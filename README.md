@@ -2,10 +2,24 @@
 
 A small family-friendly game console that lives on GitHub Pages:
 
-- **🎲 Yahtzee Logger** — a mobile-first score logger (roll real dice, tap to log). One self-contained HTML file, works fully offline.
-- **🚀 Ship Battle** — a two-player, cross-device naval guessing game (a Battleship-style game; "Battleship" is a trademark of Hasbro and is not affiliated). Two iPads, one shared code, no server.
+- **Yahtzee Logger** — a mobile-first score logger (roll real dice, tap to log). One self-contained HTML file, works fully offline.
+- **Ship Battle** — a two-player, cross-device naval guessing game (a Battleship-style game; "Battleship" is a trademark of Hasbro and is not affiliated). Two iPads, one shared code, no server.
 
 **Play it:** https://rio517.github.io/yahtzee-calculator/
+
+It's free and open source — the whole thing lives in this repo.
+
+---
+
+## Screenshots
+
+| The console | Place your fleet |
+| --- | --- |
+| ![Game console menu](docs/screenshots/menu.jpg) | ![Placing ships, dragging from the tray](docs/screenshots/placement.jpg) |
+
+| Battle view | Share the game code |
+| --- | --- |
+| ![Radar and fleet boards mid-battle](docs/screenshots/battle-view.jpg) | ![Share modal with QR code](docs/screenshots/share-qr.jpg) |
 
 ---
 
@@ -25,7 +39,7 @@ Two people on two different devices play a turn-based naval guessing game connec
 
 The shared truth is an **append-only log of settled shots**. Everything the UI shows — whose turn it is, which cells are hit, who won — is a pure function of that log (plus your own private ship placement). A settled shot is authored only by the *defender* (the one who can resolve it against their own board), and turns strictly alternate, so exactly one device writes each log entry. That single-writer property means two reconnecting peers reconcile trivially: **the longer log wins**, with no merge conflicts. A dropped message or a mid-game disconnect self-heals on the next sync.
 
-This is covered end-to-end by a test that simulates a full two-peer game *including a mid-game outage* and asserts both peers converge on the same finished game (`src/game/integration.test.ts`).
+This is covered end-to-end by a test that simulates a full two-peer game *including a mid-game outage* and asserts both peers converge on the same finished game (`src/game/session.test.ts`).
 
 ---
 
