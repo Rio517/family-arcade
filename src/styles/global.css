@@ -93,7 +93,8 @@ body {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px 12px;
   margin-bottom: 18px;
 }
 .topbar h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
@@ -327,9 +328,11 @@ body {
 .ship-overlay.bad { color: var(--bad); }
 /* Read-only ships (own battle board): no grab cursor, let taps reach cells. */
 .ship-overlay.static { cursor: default; pointer-events: none; }
-/* A destroyed ship shows a dim red hull beneath the white sink markers. */
-.ship-overlay.sunk { color: var(--bad); }
-.ship-overlay.sunk svg { opacity: 0.5; filter: none; }
+/* A destroyed ship reads as a solid grey hull (same on my board and the radar).
+   It sits above the struck cells (z 6) so the silhouette — not a row of red
+   X's — is what you see for a fully sunk ship. */
+.ship-overlay.sunk { color: #9fb0c6; z-index: 7; }
+.ship-overlay.sunk svg { opacity: 0.9; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
 /* While dragging, overlays are click-through so pointer hit-tests reach cells. */
 .board.dragging .ship-overlay { pointer-events: none; }
 
@@ -399,15 +402,14 @@ body {
 .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* ── Battle ──────────────────────────────────────────────────────────────── */
-.turn-banner {
-  border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;
-  font-weight: 700; text-align: center; letter-spacing: 0.02em;
-  border: 1px solid var(--border); background: var(--surface);
+/* Compact turn indicator in the top bar (saves the old full-width banner row). */
+.turn-pill {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.01em;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
 }
-.turn-banner.mine { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
-.turn-banner.theirs { border-color: var(--warn); color: var(--warn); background: rgba(251, 191, 36, 0.12); }
-.turn-banner.won { border-color: var(--good); color: var(--good); background: rgba(74, 222, 128, 0.14); }
-.turn-banner.lost { border-color: var(--bad); color: var(--bad); background: rgba(248, 113, 113, 0.14); }
+.turn-pill.mine { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+.turn-pill.theirs { color: var(--warn); border-color: var(--warn); background: rgba(251, 191, 36, 0.12); }
 
 /* Battle layout tiers:
    • < 720px  — .battle-narrow: tab between one board + log below.
@@ -457,8 +459,13 @@ body {
 }
 .view-tabs button[data-active='true'] { color: var(--text); border-color: var(--accent); background: var(--accent-dim); }
 
-.movelog { max-height: 220px; overflow-y: auto; display: grid; gap: 4px; }
-.movelog .entry { display: flex; gap: 8px; font-size: 13px; align-items: baseline; }
+/* Battle log — a little terminal; the newest line types itself in. */
+.movelog {
+  max-height: 220px; overflow-y: auto; display: grid; gap: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.movelog .entry { display: flex; gap: 8px; font-size: 12.5px; align-items: baseline; }
+.movelog .prompt { color: var(--accent); font-weight: 700; }
 .movelog .who { font-weight: 700; min-width: 3.2em; }
 .movelog .who.me { color: var(--accent); }
 .movelog .who.them { color: var(--warn); }
@@ -467,12 +474,13 @@ body {
 .movelog .res.miss { color: var(--muted); }
 .movelog .res.sunk { color: #fff; font-weight: 800; }
 
-.fleet-status { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.fleet-status .fs {
-  font-size: 11px; padding: 3px 8px; border-radius: 999px;
-  border: 1px solid var(--border); color: var(--muted);
-}
-.fleet-status .fs.sunk { border-color: var(--bad); color: var(--bad); text-decoration: line-through; }
+/* Fleet read-out: a profile + name per ship; sunk ones go grey + struck. */
+.fleet-roster { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+.fs-ship { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 42px; }
+.fs-art { height: 16px; display: grid; place-items: center; }
+.fs-name { font-size: 10px; color: var(--muted); letter-spacing: 0.01em; }
+.fs-ship.sunk .fs-art { color: #93a1b5; opacity: 0.6; }
+.fs-ship.sunk .fs-name { text-decoration: line-through; }
 
 /* ── Connection badge ────────────────────────────────────────────────────── */
 .conn {
@@ -539,14 +547,16 @@ body {
 .modal.modal-lg .modal-head { padding: 18px 20px; }
 .modal.modal-lg .codebox { padding: 26px 26px 30px; }
 .modal.modal-lg .codebox .code { font-size: 56px; }
-.waiting-radar { position: relative; width: 88px; height: 88px; margin: 4px auto 20px; }
-.waiting-radar::after {
-  content: ''; position: absolute; inset: 0; margin: auto; width: 12px; height: 12px;
-  border-radius: 50%; background: var(--accent);
+/* QR of the invite link with a radar ping rippling off its rounded frame. */
+.qr-radar { position: relative; display: grid; place-items: center; width: 190px; height: 190px; margin: 6px auto 14px; }
+.qr-frame {
+  position: relative; z-index: 2; background: #e2e8f0; padding: 9px; border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45); line-height: 0;
 }
-.waiting-radar span {
-  position: absolute; inset: 0; margin: auto; width: 20px; height: 20px;
-  border-radius: 50%; border: 2px solid var(--accent); opacity: 0.35;
+.qr-frame svg { display: block; }
+.qr-radar .ping {
+  position: absolute; top: 50%; left: 50%; width: 150px; height: 150px; margin: -75px 0 0 -75px;
+  border: 2px solid var(--accent); border-radius: 16px; opacity: 0;
 }
 
 /* ── History ─────────────────────────────────────────────────────────────── */
@@ -597,10 +607,11 @@ body {
 }
 
 @keyframes radar-sweep { to { transform: rotate(360deg); } }
-@keyframes radar-ping {
-  0% { width: 20px; height: 20px; opacity: 0.75; }
-  100% { width: 88px; height: 88px; opacity: 0; }
+@keyframes qr-ping {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(1.9); opacity: 0; }
 }
+@keyframes type-line { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes board-glow {
   0%, 100% { box-shadow: 0 0 18px -10px var(--accent); }
   50% { box-shadow: 0 0 28px -4px var(--accent); }
@@ -646,26 +657,30 @@ body {
 @media (prefers-reduced-motion: no-preference) {
   /* Rotating radar sweep + gentle glow on the enemy board while it's your turn. */
   .board.enemy.active::before {
-    content: ''; position: absolute; inset: 0; z-index: 4; pointer-events: none;
-    mix-blend-mode: screen; opacity: 0.5;
+    /* Oversized so the rotating beam always reaches the board's corners
+       (the board clips the overflow); a bright leading edge with a long
+       fading trail instead of a thin wedge that leaves the corners dark. */
+    content: ''; position: absolute; z-index: 4; pointer-events: none;
+    top: -30%; left: -30%; width: 160%; height: 160%;
+    mix-blend-mode: screen; opacity: 0.6;
     background: conic-gradient(from 0deg,
-      transparent 0deg 300deg,
-      color-mix(in srgb, var(--accent) 45%, transparent) 348deg,
-      color-mix(in srgb, var(--accent) 8%, transparent) 358deg,
-      transparent 360deg);
+      color-mix(in srgb, var(--accent) 55%, transparent) 0deg,
+      color-mix(in srgb, var(--accent) 12%, transparent) 48deg,
+      transparent 96deg 360deg);
     animation: radar-sweep 3.4s linear infinite;
   }
   .board.enemy.active { animation: board-glow 2.2s ease-in-out infinite; }
-  .waiting-radar span { animation: radar-ping 1800ms ease-out infinite; }
-  .waiting-radar span:nth-child(2) { animation-delay: 600ms; }
-  .waiting-radar span:nth-child(3) { animation-delay: 1200ms; }
+  .qr-radar .ping { animation: qr-ping 2100ms ease-out infinite; }
+  .qr-radar .ping:nth-child(2) { animation-delay: 700ms; }
+  .qr-radar .ping:nth-child(3) { animation-delay: 1400ms; }
   .board.shake-soft { animation: shake-soft 340ms ease; }
   .board.shake-hard { animation: shake-hard 480ms ease; }
-  .turn-banner.mine { animation: banner-pulse 1.7s ease-in-out infinite; }
+  .turn-pill.mine { animation: banner-pulse 1.7s ease-in-out infinite; }
+  .movelog .entry.new { animation: type-line 460ms steps(26, end) both; }
 
+  /* Miss keeps a soft water ripple; hits and sinks are covered by the canvas
+     particle burst, so no expanding CSS ring (that was the stray outer flash). */
   .cell.fresh.miss::before { border: 2px solid var(--muted); animation: ripple 620ms ease-out; }
-  .cell.fresh.hit::before { border: 2px solid var(--bad); animation: shock 560ms ease-out; }
-  .cell.fresh.sunk::before { border: 2px solid #fff; box-shadow: 0 0 14px var(--bad); animation: shock 640ms ease-out; }
   .cell.fresh.hit, .cell.fresh.sunk { animation: cell-flash 420ms ease-out; }
   .cell.fresh::after { animation: marker-pop 340ms cubic-bezier(0.2, 1.5, 0.35, 1) both; }
   .cell.ship::after { animation: hull-in 240ms ease both; }

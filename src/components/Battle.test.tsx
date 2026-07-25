@@ -18,7 +18,7 @@ describe('<Battle>', () => {
     { type: 'shot', by: 'guest', row: 9, col: 9, hit: false, sunk: null, allSunk: false },
   ];
 
-  it('renders the turn banner, boards, and move log without crashing', () => {
+  it('renders the boards and move log without crashing', () => {
     render(
       <Battle
         log={log}
@@ -33,9 +33,9 @@ describe('<Battle>', () => {
         onFire={vi.fn()}
       />,
     );
-    expect(screen.getByText(/Your shot/)).toBeInTheDocument();
     // The battle log and boards are rendered in both the narrow and wide
-    // layouts (CSS hides one), so these appear more than once.
+    // layouts (CSS hides one), so these appear more than once. (The turn
+    // indicator now lives in the page top bar, not inside Battle.)
     expect(screen.getAllByText('Battle log').length).toBeGreaterThan(0);
     expect(screen.getAllByText('hit').length).toBeGreaterThan(0); // host's hit entry
   });

@@ -27,25 +27,33 @@ const PROFILES: Record<ShipId, { w: number; body: JSX.Element }> = {
     ),
   },
   battleship: {
-    w: 50,
+    w: 54,
     body: (
       <>
-        <path d="M3 15 H47 L42 21 H8 Z" />
-        <path d="M9 15 H15 L14 11 H10 Z" />
-        <path d="M33 15 H39 L38 12 H34 Z" />
-        <path d="M20 15 H28 L27 6 H21 Z" />
-        <path d="M24 6 V2" stroke="currentColor" strokeWidth="1.4" />
+        {/* Big-gun capital ship: fore + aft twin turrets, a tall stepped bridge,
+            a funnel and a mast — deliberately the busiest silhouette. */}
+        <path d="M3 15 H50 L45 21 H8 Z" />
+        <path d="M8 15 H14 V11 H8 Z" />
+        <path d="M5 12.2 H9 M5 13.8 H9" stroke="currentColor" strokeWidth="1" />
+        <path d="M37 15 H43 V11 H37 Z" />
+        <path d="M42 12.2 H46 M42 13.8 H46" stroke="currentColor" strokeWidth="1" />
+        <path d="M18 15 H30 V10 H26 V5 H23 V10 H18 Z" />
+        <path d="M31 15 H35 V9 H31 Z" />
+        <path d="M24 5 V1" stroke="currentColor" strokeWidth="1.3" />
       </>
     ),
   },
   cruiser: {
-    w: 38,
+    w: 42,
     body: (
       <>
-        <path d="M3 15 H35 L31 21 H7 Z" />
-        <path d="M8 15 H13 L12 12 H9 Z" />
-        <path d="M17 15 H24 L23 8 H18 Z" />
-        <path d="M20 8 V3" stroke="currentColor" strokeWidth="1.3" />
+        {/* Sleeker: one forward gun, a single superstructure, a funnel, a mast. */}
+        <path d="M3 15 H39 L34 21 H7 Z" />
+        <path d="M9 15 H14 V12 H9 Z" />
+        <path d="M6 13.4 H10" stroke="currentColor" strokeWidth="1" />
+        <path d="M18 15 H25 V8 H21 V12 H18 Z" />
+        <path d="M27 15 H30 V10 H27 Z" />
+        <path d="M22 8 V3.5" stroke="currentColor" strokeWidth="1.2" />
       </>
     ),
   },
@@ -60,12 +68,15 @@ const PROFILES: Record<ShipId, { w: number; body: JSX.Element }> = {
     ),
   },
   destroyer: {
-    w: 26,
+    w: 28,
     body: (
       <>
-        <path d="M3 15 H23 L19 21 H7 Z" />
-        <path d="M10 15 H16 L15 9 H11 Z" />
-        <path d="M13 9 V4" stroke="currentColor" strokeWidth="1.3" />
+        {/* Small and fast: low hull, a single gun, a raked funnel, a tall mast. */}
+        <path d="M3 15 H25 L21 21 H7 Z" />
+        <path d="M8 15 H12 V12.5 H8 Z" />
+        <path d="M14 15 H18 V10 H14 Z" />
+        <path d="M19 15 H22 L21 10.5 H19 Z" />
+        <path d="M16 10 V4.5" stroke="currentColor" strokeWidth="1.1" />
       </>
     ),
   },

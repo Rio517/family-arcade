@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Board, type BoardCell, type PlacedShip } from './Board';
 import type { Burst } from './BoardFX';
-import { FLEET, shipSpec } from '../game/constants';
+import { ShipProfile } from './ships';
+import { FLEET, shipSpec, skinById } from '../game/constants';
 import { COLUMN_LABELS } from '../game/board';
-import { ownBoardView, radarGrid, shipName, sunkByAttacker } from '../game/engine';
-import { RadarIcon, ShieldIcon, TargetIcon } from './icons';
-import { BOARD_SIZE, type Coord, type Fleet, type GameLog, type ShotEvent, type Side } from '../game/types';
+import { ownBoardView, radarGrid, shipName, sunkByAttacker, type CellState } from '../game/engine';
+import { RadarIcon, ShieldIcon } from './icons';
+import { BOARD_SIZE, type Coord, type Fleet, type GameLog, type ShipId, type ShotEvent, type Side } from '../game/types';
 
 const coordLabel = (row: number, col: number) => `${COLUMN_LABELS[col]}${row + 1}`;
 
@@ -108,12 +109,9 @@ export function Battle({
   const mySunk = sunkByAttacker(log, side);
   const enemySunkCount = mySunk.length;
   const myLostCount = own.sunkShips.size;
-
-  const banner = myTurn
-    ? { cls: 'mine', text: 'Your shot — tap the enemy waters' }
-    : pendingFire
-      ? { cls: 'theirs', text: 'Firing…' }
-      : { cls: 'theirs', text: `${oppName}'s turn` };
+  // The enemy's sunk ships, reconstructed so they show as grey silhouettes on
+  // the radar just like my own sunk ships do on my board.
+  const enemyShips = sunkEnemyShips(radar, log, side);
 
   const radarBoard = (
     <div className="panel">
@@ -130,10 +128,11 @@ export function Battle({
         active={myTurn}
         shake={boardShake(true)}
         fx={fxFor(true)}
+        ships={enemyShips}
         onCell={myTurn ? (r, c) => onFire({ row: r, col: c }) : undefined}
         disabled={!myTurn}
       />
-      <FleetStatus title="Enemy fleet" sunkIds={mySunk} />
+      <FleetRoster sunkIds={mySunk} skinColor={skinById(oppSkinId).color} />
     </div>
   );
 
@@ -146,17 +145,12 @@ export function Battle({
         <span className="hint">{FLEET.length - myLostCount}/{FLEET.length} afloat</span>
       </div>
       <Board cells={ownCells} skinId={skinId} variant="own" ships={ownShips} shake={boardShake(false)} fx={fxFor(false)} />
-      <FleetStatus title="Your fleet" sunkIds={[...own.sunkShips]} />
+      <FleetRoster sunkIds={[...own.sunkShips]} skinColor={skinById(skinId).color} />
     </div>
   );
 
   return (
     <div className="stack">
-      <div className={`turn-banner ${banner.cls}`}>
-        {myTurn && <TargetIcon size={18} style={{ verticalAlign: '-3px', marginRight: 6 }} />}
-        {banner.text}
-      </div>
-
       {/* Narrow (< 720px): tab between one board at a time, log below. */}
       <div className="battle-narrow">
         <div className="view-tabs">
@@ -184,22 +178,64 @@ export function Battle({
   );
 }
 
-function FleetStatus({ title, sunkIds }: { title: string; sunkIds: string[] }) {
+/**
+ * The fleet read-out under each board: a profile silhouette + name per ship.
+ * Afloat ships glow in the fleet colour; sunk ships go grey with their name
+ * struck through — the same visual language on both my board and the radar.
+ */
+function FleetRoster({ sunkIds, skinColor }: { sunkIds: string[]; skinColor: string }) {
   return (
-    <div>
-      <div className="subtle" style={{ margin: '10px 0 4px', fontSize: 12 }}>{title}</div>
-      <div className="fleet-status">
-        {FLEET.map((spec) => {
-          const sunk = sunkIds.includes(spec.id);
-          return (
-            <span key={spec.id} className={`fs ${sunk ? 'sunk' : ''}`}>
-              {spec.name}
+    <div className="fleet-roster">
+      {FLEET.map((spec) => {
+        const sunk = sunkIds.includes(spec.id);
+        return (
+          <div key={spec.id} className={`fs-ship ${sunk ? 'sunk' : ''}`}>
+            <span className="fs-art" style={{ color: sunk ? undefined : skinColor }}>
+              <ShipProfile shipId={spec.id} height={16} />
             </span>
-          );
-        })}
-      </div>
+            <span className="fs-name">{spec.name}</span>
+          </div>
+        );
+      })}
     </div>
   );
+}
+
+/**
+ * Reconstruct the enemy's sunk ships as top-down silhouettes for the radar.
+ *
+ * `radarGrid` only marks the *finishing* cell as 'sunk' (the attacker has no
+ * enemy geometry), so for each finishing shot we know the ship's id/size and
+ * one of its cells. A sunk ship is `size` contiguous hit cells in a line, so we
+ * walk the hit run through that cell to find the orientation and anchor.
+ * (Two sunk ships touching end-to-end could in theory blur together — a rare
+ * board state that only softens the drawn shape.)
+ */
+function sunkEnemyShips(radar: CellState[][], log: GameLog, side: Side): PlacedShip[] {
+  const struck = (r: number, c: number) =>
+    r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && (radar[r][c] === 'hit' || radar[r][c] === 'sunk');
+
+  const finishing = log.filter(
+    (e): e is ShotEvent => e.type === 'shot' && e.by === side && e.sunk !== null,
+  );
+
+  return finishing.map((e) => {
+    const shipId = e.sunk as ShipId;
+    const size = shipSpec(shipId).size;
+    let left = e.col;
+    while (struck(e.row, left - 1)) left--;
+    let top = e.row;
+    while (struck(top - 1, e.col)) top--;
+    let right = e.col;
+    while (struck(e.row, right + 1)) right++;
+    let bottom = e.row;
+    while (struck(bottom + 1, e.col)) bottom++;
+    const horiz = right - left >= bottom - top;
+    // The hull's anchor is the start of the hit run, kept on-board.
+    const row = horiz ? e.row : Math.min(top, BOARD_SIZE - size);
+    const col = horiz ? Math.min(left, BOARD_SIZE - size) : e.col;
+    return { shipId, row, col, size, orientation: horiz ? ('H' as const) : ('V' as const), sunk: true };
+  });
 }
 
 /** A shot's radar class and its human-readable log label. */
@@ -211,6 +247,7 @@ function describeShot(e: ShotEvent): { res: 'hit' | 'miss' | 'sunk'; label: stri
 
 function MoveLog({ log, side, myName, oppName }: { log: GameLog; side: Side; myName: string; oppName: string }) {
   const shots = log.filter((e): e is ShotEvent => e.type === 'shot');
+  const last = shots.length - 1;
 
   return (
     <div className="panel">
@@ -219,21 +256,22 @@ function MoveLog({ log, side, myName, oppName }: { log: GameLog; side: Side; myN
         <p className="subtle">No shots fired yet.</p>
       ) : (
         <div className="movelog">
-          {/* The log is in turn order; show newest first. */}
+          {/* Newest first. Stable keys by original index so only the freshest
+              entry re-mounts (and plays the terminal typing animation). */}
           {shots
-            .slice()
-            .reverse()
-            .map((e, i) => {
+            .map((e, origIdx) => {
               const mine = e.by === side;
               const { res, label } = describeShot(e);
               return (
-                <div className="entry" key={`${e.row}-${e.col}-${i}`}>
+                <div className={`entry ${origIdx === last ? 'new' : ''}`} key={origIdx}>
+                  <span className="prompt">&gt;</span>
                   <span className={`who ${mine ? 'me' : 'them'}`}>{mine ? myName || 'You' : oppName || 'Them'}</span>
                   <span className="coord">{coordLabel(e.row, e.col)}</span>
                   <span className={`res ${res}`}>{label}</span>
                 </div>
               );
-            })}
+            })
+            .reverse()}
         </div>
       )}
     </div>
