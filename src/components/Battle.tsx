@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Board, type BoardCell } from './Board';
-import { FLEET } from '../game/constants';
+import { Board, type BoardCell, type PlacedShip } from './Board';
+import { FLEET, shipSpec } from '../game/constants';
 import { COLUMN_LABELS } from '../game/board';
 import { ownBoardView, radarGrid, shipName, sunkByAttacker } from '../game/engine';
 import { RadarIcon, ShieldIcon, TargetIcon } from './icons';
@@ -80,14 +80,25 @@ export function Battle({
     }),
   );
 
+  // Ships are drawn as top-down overlays (see ownShips); un-hit ship cells stay
+  // water so the silhouette shows, and incoming shots draw over them.
   const ownCells: BoardCell[][] = Array.from({ length: BOARD_SIZE }, (_, r) =>
     Array.from({ length: BOARD_SIZE }, (_, c) => {
       const incoming = own.incoming[r][c];
       const fresh = isFresh(false, r, c);
       if (incoming !== 'unknown') return { state: incoming, fresh };
-      return { state: own.ships[r][c] ? 'ship' : 'water' };
+      return { state: 'water' };
     }),
   );
+
+  const ownShips: PlacedShip[] = myFleet.map((p) => ({
+    shipId: p.shipId,
+    row: p.row,
+    col: p.col,
+    size: shipSpec(p.shipId).size,
+    orientation: p.orientation,
+    sunk: own.sunkShips.has(p.shipId),
+  }));
 
   const mySunk = sunkByAttacker(log, side);
   const enemySunkCount = mySunk.length;
@@ -128,7 +139,7 @@ export function Battle({
         </span>
         <span className="hint">{FLEET.length - myLostCount}/{FLEET.length} afloat</span>
       </div>
-      <Board cells={ownCells} skinId={skinId} variant="own" shake={boardShake(false)} />
+      <Board cells={ownCells} skinId={skinId} variant="own" ships={ownShips} shake={boardShake(false)} />
       <FleetStatus title="Your fleet" sunkIds={[...own.sunkShips]} />
     </div>
   );

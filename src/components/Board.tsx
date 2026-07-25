@@ -24,6 +24,8 @@ export interface PlacedShip {
   /** True while this ship is being dragged; `ok` styles the drop target. */
   dragging?: boolean;
   ok?: boolean;
+  /** Own battle board: a fully-destroyed ship reads red and dimmed. */
+  sunk?: boolean;
 }
 
 interface BoardProps {
@@ -75,6 +77,8 @@ export function Board({
   const clickable = !!onCell && !disabled;
   const shakeClass = shake ? `shake-${shake}` : '';
   const showControls = !!onShipRotate || !!onShipRemove;
+  // On the battle board ships are just a read-out (no drag, no grab cursor).
+  const interactive = !!onShipPointerDown;
 
   return (
     <div
@@ -109,7 +113,16 @@ export function Board({
             ? { gridColumn: span(ship.col, ship.size), gridRow: `${ship.row + 2}` }
             : { gridRow: span(ship.row, ship.size), gridColumn: `${ship.col + 2}` };
         const selected = ship.shipId === selectedShipId;
-        const cls = `ship-overlay ${selected ? 'selected' : ''} ${ship.dragging ? 'dragging' : ''} ${ship.dragging && !ship.ok ? 'bad' : ''}`;
+        const cls = [
+          'ship-overlay',
+          selected && 'selected',
+          ship.dragging && 'dragging',
+          ship.dragging && !ship.ok && 'bad',
+          ship.sunk && 'sunk',
+          !interactive && 'static',
+        ]
+          .filter(Boolean)
+          .join(' ');
         return (
           <div
             key={ship.shipId}

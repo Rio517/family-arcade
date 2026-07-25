@@ -288,6 +288,8 @@ body {
   content: ''; width: 26%; height: 26%; border-radius: 50%;
   background: var(--muted); opacity: 0.7;
 }
+/* Shot markers sit above the ship overlay (z 5) so hits punch through a hull. */
+.cell.hit, .cell.miss, .cell.sunk { z-index: 6; }
 .cell.hit { background: color-mix(in srgb, var(--bad) 40%, var(--sea)); }
 /* Hit: a bright peg. */
 .cell.hit::after {
@@ -321,6 +323,11 @@ body {
 .ship-overlay.dragging { z-index: 8; cursor: grabbing; }
 .ship-overlay.dragging svg { filter: drop-shadow(0 0 8px var(--skin)); }
 .ship-overlay.bad { color: var(--bad); }
+/* Read-only ships (own battle board): no grab cursor, let taps reach cells. */
+.ship-overlay.static { cursor: default; pointer-events: none; }
+/* A destroyed ship shows a dim red hull beneath the white sink markers. */
+.ship-overlay.sunk { color: var(--bad); }
+.ship-overlay.sunk svg { opacity: 0.5; filter: none; }
 /* While dragging, overlays are click-through so pointer hit-tests reach cells. */
 .board.dragging .ship-overlay { pointer-events: none; }
 
