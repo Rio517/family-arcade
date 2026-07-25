@@ -39,6 +39,42 @@ describe('<Result>', () => {
     expect(text).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u);
   });
 
+  it('shows a trophy emblem on a win and a wreck emblem on a loss', () => {
+    const { container } = render(
+      <Result
+        won
+        pointsEarned={130}
+        totalPoints={430}
+        myName="Kid"
+        oppName="Dad"
+        iWantRematch={false}
+        oppWantsRematch={false}
+        onRematch={vi.fn()}
+        onExit={vi.fn()}
+      />,
+    );
+    expect(container.querySelector('.result-emblem.win')).toBeInTheDocument();
+    expect(container.querySelector('.result-emblem.loss')).toBeNull();
+  });
+
+  it('shows a wreck emblem (not a trophy) on a loss', () => {
+    const { container } = render(
+      <Result
+        won={false}
+        pointsEarned={25}
+        totalPoints={100}
+        myName="Kid"
+        oppName="Dad"
+        iWantRematch={false}
+        oppWantsRematch={false}
+        onRematch={vi.fn()}
+        onExit={vi.fn()}
+      />,
+    );
+    expect(container.querySelector('.result-emblem.loss')).toBeInTheDocument();
+    expect(container.querySelector('.result-emblem.win')).toBeNull();
+  });
+
   it('fires rematch and exit callbacks', () => {
     const { onRematch, onExit } = renderResult();
     fireEvent.click(screen.getByTestId('rematch'));

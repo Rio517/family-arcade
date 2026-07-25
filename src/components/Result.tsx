@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { VictoryFX } from './VictoryFX';
+import { BrokenShipIcon, TrophyIcon } from './icons';
 
 interface ResultProps {
   won: boolean;
@@ -48,7 +49,7 @@ export function Result({
 
   return (
     <div className="stack">
-      <div className="panel result-panel">
+      <div className={`panel result-panel ${won ? 'won' : 'lost'}`}>
         {won && <VictoryFX />}
         <div className="result-hero">
           {won && (
@@ -64,12 +65,15 @@ export function Result({
               ))}
             </div>
           )}
-          <div className={`big ${won ? 'win' : 'loss'}`}>{won ? 'You Win!' : 'Good Game!'}</div>
-          <p className="result-flavor">{flavor}</p>
-          <div className="earned">
+          <div className={`result-emblem ${won ? 'win' : 'loss'}`} aria-hidden="true">
+            {won ? <TrophyIcon size={78} /> : <BrokenShipIcon size={78} />}
+          </div>
+          <div className={`big reveal ${won ? 'win' : 'loss'}`}>{won ? 'You Win!' : 'Good Game!'}</div>
+          <p className="result-flavor reveal">{flavor}</p>
+          <div className="earned reveal">
             +{pointsEarned} points{won ? '!' : ' for a great battle'}
           </div>
-          <div className="subtle" style={{ marginTop: 6 }}>
+          <div className="subtle reveal" style={{ marginTop: 6 }}>
             You now have {totalPoints} points — spend them on cooler fleets!
           </div>
         </div>

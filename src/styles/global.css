@@ -152,8 +152,10 @@ body {
   border-radius: 999px; padding: 2px 8px;
 }
 
-.footer { text-align: center; font-size: 11px; color: var(--muted); padding-top: 28px; }
-.footer a { color: var(--muted); }
+.footer { text-align: center; font-size: 12px; color: var(--muted); padding-top: 28px; }
+.footer p { margin: 4px 0; }
+.footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.footer a:hover { text-decoration: underline; }
 
 /* ── Panels & generic bits ───────────────────────────────────────────────── */
 .panel {
@@ -589,13 +591,39 @@ body {
 .victory-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 .result-hero { text-align: center; padding: 20px 0; position: relative; z-index: 2; }
 .result-hero .big { font-size: 40px; font-weight: 800; margin: 6px 0; position: relative; z-index: 2; }
-.result-hero .big.win { color: var(--good); animation: pop-in 480ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
-.result-hero .big.loss { color: var(--accent); }
+.result-hero .big.win { color: var(--good); }
+.result-hero .big.loss { color: var(--muted); }
 .result-hero .result-flavor { font-size: 16px; color: var(--text); margin: 4px 0 14px; }
 .result-hero .earned { font-size: 18px; color: var(--accent); font-weight: 700; }
+
+/* Emblem: a trophy for the winner, a listing wreck for the (kind) loser. It's
+   the first thing to appear, then the text reveals below it in a gentle stagger
+   so the ending eases in rather than snapping to a verdict. */
+.result-emblem { display: inline-flex; margin-bottom: 4px; position: relative; z-index: 2; }
+.result-emblem.win { color: var(--warn); filter: drop-shadow(0 6px 16px rgba(251, 191, 36, 0.4)); }
+.result-emblem.loss { color: var(--muted); filter: drop-shadow(0 4px 10px rgba(2, 6, 20, 0.5)); transform: rotate(-6deg); }
+
 @keyframes pop-in {
   from { transform: scale(0.6); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+/* Staged reveal — the ending eases in instead of snapping. */
+@keyframes rise-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+/* Winner: the trophy vaults up and settles with a proud little overshoot. */
+@keyframes trophy-in {
+  0% { opacity: 0; transform: translateY(26px) scale(0.5) rotate(-10deg); }
+  55% { opacity: 1; transform: translateY(-4px) scale(1.14) rotate(4deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+}
+/* Loser: the wreck drifts down and lists to one side, then keeps a slow bob —
+   subtle and dignified, never a harsh "defeat" slam. */
+@keyframes wreck-in {
+  0% { opacity: 0; transform: translateY(-12px) rotate(2deg); }
+  100% { opacity: 0.9; transform: translateY(0) rotate(-6deg); }
+}
+@keyframes wreck-bob {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(3px) rotate(-8deg); }
 }
 
 .toast {
@@ -704,4 +732,17 @@ body {
   .cell.ship::after { animation: hull-in 240ms ease both; }
 
   .burst span { animation: shard 950ms ease-out var(--delay) both; }
+
+  /* Result screen: emblem first, then the text lines cascade in. */
+  .result-emblem.win { animation: trophy-in 720ms cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+  .result-emblem.loss {
+    animation:
+      wreck-in 900ms ease-out both,
+      wreck-bob 4.5s ease-in-out 900ms infinite;
+  }
+  .result-hero .reveal { animation: rise-in 520ms ease-out both; opacity: 0; }
+  .result-hero .big.reveal { animation-delay: 260ms; }
+  .result-hero .result-flavor.reveal { animation-delay: 440ms; }
+  .result-hero .earned.reveal { animation-delay: 600ms; }
+  .result-hero .subtle.reveal { animation-delay: 740ms; }
 }
