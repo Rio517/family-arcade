@@ -3,7 +3,7 @@ import { Board, type BoardCell, type PlacedShip } from './Board';
 import type { Burst } from './BoardFX';
 import { ShipProfile } from './ships';
 import { FLEET, shipSpec, skinById } from '../game/constants';
-import { COLUMN_LABELS } from '../game/board';
+import { COLUMN_LABELS, shipCells } from '../game/board';
 import { ownBoardView, radarGrid, shipName, sunkByAttacker, type CellState } from '../game/engine';
 import { RadarIcon, ShieldIcon } from './icons';
 import { BOARD_SIZE, type Coord, type Fleet, type GameLog, type ShipId, type ShotEvent, type Side } from '../game/types';
@@ -97,14 +97,19 @@ export function Battle({
     }),
   );
 
-  const ownShips: PlacedShip[] = myFleet.map((p) => ({
-    shipId: p.shipId,
-    row: p.row,
-    col: p.col,
-    size: shipSpec(p.shipId).size,
-    orientation: p.orientation,
-    sunk: own.sunkShips.has(p.shipId),
-  }));
+  const ownShips: PlacedShip[] = myFleet.map((p) => {
+    const sunk = own.sunkShips.has(p.shipId);
+    const damaged = !sunk && shipCells(p).some((c) => own.incoming[c.row][c.col] === 'hit');
+    return {
+      shipId: p.shipId,
+      row: p.row,
+      col: p.col,
+      size: shipSpec(p.shipId).size,
+      orientation: p.orientation,
+      sunk,
+      damaged,
+    };
+  });
 
   const mySunk = sunkByAttacker(log, side);
   const enemySunkCount = mySunk.length;

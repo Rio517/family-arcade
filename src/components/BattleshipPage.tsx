@@ -91,13 +91,17 @@ export function BattleshipPage() {
   const isSetup = bs.phase === 'fleet' || bs.phase === 'placing' || bs.phase === 'waiting';
   const showCode = bs.side === 'host' && isSetup && !bs.oppConnected;
 
-  // The host has readied up but nobody has joined yet: surface the invite big
-  // and self-dismiss it the moment an opponent connects.
-  const awaitingOpponent = bs.side === 'host' && bs.phase === 'waiting' && !bs.oppConnected;
+  // The host has readied up and is waiting. Two sub-states: nobody has joined
+  // yet (show the invite big), or the opponent is here but still placing their
+  // ships (show that instead of hiding). The modal opens on entering the wait
+  // and closes once the battle actually starts.
+  const awaitingJoin = bs.side === 'host' && bs.phase === 'waiting' && !bs.oppConnected;
+  const awaitingPlacement = bs.side === 'host' && bs.phase === 'waiting' && bs.oppConnected;
+  const hostWaiting = awaitingJoin || awaitingPlacement;
   useEffect(() => {
-    if (awaitingOpponent) setShareOpen(true);
-    else if (bs.oppConnected) setShareOpen(false);
-  }, [awaitingOpponent, bs.oppConnected]);
+    if (hostWaiting) setShareOpen(true);
+    else if (bs.phase === 'battle') setShareOpen(false);
+  }, [hostWaiting, bs.phase]);
 
   return (
     <div className="app">
@@ -136,40 +140,68 @@ export function BattleshipPage() {
             if (e.target === e.currentTarget) setShareOpen(false);
           }}
         >
-          <div className={`modal ${awaitingOpponent ? 'modal-lg' : ''}`} role="dialog" aria-label="Invite your opponent">
+          <div className={`modal ${hostWaiting ? 'modal-lg' : ''}`} role="dialog" aria-label="Invite your opponent">
             <div className="modal-head">
               <span className="modal-title">
-                {awaitingOpponent ? 'Waiting for opponent to join' : 'Invite your opponent'}
+                {awaitingPlacement
+                  ? 'Opponent connected!'
+                  : awaitingJoin
+                    ? 'Waiting for opponent to join'
+                    : 'Invite your opponent'}
               </span>
               <button className="icon-btn" onClick={() => setShareOpen(false)} aria-label="Close">
                 <CloseIcon size={18} />
               </button>
             </div>
-            <div className="codebox">
-              {/* QR of the invite link with a radar ping rippling off its frame. */}
-              <div className="qr-radar">
-                {awaitingOpponent && (
-                  <>
-                    <span className="ping" />
-                    <span className="ping" />
-                    <span className="ping" />
-                  </>
-                )}
-                <div className="qr-frame">
-                  <QRCodeSVG value={shareUrl} size={132} bgColor="#e2e8f0" fgColor="#0b1220" level="M" />
+            {awaitingPlacement ? (
+              <div className="codebox placing-wait">
+                <div className="qr-radar">
+                  <span className="ping" />
+                  <span className="ping" />
+                  <span className="ping" />
+                  <div className="conn-badge" aria-hidden="true">
+                    <TargetIcon size={30} />
+                  </div>
                 </div>
+                <p className="pw-line">
+                  <strong>{bs.oppName ?? 'Your opponent'}</strong> is here.
+                </p>
+                <p className="subtle">
+                  Waiting for them to place their ships
+                  <span className="ell">
+                    <span>.</span>
+                    <span>.</span>
+                    <span>.</span>
+                  </span>
+                </p>
               </div>
-              <div className="lbl">Share this code</div>
-              <div className="code">{bs.code}</div>
-              <p className="subtle" style={{ margin: '8px 0 14px' }}>
-                {awaitingOpponent
-                  ? 'Give this code to the other player. The battle starts the moment they join.'
-                  : 'Open Ship Battle on the other iPad and tap “Join with a code”.'}
-              </p>
-              <button className="btn btn-primary" onClick={copyShare}>
-                {copied ? 'Link copied' : 'Copy invite link'}
-              </button>
-            </div>
+            ) : (
+              <div className="codebox">
+                {/* QR of the invite link with a radar ping rippling off its frame. */}
+                <div className="qr-radar">
+                  {awaitingJoin && (
+                    <>
+                      <span className="ping" />
+                      <span className="ping" />
+                      <span className="ping" />
+                    </>
+                  )}
+                  <div className="qr-frame">
+                    <QRCodeSVG value={shareUrl} size={132} bgColor="#e2e8f0" fgColor="#0b1220" level="M" />
+                  </div>
+                </div>
+                <div className="lbl">Share this code</div>
+                <div className="code">{bs.code}</div>
+                <p className="subtle" style={{ margin: '8px 0 14px' }}>
+                  {awaitingJoin
+                    ? 'Give this code to the other player. The battle starts the moment they join.'
+                    : 'Open Ship Battle on the other iPad and tap “Join with a code”.'}
+                </p>
+                <button className="btn btn-primary" onClick={copyShare}>
+                  {copied ? 'Link copied' : 'Copy invite link'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
