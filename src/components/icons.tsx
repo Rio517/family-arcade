@@ -41,6 +41,18 @@ export const ShipIcon = (p: IconProps) =>
     p,
   );
 
+/** A stylized chess king — the menu icon for the Chess game. */
+export const ChessIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M12 3v4M10 4.5h4" />
+      <path d="M6.5 12 8 8l4 3 4-3 1.5 4Z" />
+      <path d="M7.5 12h9l-1 5h-7Z" />
+      <path d="M6.5 20h11" />
+    </>,
+    p,
+  );
+
 export const GridIcon = (p: IconProps) =>
   svg(
     <>
@@ -172,6 +184,20 @@ export const TrophyIcon = (p: IconProps) =>
         fill="currentColor"
         stroke="none"
       />
+    </>,
+    p,
+  );
+
+/** Balanced scales — the emblem for a drawn game. */
+export const ScalesIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M12 4v16" />
+      <path d="M7 20h10" />
+      <path d="M5 7h14" />
+      <path d="M5 7 2.5 13a3 3 0 0 0 5 0L5 7Z" />
+      <path d="M19 7l-2.5 6a3 3 0 0 0 5 0L19 7Z" />
+      <circle cx="12" cy="4.5" r="1.2" fill="currentColor" stroke="none" />
     </>,
     p,
   );

@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useProfile } from '../state/useProfile';
 import { loadResumableSession } from '../storage/persistence';
-import { GridIcon, ResumeIcon, ShipIcon } from './icons';
+import { loadResumableChessGame } from '../storage/chessPersistence';
+import { ChessIcon, GridIcon, ResumeIcon, ShipIcon } from './icons';
 
 /** The landing page: pick a game, see your record, resume an interrupted duel. */
 export function Menu() {
   const { profile } = useProfile();
   const resumable = loadResumableSession();
+  const resumableChess = loadResumableChessGame();
 
   return (
     <div className="app">
@@ -30,6 +32,19 @@ export function Menu() {
           </Link>
         )}
 
+        {resumableChess && (
+          <Link className="card violet" to={`/chess?resume=${resumableChess.code}`}>
+            <div className="icon"><ResumeIcon size={30} /></div>
+            <div className="body">
+              <div className="title">Resume Chess</div>
+              <div className="sub">
+                Game <strong>{resumableChess.code}</strong> vs {resumableChess.oppName || 'opponent'} is still in progress.
+              </div>
+            </div>
+            <div className="chev" aria-hidden="true">›</div>
+          </Link>
+        )}
+
         <a className="card" href={`${import.meta.env.BASE_URL}calculator.html`}>
           <div className="icon"><GridIcon size={30} /></div>
           <div className="body">
@@ -46,6 +61,17 @@ export function Menu() {
               Ship Battle <span className="tag">2-Player</span>
             </div>
             <div className="sub">Two devices, one code. Pick your fleet, place your ships, and duel.</div>
+          </div>
+          <div className="chev" aria-hidden="true">›</div>
+        </Link>
+
+        <Link className="card violet" to="/chess">
+          <div className="icon"><ChessIcon size={30} /></div>
+          <div className="body">
+            <div className="title">
+              Chess <span className="tag">2-Player</span>
+            </div>
+            <div className="sub">Drag-and-drop chess — same device or online with a code.</div>
           </div>
           <div className="chev" aria-hidden="true">›</div>
         </Link>

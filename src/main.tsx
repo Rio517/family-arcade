@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { HashRouter, Route, Routes } from 'react-router-dom';
 import { Menu } from './components/Menu';
 import { BattleshipPage } from './components/BattleshipPage';
+import { ChessPage } from './components/ChessPage';
 import './styles/global.css';
 
 const root = document.getElementById('root');
@@ -15,6 +16,7 @@ createRoot(root).render(
       <Routes>
         <Route path="/" element={<Menu />} />
         <Route path="/play" element={<BattleshipPage />} />
+        <Route path="/chess" element={<ChessPage />} />
       </Routes>
     </HashRouter>
   </StrictMode>,
