@@ -86,4 +86,19 @@ describe('<Board>', () => {
     fireEvent.click(screen.getByTestId('board-remove-carrier'));
     expect(onShipRemove).toHaveBeenCalledWith('carrier');
   });
+
+  it('mounts the particle FX canvas only when an fx prop is given', () => {
+    const { container, rerender } = render(<Board cells={waterGrid()} skinId="aqua" variant="own" />);
+    expect(container.querySelector('canvas.board-fx')).toBeNull();
+    rerender(<Board cells={waterGrid()} skinId="aqua" variant="enemy" fx={null} />);
+    expect(container.querySelector('canvas.board-fx')).not.toBeNull();
+  });
+
+  it('places every cell on an explicit grid line so overlays can not shift it', () => {
+    render(<Board cells={waterGrid()} skinId="aqua" variant="own" />);
+    // Cell (row r, col c) lives on grid line c+2 / r+2 (line 1 is the labels).
+    const cell = screen.getByTestId('cell-own-4-7');
+    expect(cell.style.gridColumn).toBe('9');
+    expect(cell.style.gridRow).toBe('6');
+  });
 });
