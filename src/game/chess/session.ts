@@ -1,0 +1,230 @@
+/**
+ * Chess session — a pure state machine over the shared move log.
+ *
+ * One model serves both modes:
+ *  - **local** (same device / hotseat): no network, no side restriction —
+ *    whoever's turn it is may move. `side`/`myColor` are null.
+ *  - **online** (two devices, one code): host plays White, guest plays Black.
+ *    You may only move your own colour on your own turn; each move is appended
+ *    to the log *and* emitted as a `move` message. Peers resync via the same
+ *    "longer log wins" reconciliation Ship Battle uses.
+ *
+ * Every transition returns an `Outcome` = { next state, messages to send,
+ * optional one-shot `finished` }. The React adapter just commits the state and
+ * puts `outgoing` on the wire — no rules or I/O live here.
+ */
+
+import { isGameOver, replay, resolvePly, status, winnerOf } from './rules';
+import {
+  CHESS_PROTOCOL_VERSION,
+  reconcileLogs,
+  type ChessMessage,
+} from './protocol';
+import type { Color, GameLog, GameState, Ply, Side, Status } from './types';
+
+export type Mode = 'local' | 'online';
+export type Phase = 'play' | 'over';
+
+export interface SessionState {
+  mode: Mode;
+  /** Online: which side of the connection I am. Local: null. */
+  side: Side | null;
+  /** Online: the colour I control (host=White, guest=Black). Local: null. */
+  myColor: Color | null;
+  /** Online game code; empty in local mode. */
+  code: string;
+  myName: string;
+  oppName: string;
+  log: GameLog;
+  iWantRematch: boolean;
+  oppWantsRematch: boolean;
+}
+
+export interface FinishInfo {
+  status: Status;
+  /** The winning colour, or null for a draw. */
+  winner: Color | null;
+  /** Online only: did *I* win? null in local mode or on a draw. */
+  iWon: boolean | null;
+}
+
+export interface Outcome {
+  state: SessionState;
+  outgoing: ChessMessage[];
+  finished?: FinishInfo;
+  error?: string;
+}
+
+export const HOST_COLOR: Color = 'w';
+export const GUEST_COLOR: Color = 'b';
+
+export function colorForSide(side: Side): Color {
+  return side === 'host' ? HOST_COLOR : GUEST_COLOR;
+}
+
+export function createLocalSession(whiteName: string, blackName: string): SessionState {
+  return {
+    mode: 'local',
+    side: null,
+    myColor: null,
+    code: '',
+    myName: whiteName,
+    oppName: blackName,
+    log: [],
+    iWantRematch: false,
+    oppWantsRematch: false,
+  };
+}
+
+export function createOnlineSession(side: Side, code: string, myName: string): SessionState {
+  return {
+    mode: 'online',
+    side,
+    myColor: colorForSide(side),
+    code,
+    myName,
+    oppName: '',
+    log: [],
+    iWantRematch: false,
+    oppWantsRematch: false,
+  };
+}
+
+// ── Derived views (pure functions of the log) ──────────────────────────────
+
+export function boardState(s: SessionState): GameState {
+  return replay(s.log);
+}
+
+export function currentStatus(s: SessionState): Status {
+  return status(boardState(s));
+}
+
+export function phase(s: SessionState): Phase {
+  return isGameOver(currentStatus(s)) ? 'over' : 'play';
+}
+
+/** Whose turn it is (the colour to move). */
+export function turnColor(s: SessionState): Color {
+  return boardState(s).turn;
+}
+
+/**
+ * May the local player move right now? In local mode, always (for whichever
+ * colour is to move). Online, only when it's my colour's turn and the game is
+ * still going.
+ */
+export function canIMove(s: SessionState): boolean {
+  if (phase(s) === 'over') return false;
+  if (s.mode === 'local') return true;
+  return turnColor(s) === s.myColor;
+}
+
+function finishInfo(s: SessionState): FinishInfo | undefined {
+  const st = currentStatus(s);
+  if (!isGameOver(st)) return undefined;
+  const winner = winnerOf(boardState(s));
+  const iWon = s.mode === 'online' && winner !== null ? winner === s.myColor : null;
+  return { status: st, winner, iWon };
+}
+
+// ── Transitions ────────────────────────────────────────────────────────────
+
+/** Messages to (re)send whenever a data channel opens. */
+export function connectHandshake(s: SessionState): ChessMessage[] {
+  if (s.mode !== 'online' || !s.side) return [];
+  return [
+    { t: 'hello', v: CHESS_PROTOCOL_VERSION, side: s.side, name: s.myName },
+    { t: 'sync', log: s.log, wantRematch: s.iWantRematch },
+  ];
+}
+
+/**
+ * Attempt to play `ply`. Rejected (no-op) if it isn't my turn or the move is
+ * illegal. On success the log grows by one; online mode also emits a `move`.
+ */
+export function makeMove(s: SessionState, ply: Ply): Outcome {
+  if (!canIMove(s)) return { state: s, outgoing: [] };
+  const gs = boardState(s);
+  const move = resolvePly(gs, ply);
+  if (!move) return { state: s, outgoing: [] };
+
+  // Store a normalized ply (carrying the resolved promotion, if any) so both
+  // peers and any replay pick the exact same move.
+  const stored: Ply = move.promotion
+    ? { from: ply.from, to: ply.to, promotion: move.promotion }
+    : { from: ply.from, to: ply.to };
+
+  const next: SessionState = { ...s, log: [...s.log, stored] };
+  const outgoing: ChessMessage[] =
+    s.mode === 'online' ? [{ t: 'move', ply: stored }] : [];
+  return { state: next, outgoing, finished: finishInfo(next) };
+}
+
+/**
+ * Propose a rematch. When both sides have proposed, the board resets to the
+ * opening and rematch flags clear. Online, colours stay the same (host=White).
+ */
+export function proposeRematch(s: SessionState): Outcome {
+  if (s.mode === 'local') {
+    // Local rematch is immediate — just clear the board.
+    const next: SessionState = { ...s, log: [], iWantRematch: false, oppWantsRematch: false };
+    return { state: next, outgoing: [] };
+  }
+  const iWant = true;
+  const both = iWant && s.oppWantsRematch;
+  const next: SessionState = both
+    ? { ...s, log: [], iWantRematch: false, oppWantsRematch: false }
+    : { ...s, iWantRematch: true };
+  return { state: next, outgoing: [{ t: 'rematch' }] };
+}
+
+/** Inbound reducer: fold a peer message into the session. */
+export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
+  switch (msg.t) {
+    case 'hello': {
+      if (msg.v !== CHESS_PROTOCOL_VERSION) {
+        return { state: s, outgoing: [], error: 'Your opponent is on a different app version.' };
+      }
+      return { state: { ...s, oppName: msg.name || s.oppName }, outgoing: [] };
+    }
+
+    case 'sync': {
+      const merged = reconcileLogs(s.log, msg.log);
+      const next: SessionState = {
+        ...s,
+        log: merged,
+        oppWantsRematch: msg.wantRematch,
+      };
+      // If they're behind, answer with our (longer) log so they catch up.
+      const outgoing: ChessMessage[] =
+        merged.length > msg.log.length ? [{ t: 'sync', log: merged, wantRematch: s.iWantRematch }] : [];
+      return { state: next, outgoing, finished: finishInfo(next) };
+    }
+
+    case 'move': {
+      // Only accept the opponent's move if it legally extends the current log.
+      const gs = boardState(s);
+      const expectedColor = gs.turn;
+      // In online mode the opponent should only author moves for their colour.
+      if (s.mode === 'online' && s.myColor && expectedColor === s.myColor) {
+        return { state: s, outgoing: [] };
+      }
+      const move = resolvePly(gs, msg.ply);
+      if (!move) return { state: s, outgoing: [] };
+      const stored: Ply = move.promotion
+        ? { from: msg.ply.from, to: msg.ply.to, promotion: move.promotion }
+        : { from: msg.ply.from, to: msg.ply.to };
+      const next: SessionState = { ...s, log: [...s.log, stored] };
+      return { state: next, outgoing: [], finished: finishInfo(next) };
+    }
+
+    case 'rematch': {
+      const both = s.iWantRematch;
+      const next: SessionState = both
+        ? { ...s, log: [], iWantRematch: false, oppWantsRematch: false }
+        : { ...s, oppWantsRematch: true };
+      return { state: next, outgoing: [] };
+    }
+  }
+}
