@@ -33,10 +33,10 @@ describe('<Result>', () => {
     renderResult({ won: false, pointsEarned: 25 });
     expect(screen.getByText(/Good Game!/)).toBeInTheDocument();
     expect(screen.getByText(/\+25 points for a great battle/)).toBeInTheDocument();
-    // Kid-friendly guarantee: no "Defeat"/"Loss"/skull anywhere on the screen.
-    expect(screen.queryByText(/defeat/i)).toBeNull();
-    expect(screen.queryByText(/💀/)).toBeNull();
-    expect(document.body.textContent).not.toMatch(/💀|defeat/i);
+    // Kid-friendly guarantee: no "Defeat" wording and no emoji/pictographs.
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/defeat/i);
+    expect(text).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u);
   });
 
   it('fires rematch and exit callbacks', () => {

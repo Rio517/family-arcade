@@ -55,7 +55,6 @@ export function Board({
           key={`row-${r}`}
           index={r}
           rowCells={rowCells}
-          skinIcon={skin.icon}
           variant={variant}
           clickable={clickable}
           onCell={onCell}
@@ -69,7 +68,6 @@ export function Board({
 function Row({
   index,
   rowCells,
-  skinIcon,
   variant,
   clickable,
   onCell,
@@ -77,7 +75,6 @@ function Row({
 }: {
   index: number;
   rowCells: BoardCell[];
-  skinIcon: string;
   variant: 'own' | 'enemy';
   clickable: boolean;
   onCell?: (row: number, col: number) => void;
@@ -108,9 +105,7 @@ function Row({
             disabled={!clickable}
             onClick={clickable ? () => onCell?.(index, c) : undefined}
             onMouseEnter={onCellEnter ? () => onCellEnter(index, c) : undefined}
-          >
-            {variant === 'own' && cell.state === 'ship' ? skinIcon : ''}
-          </button>
+          />
         );
       })}
     </>

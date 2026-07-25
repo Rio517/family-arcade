@@ -207,13 +207,15 @@ body {
 .skin .cost.owned { color: var(--good); }
 .skin .cost.locked { color: var(--warn); }
 .skin .lockpill {
-  position: absolute; top: 10px; right: 10px; font-size: 14px;
+  position: absolute; top: 10px; right: 10px;
+  display: grid; place-items: center; color: var(--muted);
 }
 
 /* ── Boards ──────────────────────────────────────────────────────────────── */
 .board-wrap { display: inline-block; width: 100%; }
 .board-title { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.board-title .name { font-weight: 700; font-size: 14px; }
+.board-title .name { font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.board-title .name svg { color: var(--accent); }
 .board-title .hint { font-size: 12px; color: var(--muted); margin-left: auto; }
 
 .board {
@@ -253,14 +255,29 @@ body {
 .cell.clickable { cursor: pointer; }
 .cell.clickable:active { background: #12294a; }
 .cell.ship { background: color-mix(in srgb, var(--skin) 30%, var(--sea)); box-shadow: inset 0 0 0 1px var(--skin); }
+/* Own un-hit ship cells get a small hull node so the fleet reads clearly. */
+.cell.ship::after {
+  content: ''; width: 38%; height: 38%; border-radius: 3px;
+  background: var(--skin); opacity: 0.9;
+}
 .cell.miss::after {
   content: ''; width: 26%; height: 26%; border-radius: 50%;
   background: var(--muted); opacity: 0.7;
 }
 .cell.hit { background: color-mix(in srgb, var(--bad) 40%, var(--sea)); }
-.cell.hit::after { content: '✳'; color: var(--bad); font-weight: 800; }
+/* Hit: a bright peg. */
+.cell.hit::after {
+  content: ''; width: 42%; height: 42%; border-radius: 50%;
+  background: #fecaca; box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+}
 .cell.sunk { background: color-mix(in srgb, var(--bad) 62%, #000); box-shadow: inset 0 0 0 1px var(--bad); }
-.cell.sunk::after { content: '✖'; color: #fff; font-weight: 800; }
+/* Sunk: a drawn X (no glyph). */
+.cell.sunk::after {
+  content: ''; position: absolute; inset: 24%;
+  background:
+    linear-gradient(45deg, transparent 42%, #fff 42%, #fff 58%, transparent 58%),
+    linear-gradient(-45deg, transparent 42%, #fff 42%, #fff 58%, transparent 58%);
+}
 .cell.preview { background: color-mix(in srgb, var(--skin) 45%, var(--sea)); box-shadow: inset 0 0 0 1px var(--skin); }
 .cell.preview.bad { background: color-mix(in srgb, var(--bad) 45%, var(--sea)); box-shadow: inset 0 0 0 1px var(--bad); }
 .cell.target { cursor: crosshair; }
@@ -335,6 +352,7 @@ body {
 .view-tabs button {
   flex: 1; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 13px;
   background: var(--surface); color: var(--muted); border: 1px solid var(--border); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
 .view-tabs button[data-active='true'] { color: var(--text); border-color: var(--accent); background: var(--accent-dim); }
 

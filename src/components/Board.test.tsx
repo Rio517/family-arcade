@@ -29,11 +29,11 @@ describe('<Board>', () => {
     expect(onCell).not.toHaveBeenCalled();
   });
 
-  it('shows the skin icon on own ship cells', () => {
+  it('marks own ship cells with the ship class (styled, no emoji)', () => {
     const cells = waterGrid();
     cells[1][1] = { state: 'ship' };
     render(<Board cells={cells} skinId="aqua" variant="own" />);
-    // Aqua Corps icon is 🛸.
-    expect(screen.getByTestId('cell-own-1-1').textContent).toBe('🛸');
+    expect(screen.getByTestId('cell-own-1-1').className).toContain('ship');
+    expect(screen.getByTestId('cell-own-1-1').textContent).toBe('');
   });
 });

@@ -3,6 +3,7 @@ import { Board, type BoardCell } from './Board';
 import { FLEET } from '../game/constants';
 import { COLUMN_LABELS } from '../game/board';
 import { ownBoardView, radarGrid, shipName, sunkByAttacker } from '../game/engine';
+import { RadarIcon, ShieldIcon, TargetIcon } from './icons';
 import { BOARD_SIZE, type Coord, type Fleet, type GameLog, type ShotEvent, type Side } from '../game/types';
 
 const coordLabel = (row: number, col: number) => `${COLUMN_LABELS[col]}${row + 1}`;
@@ -66,15 +67,17 @@ export function Battle({
   const myLostCount = own.sunkShips.size;
 
   const banner = myTurn
-    ? { cls: 'mine', text: '🎯 Your shot — tap the enemy waters' }
+    ? { cls: 'mine', text: 'Your shot — tap the enemy waters' }
     : pendingFire
-      ? { cls: 'theirs', text: '📡 Firing…' }
-      : { cls: 'theirs', text: `⏳ ${oppName}'s turn` };
+      ? { cls: 'theirs', text: 'Firing…' }
+      : { cls: 'theirs', text: `${oppName}'s turn` };
 
   const radarBoard = (
     <div className="panel">
       <div className="board-title">
-        <span className="name">🎯 Radar — {oppName}'s waters</span>
+        <span className="name">
+          <RadarIcon size={16} /> Radar — {oppName}'s waters
+        </span>
         <span className="hint">{enemySunkCount}/{FLEET.length} sunk</span>
       </div>
       <Board
@@ -92,7 +95,9 @@ export function Battle({
   const fleetBoard = (
     <div className="panel">
       <div className="board-title">
-        <span className="name">🛡️ Your fleet — {myName}</span>
+        <span className="name">
+          <ShieldIcon size={16} /> Your fleet — {myName}
+        </span>
         <span className="hint">{FLEET.length - myLostCount}/{FLEET.length} afloat</span>
       </div>
       <Board cells={ownCells} skinId={skinId} variant="own" />
@@ -102,16 +107,19 @@ export function Battle({
 
   return (
     <div className="stack">
-      <div className={`turn-banner ${banner.cls}`}>{banner.text}</div>
+      <div className={`turn-banner ${banner.cls}`}>
+        {myTurn && <TargetIcon size={18} style={{ verticalAlign: '-3px', marginRight: 6 }} />}
+        {banner.text}
+      </div>
 
       {/* Narrow (< 720px): tab between one board at a time, log below. */}
       <div className="battle-narrow">
         <div className="view-tabs">
           <button data-active={view === 'radar'} onClick={() => setView('radar')}>
-            🎯 Radar
+            <RadarIcon size={16} /> Radar
           </button>
           <button data-active={view === 'fleet'} onClick={() => setView('fleet')}>
-            🛡️ My Fleet
+            <ShieldIcon size={16} /> My Fleet
           </button>
         </div>
         {view === 'radar' ? radarBoard : fleetBoard}

@@ -45,7 +45,7 @@ export function Lobby({ name, onName, onHost, onJoin, initialJoinCode }: LobbyPr
             }}
             data-testid="create-game"
           >
-            ⚓ Create a game
+            Create a game
           </button>
           <p className="subtle center">You’ll get a code to share with the other iPad.</p>
           <button
@@ -53,7 +53,7 @@ export function Lobby({ name, onName, onHost, onJoin, initialJoinCode }: LobbyPr
             onClick={() => setMode('join')}
             data-testid="show-join"
           >
-            🔗 Join with a code
+            Join with a code
           </button>
         </div>
       ) : (

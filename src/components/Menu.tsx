@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useProfile } from '../state/useProfile';
 import { loadResumableSession } from '../storage/persistence';
+import { GridIcon, ResumeIcon, ShipIcon } from './icons';
 
 /** The landing page: pick a game, see your record, resume an interrupted duel. */
 export function Menu() {
@@ -18,7 +19,7 @@ export function Menu() {
       <nav className="menu">
         {resumable && (
           <Link className="card violet" to={`/play?resume=${resumable.code}`}>
-            <div className="icon">⏱️</div>
+            <div className="icon"><ResumeIcon size={30} /></div>
             <div className="body">
               <div className="title">Resume Battle</div>
               <div className="sub">
@@ -30,7 +31,7 @@ export function Menu() {
         )}
 
         <a className="card" href={`${import.meta.env.BASE_URL}calculator.html`}>
-          <div className="icon">🎲</div>
+          <div className="icon"><GridIcon size={30} /></div>
           <div className="body">
             <div className="title">Yahtzee Logger</div>
             <div className="sub">Roll real dice — tap to log your scorecard. Works offline.</div>
@@ -39,7 +40,7 @@ export function Menu() {
         </a>
 
         <Link className="card violet" to="/play">
-          <div className="icon">🚀</div>
+          <div className="icon"><ShipIcon size={30} /></div>
           <div className="body">
             <div className="title">
               Ship Battle <span className="tag">2-Player</span>

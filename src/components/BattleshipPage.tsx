@@ -107,7 +107,7 @@ export function BattleshipPage() {
             Open Ship Battle on the other iPad and tap “Join with a code”.
           </p>
           <button className="btn btn-primary" onClick={copyShare}>
-            {copied ? 'Link copied ✓' : '🔗 Copy invite link'}
+            {copied ? 'Link copied' : 'Copy invite link'}
           </button>
         </div>
       )}
