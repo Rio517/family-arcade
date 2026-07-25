@@ -4,6 +4,7 @@ A small family-friendly game console that lives on GitHub Pages:
 
 - **Yahtzee Logger** — a mobile-first score logger (roll real dice, tap to log). One self-contained HTML file, works fully offline.
 - **Ship Battle** — a two-player, cross-device naval guessing game (a Battleship-style game; "Battleship" is a trademark of Hasbro and is not affiliated). Two iPads, one shared code, no server.
+- **Chess** — full-rules, drag-and-drop chess for two players: pass-and-play on one device, or online over a shared code.
 
 **Play it:** https://rio517.github.io/yahtzee-calculator/
 
@@ -20,6 +21,10 @@ It's free and open source — the whole thing lives in this repo.
 | Battle view | Share the game code |
 | --- | --- |
 | ![Radar and fleet boards mid-battle](docs/screenshots/battle-view.jpg) | ![Share modal with QR code](docs/screenshots/share-qr.jpg) |
+
+| Chess | |
+| --- | --- |
+| ![Chess board mid-game with legal-move hints](docs/screenshots/chess-board.jpg) | Drag-and-drop chess — full rules, same device or online. |
 
 ---
 
@@ -43,6 +48,19 @@ This is covered end-to-end by a test that simulates a full two-peer game *includ
 
 ---
 
+## Chess
+
+A full-rules chess game with drag-and-drop (or tap-to-move), playable two ways:
+
+- **Same device** — pass-and-play on one screen; the board tells you whose move it is.
+- **Online** — two devices connected by a 4-character code, exactly like Ship Battle (host plays White, guest plays Black). Reconnects and resumes the same way.
+
+Every real rule is enforced: legal move generation, castling, en passant, promotion (with a piece picker), check, checkmate, stalemate, plus the fifty-move and insufficient-material draws. Illegal moves simply don't happen — you can only drop a piece on a legal square, and you can never leave your own king in check.
+
+The engine is a self-contained, pure module (`src/game/chess/`) with no UI or network dependencies, verified by **perft** node-count tests — the gold standard for a move generator (the opening tree matches 20 / 400 / 8902 at depths 1–3, and the "Kiwipete" position matches 48 / 2039). Online play reuses the same event-sourced-log design as Ship Battle: the shared truth is the list of played moves, each authored by the side to move, so two peers reconcile by **"the longer log wins."** The peer transport (`src/net/peer.ts`) is generic over the message type, so both games share one WebRTC layer.
+
+---
+
 ## Development
 
 Requires Node 20+.
@@ -59,7 +77,7 @@ npm run preview    # serve the production build locally
 ### Project layout
 
 ```
-index.html              Vite entry (React app: menu + Ship Battle)
+index.html              Vite entry (React app: menu + Ship Battle + Chess)
 public/calculator.html  the Yahtzee logger (standalone, vanilla)
 public/icon.svg         app icon
 src/
@@ -69,8 +87,9 @@ src/
     board.ts            placement geometry
     engine.ts           event-sourced reductions (turn/winner/board views)
     protocol.ts         wire messages + log reconciliation
+    chess/              full chess rules + session (rules, fen, protocol, session)
     *.test.ts           unit + integration tests
-  net/peer.ts           PeerJS transport (connect, retry, reconnect)
+  net/peer.ts           generic PeerJS transport (connect, retry, reconnect)
   state/                profile (points/unlocks) + the useBattleship hook
   storage/              localStorage persistence (profile + resumable games)
   components/           React UI (Menu, Lobby, FleetSelect, Placement, Battle, …)
