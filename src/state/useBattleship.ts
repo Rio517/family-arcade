@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GameConnection, generateCode, type ConnStatus } from '../net/peer';
+import { isMessage, type Message } from '../game/protocol';
 import * as Session from '../game/session';
 import type { FinishInfo, Outcome, Phase as GamePhase, SessionState } from '../game/session';
 import {
@@ -78,7 +79,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
   const [status, setStatus] = useState<ConnStatus>('idle');
   const [statusDetail, setStatusDetail] = useState<string | undefined>(undefined);
 
-  const connRef = useRef<GameConnection | null>(null);
+  const connRef = useRef<GameConnection<Message> | null>(null);
   const sessionRef = useRef<SessionState | null>(null);
   // Keep refs current so connection callbacks and chained actions see the
   // freshest state/identity/onFinish without stale closures.
@@ -104,22 +105,25 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     if (o.finished) onFinishRef.current(o.finished);
   }, [setSessionState]);
 
-  const ensureConn = useCallback((): GameConnection => {
+  const ensureConn = useCallback((): GameConnection<Message> => {
     if (connRef.current) return connRef.current;
-    connRef.current = new GameConnection({
-      onStatus: (s, detail) => {
-        setStatus(s);
-        setStatusDetail(detail);
+    connRef.current = new GameConnection<Message>(
+      {
+        onStatus: (s, detail) => {
+          setStatus(s);
+          setStatusDetail(detail);
+        },
+        onOpen: () => {
+          const s = sessionRef.current;
+          if (s) for (const msg of Session.connectHandshake(s)) connRef.current?.send(msg);
+        },
+        onMessage: (msg) => {
+          const s = sessionRef.current;
+          if (s) applyOutcome(Session.applyMessage(s, msg));
+        },
       },
-      onOpen: () => {
-        const s = sessionRef.current;
-        if (s) for (const msg of Session.connectHandshake(s)) connRef.current?.send(msg);
-      },
-      onMessage: (msg) => {
-        const s = sessionRef.current;
-        if (s) applyOutcome(Session.applyMessage(s, msg));
-      },
-    });
+      { prefix: 'bship-v1-', isMessage },
+    );
     return connRef.current;
   }, [applyOutcome]);
 
