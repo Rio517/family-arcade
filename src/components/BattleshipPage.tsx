@@ -179,6 +179,7 @@ export function BattleshipPage() {
             won={finish.won}
             pointsEarned={finish.pointsEarned}
             totalPoints={profile.profile.points}
+            myName={bs.myName}
             oppName={bs.oppName ?? 'Opponent'}
             iWantRematch={bs.iWantRematch}
             oppWantsRematch={bs.oppWantsRematch}
