@@ -154,6 +154,44 @@ export const LinkIcon = (p: IconProps) =>
     p,
   );
 
+/** A champion's trophy — the winner's emblem on the result screen. */
+export const TrophyIcon = (p: IconProps) =>
+  svg(
+    <>
+      {/* Cup bowl */}
+      <path d="M7 4h10v3.5a5 5 0 0 1-10 0V4Z" />
+      {/* Handles */}
+      <path d="M7 5.5H4.5A1.5 1.5 0 0 0 3 7a3.6 3.6 0 0 0 3.9 3.5" />
+      <path d="M17 5.5h2.5A1.5 1.5 0 0 1 21 7a3.6 3.6 0 0 1-3.9 3.5" />
+      {/* Stem + base */}
+      <path d="M12 12.5v3.3" />
+      <path d="M9 20h6l-.8-3a1 1 0 0 0-1-.7h-2.4a1 1 0 0 0-1 .7L9 20Z" />
+      {/* A little star on the cup */}
+      <path
+        d="M12 5.4l.55 1.15 1.25.15-.92.86.23 1.24L12 8.3l-1.11.56.23-1.24-.92-.86 1.25-.15L12 5.4Z"
+        fill="currentColor"
+        stroke="none"
+      />
+    </>,
+    p,
+  );
+
+/** A cracked, listing wreck — the (kind) loser's emblem on the result screen. */
+export const BrokenShipIcon = (p: IconProps) =>
+  svg(
+    <>
+      {/* Waves along the bottom */}
+      <path d="M2.5 18c1.2.9 2.4.9 3.6 0s2.4-.9 3.6 0 2.4.9 3.6 0 2.4-.9 3.6 0" />
+      {/* Left hull piece — riding higher, tilting back */}
+      <path d="M4.5 9.2l1.7 5.3 4 .4-.5-6.4-5.2.7Z" />
+      {/* Right hull piece — sinking bow-first, a gap where it split */}
+      <path d="M12.6 8.3 19 7.8l-1.3 5.4-4.4.4.7-5.3Z" />
+      {/* Snapped mast leaning off the left piece */}
+      <path d="M8 8.6 6.8 3.8l2.1 1.4" />
+    </>,
+    p,
+  );
+
 /**
  * A distinct filled emblem per fleet skin, drawn in the skin's colour
  * (`currentColor`, set by the caller). Replaces the old emoji skin icons.
