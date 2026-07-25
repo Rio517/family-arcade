@@ -20,8 +20,9 @@
  * makes "longer log wins" a safe merge.
  */
 
-import { FLEET, TOTAL_SHIP_CELLS, otherSide, shipSpec } from './constants';
+import { FLEET, otherSide, shipSpec } from './constants';
 import {
+  BOARD_SIZE,
   type Coord,
   type Fleet,
   type GameLog,
@@ -105,6 +106,27 @@ export function resolveShot(
   };
 }
 
+/**
+ * Resolve an incoming fire request as the defender. Returns the settled shot
+ * event and whether it is a *resend* — i.e. we had already resolved this exact
+ * cell. On a resend the caller re-transmits the existing event (so a peer whose
+ * reply was lost recovers) but must NOT append it to the log again. This is the
+ * pure core of the `fire` message handler, extracted so it can be tested
+ * directly instead of only through the network glue.
+ */
+export function resolveIncomingFire(
+  log: GameLog,
+  defenderFleet: Fleet,
+  defenderSide: Side,
+  target: Coord,
+): { event: ShotEvent; isResend: boolean } {
+  const attacker = otherSide(defenderSide);
+  const existing = shotsBy(log, attacker).find((e) => e.row === target.row && e.col === target.col);
+  if (existing) return { event: existing, isResend: true };
+  const prior = shotsBy(log, attacker).map((e) => ({ row: e.row, col: e.col }));
+  return { event: resolveShot(defenderFleet, prior, target, attacker), isResend: false };
+}
+
 export type CellState = 'unknown' | 'miss' | 'hit' | 'sunk';
 
 /**
@@ -116,8 +138,11 @@ export function radarGrid(log: GameLog, side: Side): CellState[][] {
   for (const shot of shotsBy(log, side)) {
     grid[shot.row][shot.col] = shot.hit ? (shot.sunk ? 'sunk' : 'hit') : 'miss';
   }
-  // Upgrade every hit of a sunk ship to 'sunk' once the ship is destroyed, so
-  // the whole silhouette lights up — but only where the attacker actually hit.
+  // Only the *finishing* shot on a ship is marked 'sunk'. The attacker can't
+  // light up a ship's whole silhouette: the log alone doesn't say which of
+  // their earlier hits belonged to that ship (they have no enemy geometry). The
+  // move log announces the kill by name; the defender's own board (ownBoardView)
+  // does show the full sunk silhouette because it has the fleet.
   return grid;
 }
 
@@ -181,12 +206,8 @@ export function shipName(id: ShipId): string {
   return shipSpec(id).name;
 }
 
-export const ALL_SHIP_IDS: ShipId[] = FLEET.map((s) => s.id);
-
-export { TOTAL_SHIP_CELLS };
-
 // ── helpers ────────────────────────────────────────────────────────────────
 
 function emptyGrid<T>(fill: T): T[][] {
-  return Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => fill));
+  return Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => fill));
 }

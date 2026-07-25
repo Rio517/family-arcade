@@ -68,4 +68,20 @@ describe('<Placement>', () => {
     expect(fleet).toHaveLength(1);
     expect(fleet[0]).toMatchObject({ shipId: 'carrier', row: 0, col: 0, orientation: 'H' });
   });
+
+  it('picks a placed ship back up when you tap it', () => {
+    const onChange = vi.fn();
+    const fleet: Fleet = [{ shipId: 'destroyer', row: 0, col: 0, orientation: 'H' }];
+    render(<Placement skinId="aqua" fleet={fleet} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    fireEvent.click(screen.getByTestId('cell-own-0-0')); // destroyer occupies A1
+    expect(onChange).toHaveBeenCalledWith([]); // removed so it can be re-placed
+  });
+
+  it('ignores a tap that would run the ship off the board', () => {
+    const onChange = vi.fn();
+    render(<Placement skinId="aqua" fleet={[]} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    // Carrier (size 5) is selected first; horizontal from column 8 runs off-board.
+    fireEvent.click(screen.getByTestId('cell-own-0-8'));
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

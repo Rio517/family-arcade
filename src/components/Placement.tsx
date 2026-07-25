@@ -4,6 +4,7 @@ import { FLEET, shipSpec, skinById } from '../game/constants';
 import {
   autoPlace,
   canPlace,
+  inBounds,
   isFleetComplete,
   occupantAt,
   placeShip,
@@ -165,7 +166,7 @@ function buildCells(fleet: Fleet, preview: P | null): BoardCell[][] {
   if (preview) {
     const ok = canPlace(fleet, preview);
     for (const c of shipCells(preview)) {
-      if (c.row >= 0 && c.row < BOARD_SIZE && c.col >= 0 && c.col < BOARD_SIZE) {
+      if (inBounds(c.row, c.col)) {
         grid[c.row][c.col] = { state: grid[c.row][c.col].state, preview: ok ? 'ok' : 'bad' };
       }
     }

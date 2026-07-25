@@ -1,8 +1,6 @@
 import { skinById } from '../game/constants';
+import { COLUMN_LABELS } from '../game/board';
 import type { CellState } from '../game/engine';
-import { BOARD_SIZE } from '../game/types';
-
-const COLS = 'ABCDEFGHJK'.slice(0, BOARD_SIZE); // skip 'I' to avoid 1/I confusion
 
 export interface BoardCell {
   state: 'water' | 'ship' | CellState;
@@ -46,7 +44,7 @@ export function Board({
       onMouseLeave={onCellLeave}
     >
       <div className="hdr" aria-hidden="true" />
-      {COLS.split('').map((c) => (
+      {COLUMN_LABELS.map((c) => (
         <div key={`col-${c}`} className="hdr">
           {c}
         </div>
@@ -99,7 +97,7 @@ function Row({
         if (clickable) cls.push('clickable');
         if (clickable && variant === 'enemy') cls.push('target');
 
-        const label = `${'ABCDEFGHJK'[c]}${index + 1}`;
+        const label = `${COLUMN_LABELS[c]}${index + 1}`;
         return (
           <button
             key={`c-${index}-${c}`}

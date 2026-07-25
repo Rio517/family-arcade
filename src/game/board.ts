@@ -6,8 +6,22 @@
  * avoids the classic bug where the grid and the ship list drift apart.
  */
 
-import { BOARD_SIZE, type Coord, type Fleet, type Orientation, type Placement, type ShipId } from './types';
+import {
+  BOARD_SIZE,
+  type Coord,
+  type Fleet,
+  type Orientation,
+  type Placement,
+  type ShipId,
+  type ShipSpec,
+} from './types';
 import { FLEET, shipSpec } from './constants';
+
+/**
+ * Column headers, one per board column. 'I' is intentionally skipped so a
+ * column letter is never confused with the digit 1. Shared by every board view.
+ */
+export const COLUMN_LABELS = 'ABCDEFGHJK'.slice(0, BOARD_SIZE).split('');
 
 export function inBounds(row: number, col: number): boolean {
   return row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE;
@@ -79,36 +93,41 @@ export function isFleetComplete(fleet: Fleet): boolean {
 
 export const ORIENTATIONS: Orientation[] = ['H', 'V'];
 
+/** Find a random legal spot for one ship, or null after too many tries. */
+function tryPlaceShip(fleet: Fleet, spec: ShipSpec, rng: () => number): Placement | null {
+  for (let tries = 0; tries < 200; tries++) {
+    const placement: Placement = {
+      shipId: spec.id,
+      orientation: ORIENTATIONS[Math.floor(rng() * ORIENTATIONS.length)],
+      row: Math.floor(rng() * BOARD_SIZE),
+      col: Math.floor(rng() * BOARD_SIZE),
+    };
+    if (canPlace(fleet, placement)) return placement;
+  }
+  return null;
+}
+
+/** Build a whole random fleet in one pass, or null if any ship couldn't fit. */
+function tryBuildFleet(rng: () => number): Fleet | null {
+  let fleet: Fleet = [];
+  for (const spec of FLEET) {
+    const placement = tryPlaceShip(fleet, spec, rng);
+    if (!placement) return null;
+    fleet = placeShip(fleet, placement);
+  }
+  return fleet;
+}
+
 /**
  * Randomly place the whole fleet. Takes an injectable RNG so tests are
- * deterministic. Throws only if it somehow can't place after many tries,
- * which is statistically impossible on a 10×10 board with this fleet.
+ * deterministic. Retries whole-fleet builds a few times; throws only if it
+ * somehow can't place after many tries, which is statistically impossible on a
+ * 10×10 board with this fleet.
  */
 export function autoPlace(rng: () => number = Math.random): Fleet {
-  const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)];
   for (let attempt = 0; attempt < 500; attempt++) {
-    let fleet: Fleet = [];
-    let ok = true;
-    for (const spec of FLEET) {
-      let placed = false;
-      for (let tries = 0; tries < 200 && !placed; tries++) {
-        const placement: Placement = {
-          shipId: spec.id,
-          orientation: pick(ORIENTATIONS),
-          row: Math.floor(rng() * BOARD_SIZE),
-          col: Math.floor(rng() * BOARD_SIZE),
-        };
-        if (canPlace(fleet, placement)) {
-          fleet = placeShip(fleet, placement);
-          placed = true;
-        }
-      }
-      if (!placed) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok && isFleetComplete(fleet)) return fleet;
+    const fleet = tryBuildFleet(rng);
+    if (fleet && isFleetComplete(fleet)) return fleet;
   }
   throw new Error('autoPlace failed to generate a legal fleet');
 }

@@ -22,13 +22,12 @@ import {
 import {
   currentTurn,
   hasStarted,
-  resolveShot,
+  resolveIncomingFire,
   shotsBy,
   survivingCells,
   winner,
 } from '../game/engine';
-import { otherSide } from '../game/constants';
-import type { Coord, Fleet, GameLog, ShotEvent, Side } from '../game/types';
+import type { Coord, Fleet, GameLog, Side } from '../game/types';
 import {
   clearSession,
   loadSession,
@@ -36,10 +35,13 @@ import {
   type GameSession,
 } from '../storage/persistence';
 
+/** How long to wait for a fire to be answered before releasing the board lock. */
+const FIRE_TIMEOUT_MS = 8000;
+
 export type SetupPhase = 'lobby' | 'fleet' | 'placing' | 'waiting';
 export type Phase = SetupPhase | 'battle' | 'over';
 
-interface State {
+export interface State {
   side: Side | null;
   code: string;
   setupPhase: SetupPhase;
@@ -58,7 +60,7 @@ interface State {
   pendingFire: Coord | null;
 }
 
-type Action =
+export type Action =
   | { type: 'resume'; session: GameSession }
   | { type: 'host'; code: string; name: string; skinId: string }
   | { type: 'join'; code: string; name: string; skinId: string }
@@ -75,7 +77,7 @@ type Action =
   | { type: 'oppRematch' }
   | { type: 'restart' };
 
-function initialState(name: string, skinId: string): State {
+export function initialState(name: string, skinId: string): State {
   return {
     side: null,
     code: '',
@@ -96,7 +98,7 @@ function initialState(name: string, skinId: string): State {
   };
 }
 
-function reducer(state: State, action: Action): State {
+export function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'resume': {
       const s = action.session;
@@ -204,6 +206,14 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
   const connRef = useRef<GameConnection | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Two run-once latches guarding side-effects that must fire exactly once per
+  // game. They are refs, not reducer state, on purpose: they gate an effect
+  // against the render lag between "dispatch the state change" and "state
+  // reflects it", which a state flag would suffer from too. Their lifecycle:
+  //   • startSentRef  — host authored the opening event. Set in the host-start
+  //     effect; reset on rematch (restart) and re-primed by resumeGame.
+  //   • finishedRef   — the result was reported to the profile. Set in the
+  //     finish effect; reset on rematch; re-primed by resumeGame.
   const finishedRef = useRef(false);
   const startSentRef = useRef(false);
   // Always-current identity, so create/join use the freshest name/skin even if
@@ -243,7 +253,13 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
 
     switch (msg.t) {
       case 'hello':
-        dispatch({ type: 'oppHello', name: msg.name, skinId: msg.skinId });
+        // With an auto-updating PWA the two devices can end up on different
+        // app versions; refuse to play rather than exchange incompatible logs.
+        if (msg.v !== PROTOCOL_VERSION) {
+          dispatch({ type: 'status', status: 'error', detail: 'Different app versions — both players refresh the page.' });
+          return;
+        }
+        dispatch({ type: 'oppHello', name: msg.name.slice(0, 24), skinId: msg.skinId });
         break;
 
       case 'ready':
@@ -267,22 +283,11 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
 
       case 'fire': {
         // We are the defender: resolve against our own fleet and broadcast the
-        // settled shot to both logs.
-        const attacker = otherSide(s.side);
-        // If we've already resolved this exact shot, the attacker never received
-        // our reply (the channel stayed open, so no resync fired). Re-send the
-        // settled event rather than dropping it — otherwise the attacker stays
-        // locked on a shot that, for us, already happened (incl. a winning one).
-        const existing = s.log.find(
-          (e) => e.type === 'shot' && e.by === attacker && e.row === msg.row && e.col === msg.col,
-        ) as ShotEvent | undefined;
-        if (existing) {
-          conn.send({ t: 'shot', event: existing });
-          break;
-        }
-        const priorShots = shotsBy(s.log, attacker).map((e) => ({ row: e.row, col: e.col }));
-        const event = resolveShot(s.myFleet, priorShots, { row: msg.row, col: msg.col }, attacker);
-        dispatch({ type: 'setLog', log: [...s.log, event] });
+        // settled shot. On a resend (our earlier reply was lost while the channel
+        // stayed open) we re-transmit the same event without re-appending it, so
+        // the attacker unlocks instead of soft-locking on a shot we already saw.
+        const { event, isResend } = resolveIncomingFire(s.log, s.myFleet, s.side, { row: msg.row, col: msg.col });
+        if (!isResend) dispatch({ type: 'setLog', log: [...s.log, event] });
         conn.send({ t: 'shot', event });
         break;
       }
@@ -359,7 +364,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
       if (s.pendingFire && currentTurn(s.log) === s.side) {
         dispatch({ type: 'pendingFire', coord: null });
       }
-    }, 8000);
+    }, FIRE_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [state.pendingFire, state.log, state.side]);
 

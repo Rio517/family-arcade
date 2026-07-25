@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isMessage, isPrefix, reconcileLogs } from './protocol';
+import { isMessage, reconcileLogs } from './protocol';
 import type { GameLog } from './types';
 
 const start: GameLog = [{ type: 'start', first: 'host' }];
@@ -7,25 +7,6 @@ const start: GameLog = [{ type: 'start', first: 'host' }];
 function shot(by: 'host' | 'guest', row: number, col: number): GameLog[number] {
   return { type: 'shot', by, row, col, hit: false, sunk: null, allSunk: false };
 }
-
-describe('isPrefix', () => {
-  it('treats the empty log as a prefix of anything', () => {
-    expect(isPrefix([], start)).toBe(true);
-  });
-  it('recognises a genuine prefix', () => {
-    const short = [...start, shot('host', 1, 1)];
-    const long = [...short, shot('guest', 2, 2)];
-    expect(isPrefix(short, long)).toBe(true);
-  });
-  it('rejects a longer log as a prefix of a shorter one', () => {
-    const short = [...start];
-    const long = [...start, shot('host', 1, 1)];
-    expect(isPrefix(long, short)).toBe(false);
-  });
-  it('rejects diverging logs of equal length', () => {
-    expect(isPrefix([shot('host', 1, 1)], [shot('host', 2, 2)])).toBe(false);
-  });
-});
 
 describe('reconcileLogs', () => {
   it('keeps the longer log when reconnecting (peer ahead)', () => {
@@ -51,21 +32,53 @@ describe('reconcileLogs', () => {
     // the result — no duplicate, no lost move.
     const attackerLog = [...start]; // never saw the result
     const defenderLog = [...start, shot('host', 4, 4)];
-    const merged = reconcileLogs(attackerLog, defenderLog);
-    expect(merged).toEqual(defenderLog);
+    expect(reconcileLogs(attackerLog, defenderLog)).toEqual(defenderLog);
   });
 });
 
-describe('isMessage', () => {
-  it('accepts each known message tag', () => {
+describe('isMessage — accepts well-formed messages', () => {
+  it('accepts each message type with a valid payload', () => {
     expect(isMessage({ t: 'hello', v: 1, side: 'host', name: 'A', skinId: 'aqua' })).toBe(true);
-    expect(isMessage({ t: 'fire', row: 1, col: 2 })).toBe(true);
-    expect(isMessage({ t: 'sync', log: [], ready: false })).toBe(true);
+    expect(isMessage({ t: 'ready', ready: true })).toBe(true);
+    expect(isMessage({ t: 'fire', row: 0, col: 9 })).toBe(true);
+    expect(isMessage({ t: 'shot', event: shot('host', 3, 4) })).toBe(true);
+    expect(isMessage({ t: 'start', first: 'guest' })).toBe(true);
     expect(isMessage({ t: 'rematch' })).toBe(true);
+    expect(isMessage({ t: 'sync', log: [...start, shot('host', 1, 1)], ready: true })).toBe(true);
   });
-  it('rejects junk', () => {
+});
+
+describe('isMessage — rejects malformed / hostile input', () => {
+  it('rejects non-objects and unknown tags', () => {
     expect(isMessage(null)).toBe(false);
     expect(isMessage('fire')).toBe(false);
     expect(isMessage({ t: 'nope' })).toBe(false);
+    expect(isMessage({})).toBe(false);
+  });
+
+  it('rejects a fire with an out-of-range or non-integer coordinate', () => {
+    expect(isMessage({ t: 'fire', row: 99, col: 0 })).toBe(false); // the crash exploit
+    expect(isMessage({ t: 'fire', row: -1, col: 0 })).toBe(false);
+    expect(isMessage({ t: 'fire', row: 1.5, col: 0 })).toBe(false);
+    expect(isMessage({ t: 'fire', row: Number.NaN, col: 0 })).toBe(false);
+    expect(isMessage({ t: 'fire', row: 0 })).toBe(false); // missing col
+  });
+
+  it('rejects a shot whose event is malformed', () => {
+    expect(isMessage({ t: 'shot', event: { type: 'shot', by: 'host', row: 99, col: 0, hit: true, sunk: null, allSunk: false } })).toBe(false);
+    expect(isMessage({ t: 'shot', event: { type: 'shot', by: 'nope', row: 0, col: 0, hit: true, sunk: null, allSunk: false } })).toBe(false);
+    expect(isMessage({ t: 'shot', event: { type: 'shot', by: 'host', row: 0, col: 0, hit: true, sunk: 'notaship', allSunk: false } })).toBe(false);
+    expect(isMessage({ t: 'shot', event: { type: 'start', first: 'host' } })).toBe(false); // wrong event type
+  });
+
+  it('rejects a sync whose log contains any malformed event', () => {
+    expect(isMessage({ t: 'sync', log: [{ type: 'shot', by: 'host', row: 99, col: 0, hit: true, sunk: null, allSunk: false }], ready: false })).toBe(false);
+    expect(isMessage({ t: 'sync', log: 'not-an-array', ready: false })).toBe(false);
+    expect(isMessage({ t: 'sync', log: [{ type: 'garbage' }], ready: false })).toBe(false);
+  });
+
+  it('rejects a hello missing required fields', () => {
+    expect(isMessage({ t: 'hello', v: 1, side: 'host', name: 'A' })).toBe(false); // no skinId
+    expect(isMessage({ t: 'hello', side: 'host', name: 'A', skinId: 'aqua' })).toBe(false); // no version
   });
 });
