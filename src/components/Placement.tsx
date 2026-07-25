@@ -149,7 +149,15 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
                 style={placed ? undefined : { touchAction: 'none' }}
                 data-testid={`ship-chip-${spec.id}`}
               >
-                <span className="ship-art" style={{ color: skinColor }}>
+                <span
+                  className="ship-art"
+                  // Placed ships go dark with a soft grey halo to read as "done".
+                  style={
+                    placed
+                      ? { color: '#04070d', filter: 'drop-shadow(0 0 4px rgba(148, 163, 184, 0.85))' }
+                      : { color: skinColor }
+                  }
+                >
                   <ShipProfile shipId={spec.id} height={20} />
                 </span>
                 <span className="nm">{spec.name}</span>

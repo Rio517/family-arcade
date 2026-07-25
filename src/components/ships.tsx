@@ -15,13 +15,14 @@ interface ShipProfileProps {
 // Each profile is drawn on a 24-tall canvas; width scales with the ship size.
 const PROFILES: Record<ShipId, { w: number; body: JSX.Element }> = {
   carrier: {
-    w: 62,
+    w: 64,
     body: (
       <>
-        <path d="M3 15 H60 L55 21 H8 Z" />
-        <path d="M5 15 H60 V11 H10 Z" />
-        <path d="M42 11 H47 V6 H43 Z" />
-        <path d="M44 6 V2" stroke="currentColor" strokeWidth="1.4" />
+        {/* A flat flight deck with a single sharp knife bow (one angle, not two). */}
+        <path d="M2 11 H62 L56 21 H8 Z" />
+        {/* Island tower + mast on the deck. */}
+        <path d="M44 11 H49 V6 H45 Z" />
+        <path d="M46 6 V2" stroke="currentColor" strokeWidth="1.4" />
       </>
     ),
   },
