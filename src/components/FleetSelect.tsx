@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SKINS, skinById } from '../game/constants';
 import { isUnlocked, type Profile } from '../state/profile';
+import { LockIcon, SkinGlyph } from './icons';
 
 interface FleetSelectProps {
   profile: Profile;
@@ -61,14 +62,20 @@ export function FleetSelect({ profile, selectedSkinId, onSelect, onUnlock, onCon
                 onClick={() => handlePick(skin.id)}
                 data-testid={`skin-${skin.id}`}
               >
-                {!owned && <span className="lockpill">🔒</span>}
-                <div className="glyph">{skin.icon}</div>
+                {!owned && (
+                  <span className="lockpill">
+                    <LockIcon size={15} />
+                  </span>
+                )}
+                <div className="glyph">
+                  <SkinGlyph id={skin.id} size={26} style={{ color: 'var(--skin)' }} />
+                </div>
                 <div className="nm">{skin.name}</div>
                 <div className="bl">{skin.blurb}</div>
                 {owned ? (
-                  <div className="cost owned">{selected ? '✓ Selected' : 'Owned'}</div>
+                  <div className="cost owned">{selected ? 'Selected' : 'Owned'}</div>
                 ) : (
-                  <div className="cost locked">🪙 {skin.cost} pts</div>
+                  <div className="cost locked">{skin.cost} pts</div>
                 )}
               </button>
             );

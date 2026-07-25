@@ -12,6 +12,7 @@ import {
   shipCells,
 } from '../game/board';
 import { BOARD_SIZE, type Fleet, type Orientation, type Placement as P, type ShipId } from '../game/types';
+import { BoltIcon, RotateIcon, ShuffleIcon } from './icons';
 
 interface PlacementProps {
   skinId: string;
@@ -70,7 +71,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
           onClick={fastStart}
           data-testid="fast-start"
         >
-          ⚡ Fast Start — random ships, ready to battle
+          <BoltIcon size={18} /> Fast Start — random ships, ready to battle
         </button>
       )}
 
@@ -114,7 +115,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
                     />
                   ))}
                 </span>
-                <span className={`status ${placed ? '' : 'todo'}`}>{placed ? '✓' : 'place'}</span>
+                <span className={`status ${placed ? '' : 'todo'}`}>{placed ? 'placed' : 'place'}</span>
               </div>
             );
           })}
@@ -126,10 +127,10 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
             onClick={() => setOrientation((o) => (o === 'H' ? 'V' : 'H'))}
             data-testid="rotate"
           >
-            ⟳ Rotate ({orientation === 'H' ? 'Horizontal' : 'Vertical'})
+            <RotateIcon size={16} /> Rotate ({orientation === 'H' ? 'Horizontal' : 'Vertical'})
           </button>
           <button className="btn" onClick={() => onChange(autoPlace())} data-testid="auto-place">
-            🎲 Auto-place
+            <ShuffleIcon size={16} /> Auto-place
           </button>
         </div>
         <div className="row-actions" style={{ marginTop: 10 }}>
@@ -142,7 +143,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
             onClick={onReady}
             data-testid="ready"
           >
-            {waiting ? 'Ready ✓' : 'Ready to battle'}
+            {waiting ? 'Ready' : 'Ready to battle'}
           </button>
         </div>
         {waiting && <p className="subtle center" style={{ marginTop: 10 }}>Waiting for your opponent to finish placing…</p>}
