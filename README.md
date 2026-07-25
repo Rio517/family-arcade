@@ -76,27 +76,40 @@ npm run preview    # serve the production build locally
 
 ### Project layout
 
+The app is organised so each game is **self-contained** and the shared platform
+is thin. Deleting a game is its folder plus one line in `app/registry.ts`.
+
 ```
-index.html              Vite entry (React app: menu + Ship Battle + Chess)
-public/calculator.html  the Yahtzee logger (standalone, vanilla)
-public/icon.svg         app icon
+index.html               Vite entry → src/app/main.tsx
+public/calculator.html   the Yahtzee logger (standalone, vanilla)
 src/
-  game/                 pure domain logic (fully unit-tested)
-    types.ts            core types
-    constants.ts        fleet, skins, scoring
-    board.ts            placement geometry
-    engine.ts           event-sourced reductions (turn/winner/board views)
-    protocol.ts         wire messages + log reconciliation
-    chess/              full chess rules + session (rules, fen, protocol, session)
-    *.test.ts           unit + integration tests
-  net/peer.ts           generic PeerJS transport (connect, retry, reconnect)
-  state/                profile (points/unlocks) + the useBattleship hook
-  storage/              localStorage persistence (profile + resumable games)
-  components/           React UI (Menu, Lobby, FleetSelect, Placement, Battle, …)
-  styles/global.css     hand-rolled CSS design system
+  shared/                the thin platform every game builds on
+    net/peer.ts          generic PeerJS transport (connect, retry, reconnect)
+    profile/             game-neutral points/wins/unlocks + persistence
+    storage/kv.ts        defensive localStorage helpers
+    ui/                  ConnectionBadge, VictoryFX, the icon set
+    styles/tokens.css    shared design system + result/animation styles
+    game.ts              the GameDescriptor contract each game exposes
+  games/
+    battleship/          everything Ship Battle
+      domain/            pure rules (types, constants, board, engine, protocol, session, skins)
+      state/             useBattleship, useShipDrag
+      storage/           resumable-game persistence
+      components/        Lobby, FleetSelect, Placement, Board, Battle, Result, page
+      styles/battleship.css
+      index.ts           its GameDescriptor
+    chess/               everything Chess (same shape: domain / state / storage / components / styles / index.ts)
+  app/
+    Menu.tsx             registry-driven landing menu
+    registry.ts          the ONE list of games
+    main.tsx             router built from the registry
+    styles/app.css
 ```
 
-The design principle: **all game rules live in pure, tested modules**; React and the network layer are thin wiring around them.
+Path aliases (`@shared`, `@games`, `@app`) keep imports independent of nesting
+depth. The design principle: **all game rules live in pure, tested modules**;
+React and the network layer are thin wiring around them, and the shared platform
+never imports a game (only the reverse), so games stay separable.
 
 ---
 

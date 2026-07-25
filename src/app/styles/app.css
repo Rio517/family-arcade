@@ -1,0 +1,44 @@
+/* Umbrella app: the landing menu. */
+
+/* ── Menu (landing) ──────────────────────────────────────────────────────── */
+.brand { text-align: center; margin: 16px 0 28px; }
+.brand .kicker {
+  font-size: 12px; letter-spacing: 0.32em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 8px;
+}
+.brand h1 { font-size: clamp(28px, 8vw, 44px); margin: 0; font-weight: 800; letter-spacing: -0.02em; }
+.brand p { color: var(--muted); font-size: 14px; margin: 10px 0 0; }
+
+.menu { display: grid; gap: 14px; max-width: 640px; margin: 0 auto; }
+.card {
+  display: flex; align-items: center; gap: 16px;
+  text-decoration: none; color: inherit;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 18px;
+  transition: transform 120ms, border-color 120ms, background 120ms;
+  touch-action: manipulation; cursor: pointer;
+}
+.card:active { transform: scale(0.985); }
+.card:hover { border-color: var(--accent); background: #22314a; }
+.card.violet:hover { border-color: var(--violet); }
+.card .icon {
+  flex: 0 0 auto; width: 60px; height: 60px; border-radius: 14px;
+  display: grid; place-items: center; font-size: 30px;
+  background: var(--accent-dim); border: 1px solid var(--accent);
+}
+.card.violet .icon { background: var(--violet-dim); border-color: var(--violet); }
+.card .body { min-width: 0; flex: 1; }
+.card .title { font-size: 19px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.card .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.card .chev { color: var(--muted); font-size: 22px; }
+.tag {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;
+  color: var(--violet); background: var(--violet-dim); border: 1px solid var(--violet);
+  border-radius: 999px; padding: 2px 8px;
+}
+
+.footer { text-align: center; font-size: 12px; color: var(--muted); padding-top: 28px; }
+.footer p { margin: 4px 0; }
+.footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.footer a:hover { text-decoration: underline; }
+

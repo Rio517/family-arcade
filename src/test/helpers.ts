@@ -3,8 +3,8 @@
  * doesn't re-register (and re-run) another file's suite.
  */
 
-import { FLEET } from '../game/constants';
-import type { Fleet, Placement } from '../game/types';
+import { FLEET } from '@games/battleship/domain/constants';
+import type { Fleet, Placement } from '@games/battleship/domain/types';
 
 /** Deterministic PRNG (mulberry32) so fleet/shuffle tests are reproducible. */
 export function seededRng(seed: number): () => number {

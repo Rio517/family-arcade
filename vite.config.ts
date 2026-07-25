@@ -1,7 +1,15 @@
 /// <reference types="vitest/config" />
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+
+const alias = {
+  '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),
+  '@games': fileURLToPath(new URL('./src/games', import.meta.url)),
+  '@app': fileURLToPath(new URL('./src/app', import.meta.url)),
+  '@test': fileURLToPath(new URL('./src/test', import.meta.url)),
+};
 
 // Project page on GitHub Pages is served from /<repo>/, so assets must be
 // requested with that prefix. Locally (dev/preview) BASE is unset and Vite
@@ -10,6 +18,7 @@ const base = process.env.BASE_PATH ?? '/yahtzee-calculator/';
 
 export default defineConfig({
   base,
+  resolve: { alias },
   plugins: [
     react(),
     // Installable + offline app shell. On a flaky connection the console loads
@@ -46,7 +55,7 @@ export default defineConfig({
     css: false,
     coverage: {
       provider: 'v8',
-      include: ['src/game/**', 'src/state/**', 'src/storage/**', 'src/net/**'],
+      include: ['src/games/**', 'src/shared/**'],
     },
   },
 });
