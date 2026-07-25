@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Board, type BoardCell, type PlacedShip } from './Board';
+import type { Burst } from './BoardFX';
 import { FLEET, shipSpec } from '../game/constants';
 import { COLUMN_LABELS } from '../game/board';
 import { ownBoardView, radarGrid, shipName, sunkByAttacker } from '../game/engine';
@@ -45,7 +46,7 @@ export function Battle({
   // Detect the just-resolved shot and flag it for a one-shot impact animation
   // (shockwave / ripple / explosion + a board shake). The flag auto-clears so
   // the next shot re-triggers even on the same board.
-  const [impact, setImpact] = useState<{ row: number; col: number; kind: 'miss' | 'hit' | 'sunk'; onEnemy: boolean } | null>(null);
+  const [impact, setImpact] = useState<{ id: number; row: number; col: number; kind: 'miss' | 'hit' | 'sunk'; onEnemy: boolean } | null>(null);
   const shotCountRef = useRef(0);
   const impactTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -53,7 +54,7 @@ export function Battle({
     if (shots.length > shotCountRef.current) {
       const last = shots[shots.length - 1];
       const kind = last.allSunk || last.sunk ? 'sunk' : last.hit ? 'hit' : 'miss';
-      setImpact({ row: last.row, col: last.col, kind, onEnemy: last.by === side });
+      setImpact({ id: shots.length, row: last.row, col: last.col, kind, onEnemy: last.by === side });
       if (impactTimer.current) clearTimeout(impactTimer.current);
       impactTimer.current = setTimeout(() => setImpact(null), 700);
     }
@@ -67,6 +68,10 @@ export function Battle({
     impact !== null && impact.onEnemy === onEnemy && impact.row === r && impact.col === c;
   const boardShake = (onEnemy: boolean): 'soft' | 'hard' | null =>
     impact && impact.onEnemy === onEnemy && impact.kind !== 'miss' ? (impact.kind === 'sunk' ? 'hard' : 'soft') : null;
+  const fxFor = (onEnemy: boolean): Burst | null =>
+    impact && impact.onEnemy === onEnemy
+      ? { id: impact.id, row: impact.row, col: impact.col, kind: impact.kind }
+      : null;
 
   const radar = radarGrid(log, side);
   const own = ownBoardView(log, myFleet, side);
@@ -124,6 +129,7 @@ export function Battle({
         variant="enemy"
         active={myTurn}
         shake={boardShake(true)}
+        fx={fxFor(true)}
         onCell={myTurn ? (r, c) => onFire({ row: r, col: c }) : undefined}
         disabled={!myTurn}
       />
@@ -139,7 +145,7 @@ export function Battle({
         </span>
         <span className="hint">{FLEET.length - myLostCount}/{FLEET.length} afloat</span>
       </div>
-      <Board cells={ownCells} skinId={skinId} variant="own" ships={ownShips} shake={boardShake(false)} />
+      <Board cells={ownCells} skinId={skinId} variant="own" ships={ownShips} shake={boardShake(false)} fx={fxFor(false)} />
       <FleetStatus title="Your fleet" sunkIds={[...own.sunkShips]} />
     </div>
   );

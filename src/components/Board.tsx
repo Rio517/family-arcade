@@ -4,6 +4,7 @@ import { COLUMN_LABELS } from '../game/board';
 import type { CellState } from '../game/engine';
 import type { Orientation, ShipId } from '../game/types';
 import { ShipTopDown } from './ships';
+import { BoardFX, type Burst } from './BoardFX';
 import { CloseIcon, RotateIcon } from './icons';
 
 export interface BoardCell {
@@ -36,6 +37,8 @@ interface BoardProps {
   active?: boolean;
   /** A one-shot board shake on a fresh hit ('soft') or sink ('hard'). */
   shake?: 'soft' | 'hard' | null;
+  /** When present, overlays a particle canvas; change `fx.id` to burst. */
+  fx?: Burst | null;
   /** Top-down ships to draw over the grid (placement board). */
   ships?: PlacedShip[];
   /** Set while any ship is dragging so overlays let pointer hit-tests reach cells. */
@@ -62,6 +65,7 @@ export function Board({
   variant = 'own',
   active = false,
   shake = null,
+  fx,
   ships,
   dragging = false,
   selectedShipId,
@@ -86,9 +90,13 @@ export function Board({
       style={{ ['--skin' as string]: skin.color }}
       onMouseLeave={onCellLeave}
     >
-      <div className="hdr" aria-hidden="true" />
-      {COLUMN_LABELS.map((c) => (
-        <div key={`col-${c}`} className="hdr">
+      {/* Every grid item is placed explicitly (line n+2 for 0-indexed cell n;
+          line 1 is the label track). Auto-flow is avoided on purpose: the ship
+          overlays are explicitly-placed items too, and an auto-flowed cell would
+          skip past the cells they occupy, shifting the whole grid out of line. */}
+      <div className="hdr" aria-hidden="true" style={{ gridColumn: 1, gridRow: 1 }} />
+      {COLUMN_LABELS.map((c, ci) => (
+        <div key={`col-${c}`} className="hdr" style={{ gridColumn: ci + 2, gridRow: 1 }}>
           {c}
         </div>
       ))}
@@ -145,6 +153,8 @@ export function Board({
           </div>
         );
       })}
+
+      {fx !== undefined && <BoardFX burst={fx} />}
     </div>
   );
 }
@@ -166,7 +176,9 @@ function Row({
 }) {
   return (
     <>
-      <div className="hdr">{index + 1}</div>
+      <div className="hdr" style={{ gridColumn: 1, gridRow: index + 2 }}>
+        {index + 1}
+      </div>
       {rowCells.map((cell, c) => {
         const cls = ['cell'];
         if (cell.state === 'ship') cls.push('ship');
@@ -185,6 +197,7 @@ function Row({
             key={`c-${index}-${c}`}
             type="button"
             className={cls.join(' ')}
+            style={{ gridColumn: c + 2, gridRow: index + 2 }}
             aria-label={label}
             data-testid={`cell-${variant}-${index}-${c}`}
             data-row={index}
