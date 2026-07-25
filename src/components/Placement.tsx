@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Board, type BoardCell } from './Board';
+import { useMemo, useRef, useState, type PointerEvent } from 'react';
+import { Board, type BoardCell, type PlacedShip } from './Board';
 import { FLEET, shipSpec, skinById } from '../game/constants';
 import {
   autoPlace,
@@ -78,6 +78,75 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
     if (canPlace(fleet, rotated)) onChange(placeShip(fleet, rotated));
   }
 
+  // ── Drag a placed ship to a new location ────────────────────────────────
+  // Uses pointer events + elementFromPoint hit-testing so it works with a
+  // finger on an iPad, not just a mouse. The ship snaps cell-to-cell; the drop
+  // only commits if the target is legal.
+  interface DragInfo {
+    shipId: ShipId;
+    size: number;
+    orientation: Orientation;
+    grabSeg: number;
+    anchor: { row: number; col: number };
+    ok: boolean;
+  }
+  const [drag, setDrag] = useState<DragInfo | null>(null);
+  const dragRef = useRef<DragInfo | null>(null);
+
+  const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
+
+  function beginDrag(shipId: ShipId, e: PointerEvent) {
+    const p = fleet.find((x) => x.shipId === shipId);
+    if (!p) return;
+    setSelected(shipId);
+    const size = shipSpec(shipId).size;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const frac = p.orientation === 'H' ? (e.clientX - rect.left) / rect.width : (e.clientY - rect.top) / rect.height;
+    const grabSeg = clamp(Math.floor(frac * size), size - 1);
+    const info: DragInfo = { shipId, size, orientation: p.orientation, grabSeg, anchor: { row: p.row, col: p.col }, ok: true };
+    dragRef.current = info;
+    setDrag(info);
+
+    const move = (ev: globalThis.PointerEvent) => {
+      const cur = dragRef.current;
+      if (!cur) return;
+      const cell = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest('[data-row]');
+      if (!cell) return;
+      const hr = Number(cell.getAttribute('data-row'));
+      const hc = Number(cell.getAttribute('data-col'));
+      const horiz = cur.orientation === 'H';
+      const row = clamp(horiz ? hr : hr - cur.grabSeg, BOARD_SIZE - (horiz ? 1 : cur.size));
+      const col = clamp(horiz ? hc - cur.grabSeg : hc, BOARD_SIZE - (horiz ? cur.size : 1));
+      const ok = canPlace(fleet, { shipId: cur.shipId, row, col, orientation: cur.orientation });
+      const next = { ...cur, anchor: { row, col }, ok };
+      dragRef.current = next;
+      setDrag(next);
+    };
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      const cur = dragRef.current;
+      dragRef.current = null;
+      setDrag(null);
+      if (cur && cur.ok) {
+        onChange(placeShip(fleet, { shipId: cur.shipId, row: cur.anchor.row, col: cur.anchor.col, orientation: cur.orientation }));
+      }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  }
+
+  // Ships drawn on the board — the dragged one follows the pointer as a preview.
+  const boardShips: PlacedShip[] = fleet.map((p) => {
+    const size = shipSpec(p.shipId).size;
+    if (drag && drag.shipId === p.shipId) {
+      return { shipId: p.shipId, row: drag.anchor.row, col: drag.anchor.col, size, orientation: drag.orientation, dragging: true, ok: drag.ok };
+    }
+    return { shipId: p.shipId, row: p.row, col: p.col, size, orientation: p.orientation };
+  });
+
   const skinColor = skinById(skinId).color;
 
   return (
@@ -86,12 +155,18 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
         <div className="panel">
         <div className="board-title">
           <span className="name">Position your fleet</span>
-          <span className="hint">{complete ? 'All ships placed' : 'Tap a cell to place'}</span>
+          <span className="hint">{complete ? 'Drag to adjust, or ready up' : 'Tap a cell to place'}</span>
         </div>
         <Board
           cells={cells}
           skinId={skinId}
           variant="own"
+          ships={boardShips}
+          dragging={drag !== null}
+          selectedShipId={selected}
+          onShipPointerDown={beginDrag}
+          onShipRotate={rotatePlaced}
+          onShipRemove={unplace}
           onCell={handleCell}
           onCellEnter={(r, c) => setHover({ row: r, col: c })}
           onCellLeave={() => setHover(null)}
@@ -196,18 +271,17 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
   );
 }
 
+// Placed ships are drawn as SVG overlays (see boardShips), so the grid cells
+// themselves stay water — only the live placement preview tints cells.
 function buildCells(fleet: Fleet, preview: P | null): BoardCell[][] {
   const grid: BoardCell[][] = Array.from({ length: BOARD_SIZE }, () =>
     Array.from({ length: BOARD_SIZE }, () => ({ state: 'water' as const })),
   );
-  for (const p of fleet) {
-    for (const c of shipCells(p)) grid[c.row][c.col] = { state: 'ship' };
-  }
   if (preview) {
     const ok = canPlace(fleet, preview);
     for (const c of shipCells(preview)) {
       if (inBounds(c.row, c.col)) {
-        grid[c.row][c.col] = { state: grid[c.row][c.col].state, preview: ok ? 'ok' : 'bad' };
+        grid[c.row][c.col] = { state: 'water', preview: ok ? 'ok' : 'bad' };
       }
     }
   }

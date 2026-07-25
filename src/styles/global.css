@@ -304,6 +304,34 @@ body {
 }
 .cell.preview { background: color-mix(in srgb, var(--skin) 45%, var(--sea)); box-shadow: inset 0 0 0 1px var(--skin); }
 .cell.preview.bad { background: color-mix(in srgb, var(--bad) 45%, var(--sea)); box-shadow: inset 0 0 0 1px var(--bad); }
+
+/* ── Top-down ship overlays (placement board) ──────────────────────────────── */
+.ship-overlay {
+  position: relative; z-index: 5;
+  display: grid; place-items: center;
+  color: var(--skin);
+  cursor: grab; touch-action: none;
+  padding: 1px;
+}
+.ship-overlay svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+/* Un-selected ships sit back a touch so the active one reads as the focus. */
+.ship-overlay:not(.selected) svg { opacity: 0.8; }
+.ship-overlay.selected { z-index: 6; }
+.ship-overlay.selected svg { filter: drop-shadow(0 0 6px var(--skin)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+.ship-overlay.dragging { z-index: 8; cursor: grabbing; }
+.ship-overlay.dragging svg { filter: drop-shadow(0 0 8px var(--skin)); }
+.ship-overlay.bad { color: var(--bad); }
+/* While dragging, overlays are click-through so pointer hit-tests reach cells. */
+.board.dragging .ship-overlay { pointer-events: none; }
+
+.ship-ctrls { position: absolute; display: flex; gap: 5px; z-index: 9; }
+.ship-ctrl {
+  width: 24px; height: 24px; display: grid; place-items: center;
+  background: rgba(15, 23, 42, 0.86); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); cursor: pointer; padding: 0;
+}
+.ship-ctrl:hover { border-color: var(--accent); }
+.ship-ctrl.danger:hover { color: var(--bad); border-color: var(--bad); }
 .cell.target { cursor: crosshair; }
 
 /* ── Placement ───────────────────────────────────────────────────────────── */
