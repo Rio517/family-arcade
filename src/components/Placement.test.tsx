@@ -94,6 +94,22 @@ describe('<Placement>', () => {
     expect(next.find((p) => p.shipId === 'destroyer')?.orientation).toBe('V');
   });
 
+  it('rotates a ship on the bottom edge by pulling it inward instead of off-board', () => {
+    const onChange = vi.fn();
+    // Carrier (size 5) horizontal on the bottom row — rotating about its bow
+    // would run 4 cells off the board, so it must shift up to stay in bounds.
+    const fleet: Fleet = [{ shipId: 'carrier', row: 9, col: 2, orientation: 'H' }];
+    render(<Placement skinId="aqua" fleet={fleet} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    fireEvent.click(screen.getByTestId('rotate-carrier'));
+    const next = onChange.mock.calls[0][0] as Fleet;
+    // Board is 10 tall; a size-5 vertical ship must anchor at row 5 to fit.
+    expect(next.find((p) => p.shipId === 'carrier')).toMatchObject({
+      orientation: 'V',
+      row: 5,
+      col: 2,
+    });
+  });
+
   it('ignores a tap that would run the ship off the board', () => {
     const onChange = vi.fn();
     render(<Placement skinId="aqua" fleet={[]} onChange={onChange} onReady={vi.fn()} waiting={false} />);
