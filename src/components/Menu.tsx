@@ -69,7 +69,10 @@ export function Menu() {
       </div>
 
       <div className="footer">
-        Family game console · <a href="https://github.com/Rio517/yahtzee-calculator">source</a>
+        <p>Free &amp; open source — built for family game night.</p>
+        <p>
+          <a href="https://github.com/Rio517/yahtzee-calculator">View the source on GitHub ›</a>
+        </p>
       </div>
     </div>
   );
