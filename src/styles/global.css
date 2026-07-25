@@ -182,10 +182,28 @@ body {
 .stat.points .v { color: var(--accent); }
 
 /* ── Skin picker ─────────────────────────────────────────────────────────── */
+/* Panel header row: title + an inline action (e.g. the fleet info toggle). */
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.panel-head h2 { margin: 0; }
+.info-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; border: 1px solid var(--border); border-radius: 999px;
+  color: var(--muted); font-size: 12px; font-weight: 600; padding: 5px 10px; cursor: pointer;
+}
+.info-btn:hover { color: var(--text); border-color: var(--accent); }
+.info-box {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
+}
+.info-box p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.info-box p:last-child { margin-bottom: 0; }
+.info-box strong { color: var(--text); }
+
 .skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
 .skin {
   position: relative; text-align: left; cursor: pointer;
   background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); /* buttons don't inherit text colour — set it explicitly */
   border-radius: 14px; padding: 14px; overflow: hidden;
   transition: transform 120ms, border-color 120ms;
 }
