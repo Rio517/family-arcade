@@ -34,6 +34,14 @@ describe('reconcileLogs', () => {
     const defenderLog = [...start, shot('host', 4, 4)];
     expect(reconcileLogs(attackerLog, defenderLog)).toEqual(defenderLog);
   });
+
+  it('rejects a longer peer log that diverges from our history', () => {
+    // A forged/corrupt log that is longer but not an extension of ours must not
+    // clobber our valid game.
+    const ours = [...start, shot('host', 1, 1)];
+    const forged = [...start, shot('guest', 9, 9), shot('host', 8, 8)]; // differs at index 1
+    expect(reconcileLogs(ours, forged)).toBe(ours);
+  });
 });
 
 describe('isMessage — accepts well-formed messages', () => {
@@ -75,6 +83,11 @@ describe('isMessage — rejects malformed / hostile input', () => {
     expect(isMessage({ t: 'sync', log: [{ type: 'shot', by: 'host', row: 99, col: 0, hit: true, sunk: null, allSunk: false }], ready: false })).toBe(false);
     expect(isMessage({ t: 'sync', log: 'not-an-array', ready: false })).toBe(false);
     expect(isMessage({ t: 'sync', log: [{ type: 'garbage' }], ready: false })).toBe(false);
+  });
+
+  it('rejects a sync log longer than a whole game (memory-DoS guard)', () => {
+    const huge = Array.from({ length: 5000 }, () => shot('host', 0, 0));
+    expect(isMessage({ t: 'sync', log: huge, ready: false })).toBe(false);
   });
 
   it('rejects a hello missing required fields', () => {

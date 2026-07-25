@@ -151,20 +151,13 @@ export function radarGrid(log: GameLog, side: Side): CellState[][] {
  * my private fleet plus the enemy's shots (derived from the log).
  */
 export interface OwnBoardView {
-  /** ShipId occupying each cell, or null. */
-  ships: (ShipId | null)[][];
-  /** Where the enemy has fired on me. */
+  /** Where the enemy has fired on me, indexed by cell. */
   incoming: CellState[][];
   /** Ships of mine that are fully sunk. */
   sunkShips: Set<ShipId>;
 }
 
 export function ownBoardView(log: GameLog, myFleet: Fleet, mySide: Side): OwnBoardView {
-  const ships = emptyGrid<ShipId | null>(null);
-  for (const p of myFleet) {
-    for (const c of shipCells(p)) ships[c.row][c.col] = p.shipId;
-  }
-
   const incoming = emptyGrid<CellState>('unknown');
   const enemyShots = shotsBy(log, otherSide(mySide));
   const landed = new Set<string>();
@@ -181,7 +174,7 @@ export function ownBoardView(log: GameLog, myFleet: Fleet, mySide: Side): OwnBoa
     }
   }
 
-  return { ships, incoming, sunkShips };
+  return { incoming, sunkShips };
 }
 
 /** How many of `side`'s ship-cells remain unhit (used for scoring). */

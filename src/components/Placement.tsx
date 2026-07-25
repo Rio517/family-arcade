@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useMemo, useState, type PointerEvent } from 'react';
 import { Board, type BoardCell, type PlacedShip } from './Board';
 import { FLEET, shipSpec, skinById } from '../game/constants';
 import {
@@ -11,7 +11,8 @@ import {
   removeShip,
   shipCells,
 } from '../game/board';
-import { BOARD_SIZE, type Fleet, type Orientation, type Placement as P, type ShipId } from '../game/types';
+import { BOARD_SIZE, type Fleet, type Orientation, type Placement as ShipPlacement, type ShipId } from '../game/types';
+import { useShipDrag } from '../state/useShipDrag';
 import { BoltIcon, CloseIcon, RotateIcon, ShuffleIcon } from './icons';
 import { ShipProfile } from './ships';
 
@@ -33,7 +34,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
   const complete = isFleetComplete(fleet);
   const selectedPlaced = fleet.some((p) => p.shipId === selected);
 
-  const previewPlacement: P | null = useMemo(() => {
+  const previewPlacement: ShipPlacement | null = useMemo(() => {
     if (!hover || selectedPlaced) return null;
     return { shipId: selected, row: hover.row, col: hover.col, orientation };
   }, [hover, selected, orientation, selectedPlaced]);
@@ -49,7 +50,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
       return;
     }
     if (selectedPlaced) return; // selected ship already on the board elsewhere
-    const placement: P = { shipId: selected, row, col, orientation };
+    const placement: ShipPlacement = { shipId: selected, row, col, orientation };
     if (!canPlace(fleet, placement)) return;
     const next = placeShip(fleet, placement);
     onChange(next);
@@ -74,69 +75,17 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
   function rotatePlaced(shipId: ShipId) {
     const p = fleet.find((x) => x.shipId === shipId);
     if (!p) return;
-    const rotated: P = { ...p, orientation: p.orientation === 'H' ? 'V' : 'H' };
+    const rotated: ShipPlacement = { ...p, orientation: p.orientation === 'H' ? 'V' : 'H' };
     if (canPlace(fleet, rotated)) onChange(placeShip(fleet, rotated));
   }
 
-  // ── Drag a placed ship to a new location ────────────────────────────────
-  // Uses pointer events + elementFromPoint hit-testing so it works with a
-  // finger on an iPad, not just a mouse. The ship snaps cell-to-cell; the drop
-  // only commits if the target is legal.
-  interface DragInfo {
-    shipId: ShipId;
-    size: number;
-    orientation: Orientation;
-    grabSeg: number;
-    anchor: { row: number; col: number };
-    ok: boolean;
-  }
-  const [drag, setDrag] = useState<DragInfo | null>(null);
-  const dragRef = useRef<DragInfo | null>(null);
-
-  const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
-
-  function beginDrag(shipId: ShipId, e: PointerEvent) {
-    const p = fleet.find((x) => x.shipId === shipId);
-    if (!p) return;
+  // Drag a placed ship to a new cell (pointer + elementFromPoint hit-testing).
+  const { drag, beginDrag } = useShipDrag(fleet, onChange);
+  // Grabbing a ship also selects it, so its on-board controls show.
+  const grabShip = (shipId: ShipId, e: PointerEvent) => {
     setSelected(shipId);
-    const size = shipSpec(shipId).size;
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const frac = p.orientation === 'H' ? (e.clientX - rect.left) / rect.width : (e.clientY - rect.top) / rect.height;
-    const grabSeg = clamp(Math.floor(frac * size), size - 1);
-    const info: DragInfo = { shipId, size, orientation: p.orientation, grabSeg, anchor: { row: p.row, col: p.col }, ok: true };
-    dragRef.current = info;
-    setDrag(info);
-
-    const move = (ev: globalThis.PointerEvent) => {
-      const cur = dragRef.current;
-      if (!cur) return;
-      const cell = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest('[data-row]');
-      if (!cell) return;
-      const hr = Number(cell.getAttribute('data-row'));
-      const hc = Number(cell.getAttribute('data-col'));
-      const horiz = cur.orientation === 'H';
-      const row = clamp(horiz ? hr : hr - cur.grabSeg, BOARD_SIZE - (horiz ? 1 : cur.size));
-      const col = clamp(horiz ? hc - cur.grabSeg : hc, BOARD_SIZE - (horiz ? cur.size : 1));
-      const ok = canPlace(fleet, { shipId: cur.shipId, row, col, orientation: cur.orientation });
-      const next = { ...cur, anchor: { row, col }, ok };
-      dragRef.current = next;
-      setDrag(next);
-    };
-    const end = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', end);
-      window.removeEventListener('pointercancel', end);
-      const cur = dragRef.current;
-      dragRef.current = null;
-      setDrag(null);
-      if (cur && cur.ok) {
-        onChange(placeShip(fleet, { shipId: cur.shipId, row: cur.anchor.row, col: cur.anchor.col, orientation: cur.orientation }));
-      }
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', end);
-    window.addEventListener('pointercancel', end);
-  }
+    beginDrag(shipId, e);
+  };
 
   // Ships drawn on the board — the dragged one follows the pointer as a preview.
   const boardShips: PlacedShip[] = fleet.map((p) => {
@@ -164,7 +113,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
           ships={boardShips}
           dragging={drag !== null}
           selectedShipId={selected}
-          onShipPointerDown={beginDrag}
+          onShipPointerDown={grabShip}
           onShipRotate={rotatePlaced}
           onShipRemove={unplace}
           onCell={handleCell}
@@ -273,7 +222,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
 
 // Placed ships are drawn as SVG overlays (see boardShips), so the grid cells
 // themselves stay water — only the live placement preview tints cells.
-function buildCells(fleet: Fleet, preview: P | null): BoardCell[][] {
+function buildCells(fleet: Fleet, preview: ShipPlacement | null): BoardCell[][] {
   const grid: BoardCell[][] = Array.from({ length: BOARD_SIZE }, () =>
     Array.from({ length: BOARD_SIZE }, () => ({ state: 'water' as const })),
   );

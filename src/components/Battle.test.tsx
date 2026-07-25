@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Battle } from './Battle';
 import { stackFleet } from '../test/helpers';
+import { resolveShot } from '../game/engine';
 import type { GameLog } from '../game/types';
 
 /**
@@ -37,5 +38,32 @@ describe('<Battle>', () => {
     // layouts (CSS hides one), so these appear more than once.
     expect(screen.getAllByText('Battle log').length).toBeGreaterThan(0);
     expect(screen.getAllByText('hit').length).toBeGreaterThan(0); // host's hit entry
+  });
+
+  it('draws my fleet as ship overlays and marks a destroyed ship sunk', () => {
+    const myFleet = stackFleet(); // destroyer sits on row 4, cols 0–1
+    // The guest sinks my destroyer by hitting both of its cells.
+    const sunkLog: GameLog = [
+      { type: 'start', first: 'guest' },
+      resolveShot(myFleet, [], { row: 4, col: 0 }, 'guest'),
+      resolveShot(myFleet, [{ row: 4, col: 0 }], { row: 4, col: 1 }, 'guest'),
+    ];
+    render(
+      <Battle
+        log={sunkLog}
+        side="host"
+        myName="Rio"
+        oppName="Kid"
+        skinId="aqua"
+        oppSkinId="ember"
+        myFleet={myFleet}
+        myTurn={false}
+        pendingFire={null}
+        onFire={vi.fn()}
+      />,
+    );
+    // Overlays render (in both layouts); the destroyer is sunk, the carrier isn't.
+    expect(screen.getAllByTestId('ship-overlay-destroyer')[0].className).toContain('sunk');
+    expect(screen.getAllByTestId('ship-overlay-carrier')[0].className).not.toContain('sunk');
   });
 });
