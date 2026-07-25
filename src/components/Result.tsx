@@ -49,6 +49,19 @@ export function Result({
     <div className="stack">
       <div className="panel">
         <div className="result-hero">
+          {won && (
+            <div className="burst" aria-hidden="true">
+              {Array.from({ length: 18 }).map((_, i) => (
+                <span
+                  key={i}
+                  style={{
+                    ['--a' as string]: `${(360 / 18) * i}deg`,
+                    ['--delay' as string]: `${(i % 6) * 35}ms`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
           <div className={`big ${won ? 'win' : 'loss'}`}>{won ? 'You Win!' : 'Good Game!'}</div>
           <p className="result-flavor">{flavor}</p>
           <div className="earned">

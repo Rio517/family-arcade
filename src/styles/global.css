@@ -427,8 +427,8 @@ body {
 .hentry .pts { margin-left: auto; color: var(--accent); font-weight: 700; }
 
 /* ── Result ──────────────────────────────────────────────────────────────── */
-.result-hero { text-align: center; padding: 20px 0; }
-.result-hero .big { font-size: 40px; font-weight: 800; margin: 6px 0; }
+.result-hero { text-align: center; padding: 20px 0; position: relative; }
+.result-hero .big { font-size: 40px; font-weight: 800; margin: 6px 0; position: relative; z-index: 2; }
 .result-hero .big.win { color: var(--good); animation: pop-in 480ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
 .result-hero .big.loss { color: var(--accent); }
 .result-hero .result-flavor { font-size: 16px; color: var(--text); margin: 4px 0 14px; }
@@ -443,4 +443,87 @@ body {
   background: var(--surface); border: 1px solid var(--accent); color: var(--text);
   padding: 12px 18px; border-radius: 12px; font-weight: 600; z-index: 50;
   box-shadow: 0 10px 30px -10px rgba(0,0,0,0.6);
+}
+
+/* ── Battle animations ─────────────────────────────────────────────────────
+   Sleek sci-fi "juice": radar sweep, impact shockwaves, board shake, and a
+   victory burst. Every moving effect is gated behind prefers-reduced-motion so
+   the game stays comfortable; the static markers below always render. */
+.board { position: relative; overflow: hidden; }
+
+/* Fresh-cell impact ring (shockwave / ripple). ::after is the marker, so the
+   ring lives on ::before. */
+.cell.fresh::before {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  pointer-events: none; z-index: 2;
+}
+
+@keyframes radar-sweep { to { transform: rotate(360deg); } }
+@keyframes board-glow {
+  0%, 100% { box-shadow: 0 0 18px -10px var(--accent); }
+  50% { box-shadow: 0 0 28px -4px var(--accent); }
+}
+@keyframes shake-soft {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-3px, 1px); }
+  50% { transform: translate(3px, -2px); }
+  75% { transform: translate(-2px, 1px); }
+}
+@keyframes shake-hard {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  15% { transform: translate(-5px, 2px) rotate(-0.4deg); }
+  35% { transform: translate(5px, -3px) rotate(0.4deg); }
+  55% { transform: translate(-4px, 2px) rotate(-0.3deg); }
+  75% { transform: translate(3px, -1px) rotate(0.2deg); }
+}
+@keyframes banner-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-dim); }
+  50% { box-shadow: 0 0 18px 1px var(--accent-dim); }
+}
+@keyframes ripple { from { transform: scale(0.35); opacity: 0.9; } to { transform: scale(2.1); opacity: 0; } }
+@keyframes shock { from { transform: scale(0.2); opacity: 1; } to { transform: scale(2.7); opacity: 0; } }
+@keyframes cell-flash { 0% { filter: brightness(2.6); } 100% { filter: brightness(1); } }
+@keyframes marker-pop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes hull-in { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 0.9; } }
+@keyframes shard {
+  0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(0.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(-130px) scale(1); }
+}
+
+/* Victory shard burst (rendered only on a win). */
+.burst { position: absolute; left: 0; right: 0; top: 0; height: 0; pointer-events: none; z-index: 1; }
+.burst span {
+  position: absolute; left: 50%; top: 42px; width: 6px; height: 13px; border-radius: 2px;
+  background: var(--accent); opacity: 0;
+  transform: rotate(var(--a)) translateY(0) scale(0.4); transform-origin: center;
+}
+.burst span:nth-child(3n) { background: var(--good); }
+.burst span:nth-child(3n + 1) { background: var(--violet); }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Rotating radar sweep + gentle glow on the enemy board while it's your turn. */
+  .board.enemy.active::before {
+    content: ''; position: absolute; inset: 0; z-index: 4; pointer-events: none;
+    mix-blend-mode: screen; opacity: 0.5;
+    background: conic-gradient(from 0deg,
+      transparent 0deg 300deg,
+      color-mix(in srgb, var(--accent) 45%, transparent) 348deg,
+      color-mix(in srgb, var(--accent) 8%, transparent) 358deg,
+      transparent 360deg);
+    animation: radar-sweep 3.4s linear infinite;
+  }
+  .board.enemy.active { animation: board-glow 2.2s ease-in-out infinite; }
+  .board.shake-soft { animation: shake-soft 340ms ease; }
+  .board.shake-hard { animation: shake-hard 480ms ease; }
+  .turn-banner.mine { animation: banner-pulse 1.7s ease-in-out infinite; }
+
+  .cell.fresh.miss::before { border: 2px solid var(--muted); animation: ripple 620ms ease-out; }
+  .cell.fresh.hit::before { border: 2px solid var(--bad); animation: shock 560ms ease-out; }
+  .cell.fresh.sunk::before { border: 2px solid #fff; box-shadow: 0 0 14px var(--bad); animation: shock 640ms ease-out; }
+  .cell.fresh.hit, .cell.fresh.sunk { animation: cell-flash 420ms ease-out; }
+  .cell.fresh::after { animation: marker-pop 340ms cubic-bezier(0.2, 1.5, 0.35, 1) both; }
+  .cell.ship::after { animation: hull-in 240ms ease both; }
+
+  .burst span { animation: shard 950ms ease-out var(--delay) both; }
 }

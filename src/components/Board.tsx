@@ -6,6 +6,8 @@ export interface BoardCell {
   state: 'water' | 'ship' | CellState;
   /** Optional placement preview overlay. */
   preview?: 'ok' | 'bad';
+  /** Marks the just-resolved cell so it plays its impact animation once. */
+  fresh?: boolean;
 }
 
 interface BoardProps {
@@ -14,6 +16,8 @@ interface BoardProps {
   /** Enemy radar boards get a crosshair + glow when it's your turn. */
   variant?: 'own' | 'enemy';
   active?: boolean;
+  /** A one-shot board shake on a fresh hit ('soft') or sink ('hard'). */
+  shake?: 'soft' | 'hard' | null;
   onCell?: (row: number, col: number) => void;
   onCellEnter?: (row: number, col: number) => void;
   onCellLeave?: () => void;
@@ -29,6 +33,7 @@ export function Board({
   skinId,
   variant = 'own',
   active = false,
+  shake = null,
   onCell,
   onCellEnter,
   onCellLeave,
@@ -36,10 +41,11 @@ export function Board({
 }: BoardProps) {
   const skin = skinById(skinId);
   const clickable = !!onCell && !disabled;
+  const shakeClass = shake ? `shake-${shake}` : '';
 
   return (
     <div
-      className={`board ${variant} ${active ? 'active' : ''}`}
+      className={`board ${variant} ${active ? 'active' : ''} ${shakeClass}`}
       style={{ ['--skin' as string]: skin.color }}
       onMouseLeave={onCellLeave}
     >
@@ -91,6 +97,7 @@ function Row({
         if (cell.state === 'sunk') cls.push('sunk');
         if (cell.preview === 'ok') cls.push('preview');
         if (cell.preview === 'bad') cls.push('preview', 'bad');
+        if (cell.fresh) cls.push('fresh');
         if (clickable) cls.push('clickable');
         if (clickable && variant === 'enemy') cls.push('target');
 
