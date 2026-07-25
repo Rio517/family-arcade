@@ -54,9 +54,27 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
     if (nextShip) setSelected(nextShip.id);
   }
 
+  // One-tap express lane: randomly place the whole fleet (guaranteed no
+  // overlaps) and immediately declare ready.
+  function fastStart() {
+    onChange(autoPlace());
+    onReady();
+  }
+
   return (
-    <div className="placement-layout">
-      <div className="panel">
+    <div className="stack">
+      {!waiting && (
+        <button
+          className="btn btn-primary btn-lg btn-block fast-start"
+          onClick={fastStart}
+          data-testid="fast-start"
+        >
+          ⚡ Fast Start — random ships, ready to battle
+        </button>
+      )}
+
+      <div className="placement-layout">
+        <div className="panel">
         <div className="board-title">
           <span className="name">Position your fleet</span>
           <span className="hint">{complete ? 'All ships placed' : 'Tap a cell to place'}</span>
@@ -131,6 +149,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
           Selected: <strong>{shipSpec(selected).name}</strong>
           {selectedPlaced ? ' (already placed — tap it on the board to move it)' : ''}
         </p>
+        </div>
       </div>
     </div>
   );
