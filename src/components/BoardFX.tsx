@@ -17,9 +17,13 @@ interface Particle {
   maxLife: number;
   size: number;
   color: string;
-  /** Additive (glowing fire/spark) vs normal (debris/droplet). */
+  /** Additive (glowing fire/spark) vs normal (debris/droplet/smoke). */
   glow: boolean;
   gravity: number;
+  /** Radius growth per second — smoke puffs swell as they rise. */
+  grow: number;
+  /** Peak opacity multiplier — smoke stays translucent. */
+  alphaScale: number;
 }
 
 const TAU = Math.PI * 2;
@@ -106,7 +110,31 @@ export function BoardFX({ burst }: { burst: Burst | null }) {
         color: debris ? DEBRIS[(Math.random() * DEBRIS.length) | 0] : r.colors[(Math.random() * r.colors.length) | 0],
         glow: debris ? false : r.glow,
         gravity: r.gravity,
+        grow: 0,
+        alphaScale: 1,
       });
+    }
+
+    // A sink also lofts a few slow smoke puffs that swell and drift up.
+    if (burst.kind === 'sunk') {
+      for (let i = 0; i < 7; i++) {
+        const ang = rand(-Math.PI * 0.72, -Math.PI * 0.28); // upward fan
+        const spd = rand(8, 34);
+        particles.current.push({
+          x: cx + rand(-4, 4),
+          y: cy,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          life: rand(0.8, 1.4),
+          maxLife: 1.4,
+          size: rand(3, 6),
+          color: DEBRIS[(Math.random() * DEBRIS.length) | 0],
+          glow: false,
+          gravity: -26, // buoyant
+          grow: rand(10, 20),
+          alphaScale: 0.4,
+        });
+      }
     }
 
     if (rafRef.current === null) {
@@ -140,7 +168,8 @@ export function BoardFX({ burst }: { burst: Burst | null }) {
       p.vy += p.gravity * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      const alpha = Math.max(0, Math.min(1, p.life / p.maxLife));
+      p.size += p.grow * dt;
+      const alpha = Math.max(0, Math.min(1, p.life / p.maxLife)) * p.alphaScale;
       ctx.globalCompositeOperation = p.glow ? 'lighter' : 'source-over';
       ctx.globalAlpha = alpha;
       ctx.fillStyle = p.color;
