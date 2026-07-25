@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { SKINS, skinById } from '../game/constants';
 import { isUnlocked, type Profile } from '../state/profile';
-import { LockIcon, SkinGlyph } from './icons';
+import { InfoIcon, LockIcon, SkinGlyph } from './icons';
 
 interface FleetSelectProps {
   profile: Profile;
@@ -17,6 +17,7 @@ interface FleetSelectProps {
  */
 export function FleetSelect({ profile, selectedSkinId, onSelect, onUnlock, onContinue }: FleetSelectProps) {
   const [toast, setToast] = useState<string | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   function handlePick(id: string) {
     const skin = skinById(id);
@@ -39,7 +40,30 @@ export function FleetSelect({ profile, selectedSkinId, onSelect, onUnlock, onCon
   return (
     <div className="stack">
       <div className="panel">
-        <h2>Choose your fleet</h2>
+        <div className="panel-head">
+          <h2>Choose your fleet</h2>
+          <button
+            type="button"
+            className="info-btn"
+            onClick={() => setShowInfo((v) => !v)}
+            aria-expanded={showInfo}
+            data-testid="fleet-info"
+          >
+            <InfoIcon size={16} /> How fleets work
+          </button>
+        </div>
+
+        {showInfo && (
+          <div className="info-box" data-testid="fleet-info-box">
+            <p>
+              Fleets are <strong>cosmetic</strong> — they change how your ships look on the board (their colour and
+              emblem), not how the game plays.
+            </p>
+            <p>Both captains always get the same ships and the same rules, so every match is fair.</p>
+            <p>Win games to earn points, then spend them here to unlock fancier-looking fleets.</p>
+          </div>
+        )}
+
         <div className="stats" style={{ marginBottom: 14 }}>
           <div className="stat points">
             <span className="k">Points</span>
