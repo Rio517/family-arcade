@@ -18,9 +18,19 @@ export interface ShipDrag {
   onBoard: boolean;
   /** Dragging an un-placed ship in from the sidebar (vs. moving a placed one). */
   isNew: boolean;
+  /** Latest viewport pointer position — drives the off-board "carried" ghost. */
+  pointer: { x: number; y: number };
+  /** A board cell's pixel size, so the ghost is drawn to scale. */
+  cellPx: number;
 }
 
 const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
+
+/** Measure a board cell so an off-board drag ghost can match the grid scale. */
+function measureCell(): number {
+  const cell = document.querySelector('.board [data-row]');
+  return cell ? (cell as HTMLElement).getBoundingClientRect().width : 40;
+}
 
 /**
  * Pointer-driven ship dragging, for both moving a placed ship and dragging a
@@ -43,16 +53,16 @@ export function useShipDrag(fleet: Fleet, onChange: (fleet: Fleet) => void) {
     const move = (ev: globalThis.PointerEvent) => {
       const cur = dragRef.current;
       if (!cur) return;
+      const pointer = { x: ev.clientX, y: ev.clientY };
       const cell = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest(
         '[data-row]',
       );
       if (!cell) {
-        // Off the board: hide the preview but keep the drag alive.
-        if (cur.onBoard) {
-          const next = { ...cur, onBoard: false, ok: false };
-          dragRef.current = next;
-          setDrag(next);
-        }
+        // Off the board: the in-grid preview hides, but the drag stays alive and
+        // the pointer keeps updating so the carried ghost follows the cursor.
+        const next = { ...cur, pointer, onBoard: false, ok: false };
+        dragRef.current = next;
+        setDrag(next);
         return;
       }
       const hoverRow = Number(cell.getAttribute('data-row'));
@@ -67,7 +77,7 @@ export function useShipDrag(fleet: Fleet, onChange: (fleet: Fleet) => void) {
       // canPlace lets a ship overlap its own previous footprint (see board.ts),
       // so a one-cell nudge stays legal.
       const ok = canPlace(fleet, { shipId: cur.shipId, row, col, orientation: cur.orientation });
-      const next = { ...cur, anchor: { row, col }, ok, onBoard: true };
+      const next = { ...cur, pointer, anchor: { row, col }, ok, onBoard: true };
       dragRef.current = next;
       setDrag(next);
     };
@@ -105,14 +115,13 @@ export function useShipDrag(fleet: Fleet, onChange: (fleet: Fleet) => void) {
     const frac =
       p.orientation === 'H' ? (e.clientX - rect.left) / rect.width : (e.clientY - rect.top) / rect.height;
     const grabSeg = clamp(Math.floor(frac * size), size - 1);
-    run({ shipId, size, orientation: p.orientation, grabSeg, anchor: { row: p.row, col: p.col }, ok: true, onBoard: true, isNew: false });
+    run({ shipId, size, orientation: p.orientation, grabSeg, anchor: { row: p.row, col: p.col }, ok: true, onBoard: true, isNew: false, pointer: { x: e.clientX, y: e.clientY }, cellPx: measureCell() });
   }
 
   /** Drag an un-placed ship in from the sidebar; it follows the pointer bow-first. */
   function beginPlace(shipId: ShipId, e: PointerEvent, orientation: Orientation) {
-    void e;
     const size = shipSpec(shipId).size;
-    run({ shipId, size, orientation, grabSeg: 0, anchor: { row: 0, col: 0 }, ok: false, onBoard: false, isNew: true });
+    run({ shipId, size, orientation, grabSeg: 0, anchor: { row: 0, col: 0 }, ok: false, onBoard: false, isNew: true, pointer: { x: e.clientX, y: e.clientY }, cellPx: measureCell() });
   }
 
   return { drag, beginDrag, beginPlace };
