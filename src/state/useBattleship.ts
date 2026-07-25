@@ -1,166 +1,33 @@
 /**
- * useBattleship — the orchestration hook.
+ * useBattleship — the React adapter over the pure session state machine.
  *
- * It owns the connection and the reactive game state, translating between the
- * pure engine/protocol layer and the React UI. All *rules* live in the pure
- * modules (engine.ts, protocol.ts); this hook is the wiring: it sends the
- * right message at the right time, persists after every change, and derives the
- * screen the player should see.
+ * All game rules and lifecycle logic live in game/session.ts (which in turn
+ * builds on engine.ts/protocol.ts). This hook holds no rules of its own; it
+ * just:
+ *   • owns the P2P connection and the current SessionState,
+ *   • turns UI actions and inbound messages into session transitions,
+ *   • applies each transition's result — new state, outgoing messages, and the
+ *     one-shot `finished`/`error` signals,
+ *   • persists after every change (which is what powers resume).
  *
- * The setup wizard phase (lobby → fleet → placing → waiting) is stored; the
- * playing phase (battle / over) is *derived from the log*, so a resume lands
- * you exactly where the game actually is regardless of local UI state.
+ * Because the session module is pure and fully tested (including a real
+ * two-peer game through a disconnect), the risky glue is verified without a
+ * live network, and the previous run-once latch refs are gone: "author the
+ * start" and "report the finish once" are now properties of the transitions.
  */
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { GameConnection, generateCode, type ConnStatus } from '../net/peer';
-import {
-  PROTOCOL_VERSION,
-  reconcileLogs,
-  type Message,
-} from '../game/protocol';
-import {
-  currentTurn,
-  hasStarted,
-  resolveIncomingFire,
-  shotsBy,
-  survivingCells,
-  winner,
-} from '../game/engine';
+import * as Session from '../game/session';
+import type { FinishInfo, Outcome, Phase as GamePhase, SessionState } from '../game/session';
+import { currentTurn, winner } from '../game/engine';
+import { clearSession, loadSession, saveSession, type GameSession } from '../storage/persistence';
 import type { Coord, Fleet, GameLog, Side } from '../game/types';
-import {
-  clearSession,
-  loadSession,
-  saveSession,
-  type GameSession,
-} from '../storage/persistence';
 
 /** How long to wait for a fire to be answered before releasing the board lock. */
 const FIRE_TIMEOUT_MS = 8000;
 
-export type SetupPhase = 'lobby' | 'fleet' | 'placing' | 'waiting';
-export type Phase = SetupPhase | 'battle' | 'over';
-
-export interface State {
-  side: Side | null;
-  code: string;
-  setupPhase: SetupPhase;
-  status: ConnStatus;
-  statusDetail: string | undefined;
-  myName: string;
-  mySkinId: string;
-  myFleet: Fleet;
-  myReady: boolean;
-  oppName: string | null;
-  oppSkinId: string | null;
-  oppReady: boolean;
-  iWantRematch: boolean;
-  oppWantsRematch: boolean;
-  log: GameLog;
-  pendingFire: Coord | null;
-}
-
-export type Action =
-  | { type: 'resume'; session: GameSession }
-  | { type: 'host'; code: string; name: string; skinId: string }
-  | { type: 'join'; code: string; name: string; skinId: string }
-  | { type: 'status'; status: ConnStatus; detail?: string }
-  | { type: 'setSkin'; skinId: string }
-  | { type: 'toPlacing' }
-  | { type: 'setFleet'; fleet: Fleet }
-  | { type: 'ready' }
-  | { type: 'oppHello'; name: string; skinId: string }
-  | { type: 'oppReady'; ready: boolean }
-  | { type: 'setLog'; log: GameLog }
-  | { type: 'pendingFire'; coord: Coord | null }
-  | { type: 'iRematch' }
-  | { type: 'oppRematch' }
-  | { type: 'restart' };
-
-export function initialState(name: string, skinId: string): State {
-  return {
-    side: null,
-    code: '',
-    setupPhase: 'lobby',
-    status: 'idle',
-    statusDetail: undefined,
-    myName: name,
-    mySkinId: skinId,
-    myFleet: [],
-    myReady: false,
-    oppName: null,
-    oppSkinId: null,
-    oppReady: false,
-    iWantRematch: false,
-    oppWantsRematch: false,
-    log: [],
-    pendingFire: null,
-  };
-}
-
-export function reducer(state: State, action: Action): State {
-  switch (action.type) {
-    case 'resume': {
-      const s = action.session;
-      return {
-        ...state,
-        side: s.side,
-        code: s.code,
-        setupPhase: s.myReady ? 'waiting' : 'placing',
-        myName: s.myName,
-        mySkinId: s.mySkinId,
-        myFleet: s.myFleet,
-        myReady: s.myReady,
-        oppName: s.oppName,
-        oppSkinId: s.oppSkinId,
-        oppReady: s.oppReady,
-        log: s.log,
-        pendingFire: null,
-      };
-    }
-    case 'host':
-      return { ...state, side: 'host', code: action.code, myName: action.name, mySkinId: action.skinId, setupPhase: 'fleet' };
-    case 'join':
-      return { ...state, side: 'guest', code: action.code, myName: action.name, mySkinId: action.skinId, setupPhase: 'fleet' };
-    case 'status':
-      return { ...state, status: action.status, statusDetail: action.detail };
-    case 'setSkin':
-      return { ...state, mySkinId: action.skinId };
-    case 'toPlacing':
-      return { ...state, setupPhase: 'placing' };
-    case 'setFleet':
-      return { ...state, myFleet: action.fleet };
-    case 'ready':
-      return { ...state, myReady: true, setupPhase: 'waiting' };
-    case 'oppHello':
-      return { ...state, oppName: action.name, oppSkinId: action.skinId };
-    case 'oppReady':
-      return { ...state, oppReady: action.ready };
-    case 'setLog':
-      // Any log advance clears the fire lock (see hook notes on lost fires).
-      return { ...state, log: action.log, pendingFire: null };
-    case 'pendingFire':
-      return { ...state, pendingFire: action.coord };
-    case 'iRematch':
-      return { ...state, iWantRematch: true };
-    case 'oppRematch':
-      return { ...state, oppWantsRematch: true };
-    case 'restart':
-      return {
-        ...state,
-        setupPhase: 'placing',
-        myFleet: [],
-        myReady: false,
-        oppReady: false,
-        iWantRematch: false,
-        oppWantsRematch: false,
-        log: [],
-        pendingFire: null,
-      };
-    default:
-      return state;
-  }
-}
+export type Phase = 'lobby' | GamePhase;
 
 export interface UseBattleshipResult {
   phase: Phase;
@@ -198,187 +65,115 @@ export interface UseBattleshipResult {
 interface UseBattleshipOptions {
   name: string;
   skinId: string;
-  onFinish: (info: { won: boolean; survivingCells: number; code: string; opponent: string }) => void;
+  onFinish: (info: FinishInfo) => void;
+}
+
+function sessionToStored(s: SessionState): GameSession {
+  return {
+    code: s.code,
+    side: s.side,
+    myName: s.myName,
+    mySkinId: s.mySkinId,
+    oppName: s.oppName,
+    oppSkinId: s.oppSkinId,
+    myFleet: s.myFleet,
+    myReady: s.myReady,
+    oppReady: s.oppReady,
+    log: s.log,
+    finished: winner(s.log) !== null,
+    updatedAt: Date.now(),
+  };
+}
+
+function storedToSession(g: GameSession): SessionState {
+  return {
+    side: g.side,
+    code: g.code,
+    myName: g.myName,
+    mySkinId: g.mySkinId,
+    oppName: g.oppName,
+    oppSkinId: g.oppSkinId,
+    myFleet: g.myFleet,
+    myReady: g.myReady,
+    oppReady: g.oppReady,
+    iWantRematch: false,
+    oppWantsRematch: false,
+    log: g.log,
+    pendingFire: null,
+    setupPhase: g.myReady ? 'waiting' : 'placing',
+  };
 }
 
 export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
-  const [state, dispatch] = useReducer(reducer, undefined, () => initialState(opts.name, opts.skinId));
+  const [session, setSession] = useState<SessionState | null>(null);
+  const [status, setStatus] = useState<ConnStatus>('idle');
+  const [statusDetail, setStatusDetail] = useState<string | undefined>(undefined);
+
   const connRef = useRef<GameConnection | null>(null);
-  const stateRef = useRef(state);
-  stateRef.current = state;
-  // Two run-once latches guarding side-effects that must fire exactly once per
-  // game. They are refs, not reducer state, on purpose: they gate an effect
-  // against the render lag between "dispatch the state change" and "state
-  // reflects it", which a state flag would suffer from too. Their lifecycle:
-  //   • startSentRef  — host authored the opening event. Set in the host-start
-  //     effect; reset on rematch (restart) and re-primed by resumeGame.
-  //   • finishedRef   — the result was reported to the profile. Set in the
-  //     finish effect; reset on rematch; re-primed by resumeGame.
-  const finishedRef = useRef(false);
-  const startSentRef = useRef(false);
-  // Always-current identity, so create/join use the freshest name/skin even if
-  // the player edits the name field the same tick they tap Create.
+  const sessionRef = useRef<SessionState | null>(null);
+  // Keep refs current so connection callbacks and chained actions see the
+  // freshest state/identity/onFinish without stale closures.
+  const onFinishRef = useRef(opts.onFinish);
+  onFinishRef.current = opts.onFinish;
   const identityRef = useRef({ name: opts.name, skinId: opts.skinId });
   identityRef.current = { name: opts.name, skinId: opts.skinId };
 
-  // Keep a live connection object for the lifetime of the hook.
+  const setSessionState = useCallback((s: SessionState) => {
+    sessionRef.current = s;
+    setSession(s);
+  }, []);
+
+  // Apply a session transition: commit the state, send its messages, and act on
+  // the one-shot signals. This is the single place effects leave the pure core.
+  const applyOutcome = useCallback((o: Outcome) => {
+    setSessionState(o.state);
+    for (const msg of o.outgoing) connRef.current?.send(msg);
+    if (o.error) {
+      setStatus('error');
+      setStatusDetail(o.error);
+    }
+    if (o.finished) onFinishRef.current(o.finished);
+  }, [setSessionState]);
+
   const ensureConn = useCallback((): GameConnection => {
     if (connRef.current) return connRef.current;
-    const conn = new GameConnection({
-      onStatus: (status, detail) => dispatch({ type: 'status', status, detail }),
-      onOpen: () => sync(),
-      onMessage: (msg) => handleMessage(msg),
+    connRef.current = new GameConnection({
+      onStatus: (s, detail) => {
+        setStatus(s);
+        setStatusDetail(detail);
+      },
+      onOpen: () => {
+        const s = sessionRef.current;
+        if (s) for (const msg of Session.connectHandshake(s)) connRef.current?.send(msg);
+      },
+      onMessage: (msg) => {
+        const s = sessionRef.current;
+        if (s) applyOutcome(Session.applyMessage(s, msg));
+      },
     });
-    connRef.current = conn;
-    return conn;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return connRef.current;
+  }, [applyOutcome]);
 
-  // Send our identity + full log so the peer can catch up (resume). Sends here
-  // (and elsewhere) are best-effort: if one is dropped, the next onOpen re-runs
-  // this handshake and reconciles logs, so no message is critical on its own.
-  const sync = useCallback(() => {
-    const s = stateRef.current;
-    const conn = connRef.current;
-    if (!conn || !s.side) return;
-    conn.send({ t: 'hello', v: PROTOCOL_VERSION, side: s.side, name: s.myName, skinId: s.mySkinId });
-    conn.send({ t: 'sync', log: s.log, ready: s.myReady });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleMessage = useCallback((msg: Message) => {
-    const s = stateRef.current;
-    const conn = connRef.current;
-    if (!conn || !s.side) return;
-
-    switch (msg.t) {
-      case 'hello':
-        // With an auto-updating PWA the two devices can end up on different
-        // app versions; refuse to play rather than exchange incompatible logs.
-        if (msg.v !== PROTOCOL_VERSION) {
-          dispatch({ type: 'status', status: 'error', detail: 'Different app versions — both players refresh the page.' });
-          return;
-        }
-        dispatch({ type: 'oppHello', name: msg.name.slice(0, 24), skinId: msg.skinId });
-        break;
-
-      case 'ready':
-        dispatch({ type: 'oppReady', ready: msg.ready });
-        break;
-
-      case 'sync': {
-        const merged = reconcileLogs(s.log, msg.log);
-        if (merged !== s.log) dispatch({ type: 'setLog', log: merged });
-        dispatch({ type: 'oppReady', ready: msg.ready });
-        break;
-      }
-
-      case 'start': {
-        // Guest adopts the host's opening event.
-        if (!hasStarted(s.log)) {
-          dispatch({ type: 'setLog', log: [{ type: 'start', first: msg.first }, ...s.log] });
-        }
-        break;
-      }
-
-      case 'fire': {
-        // We are the defender: resolve against our own fleet and broadcast the
-        // settled shot. On a resend (our earlier reply was lost while the channel
-        // stayed open) we re-transmit the same event without re-appending it, so
-        // the attacker unlocks instead of soft-locking on a shot we already saw.
-        const { event, isResend } = resolveIncomingFire(s.log, s.myFleet, s.side, { row: msg.row, col: msg.col });
-        if (!isResend) dispatch({ type: 'setLog', log: [...s.log, event] });
-        conn.send({ t: 'shot', event });
-        break;
-      }
-
-      case 'shot': {
-        // We are the attacker (or catching up): append if new.
-        const ev = msg.event;
-        const already = shotsBy(s.log, ev.by).some((e) => e.row === ev.row && e.col === ev.col);
-        if (!already) dispatch({ type: 'setLog', log: [...s.log, ev] });
-        else dispatch({ type: 'pendingFire', coord: null });
-        break;
-      }
-
-      case 'rematch':
-        dispatch({ type: 'oppRematch' });
-        break;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── Host authors the opening event once both fleets are ready ───────────
+  // ── Persist after every change (powers resume) ──────────────────────────
   useEffect(() => {
-    if (state.side !== 'host') return;
-    if (startSentRef.current) return;
-    if (state.myReady && state.oppReady && !hasStarted(state.log)) {
-      startSentRef.current = true;
-      const first: Side = Math.random() < 0.5 ? 'host' : 'guest';
-      const log: GameLog = [{ type: 'start', first }];
-      dispatch({ type: 'setLog', log });
-      connRef.current?.send({ t: 'start', first });
-    }
-  }, [state.side, state.myReady, state.oppReady, state.log]);
+    if (session) saveSession(sessionToStored(session));
+  }, [session]);
 
-  // ── Persist the session after every change (powers resume) ──────────────
+  // ── Fire watchdog: release the board lock if a fire goes unanswered and it's
+  //    still our turn, so the player can retry. ─────────────────────────────
+  const pendingFire = session?.pendingFire ?? null;
   useEffect(() => {
-    if (!state.side || !state.code) return;
-    const session: GameSession = {
-      code: state.code,
-      side: state.side,
-      myName: state.myName,
-      mySkinId: state.mySkinId,
-      oppName: state.oppName,
-      oppSkinId: state.oppSkinId,
-      myFleet: state.myFleet,
-      myReady: state.myReady,
-      oppReady: state.oppReady,
-      log: state.log,
-      finished: winner(state.log) !== null,
-      updatedAt: Date.now(),
-    };
-    saveSession(session);
-  }, [state]);
-
-  // ── Report the finished game exactly once ───────────────────────────────
-  useEffect(() => {
-    const w = winner(state.log);
-    if (!w || finishedRef.current || !state.side) return;
-    finishedRef.current = true;
-    const won = w === state.side;
-    opts.onFinish({
-      won,
-      survivingCells: survivingCells(state.log, state.myFleet, state.side),
-      code: state.code,
-      opponent: state.oppName ?? 'Opponent',
-    });
-  }, [state.log, state.side, state.myFleet, state.code, state.oppName, opts]);
-
-  // ── Fire watchdog: if a fire goes unanswered and it's still our turn,
-  //    release the lock so the player can retry. ───────────────────────────
-  useEffect(() => {
-    if (!state.pendingFire) return;
+    if (!pendingFire) return;
     const timer = setTimeout(() => {
-      const s = stateRef.current;
-      if (s.pendingFire && currentTurn(s.log) === s.side) {
-        dispatch({ type: 'pendingFire', coord: null });
+      const s = sessionRef.current;
+      if (s?.pendingFire && currentTurn(s.log) === s.side) {
+        setSessionState({ ...s, pendingFire: null });
       }
     }, FIRE_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [state.pendingFire, state.log, state.side]);
+  }, [pendingFire, setSessionState]);
 
-  // ── Rematch: when both sides ask, reset (host re-authors start) ──────────
-  useEffect(() => {
-    if (state.iWantRematch && state.oppWantsRematch && winner(state.log) !== null) {
-      // both asked — reset locally; the ready handshake will restart the game.
-      startSentRef.current = false;
-      finishedRef.current = false;
-      dispatch({ type: 'restart' });
-    }
-  }, [state.iWantRematch, state.oppWantsRematch, state.log]);
-
-  // ── Cleanup on unmount ──────────────────────────────────────────────────
+  // ── Tear down the connection on unmount ─────────────────────────────────
   useEffect(() => {
     return () => {
       connRef.current?.destroy();
@@ -390,91 +185,71 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
   const hostGame = useCallback((name: string) => {
     const code = generateCode();
     const conn = ensureConn();
-    dispatch({ type: 'host', code, name: name.trim() || 'Captain', skinId: identityRef.current.skinId });
+    setSessionState(Session.createSession('host', code, name.trim() || 'Captain', identityRef.current.skinId));
     conn.host(code);
-  }, [ensureConn]);
+  }, [ensureConn, setSessionState]);
 
-  const joinGame = useCallback((rawCode: string, name: string) => {
+  const joinGame = useCallback((code: string, name: string) => {
     const conn = ensureConn();
-    dispatch({ type: 'join', code: rawCode, name: name.trim() || 'Captain', skinId: identityRef.current.skinId });
-    conn.join(rawCode);
-  }, [ensureConn]);
+    setSessionState(Session.createSession('guest', code, name.trim() || 'Captain', identityRef.current.skinId));
+    conn.join(code);
+  }, [ensureConn, setSessionState]);
 
   const resumeGame = useCallback((code: string) => {
-    const session = loadSession(code);
-    if (!session) return;
+    const stored = loadSession(code);
+    if (!stored) return;
     const conn = ensureConn();
-    dispatch({ type: 'resume', session });
-    finishedRef.current = session.finished;
-    startSentRef.current = hasStarted(session.log);
-    if (session.side === 'host') conn.host(session.code);
-    else conn.join(session.code);
-  }, [ensureConn]);
+    setSessionState(storedToSession(stored));
+    if (stored.side === 'host') conn.host(stored.code);
+    else conn.join(stored.code);
+  }, [ensureConn, setSessionState]);
 
-  const chooseSkin = useCallback((skinId: string) => dispatch({ type: 'setSkin', skinId }), []);
-  const confirmSkin = useCallback(() => dispatch({ type: 'toPlacing' }), []);
-  const setFleet = useCallback((fleet: Fleet) => dispatch({ type: 'setFleet', fleet }), []);
+  // Transitions that only mutate local state need the latest session via ref.
+  const withSession = useCallback((fn: (s: SessionState) => SessionState) => {
+    const s = sessionRef.current;
+    if (s) setSessionState(fn(s));
+  }, [setSessionState]);
+  const withOutcome = useCallback((fn: (s: SessionState) => Outcome) => {
+    const s = sessionRef.current;
+    if (s) applyOutcome(fn(s));
+  }, [applyOutcome]);
 
-  const confirmReady = useCallback(() => {
-    dispatch({ type: 'ready' });
-    connRef.current?.send({ t: 'ready', ready: true });
-  }, []);
-
-  const fire = useCallback((coord: Coord) => {
-    const s = stateRef.current;
-    if (currentTurn(s.log) !== s.side) return;
-    if (s.pendingFire) return;
-    const mine = shotsBy(s.log, s.side!);
-    if (mine.some((e) => e.row === coord.row && e.col === coord.col)) return;
-    // Only lock the board if the fire actually went out. If the channel is down,
-    // stay unlocked so the player can retry once the link recovers.
-    const sent = connRef.current?.send({ t: 'fire', row: coord.row, col: coord.col });
-    if (sent) dispatch({ type: 'pendingFire', coord });
-  }, []);
-
-  const requestRematch = useCallback(() => {
-    dispatch({ type: 'iRematch' });
-    connRef.current?.send({ t: 'rematch' });
-  }, []);
+  const chooseSkin = useCallback((skinId: string) => withSession((s) => Session.chooseSkin(s, skinId)), [withSession]);
+  const confirmSkin = useCallback(() => withSession(Session.toPlacing), [withSession]);
+  const setFleet = useCallback((fleet: Fleet) => withSession((s) => Session.setFleet(s, fleet)), [withSession]);
+  const confirmReady = useCallback(() => withOutcome((s) => Session.confirmReady(s)), [withOutcome]);
+  const fire = useCallback((coord: Coord) => withOutcome((s) => Session.fireAt(s, coord)), [withOutcome]);
+  const requestRematch = useCallback(() => withOutcome(Session.proposeRematch), [withOutcome]);
 
   const leave = useCallback(() => {
-    const s = stateRef.current;
-    if (s.code) clearSession(s.code);
+    const s = sessionRef.current;
+    if (s?.code) clearSession(s.code);
     connRef.current?.destroy();
     connRef.current = null;
   }, []);
 
   // ── Derived view ─────────────────────────────────────────────────────────
-  const winnerSide = winner(state.log);
-  const phase: Phase = useMemo(() => {
-    if (winnerSide) return 'over';
-    if (hasStarted(state.log)) return 'battle';
-    return state.setupPhase;
-  }, [winnerSide, state.log, state.setupPhase]);
-
-  const myTurn = state.side !== null && currentTurn(state.log) === state.side && !state.pendingFire;
-  const oppConnected = state.status === 'connected';
-
+  const s = session;
   return {
-    phase,
-    side: state.side,
-    code: state.code,
-    status: state.status,
-    statusDetail: state.statusDetail,
-    myName: state.myName,
-    mySkinId: state.mySkinId,
-    myFleet: state.myFleet,
-    myReady: state.myReady,
-    oppName: state.oppName,
-    oppSkinId: state.oppSkinId,
-    oppReady: state.oppReady,
-    oppConnected,
-    iWantRematch: state.iWantRematch,
-    oppWantsRematch: state.oppWantsRematch,
-    log: state.log,
-    myTurn,
-    pendingFire: state.pendingFire,
-    winnerSide,
+    phase: s ? Session.phase(s) : 'lobby',
+    side: s?.side ?? null,
+    code: s?.code ?? '',
+    status,
+    statusDetail,
+    myName: s?.myName ?? opts.name,
+    mySkinId: s?.mySkinId ?? opts.skinId,
+    myFleet: s?.myFleet ?? [],
+    myReady: s?.myReady ?? false,
+    oppName: s?.oppName ?? null,
+    oppSkinId: s?.oppSkinId ?? null,
+    oppReady: s?.oppReady ?? false,
+    oppConnected: status === 'connected',
+    iWantRematch: s?.iWantRematch ?? false,
+    oppWantsRematch: s?.oppWantsRematch ?? false,
+    log: s?.log ?? [],
+    myTurn: s ? Session.isMyTurn(s) : false,
+    pendingFire: s?.pendingFire ?? null,
+    winnerSide: s ? Session.winnerSide(s) : null,
     hostGame,
     joinGame,
     resumeGame,
