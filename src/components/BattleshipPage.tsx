@@ -146,7 +146,7 @@ export function BattleshipPage() {
                   ? 'Give this code to the other player. The battle starts the moment they join.'
                   : 'Open Ship Battle on the other iPad and tap “Join with a code”.'}
               </p>
-              <button className="btn btn-primary btn-block" onClick={copyShare}>
+              <button className="btn btn-primary" onClick={copyShare}>
                 {copied ? 'Link copied' : 'Copy invite link'}
               </button>
             </div>
