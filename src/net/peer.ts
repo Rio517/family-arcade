@@ -10,6 +10,12 @@
  * game rules — it moves opaque `Message`s and reports connection status. All
  * the resume/replay intelligence lives in the game layer, so when a link drops
  * and re-opens the app just re-runs its sync handshake over the new channel.
+ *
+ * Connections are opened with `reliable: true` (SCTP reliable, ordered). The
+ * game layer relies on that guarantee: a message is never silently lost while
+ * the channel stays open — a real failure closes the channel, which surfaces as
+ * a reconnect and a full log resync. That is why the protocol only ever has to
+ * reconcile prefix-compatible logs.
  */
 
 import Peer, { type DataConnection } from 'peerjs';
@@ -185,9 +191,13 @@ export class GameConnection {
   }
 
   private bindConnection(conn: DataConnection): void {
-    // Drop any previous channel in favour of this one.
+    // Drop any previous channel in favour of this one. Detach its listeners
+    // first so a late 'close'/'error' from the stale conn can't fire after we've
+    // already switched — otherwise it could stomp the new conn's 'connected'
+    // status and schedule spurious re-dials.
     if (this.conn && this.conn !== conn) {
       try {
+        this.conn.removeAllListeners();
         this.conn.close();
       } catch {
         /* ignore */
@@ -195,8 +205,12 @@ export class GameConnection {
     }
     this.conn = conn;
 
+    // Every handler also verifies it's still the active connection, guarding
+    // against events that were already queued when we swapped conns.
+    const isCurrent = () => !this.destroyed && this.conn === conn;
+
     conn.on('open', () => {
-      if (this.destroyed) return;
+      if (!isCurrent()) return;
       if (this.dialTimer) clearTimeout(this.dialTimer);
       this.dialTimer = null;
       this.handlers.onStatus('connected');
@@ -204,12 +218,12 @@ export class GameConnection {
     });
 
     conn.on('data', (data: unknown) => {
-      if (this.destroyed) return;
+      if (!isCurrent()) return;
       if (isMessage(data)) this.handlers.onMessage(data);
     });
 
     conn.on('close', () => {
-      if (this.destroyed) return;
+      if (!isCurrent()) return;
       this.handlers.onStatus('reconnecting', 'Opponent link closed');
       if (this.role === 'guest') {
         this.dialDeadline = Date.now() + DIAL_TIMEOUT_MS;
@@ -219,7 +233,7 @@ export class GameConnection {
     });
 
     conn.on('error', () => {
-      if (this.destroyed) return;
+      if (!isCurrent()) return;
       this.handlers.onStatus('reconnecting');
     });
   }

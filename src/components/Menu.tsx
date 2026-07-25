@@ -42,7 +42,7 @@ export function Menu() {
           <div className="icon">🚀</div>
           <div className="body">
             <div className="title">
-              Battleship <span className="tag">2-Player</span>
+              Ship Battle <span className="tag">2-Player</span>
             </div>
             <div className="sub">Two devices, one code. Pick your fleet, place your ships, and duel.</div>
           </div>

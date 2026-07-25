@@ -72,8 +72,13 @@ class SimPeer {
         return [];
       case 'fire': {
         const attacker = otherSide(this.side);
+        // Already resolved? The attacker's copy of our reply was lost — re-send
+        // the settled shot instead of dropping it (mirrors the hook's fix).
+        const existing = this.log.find(
+          (e) => e.type === 'shot' && e.by === attacker && e.row === msg.row && e.col === msg.col,
+        ) as ShotEvent | undefined;
+        if (existing) return [{ to: attacker, body: { t: 'shot', event: existing } }];
         const prior = shotsBy(this.log, attacker).map((e) => ({ row: e.row, col: e.col }));
-        if (prior.some((c) => c.row === msg.row && c.col === msg.col)) return [];
         const event = resolveShot(this.fleet, prior, { row: msg.row, col: msg.col }, attacker);
         this.log = [...this.log, event];
         return [{ to: attacker, body: { t: 'shot', event } }];
@@ -207,5 +212,27 @@ describe('full game simulation', () => {
     const finalGuest = reconcileLogs(guest.log, host.log);
     expect(finalHost).toEqual(finalGuest);
     expect(winner(finalHost)).not.toBeNull();
+  });
+
+  it('re-sends (does not drop) a duplicate fire so the attacker can recover', () => {
+    // Models a resync race: the attacker re-issues a fire the defender already
+    // settled. The defender must re-send the settled shot, never silently drop
+    // it, so the attacker converges. (Depends on the reliable-ordered channel
+    // assumption: a genuinely lost message closes the channel and triggers a
+    // full log resync; this covers only the benign duplicate.)
+    const guest = new SimPeer('guest', autoPlace(seededRng(6)), allTargets(seededRng(66)));
+    guest.receive({ t: 'start', first: 'host' });
+
+    const fire = { t: 'fire' as const, row: 2, col: 3 };
+    const first = guest.receive(fire);
+    expect(first).toHaveLength(1);
+    expect(first[0].body.t).toBe('shot');
+
+    // The duplicate produces the SAME settled shot again, not an empty drop.
+    const dup = guest.receive(fire);
+    expect(dup).toHaveLength(1);
+    expect(dup[0].body).toEqual(first[0].body);
+    // And it did not double-append to the defender's log.
+    expect(guest.log.filter((e) => e.type === 'shot')).toHaveLength(1);
   });
 });

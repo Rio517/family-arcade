@@ -104,23 +104,29 @@ export function Battle({
     <div className="stack">
       <div className={`turn-banner ${banner.cls}`}>{banner.text}</div>
 
-      <div className="view-tabs only-narrow">
-        <button data-active={view === 'radar'} onClick={() => setView('radar')}>
-          🎯 Radar
-        </button>
-        <button data-active={view === 'fleet'} onClick={() => setView('fleet')}>
-          🛡️ My Fleet
-        </button>
+      {/* Narrow (< 720px): tab between one board at a time, log below. */}
+      <div className="battle-narrow">
+        <div className="view-tabs">
+          <button data-active={view === 'radar'} onClick={() => setView('radar')}>
+            🎯 Radar
+          </button>
+          <button data-active={view === 'fleet'} onClick={() => setView('fleet')}>
+            🛡️ My Fleet
+          </button>
+        </div>
+        {view === 'radar' ? radarBoard : fleetBoard}
+        <MoveLog log={log} side={side} myName={myName} oppName={oppName} />
       </div>
 
-      {/* Wide screens: both boards side by side. Narrow: the selected tab. */}
-      <div className="battle-grids split only-wide">
-        {radarBoard}
-        {fleetBoard}
+      {/* Wide (≥ 720px): both boards side by side; at ≥ 1024px the log becomes
+          a full-height column beside them to fill a landscape tablet/desktop. */}
+      <div className="battle-wide">
+        <div className="boards">
+          {radarBoard}
+          {fleetBoard}
+        </div>
+        <MoveLog log={log} side={side} myName={myName} oppName={oppName} />
       </div>
-      <div className="only-narrow">{view === 'radar' ? radarBoard : fleetBoard}</div>
-
-      <MoveLog log={log} side={side} myName={myName} oppName={oppName} />
     </div>
   );
 }

@@ -81,15 +81,13 @@ export type Message =
  * Given our log and a peer's log, return the authoritative one.
  *
  * Invariant (see engine.ts): every log position is written by exactly one
- * peer, and both peers process events in the same order, so one log is always
- * a prefix of the other. The longer log therefore supersedes the shorter with
- * no merge conflict. We assert the prefix property defensively; if it is ever
- * violated we keep the longer log (still the safest recovery) rather than
- * throwing in the middle of a game.
+ * peer, and both peers process events in the same order, so one log is always a
+ * prefix of the other (proven by the `isPrefix` tests). The longer log
+ * therefore supersedes the shorter with no merge conflict; on a tie we keep our
+ * own copy so the result is stable and idempotent.
  */
 export function reconcileLogs(ours: GameLog, theirs: GameLog): GameLog {
-  const [shorter, longer] = ours.length <= theirs.length ? [ours, theirs] : [theirs, ours];
-  return isPrefix(shorter, longer) ? longer : longer;
+  return theirs.length > ours.length ? theirs : ours;
 }
 
 /** Is `a` a prefix of `b` (by structural equality of each event)? */

@@ -55,7 +55,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
   }
 
   return (
-    <div className="stack">
+    <div className="placement-layout">
       <div className="panel">
         <div className="board-title">
           <span className="name">Position your fleet</span>
