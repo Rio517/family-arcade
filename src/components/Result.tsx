@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { VictoryFX } from './VictoryFX';
 
 interface ResultProps {
   won: boolean;
@@ -47,7 +48,8 @@ export function Result({
 
   return (
     <div className="stack">
-      <div className="panel">
+      <div className="panel result-panel">
+        {won && <VictoryFX />}
         <div className="result-hero">
           {won && (
             <div className="burst" aria-hidden="true">
