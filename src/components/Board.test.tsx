@@ -58,7 +58,7 @@ describe('<Board>', () => {
     expect(carrier.className).toContain('static');
   });
 
-  it('shows on-board rotate/remove controls only for the selected ship', () => {
+  it('shows rotate/remove controls at the ends of every placed ship', () => {
     const onShipRotate = vi.fn();
     const onShipRemove = vi.fn();
     const ships: PlacedShip[] = [
@@ -71,20 +71,24 @@ describe('<Board>', () => {
         skinId="aqua"
         variant="own"
         ships={ships}
-        selectedShipId="carrier"
         onShipPointerDown={vi.fn()}
         onShipRotate={onShipRotate}
         onShipRemove={onShipRemove}
       />,
     );
-    // Controls exist for the selected ship, not the others.
+    // Controls are always visible on every placed ship (not selection-gated).
     expect(screen.getByTestId('board-rotate-carrier')).toBeInTheDocument();
-    expect(screen.queryByTestId('board-rotate-destroyer')).toBeNull();
+    expect(screen.getByTestId('board-remove-carrier')).toBeInTheDocument();
+    expect(screen.getByTestId('board-rotate-destroyer')).toBeInTheDocument();
+
+    // Rotate is at one end, remove at the other (positioned via classes).
+    expect(screen.getByTestId('board-rotate-carrier').className).toContain('start');
+    expect(screen.getByTestId('board-remove-carrier').className).toContain('end');
 
     fireEvent.click(screen.getByTestId('board-rotate-carrier'));
     expect(onShipRotate).toHaveBeenCalledWith('carrier');
-    fireEvent.click(screen.getByTestId('board-remove-carrier'));
-    expect(onShipRemove).toHaveBeenCalledWith('carrier');
+    fireEvent.click(screen.getByTestId('board-remove-destroyer'));
+    expect(onShipRemove).toHaveBeenCalledWith('destroyer');
   });
 
   it('mounts the particle FX canvas only when an fx prop is given', () => {
