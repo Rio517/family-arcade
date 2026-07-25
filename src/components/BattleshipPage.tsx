@@ -90,6 +90,14 @@ export function BattleshipPage() {
   const isSetup = bs.phase === 'fleet' || bs.phase === 'placing' || bs.phase === 'waiting';
   const showCode = bs.side === 'host' && isSetup && !bs.oppConnected;
 
+  // The host has readied up but nobody has joined yet: surface the invite big
+  // and self-dismiss it the moment an opponent connects.
+  const awaitingOpponent = bs.side === 'host' && bs.phase === 'waiting' && !bs.oppConnected;
+  useEffect(() => {
+    if (awaitingOpponent) setShareOpen(true);
+    else if (bs.oppConnected) setShareOpen(false);
+  }, [awaitingOpponent, bs.oppConnected]);
+
   return (
     <div className="app">
       <div className="topbar">
@@ -114,18 +122,29 @@ export function BattleshipPage() {
             if (e.target === e.currentTarget) setShareOpen(false);
           }}
         >
-          <div className="modal" role="dialog" aria-label="Invite your opponent">
+          <div className={`modal ${awaitingOpponent ? 'modal-lg' : ''}`} role="dialog" aria-label="Invite your opponent">
             <div className="modal-head">
-              <span className="modal-title">Invite your opponent</span>
+              <span className="modal-title">
+                {awaitingOpponent ? 'Waiting for opponent to join' : 'Invite your opponent'}
+              </span>
               <button className="icon-btn" onClick={() => setShareOpen(false)} aria-label="Close">
                 <CloseIcon size={18} />
               </button>
             </div>
             <div className="codebox">
+              {awaitingOpponent && (
+                <div className="waiting-radar" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              )}
               <div className="lbl">Share this code</div>
               <div className="code">{bs.code}</div>
               <p className="subtle" style={{ margin: '8px 0 14px' }}>
-                Open Ship Battle on the other iPad and tap “Join with a code”.
+                {awaitingOpponent
+                  ? 'Give this code to the other player. The battle starts the moment they join.'
+                  : 'Open Ship Battle on the other iPad and tap “Join with a code”.'}
               </p>
               <button className="btn btn-primary btn-block" onClick={copyShare}>
                 {copied ? 'Link copied' : 'Copy invite link'}

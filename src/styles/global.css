@@ -525,6 +525,19 @@ body {
   color: var(--muted); cursor: pointer; padding: 4px; border-radius: 8px;
 }
 .icon-btn:hover { color: var(--text); background: var(--surface-2); }
+/* Big "waiting for opponent to join" variant. */
+.modal.modal-lg { max-width: 560px; }
+.modal.modal-lg .codebox { padding: 26px 26px 30px; }
+.modal.modal-lg .codebox .code { font-size: 56px; }
+.waiting-radar { position: relative; width: 88px; height: 88px; margin: 4px auto 20px; }
+.waiting-radar::after {
+  content: ''; position: absolute; inset: 0; margin: auto; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--accent);
+}
+.waiting-radar span {
+  position: absolute; inset: 0; margin: auto; width: 20px; height: 20px;
+  border-radius: 50%; border: 2px solid var(--accent); opacity: 0.35;
+}
 
 /* ── History ─────────────────────────────────────────────────────────────── */
 .history { display: grid; gap: 6px; }
@@ -574,6 +587,10 @@ body {
 }
 
 @keyframes radar-sweep { to { transform: rotate(360deg); } }
+@keyframes radar-ping {
+  0% { width: 20px; height: 20px; opacity: 0.75; }
+  100% { width: 88px; height: 88px; opacity: 0; }
+}
 @keyframes board-glow {
   0%, 100% { box-shadow: 0 0 18px -10px var(--accent); }
   50% { box-shadow: 0 0 28px -4px var(--accent); }
@@ -629,6 +646,9 @@ body {
     animation: radar-sweep 3.4s linear infinite;
   }
   .board.enemy.active { animation: board-glow 2.2s ease-in-out infinite; }
+  .waiting-radar span { animation: radar-ping 1800ms ease-out infinite; }
+  .waiting-radar span:nth-child(2) { animation-delay: 600ms; }
+  .waiting-radar span:nth-child(3) { animation-delay: 1200ms; }
   .board.shake-soft { animation: shake-soft 340ms ease; }
   .board.shake-hard { animation: shake-hard 480ms ease; }
   .turn-banner.mine { animation: banner-pulse 1.7s ease-in-out infinite; }
