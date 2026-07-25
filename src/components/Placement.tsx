@@ -54,6 +54,9 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
     if (!canPlace(fleet, placement)) return;
     const next = placeShip(fleet, placement);
     onChange(next);
+    // Drop the hover so the next auto-selected ship doesn't immediately paint a
+    // stale (usually red) preview under the ship we just placed.
+    setHover(null);
     const nextShip = FLEET.find((s) => !next.some((p) => p.shipId === s.id));
     if (nextShip) setSelected(nextShip.id);
   }
@@ -79,22 +82,30 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
     if (canPlace(fleet, rotated)) onChange(placeShip(fleet, rotated));
   }
 
-  // Drag a placed ship to a new cell (pointer + elementFromPoint hit-testing).
-  const { drag, beginDrag } = useShipDrag(fleet, onChange);
-  // Grabbing a ship also selects it, so its on-board controls show.
+  // Drag placed ships around, and drag un-placed ships in from the sidebar.
+  const { drag, beginDrag, beginPlace } = useShipDrag(fleet, onChange);
+  // Grabbing a placed ship also selects it, so its on-board controls show.
   const grabShip = (shipId: ShipId, e: PointerEvent) => {
     setSelected(shipId);
     beginDrag(shipId, e);
+  };
+  const grabNewShip = (shipId: ShipId, e: PointerEvent) => {
+    setSelected(shipId);
+    beginPlace(shipId, e, orientation);
   };
 
   // Ships drawn on the board — the dragged one follows the pointer as a preview.
   const boardShips: PlacedShip[] = fleet.map((p) => {
     const size = shipSpec(p.shipId).size;
-    if (drag && drag.shipId === p.shipId) {
+    if (drag && !drag.isNew && drag.shipId === p.shipId) {
       return { shipId: p.shipId, row: drag.anchor.row, col: drag.anchor.col, size, orientation: drag.orientation, dragging: true, ok: drag.ok };
     }
     return { shipId: p.shipId, row: p.row, col: p.col, size, orientation: p.orientation };
   });
+  // A fresh ship being dragged in from the sidebar previews only while over the board.
+  if (drag && drag.isNew && drag.onBoard) {
+    boardShips.push({ shipId: drag.shipId, row: drag.anchor.row, col: drag.anchor.col, size: drag.size, orientation: drag.orientation, dragging: true, ok: drag.ok });
+  }
 
   const skinColor = skinById(skinId).color;
 
@@ -134,6 +145,8 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
                 data-selected={selected === spec.id}
                 data-placed={placed}
                 onClick={() => setSelected(spec.id)}
+                onPointerDown={placed ? undefined : (e) => grabNewShip(spec.id, e)}
+                style={placed ? undefined : { touchAction: 'none' }}
                 data-testid={`ship-chip-${spec.id}`}
               >
                 <span className="ship-art" style={{ color: skinColor }}>
@@ -167,7 +180,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
                       </button>
                     </>
                   ) : (
-                    <span className="status todo">place</span>
+                    <span className="status todo">tap / drag</span>
                   )}
                 </span>
               </div>

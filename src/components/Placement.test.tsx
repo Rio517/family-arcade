@@ -156,4 +156,32 @@ describe('<Placement>', () => {
 
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('places a ship dragged in from its sidebar chip onto the board', () => {
+    const onChange = vi.fn();
+    render(<Placement skinId="aqua" fleet={[]} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    const restore = stubDragLayout('cell-own-3-4'); // drop target E4
+
+    // Carrier is the first (selected) ship; drag its chip onto the board.
+    fireEvent(screen.getByTestId('ship-chip-carrier'), pointer('pointerdown', 5, 5));
+    fireEvent(window, pointer('pointermove', 20, 20));
+    fireEvent(window, pointer('pointerup'));
+    restore();
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Fleet;
+    expect(next).toContainEqual({ shipId: 'carrier', row: 3, col: 4, orientation: 'H' });
+  });
+
+  it('does not place a sidebar-dragged ship dropped off the board', () => {
+    const onChange = vi.fn();
+    render(<Placement skinId="aqua" fleet={[]} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    // No elementFromPoint stub → the pointer is never "over" a cell.
+    (document as unknown as { elementFromPoint: () => Element | null }).elementFromPoint = () => null;
+    fireEvent(screen.getByTestId('ship-chip-carrier'), pointer('pointerdown', 5, 5));
+    fireEvent(window, pointer('pointermove', 500, 500));
+    fireEvent(window, pointer('pointerup'));
+    delete (document as unknown as { elementFromPoint?: unknown }).elementFromPoint;
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
