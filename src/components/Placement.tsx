@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Board, type BoardCell } from './Board';
+import { useMemo, useState, type PointerEvent } from 'react';
+import { Board, type BoardCell, type PlacedShip } from './Board';
 import { FLEET, shipSpec, skinById } from '../game/constants';
 import {
   autoPlace,
@@ -11,8 +11,10 @@ import {
   removeShip,
   shipCells,
 } from '../game/board';
-import { BOARD_SIZE, type Fleet, type Orientation, type Placement as P, type ShipId } from '../game/types';
-import { BoltIcon, RotateIcon, ShuffleIcon } from './icons';
+import { BOARD_SIZE, type Fleet, type Orientation, type Placement as ShipPlacement, type ShipId } from '../game/types';
+import { useShipDrag } from '../state/useShipDrag';
+import { BoltIcon, CloseIcon, RotateIcon, ShuffleIcon } from './icons';
+import { ShipProfile } from './ships';
 
 interface PlacementProps {
   skinId: string;
@@ -32,7 +34,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
   const complete = isFleetComplete(fleet);
   const selectedPlaced = fleet.some((p) => p.shipId === selected);
 
-  const previewPlacement: P | null = useMemo(() => {
+  const previewPlacement: ShipPlacement | null = useMemo(() => {
     if (!hover || selectedPlaced) return null;
     return { shipId: selected, row: hover.row, col: hover.col, orientation };
   }, [hover, selected, orientation, selectedPlaced]);
@@ -48,7 +50,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
       return;
     }
     if (selectedPlaced) return; // selected ship already on the board elsewhere
-    const placement: P = { shipId: selected, row, col, orientation };
+    const placement: ShipPlacement = { shipId: selected, row, col, orientation };
     if (!canPlace(fleet, placement)) return;
     const next = placeShip(fleet, placement);
     onChange(next);
@@ -63,28 +65,57 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
     onReady();
   }
 
+  // Remove a placed ship back to its un-placed state and re-select it.
+  function unplace(shipId: ShipId) {
+    onChange(removeShip(fleet, shipId));
+    setSelected(shipId);
+  }
+
+  // Rotate a placed ship about its bow, if the rotated footprint still fits.
+  function rotatePlaced(shipId: ShipId) {
+    const p = fleet.find((x) => x.shipId === shipId);
+    if (!p) return;
+    const rotated: ShipPlacement = { ...p, orientation: p.orientation === 'H' ? 'V' : 'H' };
+    if (canPlace(fleet, rotated)) onChange(placeShip(fleet, rotated));
+  }
+
+  // Drag a placed ship to a new cell (pointer + elementFromPoint hit-testing).
+  const { drag, beginDrag } = useShipDrag(fleet, onChange);
+  // Grabbing a ship also selects it, so its on-board controls show.
+  const grabShip = (shipId: ShipId, e: PointerEvent) => {
+    setSelected(shipId);
+    beginDrag(shipId, e);
+  };
+
+  // Ships drawn on the board — the dragged one follows the pointer as a preview.
+  const boardShips: PlacedShip[] = fleet.map((p) => {
+    const size = shipSpec(p.shipId).size;
+    if (drag && drag.shipId === p.shipId) {
+      return { shipId: p.shipId, row: drag.anchor.row, col: drag.anchor.col, size, orientation: drag.orientation, dragging: true, ok: drag.ok };
+    }
+    return { shipId: p.shipId, row: p.row, col: p.col, size, orientation: p.orientation };
+  });
+
+  const skinColor = skinById(skinId).color;
+
   return (
     <div className="stack">
-      {!waiting && (
-        <button
-          className="btn btn-primary btn-lg btn-block fast-start"
-          onClick={fastStart}
-          data-testid="fast-start"
-        >
-          <BoltIcon size={18} /> Fast Start — random ships, ready to battle
-        </button>
-      )}
-
       <div className="placement-layout">
         <div className="panel">
         <div className="board-title">
           <span className="name">Position your fleet</span>
-          <span className="hint">{complete ? 'All ships placed' : 'Tap a cell to place'}</span>
+          <span className="hint">{complete ? 'Drag to adjust, or ready up' : 'Tap a cell to place'}</span>
         </div>
         <Board
           cells={cells}
           skinId={skinId}
           variant="own"
+          ships={boardShips}
+          dragging={drag !== null}
+          selectedShipId={selected}
+          onShipPointerDown={grabShip}
+          onShipRotate={rotatePlaced}
+          onShipRemove={unplace}
           onCell={handleCell}
           onCellEnter={(r, c) => setHover({ row: r, col: c })}
           onCellLeave={() => setHover(null)}
@@ -105,17 +136,40 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
                 onClick={() => setSelected(spec.id)}
                 data-testid={`ship-chip-${spec.id}`}
               >
-                <span className="nm">{spec.name}</span>
-                <span className="pips">
-                  {Array.from({ length: spec.size }).map((_, i) => (
-                    <span
-                      key={i}
-                      className="pip"
-                      style={{ ['--skin' as string]: skinById(skinId).color }}
-                    />
-                  ))}
+                <span className="ship-art" style={{ color: skinColor }}>
+                  <ShipProfile shipId={spec.id} height={20} />
                 </span>
-                <span className={`status ${placed ? '' : 'todo'}`}>{placed ? 'placed' : 'place'}</span>
+                <span className="nm">{spec.name}</span>
+                <span className="chip-actions">
+                  {placed ? (
+                    <>
+                      <button
+                        className="chip-btn"
+                        aria-label={`Rotate ${spec.name}`}
+                        data-testid={`rotate-${spec.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          rotatePlaced(spec.id);
+                        }}
+                      >
+                        <RotateIcon size={15} />
+                      </button>
+                      <button
+                        className="chip-btn danger"
+                        aria-label={`Remove ${spec.name}`}
+                        data-testid={`unplace-${spec.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          unplace(spec.id);
+                        }}
+                      >
+                        <CloseIcon size={15} />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="status todo">place</span>
+                  )}
+                </span>
               </div>
             );
           })}
@@ -151,24 +205,32 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
           Selected: <strong>{shipSpec(selected).name}</strong>
           {selectedPlaced ? ' (already placed — tap it on the board to move it)' : ''}
         </p>
+
+        {!waiting && (
+          <>
+            <div className="or-divider"><span>or</span></div>
+            <button className="btn btn-block fast-start" onClick={fastStart} data-testid="fast-start">
+              <BoltIcon size={16} /> Fast Start — auto-place everything &amp; ready up
+            </button>
+          </>
+        )}
         </div>
       </div>
     </div>
   );
 }
 
-function buildCells(fleet: Fleet, preview: P | null): BoardCell[][] {
+// Placed ships are drawn as SVG overlays (see boardShips), so the grid cells
+// themselves stay water — only the live placement preview tints cells.
+function buildCells(fleet: Fleet, preview: ShipPlacement | null): BoardCell[][] {
   const grid: BoardCell[][] = Array.from({ length: BOARD_SIZE }, () =>
     Array.from({ length: BOARD_SIZE }, () => ({ state: 'water' as const })),
   );
-  for (const p of fleet) {
-    for (const c of shipCells(p)) grid[c.row][c.col] = { state: 'ship' };
-  }
   if (preview) {
     const ok = canPlace(fleet, preview);
     for (const c of shipCells(preview)) {
       if (inBounds(c.row, c.col)) {
-        grid[c.row][c.col] = { state: grid[c.row][c.col].state, preview: ok ? 'ok' : 'bad' };
+        grid[c.row][c.col] = { state: 'water', preview: ok ? 'ok' : 'bad' };
       }
     }
   }

@@ -77,11 +77,83 @@ describe('<Placement>', () => {
     expect(onChange).toHaveBeenCalledWith([]); // removed so it can be re-placed
   });
 
+  it('un-places a ship via its remove (X) control', () => {
+    const onChange = vi.fn();
+    const fleet: Fleet = [{ shipId: 'destroyer', row: 0, col: 0, orientation: 'H' }];
+    render(<Placement skinId="aqua" fleet={fleet} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    fireEvent.click(screen.getByTestId('unplace-destroyer'));
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it('rotates a placed ship in place when it fits', () => {
+    const onChange = vi.fn();
+    const fleet: Fleet = [{ shipId: 'destroyer', row: 0, col: 0, orientation: 'H' }];
+    render(<Placement skinId="aqua" fleet={fleet} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    fireEvent.click(screen.getByTestId('rotate-destroyer'));
+    const next = onChange.mock.calls[0][0] as Fleet;
+    expect(next.find((p) => p.shipId === 'destroyer')?.orientation).toBe('V');
+  });
+
   it('ignores a tap that would run the ship off the board', () => {
     const onChange = vi.fn();
     render(<Placement skinId="aqua" fleet={[]} onChange={onChange} onReady={vi.fn()} waiting={false} />);
     // Carrier (size 5) is selected first; horizontal from column 8 runs off-board.
     fireEvent.click(screen.getByTestId('cell-own-0-8'));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  // Drag repositioning leans on layout APIs jsdom doesn't implement
+  // (getBoundingClientRect returns zeros, elementFromPoint returns null), so we
+  // stub them to drive the pointer lifecycle deterministically.
+  function stubDragLayout(targetTestId: string) {
+    const rect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ left: 0, top: 0, width: 40, height: 20, right: 40, bottom: 20, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
+    // jsdom has no elementFromPoint at all, so assign rather than spy.
+    const target = screen.getByTestId(targetTestId);
+    (document as unknown as { elementFromPoint: (x: number, y: number) => Element | null }).elementFromPoint = () =>
+      target as unknown as Element;
+    return () => {
+      rect.mockRestore();
+      delete (document as unknown as { elementFromPoint?: unknown }).elementFromPoint;
+    };
+  }
+
+  // jsdom lacks PointerEvent (and drops clientX from it), but a MouseEvent with
+  // a pointer* type both triggers React's onPointerDown and carries clientX.
+  const pointer = (type: string, clientX = 0, clientY = 0) =>
+    new MouseEvent(type, { clientX, clientY, bubbles: true });
+
+  it('commits a drag that drops a ship on a legal cell', () => {
+    const onChange = vi.fn();
+    const fleet: Fleet = [{ shipId: 'destroyer', row: 0, col: 0, orientation: 'H' }];
+    render(<Placement skinId="aqua" fleet={fleet} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    const restore = stubDragLayout('cell-own-2-2'); // drop target C3
+
+    fireEvent(screen.getByTestId('ship-overlay-destroyer'), pointer('pointerdown', 5, 5));
+    fireEvent(window, pointer('pointermove', 90, 45));
+    fireEvent(window, pointer('pointerup'));
+    restore();
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Fleet;
+    expect(next).toContainEqual({ shipId: 'destroyer', row: 2, col: 2, orientation: 'H' });
+  });
+
+  it('does not commit a drag that ends on an illegal cell', () => {
+    const onChange = vi.fn();
+    const fleet: Fleet = [
+      { shipId: 'carrier', row: 0, col: 0, orientation: 'H' }, // occupies A1–E1
+      { shipId: 'destroyer', row: 5, col: 0, orientation: 'H' },
+    ];
+    render(<Placement skinId="aqua" fleet={fleet} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    // Drop the destroyer onto the carrier — an illegal overlap.
+    const restore = stubDragLayout('cell-own-0-0');
+
+    fireEvent(screen.getByTestId('ship-overlay-destroyer'), pointer('pointerdown', 5, 5));
+    fireEvent(window, pointer('pointermove', 0, 5));
+    fireEvent(window, pointer('pointerup'));
+    restore();
+
     expect(onChange).not.toHaveBeenCalled();
   });
 });

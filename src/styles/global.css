@@ -99,14 +99,20 @@ body {
 .topbar h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
 .topbar .spacer { flex: 1; }
 .back-link {
-  color: var(--muted);
+  color: var(--text);
+  background: var(--surface-2); /* it's a <button>, so set a real surface */
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;
-  padding: 6px 10px;
+  padding: 7px 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
+.back-link:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── Menu (landing) ──────────────────────────────────────────────────────── */
 .brand { text-align: center; margin: 16px 0 28px; }
@@ -282,6 +288,8 @@ body {
   content: ''; width: 26%; height: 26%; border-radius: 50%;
   background: var(--muted); opacity: 0.7;
 }
+/* Shot markers sit above the ship overlay (z 5) so hits punch through a hull. */
+.cell.hit, .cell.miss, .cell.sunk { z-index: 6; }
 .cell.hit { background: color-mix(in srgb, var(--bad) 40%, var(--sea)); }
 /* Hit: a bright peg. */
 .cell.hit::after {
@@ -298,6 +306,39 @@ body {
 }
 .cell.preview { background: color-mix(in srgb, var(--skin) 45%, var(--sea)); box-shadow: inset 0 0 0 1px var(--skin); }
 .cell.preview.bad { background: color-mix(in srgb, var(--bad) 45%, var(--sea)); box-shadow: inset 0 0 0 1px var(--bad); }
+
+/* ── Top-down ship overlays (placement board) ──────────────────────────────── */
+.ship-overlay {
+  position: relative; z-index: 5;
+  display: grid; place-items: center;
+  color: var(--skin);
+  cursor: grab; touch-action: none;
+  padding: 1px;
+}
+.ship-overlay svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+/* Un-selected ships sit back a touch so the active one reads as the focus. */
+.ship-overlay:not(.selected) svg { opacity: 0.8; }
+.ship-overlay.selected { z-index: 6; }
+.ship-overlay.selected svg { filter: drop-shadow(0 0 6px var(--skin)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+.ship-overlay.dragging { z-index: 8; cursor: grabbing; }
+.ship-overlay.dragging svg { filter: drop-shadow(0 0 8px var(--skin)); }
+.ship-overlay.bad { color: var(--bad); }
+/* Read-only ships (own battle board): no grab cursor, let taps reach cells. */
+.ship-overlay.static { cursor: default; pointer-events: none; }
+/* A destroyed ship shows a dim red hull beneath the white sink markers. */
+.ship-overlay.sunk { color: var(--bad); }
+.ship-overlay.sunk svg { opacity: 0.5; filter: none; }
+/* While dragging, overlays are click-through so pointer hit-tests reach cells. */
+.board.dragging .ship-overlay { pointer-events: none; }
+
+.ship-ctrls { position: absolute; display: flex; gap: 5px; z-index: 9; }
+.ship-ctrl {
+  width: 24px; height: 24px; display: grid; place-items: center;
+  background: rgba(15, 23, 42, 0.86); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); cursor: pointer; padding: 0;
+}
+.ship-ctrl:hover { border-color: var(--accent); }
+.ship-ctrl.danger:hover { color: var(--bad); border-color: var(--bad); }
 .cell.target { cursor: crosshair; }
 
 /* ── Placement ───────────────────────────────────────────────────────────── */
@@ -310,10 +351,21 @@ body {
 }
 .ship-chip[data-selected='true'] { border-color: var(--skin); background: color-mix(in srgb, var(--skin) 14%, var(--surface-2)); }
 .ship-chip[data-placed='true'] .nm { color: var(--muted); }
-.ship-chip .pips { display: flex; gap: 3px; margin-left: auto; }
-.ship-chip .pip { width: 10px; height: 10px; border-radius: 2px; background: var(--skin); opacity: 0.8; }
-.ship-chip .status { font-size: 12px; color: var(--good); }
+.ship-art { display: inline-flex; align-items: center; min-width: 64px; }
+.chip-actions { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.chip-btn {
+  display: grid; place-items: center; width: 30px; height: 30px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--muted); cursor: pointer;
+}
+.chip-btn:hover { color: var(--text); border-color: var(--accent); }
+.chip-btn.danger:hover { color: var(--bad); border-color: var(--bad); }
+.ship-chip .status { font-size: 12px; color: var(--warn); }
 .ship-chip .status.todo { color: var(--warn); }
+
+/* "or" divider above the Fast Start express lane. */
+.or-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; color: var(--muted); font-size: 12px; }
+.or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* ── Battle ──────────────────────────────────────────────────────────────── */
 .turn-banner {
@@ -401,19 +453,55 @@ body {
 .conn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .conn[data-s='connected'] { color: var(--good); border-color: color-mix(in srgb, var(--good) 50%, var(--border)); }
 .conn[data-s='connected'] .dot { background: var(--good); box-shadow: 0 0 8px var(--good); }
-.conn[data-s='reconnecting'] { color: var(--warn); }
+/* Not-yet-connected states read as a warning so it's obvious you're waiting. */
+.conn[data-s='hosting'],
+.conn[data-s='dialing'] {
+  color: var(--bad); border-color: color-mix(in srgb, var(--bad) 55%, var(--border));
+  background: rgba(248, 113, 113, 0.10);
+}
+.conn[data-s='reconnecting'] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
 .conn[data-s='reconnecting'] .dot { background: var(--warn); animation: pulse 1s infinite; }
-.conn[data-s='error'] { color: var(--bad); }
+.conn[data-s='error'] { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 55%, var(--border)); }
 .conn[data-s='error'] .dot { background: var(--bad); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 /* ── Code share ──────────────────────────────────────────────────────────── */
+/* Compact chip in the top bar; opens the share modal on tap. */
+.code-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--accent); border-radius: 999px;
+  padding: 5px 12px; cursor: pointer; color: var(--text);
+}
+.code-chip .lbl { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.code-chip strong { color: var(--accent); font-variant-numeric: tabular-nums; letter-spacing: 0.14em; font-size: 15px; }
+
 .codebox { text-align: center; padding: 22px; }
 .codebox .code {
   font-size: 44px; font-weight: 800; letter-spacing: 0.28em;
   color: var(--accent); font-variant-numeric: tabular-nums; padding-left: 0.28em;
 }
 .codebox .lbl { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+
+/* ── Modal ─────────────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.55); padding: 16px;
+}
+.modal {
+  width: 100%; max-width: 420px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.7);
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--surface-2);
+}
+.modal-title { font-weight: 700; }
+.icon-btn {
+  display: grid; place-items: center; background: transparent; border: none;
+  color: var(--muted); cursor: pointer; padding: 4px; border-radius: 8px;
+}
+.icon-btn:hover { color: var(--text); background: var(--surface-2); }
 
 /* ── History ─────────────────────────────────────────────────────────────── */
 .history { display: grid; gap: 6px; }
@@ -427,8 +515,8 @@ body {
 .hentry .pts { margin-left: auto; color: var(--accent); font-weight: 700; }
 
 /* ── Result ──────────────────────────────────────────────────────────────── */
-.result-hero { text-align: center; padding: 20px 0; }
-.result-hero .big { font-size: 40px; font-weight: 800; margin: 6px 0; }
+.result-hero { text-align: center; padding: 20px 0; position: relative; }
+.result-hero .big { font-size: 40px; font-weight: 800; margin: 6px 0; position: relative; z-index: 2; }
 .result-hero .big.win { color: var(--good); animation: pop-in 480ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
 .result-hero .big.loss { color: var(--accent); }
 .result-hero .result-flavor { font-size: 16px; color: var(--text); margin: 4px 0 14px; }
@@ -443,4 +531,87 @@ body {
   background: var(--surface); border: 1px solid var(--accent); color: var(--text);
   padding: 12px 18px; border-radius: 12px; font-weight: 600; z-index: 50;
   box-shadow: 0 10px 30px -10px rgba(0,0,0,0.6);
+}
+
+/* ── Battle animations ─────────────────────────────────────────────────────
+   Sleek sci-fi "juice": radar sweep, impact shockwaves, board shake, and a
+   victory burst. Every moving effect is gated behind prefers-reduced-motion so
+   the game stays comfortable; the static markers below always render. */
+.board { position: relative; overflow: hidden; }
+
+/* Fresh-cell impact ring (shockwave / ripple). ::after is the marker, so the
+   ring lives on ::before. */
+.cell.fresh::before {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  pointer-events: none; z-index: 2;
+}
+
+@keyframes radar-sweep { to { transform: rotate(360deg); } }
+@keyframes board-glow {
+  0%, 100% { box-shadow: 0 0 18px -10px var(--accent); }
+  50% { box-shadow: 0 0 28px -4px var(--accent); }
+}
+@keyframes shake-soft {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-3px, 1px); }
+  50% { transform: translate(3px, -2px); }
+  75% { transform: translate(-2px, 1px); }
+}
+@keyframes shake-hard {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  15% { transform: translate(-5px, 2px) rotate(-0.4deg); }
+  35% { transform: translate(5px, -3px) rotate(0.4deg); }
+  55% { transform: translate(-4px, 2px) rotate(-0.3deg); }
+  75% { transform: translate(3px, -1px) rotate(0.2deg); }
+}
+@keyframes banner-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-dim); }
+  50% { box-shadow: 0 0 18px 1px var(--accent-dim); }
+}
+@keyframes ripple { from { transform: scale(0.35); opacity: 0.9; } to { transform: scale(2.1); opacity: 0; } }
+@keyframes shock { from { transform: scale(0.2); opacity: 1; } to { transform: scale(2.7); opacity: 0; } }
+@keyframes cell-flash { 0% { filter: brightness(2.6); } 100% { filter: brightness(1); } }
+@keyframes marker-pop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes hull-in { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 0.9; } }
+@keyframes shard {
+  0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(0.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(-130px) scale(1); }
+}
+
+/* Victory shard burst (rendered only on a win). */
+.burst { position: absolute; left: 0; right: 0; top: 0; height: 0; pointer-events: none; z-index: 1; }
+.burst span {
+  position: absolute; left: 50%; top: 42px; width: 6px; height: 13px; border-radius: 2px;
+  background: var(--accent); opacity: 0;
+  transform: rotate(var(--a)) translateY(0) scale(0.4); transform-origin: center;
+}
+.burst span:nth-child(3n) { background: var(--good); }
+.burst span:nth-child(3n + 1) { background: var(--violet); }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Rotating radar sweep + gentle glow on the enemy board while it's your turn. */
+  .board.enemy.active::before {
+    content: ''; position: absolute; inset: 0; z-index: 4; pointer-events: none;
+    mix-blend-mode: screen; opacity: 0.5;
+    background: conic-gradient(from 0deg,
+      transparent 0deg 300deg,
+      color-mix(in srgb, var(--accent) 45%, transparent) 348deg,
+      color-mix(in srgb, var(--accent) 8%, transparent) 358deg,
+      transparent 360deg);
+    animation: radar-sweep 3.4s linear infinite;
+  }
+  .board.enemy.active { animation: board-glow 2.2s ease-in-out infinite; }
+  .board.shake-soft { animation: shake-soft 340ms ease; }
+  .board.shake-hard { animation: shake-hard 480ms ease; }
+  .turn-banner.mine { animation: banner-pulse 1.7s ease-in-out infinite; }
+
+  .cell.fresh.miss::before { border: 2px solid var(--muted); animation: ripple 620ms ease-out; }
+  .cell.fresh.hit::before { border: 2px solid var(--bad); animation: shock 560ms ease-out; }
+  .cell.fresh.sunk::before { border: 2px solid #fff; box-shadow: 0 0 14px var(--bad); animation: shock 640ms ease-out; }
+  .cell.fresh.hit, .cell.fresh.sunk { animation: cell-flash 420ms ease-out; }
+  .cell.fresh::after { animation: marker-pop 340ms cubic-bezier(0.2, 1.5, 0.35, 1) both; }
+  .cell.ship::after { animation: hull-in 240ms ease both; }
+
+  .burst span { animation: shard 950ms ease-out var(--delay) both; }
 }

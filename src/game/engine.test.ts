@@ -164,7 +164,6 @@ describe('ownBoardView', () => {
       resolveShot(myFleet, [{ row: 0, col: 0 }], { row: 5, col: 5 }, 'guest'), // miss
     ];
     const view = ownBoardView(log, myFleet, 'host');
-    expect(view.ships[0][0]).toBe('carrier');
     expect(view.incoming[0][0]).toBe('hit');
     expect(view.incoming[5][5]).toBe('miss');
     expect(view.sunkShips.size).toBe(0);

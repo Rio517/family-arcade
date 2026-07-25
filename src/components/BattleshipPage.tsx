@@ -10,6 +10,7 @@ import { Placement } from './Placement';
 import { Battle } from './Battle';
 import { Result } from './Result';
 import { ConnectionBadge } from './ConnectionBadge';
+import { CloseIcon } from './icons';
 import type { FinishInfo } from '../game/session';
 
 /** The finished-game summary shown on the Result screen. */
@@ -24,6 +25,7 @@ export function BattleshipPage() {
   const profile = useProfile();
   const [finish, setFinish] = useState<ResultSummary | null>(null);
   const [copied, setCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const onFinish = useCallback(
     (info: FinishInfo) => {
@@ -96,19 +98,40 @@ export function BattleshipPage() {
         </button>
         <h1>Ship Battle</h1>
         <span className="spacer" />
+        {showCode && (
+          <button className="code-chip" onClick={() => setShareOpen(true)} data-testid="share-chip">
+            <span className="lbl">Code</span>
+            <strong data-testid="game-code">{bs.code}</strong>
+          </button>
+        )}
         {bs.side && <ConnectionBadge status={bs.status} detail={bs.statusDetail} />}
       </div>
 
-      {showCode && (
-        <div className="panel codebox narrow-col">
-          <div className="lbl">Share this code</div>
-          <div className="code" data-testid="game-code">{bs.code}</div>
-          <p className="subtle" style={{ margin: '8px 0 14px' }}>
-            Open Ship Battle on the other iPad and tap “Join with a code”.
-          </p>
-          <button className="btn btn-primary" onClick={copyShare}>
-            {copied ? 'Link copied' : 'Copy invite link'}
-          </button>
+      {shareOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShareOpen(false);
+          }}
+        >
+          <div className="modal" role="dialog" aria-label="Invite your opponent">
+            <div className="modal-head">
+              <span className="modal-title">Invite your opponent</span>
+              <button className="icon-btn" onClick={() => setShareOpen(false)} aria-label="Close">
+                <CloseIcon size={18} />
+              </button>
+            </div>
+            <div className="codebox">
+              <div className="lbl">Share this code</div>
+              <div className="code">{bs.code}</div>
+              <p className="subtle" style={{ margin: '8px 0 14px' }}>
+                Open Ship Battle on the other iPad and tap “Join with a code”.
+              </p>
+              <button className="btn btn-primary btn-block" onClick={copyShare}>
+                {copied ? 'Link copied' : 'Copy invite link'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

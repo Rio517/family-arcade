@@ -80,6 +80,19 @@ export type Message =
 
 // ── Reconciliation ──────────────────────────────────────────────────────────
 
+/** A finished game is at most one shot per cell per side, plus a few framing
+ * events. Anything past this is malformed/hostile and rejected outright. */
+export const MAX_LOG_EVENTS = 2 * BOARD_SIZE * BOARD_SIZE + 4;
+
+/** True when `short` is an exact prefix of `long` (same events, same order). */
+function isPrefix(short: GameLog, long: GameLog): boolean {
+  if (short.length > long.length) return false;
+  for (let i = 0; i < short.length; i++) {
+    if (JSON.stringify(short[i]) !== JSON.stringify(long[i])) return false;
+  }
+  return true;
+}
+
 /**
  * Given our log and a peer's log, return the authoritative one.
  *
@@ -89,9 +102,16 @@ export type Message =
  * merge conflict; on a tie we keep our own copy so the result is stable and
  * idempotent. (The `full-game-through-a-disconnect` integration test exercises
  * this convergence end to end.)
+ *
+ * We only adopt a longer peer log when it genuinely *extends* ours. A longer log
+ * that diverges from our history can't have come from an honest peer following
+ * the invariant — it's corrupt or forged — so we keep our own rather than let it
+ * overwrite a valid game. (Shape is already checked by `isMessage`; this is the
+ * consistency check on top of it.)
  */
 export function reconcileLogs(ours: GameLog, theirs: GameLog): GameLog {
-  return theirs.length > ours.length ? theirs : ours;
+  if (theirs.length > ours.length && isPrefix(ours, theirs)) return theirs;
+  return ours;
 }
 
 // ── Inbound validation ───────────────────────────────────────────────────────
@@ -149,7 +169,12 @@ export function isMessage(value: unknown): value is Message {
     case 'ready':
       return typeof m.ready === 'boolean';
     case 'sync':
-      return Array.isArray(m.log) && m.log.every(isGameEvent) && typeof m.ready === 'boolean';
+      return (
+        Array.isArray(m.log) &&
+        m.log.length <= MAX_LOG_EVENTS &&
+        m.log.every(isGameEvent) &&
+        typeof m.ready === 'boolean'
+      );
     case 'fire':
       return isCell(m);
     case 'shot':

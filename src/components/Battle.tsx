@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Board, type BoardCell } from './Board';
-import { FLEET } from '../game/constants';
+import { useEffect, useRef, useState } from 'react';
+import { Board, type BoardCell, type PlacedShip } from './Board';
+import { FLEET, shipSpec } from '../game/constants';
 import { COLUMN_LABELS } from '../game/board';
 import { ownBoardView, radarGrid, shipName, sunkByAttacker } from '../game/engine';
 import { RadarIcon, ShieldIcon, TargetIcon } from './icons';
@@ -42,6 +42,32 @@ export function Battle({
     if (myTurn) setView('radar');
   }, [myTurn]);
 
+  // Detect the just-resolved shot and flag it for a one-shot impact animation
+  // (shockwave / ripple / explosion + a board shake). The flag auto-clears so
+  // the next shot re-triggers even on the same board.
+  const [impact, setImpact] = useState<{ row: number; col: number; kind: 'miss' | 'hit' | 'sunk'; onEnemy: boolean } | null>(null);
+  const shotCountRef = useRef(0);
+  const impactTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const shots = log.filter((e): e is ShotEvent => e.type === 'shot');
+    if (shots.length > shotCountRef.current) {
+      const last = shots[shots.length - 1];
+      const kind = last.allSunk || last.sunk ? 'sunk' : last.hit ? 'hit' : 'miss';
+      setImpact({ row: last.row, col: last.col, kind, onEnemy: last.by === side });
+      if (impactTimer.current) clearTimeout(impactTimer.current);
+      impactTimer.current = setTimeout(() => setImpact(null), 700);
+    }
+    shotCountRef.current = shots.length;
+  }, [log, side]);
+  useEffect(() => () => {
+    if (impactTimer.current) clearTimeout(impactTimer.current);
+  }, []);
+
+  const isFresh = (onEnemy: boolean, r: number, c: number) =>
+    impact !== null && impact.onEnemy === onEnemy && impact.row === r && impact.col === c;
+  const boardShake = (onEnemy: boolean): 'soft' | 'hard' | null =>
+    impact && impact.onEnemy === onEnemy && impact.kind !== 'miss' ? (impact.kind === 'sunk' ? 'hard' : 'soft') : null;
+
   const radar = radarGrid(log, side);
   const own = ownBoardView(log, myFleet, side);
 
@@ -50,17 +76,29 @@ export function Battle({
       if (pendingFire && pendingFire.row === ri && pendingFire.col === ci) {
         return { state: 'water', preview: 'ok' };
       }
-      return { state: state === 'unknown' ? 'water' : state };
+      return { state: state === 'unknown' ? 'water' : state, fresh: isFresh(true, ri, ci) };
     }),
   );
 
+  // Ships are drawn as top-down overlays (see ownShips); un-hit ship cells stay
+  // water so the silhouette shows, and incoming shots draw over them.
   const ownCells: BoardCell[][] = Array.from({ length: BOARD_SIZE }, (_, r) =>
     Array.from({ length: BOARD_SIZE }, (_, c) => {
       const incoming = own.incoming[r][c];
-      if (incoming !== 'unknown') return { state: incoming };
-      return { state: own.ships[r][c] ? 'ship' : 'water' };
+      const fresh = isFresh(false, r, c);
+      if (incoming !== 'unknown') return { state: incoming, fresh };
+      return { state: 'water' };
     }),
   );
+
+  const ownShips: PlacedShip[] = myFleet.map((p) => ({
+    shipId: p.shipId,
+    row: p.row,
+    col: p.col,
+    size: shipSpec(p.shipId).size,
+    orientation: p.orientation,
+    sunk: own.sunkShips.has(p.shipId),
+  }));
 
   const mySunk = sunkByAttacker(log, side);
   const enemySunkCount = mySunk.length;
@@ -85,6 +123,7 @@ export function Battle({
         skinId={oppSkinId}
         variant="enemy"
         active={myTurn}
+        shake={boardShake(true)}
         onCell={myTurn ? (r, c) => onFire({ row: r, col: c }) : undefined}
         disabled={!myTurn}
       />
@@ -100,7 +139,7 @@ export function Battle({
         </span>
         <span className="hint">{FLEET.length - myLostCount}/{FLEET.length} afloat</span>
       </div>
-      <Board cells={ownCells} skinId={skinId} variant="own" />
+      <Board cells={ownCells} skinId={skinId} variant="own" ships={ownShips} shake={boardShake(false)} />
       <FleetStatus title="Your fleet" sunkIds={[...own.sunkShips]} />
     </div>
   );
