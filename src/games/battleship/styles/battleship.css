@@ -1,0 +1,297 @@
+/* Ship Battle — gameplay styles (boards, ships, placement, battle, skins). */
+
+/* ── Skin picker ─────────────────────────────────────────────────────────── */
+/* Panel header row: title + an inline action (e.g. the fleet info toggle). */
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.panel-head h2 { margin: 0; }
+.info-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; border: 1px solid var(--border); border-radius: 999px;
+  color: var(--muted); font-size: 12px; font-weight: 600; padding: 5px 10px; cursor: pointer;
+}
+.info-btn:hover { color: var(--text); border-color: var(--accent); }
+.info-box {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
+}
+.info-box p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.info-box p:last-child { margin-bottom: 0; }
+.info-box strong { color: var(--text); }
+
+.skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.skin {
+  position: relative; text-align: left; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); /* buttons don't inherit text colour — set it explicitly */
+  border-radius: 14px; padding: 14px; overflow: hidden;
+  transition: transform 120ms, border-color 120ms;
+}
+.skin:active { transform: scale(0.98); }
+.skin[data-selected='true'] { border-color: var(--skin); box-shadow: 0 0 0 1px var(--skin), 0 0 24px -6px var(--skin); }
+.skin[data-locked='true'] { opacity: 0.85; }
+.skin .glyph {
+  width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center;
+  font-size: 24px; margin-bottom: 10px;
+  background: color-mix(in srgb, var(--skin) 18%, transparent);
+  border: 1px solid var(--skin);
+}
+.skin .nm { font-weight: 700; font-size: 15px; }
+.skin .bl { font-size: 12px; color: var(--muted); margin-top: 2px; min-height: 2.4em; }
+.skin .cost {
+  margin-top: 8px; font-size: 12px; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.skin .cost.owned { color: var(--good); }
+.skin .cost.locked { color: var(--warn); }
+.skin .lockpill {
+  position: absolute; top: 10px; right: 10px;
+  display: grid; place-items: center; color: var(--muted);
+}
+
+/* ── Boards ──────────────────────────────────────────────────────────────── */
+.board-wrap { display: inline-block; width: 100%; }
+.board-title { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.board-title .name { font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.board-title .name svg { color: var(--accent); }
+.board-title .hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+.board {
+  display: grid;
+  grid-template-columns: 0.7fr repeat(10, 1fr);
+  gap: 2px;
+  background: var(--surface);
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  user-select: none;
+  touch-action: manipulation;
+  /* Cap the size so cells stay crisp and tappable on big screens, and both
+     boards + the log fit the viewport height on a landscape iPad. */
+  max-width: 560px;
+  margin-inline: auto;
+}
+.board.enemy.active { border-color: var(--accent); box-shadow: 0 0 22px -8px var(--accent); }
+.board .hdr {
+  display: grid; place-items: center;
+  font-size: 9px; color: var(--muted); font-weight: 600;
+}
+.cell {
+  aspect-ratio: 1 / 1;
+  border: none;
+  padding: 0;
+  border-radius: 3px;
+  background: var(--sea);
+  box-shadow: inset 0 0 0 1px var(--sea-line);
+  display: grid; place-items: center;
+  font-size: clamp(9px, 2.6vw, 16px);
+  color: var(--text);
+  cursor: default;
+  position: relative;
+  transition: background 100ms;
+}
+.cell.clickable { cursor: pointer; }
+.cell.clickable:active { background: #12294a; }
+.cell.ship { background: color-mix(in srgb, var(--skin) 30%, var(--sea)); box-shadow: inset 0 0 0 1px var(--skin); }
+/* Own un-hit ship cells get a small hull node so the fleet reads clearly. */
+.cell.ship::after {
+  content: ''; width: 38%; height: 38%; border-radius: 3px;
+  background: var(--skin); opacity: 0.9;
+}
+.cell.miss::after {
+  content: ''; width: 26%; height: 26%; border-radius: 50%;
+  background: var(--muted); opacity: 0.7;
+}
+/* Shot markers sit above the ship overlay (z 5) so hits punch through a hull. */
+.cell.hit, .cell.miss, .cell.sunk { z-index: 6; }
+.cell.hit { background: color-mix(in srgb, #ff7a2e 12%, var(--sea)); }
+/* On my own fleet the hit sits over a ship hull, so let the grey hull show
+   through cleanly with just the ember — no cell square shining through. */
+.board.own .cell.hit { background: transparent; box-shadow: none; }
+/* Hit: a glowing fire ember at the wound. */
+.cell.hit::after {
+  content: ''; width: 46%; height: 46%; border-radius: 50%;
+  background: radial-gradient(circle, #fff2c4 0%, #ff9d3c 45%, #ff4d2e 78%, rgba(255, 77, 46, 0) 100%);
+  box-shadow: 0 0 9px 2px rgba(255, 120, 40, 0.7);
+}
+/* Sunk: a scorched cell (no red squares); the charred wreck overlay sits on top. */
+.cell.sunk { background: color-mix(in srgb, #000 34%, var(--sea)); box-shadow: inset 0 0 0 1px rgba(120, 82, 52, 0.55); }
+.cell.sunk::after { content: none; }
+.cell.preview { background: color-mix(in srgb, var(--skin) 45%, var(--sea)); box-shadow: inset 0 0 0 1px var(--skin); }
+.cell.preview.bad { background: color-mix(in srgb, var(--bad) 45%, var(--sea)); box-shadow: inset 0 0 0 1px var(--bad); }
+
+/* ── Top-down ship overlays (placement board) ──────────────────────────────── */
+.ship-overlay {
+  position: relative; z-index: 5;
+  color: var(--skin);
+  cursor: grab; touch-action: none;
+  /* The overlay stretches to fill its grid area; its SVG is absolutely
+     positioned so it never contributes intrinsic height, which would inflate
+     the auto-sized row track and push the ship off-centre. */
+  min-height: 0; min-width: 0;
+}
+.ship-overlay svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+/* Un-selected ships sit back a touch so the active one reads as the focus. */
+.ship-overlay:not(.selected) svg { opacity: 0.8; }
+.ship-overlay.selected { z-index: 6; }
+.ship-overlay.selected svg { filter: drop-shadow(0 0 6px var(--skin)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+.ship-overlay.dragging { z-index: 8; cursor: grabbing; }
+.ship-overlay.dragging svg { filter: drop-shadow(0 0 8px var(--skin)); }
+.ship-overlay.bad { color: var(--bad); }
+/* Read-only ships (own battle board): no grab cursor, let taps reach cells. */
+.ship-overlay.static { cursor: default; pointer-events: none; }
+/* Damage progression. Hit-but-afloat: a grey hull (the fire embers ride on the
+   struck cells above it). Fully sunk: a charred wreck with an orange burn glow,
+   raised above the cells so the silhouette — not a row of red X's — is what you
+   see. Same on my board and the radar. */
+.ship-overlay.damaged { color: #9fb0c6; }
+.ship-overlay.sunk { color: #23282f; z-index: 7; }
+.ship-overlay.sunk svg { opacity: 1; filter: drop-shadow(0 0 5px rgba(255, 120, 40, 0.85)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
+/* While dragging, overlays are click-through so pointer hit-tests reach cells. */
+.board.dragging .ship-overlay { pointer-events: none; }
+
+/* Rotate + remove sit at the two ends of a placed ship; the middle stays a
+   drag handle. Always visible while placing. */
+.ship-ctrl {
+  position: absolute; z-index: 9;
+  width: 21px; height: 21px; display: grid; place-items: center;
+  background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); cursor: pointer; padding: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.ship-ctrl.h.start { left: 2px; top: 50%; transform: translateY(-50%); }
+.ship-ctrl.h.end { right: 2px; top: 50%; transform: translateY(-50%); }
+.ship-ctrl.v.start { top: 2px; left: 50%; transform: translateX(-50%); }
+.ship-ctrl.v.end { bottom: 2px; left: 50%; transform: translateX(-50%); }
+.ship-ctrl:hover { border-color: var(--accent); }
+.ship-ctrl.danger:hover { color: var(--bad); border-color: var(--bad); }
+/* Ship carried from the sidebar toward the board (follows the cursor). */
+.drag-ghost {
+  position: fixed; z-index: 100; pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-4deg);
+  color: var(--skin); opacity: 0.92;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.55));
+}
+.drag-ghost svg { display: block; width: 100%; height: 100%; }
+.cell.target { cursor: crosshair; }
+
+/* Particle effects layer: spans the whole board grid, never eats pointer
+   events, and paints above cells (z 6) and ship overlays. */
+.board-fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* ── Placement ───────────────────────────────────────────────────────────── */
+.ship-list { display: grid; gap: 8px; }
+.ship-chip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid transparent;
+  cursor: pointer; transition: border-color 120ms, background 120ms;
+  user-select: none; -webkit-user-select: none;
+}
+.ship-chip[data-placed='false'] { cursor: grab; }
+.ship-chip[data-selected='true'] { border-color: var(--skin); background: color-mix(in srgb, var(--skin) 14%, var(--surface-2)); }
+.ship-chip[data-placed='true'] .nm { color: var(--muted); }
+.ship-art { display: inline-flex; align-items: center; min-width: 64px; }
+.chip-actions { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.chip-btn {
+  display: grid; place-items: center; width: 30px; height: 30px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--muted); cursor: pointer;
+}
+.chip-btn:hover { color: var(--text); border-color: var(--accent); }
+.chip-btn.danger:hover { color: var(--bad); border-color: var(--bad); }
+.ship-chip .status { font-size: 12px; color: var(--warn); }
+.ship-chip .status.todo { color: var(--warn); }
+
+/* "or" divider above the Fast Start express lane. */
+.or-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; color: var(--muted); font-size: 12px; }
+.or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── Battle ──────────────────────────────────────────────────────────────── */
+/* Compact turn indicator in the top bar (saves the old full-width banner row). */
+.turn-pill {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.01em;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
+}
+.turn-pill.mine { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+.turn-pill.theirs { color: var(--warn); border-color: var(--warn); background: rgba(251, 191, 36, 0.12); }
+
+/* Battle layout tiers:
+   • < 720px  — .battle-narrow: tab between one board + log below.
+   • 720px+   — .battle-wide: both boards side by side, log below.
+   • 1024px+  — .battle-wide becomes 2 columns: boards | full-height log. */
+.battle-narrow { display: block; }
+.battle-wide { display: none; }
+
+@media (min-width: 720px) {
+  .battle-narrow { display: none; }
+  .battle-wide { display: block; }
+  .battle-wide .boards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+    margin-bottom: 14px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .battle-wide {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+    gap: 16px;
+    align-items: start;
+  }
+  .battle-wide .boards { margin-bottom: 0; }
+  /* Let the log column grow tall alongside the boards. */
+  .battle-wide .movelog { max-height: min(70vh, 640px); }
+}
+
+/* Placement: board + controls stack on phones, sit side-by-side on wide. */
+.placement-layout { display: grid; gap: 14px; }
+@media (min-width: 900px) {
+  .placement-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+    align-items: start;
+  }
+}
+
+.view-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.view-tabs button {
+  flex: 1; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 13px;
+  background: var(--surface); color: var(--muted); border: 1px solid var(--border); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.view-tabs button[data-active='true'] { color: var(--text); border-color: var(--accent); background: var(--accent-dim); }
+
+/* Battle log — a little terminal; the newest line types itself in. */
+.movelog {
+  max-height: 220px; overflow-y: auto; display: grid; gap: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.movelog .entry { display: flex; gap: 8px; font-size: 12.5px; align-items: baseline; }
+.movelog .prompt { color: var(--accent); font-weight: 700; }
+.movelog .who { font-weight: 700; min-width: 3.2em; }
+.movelog .who.me { color: var(--accent); }
+.movelog .who.them { color: var(--warn); }
+.movelog .coord { font-variant-numeric: tabular-nums; color: var(--muted); }
+.movelog .res.hit { color: var(--bad); font-weight: 700; }
+.movelog .res.miss { color: var(--muted); }
+.movelog .res.sunk { color: #fff; font-weight: 800; }
+
+/* Fleet read-out: a profile + name per ship; sunk ones go grey + struck. */
+.fleet-roster { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+.fs-ship { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 42px; }
+.fs-art { height: 16px; display: grid; place-items: center; }
+.fs-name { font-size: 10px; color: var(--muted); letter-spacing: 0.01em; }
+.fs-ship.sunk .fs-art { color: #93a1b5; opacity: 0.6; }
+.fs-ship.sunk .fs-name { text-decoration: line-through; }
+

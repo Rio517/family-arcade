@@ -1,0 +1,91 @@
+/* Chess — board, pieces, promotion picker. */
+
+/* ── Chess ─────────────────────────────────────────────────────────────────
+   An 8×8 board with rank/file labels, drag-and-drop pieces, legal-move hints,
+   and a promotion picker. The board is square and fluid: it fills the column up
+   to a comfortable max so it works on a phone and a tablet alike. */
+.chess-wrap {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  grid-template-rows: 1fr 18px;
+  gap: 4px;
+  max-width: min(92vw, 560px);
+  margin: 8px auto 0;
+}
+.chess-board {
+  grid-column: 2; grid-row: 1;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 12px 34px -14px rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--border);
+  touch-action: manipulation;
+}
+.chess-ranks, .chess-files {
+  display: grid; color: var(--muted); font-size: 11px; font-weight: 600;
+}
+.chess-ranks { grid-column: 1; grid-row: 1; grid-template-rows: repeat(8, 1fr); }
+.chess-ranks span { display: flex; align-items: center; justify-content: center; }
+.chess-files { grid-column: 2; grid-row: 2; grid-template-columns: repeat(8, 1fr); }
+.chess-files span { display: flex; align-items: center; justify-content: center; }
+
+.chess-board .sq {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  border: none; padding: 0; margin: 0; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.chess-board .sq svg { width: 82%; height: 82%; }
+.chess-board .sq.light { background: #cbd5e1; }
+.chess-board .sq.dark { background: #64748b; }
+.chess-board .sq.last { background: color-mix(in srgb, var(--warn) 42%, #cbd5e1); }
+.chess-board .sq.dark.last { background: color-mix(in srgb, var(--warn) 42%, #64748b); }
+.chess-board .sq.sel { box-shadow: inset 0 0 0 3px var(--accent); }
+.chess-board .sq.check { background: color-mix(in srgb, var(--bad) 55%, #64748b); }
+
+/* Legal-move hints: a dot on empty targets, a ring on captures. */
+.chess-board .sq.target::after {
+  content: ''; position: absolute; width: 30%; height: 30%; border-radius: 50%;
+  background: rgba(15, 23, 42, 0.4); pointer-events: none;
+}
+.chess-board .sq.capture::before {
+  content: ''; position: absolute; inset: 8%; border-radius: 50%;
+  box-shadow: inset 0 0 0 4px rgba(15, 23, 42, 0.4); pointer-events: none;
+}
+
+/* The dragged piece follows the pointer, offset so it sits above the finger. */
+.chess-drag {
+  position: fixed; z-index: 60; pointer-events: none;
+  transform: translate(-50%, -60%);
+}
+
+/* Promotion picker. */
+.promo-backdrop {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(2, 6, 20, 0.6);
+  display: flex; align-items: center; justify-content: center;
+}
+.promo {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px; box-shadow: 0 20px 50px -16px rgba(0, 0, 0, 0.7); text-align: center;
+}
+.promo-title { color: var(--muted); font-size: 13px; margin-bottom: 10px; font-weight: 600; }
+.promo-row { display: flex; gap: 8px; }
+.promo-btn {
+  width: 56px; height: 56px; border-radius: 10px;
+  background: #64748b; border: 1px solid var(--border); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.promo-btn:hover { border-color: var(--accent); }
+
+/* Draw emblem on the result screen. */
+.result-emblem.draw { color: var(--muted); filter: drop-shadow(0 4px 10px rgba(2, 6, 20, 0.5)); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .result-emblem.draw { animation: rise-in 600ms ease-out both; }
+}
