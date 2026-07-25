@@ -9,6 +9,7 @@ import {
   isMyTurn,
   phase,
   proposeRematch,
+  releaseUnansweredFire,
   setFleet,
   toPlacing,
   type SessionState,
@@ -17,7 +18,7 @@ import { autoPlace, shipCells } from './board';
 import { hasStarted, winner } from './engine';
 import type { Message } from './protocol';
 import { seededRng } from '../test/helpers';
-import type { Coord, Fleet, GameEvent, Side } from './types';
+import type { Coord, Fleet, ShotEvent, Side } from './types';
 
 const HOST_FIRST = () => 0.1; // rng < 0.5 → start.first = 'host'
 
@@ -25,7 +26,7 @@ function newSession(side: Side): SessionState {
   return createSession(side, 'CODE', side === 'host' ? 'Rio' : 'Kid', 'aqua');
 }
 
-function mkShot(by: Side, row: number, col: number, hit = false): GameEvent {
+function mkShot(by: Side, row: number, col: number, hit = false): ShotEvent {
   return { type: 'shot', by, row, col, hit, sunk: null, allSunk: false };
 }
 
@@ -149,6 +150,74 @@ describe('connectHandshake', () => {
     const msgs = connectHandshake(s);
     expect(msgs.map((m) => m.t)).toEqual(['hello', 'sync']);
     expect(msgs.find((m) => m.t === 'sync')).toMatchObject({ log: s.log, ready: true });
+  });
+});
+
+describe('start authoring via sync (reconnect deadlock regression)', () => {
+  it('host authors start when the guest readiness arrives only via sync', () => {
+    // Host readied first; the guest's live `ready` was lost on a drop and its
+    // readiness reaches the host only in the reconnect sync.
+    const hostReady: SessionState = { ...newSession('host'), myReady: true };
+    const out = applyMessage(hostReady, { t: 'sync', log: [], ready: true }, HOST_FIRST);
+    expect(out.state.oppReady).toBe(true);
+    expect(hasStarted(out.state.log)).toBe(true);
+    expect(out.outgoing).toContainEqual({ t: 'start', first: 'host' });
+  });
+});
+
+describe('finish detection', () => {
+  const overLog = [
+    { type: 'start', first: 'host' } as const,
+    { type: 'shot', by: 'host', row: 0, col: 0, hit: true, sunk: 'destroyer', allSunk: true } as const,
+  ];
+
+  it('does not re-report a finish after the game is already over', () => {
+    const over: SessionState = { ...newSession('guest'), myFleet: autoPlace(seededRng(1)), log: overLog };
+    expect(applyMessage(over, { t: 'sync', log: overLog, ready: true }).finished).toBeUndefined();
+    expect(applyMessage(over, { t: 'shot', event: mkShot('guest', 5, 5) }).finished).toBeUndefined();
+  });
+
+  it('reports finish when the winning shot arrives via sync (reconnect race)', () => {
+    const loser: SessionState = { ...newSession('guest'), myFleet: autoPlace(seededRng(2)), log: [{ type: 'start', first: 'host' }] };
+    const out = applyMessage(loser, { t: 'sync', log: overLog, ready: true });
+    expect(out.finished).toBeDefined();
+    expect(out.finished?.won).toBe(false); // host sank everything; I'm the guest
+  });
+});
+
+describe('fire lock (pendingFire)', () => {
+  it('clears the lock when the matching shot arrives', () => {
+    const s: SessionState = { ...newSession('host'), log: [{ type: 'start', first: 'host' }], pendingFire: { row: 1, col: 1 } };
+    const out = applyMessage(s, { t: 'shot', event: mkShot('host', 1, 1) });
+    expect(out.state.pendingFire).toBeNull();
+    expect(out.state.log.filter((e) => e.type === 'shot')).toHaveLength(1);
+  });
+
+  it('clears the lock on a duplicate shot without re-appending', () => {
+    const shot = mkShot('host', 1, 1);
+    const s: SessionState = { ...newSession('host'), log: [{ type: 'start', first: 'host' }, shot], pendingFire: { row: 1, col: 1 } };
+    const out = applyMessage(s, { t: 'shot', event: shot });
+    expect(out.state.pendingFire).toBeNull();
+    expect(out.state.log.filter((e) => e.type === 'shot')).toHaveLength(1);
+  });
+
+  it('fireAt is a no-op on an already-tried cell (even on my turn)', () => {
+    const s: SessionState = {
+      ...newSession('host'),
+      log: [{ type: 'start', first: 'host' }, mkShot('host', 3, 3), mkShot('guest', 0, 0)],
+    };
+    expect(isMyTurn(s)).toBe(true);
+    const out = fireAt(s, { row: 3, col: 3 });
+    expect(out.outgoing).toEqual([]);
+    expect(out.state.pendingFire).toBeNull();
+  });
+
+  it('releaseUnansweredFire releases only while it is still my turn', () => {
+    const stillMine: SessionState = { ...newSession('host'), log: [{ type: 'start', first: 'host' }], pendingFire: { row: 2, col: 2 } };
+    expect(releaseUnansweredFire(stillMine).pendingFire).toBeNull();
+
+    const turnPassed: SessionState = { ...newSession('host'), log: [{ type: 'start', first: 'host' }, mkShot('host', 2, 2)], pendingFire: { row: 2, col: 2 } };
+    expect(releaseUnansweredFire(turnPassed).pendingFire).toEqual({ row: 2, col: 2 });
   });
 });
 

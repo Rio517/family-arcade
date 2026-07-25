@@ -12,6 +12,8 @@
  */
 
 import type { Fleet, GameLog, Side } from '../game/types';
+import { winner } from '../game/engine';
+import type { SessionState } from '../game/session';
 import { normalizeProfile, type Profile } from '../state/profile';
 
 const PROFILE_KEY = 'bship:profile:v1';
@@ -32,6 +34,47 @@ export interface GameSession {
   log: GameLog;
   finished: boolean;
   updatedAt: number;
+}
+
+/** Serialize a live session for storage. `now` is injected so this stays pure. */
+export function sessionToStored(s: SessionState, now: number): GameSession {
+  return {
+    code: s.code,
+    side: s.side,
+    myName: s.myName,
+    mySkinId: s.mySkinId,
+    oppName: s.oppName,
+    oppSkinId: s.oppSkinId,
+    myFleet: s.myFleet,
+    myReady: s.myReady,
+    oppReady: s.oppReady,
+    log: s.log,
+    finished: winner(s.log) !== null,
+    updatedAt: now,
+  };
+}
+
+/**
+ * Rebuild a session from storage. The setup phase is derived from readiness;
+ * rematch flags and the fire lock always start clear on a fresh restore.
+ */
+export function storedToSession(g: GameSession): SessionState {
+  return {
+    side: g.side,
+    code: g.code,
+    myName: g.myName,
+    mySkinId: g.mySkinId,
+    oppName: g.oppName,
+    oppSkinId: g.oppSkinId,
+    myFleet: g.myFleet,
+    myReady: g.myReady,
+    oppReady: g.oppReady,
+    iWantRematch: false,
+    oppWantsRematch: false,
+    log: g.log,
+    pendingFire: null,
+    setupPhase: g.myReady ? 'waiting' : 'placing',
+  };
 }
 
 function safeGet(key: string): string | null {

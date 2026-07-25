@@ -176,8 +176,12 @@ export function applyMessage(s: SessionState, msg: Message, rng: () => number = 
 
     case 'sync': {
       const merged = reconcileLogs(s.log, msg.log);
-      const next: SessionState = { ...s, oppReady: msg.ready };
-      return advanceLog(s, next, merged);
+      const synced = advanceLog({ ...s, oppReady: msg.ready }, merged);
+      // The guest's readiness may reach the host ONLY via this sync — its live
+      // `ready` was lost on the drop that forced the reconnect. Re-check start
+      // authoring here or the lobby deadlocks in `waiting` forever.
+      const started = maybeAuthorStart(synced.state, rng);
+      return { state: started.state, outgoing: [...synced.outgoing, ...started.outgoing], finished: synced.finished };
     }
 
     case 'start': {
@@ -191,7 +195,7 @@ export function applyMessage(s: SessionState, msg: Message, rng: () => number = 
       const { event, isResend } = resolveIncomingFire(s.log, s.myFleet, s.side, { row: msg.row, col: msg.col });
       const outgoing: Message[] = [{ t: 'shot', event }];
       if (isResend) return { state: s, outgoing };
-      const result = advanceLog(s, s, [...s.log, event]);
+      const result = advanceLog(s, [...s.log, event]);
       return { ...result, outgoing: [...outgoing, ...result.outgoing] };
     }
 
@@ -199,7 +203,7 @@ export function applyMessage(s: SessionState, msg: Message, rng: () => number = 
       const ev = msg.event;
       const already = shotsBy(s.log, ev.by).some((e) => e.row === ev.row && e.col === ev.col);
       if (already) return none({ ...s, pendingFire: null });
-      return advanceLog(s, s, [...s.log, ev]);
+      return advanceLog(s, [...s.log, ev]);
     }
 
     case 'rematch':
@@ -210,15 +214,25 @@ export function applyMessage(s: SessionState, msg: Message, rng: () => number = 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
 /**
- * Adopt a new log on top of `next`, clearing the fire lock and detecting the
- * one transition where the game becomes finished (so the caller reports it to
- * the profile exactly once). `before` carries the pre-change log for the
- * winner-transition check.
+ * Adopt a new log, clearing the fire lock and detecting the one transition
+ * where the game becomes finished (so the caller reports it exactly once). The
+ * pre-change log for that check is simply `next.log` — callers pass the state
+ * whose log is about to be replaced.
  */
-function advanceLog(before: SessionState, next: SessionState, log: GameLog): Outcome {
+function advanceLog(next: SessionState, log: GameLog): Outcome {
   const state: SessionState = { ...next, log, pendingFire: null };
-  const finished = detectFinish(before.log, log, state);
+  const finished = detectFinish(next.log, log, state);
   return finished ? { state, outgoing: [], finished } : none(state);
+}
+
+/**
+ * Release the board lock for an unanswered fire, but only if it's still our
+ * turn (the reply never landed). Called by the hook's timeout watchdog — the
+ * timing lives in React, the rule lives here.
+ */
+export function releaseUnansweredFire(s: SessionState): SessionState {
+  if (s.pendingFire && currentTurn(s.log) === s.side) return { ...s, pendingFire: null };
+  return s;
 }
 
 function detectFinish(beforeLog: GameLog, afterLog: GameLog, s: SessionState): FinishInfo | undefined {
@@ -243,7 +257,11 @@ function maybeAuthorStart(s: SessionState, rng: () => number): Outcome {
   };
 }
 
-/** Reset for a rematch once both sides have asked and the game is over. */
+/**
+ * Reset for a rematch once both sides have asked and the game is over. Returns
+ * a bare SessionState (not an Outcome) because a restart emits no messages —
+ * unlike maybeAuthorStart, which sends the opening `start`.
+ */
 function maybeRestart(s: SessionState): SessionState {
   if (!s.iWantRematch || !s.oppWantsRematch || winner(s.log) === null) return s;
   return {

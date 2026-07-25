@@ -10,8 +10,10 @@ import { Placement } from './Placement';
 import { Battle } from './Battle';
 import { Result } from './Result';
 import { ConnectionBadge } from './ConnectionBadge';
+import type { FinishInfo } from '../game/session';
 
-interface FinishInfo {
+/** The finished-game summary shown on the Result screen. */
+interface ResultSummary {
   won: boolean;
   pointsEarned: number;
 }
@@ -20,11 +22,11 @@ export function BattleshipPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const profile = useProfile();
-  const [finish, setFinish] = useState<FinishInfo | null>(null);
+  const [finish, setFinish] = useState<ResultSummary | null>(null);
   const [copied, setCopied] = useState(false);
 
   const onFinish = useCallback(
-    (info: { won: boolean; survivingCells: number; code: string; opponent: string }) => {
+    (info: FinishInfo) => {
       const pointsEarned = pointsForResult(info.won, info.survivingCells);
       profile.recordResult({
         won: info.won,
