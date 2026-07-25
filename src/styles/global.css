@@ -333,12 +333,19 @@ body {
 /* While dragging, overlays are click-through so pointer hit-tests reach cells. */
 .board.dragging .ship-overlay { pointer-events: none; }
 
-.ship-ctrls { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 5px; z-index: 9; }
+/* Rotate + remove sit at the two ends of a placed ship; the middle stays a
+   drag handle. Always visible while placing. */
 .ship-ctrl {
-  width: 24px; height: 24px; display: grid; place-items: center;
-  background: rgba(15, 23, 42, 0.86); border: 1px solid var(--border); border-radius: 6px;
+  position: absolute; z-index: 9;
+  width: 21px; height: 21px; display: grid; place-items: center;
+  background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border); border-radius: 6px;
   color: var(--text); cursor: pointer; padding: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
+.ship-ctrl.h.start { left: 2px; top: 50%; transform: translateY(-50%); }
+.ship-ctrl.h.end { right: 2px; top: 50%; transform: translateY(-50%); }
+.ship-ctrl.v.start { top: 2px; left: 50%; transform: translateX(-50%); }
+.ship-ctrl.v.end { bottom: 2px; left: 50%; transform: translateX(-50%); }
 .ship-ctrl:hover { border-color: var(--accent); }
 .ship-ctrl.danger:hover { color: var(--bad); border-color: var(--bad); }
 .cell.target { cursor: crosshair; }

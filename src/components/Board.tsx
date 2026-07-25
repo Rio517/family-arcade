@@ -140,15 +140,29 @@ export function Board({
             onPointerDown={onShipPointerDown ? (e) => onShipPointerDown(ship.shipId, e) : undefined}
           >
             <ShipTopDown shipId={ship.shipId} size={ship.size} orientation={ship.orientation} />
-            {showControls && selected && !ship.dragging && (
-              <div className="ship-ctrls" onPointerDown={(e) => e.stopPropagation()}>
-                <button className="ship-ctrl" aria-label={`Rotate ${ship.shipId}`} data-testid={`board-rotate-${ship.shipId}`} onClick={() => onShipRotate?.(ship.shipId)}>
-                  <RotateIcon size={13} />
+            {showControls && !ship.dragging && (
+              // Controls live at the two ends so the middle stays a drag handle.
+              // onPointerDown stops the tap from starting a ship drag.
+              <>
+                <button
+                  className={`ship-ctrl start ${ship.orientation === 'H' ? 'h' : 'v'}`}
+                  aria-label={`Rotate ${ship.shipId}`}
+                  data-testid={`board-rotate-${ship.shipId}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => onShipRotate?.(ship.shipId)}
+                >
+                  <RotateIcon size={12} />
                 </button>
-                <button className="ship-ctrl danger" aria-label={`Remove ${ship.shipId}`} data-testid={`board-remove-${ship.shipId}`} onClick={() => onShipRemove?.(ship.shipId)}>
-                  <CloseIcon size={13} />
+                <button
+                  className={`ship-ctrl end danger ${ship.orientation === 'H' ? 'h' : 'v'}`}
+                  aria-label={`Remove ${ship.shipId}`}
+                  data-testid={`board-remove-${ship.shipId}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => onShipRemove?.(ship.shipId)}
+                >
+                  <CloseIcon size={12} />
                 </button>
-              </div>
+              </>
             )}
           </div>
         );
