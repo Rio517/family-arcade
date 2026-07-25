@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Yahtzee Logger</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-2: #334155;
+      --border: #475569;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #22d3ee;
+      --accent-dim: rgba(34, 211, 238, 0.18);
+      --good: #4ade80;
+      --warn: #fbbf24;
+      --bad: #f87171;
+      --tap: rgba(255, 255, 255, 0.06);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      font-size: 16px;
+      line-height: 1.4;
+      overscroll-behavior: none;
+    }
+
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: max(12px, env(safe-area-inset-top)) 12px max(20px, env(safe-area-inset-bottom));
+    }
+
+    /* ── Buttons ─────────────────────────────────────────────────────── */
+    /* .btn is the base; modifiers below (.btn-header, .picker-actions
+       variants) refine it. Defined first so modifier rules win on equal
+       specificity. */
+    .btn {
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: opacity 120ms;
+    }
+    .btn:active { opacity: 0.7; }
+
+    /* ── Header ──────────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+    .btn-header {
+      padding: 8px 14px;
+      font-size: 13px;
+      border-radius: 8px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-left: auto;
+    }
+    /* Back link sits on the far left; the h1's auto right-margin pushes the
+       New button to the far right, keeping the title centered between them. */
+    .btn-back {
+      margin-left: 0;
+      text-decoration: none;
+      display: inline-block;
+    }
+    header h1 { margin-right: auto; }
+
+    /* ── Summary (Upper + Lower = Total) ─────────────────────────────── */
+    .summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .stat {
+      flex: 1;
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+      min-width: 0;
+    }
+    .stat .stat-label {
+      display: block;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .stat .stat-value {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      font-size: 18px;
+    }
+    .stat.total .stat-value { color: var(--accent); }
+    .stat-op {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--muted);
+      flex: 0 0 auto;
+    }
+
+    /* ── Scorecard ───────────────────────────────────────────────────── */
+    .section {
+      margin-bottom: 16px;
+    }
+    .section h2 {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 8px;
+      padding-left: 4px;
+    }
+    .scorecard {
+      background: var(--surface);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--surface-2);
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: background 120ms;
+    }
+    .row:last-child { border-bottom: none; }
+    /* The upper section's last lockable row (Sixes) sits directly above
+       the static Bonus row. Restore its border so the two read as
+       separate rows inside the same card. */
+    #upper > .row:last-child { border-bottom: 1px solid var(--surface-2); }
+    .row.lockable:active { background: var(--tap); }
+    .row.subtotal {
+      cursor: default;
+      background: var(--surface-2);
+      font-weight: 600;
+    }
+    .row.bonus-pending .score { color: var(--warn); font-size: 14px; }
+    .row.bonus-earned .score { color: var(--good); }
+    .label {
+      font-size: 14px;
+    }
+    .label .desc {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .score {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      font-size: 18px;
+      min-width: 44px;
+      text-align: right;
+      padding: 6px 10px;
+      border-radius: 6px;
+      color: var(--text);
+    }
+    .score.empty {
+      color: var(--muted);
+      font-weight: 400;
+      font-style: italic;
+    }
+    .score.locked {
+      color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    /* ── Picker overlay ──────────────────────────────────────────────── */
+    .picker-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+      padding: 0;
+    }
+    .picker-backdrop.open { display: flex; }
+    .picker {
+      background: var(--surface);
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      width: 100%;
+      max-width: 480px;
+      padding: 16px 16px max(20px, env(safe-area-inset-bottom));
+      animation: slide-up 200ms ease;
+    }
+    @keyframes slide-up {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .picker-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .picker-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .picker-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+    .picker-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .picker-options {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .picker-options.toggle { grid-template-columns: repeat(2, 1fr); }
+    .picker-option {
+      padding: 14px 8px;
+      border-radius: 8px;
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid transparent;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      font-size: 17px;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: background 100ms, border-color 100ms;
+    }
+    .picker-option:active { background: var(--border); }
+    .picker-option.zero { color: var(--bad); }
+    .picker-option.score { color: var(--good); }
+    .picker-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .picker-actions .btn-clear {
+      background: transparent;
+      border: 1px solid var(--bad);
+      color: var(--bad);
+    }
+    .picker-actions .btn-cancel {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+    }
+    .picker-actions .btn-primary {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────── */
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+      padding-top: 8px;
+    }
+    .footer a { color: var(--muted); }
+
+    /* ── Responsive ──────────────────────────────────────────────────── */
+    /* Side-by-side sections. Two columns kick in at modern phone-portrait
+       widths (iPhone 16 = 393px). Below 380px we stay stacked since the
+       longer Lower-section labels won't fit cleanly. */
+    @media (min-width: 380px) {
+      .sections {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        align-items: start;
+      }
+      .sections .section { margin-bottom: 0; }
+    }
+
+    /* Tight styling for narrow phone-portrait 2-column: trim padding,
+       hide row descriptions, shrink the score chip. */
+    @media (min-width: 380px) and (max-width: 639px) {
+      .sections .row { padding: 8px 10px; }
+      .sections .label { font-size: 15px; }
+      .sections .score {
+        font-size: 16px;
+        min-width: 34px;
+        padding: 4px 6px;
+      }
+    }
+
+    /* Roomy layout for landscape phones, tablets, and desktop. */
+    @media (min-width: 640px) {
+      .app { max-width: 760px; }
+      .sections { gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <a href="./index.html" class="btn btn-header btn-back" aria-label="Back to menu">‹ Menu</a>
+      <h1>Yahtzee Logger</h1>
+      <button class="btn btn-header" id="new-game" data-testid="btn-new-game">New</button>
+    </header>
+
+    <div class="summary">
+      <div class="stat">
+        <span class="stat-label">Upper</span>
+        <span class="stat-value" data-testid="upper-subtotal">0</span>
+      </div>
+      <span class="stat-op" aria-hidden="true">+</span>
+      <div class="stat">
+        <span class="stat-label">Lower</span>
+        <span class="stat-value" data-testid="lower-subtotal">0</span>
+      </div>
+      <span class="stat-op" aria-hidden="true">=</span>
+      <div class="stat total">
+        <span class="stat-label">Total</span>
+        <span class="stat-value" data-testid="grand-total">0</span>
+      </div>
+    </div>
+
+    <div class="sections">
+      <div class="section">
+        <h2>Upper Section</h2>
+        <div class="scorecard">
+          <div id="upper"></div>
+          <div class="row subtotal" id="bonus-row">
+            <div class="label">Bonus</div>
+            <div class="score" data-testid="upper-bonus">63 to go</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Lower Section</h2>
+        <div class="scorecard" id="lower"></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Yahtzee logger · works offline · <a href="https://github.com/Rio517/yahtzee-calculator">source</a>
+    </div>
+  </div>
+
+  <!-- New-game confirm overlay -->
+  <div class="picker-backdrop" id="confirm-new-backdrop" data-testid="confirm-new-modal">
+    <div class="picker" role="dialog" aria-labelledby="confirm-new-title">
+      <div class="picker-head">
+        <span class="picker-title" id="confirm-new-title">Start a new game?</span>
+      </div>
+      <p class="picker-desc">Your current scores will be lost.</p>
+      <div class="picker-actions">
+        <button class="btn btn-cancel" id="confirm-new-cancel" data-testid="confirm-new-cancel">Cancel</button>
+        <button class="btn btn-clear" id="confirm-new-ok" data-testid="confirm-new-ok">Start New</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resume-game overlay -->
+  <div class="picker-backdrop" id="resume-backdrop" data-testid="resume-modal">
+    <div class="picker" role="dialog" aria-labelledby="resume-title">
+      <div class="picker-head">
+        <span class="picker-title" id="resume-title">Resume previous game?</span>
+      </div>
+      <p class="picker-desc" id="resume-desc"></p>
+      <div class="picker-actions">
+        <button class="btn btn-cancel" id="resume-new" data-testid="resume-new">Start New</button>
+        <button class="btn btn-primary" id="resume-continue" data-testid="resume-continue">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Picker overlay -->
+  <div class="picker-backdrop" id="picker-backdrop" data-testid="picker">
+    <div class="picker" role="dialog" aria-labelledby="picker-title">
+      <div class="picker-head">
+        <span class="picker-title" id="picker-title"></span>
+        <button class="picker-close" id="picker-close" aria-label="Close picker">×</button>
+      </div>
+      <p class="picker-desc" id="picker-desc"></p>
+      <div class="picker-options" id="picker-options"></div>
+      <div class="picker-actions">
+        <button class="btn btn-clear" id="picker-clear" data-testid="picker-clear">Clear</button>
+        <button class="btn btn-cancel" id="picker-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "yahtzee-logger-v1";
+    const RESUME_PROMPT_AFTER_MS = 60 * 60 * 1000; // 1 hour
+
+    const initialState = () => ({
+      scores: {
+        ones: null, twos: null, threes: null, fours: null, fives: null, sixes: null,
+        threeKind: null, fourKind: null, fullHouse: null,
+        smallStraight: null, largeStraight: null, yahtzee: null, chance: null,
+      },
+      yahtzeeBonusCount: 0,
+    });
+
+    let state = initialState();
+
+    // ── State & persistence ────────────────────────────────────────────
+    function loadStored() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        // Wrapped form: { state, updatedAt }. Legacy form: bare state object.
+        if (parsed && parsed.state && typeof parsed.updatedAt === "number") {
+          return parsed;
+        }
+        if (parsed && parsed.scores) {
+          return { state: parsed, updatedAt: Date.now() };
+        }
+        return null;
+      } catch { return null; }
+    }
+    function saveState() {
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ state, updatedAt: Date.now() })
+        );
+      } catch {}
+    }
+    function hasProgress(s) {
+      return Object.values(s.scores).some(v => v !== null) ||
+             s.yahtzeeBonusCount > 0;
+    }
+
+    // ── Score config ───────────────────────────────────────────────────
+    // Each category declares its valid score options. The picker renders
+    // exactly these — no free-form input, no risk of typos.
+    const ROWS = {
+      upper: [
+        { key: "ones",   label: "Ones",   desc: "Sum of 1s",
+          options: [0, 1, 2, 3, 4, 5] },
+        { key: "twos",   label: "Twos",   desc: "Sum of 2s",
+          options: [0, 2, 4, 6, 8, 10] },
+        { key: "threes", label: "Threes", desc: "Sum of 3s",
+          options: [0, 3, 6, 9, 12, 15] },
+        { key: "fours",  label: "Fours",  desc: "Sum of 4s",
+          options: [0, 4, 8, 12, 16, 20] },
+        { key: "fives",  label: "Fives",  desc: "Sum of 5s",
+          options: [0, 5, 10, 15, 20, 25] },
+        { key: "sixes",  label: "Sixes",  desc: "Sum of 6s",
+          options: [0, 6, 12, 18, 24, 30] },
+      ],
+      lower: [
+        { key: "threeKind", label: "3 of a Kind", desc: "Sum of all dice",
+          // Sum of 5 dice ≥ three of one value: min 5, max 30. Plus 0 if not qualifying.
+          options: [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] },
+        { key: "fourKind", label: "4 of a Kind", desc: "Sum of all dice",
+          options: [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] },
+        { key: "fullHouse", label: "Full House", desc: "25 points",
+          options: [0, 25], toggle: true },
+        { key: "smallStraight", label: "Small Straight", desc: "4 in a row · 30 pts",
+          options: [0, 30], toggle: true },
+        { key: "largeStraight", label: "Large Straight", desc: "5 in a row · 40 pts",
+          options: [0, 40], toggle: true },
+        { key: "yahtzee", label: "Yahtzee", desc: "5 of a kind · 50 pts",
+          options: [0, 50], toggle: true },
+        { key: "chance", label: "Chance", desc: "Sum of all dice",
+          options: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] },
+      ],
+    };
+
+    function rowConfig(key) {
+      for (const section of Object.values(ROWS)) {
+        const r = section.find(x => x.key === key);
+        if (r) return r;
+      }
+      return null;
+    }
+
+    // ── Totals ─────────────────────────────────────────────────────────
+    function upperSubtotal() {
+      return ROWS.upper.reduce((acc, r) => acc + (state.scores[r.key] || 0), 0);
+    }
+    function upperBonus() { return upperSubtotal() >= 63 ? 35 : 0; }
+    function yahtzeeBonus() { return state.yahtzeeBonusCount * 100; }
+    function lowerSubtotal() {
+      const base = ROWS.lower.reduce((acc, r) => acc + (state.scores[r.key] || 0), 0);
+      return base + yahtzeeBonus();
+    }
+    function grandTotal() {
+      return upperSubtotal() + upperBonus() + lowerSubtotal();
+    }
+
+    // ── Rendering ──────────────────────────────────────────────────────
+    function renderSection(sectionKey) {
+      const root = document.getElementById(sectionKey);
+      root.innerHTML = "";
+      for (const r of ROWS[sectionKey]) {
+        const value = state.scores[r.key];
+        const locked = value !== null;
+        const row = document.createElement("div");
+        row.className = "row lockable";
+        row.setAttribute("data-testid", `row-${r.key}`);
+
+        const label = document.createElement("div");
+        label.className = "label";
+        label.innerHTML = `${r.label}<span class="desc">${r.desc}</span>`;
+        row.appendChild(label);
+
+        const score = document.createElement("div");
+        score.className = locked ? "score locked" : "score empty";
+        score.textContent = locked ? value : "—";
+        row.appendChild(score);
+        row.addEventListener("click", () => openPicker(r.key));
+        root.appendChild(row);
+      }
+
+      if (sectionKey === "lower" && state.yahtzeeBonusCount > 0) {
+        appendSubtotalRow(root, `Yahtzee Bonus ×${state.yahtzeeBonusCount}`, yahtzeeBonus(), "yahtzee-bonus");
+      }
+    }
+
+    function appendSubtotalRow(root, label, value, key) {
+      const row = document.createElement("div");
+      row.className = "row subtotal";
+      const lab = document.createElement("div");
+      lab.className = "label";
+      lab.textContent = label;
+      const sc = document.createElement("div");
+      sc.className = "score";
+      sc.textContent = value;
+      sc.setAttribute("data-testid", key);
+      row.appendChild(lab);
+      row.appendChild(sc);
+      root.appendChild(row);
+    }
+
+    function renderSummary() {
+      document.querySelector('[data-testid="upper-subtotal"]').textContent = upperSubtotal();
+      document.querySelector('[data-testid="lower-subtotal"]').textContent = lowerSubtotal();
+      document.querySelector('[data-testid="grand-total"]').textContent = grandTotal();
+
+      const bonusRow = document.getElementById("bonus-row");
+      const bonusEl = document.querySelector('[data-testid="upper-bonus"]');
+      const bonus = upperBonus();
+      bonusRow.classList.remove("bonus-pending", "bonus-earned");
+      if (bonus === 35) {
+        bonusEl.textContent = "+35";
+        bonusRow.classList.add("bonus-earned");
+      } else {
+        const need = 63 - upperSubtotal();
+        bonusEl.textContent = need > 0 ? `${need} to go` : "+0";
+        bonusRow.classList.add("bonus-pending");
+      }
+    }
+
+    function render() {
+      renderSection("upper");
+      renderSection("lower");
+      renderSummary();
+    }
+
+    // ── Picker ─────────────────────────────────────────────────────────
+    let activeKey = null;
+
+    function openPicker(key) {
+      const cfg = rowConfig(key);
+      if (!cfg) return;
+      activeKey = key;
+      document.getElementById("picker-title").textContent = cfg.label;
+      document.getElementById("picker-desc").textContent = cfg.desc;
+      const opts = document.getElementById("picker-options");
+      opts.className = "picker-options" + (cfg.toggle ? " toggle" : "");
+      opts.innerHTML = "";
+      for (const v of cfg.options) {
+        const b = document.createElement("button");
+        b.className = "picker-option" + (v === 0 ? " zero" : " score");
+        b.type = "button";
+        b.textContent = v;
+        b.setAttribute("data-testid", `option-${key}-${v}`);
+        b.addEventListener("click", () => commit(key, v));
+        opts.appendChild(b);
+      }
+      // Show/hide Clear depending on whether the row is filled.
+      document.getElementById("picker-clear").style.visibility =
+        state.scores[key] !== null ? "visible" : "hidden";
+      document.getElementById("picker-backdrop").classList.add("open");
+    }
+
+    function closePicker() {
+      activeKey = null;
+      document.getElementById("picker-backdrop").classList.remove("open");
+    }
+
+    function setScore(key, value) {
+      state.scores[key] = value;
+      // Yahtzee bonuses are only valid while the Yahtzee box still holds 50.
+      // Clearing it (null) or scoring it 0 wipes accumulated bonuses too,
+      // so no orphaned state survives.
+      if (key === "yahtzee" && value !== 50) state.yahtzeeBonusCount = 0;
+    }
+
+    function commit(key, value) {
+      // Yahtzee joker rule: any subsequent Yahtzee logged after the box is
+      // already filled with 50 awards a +100 bonus per occurrence. We
+      // surface a discrete increment so the user explicitly tracks it
+      // instead of clobbering the lock.
+      if (key === "yahtzee" && value === 50 && state.scores.yahtzee === 50) {
+        state.yahtzeeBonusCount++;
+      } else {
+        setScore(key, value);
+      }
+      saveState(); render(); closePicker();
+    }
+
+    function clearActive() {
+      if (!activeKey) return;
+      setScore(activeKey, null);
+      saveState(); render(); closePicker();
+    }
+
+    // ── Game lifecycle ─────────────────────────────────────────────────
+    function resetGame() {
+      state = initialState();
+      saveState();
+      render();
+    }
+    function newGame() {
+      if (hasProgress(state)) {
+        document.getElementById("confirm-new-backdrop").classList.add("open");
+        return;
+      }
+      resetGame();
+    }
+    function closeConfirmNew() {
+      document.getElementById("confirm-new-backdrop").classList.remove("open");
+    }
+
+    // ── Event wiring ───────────────────────────────────────────────────
+    function setupEvents() {
+      // Tap the backdrop (not the dialog itself) to dismiss.
+      const backdropDismiss = (id, closer) =>
+        document.getElementById(id).addEventListener("click", (e) => {
+          if (e.target.id === id) closer();
+        });
+      backdropDismiss("picker-backdrop", closePicker);
+      backdropDismiss("confirm-new-backdrop", closeConfirmNew);
+
+      document.getElementById("picker-close").addEventListener("click", closePicker);
+      document.getElementById("picker-cancel").addEventListener("click", closePicker);
+      document.getElementById("picker-clear").addEventListener("click", clearActive);
+
+      document.getElementById("new-game").addEventListener("click", newGame);
+      document.getElementById("confirm-new-cancel").addEventListener("click", closeConfirmNew);
+      document.getElementById("confirm-new-ok").addEventListener("click", () => {
+        closeConfirmNew();
+        resetGame();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          if (activeKey) closePicker();
+          closeConfirmNew();
+        }
+      });
+    }
+
+    // ── Resume prompt ──────────────────────────────────────────────────
+    function promptResume(stored) {
+      const when = new Date(stored.updatedAt).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+      document.getElementById("resume-desc").textContent =
+        `Found a game from ${when}. Continue where you left off, or start a new game?`;
+      const backdrop = document.getElementById("resume-backdrop");
+      backdrop.classList.add("open");
+
+      // Use .onclick (not addEventListener) so we replace any handler from
+      // a prior prompt, instead of accumulating listeners.
+      const cont = document.getElementById("resume-continue");
+      const fresh = document.getElementById("resume-new");
+      const close = () => backdrop.classList.remove("open");
+      cont.onclick = () => {
+        // Keep the previewed state; refresh the timestamp so we don't re-prompt.
+        saveState();
+        close();
+      };
+      fresh.onclick = () => {
+        resetGame();
+        close();
+      };
+    }
+
+    function init() {
+      setupEvents();
+      const stored = loadStored();
+      if (stored && hasProgress(stored.state)) {
+        const age = Date.now() - stored.updatedAt;
+        if (age > RESUME_PROMPT_AFTER_MS) {
+          // Preview the loaded game behind the modal.
+          state = stored.state;
+          render();
+          promptResume(stored);
+          return;
+        }
+        state = stored.state;
+      }
+      render();
+    }
+
+    init();
+  </script>
+</body>
+</html>
