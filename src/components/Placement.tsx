@@ -14,7 +14,7 @@ import {
 import { BOARD_SIZE, type Fleet, type Orientation, type Placement as ShipPlacement, type ShipId } from '../game/types';
 import { useShipDrag } from '../state/useShipDrag';
 import { BoltIcon, CloseIcon, RotateIcon, ShuffleIcon } from './icons';
-import { ShipProfile } from './ships';
+import { ShipProfile, ShipTopDown } from './ships';
 
 interface PlacementProps {
   skinId: string;
@@ -111,6 +111,24 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
 
   return (
     <div className="stack">
+      {/* A "carried" ship that follows the cursor from the sidebar until it
+          reaches the board, where the in-grid preview takes over. */}
+      {drag?.isNew && !drag.onBoard && (
+        <div
+          className="drag-ghost"
+          aria-hidden="true"
+          style={{
+            left: drag.pointer.x,
+            top: drag.pointer.y,
+            width: (drag.orientation === 'H' ? drag.size : 1) * drag.cellPx,
+            height: (drag.orientation === 'H' ? 1 : drag.size) * drag.cellPx,
+            color: skinColor,
+          }}
+        >
+          <ShipTopDown shipId={drag.shipId} size={drag.size} orientation={drag.orientation} />
+        </div>
+      )}
+
       <div className="placement-layout">
         <div className="panel">
         <div className="board-title">
