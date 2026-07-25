@@ -19,7 +19,6 @@
  */
 
 import Peer, { type DataConnection } from 'peerjs';
-import { isMessage, type Message } from '../game/protocol';
 
 export type ConnStatus =
   | 'idle'
@@ -29,14 +28,24 @@ export type ConnStatus =
   | 'reconnecting'
   | 'error';
 
-export interface ConnectionHandlers {
+export interface ConnectionHandlers<TMessage> {
   onStatus: (status: ConnStatus, detail?: string) => void;
-  onMessage: (msg: Message) => void;
+  onMessage: (msg: TMessage) => void;
   /** Fires each time a data channel freshly opens — the cue to (re)sync. */
   onOpen: () => void;
 }
 
-const PEER_PREFIX = 'bship-v1-';
+/**
+ * Per-game transport configuration. Each game supplies its own broker-id
+ * `prefix` (so two games' 4-char codes never collide on the same peer id) and
+ * an `isMessage` guard that validates inbound data before it reaches the game
+ * layer — the single choke point that keeps malformed/forged wire data out.
+ */
+export interface ConnectionConfig<TMessage> {
+  prefix: string;
+  isMessage: (value: unknown) => value is TMessage;
+}
+
 const DIAL_RETRY_MS = 2500;
 const DIAL_TIMEOUT_MS = 20000;
 
@@ -58,10 +67,6 @@ export function normalizeCode(raw: string): string {
     .slice(0, 4);
 }
 
-function peerIdForCode(code: string): string {
-  return PEER_PREFIX + code;
-}
-
 const ICE = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -69,22 +74,30 @@ const ICE = {
   ],
 };
 
-export class GameConnection {
+export class GameConnection<TMessage> {
   private peer: Peer | null = null;
   private conn: DataConnection | null = null;
-  private handlers: ConnectionHandlers;
+  private handlers: ConnectionHandlers<TMessage>;
+  private prefix: string;
+  private isMessage: (value: unknown) => value is TMessage;
   private role: 'host' | 'guest' = 'host';
   private code = '';
   private dialTimer: ReturnType<typeof setTimeout> | null = null;
   private dialDeadline = 0;
   private destroyed = false;
 
-  constructor(handlers: ConnectionHandlers) {
+  constructor(handlers: ConnectionHandlers<TMessage>, config: ConnectionConfig<TMessage>) {
     this.handlers = handlers;
+    this.prefix = config.prefix;
+    this.isMessage = config.isMessage;
   }
 
   get gameCode(): string {
     return this.code;
+  }
+
+  private peerIdForCode(code: string): string {
+    return this.prefix + code;
   }
 
   /** Host a new game. Returns the code the guest must enter. */
@@ -93,7 +106,7 @@ export class GameConnection {
     this.code = code;
     this.destroyed = false;
     this.handlers.onStatus('hosting');
-    this.createPeer(peerIdForCode(code));
+    this.createPeer(this.peerIdForCode(code));
   }
 
   /** Join an existing game by code. */
@@ -106,7 +119,7 @@ export class GameConnection {
     this.createPeer(undefined);
   }
 
-  send(msg: Message): boolean {
+  send(msg: TMessage): boolean {
     if (this.conn && this.conn.open) {
       this.conn.send(msg);
       return true;
@@ -176,7 +189,7 @@ export class GameConnection {
       this.handlers.onStatus('error', 'Could not reach that game. Check the code and that the host is online.');
       return;
     }
-    const conn = this.peer.connect(peerIdForCode(this.code), { reliable: true });
+    const conn = this.peer.connect(this.peerIdForCode(this.code), { reliable: true });
     this.bindConnection(conn);
     // If it doesn't open promptly, try again.
     this.scheduleDial();
@@ -219,7 +232,7 @@ export class GameConnection {
 
     conn.on('data', (data: unknown) => {
       if (!isCurrent()) return;
-      if (isMessage(data)) this.handlers.onMessage(data);
+      if (this.isMessage(data)) this.handlers.onMessage(data);
     });
 
     conn.on('close', () => {
