@@ -6,8 +6,11 @@ import {
   loadSession,
   saveProfile,
   saveSession,
+  sessionToStored,
+  storedToSession,
   type GameSession,
 } from './persistence';
+import { createSession, type SessionState } from '../game/session';
 import { defaultProfile } from '../state/profile';
 import type { GameLog } from '../game/types';
 
@@ -78,5 +81,44 @@ describe('session persistence', () => {
   it('returns null for a malformed session blob', () => {
     localStorage.setItem('bship:session:v1:BAD', '{"nope":true}');
     expect(loadSession('BAD')).toBeNull();
+  });
+});
+
+describe('session <-> stored mapping', () => {
+  it('round-trips the persisted fields', () => {
+    const live: SessionState = {
+      ...createSession('guest', 'ABCD', 'Kid', 'ember'),
+      oppName: 'Rio',
+      oppSkinId: 'aqua',
+      myReady: true,
+      log: [{ type: 'start', first: 'host' }],
+    };
+    const restored = storedToSession(sessionToStored(live, 123));
+    expect(restored.code).toBe('ABCD');
+    expect(restored.side).toBe('guest');
+    expect(restored.oppName).toBe('Rio');
+    expect(restored.myReady).toBe(true);
+    expect(restored.log).toEqual(live.log);
+  });
+
+  it('derives the setup phase from readiness and clears volatile flags', () => {
+    const notReady = storedToSession(sessionToStored({ ...createSession('host', 'C', 'N', 'aqua') }, 1));
+    expect(notReady.setupPhase).toBe('placing');
+
+    const ready = storedToSession(sessionToStored({ ...createSession('host', 'C', 'N', 'aqua'), myReady: true }, 1));
+    expect(ready.setupPhase).toBe('waiting');
+    expect(ready.iWantRematch).toBe(false);
+    expect(ready.pendingFire).toBeNull();
+  });
+
+  it('marks a session finished once someone has won', () => {
+    const won: SessionState = {
+      ...createSession('host', 'C', 'N', 'aqua'),
+      log: [
+        { type: 'start', first: 'host' },
+        { type: 'shot', by: 'host', row: 0, col: 0, hit: true, sunk: 'destroyer', allSunk: true },
+      ],
+    };
+    expect(sessionToStored(won, 1).finished).toBe(true);
   });
 });

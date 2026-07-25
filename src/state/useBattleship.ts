@@ -20,8 +20,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { GameConnection, generateCode, type ConnStatus } from '../net/peer';
 import * as Session from '../game/session';
 import type { FinishInfo, Outcome, Phase as GamePhase, SessionState } from '../game/session';
-import { currentTurn, winner } from '../game/engine';
-import { clearSession, loadSession, saveSession, type GameSession } from '../storage/persistence';
+import {
+  clearSession,
+  loadSession,
+  saveSession,
+  sessionToStored,
+  storedToSession,
+} from '../storage/persistence';
 import type { Coord, Fleet, GameLog, Side } from '../game/types';
 
 /** How long to wait for a fire to be answered before releasing the board lock. */
@@ -66,42 +71,6 @@ interface UseBattleshipOptions {
   name: string;
   skinId: string;
   onFinish: (info: FinishInfo) => void;
-}
-
-function sessionToStored(s: SessionState): GameSession {
-  return {
-    code: s.code,
-    side: s.side,
-    myName: s.myName,
-    mySkinId: s.mySkinId,
-    oppName: s.oppName,
-    oppSkinId: s.oppSkinId,
-    myFleet: s.myFleet,
-    myReady: s.myReady,
-    oppReady: s.oppReady,
-    log: s.log,
-    finished: winner(s.log) !== null,
-    updatedAt: Date.now(),
-  };
-}
-
-function storedToSession(g: GameSession): SessionState {
-  return {
-    side: g.side,
-    code: g.code,
-    myName: g.myName,
-    mySkinId: g.mySkinId,
-    oppName: g.oppName,
-    oppSkinId: g.oppSkinId,
-    myFleet: g.myFleet,
-    myReady: g.myReady,
-    oppReady: g.oppReady,
-    iWantRematch: false,
-    oppWantsRematch: false,
-    log: g.log,
-    pendingFire: null,
-    setupPhase: g.myReady ? 'waiting' : 'placing',
-  };
 }
 
 export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
@@ -156,7 +125,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
 
   // ── Persist after every change (powers resume) ──────────────────────────
   useEffect(() => {
-    if (session) saveSession(sessionToStored(session));
+    if (session) saveSession(sessionToStored(session, Date.now()));
   }, [session]);
 
   // ── Fire watchdog: release the board lock if a fire goes unanswered and it's
@@ -166,9 +135,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     if (!pendingFire) return;
     const timer = setTimeout(() => {
       const s = sessionRef.current;
-      if (s?.pendingFire && currentTurn(s.log) === s.side) {
-        setSessionState({ ...s, pendingFire: null });
-      }
+      if (s) setSessionState(Session.releaseUnansweredFire(s));
     }, FIRE_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [pendingFire, setSessionState]);
@@ -218,8 +185,19 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
   const confirmSkin = useCallback(() => withSession(Session.toPlacing), [withSession]);
   const setFleet = useCallback((fleet: Fleet) => withSession((s) => Session.setFleet(s, fleet)), [withSession]);
   const confirmReady = useCallback(() => withOutcome((s) => Session.confirmReady(s)), [withOutcome]);
-  const fire = useCallback((coord: Coord) => withOutcome((s) => Session.fireAt(s, coord)), [withOutcome]);
   const requestRematch = useCallback(() => withOutcome(Session.proposeRematch), [withOutcome]);
+
+  // Fire is special-cased: lock the board only if the fire actually went out.
+  // On a dead channel we leave it unlocked so the player can retry the moment
+  // the link recovers, instead of waiting out the watchdog.
+  const fire = useCallback((coord: Coord) => {
+    const s = sessionRef.current;
+    if (!s) return;
+    const { state, outgoing } = Session.fireAt(s, coord);
+    if (outgoing.length === 0) return; // illegal shot right now — no-op
+    const sent = outgoing.every((m) => connRef.current?.send(m) === true);
+    if (sent) setSessionState(state);
+  }, [setSessionState]);
 
   const leave = useCallback(() => {
     const s = sessionRef.current;
