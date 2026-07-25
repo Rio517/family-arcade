@@ -44,15 +44,22 @@ export function BattleshipPage() {
     onFinish,
   });
 
-  // Resume a saved game or auto-open a shared join code — exactly once.
+  // Resume a saved game (a shared ?g= join code is handled by the Lobby).
   const bootRef = useRef(false);
   const resumeCode = params.get('resume');
   const joinCode = params.get('g');
+  // The cleanup resets the guard so React StrictMode's mount→unmount→mount
+  // (whose unmount destroys the hook's connection) re-runs resume and rebuilds
+  // the connection instead of leaving it torn down.
   useEffect(() => {
     if (bootRef.current) return;
     bootRef.current = true;
     if (resumeCode) bs.resumeGame(resumeCode);
-  }, [resumeCode, bs]);
+    return () => {
+      bootRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeCode]);
 
   // Clear the finished-result banner whenever a new game begins (rematch).
   useEffect(() => {
@@ -85,17 +92,17 @@ export function BattleshipPage() {
         <button className="back-link" onClick={goMenu} data-testid="back">
           ‹ Menu
         </button>
-        <h1>Battleship</h1>
+        <h1>Ship Battle</h1>
         <span className="spacer" />
         {bs.side && <ConnectionBadge status={bs.status} detail={bs.statusDetail} />}
       </div>
 
       {showCode && (
-        <div className="panel codebox">
+        <div className="panel codebox narrow-col">
           <div className="lbl">Share this code</div>
           <div className="code" data-testid="game-code">{bs.code}</div>
           <p className="subtle" style={{ margin: '8px 0 14px' }}>
-            Open Battleship on the other iPad and tap “Join with a code”.
+            Open Ship Battle on the other iPad and tap “Join with a code”.
           </p>
           <button className="btn btn-primary" onClick={copyShare}>
             {copied ? 'Link copied ✓' : '🔗 Copy invite link'}
@@ -104,7 +111,7 @@ export function BattleshipPage() {
       )}
 
       {bs.side && bs.status === 'error' && (
-        <div className="panel">
+        <div className="panel narrow-col">
           <p className="subtle" style={{ color: 'var(--bad)' }}>
             {bs.statusDetail ?? 'Connection error.'}
           </p>
@@ -113,26 +120,30 @@ export function BattleshipPage() {
       )}
 
       {bs.phase === 'lobby' && (
-        <Lobby
-          name={profile.profile.name}
-          onName={profile.setName}
-          onHost={bs.hostGame}
-          onJoin={bs.joinGame}
-          initialJoinCode={joinCode ?? undefined}
-        />
+        <div className="narrow-col">
+          <Lobby
+            name={profile.profile.name}
+            onName={profile.setName}
+            onHost={bs.hostGame}
+            onJoin={bs.joinGame}
+            initialJoinCode={joinCode ?? undefined}
+          />
+        </div>
       )}
 
       {bs.phase === 'fleet' && (
-        <FleetSelect
-          profile={profile.profile}
-          selectedSkinId={bs.mySkinId}
-          onSelect={(id) => {
-            profile.selectSkin(id);
-            bs.chooseSkin(id);
-          }}
-          onUnlock={(id) => profile.unlockSkin(skinById(id))}
-          onContinue={bs.confirmSkin}
-        />
+        <div className="narrow-col">
+          <FleetSelect
+            profile={profile.profile}
+            selectedSkinId={bs.mySkinId}
+            onSelect={(id) => {
+              profile.selectSkin(id);
+              bs.chooseSkin(id);
+            }}
+            onUnlock={(id) => profile.unlockSkin(skinById(id))}
+            onContinue={bs.confirmSkin}
+          />
+        </div>
       )}
 
       {(bs.phase === 'placing' || bs.phase === 'waiting') && (
@@ -161,16 +172,18 @@ export function BattleshipPage() {
       )}
 
       {bs.phase === 'over' && finish && (
-        <Result
-          won={finish.won}
-          pointsEarned={finish.pointsEarned}
-          totalPoints={profile.profile.points}
-          oppName={bs.oppName ?? 'Opponent'}
-          iWantRematch={bs.iWantRematch}
-          oppWantsRematch={bs.oppWantsRematch}
-          onRematch={bs.requestRematch}
-          onExit={exitToMenu}
-        />
+        <div className="narrow-col">
+          <Result
+            won={finish.won}
+            pointsEarned={finish.pointsEarned}
+            totalPoints={profile.profile.points}
+            oppName={bs.oppName ?? 'Opponent'}
+            iWantRematch={bs.iWantRematch}
+            oppWantsRematch={bs.oppWantsRematch}
+            onRematch={bs.requestRematch}
+            onExit={exitToMenu}
+          />
+        </div>
       )}
 
       <div className="footer">

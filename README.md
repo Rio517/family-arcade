@@ -3,15 +3,15 @@
 A small family-friendly game console that lives on GitHub Pages:
 
 - **🎲 Yahtzee Logger** — a mobile-first score logger (roll real dice, tap to log). One self-contained HTML file, works fully offline.
-- **🚀 Battleship** — a two-player, cross-device Battleship game. Two iPads, one shared code, no server.
+- **🚀 Ship Battle** — a two-player, cross-device naval guessing game (a Battleship-style game; "Battleship" is a trademark of Hasbro and is not affiliated). Two iPads, one shared code, no server.
 
 **Play it:** https://rio517.github.io/yahtzee-calculator/
 
 ---
 
-## Battleship
+## Ship Battle
 
-Two people on two different devices play a turn-based game of Battleship connected only by a short game code.
+Two people on two different devices play a turn-based naval guessing game connected only by a short game code.
 
 - **Peer-to-peer** over WebRTC (via [PeerJS](https://peerjs.com/)). One player taps **Create a game** and gets a 4-character code (and a shareable invite link); the other taps **Join** and types it in. Game data then flows device-to-device.
 - **Pick your fleet** — choose a cosmetic skin (free ones plus premium skins unlocked with points).
@@ -45,7 +45,7 @@ npm run preview    # serve the production build locally
 ### Project layout
 
 ```
-index.html              Vite entry (React app: menu + Battleship)
+index.html              Vite entry (React app: menu + Ship Battle)
 public/calculator.html  the Yahtzee logger (standalone, vanilla)
 public/icon.svg         app icon
 src/

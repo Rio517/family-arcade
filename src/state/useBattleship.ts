@@ -28,7 +28,7 @@ import {
   winner,
 } from '../game/engine';
 import { otherSide } from '../game/constants';
-import type { Coord, Fleet, GameLog, Side } from '../game/types';
+import type { Coord, Fleet, GameLog, ShotEvent, Side } from '../game/types';
 import {
   clearSession,
   loadSession,
@@ -224,7 +224,9 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Send our identity + full log so the peer can catch up (resume).
+  // Send our identity + full log so the peer can catch up (resume). Sends here
+  // (and elsewhere) are best-effort: if one is dropped, the next onOpen re-runs
+  // this handshake and reconciles logs, so no message is critical on its own.
   const sync = useCallback(() => {
     const s = stateRef.current;
     const conn = connRef.current;
@@ -267,12 +269,20 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
         // We are the defender: resolve against our own fleet and broadcast the
         // settled shot to both logs.
         const attacker = otherSide(s.side);
+        // If we've already resolved this exact shot, the attacker never received
+        // our reply (the channel stayed open, so no resync fired). Re-send the
+        // settled event rather than dropping it — otherwise the attacker stays
+        // locked on a shot that, for us, already happened (incl. a winning one).
+        const existing = s.log.find(
+          (e) => e.type === 'shot' && e.by === attacker && e.row === msg.row && e.col === msg.col,
+        ) as ShotEvent | undefined;
+        if (existing) {
+          conn.send({ t: 'shot', event: existing });
+          break;
+        }
         const priorShots = shotsBy(s.log, attacker).map((e) => ({ row: e.row, col: e.col }));
-        // Ignore a duplicate fire we've already resolved.
-        if (priorShots.some((c) => c.row === msg.row && c.col === msg.col)) break;
         const event = resolveShot(s.myFleet, priorShots, { row: msg.row, col: msg.col }, attacker);
-        const nextLog = [...s.log, event];
-        dispatch({ type: 'setLog', log: nextLog });
+        dispatch({ type: 'setLog', log: [...s.log, event] });
         conn.send({ t: 'shot', event });
         break;
       }
@@ -411,8 +421,10 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     if (s.pendingFire) return;
     const mine = shotsBy(s.log, s.side!);
     if (mine.some((e) => e.row === coord.row && e.col === coord.col)) return;
-    dispatch({ type: 'pendingFire', coord });
-    connRef.current?.send({ t: 'fire', row: coord.row, col: coord.col });
+    // Only lock the board if the fire actually went out. If the channel is down,
+    // stay unlocked so the player can retry once the link recovers.
+    const sent = connRef.current?.send({ t: 'fire', row: coord.row, col: coord.col });
+    if (sent) dispatch({ type: 'pendingFire', coord });
   }, []);
 
   const requestRematch = useCallback(() => {

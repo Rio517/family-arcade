@@ -25,7 +25,7 @@ export default defineConfig({
       manifest: {
         name: 'Family Game Console',
         short_name: 'Game Console',
-        description: 'A Yahtzee logger and a two-player Battleship game.',
+        description: 'A Yahtzee logger and a two-player Ship Battle game.',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
