@@ -232,6 +232,11 @@ export function BattleshipPage() {
           <FleetSelect
             profile={profile.profile}
             selectedSkinId={bs.mySkinId}
+            name={profile.profile.name}
+            onName={(name) => {
+              profile.setName(name);
+              bs.setMyName(name);
+            }}
             onSelect={(id) => {
               profile.selectSkin(id);
               bs.chooseSkin(id);

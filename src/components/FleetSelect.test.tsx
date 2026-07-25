@@ -7,17 +7,20 @@ function setup(overrides = {}) {
   const onSelect = vi.fn();
   const onUnlock = vi.fn(() => false);
   const onContinue = vi.fn();
+  const onName = vi.fn();
   render(
     <FleetSelect
       profile={defaultProfile()}
       selectedSkinId="aqua"
+      name="Kid"
+      onName={onName}
       onSelect={onSelect}
       onUnlock={onUnlock}
       onContinue={onContinue}
       {...overrides}
     />,
   );
-  return { onSelect, onUnlock, onContinue };
+  return { onSelect, onUnlock, onContinue, onName };
 }
 
 describe('<FleetSelect>', () => {
@@ -46,5 +49,11 @@ describe('<FleetSelect>', () => {
     const { onContinue } = setup();
     fireEvent.click(screen.getByTestId('fleet-continue'));
     expect(onContinue).toHaveBeenCalled();
+  });
+
+  it('lets you change your captain name here', () => {
+    const { onName } = setup();
+    fireEvent.change(screen.getByTestId('fleet-name-input'), { target: { value: 'Skipper' } });
+    expect(onName).toHaveBeenCalledWith('Skipper');
   });
 });

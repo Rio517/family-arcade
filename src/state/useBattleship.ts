@@ -60,6 +60,7 @@ export interface UseBattleshipResult {
   joinGame: (code: string, name: string) => void;
   resumeGame: (code: string) => void;
   chooseSkin: (skinId: string) => void;
+  setMyName: (name: string) => void;
   confirmSkin: () => void;
   setFleet: (fleet: Fleet) => void;
   confirmReady: () => void;
@@ -185,7 +186,20 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     if (s) applyOutcome(fn(s));
   }, [applyOutcome]);
 
-  const chooseSkin = useCallback((skinId: string) => withSession((s) => Session.chooseSkin(s, skinId)), [withSession]);
+  // Broadcast my current identity (name + fleet) so a connected opponent sees
+  // edits made on the setup page, not just the values from the first handshake.
+  const announceIdentity = useCallback(() => {
+    const s = sessionRef.current;
+    if (s) connRef.current?.send(Session.helloOf(s));
+  }, []);
+  const chooseSkin = useCallback((skinId: string) => {
+    withSession((s) => Session.chooseSkin(s, skinId));
+    announceIdentity();
+  }, [withSession, announceIdentity]);
+  const setMyName = useCallback((name: string) => {
+    withSession((s) => Session.setMyName(s, name));
+    announceIdentity();
+  }, [withSession, announceIdentity]);
   const confirmSkin = useCallback(() => withSession(Session.toPlacing), [withSession]);
   const setFleet = useCallback((fleet: Fleet) => withSession((s) => Session.setFleet(s, fleet)), [withSession]);
   const confirmReady = useCallback(() => withOutcome((s) => Session.confirmReady(s)), [withOutcome]);
@@ -236,6 +250,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     joinGame,
     resumeGame,
     chooseSkin,
+    setMyName,
     confirmSkin,
     setFleet,
     confirmReady,

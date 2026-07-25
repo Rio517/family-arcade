@@ -114,6 +114,11 @@ export function chooseSkin(s: SessionState, skinId: string): SessionState {
   return { ...s, mySkinId: skinId };
 }
 
+/** Change the name shown to the opponent (editable on the setup page). */
+export function setMyName(s: SessionState, name: string): SessionState {
+  return { ...s, myName: name };
+}
+
 export function toPlacing(s: SessionState): SessionState {
   return { ...s, setupPhase: 'placing' };
 }
@@ -124,12 +129,14 @@ export function setFleet(s: SessionState, fleet: Fleet): SessionState {
 
 // ── Local player actions (produce messages) ──────────────────────────────────
 
+/** My identity announcement — re-sent whenever my name or fleet changes. */
+export function helloOf(s: SessionState): Message {
+  return { t: 'hello', v: PROTOCOL_VERSION, side: s.side, name: s.myName, skinId: s.mySkinId };
+}
+
 /** The identity/catch-up handshake to send whenever a channel (re)opens. */
 export function connectHandshake(s: SessionState): Message[] {
-  return [
-    { t: 'hello', v: PROTOCOL_VERSION, side: s.side, name: s.myName, skinId: s.mySkinId },
-    { t: 'sync', log: s.log, ready: s.myReady },
-  ];
+  return [helloOf(s), { t: 'sync', log: s.log, ready: s.myReady }];
 }
 
 /** Player confirms placement. Host may author the opening move if both ready. */

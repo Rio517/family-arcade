@@ -6,16 +6,19 @@ import { InfoIcon, LockIcon, SkinGlyph } from './icons';
 interface FleetSelectProps {
   profile: Profile;
   selectedSkinId: string;
+  name: string;
+  onName: (name: string) => void;
   onSelect: (skinId: string) => void;
   onUnlock: (skinId: string) => boolean;
   onContinue: () => void;
 }
 
 /**
- * Screen 1 of setup: choose the look of your fleet. Free skins are always
- * available; premium skins are unlocked by spending points earned from wins.
+ * Screen 1 of setup: set your captain's name and choose the look of your fleet.
+ * Both are editable here (and any change is announced to a connected opponent).
+ * Free skins are always available; premium skins are unlocked by spending points.
  */
-export function FleetSelect({ profile, selectedSkinId, onSelect, onUnlock, onContinue }: FleetSelectProps) {
+export function FleetSelect({ profile, selectedSkinId, name, onName, onSelect, onUnlock, onContinue }: FleetSelectProps) {
   const [toast, setToast] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
 
@@ -39,6 +42,21 @@ export function FleetSelect({ profile, selectedSkinId, onSelect, onUnlock, onCon
 
   return (
     <div className="stack">
+      <div className="panel">
+        <h2>Captain’s name</h2>
+        <div className="field">
+          <label htmlFor="captain-name">Shown to your opponent</label>
+          <input
+            id="captain-name"
+            value={name}
+            maxLength={20}
+            placeholder="Captain"
+            onChange={(e) => onName(e.target.value)}
+            data-testid="fleet-name-input"
+          />
+        </div>
+      </div>
+
       <div className="panel">
         <div className="panel-head">
           <h2>Choose your fleet</h2>
