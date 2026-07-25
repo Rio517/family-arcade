@@ -310,12 +310,14 @@ body {
 /* ── Top-down ship overlays (placement board) ──────────────────────────────── */
 .ship-overlay {
   position: relative; z-index: 5;
-  display: grid; place-items: center;
   color: var(--skin);
   cursor: grab; touch-action: none;
-  padding: 1px;
+  /* The overlay stretches to fill its grid area; its SVG is absolutely
+     positioned so it never contributes intrinsic height, which would inflate
+     the auto-sized row track and push the ship off-centre. */
+  min-height: 0; min-width: 0;
 }
-.ship-overlay svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+.ship-overlay svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
 /* Un-selected ships sit back a touch so the active one reads as the focus. */
 .ship-overlay:not(.selected) svg { opacity: 0.8; }
 .ship-overlay.selected { z-index: 6; }
@@ -331,7 +333,7 @@ body {
 /* While dragging, overlays are click-through so pointer hit-tests reach cells. */
 .board.dragging .ship-overlay { pointer-events: none; }
 
-.ship-ctrls { position: absolute; display: flex; gap: 5px; z-index: 9; }
+.ship-ctrls { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 5px; z-index: 9; }
 .ship-ctrl {
   width: 24px; height: 24px; display: grid; place-items: center;
   background: rgba(15, 23, 42, 0.86); border: 1px solid var(--border); border-radius: 6px;
@@ -360,7 +362,9 @@ body {
   padding: 10px 12px; border-radius: 10px;
   background: var(--surface-2); border: 1px solid transparent;
   cursor: pointer; transition: border-color 120ms, background 120ms;
+  user-select: none; -webkit-user-select: none;
 }
+.ship-chip[data-placed='false'] { cursor: grab; }
 .ship-chip[data-selected='true'] { border-color: var(--skin); background: color-mix(in srgb, var(--skin) 14%, var(--surface-2)); }
 .ship-chip[data-placed='true'] .nm { color: var(--muted); }
 .ship-art { display: inline-flex; align-items: center; min-width: 64px; }
