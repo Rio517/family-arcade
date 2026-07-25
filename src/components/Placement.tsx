@@ -74,11 +74,18 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
     setSelected(shipId);
   }
 
-  // Rotate a placed ship about its bow, if the rotated footprint still fits.
+  // Rotate a placed ship in place. Rotating about the bow can push the far end
+  // off the board (e.g. a horizontal ship along the bottom edge rotating to
+  // vertical) — so we first pull the anchor back inward just enough that the
+  // rotated footprint fits, then confirm nothing else is in the way.
   function rotatePlaced(shipId: ShipId) {
     const p = fleet.find((x) => x.shipId === shipId);
     if (!p) return;
-    const rotated: ShipPlacement = { ...p, orientation: p.orientation === 'H' ? 'V' : 'H' };
+    const orientation: Orientation = p.orientation === 'H' ? 'V' : 'H';
+    const size = shipSpec(shipId).size;
+    const row = orientation === 'V' ? Math.min(p.row, BOARD_SIZE - size) : p.row;
+    const col = orientation === 'H' ? Math.min(p.col, BOARD_SIZE - size) : p.col;
+    const rotated: ShipPlacement = { shipId, row, col, orientation };
     if (canPlace(fleet, rotated)) onChange(placeShip(fleet, rotated));
   }
 
