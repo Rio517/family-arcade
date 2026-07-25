@@ -10,7 +10,8 @@ import { Placement } from './Placement';
 import { Battle } from './Battle';
 import { Result } from './Result';
 import { ConnectionBadge } from './ConnectionBadge';
-import { CloseIcon } from './icons';
+import { CloseIcon, TargetIcon } from './icons';
+import { QRCodeSVG } from 'qrcode.react';
 import type { FinishInfo } from '../game/session';
 
 /** The finished-game summary shown on the Result screen. */
@@ -106,6 +107,19 @@ export function BattleshipPage() {
         </button>
         <h1>Ship Battle</h1>
         <span className="spacer" />
+        {bs.phase === 'battle' && (
+          <span className={`turn-pill ${bs.myTurn ? 'mine' : 'theirs'}`} data-testid="turn-pill">
+            {bs.myTurn ? (
+              <>
+                <TargetIcon size={14} /> Your shot
+              </>
+            ) : bs.pendingFire ? (
+              'Firing…'
+            ) : (
+              `${bs.oppName ?? 'Opponent'}'s turn`
+            )}
+          </span>
+        )}
         {showCode && (
           <button className="code-chip" onClick={() => setShareOpen(true)} data-testid="share-chip">
             <span className="lbl">Code</span>
@@ -132,13 +146,19 @@ export function BattleshipPage() {
               </button>
             </div>
             <div className="codebox">
-              {awaitingOpponent && (
-                <div className="waiting-radar" aria-hidden="true">
-                  <span />
-                  <span />
-                  <span />
+              {/* QR of the invite link with a radar ping rippling off its frame. */}
+              <div className="qr-radar">
+                {awaitingOpponent && (
+                  <>
+                    <span className="ping" />
+                    <span className="ping" />
+                    <span className="ping" />
+                  </>
+                )}
+                <div className="qr-frame">
+                  <QRCodeSVG value={shareUrl} size={132} bgColor="#e2e8f0" fgColor="#0b1220" level="M" />
                 </div>
-              )}
+              </div>
               <div className="lbl">Share this code</div>
               <div className="code">{bs.code}</div>
               <p className="subtle" style={{ margin: '8px 0 14px' }}>
