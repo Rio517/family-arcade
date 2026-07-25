@@ -25,8 +25,10 @@ export interface PlacedShip {
   /** True while this ship is being dragged; `ok` styles the drop target. */
   dragging?: boolean;
   ok?: boolean;
-  /** Own battle board: a fully-destroyed ship reads red and dimmed. */
+  /** Fully destroyed — renders as a charred wreck. */
   sunk?: boolean;
+  /** Hit but not yet sunk — renders as a grey, burning hull. */
+  damaged?: boolean;
 }
 
 interface BoardProps {
@@ -127,6 +129,7 @@ export function Board({
           ship.dragging && 'dragging',
           ship.dragging && !ship.ok && 'bad',
           ship.sunk && 'sunk',
+          ship.damaged && !ship.sunk && 'damaged',
           !interactive && 'static',
         ]
           .filter(Boolean)

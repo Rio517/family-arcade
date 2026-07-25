@@ -291,20 +291,16 @@ body {
 }
 /* Shot markers sit above the ship overlay (z 5) so hits punch through a hull. */
 .cell.hit, .cell.miss, .cell.sunk { z-index: 6; }
-.cell.hit { background: color-mix(in srgb, var(--bad) 40%, var(--sea)); }
-/* Hit: a bright peg. */
+.cell.hit { background: color-mix(in srgb, var(--bad) 20%, var(--sea)); }
+/* Hit: a glowing fire ember at the wound. */
 .cell.hit::after {
-  content: ''; width: 42%; height: 42%; border-radius: 50%;
-  background: #fecaca; box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+  content: ''; width: 46%; height: 46%; border-radius: 50%;
+  background: radial-gradient(circle, #fff2c4 0%, #ff9d3c 45%, #ff4d2e 78%, rgba(255, 77, 46, 0) 100%);
+  box-shadow: 0 0 9px 2px rgba(255, 120, 40, 0.7);
 }
-.cell.sunk { background: color-mix(in srgb, var(--bad) 62%, #000); box-shadow: inset 0 0 0 1px var(--bad); }
-/* Sunk: a drawn X (no glyph). */
-.cell.sunk::after {
-  content: ''; position: absolute; inset: 24%;
-  background:
-    linear-gradient(45deg, transparent 42%, #fff 42%, #fff 58%, transparent 58%),
-    linear-gradient(-45deg, transparent 42%, #fff 42%, #fff 58%, transparent 58%);
-}
+/* Sunk: a scorched cell (no red squares); the charred wreck overlay sits on top. */
+.cell.sunk { background: color-mix(in srgb, #000 34%, var(--sea)); box-shadow: inset 0 0 0 1px rgba(120, 82, 52, 0.55); }
+.cell.sunk::after { content: none; }
 .cell.preview { background: color-mix(in srgb, var(--skin) 45%, var(--sea)); box-shadow: inset 0 0 0 1px var(--skin); }
 .cell.preview.bad { background: color-mix(in srgb, var(--bad) 45%, var(--sea)); box-shadow: inset 0 0 0 1px var(--bad); }
 
@@ -328,11 +324,13 @@ body {
 .ship-overlay.bad { color: var(--bad); }
 /* Read-only ships (own battle board): no grab cursor, let taps reach cells. */
 .ship-overlay.static { cursor: default; pointer-events: none; }
-/* A destroyed ship reads as a solid grey hull (same on my board and the radar).
-   It sits above the struck cells (z 6) so the silhouette — not a row of red
-   X's — is what you see for a fully sunk ship. */
-.ship-overlay.sunk { color: #9fb0c6; z-index: 7; }
-.ship-overlay.sunk svg { opacity: 0.9; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
+/* Damage progression. Hit-but-afloat: a grey hull (the fire embers ride on the
+   struck cells above it). Fully sunk: a charred wreck with an orange burn glow,
+   raised above the cells so the silhouette — not a row of red X's — is what you
+   see. Same on my board and the radar. */
+.ship-overlay.damaged { color: #9fb0c6; }
+.ship-overlay.sunk { color: #23282f; z-index: 7; }
+.ship-overlay.sunk svg { opacity: 1; filter: drop-shadow(0 0 5px rgba(255, 120, 40, 0.85)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
 /* While dragging, overlays are click-through so pointer hit-tests reach cells. */
 .board.dragging .ship-overlay { pointer-events: none; }
 
@@ -558,6 +556,17 @@ body {
   position: absolute; top: 50%; left: 50%; width: 150px; height: 150px; margin: -75px 0 0 -75px;
   border: 2px solid var(--accent); border-radius: 16px; opacity: 0;
 }
+/* "Opponent connected — waiting for them to place" state. */
+.placing-wait { text-align: center; }
+.placing-wait .conn-badge {
+  position: relative; z-index: 2; width: 78px; height: 78px; border-radius: 20px;
+  display: grid; place-items: center; color: var(--accent);
+  background: var(--accent-dim); border: 1px solid var(--accent);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+.placing-wait .pw-line { font-size: 16px; margin: 2px 0; }
+.placing-wait .pw-line strong { color: var(--accent); }
+.placing-wait .ell span { opacity: 0.25; }
 
 /* ── History ─────────────────────────────────────────────────────────────── */
 .history { display: grid; gap: 6px; }
@@ -612,6 +621,8 @@ body {
   100% { transform: scale(1.9); opacity: 0; }
 }
 @keyframes type-line { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes ell-blink { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@keyframes ember-flicker { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.72; transform: scale(0.9); } }
 @keyframes board-glow {
   0%, 100% { box-shadow: 0 0 18px -10px var(--accent); }
   50% { box-shadow: 0 0 28px -4px var(--accent); }
@@ -677,6 +688,10 @@ body {
   .board.shake-hard { animation: shake-hard 480ms ease; }
   .turn-pill.mine { animation: banner-pulse 1.7s ease-in-out infinite; }
   .movelog .entry.new { animation: type-line 460ms steps(26, end) both; }
+  .placing-wait .ell span { animation: ell-blink 1.2s infinite; }
+  .placing-wait .ell span:nth-child(2) { animation-delay: 0.2s; }
+  .placing-wait .ell span:nth-child(3) { animation-delay: 0.4s; }
+  .cell.hit::after { animation: ember-flicker 1.7s ease-in-out infinite; }
 
   /* Miss keeps a soft water ripple; hits and sinks are covered by the canvas
      particle burst, so no expanding CSS ring (that was the stray outer flash). */
