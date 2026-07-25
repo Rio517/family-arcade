@@ -393,9 +393,14 @@ body {
 /* ── Result ──────────────────────────────────────────────────────────────── */
 .result-hero { text-align: center; padding: 20px 0; }
 .result-hero .big { font-size: 40px; font-weight: 800; margin: 6px 0; }
-.result-hero .big.win { color: var(--good); }
-.result-hero .big.loss { color: var(--bad); }
+.result-hero .big.win { color: var(--good); animation: pop-in 480ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.result-hero .big.loss { color: var(--accent); }
+.result-hero .result-flavor { font-size: 16px; color: var(--text); margin: 4px 0 14px; }
 .result-hero .earned { font-size: 18px; color: var(--accent); font-weight: 700; }
+@keyframes pop-in {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
 
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);

@@ -1,7 +1,10 @@
+import { useState } from 'react';
+
 interface ResultProps {
   won: boolean;
   pointsEarned: number;
   totalPoints: number;
+  myName: string;
   oppName: string;
   iWantRematch: boolean;
   oppWantsRematch: boolean;
@@ -9,36 +12,63 @@ interface ResultProps {
   onExit: () => void;
 }
 
+// Warm, varied end-of-game messages. Winner gets a celebration; the loser is
+// always encouraged and pointed at a rematch — never told they were "defeated".
+const WIN_LINES: Array<(me: string, opp: string) => string> = [
+  (me) => `You sank every ship, Captain ${me}! 🚢💥`,
+  () => `Admiral-level work — the whole fleet is yours! 🌊`,
+  (_, opp) => `You out-sailed ${opp} this time. Well played!`,
+  () => `Direct hits all around. What a battle! 🎯`,
+];
+
+const LOSS_LINES: Array<(me: string, opp: string) => string> = [
+  (_, opp) => `${opp} got you this round — go again? 💪`,
+  () => `Great battle! Your ships put up a real fight. ⚓`,
+  () => `So close! One more game and you'll get them. 🌟`,
+  (me) => `Nice sailing, Captain ${me}. Ready for a rematch?`,
+];
+
 export function Result({
   won,
   pointsEarned,
   totalPoints,
+  myName,
   oppName,
   iWantRematch,
   oppWantsRematch,
   onRematch,
   onExit,
 }: ResultProps) {
+  // Pick one flavour line per game (stable across re-renders).
+  const [idx] = useState(() => Math.floor(Math.random() * WIN_LINES.length));
+  const captain = myName || 'Captain';
+  const rival = oppName || 'your rival';
+  const flavor = (won ? WIN_LINES : LOSS_LINES)[idx](captain, rival);
+
   return (
     <div className="stack">
       <div className="panel">
         <div className="result-hero">
-          <div className="subtle">{won ? 'Enemy fleet destroyed' : `${oppName} sank your fleet`}</div>
-          <div className={`big ${won ? 'win' : 'loss'}`}>{won ? '🏆 Victory' : '💀 Defeat'}</div>
-          <div className="earned">+{pointsEarned} points</div>
-          <div className="subtle" style={{ marginTop: 6 }}>New balance: {totalPoints} pts</div>
+          <div className={`big ${won ? 'win' : 'loss'}`}>{won ? '🎉 You Win!' : '⚓ Good Game!'}</div>
+          <p className="result-flavor">{flavor}</p>
+          <div className="earned">
+            🪙 +{pointsEarned} points{won ? '!' : ' for a great battle'}
+          </div>
+          <div className="subtle" style={{ marginTop: 6 }}>
+            You now have {totalPoints} points — spend them on cooler fleets!
+          </div>
         </div>
       </div>
 
       <div className="panel stack">
         {oppWantsRematch && !iWantRematch && (
-          <p className="subtle center">🔁 {oppName} wants a rematch!</p>
+          <p className="subtle center">🔁 {rival} wants a rematch!</p>
         )}
         {iWantRematch && !oppWantsRematch && (
-          <p className="subtle center">Waiting for {oppName} to accept the rematch…</p>
+          <p className="subtle center">Waiting for {rival} to jump back in…</p>
         )}
         <button className="btn btn-primary btn-lg btn-block" onClick={onRematch} disabled={iWantRematch} data-testid="rematch">
-          {iWantRematch ? 'Rematch requested ✓' : '🔁 Rematch'}
+          {iWantRematch ? 'Rematch requested ✓' : '🔁 Play again'}
         </button>
         <button className="btn btn-block" onClick={onExit} data-testid="exit">
           ← Back to menu
