@@ -87,6 +87,7 @@ body {
 .btn-danger { border-color: var(--bad); color: var(--bad); background: transparent; }
 .btn-block { width: 100%; }
 .btn-lg { padding: 16px; font-size: 17px; }
+.fast-start { box-shadow: 0 0 24px -8px var(--accent); }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
 .topbar {

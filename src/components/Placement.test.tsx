@@ -43,6 +43,22 @@ describe('<Placement>', () => {
     expect(onChange).toHaveBeenCalledWith([]);
   });
 
+  it('fast start places a full fleet and readies in one tap', () => {
+    const onChange = vi.fn();
+    const onReady = vi.fn();
+    render(<Placement skinId="aqua" fleet={[]} onChange={onChange} onReady={onReady} waiting={false} />);
+    fireEvent.click(screen.getByTestId('fast-start'));
+    expect(isFleetComplete(onChange.mock.calls[0][0] as Fleet)).toBe(true);
+    expect(onReady).toHaveBeenCalled();
+  });
+
+  it('hides fast start once the player is waiting', () => {
+    render(
+      <Placement skinId="aqua" fleet={autoPlace(seededRng(2))} onChange={vi.fn()} onReady={vi.fn()} waiting />,
+    );
+    expect(screen.queryByTestId('fast-start')).toBeNull();
+  });
+
   it('places the selected ship where you tap an empty cell', () => {
     const onChange = vi.fn();
     render(<Placement skinId="aqua" fleet={[]} onChange={onChange} onReady={vi.fn()} waiting={false} />);
