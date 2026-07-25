@@ -291,7 +291,10 @@ body {
 }
 /* Shot markers sit above the ship overlay (z 5) so hits punch through a hull. */
 .cell.hit, .cell.miss, .cell.sunk { z-index: 6; }
-.cell.hit { background: color-mix(in srgb, var(--bad) 20%, var(--sea)); }
+.cell.hit { background: color-mix(in srgb, #ff7a2e 12%, var(--sea)); }
+/* On my own fleet the hit sits over a ship hull, so let the grey hull show
+   through cleanly with just the ember — no cell square shining through. */
+.board.own .cell.hit { background: transparent; box-shadow: none; }
 /* Hit: a glowing fire ember at the wound. */
 .cell.hit::after {
   content: ''; width: 46%; height: 46%; border-radius: 50%;
