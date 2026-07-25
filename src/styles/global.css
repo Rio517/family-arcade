@@ -527,6 +527,8 @@ body {
 .icon-btn:hover { color: var(--text); background: var(--surface-2); }
 /* Big "waiting for opponent to join" variant. */
 .modal.modal-lg { max-width: 560px; }
+.modal.modal-lg .modal-title { font-size: 26px; line-height: 1.2; }
+.modal.modal-lg .modal-head { padding: 18px 20px; }
 .modal.modal-lg .codebox { padding: 26px 26px 30px; }
 .modal.modal-lg .codebox .code { font-size: 56px; }
 .waiting-radar { position: relative; width: 88px; height: 88px; margin: 4px auto 20px; }
