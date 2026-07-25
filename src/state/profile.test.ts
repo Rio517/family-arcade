@@ -44,6 +44,16 @@ describe('recordResult', () => {
     expect(p.history.map((h) => h.code)).toEqual(['B', 'A']);
     expect(p.losses).toBe(1);
   });
+
+  it('caps history at 25 entries, keeping the newest', () => {
+    let p = defaultProfile();
+    for (let i = 0; i < 30; i++) {
+      p = recordResult(p, { won: true, survivingCells: 0, code: `G${i}`, opponent: 'x', finishedAt: i });
+    }
+    expect(p.history).toHaveLength(25);
+    expect(p.history[0].code).toBe('G29'); // newest kept
+    expect(p.history.some((h) => h.code === 'G4')).toBe(false); // oldest dropped
+  });
 });
 
 describe('unlockSkin', () => {

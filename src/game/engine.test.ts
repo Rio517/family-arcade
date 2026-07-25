@@ -5,6 +5,7 @@ import {
   isGameOver,
   ownBoardView,
   radarGrid,
+  resolveIncomingFire,
   resolveShot,
   shotsBy,
   survivingCells,
@@ -124,9 +125,32 @@ describe('radarGrid', () => {
     ];
     const grid = radarGrid(log, 'host');
     expect(grid[9][9]).toBe('miss');
-    expect(grid[4][0]).toBe('hit'); // hit but recorded before sinking shot
+    // Intentional: only the finishing shot reads 'sunk'. The attacker can't
+    // light up the whole silhouette — the log doesn't tell them which earlier
+    // hits belonged to that ship. So the first destroyer cell stays 'hit'.
+    expect(grid[4][0]).toBe('hit');
     expect(grid[4][1]).toBe('sunk');
     expect(grid[0][0]).toBe('unknown');
+  });
+});
+
+describe('resolveIncomingFire', () => {
+  const myFleet = stackFleet(); // I am the defender ('host'); attacker is 'guest'
+
+  it('resolves a fresh incoming shot against my fleet', () => {
+    const log: GameLog = [{ type: 'start', first: 'guest' }];
+    const { event, isResend } = resolveIncomingFire(log, myFleet, 'host', { row: 0, col: 0 });
+    expect(isResend).toBe(false);
+    expect(event.by).toBe('guest'); // authored on behalf of the attacker
+    expect(event.hit).toBe(true); // carrier occupies row 0
+  });
+
+  it('re-sends the existing settled shot on a duplicate, without re-appending', () => {
+    const first = resolveShot(myFleet, [], { row: 0, col: 0 }, 'guest');
+    const log: GameLog = [{ type: 'start', first: 'guest' }, first];
+    const { event, isResend } = resolveIncomingFire(log, myFleet, 'host', { row: 0, col: 0 });
+    expect(isResend).toBe(true);
+    expect(event).toBe(first); // same event object, so the caller won't duplicate it
   });
 });
 

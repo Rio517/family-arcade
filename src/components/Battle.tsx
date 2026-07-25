@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Board, type BoardCell } from './Board';
 import { FLEET } from '../game/constants';
-import { ownBoardView, radarGrid, sunkByAttacker } from '../game/engine';
-import { BOARD_SIZE, type Coord, type Fleet, type GameLog, type Side } from '../game/types';
+import { COLUMN_LABELS } from '../game/board';
+import { ownBoardView, radarGrid, shipName, sunkByAttacker } from '../game/engine';
+import { BOARD_SIZE, type Coord, type Fleet, type GameLog, type ShotEvent, type Side } from '../game/types';
 
-const COL = 'ABCDEFGHJK';
-const coordLabel = (row: number, col: number) => `${COL[col]}${row + 1}`;
+const coordLabel = (row: number, col: number) => `${COLUMN_LABELS[col]}${row + 1}`;
 
 interface BattleProps {
   log: GameLog;
@@ -149,31 +149,30 @@ function FleetStatus({ title, sunkIds }: { title: string; sunkIds: string[] }) {
   );
 }
 
+/** A shot's radar class and its human-readable log label. */
+function describeShot(e: ShotEvent): { res: 'hit' | 'miss' | 'sunk'; label: string } {
+  if (e.allSunk) return { res: 'sunk', label: 'WIN — fleet destroyed' };
+  if (e.sunk) return { res: 'sunk', label: `sank the ${shipName(e.sunk)}` };
+  return e.hit ? { res: 'hit', label: 'hit' } : { res: 'miss', label: 'miss' };
+}
+
 function MoveLog({ log, side, myName, oppName }: { log: GameLog; side: Side; myName: string; oppName: string }) {
-  // The log is already in turn order; newest-first for display.
-  const ordered = log.filter((e) => e.type === 'shot');
+  const shots = log.filter((e): e is ShotEvent => e.type === 'shot');
 
   return (
     <div className="panel">
       <h2>Battle log</h2>
-      {ordered.length === 0 ? (
+      {shots.length === 0 ? (
         <p className="subtle">No shots fired yet.</p>
       ) : (
         <div className="movelog">
-          {ordered
+          {/* The log is in turn order; show newest first. */}
+          {shots
             .slice()
             .reverse()
             .map((e, i) => {
-              if (e.type !== 'shot') return null;
               const mine = e.by === side;
-              const res = e.allSunk ? 'sunk' : e.sunk ? 'sunk' : e.hit ? 'hit' : 'miss';
-              const label = e.allSunk
-                ? 'WIN — fleet destroyed'
-                : e.sunk
-                  ? `sank the ${shipName(e.sunk)}`
-                  : e.hit
-                    ? 'hit'
-                    : 'miss';
+              const { res, label } = describeShot(e);
               return (
                 <div className="entry" key={`${e.row}-${e.col}-${i}`}>
                   <span className={`who ${mine ? 'me' : 'them'}`}>{mine ? myName || 'You' : oppName || 'Them'}</span>
@@ -186,8 +185,4 @@ function MoveLog({ log, side, myName, oppName }: { log: GameLog; side: Side; myN
       )}
     </div>
   );
-}
-
-function shipName(id: string): string {
-  return FLEET.find((s) => s.id === id)?.name ?? id;
 }

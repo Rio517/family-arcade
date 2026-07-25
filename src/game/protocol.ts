@@ -7,9 +7,12 @@
  * them to the reducer in the UI layer.
  */
 
-import type { GameLog, Side } from './types';
+import { BOARD_SIZE, type GameEvent, type GameLog, type ShipId, type Side } from './types';
+import { FLEET } from './constants';
 
 export const PROTOCOL_VERSION = 1;
+
+const SHIP_IDS = new Set<string>(FLEET.map((s) => s.id));
 
 // ── Messages ────────────────────────────────────────────────────────────────
 
@@ -82,38 +85,80 @@ export type Message =
  *
  * Invariant (see engine.ts): every log position is written by exactly one
  * peer, and both peers process events in the same order, so one log is always a
- * prefix of the other (proven by the `isPrefix` tests). The longer log
- * therefore supersedes the shorter with no merge conflict; on a tie we keep our
- * own copy so the result is stable and idempotent.
+ * prefix of the other. The longer log therefore supersedes the shorter with no
+ * merge conflict; on a tie we keep our own copy so the result is stable and
+ * idempotent. (The `full-game-through-a-disconnect` integration test exercises
+ * this convergence end to end.)
  */
 export function reconcileLogs(ours: GameLog, theirs: GameLog): GameLog {
   return theirs.length > ours.length ? theirs : ours;
 }
 
-/** Is `a` a prefix of `b` (by structural equality of each event)? */
-export function isPrefix(a: GameLog, b: GameLog): boolean {
-  if (a.length > b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (!eventsEqual(a[i], b[i])) return false;
+// ── Inbound validation ───────────────────────────────────────────────────────
+// Messages arrive from *another device* — a peer that may be buggy, running a
+// mismatched app version, or (since anyone with the game code can dial in)
+// hostile. We therefore validate the full *shape* of every message before it
+// reaches game logic, not just its `t` tag. An out-of-range coordinate fed into
+// the engine would index off the board and crash the whole React tree (a
+// white-screen DoS), so anything malformed is dropped at this single choke
+// point (see net/peer.ts, which only forwards messages that pass `isMessage`).
+
+function isInt(n: unknown, min: number, max: number): boolean {
+  return typeof n === 'number' && Number.isInteger(n) && n >= min && n <= max;
+}
+
+function isCell(o: { row?: unknown; col?: unknown }): boolean {
+  return isInt(o.row, 0, BOARD_SIZE - 1) && isInt(o.col, 0, BOARD_SIZE - 1);
+}
+
+function isSide(s: unknown): s is Side {
+  return s === 'host' || s === 'guest';
+}
+
+function isShipId(s: unknown): s is ShipId {
+  return typeof s === 'string' && SHIP_IDS.has(s);
+}
+
+function isGameEvent(e: unknown): e is GameEvent {
+  if (typeof e !== 'object' || e === null) return false;
+  const ev = e as Record<string, unknown>;
+  if (ev.type === 'start') return isSide(ev.first);
+  if (ev.type === 'shot') {
+    return (
+      isSide(ev.by) &&
+      isCell(ev) &&
+      typeof ev.hit === 'boolean' &&
+      (ev.sunk === null || isShipId(ev.sunk)) &&
+      typeof ev.allSunk === 'boolean'
+    );
   }
-  return true;
+  return false;
 }
 
-function eventsEqual(x: GameLog[number], y: GameLog[number]): boolean {
-  return JSON.stringify(x) === JSON.stringify(y);
-}
-
-/** Runtime guard for messages arriving off the wire. */
+/**
+ * Runtime guard for messages arriving off the wire: validates both the `t` tag
+ * and the payload shape for that tag. Returns false (→ message dropped) for
+ * anything malformed, out of range, or of the wrong type.
+ */
 export function isMessage(value: unknown): value is Message {
   if (typeof value !== 'object' || value === null) return false;
-  const t = (value as { t?: unknown }).t;
-  return (
-    t === 'hello' ||
-    t === 'ready' ||
-    t === 'sync' ||
-    t === 'fire' ||
-    t === 'shot' ||
-    t === 'start' ||
-    t === 'rematch'
-  );
+  const m = value as Record<string, unknown>;
+  switch (m.t) {
+    case 'hello':
+      return typeof m.v === 'number' && isSide(m.side) && typeof m.name === 'string' && typeof m.skinId === 'string';
+    case 'ready':
+      return typeof m.ready === 'boolean';
+    case 'sync':
+      return Array.isArray(m.log) && m.log.every(isGameEvent) && typeof m.ready === 'boolean';
+    case 'fire':
+      return isCell(m);
+    case 'shot':
+      return isGameEvent(m.event) && (m.event as GameEvent).type === 'shot';
+    case 'start':
+      return isSide(m.first);
+    case 'rematch':
+      return true;
+    default:
+      return false;
+  }
 }
