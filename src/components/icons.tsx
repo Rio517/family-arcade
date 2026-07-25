@@ -108,6 +108,24 @@ export const ShuffleIcon = (p: IconProps) =>
     p,
   );
 
+export const WarningIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M12 3.2 22 20H2L12 3.2Z" />
+      <path d="M12 10v4" />
+      <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none" />
+    </>,
+    p,
+  );
+
+export const CloseIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </>,
+    p,
+  );
+
 export const InfoIcon = (p: IconProps) =>
   svg(
     <>

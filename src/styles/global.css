@@ -99,14 +99,20 @@ body {
 .topbar h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
 .topbar .spacer { flex: 1; }
 .back-link {
-  color: var(--muted);
+  color: var(--text);
+  background: var(--surface-2); /* it's a <button>, so set a real surface */
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;
-  padding: 6px 10px;
+  padding: 7px 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
+.back-link:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── Menu (landing) ──────────────────────────────────────────────────────── */
 .brand { text-align: center; margin: 16px 0 28px; }
@@ -310,10 +316,21 @@ body {
 }
 .ship-chip[data-selected='true'] { border-color: var(--skin); background: color-mix(in srgb, var(--skin) 14%, var(--surface-2)); }
 .ship-chip[data-placed='true'] .nm { color: var(--muted); }
-.ship-chip .pips { display: flex; gap: 3px; margin-left: auto; }
-.ship-chip .pip { width: 10px; height: 10px; border-radius: 2px; background: var(--skin); opacity: 0.8; }
-.ship-chip .status { font-size: 12px; color: var(--good); }
+.ship-art { display: inline-flex; align-items: center; min-width: 64px; }
+.chip-actions { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.chip-btn {
+  display: grid; place-items: center; width: 30px; height: 30px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--muted); cursor: pointer;
+}
+.chip-btn:hover { color: var(--text); border-color: var(--accent); }
+.chip-btn.danger:hover { color: var(--bad); border-color: var(--bad); }
+.ship-chip .status { font-size: 12px; color: var(--warn); }
 .ship-chip .status.todo { color: var(--warn); }
+
+/* "or" divider above the Fast Start express lane. */
+.or-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; color: var(--muted); font-size: 12px; }
+.or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* ── Battle ──────────────────────────────────────────────────────────────── */
 .turn-banner {
@@ -401,19 +418,55 @@ body {
 .conn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .conn[data-s='connected'] { color: var(--good); border-color: color-mix(in srgb, var(--good) 50%, var(--border)); }
 .conn[data-s='connected'] .dot { background: var(--good); box-shadow: 0 0 8px var(--good); }
-.conn[data-s='reconnecting'] { color: var(--warn); }
+/* Not-yet-connected states read as a warning so it's obvious you're waiting. */
+.conn[data-s='hosting'],
+.conn[data-s='dialing'] {
+  color: var(--bad); border-color: color-mix(in srgb, var(--bad) 55%, var(--border));
+  background: rgba(248, 113, 113, 0.10);
+}
+.conn[data-s='reconnecting'] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
 .conn[data-s='reconnecting'] .dot { background: var(--warn); animation: pulse 1s infinite; }
-.conn[data-s='error'] { color: var(--bad); }
+.conn[data-s='error'] { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 55%, var(--border)); }
 .conn[data-s='error'] .dot { background: var(--bad); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 /* ── Code share ──────────────────────────────────────────────────────────── */
+/* Compact chip in the top bar; opens the share modal on tap. */
+.code-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--accent); border-radius: 999px;
+  padding: 5px 12px; cursor: pointer; color: var(--text);
+}
+.code-chip .lbl { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.code-chip strong { color: var(--accent); font-variant-numeric: tabular-nums; letter-spacing: 0.14em; font-size: 15px; }
+
 .codebox { text-align: center; padding: 22px; }
 .codebox .code {
   font-size: 44px; font-weight: 800; letter-spacing: 0.28em;
   color: var(--accent); font-variant-numeric: tabular-nums; padding-left: 0.28em;
 }
 .codebox .lbl { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+
+/* ── Modal ─────────────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.55); padding: 16px;
+}
+.modal {
+  width: 100%; max-width: 420px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.7);
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--surface-2);
+}
+.modal-title { font-weight: 700; }
+.icon-btn {
+  display: grid; place-items: center; background: transparent; border: none;
+  color: var(--muted); cursor: pointer; padding: 4px; border-radius: 8px;
+}
+.icon-btn:hover { color: var(--text); background: var(--surface-2); }
 
 /* ── History ─────────────────────────────────────────────────────────────── */
 .history { display: grid; gap: 6px; }

@@ -12,7 +12,8 @@ import {
   shipCells,
 } from '../game/board';
 import { BOARD_SIZE, type Fleet, type Orientation, type Placement as P, type ShipId } from '../game/types';
-import { BoltIcon, RotateIcon, ShuffleIcon } from './icons';
+import { BoltIcon, CloseIcon, RotateIcon, ShuffleIcon } from './icons';
+import { ShipProfile } from './ships';
 
 interface PlacementProps {
   skinId: string;
@@ -63,18 +64,24 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
     onReady();
   }
 
+  // Remove a placed ship back to its un-placed state and re-select it.
+  function unplace(shipId: ShipId) {
+    onChange(removeShip(fleet, shipId));
+    setSelected(shipId);
+  }
+
+  // Rotate a placed ship about its bow, if the rotated footprint still fits.
+  function rotatePlaced(shipId: ShipId) {
+    const p = fleet.find((x) => x.shipId === shipId);
+    if (!p) return;
+    const rotated: P = { ...p, orientation: p.orientation === 'H' ? 'V' : 'H' };
+    if (canPlace(fleet, rotated)) onChange(placeShip(fleet, rotated));
+  }
+
+  const skinColor = skinById(skinId).color;
+
   return (
     <div className="stack">
-      {!waiting && (
-        <button
-          className="btn btn-primary btn-lg btn-block fast-start"
-          onClick={fastStart}
-          data-testid="fast-start"
-        >
-          <BoltIcon size={18} /> Fast Start — random ships, ready to battle
-        </button>
-      )}
-
       <div className="placement-layout">
         <div className="panel">
         <div className="board-title">
@@ -105,17 +112,40 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
                 onClick={() => setSelected(spec.id)}
                 data-testid={`ship-chip-${spec.id}`}
               >
-                <span className="nm">{spec.name}</span>
-                <span className="pips">
-                  {Array.from({ length: spec.size }).map((_, i) => (
-                    <span
-                      key={i}
-                      className="pip"
-                      style={{ ['--skin' as string]: skinById(skinId).color }}
-                    />
-                  ))}
+                <span className="ship-art" style={{ color: skinColor }}>
+                  <ShipProfile shipId={spec.id} height={20} />
                 </span>
-                <span className={`status ${placed ? '' : 'todo'}`}>{placed ? 'placed' : 'place'}</span>
+                <span className="nm">{spec.name}</span>
+                <span className="chip-actions">
+                  {placed ? (
+                    <>
+                      <button
+                        className="chip-btn"
+                        aria-label={`Rotate ${spec.name}`}
+                        data-testid={`rotate-${spec.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          rotatePlaced(spec.id);
+                        }}
+                      >
+                        <RotateIcon size={15} />
+                      </button>
+                      <button
+                        className="chip-btn danger"
+                        aria-label={`Remove ${spec.name}`}
+                        data-testid={`unplace-${spec.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          unplace(spec.id);
+                        }}
+                      >
+                        <CloseIcon size={15} />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="status todo">place</span>
+                  )}
+                </span>
               </div>
             );
           })}
@@ -151,6 +181,15 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
           Selected: <strong>{shipSpec(selected).name}</strong>
           {selectedPlaced ? ' (already placed — tap it on the board to move it)' : ''}
         </p>
+
+        {!waiting && (
+          <>
+            <div className="or-divider"><span>or</span></div>
+            <button className="btn btn-block fast-start" onClick={fastStart} data-testid="fast-start">
+              <BoltIcon size={16} /> Fast Start — auto-place everything &amp; ready up
+            </button>
+          </>
+        )}
         </div>
       </div>
     </div>

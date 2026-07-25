@@ -77,6 +77,23 @@ describe('<Placement>', () => {
     expect(onChange).toHaveBeenCalledWith([]); // removed so it can be re-placed
   });
 
+  it('un-places a ship via its remove (X) control', () => {
+    const onChange = vi.fn();
+    const fleet: Fleet = [{ shipId: 'destroyer', row: 0, col: 0, orientation: 'H' }];
+    render(<Placement skinId="aqua" fleet={fleet} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    fireEvent.click(screen.getByTestId('unplace-destroyer'));
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it('rotates a placed ship in place when it fits', () => {
+    const onChange = vi.fn();
+    const fleet: Fleet = [{ shipId: 'destroyer', row: 0, col: 0, orientation: 'H' }];
+    render(<Placement skinId="aqua" fleet={fleet} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    fireEvent.click(screen.getByTestId('rotate-destroyer'));
+    const next = onChange.mock.calls[0][0] as Fleet;
+    expect(next.find((p) => p.shipId === 'destroyer')?.orientation).toBe('V');
+  });
+
   it('ignores a tap that would run the ship off the board', () => {
     const onChange = vi.fn();
     render(<Placement skinId="aqua" fleet={[]} onChange={onChange} onReady={vi.fn()} waiting={false} />);
