@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { VictoryFX } from '@shared/ui/VictoryFX';
-import { BrokenShipIcon, ScalesIcon, TrophyIcon } from '@shared/ui/icons';
+import { ScalesIcon } from '@shared/ui/icons';
+import { ChessPiece } from './chessPieces';
 import type { Mode } from '@games/chess/domain/session';
 import type { Color, Status } from '@games/chess/domain/types';
 
@@ -12,6 +12,9 @@ interface ChessResultProps {
   iWon: boolean | null;
   myName: string;
   oppName: string;
+  /** The names in play, so we can announce the winner by name. */
+  whiteName: string;
+  blackName: string;
   /** Online only. */
   pointsEarned: number;
   totalPoints: number;
@@ -30,46 +33,62 @@ const REASON: Record<Status, string> = {
   'draw-material': 'Draw — not enough material to mate',
 };
 
-const colorName = (c: Color) => (c === 'w' ? 'White' : 'Black');
+/** The defeated king, toppled — the emblem when someone is checkmated. */
+function FallenKing({ color }: { color: Color }) {
+  return (
+    <div className="fallen-king" aria-hidden="true">
+      <span className="fk-shadow" />
+      <span className="fk-piece">
+        <ChessPiece color={color} type="k" size={128} />
+      </span>
+    </div>
+  );
+}
 
 export function ChessResult(props: ChessResultProps) {
-  const { status, winner, mode, iWon, myName, oppName, pointsEarned, totalPoints } = props;
+  const { status, winner, mode, iWon, myName, oppName, whiteName, blackName, pointsEarned, totalPoints } = props;
   const isDraw = winner === null;
 
-  // Pick emblem + headline for the three cases: draw, online (me), local (colour).
   let emblem: 'win' | 'loss' | 'draw';
   let headline: string;
   let flavor: string;
+  let loserColor: Color = 'b';
+
   if (isDraw) {
     emblem = 'draw';
-    headline = 'Draw';
-    flavor = REASON[status] || 'An even match.';
-  } else if (mode === 'online') {
-    emblem = iWon ? 'win' : 'loss';
-    headline = iWon ? 'You Win!' : 'Good Game!';
-    flavor = iWon
-      ? `Checkmate — well played, ${myName || 'Captain'}!`
-      : `${oppName || 'Your opponent'} found the mate this time. Rematch?`;
+    headline = 'A Draw';
+    flavor = REASON[status] || 'An even match — honours shared.';
   } else {
-    // Local hotseat: celebrate the winning colour.
-    emblem = 'win';
-    headline = `${colorName(winner)} Wins!`;
-    flavor = `${colorName(winner)} delivered checkmate. Good game!`;
+    loserColor = winner === 'w' ? 'b' : 'w';
+    const winnerName = winner === 'w' ? whiteName : blackName;
+    emblem = mode === 'online' && !iWon ? 'loss' : 'win';
+    headline = `${winnerName} wins!`;
+    if (mode === 'online') {
+      flavor = iWon
+        ? `Checkmate — well played, ${myName || winnerName}!`
+        : `Good game — ${oppName || winnerName} found the mate. Rematch?`;
+    } else {
+      flavor = `${winnerName} delivers checkmate. Good game, both!`;
+    }
   }
 
-  const [reveal] = useState(true); // stable; the reveal is CSS-driven
   const showConfetti = emblem === 'win';
-  const EmblemIcon = emblem === 'win' ? TrophyIcon : emblem === 'loss' ? BrokenShipIcon : ScalesIcon;
 
   return (
     <div className="stack">
       <div className={`panel result-panel ${emblem === 'win' ? 'won' : emblem === 'loss' ? 'lost' : 'drawn'}`}>
         {showConfetti && <VictoryFX />}
         <div className="result-hero">
-          <div className={`result-emblem ${emblem}`} aria-hidden="true">
-            <EmblemIcon size={78} />
+          {isDraw ? (
+            <div className="result-emblem draw" aria-hidden="true">
+              <ScalesIcon size={78} />
+            </div>
+          ) : (
+            <FallenKing color={loserColor} />
+          )}
+          <div className={`big reveal ${emblem === 'win' ? 'win' : 'loss'}`} data-testid="chess-result-headline">
+            {headline}
           </div>
-          <div className={`big ${reveal ? 'reveal' : ''} ${emblem === 'win' ? 'win' : 'loss'}`}>{headline}</div>
           <p className="result-flavor reveal">{flavor}</p>
           {mode === 'online' && !isDraw && (
             <>

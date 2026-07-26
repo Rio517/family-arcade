@@ -371,6 +371,8 @@ export function ChessPage() {
             iWon={cx.mode === 'online' ? winnerOf(cx.board) === cx.myColor : null}
             myName={cx.myName}
             oppName={cx.oppName}
+            whiteName={nameW}
+            blackName={nameB}
             pointsEarned={finish.pointsEarned}
             totalPoints={profile.profile.points}
             iWantRematch={cx.iWantRematch}
