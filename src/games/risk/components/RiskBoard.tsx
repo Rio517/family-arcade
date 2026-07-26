@@ -62,11 +62,35 @@ export function RiskBoard({ map, state, selected, targets, onPick }: RiskBoardPr
           const cls = ['risk-terr', selected === t.id ? 'sel' : '', targets.has(t.id) ? 'target' : '']
             .filter(Boolean).join(' ');
           return (
-            <path key={t.id} d={t.path} className={cls} fill={fill} onClick={() => onPick(t.id)} data-testid={`terr-${t.id}`}>
-              <title>{t.name}</title>
-            </path>
+            <g key={t.id}>
+              {t.clip && (
+                <clipPath id={`clip-${t.id}`}>
+                  {t.clip.map((r, i) => <rect key={i} x={r[0]} y={r[1]} width={r[2]} height={r[3]} />)}
+                </clipPath>
+              )}
+              <path
+                d={t.path}
+                className={cls}
+                fill={fill}
+                clipPath={t.clip ? `url(#clip-${t.id})` : undefined}
+                onClick={() => onPick(t.id)}
+                data-testid={`terr-${t.id}`}
+              >
+                <title>{t.name}</title>
+              </path>
+            </g>
           );
         })}
+
+        {/* Internal Risk lines over the split countries. */}
+        {map.dividers.map((dv, i) => (
+          <g key={`dv-${i}`} className="risk-divider">
+            <clipPath id={`dvclip-${i}`}><path d={dv.clip} /></clipPath>
+            <g clipPath={`url(#dvclip-${i})`}>
+              {dv.lines.map((l, j) => <line key={j} x1={l[0]} y1={l[1]} x2={l[2]} y2={l[3]} />)}
+            </g>
+          </g>
+        ))}
 
         {map.territories.map((t) => {
           const st = state.territories[t.id];

@@ -112,6 +112,7 @@
 
 .risk-badge { cursor: pointer; }
 .risk-badge > text { pointer-events: none; }
+.risk-divider line { stroke: #5b4425; stroke-width: 0.6; pointer-events: none; }
 .risk-token { fill: url(#risk-brass); }
 .risk-token-ring { fill: none; stroke: #4a3212; stroke-width: 1; }
 .risk-token-num {
