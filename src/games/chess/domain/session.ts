@@ -172,6 +172,18 @@ export function undoMove(s: SessionState): Outcome {
 }
 
 /**
+ * Rewind the game to the position after ply `n` (i.e. keep the first `n` plies).
+ * Local (hotseat) only, for the same reason as undo — online reconciliation
+ * would immediately restore the longer log. No-op if `n` is already the length.
+ */
+export function truncateLog(s: SessionState, n: number): Outcome {
+  if (s.mode !== 'local') return { state: s, outgoing: [] };
+  const clamped = Math.max(0, Math.min(Math.floor(n), s.log.length));
+  if (clamped === s.log.length) return { state: s, outgoing: [] };
+  return { state: { ...s, log: s.log.slice(0, clamped) }, outgoing: [] };
+}
+
+/**
  * Propose a rematch. When both sides have proposed, the board resets to the
  * opening and rematch flags clear. Online, colours stay the same (host=White).
  */

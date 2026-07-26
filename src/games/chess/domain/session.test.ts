@@ -8,6 +8,7 @@ import {
   phase,
   proposeRematch,
   turnColor,
+  truncateLog,
   undoMove,
   type SessionState,
 } from './session';
@@ -73,6 +74,19 @@ describe('local session', () => {
     expect(s.log).toHaveLength(1);
     expect(turnColor(s)).toBe('b'); // back to Black's turn
   });
+
+  it('rewinds to an earlier move via the log', () => {
+    let s = createLocalSession('Alice', 'Bob');
+    s = makeMove(s, ply('e2', 'e4')).state;
+    s = makeMove(s, ply('e7', 'e5')).state;
+    s = makeMove(s, ply('g1', 'f3')).state;
+    expect(s.log).toHaveLength(3);
+
+    s = truncateLog(s, 1).state; // keep only 1.e4
+    expect(s.log).toHaveLength(1);
+    expect(turnColor(s)).toBe('b');
+    expect(truncateLog(s, 1)).toEqual({ state: s, outgoing: [] }); // already there → no-op
+  });
 });
 
 describe('undo is local-only', () => {
@@ -82,6 +96,7 @@ describe('undo is local-only', () => {
     const out = undoMove(s);
     expect(out.state.log).toHaveLength(1); // unchanged
     expect(out.outgoing).toEqual([]);
+    expect(truncateLog(s, 0).state.log).toHaveLength(1); // truncate also local-only
   });
 });
 

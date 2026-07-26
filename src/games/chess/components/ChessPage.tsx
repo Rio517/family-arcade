@@ -1,5 +1,5 @@
 import '../styles/chess.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useProfile } from '@shared/profile/useProfile';
@@ -8,13 +8,15 @@ import { pointsForResult } from '@shared/profile/profile';
 import { normalizeCode } from '@shared/net/peer';
 import { ChessBoard } from './ChessBoard';
 import { ChessResult } from './ChessResult';
+import { ChessLogModal, CapturedTray } from './ChessLogModal';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
-import { CloseIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
+import { CloseIcon, ListIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
 import { loadResumableChessGame } from '../storage/chessPersistence';
 import { winnerOf, status as statusOf } from '@games/chess/domain/rules';
+import { analyzeGame, tallyCaptures } from '@games/chess/domain/analysis';
 import type { FinishInfo } from '@games/chess/domain/session';
-import type { Ply, Status } from '@games/chess/domain/types';
+import type { Color, PieceType, Ply, Status } from '@games/chess/domain/types';
 
 type Setup = 'pick' | 'local' | 'online';
 
@@ -34,6 +36,7 @@ export function ChessPage() {
   const [joinInput, setJoinInput] = useState(normalizeCode(params.get('g') ?? ''));
   const [whiteName, setWhiteName] = useState('White');
   const [blackName, setBlackName] = useState('Black');
+  const [logOpen, setLogOpen] = useState(false);
 
   const onFinish = useCallback(
     (info: FinishInfo) => {
@@ -105,15 +108,12 @@ export function ChessPage() {
 
   const onMove = (ply: Ply) => cx.move(ply);
 
-  // Turn indicator text — name the player whose move it is, not just the colour.
-  const turnText = (() => {
-    if (cx.phase !== 'play') return '';
-    if (cx.mode === 'local') {
-      const mover = cx.turn === 'w' ? cx.myName : cx.oppName;
-      return `${mover || (cx.turn === 'w' ? 'White' : 'Black')} to move`;
-    }
-    return cx.canMove ? 'Your move' : `${cx.oppName || 'Opponent'}’s move`;
-  })();
+  // The move log + captured pieces are pure views of the log.
+  const moves = useMemo(() => analyzeGame(cx.log), [cx.log]);
+  const caps = useMemo(() => tallyCaptures(moves), [moves]);
+  const boardOrientation: Color = cx.mode === 'online' && cx.myColor ? cx.myColor : 'w';
+  const nameW = (cx.myColor === 'b' ? cx.oppName : cx.myName) || 'White';
+  const nameB = (cx.myColor === 'b' ? cx.myName : cx.oppName) || 'Black';
 
   const inGame = cx.phase === 'play' || cx.phase === 'over';
   const showCodeChip = cx.mode === 'online' && cx.side === 'host' && !cx.oppConnected && cx.phase === 'play';
@@ -126,11 +126,6 @@ export function ChessPage() {
         <button className="back-link" onClick={goMenu} data-testid="chess-back">‹ Menu</button>
         <h1>Chess</h1>
         <span className="spacer" />
-        {cx.phase === 'play' && turnText && (
-          <span className={`turn-pill ${cx.mode === 'local' ? '' : cx.canMove ? 'mine' : 'theirs'}`} data-testid="chess-turn">
-            {turnText}
-          </span>
-        )}
         {showCodeChip && (
           <button className="code-chip" onClick={() => setShareOpen(true)} data-testid="chess-share-chip">
             <span className="lbl">Code</span>
@@ -313,11 +308,34 @@ export function ChessPage() {
               onMove={onMove}
             />
           </div>
-          {(cx.mode === 'local' || statusOf(cx.board) === 'check') && (
-            <div className="chess-side">
-              {statusOf(cx.board) === 'check' && (
-                <p className="chess-check" data-testid="check-banner">Check!</p>
-              )}
+          <div className="chess-side">
+            <div className="chess-players">
+              {/* Black on top, White at the foot — mirroring the board. Each card
+                  names the player and shows the pieces they've captured. */}
+              <PlayerCard
+                name={nameB}
+                color="b"
+                active={cx.turn === 'b'}
+                inCheck={statusOf(cx.board) === 'check' && cx.turn === 'b'}
+                captured={caps.byBlack}
+                capColor="w"
+                lead={-caps.whiteLead}
+              />
+              <PlayerCard
+                name={nameW}
+                color="w"
+                active={cx.turn === 'w'}
+                inCheck={statusOf(cx.board) === 'check' && cx.turn === 'w'}
+                captured={caps.byWhite}
+                capColor="b"
+                lead={caps.whiteLead}
+              />
+            </div>
+
+            <div className="chess-side-actions">
+              <button className="btn btn-ghost chess-log-btn" onClick={() => setLogOpen(true)} data-testid="chess-log-open">
+                <ListIcon size={18} /> Move log
+              </button>
               {cx.mode === 'local' && (
                 <button
                   className="btn btn-ghost chess-undo-btn"
@@ -325,12 +343,22 @@ export function ChessPage() {
                   disabled={!cx.canUndo}
                   data-testid="chess-undo"
                 >
-                  ↶ Undo
+                  ↶ Undo move
                 </button>
               )}
             </div>
-          )}
+          </div>
         </div>
+      )}
+
+      {logOpen && (
+        <ChessLogModal
+          moves={moves}
+          orientation={boardOrientation}
+          canReturn={cx.mode === 'local'}
+          onReturn={(n) => { cx.goToPly(n); setLogOpen(false); }}
+          onClose={() => setLogOpen(false)}
+        />
       )}
 
       {/* ── Result ── */}
@@ -355,6 +383,40 @@ export function ChessPage() {
 
       <div className="footer">
         <Link to="/">Family game console</Link>
+      </div>
+    </div>
+  );
+}
+
+/** A player's plaque beside the board: name (with a "to move" cue on the active
+ *  side) and the pieces they've captured. */
+function PlayerCard({
+  name,
+  color,
+  active,
+  inCheck,
+  captured,
+  capColor,
+  lead,
+}: {
+  name: string;
+  color: Color;
+  active: boolean;
+  inCheck: boolean;
+  captured: PieceType[];
+  capColor: Color;
+  lead: number;
+}) {
+  return (
+    <div className={`chess-player ${active ? 'active' : ''}`}>
+      <span className={`pl-dot ${color === 'w' ? 'light' : 'dark'}`} aria-hidden="true" />
+      <div className="pl-main">
+        <div className="pl-name" data-testid={active ? 'chess-turn' : undefined}>
+          <strong>{name}</strong>
+          {active && <span className="pl-turn"> to move</span>}
+          {inCheck && <span className="pl-check">Check!</span>}
+        </div>
+        <CapturedTray pieces={captured} color={capColor} lead={lead} />
       </div>
     </div>
   );
