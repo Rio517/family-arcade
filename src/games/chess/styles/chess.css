@@ -83,6 +83,10 @@
 }
 .promo-btn:hover { border-color: var(--accent); }
 
+/* Take-back control under the board (same-device games only). */
+.chess-undo-row { display: flex; justify-content: center; margin-top: 12px; }
+.chess-undo-row .btn { min-width: 160px; }
+
 /* Draw emblem on the result screen. */
 .result-emblem.draw { color: var(--muted); filter: drop-shadow(0 4px 10px rgba(2, 6, 20, 0.5)); }
 

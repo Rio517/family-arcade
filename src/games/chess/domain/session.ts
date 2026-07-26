@@ -162,6 +162,16 @@ export function makeMove(s: SessionState, ply: Ply): Outcome {
 }
 
 /**
+ * Take back the last move. Local (hotseat) only: online games reconcile by
+ * "longer log wins", so an undo would be instantly overwritten by the peer's
+ * longer log — there it's a no-op. Also a no-op when the log is empty.
+ */
+export function undoMove(s: SessionState): Outcome {
+  if (s.mode !== 'local' || s.log.length === 0) return { state: s, outgoing: [] };
+  return { state: { ...s, log: s.log.slice(0, -1) }, outgoing: [] };
+}
+
+/**
  * Propose a rematch. When both sides have proposed, the board resets to the
  * opening and rematch flags clear. Online, colours stay the same (host=White).
  */
