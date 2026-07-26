@@ -104,10 +104,13 @@ export function ChessPage() {
 
   const onMove = (ply: Ply) => cx.move(ply);
 
-  // Turn indicator text.
+  // Turn indicator text — name the player whose move it is, not just the colour.
   const turnText = (() => {
     if (cx.phase !== 'play') return '';
-    if (cx.mode === 'local') return `${cx.turn === 'w' ? 'White' : 'Black'} to move`;
+    if (cx.mode === 'local') {
+      const mover = cx.turn === 'w' ? cx.myName : cx.oppName;
+      return `${mover || (cx.turn === 'w' ? 'White' : 'Black')} to move`;
+    }
     return cx.canMove ? 'Your move' : `${cx.oppName || 'Opponent'}’s move`;
   })();
 
@@ -309,6 +312,18 @@ export function ChessPage() {
             <p className="subtle center" style={{ marginTop: 10, color: 'var(--warn)' }} data-testid="check-banner">
               Check!
             </p>
+          )}
+          {cx.mode === 'local' && (
+            <div className="chess-undo-row">
+              <button
+                className="btn btn-ghost"
+                onClick={cx.undo}
+                disabled={!cx.canUndo}
+                data-testid="chess-undo"
+              >
+                ↶ Undo move
+              </button>
+            </div>
           )}
         </div>
       )}

@@ -42,6 +42,33 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Black to move/);
   });
 
+  it('names the player whose move it is, and takes moves back', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+
+    // Give the two players real names.
+    fireEvent.change(screen.getByTestId('white-name'), { target: { value: 'Alice' } });
+    fireEvent.change(screen.getByTestId('black-name'), { target: { value: 'Bob' } });
+    fireEvent.click(screen.getByTestId('start-local'));
+
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Alice to move/);
+
+    // Nothing to undo before the first move.
+    expect(screen.getByTestId('chess-undo')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('sq-e2'));
+    fireEvent.click(screen.getByTestId('sq-e4'));
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Bob to move/);
+    expect(screen.getByTestId('sq-e4').querySelector('svg')).toBeTruthy();
+
+    // Undo restores the pawn and hands the turn back to Alice.
+    fireEvent.click(screen.getByTestId('chess-undo'));
+    expect(screen.getByTestId('sq-e4').querySelector('svg')).toBeNull();
+    expect(screen.getByTestId('sq-e2').querySelector('svg')).toBeTruthy();
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Alice to move/);
+    expect(screen.getByTestId('chess-undo')).toBeDisabled();
+  });
+
   it('reaching the online lobby shows create/join controls', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));

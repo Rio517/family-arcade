@@ -8,6 +8,7 @@ import {
   phase,
   proposeRematch,
   turnColor,
+  undoMove,
   type SessionState,
 } from './session';
 import type { Ply, Square } from './types';
@@ -58,6 +59,29 @@ describe('local session', () => {
     s = makeMove(s, ply('e2', 'e4')).state;
     s = proposeRematch(s).state;
     expect(s.log).toHaveLength(0);
+  });
+
+  it('takes back the last move (and no-ops on an empty log)', () => {
+    let s = createLocalSession('Alice', 'Bob');
+    expect(undoMove(s).state.log).toHaveLength(0); // nothing to undo
+
+    s = makeMove(s, ply('e2', 'e4')).state;
+    s = makeMove(s, ply('e7', 'e5')).state;
+    expect(turnColor(s)).toBe('w');
+
+    s = undoMove(s).state;
+    expect(s.log).toHaveLength(1);
+    expect(turnColor(s)).toBe('b'); // back to Black's turn
+  });
+});
+
+describe('undo is local-only', () => {
+  it('is a no-op online (longer-log reconciliation would override it)', () => {
+    let s = createOnlineSession('host', 'ABCD', 'Host');
+    s = makeMove(s, ply('e2', 'e4')).state;
+    const out = undoMove(s);
+    expect(out.state.log).toHaveLength(1); // unchanged
+    expect(out.outgoing).toEqual([]);
   });
 });
 

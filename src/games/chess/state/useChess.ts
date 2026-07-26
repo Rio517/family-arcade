@@ -45,12 +45,15 @@ export interface UseChessResult {
   board: GameState;
   turn: Color;
   canMove: boolean;
+  /** Local (hotseat) only: is there a move to take back? */
+  canUndo: boolean;
   // actions
   startLocal: (whiteName: string, blackName: string) => void;
   hostGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
   resumeGame: (code: string) => void;
   move: (ply: Ply) => void;
+  undo: () => void;
   requestRematch: () => void;
   leave: () => void;
 }
@@ -157,6 +160,11 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     applyOutcome(Session.makeMove(s, ply));
   }, [applyOutcome]);
 
+  const undo = useCallback(() => {
+    const s = sessionRef.current;
+    if (s) applyOutcome(Session.undoMove(s));
+  }, [applyOutcome]);
+
   const requestRematch = useCallback(() => {
     const s = sessionRef.current;
     if (s) applyOutcome(Session.proposeRematch(s));
@@ -189,11 +197,13 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     board,
     turn: s ? turnColor(s) : 'w',
     canMove: s ? canIMove(s) : false,
+    canUndo: s?.mode === 'local' && s.log.length > 0,
     startLocal,
     hostGame,
     joinGame,
     resumeGame,
     move,
+    undo,
     requestRematch,
     leave,
   };
