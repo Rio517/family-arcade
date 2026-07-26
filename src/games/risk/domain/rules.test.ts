@@ -3,8 +3,10 @@ import {
   canAttack,
   canFortify,
   connectedOwned,
+  deployReserve,
   endAttack,
   endReinforce,
+  endSetup,
   endTurn,
   fortify,
   newGame,
@@ -64,18 +66,64 @@ function scriptedRng(seq: number[]): () => number {
 }
 
 describe('newGame', () => {
-  it('deals every territory and the right number of starting armies', () => {
+  it('deals every territory one army and opens in the setup deploy', () => {
     const g = newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }], scriptedRng([0.1, 0.4, 0.7, 0.2, 0.9, 0.5]));
-    // All territories owned by someone.
+    // All territories owned by someone, one army each (deploy comes next).
     expect(Object.values(g.territories).every((t) => t.owner === 0 || t.owner === 1)).toBe(true);
-    // 2 players → 40 armies each = 80 total on the board.
     const total = Object.values(g.territories).reduce((s, t) => s + t.armies, 0);
-    expect(total).toBe(80);
+    expect(total).toBe(6);
     // Split 6 territories 3/3.
     expect(territoriesOf(g, 0)).toHaveLength(3);
     expect(territoriesOf(g, 1)).toHaveLength(3);
+    // 2 players → 40 starting; 3 already on the board → 37 left to deploy.
+    expect(g.phase).toBe('setup');
+    expect(g.current).toBe(0);
+    expect(g.toPlace).toBe(37);
+    expect(deployReserve(g, 1)).toBe(37);
+  });
+});
+
+describe('setup deploy', () => {
+  const twoPlayer = () =>
+    newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }], scriptedRng([0.1, 0.4, 0.7, 0.2, 0.9, 0.5]));
+  const armiesOf = (g: GameState, p: number) =>
+    territoriesOf(g, p).reduce((s, t) => s + g.territories[t].armies, 0);
+
+  it('deploys each general in turn, then opens the campaign at reinforce', () => {
+    let g = twoPlayer();
+
+    // Player 0 deploys their whole reserve; total climbs to 40.
+    const mine0 = territoriesOf(g, 0)[0];
+    while (g.toPlace > 0) g = placeArmy(g, mine0);
+    expect(armiesOf(g, 0)).toBe(40);
+
+    // Hand off — now player 1 deploys.
+    g = endSetup(g, MAP);
+    expect(g.phase).toBe('setup');
+    expect(g.current).toBe(1);
+    expect(g.toPlace).toBe(37);
+
+    const mine1 = territoriesOf(g, 1)[0];
+    while (g.toPlace > 0) g = placeArmy(g, mine1);
+    expect(armiesOf(g, 1)).toBe(40);
+
+    // Last general done → real game opens at player 0's reinforce.
+    g = endSetup(g, MAP);
     expect(g.phase).toBe('reinforce');
+    expect(g.current).toBe(0);
     expect(g.toPlace).toBeGreaterThanOrEqual(3);
+  });
+
+  it('will not deploy onto another general’s land', () => {
+    const g = twoPlayer();
+    const enemy = territoriesOf(g, 1)[0];
+    const after = placeArmy(g, enemy);
+    expect(after).toBe(g); // rejected, unchanged
+  });
+
+  it('endSetup is a no-op until the reserve is fully placed', () => {
+    const g = twoPlayer();
+    expect(endSetup(g, MAP)).toBe(g);
   });
 });
 

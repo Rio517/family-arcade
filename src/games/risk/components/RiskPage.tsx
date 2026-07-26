@@ -1,5 +1,5 @@
 import '../styles/risk.css';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { RiskBoard } from './RiskBoard';
 import { mapById, MAPS } from '../maps/registry';
@@ -11,6 +11,7 @@ import {
   currentPlayer,
   endAttack,
   endReinforce,
+  endSetup,
   endTurn,
   fortify,
   newGame,
@@ -21,8 +22,9 @@ import {
 } from '../domain/rules';
 import type { BattleResult, GameState } from '../domain/types';
 
-// Heraldic tinctures — a general's banner, not a neon jersey.
-const PLAYER_COLORS = ['#9e2b25', '#284c7a', '#3f6b45', '#b1802b', '#6a3d6b', '#2b6f6a'];
+// Heraldic tinctures — a general's banner. Kept bright enough that the dark
+// border lines read against them, and the six stay easy to tell apart.
+const PLAYER_COLORS = ['#cf3a30', '#3f78bd', '#4f9c60', '#d69a34', '#9b5aa6', '#2fa199'];
 const PLAYER_NAMES = ['Crimson', 'Cobalt', 'Forest', 'Amber', 'Plum', 'Teal'];
 
 export function RiskPage() {
@@ -74,7 +76,7 @@ export function RiskPage() {
     const topo = map.topology;
     const t = state.territories[id];
 
-    if (state.phase === 'reinforce') {
+    if (state.phase === 'reinforce' || state.phase === 'setup') {
       if (t.owner === state.current && state.toPlace > 0) setState(placeArmy(state, id));
       return;
     }
@@ -187,16 +189,18 @@ export function RiskPage() {
   const me = currentPlayer(state);
   const owned = territoriesOf(state, state.current).length;
   const phaseLabel =
+    state.phase === 'setup' ? `Deploy — place ${state.toPlace}` :
     state.phase === 'reinforce' ? `Reinforce — place ${state.toPlace}` :
     state.phase === 'attack' ? 'Attack' : 'Fortify';
+  const turnKicker = state.phase === 'setup' ? 'Now deploying' : 'Now playing';
 
   return (
     <Shell onMenu={goMenu}>
-      <div className="risk-hud" style={{ ['--pc' as string]: me.color }}>
+      <div className="risk-hud risk-hud-active" style={{ ['--pc' as string]: me.color }}>
         <span className="risk-general" data-testid="risk-turn">
           <span className="risk-seal lg" style={{ ['--pc' as string]: me.color }} />
           <span className="risk-general-text">
-            <span className="risk-eyebrow">To move</span>
+            <span className="risk-eyebrow">{turnKicker}</span>
             <strong>{me.name}</strong>
           </span>
         </span>
@@ -204,9 +208,21 @@ export function RiskPage() {
         <span className="risk-owned"><strong>{owned}</strong> territories</span>
       </div>
 
-      <RiskBoard map={map} state={state} selected={sel} targets={targets} onPick={onPick} />
+      <RiskBoard map={map} state={state} selected={sel} targets={targets} onPick={onPick} accent={me.color} />
 
       <div className="risk-controls">
+        {state.phase === 'setup' && (
+          <>
+            <p className="risk-note">
+              <strong style={{ color: me.color }}>{me.name}</strong>, tap your lands to deploy your{' '}
+              {state.toPlace} starting arm{state.toPlace === 1 ? 'y' : 'ies'}.
+            </p>
+            <button className="risk-btn primary block" disabled={state.toPlace > 0} onClick={() => setState(endSetup(state, map.topology))} data-testid="end-setup">
+              {state.toPlace > 0 ? `Deploy ${state.toPlace} more` : 'Done — pass the map →'}
+            </button>
+          </>
+        )}
+
         {state.phase === 'reinforce' && (
           <>
             <p className="risk-note">Tap your lands to muster {state.toPlace} arm{state.toPlace === 1 ? 'y' : 'ies'}.</p>
@@ -247,16 +263,85 @@ export function RiskPage() {
   );
 }
 
+const HELP_SEEN_KEY = 'risk-help-seen-v1';
+
 function Shell({ children, onMenu }: { children: React.ReactNode; onMenu: () => void }) {
+  const [showHelp, setShowHelp] = useState(false);
+
+  // Pop the rules open the very first time someone opens Risk, so a new player
+  // (or a kid) learns the game before staring at a map they don't understand.
+  useEffect(() => {
+    let seen = false;
+    try {
+      seen = localStorage.getItem(HELP_SEEN_KEY) === '1';
+    } catch {
+      /* private mode / storage blocked — just don't auto-open */
+      seen = true;
+    }
+    if (!seen) {
+      setShowHelp(true);
+      try {
+        localStorage.setItem(HELP_SEEN_KEY, '1');
+      } catch { /* ignore */ }
+    }
+  }, []);
+
   return (
     <div className="app risk-theme">
       <div className="topbar risk-topbar">
         <button className="risk-btn ghost" onClick={onMenu} data-testid="risk-back">‹ Menu</button>
         <h1>Risk</h1>
         <span className="risk-topbar-rule" aria-hidden="true" />
+        <button className="risk-btn ghost" onClick={() => setShowHelp(true)} data-testid="risk-help-open">
+          How to play
+        </button>
       </div>
       {children}
       <div className="footer"><Link to="/">Family game console</Link></div>
+      {showHelp && <RiskHelp onClose={() => setShowHelp(false)} />}
+    </div>
+  );
+}
+
+/** A friendly, kid-readable rules card, themed as a field manual. */
+function RiskHelp({ onClose }: { onClose: () => void }) {
+  const steps: { n: number; name: string; body: string }[] = [
+    { n: 1, name: 'Reinforce', body: 'You get fresh armies at the start of your turn — more if you hold whole continents. Tap your own lands to place them.' },
+    { n: 2, name: 'Attack', body: 'Tap one of your lands that has 2 or more armies, then tap a touching enemy land. Dice decide the battle — the defender wins ties. Win, and the land becomes yours. Attack as often as you like, or not at all.' },
+    { n: 3, name: 'Fortify', body: 'Once per turn you may slide armies between two of your connected lands. Then tap “End turn” to pass to the next general.' },
+  ];
+  return (
+    <div className="risk-help-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="risk-help" role="dialog" aria-label="How to play Risk" aria-modal="true">
+        <div className="risk-eyebrow">The field manual</div>
+        <h2 className="risk-help-title">How to play Risk</h2>
+        <p className="risk-help-goal">
+          <strong>Goal:</strong> conquer the world. Be the last general with any lands left on the map.
+        </p>
+        <p className="risk-help-sub">
+          <strong>To start,</strong> the map is split between the generals and each of you taps
+          your own lands to place your starting armies. Then play begins — every turn has three
+          steps, in order:
+        </p>
+        <ol className="risk-help-steps">
+          {steps.map((s) => (
+            <li key={s.n} className="risk-help-step">
+              <span className="risk-help-num">{s.n}</span>
+              <span>
+                <strong>{s.name}</strong>
+                <span className="risk-help-body">{s.body}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <p className="risk-help-tip">
+          Your lands are the ones washed in <strong>your banner’s colour</strong>. The plaque at the top
+          always shows whose turn it is and which step they’re on.
+        </p>
+        <button className="risk-btn primary block lg" onClick={onClose} data-testid="risk-help-close">
+          Got it — take the field
+        </button>
+      </div>
     </div>
   );
 }

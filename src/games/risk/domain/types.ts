@@ -42,7 +42,7 @@ export interface TerritoryState {
   armies: number;
 }
 
-export type Phase = 'reinforce' | 'attack' | 'fortify' | 'over';
+export type Phase = 'setup' | 'reinforce' | 'attack' | 'fortify' | 'over';
 
 export interface GameState {
   mapId: string;

@@ -7,10 +7,10 @@
  * move between connected owned territories) → next living player. Win by holding
  * every territory (equivalently, being the last player left).
  *
- * To keep a hot-seat game moving, the initial claim/deploy is dealt
- * automatically (territories split as evenly as the count allows, then each
- * player's starting armies scattered over their own land) — the strategic game
- * begins at the first reinforce.
+ * The game opens with a **setup** (deploy) phase: territories are split as
+ * evenly as the count allows (one army each), then each general in turn places
+ * their remaining starting armies on their own lands — the part players enjoy.
+ * Once everyone has deployed, the strategic game begins at the first reinforce.
  */
 
 import type {
@@ -40,7 +40,7 @@ function shuffle<T>(items: T[], rng: () => number): T[] {
 
 const die = (rng: () => number) => Math.floor(rng() * 6) + 1;
 
-/** Deal the board and scatter starting armies; ready to play from reinforce. */
+/** Deal the board (one army per territory); players then deploy in setup. */
 export function newGame(map: MapTopology, newPlayers: NewPlayer[], rng: () => number = Math.random): GameState {
   const players: PlayerState[] = newPlayers.map((p, id) => ({
     id,
@@ -52,36 +52,48 @@ export function newGame(map: MapTopology, newPlayers: NewPlayer[], rng: () => nu
   // Deal territories round-robin over a shuffled order, 1 army each.
   const dealt = shuffle(map.territoryIds, rng);
   const territories: Record<string, TerritoryState> = {};
-  const ownedBy: string[][] = players.map(() => []);
   dealt.forEach((tid, i) => {
-    const owner = i % players.length;
-    territories[tid] = { owner, armies: 1 };
-    ownedBy[owner].push(tid);
+    territories[tid] = { owner: i % players.length, armies: 1 };
   });
-
-  // Scatter each player's remaining starting armies over their own territories.
-  const starting = STARTING_ARMIES[players.length] ?? 30;
-  for (const p of players) {
-    let remaining = starting - ownedBy[p.id].length;
-    const mine = ownedBy[p.id];
-    while (remaining > 0 && mine.length > 0) {
-      territories[mine[Math.floor(rng() * mine.length)]].armies += 1;
-      remaining--;
-    }
-  }
 
   const state: GameState = {
     mapId: map.id,
     players,
     territories,
     current: 0,
-    phase: 'reinforce',
+    phase: 'setup',
     toPlace: 0,
     conqueredThisTurn: false,
     winner: null,
   };
-  state.toPlace = reinforcementCount(state, map, 0);
+  // The first general deploys their remaining starting armies by hand.
+  state.toPlace = deployReserve(state, 0);
   return state;
+}
+
+/** How many starting armies a player still has to deploy (beyond the one
+ *  already sitting on each of their territories). */
+export function deployReserve(state: GameState, playerId: number): number {
+  const starting = STARTING_ARMIES[state.players.length] ?? 30;
+  return Math.max(0, starting - territoriesOf(state, playerId).length);
+}
+
+/**
+ * Finish the current general's deployment and hand off. When the last general
+ * has deployed, the campaign opens at the first player's reinforce.
+ */
+export function endSetup(state: GameState, map: MapTopology): GameState {
+  if (state.phase !== 'setup' || state.toPlace > 0) return state;
+  const next = state.current + 1;
+  if (next < state.players.length) {
+    const handed: GameState = { ...state, current: next, phase: 'setup', toPlace: 0 };
+    handed.toPlace = deployReserve(handed, next);
+    return handed;
+  }
+  // Everyone has deployed — begin the real game at player 0.
+  const started: GameState = { ...state, current: 0, phase: 'reinforce', toPlace: 0, conqueredThisTurn: false };
+  started.toPlace = reinforcementCount(started, map, 0);
+  return started;
 }
 
 /** Territory ids owned by a player. */
@@ -101,9 +113,9 @@ export function reinforcementCount(state: GameState, map: MapTopology, playerId:
 
 const current = (state: GameState) => state.players[state.current];
 
-/** Place one reinforcement on an owned territory during the reinforce phase. */
+/** Place one army on an owned territory — during setup deploy or reinforce. */
 export function placeArmy(state: GameState, territoryId: string): GameState {
-  if (state.phase !== 'reinforce' || state.toPlace <= 0) return state;
+  if ((state.phase !== 'reinforce' && state.phase !== 'setup') || state.toPlace <= 0) return state;
   const t = state.territories[territoryId];
   if (!t || t.owner !== state.current) return state;
   return {
