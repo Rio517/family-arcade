@@ -12,7 +12,6 @@ import {
   currentPlayer,
   endAttack,
   endReinforce,
-  endSetup,
   endTurn,
   fortify,
   newGame,
@@ -78,7 +77,7 @@ export function RiskPage() {
     const t = state.territories[id];
 
     if (state.phase === 'reinforce' || state.phase === 'setup') {
-      if (t.owner === state.current && state.toPlace > 0) setState(placeArmy(state, id));
+      if (t.owner === state.current && state.toPlace > 0) setState(placeArmy(state, id, map.topology));
       return;
     }
 
@@ -197,31 +196,31 @@ export function RiskPage() {
 
   return (
     <Shell onMenu={goMenu}>
-      <div className="risk-hud risk-hud-active" style={{ ['--pc' as string]: me.color }}>
-        <span className="risk-general" data-testid="risk-turn">
-          <span className="risk-seal lg" style={{ ['--pc' as string]: me.color }} />
-          <span className="risk-general-text">
-            <span className="risk-eyebrow">{turnKicker}</span>
-            <strong>{me.name}</strong>
+      {/* The map IS the screen: it fills the stage and everything else floats
+          over it. The stage wears the active general's colour as a glowing
+          ring, and the banner re-pops on every hand-off so whose turn it is
+          can't be missed — especially during the alternating deploy. */}
+      <div className="risk-stage" style={{ ['--pc' as string]: me.color }} data-testid="risk-stage">
+        <RiskBoard map={map} state={state} selected={sel} targets={targets} onPick={onPick} accent={me.color} />
+
+        <div className="risk-banner" key={`${state.current}-${state.phase === 'setup' ? 's' : 'p'}`}>
+          <span className="risk-general" data-testid="risk-turn">
+            <span className="risk-seal lg" style={{ ['--pc' as string]: me.color }} />
+            <span className="risk-general-text">
+              <span className="risk-eyebrow">{turnKicker}</span>
+              <strong>{me.name}</strong>
+            </span>
           </span>
-        </span>
-        <span className="risk-phase" data-testid="risk-phase">{phaseLabel}</span>
-        <span className="risk-owned"><strong>{owned}</strong> territories</span>
-      </div>
+          <span className="risk-phase" data-testid="risk-phase">{phaseLabel}</span>
+          <span className="risk-owned"><strong>{owned}</strong> territories</span>
+        </div>
 
-      <RiskBoard map={map} state={state} selected={sel} targets={targets} onPick={onPick} accent={me.color} />
-
-      <div className="risk-controls">
+        <div className="risk-dock">
         {state.phase === 'setup' && (
-          <>
-            <p className="risk-note">
-              <strong style={{ color: me.color }}>{me.name}</strong>, tap your lands to deploy your{' '}
-              {state.toPlace} starting arm{state.toPlace === 1 ? 'y' : 'ies'}.
-            </p>
-            <button className="risk-btn primary block" disabled={state.toPlace > 0} onClick={() => setState(endSetup(state, map.topology))} data-testid="end-setup">
-              {state.toPlace > 0 ? `Deploy ${state.toPlace} more` : 'Done — pass the map →'}
-            </button>
-          </>
+          <p className="risk-note">
+            <strong style={{ color: me.color }}>{me.name}</strong>, tap one of your lands —{' '}
+            {state.toPlace} arm{state.toPlace === 1 ? 'y' : 'ies'} left. Play passes on automatically.
+          </p>
         )}
 
         {state.phase === 'reinforce' && (
@@ -257,8 +256,8 @@ export function RiskPage() {
             <button className="risk-btn block" onClick={() => { setState(endTurn(state, map.topology)); resetSelection(); }} data-testid="end-turn">End turn →</button>
           </>
         )}
-
-        <ContinentLegend map={map} state={state} />
+          <ContinentLegend map={map} state={state} />
+        </div>
       </div>
     </Shell>
   );

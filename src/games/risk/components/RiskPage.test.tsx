@@ -22,9 +22,14 @@ const tapEveryTerritory = () => {
 /** Walk the opening deploy: each general places their whole reserve, then passes,
  *  until the campaign opens at the first reinforce. */
 function completeDeploy() {
-  for (let guard = 0; guard < 10 && /Deploy/i.test(phaseText()); guard++) {
-    for (let i = 0; i < 80 && /Deploy — place [1-9]/.test(phaseText()); i++) tapEveryTerritory();
-    fireEvent.click(screen.getByTestId('end-setup'));
+  // Deploy rotates automatically after every army, so sweeping taps across all
+  // territories drains every general's reserve without any button presses.
+  // Stop the instant the campaign opens so reinforce armies aren't consumed.
+  for (let guard = 0; guard < 40 && /Deploy/i.test(phaseText()); guard++) {
+    for (const path of boardEl().querySelectorAll<SVGPathElement>('.risk-terr')) {
+      if (!/Deploy/i.test(phaseText())) return;
+      fireEvent.click(path);
+    }
   }
 }
 
@@ -47,11 +52,30 @@ describe('<RiskPage>', () => {
     fireEvent.click(screen.getByTestId('count-4'));
     fireEvent.click(screen.getByTestId('risk-start'));
 
-    // The board renders every territory and opens in the deploy (setup) phase.
+    // The board renders every territory and opens in the deploy (setup) phase,
+    // with the stage + turn banner making the active general unmistakable.
     expect(boardEl().querySelectorAll('.risk-terr').length).toBeGreaterThanOrEqual(30);
     expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Deploy/i);
-    // Can't pass the map on until the starting armies are placed.
-    expect(screen.getByTestId('end-setup')).toBeDisabled();
+    expect(screen.getByTestId('risk-stage')).toBeInTheDocument();
+    expect(screen.getByTestId('risk-turn')).toBeInTheDocument();
+  });
+
+  it('deploy alternates generals automatically after each army', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('count-2'));
+    fireEvent.click(screen.getByTestId('risk-start'));
+
+    const general = () => screen.getByTestId('risk-turn').querySelector('strong')?.textContent ?? '';
+    const first = general();
+
+    // Place a single army on the current general's land → the banner flips to
+    // the other general without any button press.
+    for (const path of boardEl().querySelectorAll<SVGPathElement>('.risk-terr')) {
+      fireEvent.click(path);
+      if (general() !== first) break;
+    }
+    expect(general()).not.toBe(first);
+    expect(phaseText()).toMatch(/Deploy/i);
   });
 
   it('deploys the opening armies, reinforces, then begins attacks', () => {
