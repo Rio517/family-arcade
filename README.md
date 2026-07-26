@@ -5,6 +5,7 @@ A small family-friendly game console that lives on GitHub Pages:
 - **Yahtzee Logger** — a mobile-first score logger (roll real dice, tap to log). One self-contained HTML file, works fully offline.
 - **Ship Battle** — a two-player, cross-device naval guessing game (a Battleship-style game; "Battleship" is a trademark of Hasbro and is not affiliated). Two iPads, one shared code, no server.
 - **Chess** — full-rules, drag-and-drop chess for two players: pass-and-play on one device, or online over a shared code.
+- **Risk** — world-conquest for 2–6 players on one shared board (hot-seat): reinforce, attack with dice, and take over a real-geography world map.
 
 **Play it:** https://rio517.github.io/yahtzee-calculator/
 
@@ -22,9 +23,9 @@ It's free and open source — the whole thing lives in this repo.
 | --- | --- |
 | ![Radar and fleet boards mid-battle](docs/screenshots/battle-view.jpg) | ![Share modal with QR code](docs/screenshots/share-qr.jpg) |
 
-| Chess | |
+| Chess | Risk |
 | --- | --- |
-| ![Chess board mid-game with legal-move hints](docs/screenshots/chess-board.jpg) | Drag-and-drop chess — full rules, same device or online. |
+| ![Chess board mid-game with legal-move hints](docs/screenshots/chess-board.jpg) | ![Risk world board with armies](docs/screenshots/risk-board.jpg) |
 
 ---
 
@@ -57,7 +58,18 @@ A full-rules chess game with drag-and-drop (or tap-to-move), playable two ways:
 
 Every real rule is enforced: legal move generation, castling, en passant, promotion (with a piece picker), check, checkmate, stalemate, plus the fifty-move and insufficient-material draws. Illegal moves simply don't happen — you can only drop a piece on a legal square, and you can never leave your own king in check.
 
-The engine is a self-contained, pure module (`src/game/chess/`) with no UI or network dependencies, verified by **perft** node-count tests — the gold standard for a move generator (the opening tree matches 20 / 400 / 8902 at depths 1–3, and the "Kiwipete" position matches 48 / 2039). Online play reuses the same event-sourced-log design as Ship Battle: the shared truth is the list of played moves, each authored by the side to move, so two peers reconcile by **"the longer log wins."** The peer transport (`src/net/peer.ts`) is generic over the message type, so both games share one WebRTC layer.
+The engine is a self-contained, pure module (`src/games/chess/domain/`) with no UI or network dependencies, verified by **perft** node-count tests — the gold standard for a move generator (the opening tree matches 20 / 400 / 8902 at depths 1–3, and the "Kiwipete" position matches 48 / 2039). Online play reuses the same event-sourced-log design as Ship Battle: the shared truth is the list of played moves, each authored by the side to move, so two peers reconcile by **"the longer log wins."** The peer transport (`src/shared/net/peer.ts`) is generic over the message type, so both games share one WebRTC layer.
+
+---
+
+## Risk
+
+World conquest for **2–6 players on one shared device** (hot-seat, open information). Each turn is the classic loop: **reinforce** (armies from your territory count plus a bonus for every continent you fully hold) → **attack** (roll dice, 3 v 2, defender wins ties) → **fortify** (one move between connected territories). Eliminated players drop out; the last one standing conquers the world.
+
+- **Pluggable, data-driven maps.** The rules engine (`src/games/risk/domain/`) is map-agnostic — it only sees an abstract topology (which territories exist, their continents/bonuses, and who borders whom). A map is a self-contained module under `src/games/risk/maps/` that produces that topology plus the rendered SVG. Adding another map is one new module in the map registry; nothing in the engine or UI hard-codes "world".
+- **Real geography, offline.** The World map is built from real country outlines (`world-atlas`, Natural Earth — MIT, bundled into the app) projected to SVG with `d3-geo`. No tile server and no network: the whole map ships in the build, so it works offline like the rest of the console.
+
+The engine is fully unit-tested (deal, reinforcement + continent bonuses, dice combat, capture, fortify connectivity, elimination/win), and the World map has integrity tests (symmetric adjacency, one connected landmass, every territory in exactly one continent).
 
 ---
 
@@ -99,6 +111,12 @@ src/
       styles/battleship.css
       index.ts           its GameDescriptor
     chess/               everything Chess (same shape: domain / state / storage / components / styles / index.ts)
+    risk/                everything Risk
+      domain/            map-agnostic rules (types, rules) + tests
+      maps/              pluggable maps: world.ts (real geography via d3-geo) + registry
+      components/        RiskBoard, RiskPage
+      styles/risk.css
+      index.ts           its GameDescriptor
   app/
     Menu.tsx             registry-driven landing menu
     registry.ts          the ONE list of games
