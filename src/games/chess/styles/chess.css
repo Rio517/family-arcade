@@ -308,7 +308,9 @@
   box-shadow: 0 0 0 1px var(--accent), 0 0 12px -3px var(--accent);
 }
 .fp-hint { margin: 0; min-height: 20px; }
-.fp-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.fp-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: stretch; }
+.fp-view { width: 120px; }
+.fp-3d { width: min(100%, 720px); }
 
 @media (max-width: 640px), (orientation: portrait) {
   .fp-row { flex-direction: column; }

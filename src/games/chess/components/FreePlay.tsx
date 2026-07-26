@@ -4,10 +4,13 @@
  * remove. No turns, no legality — it's a toy chess set. Ends when the player
  * taps "End play".
  */
-import { useEffect, useState, type PointerEvent } from 'react';
+import { lazy, Suspense, useEffect, useState, type PointerEvent } from 'react';
 import { ChessPiece, pieceName } from './chessPieces';
 import { initialState } from '@games/chess/domain/rules';
 import { FILES, RANKS, type Board, type Color, type Piece, type PieceType, type Square } from '@games/chess/domain/types';
+
+// The 3D sandbox shares the game's three.js scene; loaded only when picked.
+const FreePlay3D = lazy(() => import('./FreePlay3D'));
 
 const TRAY_TYPES: PieceType[] = ['k', 'q', 'r', 'b', 'n', 'p'];
 
@@ -23,6 +26,19 @@ export function FreePlay({ onExit }: { onExit: () => void }) {
   const [board, setBoard] = useState<Board>(emptyBoard);
   const [hand, setHand] = useState<Hand | null>(null);
   const [drag, setDrag] = useState<{ hand: Hand; x: number; y: number } | null>(null);
+  // 2D or 3D sandbox; follows the game's view if 3D was picked there.
+  const [view, setView] = useState<'2d' | '3d'>(() => {
+    try {
+      const own = localStorage.getItem('chess-freeplay-view-v1');
+      if (own === '2d' || own === '3d') return own;
+      return localStorage.getItem('chess-view-v1') === '3d' ? '3d' : '2d';
+    } catch { return '2d'; }
+  });
+  const pickView = (v: '2d' | '3d') => {
+    setView(v);
+    setDrag(null);
+    try { localStorage.setItem('chess-freeplay-view-v1', v); } catch { /* ignore */ }
+  };
 
   const setSquare = (sq: Square, p: Piece | null, prev: Board): Board => {
     const next = prev.map((row) => row.slice());
@@ -100,7 +116,7 @@ export function FreePlay({ onExit }: { onExit: () => void }) {
             className={`fp-tray-piece ${held ? 'held' : ''}`}
             aria-label={`${color === 'w' ? 'White' : 'Black'} ${pieceName(t)}`}
             onClick={() => tapTray({ color, type: t })}
-            onPointerDown={(e) => startDrag({ piece: { color, type: t }, from: null }, e)}
+            onPointerDown={view === '2d' ? (e) => startDrag({ piece: { color, type: t }, from: null }, e) : undefined}
             style={{ touchAction: 'none' }}
             data-testid={`fp-tray-${color}-${t}`}
           >
@@ -116,6 +132,11 @@ export function FreePlay({ onExit }: { onExit: () => void }) {
       <div className="fp-row">
         {tray('b')}
 
+        {view === '3d' ? (
+          <Suspense fallback={<p className="subtle center">Setting up the 3D set…</p>}>
+            <FreePlay3D board={board} lifted={hand?.from ?? null} onTap={tapSquare} />
+          </Suspense>
+        ) : (
         <div className="chess-wrap fp-wrap">
           <div className="chess-ranks" aria-hidden="true">{RANKS.split('').map((r) => <span key={r}>{r}</span>)}</div>
           <div className="chess-board" data-testid="fp-board">
@@ -144,6 +165,7 @@ export function FreePlay({ onExit }: { onExit: () => void }) {
           </div>
           <div className="chess-files" aria-hidden="true">{FILES.split('').map((f) => <span key={f}>{f}</span>)}</div>
         </div>
+        )}
 
         {tray('w')}
       </div>
@@ -151,10 +173,25 @@ export function FreePlay({ onExit }: { onExit: () => void }) {
       <p className="subtle center fp-hint">
         {hand
           ? `Holding a ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type)} — tap any square to put it down.`
-          : 'Drag pieces from the trays onto the board. Drag a piece off the board to remove it.'}
+          : view === '3d'
+            ? 'Tap a tray piece, then tap the board to place it. Tap a piece on the board to pick it up.'
+            : 'Drag pieces from the trays onto the board. Drag a piece off the board to remove it.'}
       </p>
 
       <div className="fp-actions">
+        <div className="chess-view-seg fp-view" role="group" aria-label="Sandbox view">
+          <button className={`seg-btn ${view === '2d' ? 'on' : ''}`} onClick={() => pickView('2d')} data-testid="fp-view-2d">2D</button>
+          <button className={`seg-btn ${view === '3d' ? 'on' : ''}`} onClick={() => pickView('3d')} data-testid="fp-view-3d">3D</button>
+        </div>
+        {hand && (
+          <button
+            className="btn"
+            onClick={() => (hand.from ? drop(hand, null) : setHand(null))}
+            data-testid="fp-remove"
+          >
+            {hand.from ? '🗑 Remove piece' : 'Put back'}
+          </button>
+        )}
         <button className="btn" onClick={() => setBoard(initialState().board)} data-testid="fp-lineup">Starting lineup</button>
         <button className="btn" onClick={() => { setBoard(emptyBoard()); setHand(null); }} data-testid="fp-clear">Clear board</button>
         <button className="btn btn-primary" onClick={onExit} data-testid="fp-end">End play →</button>

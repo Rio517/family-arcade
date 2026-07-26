@@ -128,6 +128,14 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeNull();
     expect(screen.getByTestId('fp-sq-a1').querySelector('svg')).toBeTruthy();
 
+    // Pick the queen up and remove it via the remove button (the 3D-friendly path).
+    fireEvent.click(screen.getByTestId('fp-sq-a1'));
+    fireEvent.click(screen.getByTestId('fp-remove'));
+    expect(screen.getByTestId('fp-sq-a1').querySelector('svg')).toBeNull();
+
+    // A 2D/3D toggle is offered for the sandbox too.
+    expect(screen.getByTestId('fp-view-3d')).toBeInTheDocument();
+
     // The starting lineup fills 32 squares; clear empties the board.
     fireEvent.click(screen.getByTestId('fp-lineup'));
     expect(screen.getByTestId('fp-board').querySelectorAll('svg').length).toBe(32);
