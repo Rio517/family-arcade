@@ -212,6 +212,35 @@
 .cap-none { font-size: 11px; color: var(--muted); font-style: italic; }
 .cap-lead { font-size: 12px; font-weight: 700; color: var(--muted); margin-left: 4px; font-variant-numeric: tabular-nums; }
 
+/* ── Full 3D (three.js) view ───────────────────────────────────────────────── */
+.chess3d { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.chess3d-canvas {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  max-height: calc(100dvh - 170px);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 2px #0b1220,
+    0 0 0 4px color-mix(in srgb, var(--accent) 32%, #1a2740),
+    0 22px 46px -18px rgba(0, 0, 0, 0.85);
+}
+.chess3d-canvas canvas { display: block; width: 100% !important; height: 100% !important; }
+.chess3d-hint { margin: 0; font-size: 12px; }
+.chess3d-fallback { padding: 30px 10px; }
+.chess-play .chess-board-area { flex: 1 1 auto; min-width: 0; width: 100%; }
+
+/* Segmented view picker: Flat / Table / 3D. */
+.chess-view-seg {
+  display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.seg-btn {
+  flex: 1; padding: 9px 4px; font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+  background: transparent; border: none; color: var(--muted); cursor: pointer;
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+.seg-btn.on { background: var(--accent-dim); color: var(--accent); }
+
 .chess-side-actions { display: flex; flex-direction: column; gap: 8px; }
 .chess-side-actions .btn { justify-content: center; }
 @media (orientation: portrait) {

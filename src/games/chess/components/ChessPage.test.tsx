@@ -98,18 +98,19 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Black to move/);
   });
 
-  it('defaults to the tabletop (tilt) view and remembers turning it off', () => {
+  it('defaults to the tabletop view and remembers switching to flat', () => {
     const { container } = renderPage();
     fireEvent.click(screen.getByTestId('mode-local'));
     fireEvent.click(screen.getByTestId('start-local'));
 
-    // Tabletop view is the default…
+    // Tabletop view is the default; all three view buttons are offered.
     expect(container.querySelector('.chess-wrap')?.classList.contains('tilt')).toBe(true);
+    expect(screen.getByTestId('view-3d')).toBeInTheDocument();
 
-    // …and the toggle flips to flat and persists the choice.
-    fireEvent.click(screen.getByTestId('chess-tilt-toggle'));
+    // Picking Flat un-tilts the board and persists the choice.
+    fireEvent.click(screen.getByTestId('view-flat'));
     expect(container.querySelector('.chess-wrap')?.classList.contains('tilt')).toBe(false);
-    expect(localStorage.getItem('chess-tilt-v1')).toBe('0');
+    expect(localStorage.getItem('chess-view-v1')).toBe('flat');
   });
 
   it('free play: place, move, clear, and end the sandbox', () => {

@@ -1,5 +1,5 @@
 import '../styles/chess.css';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useProfile } from '@shared/profile/useProfile';
@@ -10,6 +10,12 @@ import { ChessBoard } from './ChessBoard';
 import { ChessResult } from './ChessResult';
 import { ChessLogModal, CapturedTray } from './ChessLogModal';
 import { FreePlay } from './FreePlay';
+
+// three.js is heavy, so the 3D board loads on demand — picking Flat or Table
+// never downloads it.
+const Chess3D = lazy(() => import('./Chess3D'));
+
+type BoardView = 'flat' | 'table' | '3d';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { CloseIcon, GridIcon, ListIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
@@ -38,15 +44,16 @@ export function ChessPage() {
   const [whiteName, setWhiteName] = useState('White');
   const [blackName, setBlackName] = useState('Black');
   const [logOpen, setLogOpen] = useState(false);
-  // Tabletop (3D-tilt) view — on by default, remembered per device.
-  const [tilt, setTilt] = useState(() => {
-    try { return localStorage.getItem('chess-tilt-v1') !== '0'; } catch { return true; }
+  // Board view — flat, tabletop tilt, or full 3D. Remembered per device.
+  const [view, setView] = useState<BoardView>(() => {
+    try {
+      const v = localStorage.getItem('chess-view-v1');
+      return v === 'flat' || v === '3d' ? v : 'table';
+    } catch { return 'table'; }
   });
-  const toggleTilt = () => {
-    setTilt((t) => {
-      try { localStorage.setItem('chess-tilt-v1', t ? '0' : '1'); } catch { /* ignore */ }
-      return !t;
-    });
+  const pickView = (v: BoardView) => {
+    setView(v);
+    try { localStorage.setItem('chess-view-v1', v); } catch { /* ignore */ }
   };
 
   const onFinish = useCallback(
@@ -321,15 +328,28 @@ export function ChessPage() {
       {cx.phase === 'play' && (
         <div className="chess-play">
           <div className="chess-board-area">
-            <ChessBoard
-              board={cx.board}
-              orientation={cx.mode === 'online' && cx.myColor ? cx.myColor : 'w'}
-              interactive={cx.canMove}
-              movableColor={cx.mode === 'online' && cx.myColor ? cx.myColor : cx.turn}
-              lastMove={lastMoveSquares(cx.log)}
-              tilt={tilt}
-              onMove={onMove}
-            />
+            {view === '3d' ? (
+              <Suspense fallback={<p className="subtle center">Setting up the 3D set…</p>}>
+                <Chess3D
+                  board={cx.board}
+                  orientation={boardOrientation}
+                  interactive={cx.canMove}
+                  movableColor={cx.mode === 'online' && cx.myColor ? cx.myColor : cx.turn}
+                  lastMove={lastMoveSquares(cx.log)}
+                  onMove={onMove}
+                />
+              </Suspense>
+            ) : (
+              <ChessBoard
+                board={cx.board}
+                orientation={boardOrientation}
+                interactive={cx.canMove}
+                movableColor={cx.mode === 'online' && cx.myColor ? cx.myColor : cx.turn}
+                lastMove={lastMoveSquares(cx.log)}
+                tilt={view === 'table'}
+                onMove={onMove}
+              />
+            )}
           </div>
           <div className="chess-side">
             <div className="chess-players">
@@ -359,9 +379,18 @@ export function ChessPage() {
               <button className="btn btn-ghost chess-log-btn" onClick={() => setLogOpen(true)} data-testid="chess-log-open">
                 <ListIcon size={18} /> Move log
               </button>
-              <button className="btn btn-ghost chess-tilt-btn" onClick={toggleTilt} data-testid="chess-tilt-toggle">
-                {tilt ? '▦ Flat view' : '◇ Table view'}
-              </button>
+              <div className="chess-view-seg" role="group" aria-label="Board view">
+                {(['flat', 'table', '3d'] as const).map((v) => (
+                  <button
+                    key={v}
+                    className={`seg-btn ${view === v ? 'on' : ''}`}
+                    onClick={() => pickView(v)}
+                    data-testid={`view-${v}`}
+                  >
+                    {v === 'flat' ? 'Flat' : v === 'table' ? 'Table' : '3D'}
+                  </button>
+                ))}
+              </div>
               {cx.mode === 'local' && (
                 <button
                   className="btn btn-ghost chess-undo-btn"
