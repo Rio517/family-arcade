@@ -98,6 +98,20 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Black to move/);
   });
 
+  it('defaults to the tabletop (tilt) view and remembers turning it off', () => {
+    const { container } = renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.click(screen.getByTestId('start-local'));
+
+    // Tabletop view is the default…
+    expect(container.querySelector('.chess-wrap')?.classList.contains('tilt')).toBe(true);
+
+    // …and the toggle flips to flat and persists the choice.
+    fireEvent.click(screen.getByTestId('chess-tilt-toggle'));
+    expect(container.querySelector('.chess-wrap')?.classList.contains('tilt')).toBe(false);
+    expect(localStorage.getItem('chess-tilt-v1')).toBe('0');
+  });
+
   it('reaching the online lobby shows create/join controls', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
