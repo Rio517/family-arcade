@@ -112,6 +112,32 @@ describe('<ChessPage> — local flow', () => {
     expect(localStorage.getItem('chess-tilt-v1')).toBe('0');
   });
 
+  it('free play: place, move, clear, and end the sandbox', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-free'));
+
+    // Tap a white queen in the tray, then a square — it lands there. No rules.
+    fireEvent.click(screen.getByTestId('fp-tray-w-q'));
+    fireEvent.click(screen.getByTestId('fp-sq-e5'));
+    expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeTruthy();
+
+    // Pick the queen back up and drop it across the board — anywhere goes.
+    fireEvent.click(screen.getByTestId('fp-sq-e5'));
+    fireEvent.click(screen.getByTestId('fp-sq-a1'));
+    expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeNull();
+    expect(screen.getByTestId('fp-sq-a1').querySelector('svg')).toBeTruthy();
+
+    // The starting lineup fills 32 squares; clear empties the board.
+    fireEvent.click(screen.getByTestId('fp-lineup'));
+    expect(screen.getByTestId('fp-board').querySelectorAll('svg').length).toBe(32);
+    fireEvent.click(screen.getByTestId('fp-clear'));
+    expect(screen.getByTestId('fp-board').querySelectorAll('svg').length).toBe(0);
+
+    // End play returns to the mode picker.
+    fireEvent.click(screen.getByTestId('fp-end'));
+    expect(screen.getByTestId('mode-free')).toBeInTheDocument();
+  });
+
   it('reaching the online lobby shows create/join controls', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));

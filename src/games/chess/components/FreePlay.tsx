@@ -1,0 +1,171 @@
+/**
+ * Free play — a rules-free sandbox board. Piece trays sit beside the board;
+ * drag (or tap) pieces onto any square, move them anywhere, drag them off to
+ * remove. No turns, no legality — it's a toy chess set. Ends when the player
+ * taps "End play".
+ */
+import { useEffect, useState, type PointerEvent } from 'react';
+import { ChessPiece, pieceName } from './chessPieces';
+import { initialState } from '@games/chess/domain/rules';
+import { FILES, RANKS, type Board, type Color, type Piece, type PieceType, type Square } from '@games/chess/domain/types';
+
+const TRAY_TYPES: PieceType[] = ['k', 'q', 'r', 'b', 'n', 'p'];
+
+const emptyBoard = (): Board => Array.from({ length: 8 }, () => Array<Piece | null>(8).fill(null));
+
+/** What's currently "in hand": a fresh tray piece, or one lifted off the board. */
+interface Hand {
+  piece: Piece;
+  from: Square | null;
+}
+
+export function FreePlay({ onExit }: { onExit: () => void }) {
+  const [board, setBoard] = useState<Board>(emptyBoard);
+  const [hand, setHand] = useState<Hand | null>(null);
+  const [drag, setDrag] = useState<{ hand: Hand; x: number; y: number } | null>(null);
+
+  const setSquare = (sq: Square, p: Piece | null, prev: Board): Board => {
+    const next = prev.map((row) => row.slice());
+    next[sq.row][sq.col] = p;
+    return next;
+  };
+
+  /** Drop whatever is held onto a square (or nowhere, removing it). */
+  const drop = (h: Hand, target: Square | null) => {
+    setBoard((prev) => {
+      let next = prev;
+      if (h.from) next = setSquare(h.from, null, next); // lift off its old square
+      if (target) next = setSquare(target, h.piece, next); // off-board drop = removed
+      return next;
+    });
+    setHand(null);
+  };
+
+  // ── Tap flow: tap to pick up (tray or board), tap a square to put down ──
+  const tapTray = (piece: Piece) => {
+    setHand((h) => (h && !h.from && h.piece.color === piece.color && h.piece.type === piece.type ? null : { piece, from: null }));
+  };
+  const tapSquare = (sq: Square) => {
+    if (hand) {
+      drop(hand, sq);
+      return;
+    }
+    const p = board[sq.row][sq.col];
+    if (p) setHand({ piece: p, from: sq });
+  };
+
+  // ── Drag flow (transform-safe, same technique as the game board) ──
+  const squareFromPoint = (x: number, y: number): Square | null => {
+    const el = document.elementFromPoint?.(x, y);
+    const btn = el?.closest?.('[data-testid^="fp-sq-"]');
+    if (!btn) return null;
+    const name = btn.getAttribute('data-testid')!.slice(6);
+    const col = FILES.indexOf(name[0]);
+    const row = RANKS.indexOf(name[1]);
+    return col >= 0 && row >= 0 ? { row, col } : null;
+  };
+  const startDrag = (h: Hand, e: PointerEvent) => {
+    e.preventDefault();
+    setHand(null);
+    setDrag({ hand: h, x: e.clientX, y: e.clientY });
+  };
+  useEffect(() => {
+    if (!drag) return;
+    const onMove = (e: globalThis.PointerEvent) => setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY } : d));
+    const onUp = (e: globalThis.PointerEvent) => {
+      setDrag((d) => {
+        if (d) drop(d.hand, squareFromPoint(e.clientX, e.clientY));
+        return null;
+      });
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag !== null]);
+
+  const rows = Array.from({ length: 8 }, (_, r) => r);
+
+  const tray = (color: Color) => (
+    <div className={`fp-tray ${color === 'w' ? 'white' : 'black'}`} data-testid={`fp-tray-${color}`}>
+      {TRAY_TYPES.map((t) => {
+        const held = hand && !hand.from && hand.piece.color === color && hand.piece.type === t;
+        return (
+          <button
+            key={t}
+            type="button"
+            className={`fp-tray-piece ${held ? 'held' : ''}`}
+            aria-label={`${color === 'w' ? 'White' : 'Black'} ${pieceName(t)}`}
+            onClick={() => tapTray({ color, type: t })}
+            onPointerDown={(e) => startDrag({ piece: { color, type: t }, from: null }, e)}
+            style={{ touchAction: 'none' }}
+            data-testid={`fp-tray-${color}-${t}`}
+          >
+            <ChessPiece color={color} type={t} size={34} />
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div className="freeplay">
+      <div className="fp-row">
+        {tray('b')}
+
+        <div className="chess-wrap fp-wrap">
+          <div className="chess-ranks" aria-hidden="true">{RANKS.split('').map((r) => <span key={r}>{r}</span>)}</div>
+          <div className="chess-board" data-testid="fp-board">
+            {rows.map((r) =>
+              rows.map((c) => {
+                const piece = board[r][c];
+                const dark = (r + c) % 2 === 1;
+                const lifted = hand?.from && hand.from.row === r && hand.from.col === c;
+                return (
+                  <button
+                    key={`${r}-${c}`}
+                    type="button"
+                    className={`sq ${dark ? 'dark' : 'light'} ${lifted ? 'sel' : ''}`}
+                    data-testid={`fp-sq-${FILES[c]}${8 - r}`}
+                    onClick={() => tapSquare({ row: r, col: c })}
+                    onPointerDown={piece ? (e) => startDrag({ piece, from: { row: r, col: c } }, e) : undefined}
+                    style={piece ? { touchAction: 'none' } : undefined}
+                  >
+                    {piece && !lifted && (
+                      <span className="pslide"><span className="pstand"><ChessPiece color={piece.color} type={piece.type} /></span></span>
+                    )}
+                  </button>
+                );
+              }),
+            )}
+          </div>
+          <div className="chess-files" aria-hidden="true">{FILES.split('').map((f) => <span key={f}>{f}</span>)}</div>
+        </div>
+
+        {tray('w')}
+      </div>
+
+      <p className="subtle center fp-hint">
+        {hand
+          ? `Holding a ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type)} — tap any square to put it down.`
+          : 'Drag pieces from the trays onto the board. Drag a piece off the board to remove it.'}
+      </p>
+
+      <div className="fp-actions">
+        <button className="btn" onClick={() => setBoard(initialState().board)} data-testid="fp-lineup">Starting lineup</button>
+        <button className="btn" onClick={() => { setBoard(emptyBoard()); setHand(null); }} data-testid="fp-clear">Clear board</button>
+        <button className="btn btn-primary" onClick={onExit} data-testid="fp-end">End play →</button>
+      </div>
+
+      {/* The piece riding along under the finger while dragging. */}
+      {drag && (
+        <div className="chess-drag" style={{ left: drag.x, top: drag.y }} aria-hidden="true">
+          <ChessPiece color={drag.hand.piece.color} type={drag.hand.piece.type} size={52} />
+        </div>
+      )}
+    </div>
+  );
+}

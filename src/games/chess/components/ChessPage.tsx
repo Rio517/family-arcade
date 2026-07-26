@@ -9,16 +9,17 @@ import { normalizeCode } from '@shared/net/peer';
 import { ChessBoard } from './ChessBoard';
 import { ChessResult } from './ChessResult';
 import { ChessLogModal, CapturedTray } from './ChessLogModal';
+import { FreePlay } from './FreePlay';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
-import { CloseIcon, ListIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
+import { CloseIcon, GridIcon, ListIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
 import { loadResumableChessGame } from '../storage/chessPersistence';
 import { winnerOf, status as statusOf } from '@games/chess/domain/rules';
 import { analyzeGame, tallyCaptures } from '@games/chess/domain/analysis';
 import type { FinishInfo } from '@games/chess/domain/session';
 import type { Color, PieceType, Ply, Status } from '@games/chess/domain/types';
 
-type Setup = 'pick' | 'local' | 'online';
+type Setup = 'pick' | 'local' | 'online' | 'free';
 
 interface ResultSummary {
   status: Status;
@@ -225,8 +226,19 @@ export function ChessPage() {
             </div>
             <div className="chev" aria-hidden="true">›</div>
           </button>
+          <button className="card" onClick={() => setSetup('free')} data-testid="mode-free">
+            <div className="icon"><GridIcon size={26} /></div>
+            <div className="body">
+              <div className="title">Free play</div>
+              <div className="sub">No rules — drag pieces anywhere, set up anything. Just play.</div>
+            </div>
+            <div className="chev" aria-hidden="true">›</div>
+          </button>
         </div>
       )}
+
+      {/* ── Free play sandbox ── */}
+      {!inGame && setup === 'free' && <FreePlay onExit={() => setSetup('pick')} />}
 
       {/* ── Setup: local (hotseat) name form ── */}
       {!inGame && setup === 'local' && (
