@@ -128,7 +128,7 @@ const EDGES: [string, string][] = [
   ['centralamerica', 'colombia'], ['caribbean', 'venezuela'], ['greenland', 'britain'],
   // South America
   ['colombia', 'venezuela'], ['colombia', 'peru'], ['venezuela', 'brazil'],
-  ['peru', 'brazil'], ['peru', 'argentina'], ['brazil', 'argentina'], ['brazil', 'northafrica'],
+  ['peru', 'brazil'], ['peru', 'argentina'], ['brazil', 'argentina'], ['brazil', 'westafrica'],
   // Europe
   ['britain', 'westeurope'], ['britain', 'scandinavia'], ['britain', 'centraleurope'],
   ['scandinavia', 'centraleurope'], ['scandinavia', 'easteurope'],
@@ -159,7 +159,7 @@ const EDGES: [string, string][] = [
  */
 const SEA_ROUTES: [string, string][] = [
   ['greenland', 'britain'],
-  ['brazil', 'northafrica'],
+  ['brazil', 'westafrica'],
   ['easteurope', 'middleeast'],
   ['eastafrica', 'middleeast'],
   ['southeurope', 'egypt'],

@@ -15,6 +15,7 @@ import {
   endTurn,
   fortify,
   newGame,
+  hasUnclaimed,
   placeArmy,
   resolveAttack,
   territoriesOf,
@@ -77,7 +78,9 @@ export function RiskPage() {
     const t = state.territories[id];
 
     if (state.phase === 'reinforce' || state.phase === 'setup') {
-      if (t.owner === state.current && state.toPlace > 0) setState(placeArmy(state, id, map.topology));
+      // The engine knows the rules for each stage (claiming an empty land vs
+      // reinforcing your own); invalid taps are simply no-ops.
+      setState(placeArmy(state, id, map.topology));
       return;
     }
 
@@ -188,11 +191,16 @@ export function RiskPage() {
   // ── The campaign ──────────────────────────────────────────────────────────
   const me = currentPlayer(state);
   const owned = territoriesOf(state, state.current).length;
+  const claiming = state.phase === 'setup' && hasUnclaimed(state);
+  const freeLands = claiming
+    ? Object.values(state.territories).filter((t) => t.owner === -1).length
+    : 0;
   const phaseLabel =
+    claiming ? `Claim — ${freeLands} lands free` :
     state.phase === 'setup' ? `Deploy — place ${state.toPlace}` :
     state.phase === 'reinforce' ? `Reinforce — place ${state.toPlace}` :
     state.phase === 'attack' ? 'Attack' : 'Fortify';
-  const turnKicker = state.phase === 'setup' ? 'Now deploying' : 'Now playing';
+  const turnKicker = claiming ? 'Now claiming' : state.phase === 'setup' ? 'Now deploying' : 'Now playing';
 
   return (
     <Shell onMenu={goMenu}>
@@ -218,8 +226,11 @@ export function RiskPage() {
         <div className="risk-dock">
         {state.phase === 'setup' && (
           <p className="risk-note">
-            <strong style={{ color: me.color }}>{me.name}</strong>, tap one of your lands —{' '}
-            {state.toPlace} arm{state.toPlace === 1 ? 'y' : 'ies'} left. Play passes on automatically.
+            <strong style={{ color: me.color }}>{me.name}</strong>,{' '}
+            {claiming
+              ? 'tap any parchment (unclaimed) land to claim it — one army raises your flag.'
+              : `tap one of your lands — ${state.toPlace} arm${state.toPlace === 1 ? 'y' : 'ies'} left.`}{' '}
+            Play passes on automatically.
           </p>
         )}
 
@@ -320,9 +331,10 @@ function RiskHelp({ onClose }: { onClose: () => void }) {
           <strong>Goal:</strong> conquer the world. Be the last general with any lands left on the map.
         </p>
         <p className="risk-help-sub">
-          <strong>To start,</strong> the map is split between the generals and each of you taps
-          your own lands to place your starting armies. Then play begins — every turn has three
-          steps, in order:
+          <strong>To start,</strong> you take turns <em>claiming</em> free lands — one army raises
+          your flag — until the whole map is taken. Then you take turns placing the rest of your
+          starting armies on your own lands. After that, play begins — every turn has three steps,
+          in order:
         </p>
         <ol className="risk-help-steps">
           {steps.map((s) => (

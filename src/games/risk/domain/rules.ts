@@ -29,19 +29,15 @@ export interface NewPlayer {
   color: string;
 }
 
-function shuffle<T>(items: T[], rng: () => number): T[] {
-  const out = [...items];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
-
 const die = (rng: () => number) => Math.floor(rng() * 6) + 1;
 
-/** Deal the board (one army per territory); players then deploy in setup. */
-export function newGame(map: MapTopology, newPlayers: NewPlayer[], rng: () => number = Math.random): GameState {
+/**
+ * Open the board with every territory unclaimed. Setup then runs the classic
+ * two-stage draft, one army per turn with automatic rotation: first everyone
+ * takes turns CLAIMING empty lands (1 army each), then everyone takes turns
+ * REINFORCING their own lands until all starting armies are down.
+ */
+export function newGame(map: MapTopology, newPlayers: NewPlayer[], _rng: () => number = Math.random): GameState {
   const players: PlayerState[] = newPlayers.map((p, id) => ({
     id,
     name: p.name,
@@ -49,12 +45,8 @@ export function newGame(map: MapTopology, newPlayers: NewPlayer[], rng: () => nu
     alive: true,
   }));
 
-  // Deal territories round-robin over a shuffled order, 1 army each.
-  const dealt = shuffle(map.territoryIds, rng);
   const territories: Record<string, TerritoryState> = {};
-  dealt.forEach((tid, i) => {
-    territories[tid] = { owner: i % players.length, armies: 1 };
-  });
+  for (const tid of map.territoryIds) territories[tid] = { owner: -1, armies: 0 };
 
   const state: GameState = {
     mapId: map.id,
@@ -66,9 +58,13 @@ export function newGame(map: MapTopology, newPlayers: NewPlayer[], rng: () => nu
     conqueredThisTurn: false,
     winner: null,
   };
-  // The first general deploys their remaining starting armies by hand.
   state.toPlace = deployReserve(state, 0);
   return state;
+}
+
+/** True while any territory is still unclaimed (the claim stage of setup). */
+export function hasUnclaimed(state: GameState): boolean {
+  return Object.values(state.territories).some((t) => t.owner === -1);
 }
 
 /** How many starting armies a player still has to deploy (their allotment
@@ -123,7 +119,20 @@ const current = (state: GameState) => state.players[state.current];
 export function placeArmy(state: GameState, territoryId: string, map?: MapTopology): GameState {
   if ((state.phase !== 'reinforce' && state.phase !== 'setup') || state.toPlace <= 0) return state;
   const t = state.territories[territoryId];
-  if (!t || t.owner !== state.current) return state;
+  if (!t) return state;
+
+  if (state.phase === 'setup' && hasUnclaimed(state)) {
+    // Claim stage: only an unclaimed land may be taken — one army raises the flag.
+    if (t.owner !== -1) return state;
+    const placed: GameState = {
+      ...state,
+      territories: { ...state.territories, [territoryId]: { owner: state.current, armies: 1 } },
+      toPlace: state.toPlace - 1,
+    };
+    return map ? rotateSetup(placed, map) : placed;
+  }
+
+  if (t.owner !== state.current) return state;
   const placed: GameState = {
     ...state,
     territories: { ...state.territories, [territoryId]: { ...t, armies: t.armies + 1 } },
