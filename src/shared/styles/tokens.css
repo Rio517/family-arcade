@@ -212,6 +212,14 @@ body {
   color: var(--muted); cursor: pointer; padding: 4px; border-radius: 8px;
 }
 .icon-btn:hover { color: var(--text); background: var(--surface-2); }
+
+/* Full-screen toggle in game headers. Inherits the header's colour (via
+   currentColor) so it sits comfortably in every game's theme. */
+.fs-btn {
+  color: currentColor; opacity: 0.72;
+  width: 34px; height: 34px; border: 1px solid transparent; border-radius: 8px;
+}
+.fs-btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 12%, transparent); }
 /* Big "waiting for opponent to join" variant. */
 .modal.modal-lg { max-width: 560px; }
 .modal.modal-lg .modal-title { font-size: 26px; line-height: 1.2; }

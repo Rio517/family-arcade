@@ -7,11 +7,11 @@
 .chess-wrap {
   position: relative;
   display: grid;
-  grid-template-columns: 18px 1fr;
-  grid-template-rows: 1fr 18px;
+  grid-template-columns: 16px 1fr;
+  grid-template-rows: 1fr 16px;
   gap: 4px;
-  max-width: min(92vw, 560px);
-  margin: 8px auto 0;
+  width: min(92vw, 92vh, 560px); /* fallback; orientation rules below refine it */
+  margin: 0 auto;
 }
 .chess-board {
   grid-column: 2; grid-row: 1;
@@ -83,9 +83,35 @@
 }
 .promo-btn:hover { border-color: var(--accent); }
 
-/* Take-back control under the board (same-device games only). */
-.chess-undo-row { display: flex; justify-content: center; margin-top: 12px; }
-.chess-undo-row .btn { min-width: 160px; }
+/* ── In-game layout ─────────────────────────────────────────────────────────
+   The board is sized to fill the available screen (bounded by the smaller of
+   width/height). Controls sit in a slim panel beside the board in landscape —
+   the common orientation for play — and below it in portrait. */
+.chess-play {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+.chess-board-area { display: grid; place-items: center; min-width: 0; min-height: 0; }
+.chess-side { display: flex; gap: 10px; align-items: center; justify-content: center; }
+.chess-check { color: var(--warn); font-weight: 700; margin: 0; text-align: center; }
+.chess-undo-btn { white-space: nowrap; }
+
+@media (orientation: portrait) {
+  .chess-play { flex-direction: column; }
+  .chess-side { flex-direction: row; width: 100%; }
+  /* Room for the header above and the controls row below. */
+  .chess-wrap { width: min(96vw, calc(100dvh - 172px)); }
+}
+@media (orientation: landscape) {
+  .chess-play { flex-direction: row; }
+  .chess-side { flex-direction: column; flex: 0 0 auto; width: 118px; }
+  .chess-undo-btn { width: 100%; }
+  /* Height-bounded, minus the header; leave room for the side panel. */
+  .chess-wrap { width: min(calc(100dvh - 104px), calc(100vw - 168px)); }
+}
 
 /* Draw emblem on the result screen. */
 .result-emblem.draw { color: var(--muted); filter: drop-shadow(0 4px 10px rgba(2, 6, 20, 0.5)); }

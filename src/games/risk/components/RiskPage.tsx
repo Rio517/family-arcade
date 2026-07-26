@@ -2,6 +2,7 @@ import '../styles/risk.css';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { RiskBoard } from './RiskBoard';
+import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { mapById, MAPS } from '../maps/registry';
 import type { RiskMap } from '../maps/types';
 import {
@@ -295,6 +296,7 @@ function Shell({ children, onMenu }: { children: React.ReactNode; onMenu: () => 
         <button className="risk-btn ghost" onClick={() => setShowHelp(true)} data-testid="risk-help-open">
           How to play
         </button>
+        <FullscreenButton />
       </div>
       {children}
       <div className="footer"><Link to="/">Family game console</Link></div>
