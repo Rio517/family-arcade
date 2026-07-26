@@ -117,18 +117,26 @@ describe('<ChessPage> — local flow', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-free'));
 
-    // Tap a white queen in the tray, then a square — it lands there. No rules.
+    // Tap a white queen in the tray — it becomes a stamp: every square tapped
+    // gets a queen, without re-picking from the tray.
     fireEvent.click(screen.getByTestId('fp-tray-w-q'));
     fireEvent.click(screen.getByTestId('fp-sq-e5'));
-    expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeTruthy();
-
-    // Pick the queen back up and drop it across the board — anywhere goes.
-    fireEvent.click(screen.getByTestId('fp-sq-e5'));
     fireEvent.click(screen.getByTestId('fp-sq-a1'));
-    expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeNull();
+    fireEvent.click(screen.getByTestId('fp-sq-h8'));
+    expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeTruthy();
     expect(screen.getByTestId('fp-sq-a1').querySelector('svg')).toBeTruthy();
+    expect(screen.getByTestId('fp-sq-h8').querySelector('svg')).toBeTruthy();
 
-    // Pick the queen up and remove it via the remove button (the 3D-friendly path).
+    // Tapping the tray piece again puts the stamp down.
+    fireEvent.click(screen.getByTestId('fp-tray-w-q'));
+
+    // Now board pieces can be picked up and moved — a one-shot, not a stamp.
+    fireEvent.click(screen.getByTestId('fp-sq-e5'));
+    fireEvent.click(screen.getByTestId('fp-sq-b2'));
+    expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeNull();
+    expect(screen.getByTestId('fp-sq-b2').querySelector('svg')).toBeTruthy();
+
+    // Pick a piece up and remove it via the remove button (the 3D-friendly path).
     fireEvent.click(screen.getByTestId('fp-sq-a1'));
     fireEvent.click(screen.getByTestId('fp-remove'));
     expect(screen.getByTestId('fp-sq-a1').querySelector('svg')).toBeNull();
