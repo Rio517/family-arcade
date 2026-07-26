@@ -130,6 +130,23 @@
   text-anchor: middle; font-variant-numeric: tabular-nums;
 }
 
+/* Decorative galleon over open water. */
+.risk-ship { pointer-events: none; }
+.risk-ship .rs-hull { fill: #4a3218; stroke: #2c1c0c; stroke-width: 1; }
+.risk-ship .rs-hull-line { fill: none; stroke: #c2a15a; stroke-width: 1; opacity: 0.55; }
+.risk-ship .rs-mast line { stroke: #3a2610; stroke-width: 1.6; stroke-linecap: round; }
+.risk-ship .rs-sail { fill: #efe4c6; stroke: #8a6a34; stroke-width: 0.8; opacity: 0.94; }
+.risk-ship .rs-rigging line { stroke: #6b5024; stroke-width: 0.5; opacity: 0.5; }
+.risk-ship .rs-pennant { fill: #7a2a1c; stroke: #4a1810; stroke-width: 0.5; }
+.risk-ship .rs-wake path { fill: none; stroke: #8a6a2e; stroke-width: 1; stroke-dasharray: 1 4; stroke-linecap: round; opacity: 0.4; }
+@media (prefers-reduced-motion: no-preference) {
+  .risk-ship { animation: risk-ship-bob 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+}
+@keyframes risk-ship-bob {
+  0%, 100% { transform: translateY(0) rotate(-0.6deg); }
+  50% { transform: translateY(-2px) rotate(0.6deg); }
+}
+
 .risk-compass .rc-ring { fill: none; stroke: #8a6a2e; stroke-width: 1.2; opacity: 0.75; }
 .risk-compass .rc-ring2 { fill: none; stroke: #8a6a2e; stroke-width: 0.6; opacity: 0.5; }
 .risk-compass .rc-star { fill: #8a6a2e; }

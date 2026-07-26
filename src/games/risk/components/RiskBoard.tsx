@@ -123,11 +123,65 @@ export function RiskBoard({ map, state, selected, targets, onPick }: RiskBoardPr
           );
         })}
 
+        <SeaShip x={533} y={430} />
         <CompassRose x={70} y={map.height - 78} />
         <rect x={5} y={5} width={map.width - 10} height={map.height - 10} className="risk-frame-inner" />
         <rect x={0} y={0} width={map.width} height={map.height} fill="url(#risk-vignette)" pointerEvents="none" />
       </svg>
     </div>
+  );
+}
+
+/**
+ * A decorative antique galleon under full sail, for the open ocean — the kind
+ * of flourish an old cartographer would ink into empty water. Hand-drawn:
+ * walnut hull, three masts of billowing parchment sails, a swallowtail pennant,
+ * and a dotted wake. Purely ornamental (aria-hidden, no pointer events).
+ */
+function SeaShip({ x, y }: { x: number; y: number }) {
+  return (
+    <g transform={`translate(${x},${y}) scale(0.66)`} aria-hidden="true">
+      <g className="risk-ship">
+      {/* Wake — dotted ripples trailing the hull. */}
+      <g className="rs-wake">
+        <path d="M-50,9 q-18,3 -34,0" />
+        <path d="M-46,14 q-22,4 -42,1" />
+        <path d="M-38,5 q-15,2 -28,0" />
+      </g>
+      {/* Standing rigging — stays from the mastheads down to bow and stern. */}
+      <g className="rs-rigging">
+        <line x1="2" y1="-76" x2="-46" y2="-7" />
+        <line x1="2" y1="-76" x2="48" y2="-7" />
+        <line x1="-24" y1="-58" x2="-46" y2="-7" />
+        <line x1="26" y1="-52" x2="48" y2="-7" />
+      </g>
+      {/* Masts. */}
+      <g className="rs-mast">
+        <line x1="-24" y1="-9" x2="-24" y2="-58" />
+        <line x1="2" y1="-9" x2="2" y2="-78" />
+        <line x1="26" y1="-9" x2="26" y2="-52" />
+      </g>
+      {/* Sails — billowing parchment, bellying out to the right. */}
+      <g className="rs-sails">
+        <path className="rs-sail" d="M-38,-30 Q-24,-24 -12,-30 Q-7,-19 -13,-11 Q-24,-7 -35,-11 Q-40,-21 -38,-30 Z" />
+        <path className="rs-sail" d="M-11,-73 Q2,-67 16,-73 Q21,-62 15,-53 Q2,-49 -8,-53 Q-13,-63 -11,-73 Z" />
+        <path className="rs-sail" d="M-15,-47 Q2,-40 21,-47 Q28,-30 20,-13 Q2,-8 -11,-13 Q-19,-30 -15,-47 Z" />
+        <path className="rs-sail" d="M13,-44 Q26,-39 38,-44 Q43,-30 37,-13 Q26,-9 16,-13 Q11,-28 13,-44 Z" />
+      </g>
+      {/* Yards (spars) across the masts. */}
+      <g className="rs-mast">
+        <line x1="-40" y1="-30" x2="-10" y2="-30" />
+        <line x1="-13" y1="-73" x2="18" y2="-73" />
+        <line x1="-17" y1="-47" x2="23" y2="-47" />
+        <line x1="11" y1="-44" x2="40" y2="-44" />
+      </g>
+      {/* Swallowtail pennant at the mainmast head. */}
+      <path className="rs-pennant" d="M2,-78 L30,-81 L23,-83 L31,-86 L2,-84 Z" />
+      {/* Hull — a walnut carrack with a raised stern. */}
+      <path className="rs-hull" d="M-46,-9 L48,-9 Q54,-3 45,5 Q27,16 -2,16 Q-30,16 -42,4 Q-51,-2 -46,-9 Z" />
+      <path className="rs-hull-line" d="M-43,-3 Q1,7 47,-3" />
+      </g>
+    </g>
   );
 }
 
