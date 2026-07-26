@@ -1,0 +1,86 @@
+/* Risk — world board, army badges, turn HUD, dice, and setup controls. */
+
+.risk-board {
+  max-width: 1000px;
+  margin: 8px auto;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 14px 40px -18px rgba(0, 0, 0, 0.7);
+}
+.risk-svg { display: block; width: 100%; height: auto; background: var(--sea); }
+.risk-sea { fill: var(--sea); }
+
+.risk-terr {
+  stroke-width: 0.7;
+  cursor: pointer;
+  transition: filter 120ms;
+}
+.risk-terr:hover { filter: brightness(1.18); }
+.risk-terr.target { stroke: #f8fafc !important; stroke-width: 1.4; filter: brightness(1.12); }
+.risk-terr.sel {
+  stroke: #f8fafc !important; stroke-width: 2;
+  filter: brightness(1.25) drop-shadow(0 0 3px rgba(255, 255, 255, 0.7));
+}
+
+.risk-badge { pointer-events: none; }
+.risk-badge-bg { fill: #0b1220; stroke: rgba(255, 255, 255, 0.55); stroke-width: 0.7; }
+.risk-badge-num { fill: #fff; font-size: 11px; font-weight: 800; text-anchor: middle; font-variant-numeric: tabular-nums; }
+
+/* Turn HUD */
+.risk-hud {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  max-width: 1000px; margin: 0 auto 4px; padding: 0 2px;
+}
+.risk-turn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-weight: 800; font-size: 17px; color: var(--pc);
+}
+.risk-turn .risk-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 10px -1px var(--pc); }
+.risk-phase {
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;
+  color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent);
+  border-radius: 999px; padding: 3px 10px;
+}
+.risk-owned { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+.risk-controls { max-width: 1000px; margin: 10px auto 0; display: grid; gap: 10px; }
+
+/* Setup */
+.risk-count { display: flex; gap: 8px; flex-wrap: wrap; }
+.risk-count .btn { flex: 1; min-width: 56px; }
+.risk-player-row { display: flex; align-items: center; gap: 10px; }
+.risk-swatch { width: 22px; height: 22px; border-radius: 6px; flex: 0 0 auto; border: 1px solid rgba(255, 255, 255, 0.25); }
+.risk-player-row input {
+  flex: 1; padding: 10px 12px; font-size: 15px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+}
+
+/* Dice */
+.risk-dice {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+}
+.dice-side { display: inline-flex; align-items: center; gap: 6px; }
+.dice-side .dice-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-left: 2px; }
+.die {
+  width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center;
+  font-weight: 800; font-size: 15px; color: #0b1220;
+}
+.dice-side.att .die { background: #fca5a5; }
+.dice-side.def .die { background: #93c5fd; }
+.dice-outcome { margin-left: auto; font-weight: 700; color: var(--text); }
+
+.risk-fortify { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.risk-fortify input[type='range'] { width: 100%; accent-color: var(--accent); }
+.risk-fortify-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* Continent legend */
+.risk-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 4px 2px; }
+.risk-legend-item { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
+.risk-legend-chip { width: 11px; height: 11px; border-radius: 3px; }
+.risk-legend-item strong { color: var(--text); }
+.risk-legend-held { font-weight: 700; }
+
+/* Result crown emblem */
+.risk-crown { width: 54px; height: 54px; border-radius: 12px; display: inline-block; box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.6); }

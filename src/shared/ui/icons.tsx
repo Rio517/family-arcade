@@ -41,6 +41,18 @@ export const ShipIcon = (p: IconProps) =>
     p,
   );
 
+/** A globe — the menu icon for Risk (world conquest). */
+export const GlobeIcon = (p: IconProps) =>
+  svg(
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18" />
+      <path d="M4.5 8c4.5 2.2 10.5 2.2 15 0M4.5 16c4.5-2.2 10.5-2.2 15 0" />
+    </>,
+    p,
+  );
+
 /** A stylized chess king — the menu icon for the Chess game. */
 export const ChessIcon = (p: IconProps) =>
   svg(
