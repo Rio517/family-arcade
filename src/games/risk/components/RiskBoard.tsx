@@ -9,6 +9,8 @@ interface RiskBoardProps {
   /** Territories that are valid targets right now (highlighted). */
   targets: Set<string>;
   onPick: (territoryId: string) => void;
+  /** The active general's colour — frames the board so whose turn it is is obvious. */
+  accent: string;
 }
 
 /** Faint engraved continent names, placed at the centroid of their territories. */
@@ -28,9 +30,9 @@ function continentLabels(map: RiskMap) {
  * heraldic colour, and brass army tokens. A compass rose and a brass rule frame
  * the theatre. Scales to its container via the SVG viewBox.
  */
-export function RiskBoard({ map, state, selected, targets, onPick }: RiskBoardProps) {
+export function RiskBoard({ map, state, selected, targets, onPick, accent }: RiskBoardProps) {
   return (
-    <div className="risk-board">
+    <div className="risk-board risk-board-active" style={{ ['--pc' as string]: accent }}>
       <svg viewBox={`0 0 ${map.width} ${map.height}`} className="risk-svg" role="img" aria-label="World map">
         <defs>
           <filter id="risk-paper">
@@ -42,10 +44,11 @@ export function RiskBoard({ map, state, selected, targets, onPick }: RiskBoardPr
             <stop offset="60%" stopColor="#000" stopOpacity="0" />
             <stop offset="100%" stopColor="#3a2a12" stopOpacity="0.5" />
           </radialGradient>
-          <radialGradient id="risk-brass" cx="38%" cy="32%" r="72%">
-            <stop offset="0%" stopColor="#f0dca0" />
-            <stop offset="55%" stopColor="#c9a860" />
-            <stop offset="100%" stopColor="#8a6a34" />
+          {/* Soft dark halo behind army counts so light digits read on any land colour. */}
+          <radialGradient id="risk-halo" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#140c04" stopOpacity="0.72" />
+            <stop offset="58%" stopColor="#140c04" stopOpacity="0.48" />
+            <stop offset="100%" stopColor="#140c04" stopOpacity="0" />
           </radialGradient>
         </defs>
 
@@ -116,9 +119,10 @@ export function RiskBoard({ map, state, selected, targets, onPick }: RiskBoardPr
               onClick={() => onPick(t.id)}
               data-testid={`token-${t.id}`}
             >
-              <circle r={9.5} className="risk-token" />
-              <circle r={9.5} className="risk-token-ring" />
-              <text className="risk-token-num" dy="3.4">{st.armies}</text>
+              {/* Invisible, generous hit area — vital for tiny lands like Cuba. */}
+              <circle r={12} className="risk-token-hit" />
+              <circle r={10.5} className="risk-token-halo" fill="url(#risk-halo)" />
+              <text className="risk-token-num" dy="3.9">{st.armies}</text>
             </g>
           );
         })}

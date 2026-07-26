@@ -92,6 +92,16 @@
   background: linear-gradient(#3c2a19, #241811); border: 1px solid var(--brass);
   box-shadow: 0 0 0 1px var(--walnut-edge), inset 0 0 0 1px var(--brass-dim), 0 20px 50px -22px #000;
 }
+/* Frame the board in the active general's colour so whose turn it is is unmistakable. */
+.risk-board-active {
+  border-color: color-mix(in srgb, var(--pc) 60%, var(--brass));
+  box-shadow:
+    0 0 0 1px var(--walnut-edge),
+    inset 0 0 0 3px var(--pc),
+    0 0 26px -6px color-mix(in srgb, var(--pc) 75%, transparent),
+    0 20px 50px -22px #000;
+  transition: border-color 260ms, box-shadow 260ms;
+}
 .risk-svg { display: block; width: 100%; height: auto; border-radius: 2px; }
 .risk-sea { fill: var(--parchment); }
 .risk-graticule { fill: none; stroke: rgba(122, 92, 42, 0.30); stroke-width: 0.5; }
@@ -100,7 +110,7 @@
   letter-spacing: 0.34em; text-transform: uppercase; text-anchor: middle; pointer-events: none;
 }
 .risk-terr {
-  stroke: #5b4425; stroke-width: 0.6; cursor: pointer; fill-opacity: 0.9;
+  stroke: #43301a; stroke-width: 0.9; cursor: pointer; fill-opacity: 0.92;
   transition: filter 120ms;
 }
 .risk-terr:hover { filter: brightness(1.12); }
@@ -112,7 +122,7 @@
 
 .risk-badge { cursor: pointer; }
 .risk-badge > text { pointer-events: none; }
-.risk-divider line { stroke: #5b4425; stroke-width: 0.6; pointer-events: none; }
+.risk-divider line { stroke: #43301a; stroke-width: 0.8; pointer-events: none; }
 
 /* Sea routes — dotted brass shipping lines across the water. */
 .risk-searoutes { pointer-events: none; }
@@ -123,11 +133,12 @@
   .risk-searoute { animation: risk-searoute-flow 2.6s linear infinite; }
 }
 @keyframes risk-searoute-flow { to { stroke-dashoffset: -8; } }
-.risk-token { fill: url(#risk-brass); }
-.risk-token-ring { fill: none; stroke: #4a3212; stroke-width: 1; }
+.risk-token-hit { fill: transparent; pointer-events: all; }
+.risk-token-halo { pointer-events: none; }
 .risk-token-num {
-  fill: #2a1c08; font-family: var(--font-display); font-weight: 700; font-size: 11px;
-  text-anchor: middle; font-variant-numeric: tabular-nums;
+  fill: #fbf1d6; font-family: var(--font-display); font-weight: 700; font-size: 13px;
+  text-anchor: middle; font-variant-numeric: tabular-nums; pointer-events: none;
+  paint-order: stroke; stroke: #140c04; stroke-width: 2.6; stroke-linejoin: round;
 }
 
 /* Decorative galleon over open water. */
@@ -161,9 +172,19 @@
   background: linear-gradient(#3c2a19, #2c1d11); border: 1px solid var(--brass-dim); border-radius: 4px;
   box-shadow: inset 0 1px 0 rgba(231, 207, 149, 0.1);
 }
+/* Tie the plaque to the active general's colour: a banner in their tincture. */
+.risk-hud-active {
+  border-left: 6px solid var(--pc);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--pc) 26%, #2c1d11), #2c1d11 62%);
+  transition: border-color 260ms, background 260ms;
+}
 .risk-general { display: inline-flex; align-items: center; gap: 12px; }
 .risk-general-text { display: flex; flex-direction: column; line-height: 1.1; }
-.risk-general-text strong { font-family: var(--font-display); font-size: 21px; color: var(--cream); }
+.risk-general-text .risk-eyebrow { color: color-mix(in srgb, var(--pc) 55%, var(--brass)); }
+.risk-general-text strong {
+  font-family: var(--font-display); font-size: 22px; font-weight: 700;
+  color: var(--cream); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
 
 /* Wax seal in a general's tincture. */
 .risk-seal {
@@ -254,3 +275,46 @@
 }
 @keyframes risk-emblem-in { from { opacity: 0; transform: translateY(14px) scale(0.7); } to { opacity: 1; transform: none; } }
 @keyframes risk-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ── How to play — a field manual on parchment ───────────────────────────── */
+.risk-help-backdrop {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  padding: 18px; background: rgba(10, 6, 3, 0.66); backdrop-filter: blur(2px);
+  overflow-y: auto;
+}
+.risk-help {
+  width: min(560px, 100%); margin: auto;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(214, 172, 92, 0.12), transparent 60%),
+    linear-gradient(180deg, #efe2c2, #e2d1aa);
+  color: var(--ink); border: 1px solid var(--brass); border-radius: 6px;
+  box-shadow: 0 0 0 1px var(--walnut-edge), 0 26px 60px -22px #000;
+  padding: 22px 22px 20px;
+}
+.risk-help .risk-eyebrow { color: var(--brass-dim); }
+.risk-help-title {
+  font-family: var(--font-display); font-size: 27px; font-weight: 600; color: #3a2a12;
+  margin: 2px 0 12px; text-wrap: balance;
+}
+.risk-help-goal { margin: 0 0 6px; font-size: 16px; }
+.risk-help-goal strong { color: var(--oxblood); }
+.risk-help-sub { margin: 8px 0 12px; font-style: italic; color: #6a5836; }
+.risk-help-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.risk-help-step { display: flex; gap: 13px; align-items: flex-start; }
+.risk-help-num {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 16px;
+  color: #2a1c08; background: radial-gradient(circle at 38% 32%, #f0dca0, #c9a860 55%, #8a6a34);
+  border: 1px solid #6b4f22; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.risk-help-step strong { font-family: var(--font-display); font-size: 17px; display: block; color: #3a2a12; }
+.risk-help-body { display: block; font-size: 15px; line-height: 1.5; color: #4a3d24; margin-top: 1px; }
+.risk-help-tip {
+  margin: 16px 0 18px; padding: 11px 13px; font-size: 14.5px; line-height: 1.5;
+  background: rgba(122, 92, 42, 0.12); border-left: 3px solid var(--brass-dim); border-radius: 3px; color: #4a3d24;
+}
+.risk-help-tip strong { color: var(--oxblood); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .risk-help { animation: risk-emblem-in 380ms cubic-bezier(0.2, 1, 0.4, 1) both; }
+}
