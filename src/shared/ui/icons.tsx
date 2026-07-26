@@ -160,6 +160,19 @@ export const InfoIcon = (p: IconProps) =>
     p,
   );
 
+export const ListIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M9 6h11" />
+      <path d="M9 12h11" />
+      <path d="M9 18h11" />
+      <circle cx="4.5" cy="6" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="4.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="4.5" cy="18" r="1.1" fill="currentColor" stroke="none" />
+    </>,
+    p,
+  );
+
 export const FullscreenIcon = (p: IconProps) =>
   svg(
     <>

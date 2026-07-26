@@ -69,6 +69,35 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('chess-undo')).toBeDisabled();
   });
 
+  it('shows the move log and can return to an earlier move', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.click(screen.getByTestId('start-local'));
+
+    // Play 1.e4 e5 2.Nf3.
+    for (const [from, to] of [['e2', 'e4'], ['e7', 'e5'], ['g1', 'f3']]) {
+      fireEvent.click(screen.getByTestId(`sq-${from}`));
+      fireEvent.click(screen.getByTestId(`sq-${to}`));
+    }
+    expect(screen.getByTestId('sq-f3').querySelector('svg')).toBeTruthy();
+
+    // Open the log — three plies are listed.
+    fireEvent.click(screen.getByTestId('chess-log-open'));
+    expect(screen.getByRole('dialog', { name: /move log/i })).toBeInTheDocument();
+    expect(screen.getByTestId('log-ply-0')).toHaveTextContent('e4');
+    expect(screen.getByTestId('log-ply-2')).toHaveTextContent(/Nf3/);
+
+    // Pick the position after 1.e4 and rewind to it.
+    fireEvent.click(screen.getByTestId('log-ply-0'));
+    fireEvent.click(screen.getByTestId('chess-log-return'));
+
+    // The knight move is undone, the board is back to Black-to-move after 1.e4.
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId('sq-f3').querySelector('svg')).toBeNull();
+    expect(screen.getByTestId('sq-e4').querySelector('svg')).toBeTruthy();
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Black to move/);
+  });
+
   it('reaching the online lobby shows create/join controls', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));

@@ -54,6 +54,8 @@ export interface UseChessResult {
   resumeGame: (code: string) => void;
   move: (ply: Ply) => void;
   undo: () => void;
+  /** Local only: rewind to the position after ply `n` (keep the first `n` plies). */
+  goToPly: (n: number) => void;
   requestRematch: () => void;
   leave: () => void;
 }
@@ -165,6 +167,11 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     if (s) applyOutcome(Session.undoMove(s));
   }, [applyOutcome]);
 
+  const goToPly = useCallback((n: number) => {
+    const s = sessionRef.current;
+    if (s) applyOutcome(Session.truncateLog(s, n));
+  }, [applyOutcome]);
+
   const requestRematch = useCallback(() => {
     const s = sessionRef.current;
     if (s) applyOutcome(Session.proposeRematch(s));
@@ -204,6 +211,7 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     resumeGame,
     move,
     undo,
+    goToPly,
     requestRematch,
     leave,
   };
