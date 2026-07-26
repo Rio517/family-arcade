@@ -21,8 +21,9 @@ import {
 } from '../domain/rules';
 import type { BattleResult, GameState } from '../domain/types';
 
-const PLAYER_COLORS = ['#dc2626', '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#0d9488'];
-const PLAYER_NAMES = ['Red', 'Blue', 'Green', 'Gold', 'Purple', 'Teal'];
+// Heraldic tinctures — a general's banner, not a neon jersey.
+const PLAYER_COLORS = ['#9e2b25', '#284c7a', '#3f6b45', '#b1802b', '#6a3d6b', '#2b6f6a'];
+const PLAYER_NAMES = ['Crimson', 'Cobalt', 'Forest', 'Amber', 'Plum', 'Teal'];
 
 export function RiskPage() {
   const navigate = useNavigate();
@@ -51,8 +52,7 @@ export function RiskPage() {
   }, [state, map, sel]);
 
   function start() {
-    const mod = mapById(mapId);
-    const rendered = mod.build();
+    const rendered = mapById(mapId).build();
     const players: NewPlayer[] = Array.from({ length: count }, (_, i) => ({
       name: names[i]?.trim() || PLAYER_NAMES[i],
       color: PLAYER_COLORS[i],
@@ -88,7 +88,6 @@ export function RiskPage() {
         const { state: ns, result } = resolveAttack(state, topo, sel, id);
         setState(ns);
         setBattle(result);
-        // Keep attacking from the same territory while it can still push.
         if (ns.territories[sel].armies < 2 || ns.phase === 'over') setSel(null);
       } else if (t.owner === state.current && t.armies >= 2) {
         setSel(id);
@@ -113,29 +112,25 @@ export function RiskPage() {
 
   const goMenu = () => navigate('/');
 
-  // ── Setup screen ──────────────────────────────────────────────────────────
+  // ── Setup: muster the generals ────────────────────────────────────────────
   if (!state || !map) {
     return (
       <Shell onMenu={goMenu}>
         <div className="narrow-col stack">
           <div className="panel">
-            <h2>Players</h2>
+            <div className="risk-eyebrow">The war council</div>
+            <h2>Muster your generals</h2>
             <div className="risk-count">
               {[2, 3, 4, 5, 6].map((n) => (
-                <button
-                  key={n}
-                  className={`btn ${count === n ? 'btn-primary' : ''}`}
-                  onClick={() => setCount(n)}
-                  data-testid={`count-${n}`}
-                >
+                <button key={n} className={`risk-choice ${count === n ? 'on' : ''}`} onClick={() => setCount(n)} data-testid={`count-${n}`}>
                   {n}
                 </button>
               ))}
             </div>
-            <div className="stack" style={{ marginTop: 12 }}>
+            <div className="stack" style={{ marginTop: 14 }}>
               {Array.from({ length: count }, (_, i) => (
                 <div className="risk-player-row" key={i}>
-                  <span className="risk-swatch" style={{ background: PLAYER_COLORS[i] }} />
+                  <span className="risk-seal" style={{ ['--pc' as string]: PLAYER_COLORS[i] }} />
                   <input
                     value={names[i] ?? ''}
                     maxLength={16}
@@ -154,63 +149,59 @@ export function RiskPage() {
 
           {MAPS.length > 1 && (
             <div className="panel">
-              <h2>Map</h2>
+              <div className="risk-eyebrow">Theatre</div>
               <div className="risk-count">
                 {MAPS.map((m) => (
-                  <button key={m.id} className={`btn ${mapId === m.id ? 'btn-primary' : ''}`} onClick={() => setMapId(m.id)}>
-                    {m.name}
-                  </button>
+                  <button key={m.id} className={`risk-choice ${mapId === m.id ? 'on' : ''}`} onClick={() => setMapId(m.id)}>{m.name}</button>
                 ))}
               </div>
             </div>
           )}
 
-          <button className="btn btn-primary btn-lg btn-block" onClick={start} data-testid="risk-start">
-            Start conquest
-          </button>
+          <button className="risk-btn primary block lg" onClick={start} data-testid="risk-start">Take the field</button>
         </div>
       </Shell>
     );
   }
 
-  // ── Result ────────────────────────────────────────────────────────────────
+  // ── Victory ───────────────────────────────────────────────────────────────
   if (state.phase === 'over' && state.winner !== null) {
     const w = state.players[state.winner];
     return (
       <Shell onMenu={goMenu}>
         <div className="narrow-col stack">
-          <div className="panel result-panel won">
-            <div className="result-hero">
-              <div className="result-emblem win"><span className="risk-crown" style={{ background: w.color }} /></div>
-              <div className="big win reveal">{w.name} conquers the world!</div>
-              <p className="result-flavor reveal">Every territory flies one banner. Well played, general.</p>
-            </div>
+          <div className="risk-victory">
+            <WinEmblem color={w.color} />
+            <div className="risk-eyebrow">Dispatch from the front</div>
+            <h2 className="risk-victory-title">{w.name} holds the world</h2>
+            <p className="risk-victory-sub">Every banner on the map is theirs. A decisive campaign, General.</p>
           </div>
-          <button className="btn btn-primary btn-lg btn-block" onClick={() => { setState(null); setMap(null); }} data-testid="risk-again">
-            New game
-          </button>
-          <button className="btn btn-block" onClick={goMenu}>← Back to menu</button>
+          <button className="risk-btn primary block lg" onClick={() => { setState(null); setMap(null); }} data-testid="risk-again">New campaign</button>
+          <button className="risk-btn block" onClick={goMenu}>← Back to menu</button>
         </div>
       </Shell>
     );
   }
 
-  // ── Play ──────────────────────────────────────────────────────────────────
+  // ── The campaign ──────────────────────────────────────────────────────────
   const me = currentPlayer(state);
   const owned = territoriesOf(state, state.current).length;
+  const phaseLabel =
+    state.phase === 'reinforce' ? `Reinforce — place ${state.toPlace}` :
+    state.phase === 'attack' ? 'Attack' : 'Fortify';
 
   return (
     <Shell onMenu={goMenu}>
-      <div className="risk-hud">
-        <span className="risk-turn" style={{ ['--pc' as string]: me.color }} data-testid="risk-turn">
-          <span className="risk-dot" /> {me.name}
+      <div className="risk-hud" style={{ ['--pc' as string]: me.color }}>
+        <span className="risk-general" data-testid="risk-turn">
+          <span className="risk-seal lg" style={{ ['--pc' as string]: me.color }} />
+          <span className="risk-general-text">
+            <span className="risk-eyebrow">To move</span>
+            <strong>{me.name}</strong>
+          </span>
         </span>
-        <span className="risk-phase" data-testid="risk-phase">
-          {state.phase === 'reinforce' && `Reinforce — place ${state.toPlace}`}
-          {state.phase === 'attack' && 'Attack'}
-          {state.phase === 'fortify' && 'Fortify'}
-        </span>
-        <span className="risk-owned">{owned} territories</span>
+        <span className="risk-phase" data-testid="risk-phase">{phaseLabel}</span>
+        <span className="risk-owned"><strong>{owned}</strong> territories</span>
       </div>
 
       <RiskBoard map={map} state={state} selected={sel} targets={targets} onPick={onPick} />
@@ -218,23 +209,17 @@ export function RiskPage() {
       <div className="risk-controls">
         {state.phase === 'reinforce' && (
           <>
-            <p className="subtle">Tap your territories to place {state.toPlace} arm{state.toPlace === 1 ? 'y' : 'ies'}.</p>
-            <button className="btn btn-primary btn-block" disabled={state.toPlace > 0} onClick={() => setState(endReinforce(state))} data-testid="end-reinforce">
-              {state.toPlace > 0 ? `Place ${state.toPlace} more` : 'Begin attacks →'}
+            <p className="risk-note">Tap your lands to muster {state.toPlace} arm{state.toPlace === 1 ? 'y' : 'ies'}.</p>
+            <button className="risk-btn primary block" disabled={state.toPlace > 0} onClick={() => setState(endReinforce(state))} data-testid="end-reinforce">
+              {state.toPlace > 0 ? `Place ${state.toPlace} more` : 'Begin the assault →'}
             </button>
           </>
         )}
 
         {state.phase === 'attack' && (
           <>
-            {battle ? (
-              <DiceRow battle={battle} state={state} />
-            ) : (
-              <p className="subtle">Tap one of your territories (2+ armies), then an adjacent enemy to attack.</p>
-            )}
-            <button className="btn btn-block" onClick={() => { setState(endAttack(state)); resetSelection(); }} data-testid="end-attack">
-              End attacks →
-            </button>
+            {battle ? <DiceRow battle={battle} /> : <p className="risk-note">Choose one of your lands (2+ armies), then an adjacent rival to strike.</p>}
+            <button className="risk-btn block" onClick={() => { setState(endAttack(state)); resetSelection(); }} data-testid="end-attack">Hold the line →</button>
           </>
         )}
 
@@ -242,28 +227,17 @@ export function RiskPage() {
           <>
             {sel && dest ? (
               <div className="risk-fortify">
-                <p className="subtle">Move armies, then confirm.</p>
-                <input
-                  type="range"
-                  min={1}
-                  max={state.territories[sel].armies - 1}
-                  value={moveCount}
-                  onChange={(e) => setMoveCount(Number(e.target.value))}
-                  data-testid="fortify-range"
-                />
+                <p className="risk-note">March your reserves, then confirm.</p>
+                <input type="range" min={1} max={state.territories[sel].armies - 1} value={moveCount} onChange={(e) => setMoveCount(Number(e.target.value))} data-testid="fortify-range" />
                 <div className="risk-fortify-actions">
-                  <button className="btn btn-primary" onClick={() => { setState(fortify(state, map.topology, sel, dest, moveCount)); resetSelection(); }} data-testid="fortify-confirm">
-                    Move {moveCount} →
-                  </button>
-                  <button className="btn" onClick={resetSelection}>Cancel</button>
+                  <button className="risk-btn primary" onClick={() => { setState(fortify(state, map.topology, sel, dest, moveCount)); resetSelection(); }} data-testid="fortify-confirm">March {moveCount} →</button>
+                  <button className="risk-btn" onClick={resetSelection}>Cancel</button>
                 </div>
               </div>
             ) : (
-              <p className="subtle">Optional: tap a territory, then a connected one of yours to move armies.</p>
+              <p className="risk-note">Optional: tap a land, then a connected land of yours to move armies.</p>
             )}
-            <button className="btn btn-block" onClick={() => { setState(endTurn(state, map.topology)); resetSelection(); }} data-testid="end-turn">
-              End turn →
-            </button>
+            <button className="risk-btn block" onClick={() => { setState(endTurn(state, map.topology)); resetSelection(); }} data-testid="end-turn">End turn →</button>
           </>
         )}
 
@@ -275,11 +249,11 @@ export function RiskPage() {
 
 function Shell({ children, onMenu }: { children: React.ReactNode; onMenu: () => void }) {
   return (
-    <div className="app">
-      <div className="topbar">
-        <button className="back-link" onClick={onMenu} data-testid="risk-back">‹ Menu</button>
+    <div className="app risk-theme">
+      <div className="topbar risk-topbar">
+        <button className="risk-btn ghost" onClick={onMenu} data-testid="risk-back">‹ Menu</button>
         <h1>Risk</h1>
-        <span className="spacer" />
+        <span className="risk-topbar-rule" aria-hidden="true" />
       </div>
       {children}
       <div className="footer"><Link to="/">Family game console</Link></div>
@@ -287,20 +261,38 @@ function Shell({ children, onMenu }: { children: React.ReactNode; onMenu: () => 
   );
 }
 
-function DiceRow({ battle, state }: { battle: BattleResult; state: GameState }) {
+const PIPS: Record<number, [number, number][]> = {
+  1: [[1, 1]],
+  2: [[0, 0], [2, 2]],
+  3: [[0, 0], [1, 1], [2, 2]],
+  4: [[0, 0], [2, 0], [0, 2], [2, 2]],
+  5: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]],
+  6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]],
+};
+
+function Die({ v, side }: { v: number; side: 'att' | 'def' }) {
+  return (
+    <span className={`risk-die ${side}`}>
+      <svg viewBox="0 0 30 30" aria-hidden="true">
+        {(PIPS[v] ?? []).map(([c, r], i) => <circle key={i} cx={7 + c * 8} cy={7 + r * 8} r={2.7} />)}
+      </svg>
+    </span>
+  );
+}
+
+function DiceRow({ battle }: { battle: BattleResult }) {
   return (
     <div className="risk-dice" data-testid="dice-row">
-      <div className="dice-side att">
-        {battle.attackerDice.map((d, i) => <span key={i} className="die">{d}</span>)}
-        <span className="dice-lbl">attack</span>
+      <div className="risk-dice-side">
+        <span className="risk-eyebrow">Attack</span>
+        <span className="risk-dice-row">{battle.attackerDice.map((d, i) => <Die key={i} v={d} side="att" />)}</span>
       </div>
-      <div className="dice-side def">
-        {battle.defenderDice.map((d, i) => <span key={i} className="die">{d}</span>)}
-        <span className="dice-lbl">defend</span>
+      <div className="risk-dice-side">
+        <span className="risk-eyebrow">Defend</span>
+        <span className="risk-dice-row">{battle.defenderDice.map((d, i) => <Die key={i} v={d} side="def" />)}</span>
       </div>
-      <div className="dice-outcome">
-        {battle.captured ? 'Captured!' : `−${battle.attackerLosses} you · −${battle.defenderLosses} them`}
-        {state.phase === 'over' && ' · game over'}
+      <div className="risk-dice-outcome">
+        {battle.captured ? 'Territory taken' : `−${battle.attackerLosses} yours · −${battle.defenderLosses} theirs`}
       </div>
     </div>
   );
@@ -309,19 +301,44 @@ function DiceRow({ battle, state }: { battle: BattleResult; state: GameState }) 
 function ContinentLegend({ map, state }: { map: RiskMap; state: GameState }) {
   return (
     <div className="risk-legend">
+      <span className="risk-legend-title">Continents</span>
       {map.continents.map((c) => {
         const terrs = map.topology.continents.find((x) => x.id === c.id)?.territoryIds ?? [];
         const owners = new Set(terrs.map((t) => state.territories[t]?.owner));
-        const holder = owners.size === 1 ? [...owners][0] : -1;
-        const held = holder >= 0 ? state.players[holder] : null;
+        const held = owners.size === 1 ? state.players[[...owners][0]] : null;
         return (
           <span key={c.id} className="risk-legend-item">
             <span className="risk-legend-chip" style={{ background: c.color }} />
             {c.name} <strong>+{c.bonus}</strong>
-            {held && <span className="risk-legend-held" style={{ color: held.color }}>· {held.name}</span>}
+            {held && <em className="risk-legend-held" style={{ color: held.color }}>{held.name}</em>}
           </span>
         );
       })}
     </div>
+  );
+}
+
+/** A laurel-crowned wax seal in the victor's colour. */
+function WinEmblem({ color }: { color: string }) {
+  return (
+    <svg className="risk-win-emblem" viewBox="0 0 120 120" aria-hidden="true" style={{ ['--pc' as string]: color }}>
+      {/* Two laurel branches sweeping up the left and right of the seal (open at
+          the top for the crown). Angle 180° is the bottom; each branch climbs
+          one side. Leaves are tilted along the branch so they read as foliage. */}
+      <g className="rw-laurel">
+        {Array.from({ length: 7 }, (_, i) => {
+          const a = 178 + i * 11; // bottom → up the left side
+          return <ellipse key={`l${i}`} cx={60} cy={18} rx={5.5} ry={2.6} transform={`rotate(${a} 60 60) rotate(35 60 18)`} />;
+        })}
+        {Array.from({ length: 7 }, (_, i) => {
+          const a = 182 - i * 11; // bottom → up the right side
+          return <ellipse key={`r${i}`} cx={60} cy={18} rx={5.5} ry={2.6} transform={`rotate(${a} 60 60) rotate(-35 60 18)`} />;
+        })}
+      </g>
+      <circle cx={60} cy={62} r={30} className="rw-ring-outer" />
+      <circle cx={60} cy={62} r={25} className="rw-seal" />
+      {/* crown */}
+      <path className="rw-crown" d="M44 44 L48 30 L54 40 L60 26 L66 40 L72 30 L76 44 Z" />
+    </svg>
   );
 }

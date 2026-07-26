@@ -11,52 +11,107 @@ interface RiskBoardProps {
   onPick: (territoryId: string) => void;
 }
 
-const continentColor = (map: RiskMap, id: string) =>
-  map.continents.find((c) => c.id === id)?.color ?? '#64748b';
+/** Faint engraved continent names, placed at the centroid of their territories. */
+function continentLabels(map: RiskMap) {
+  return map.continents.map((c) => {
+    const ids = map.topology.continents.find((x) => x.id === c.id)?.territoryIds ?? [];
+    const pts = ids.map((id) => map.territories.find((t) => t.id === id)).filter(Boolean) as RiskMap['territories'];
+    const x = pts.reduce((s, p) => s + p.labelX, 0) / (pts.length || 1);
+    const y = pts.reduce((s, p) => s + p.labelY, 0) / (pts.length || 1);
+    return { id: c.id, name: c.name, x, y };
+  });
+}
 
 /**
- * The world board. Territories are filled with their owner's colour and
- * outlined in their continent's colour; a badge shows the army count. The whole
- * thing scales to its container via the SVG viewBox.
+ * The board, drawn as a hand-tinted antique map: parchment sea with a faint
+ * graticule, engraved continent names, territories washed in their owner's
+ * heraldic colour, and brass army tokens. A compass rose and a brass rule frame
+ * the theatre. Scales to its container via the SVG viewBox.
  */
 export function RiskBoard({ map, state, selected, targets, onPick }: RiskBoardProps) {
   return (
     <div className="risk-board">
       <svg viewBox={`0 0 ${map.width} ${map.height}`} className="risk-svg" role="img" aria-label="World map">
-        <rect x={0} y={0} width={map.width} height={map.height} className="risk-sea" />
+        <defs>
+          <filter id="risk-paper">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves={2} stitchTiles="stitch" result="n" />
+            <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.32  0 0 0 0 0.24  0 0 0 0 0.12  0 0 0 0.05 0" />
+            <feComposite operator="over" in2="SourceGraphic" />
+          </filter>
+          <radialGradient id="risk-vignette" cx="50%" cy="48%" r="72%">
+            <stop offset="60%" stopColor="#000" stopOpacity="0" />
+            <stop offset="100%" stopColor="#3a2a12" stopOpacity="0.5" />
+          </radialGradient>
+          <radialGradient id="risk-brass" cx="38%" cy="32%" r="72%">
+            <stop offset="0%" stopColor="#f0dca0" />
+            <stop offset="55%" stopColor="#c9a860" />
+            <stop offset="100%" stopColor="#8a6a34" />
+          </radialGradient>
+        </defs>
+
+        <rect x={0} y={0} width={map.width} height={map.height} className="risk-sea" filter="url(#risk-paper)" />
+        <path d={map.graticule} className="risk-graticule" />
+
+        {continentLabels(map).map((c) => (
+          <text key={c.id} className="risk-continent-label" x={c.x} y={c.y}>{c.name}</text>
+        ))}
+
         {map.territories.map((t) => {
           const owner = state.territories[t.id]?.owner ?? -1;
-          const fill = owner >= 0 ? state.players[owner].color : '#334155';
-          const cls = [
-            'risk-terr',
-            selected === t.id ? 'sel' : '',
-            targets.has(t.id) ? 'target' : '',
-          ].filter(Boolean).join(' ');
+          const fill = owner >= 0 ? state.players[owner].color : '#8a7a55';
+          const cls = ['risk-terr', selected === t.id ? 'sel' : '', targets.has(t.id) ? 'target' : '']
+            .filter(Boolean).join(' ');
           return (
-            <path
-              key={t.id}
-              d={t.path}
-              className={cls}
-              fill={fill}
-              stroke={continentColor(map, t.continentId)}
-              onClick={() => onPick(t.id)}
-              data-testid={`terr-${t.id}`}
-            >
+            <path key={t.id} d={t.path} className={cls} fill={fill} onClick={() => onPick(t.id)} data-testid={`terr-${t.id}`}>
               <title>{t.name}</title>
             </path>
           );
         })}
+
         {map.territories.map((t) => {
           const st = state.territories[t.id];
           if (!st) return null;
+          // The token is also a (larger) tap target for the territory — vital for
+          // tiny lands like Cuba or New Zealand.
           return (
-            <g key={`b-${t.id}`} className="risk-badge" transform={`translate(${t.labelX},${t.labelY})`}>
-              <circle r={9} className="risk-badge-bg" />
-              <text className="risk-badge-num" dy="3.2">{st.armies}</text>
+            <g
+              key={`b-${t.id}`}
+              className="risk-badge"
+              transform={`translate(${t.labelX},${t.labelY})`}
+              onClick={() => onPick(t.id)}
+              data-testid={`token-${t.id}`}
+            >
+              <circle r={9.5} className="risk-token" />
+              <circle r={9.5} className="risk-token-ring" />
+              <text className="risk-token-num" dy="3.4">{st.armies}</text>
             </g>
           );
         })}
+
+        <CompassRose x={70} y={map.height - 78} />
+        <rect x={5} y={5} width={map.width - 10} height={map.height - 10} className="risk-frame-inner" />
+        <rect x={0} y={0} width={map.width} height={map.height} fill="url(#risk-vignette)" pointerEvents="none" />
       </svg>
     </div>
+  );
+}
+
+/** A small brass compass rose to sit over open ocean. */
+function CompassRose({ x, y }: { x: number; y: number }) {
+  return (
+    <g className="risk-compass" transform={`translate(${x},${y})`} aria-hidden="true">
+      <circle r={34} className="rc-ring" />
+      <circle r={26} className="rc-ring2" />
+      {/* Eight points — cardinals long, ordinals short. */}
+      <path className="rc-star" d="M0 -32 L6 -6 L0 0 L-6 -6 Z" />
+      <path className="rc-star" d="M0 32 L6 6 L0 0 L-6 6 Z" />
+      <path className="rc-star" d="M-32 0 L-6 -6 L0 0 L-6 6 Z" />
+      <path className="rc-star" d="M32 0 L6 -6 L0 0 L6 6 Z" />
+      <path className="rc-star dim" d="M-20 -20 L-5 -5 L0 0 L-5 5 Z" transform="rotate(45)" />
+      <path className="rc-star dim" d="M0 -22 L4 -4 L0 0 L-4 -4 Z" transform="rotate(45)" />
+      <path className="rc-star dim" d="M0 -22 L4 -4 L0 0 L-4 -4 Z" transform="rotate(135)" />
+      <path className="rc-star dim" d="M0 -22 L4 -4 L0 0 L-4 -4 Z" transform="rotate(225)" />
+      <text className="rc-n" y={-38}>N</text>
+    </g>
   );
 }

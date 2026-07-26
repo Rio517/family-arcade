@@ -34,6 +34,8 @@ export interface RiskMap {
   topology: MapTopology;
   continents: RenderedContinent[];
   territories: RenderedTerritory[];
+  /** Projected lat/long graticule as an SVG path — a faint antique map grid. */
+  graticule: string;
 }
 
 export interface RiskMapModule {
