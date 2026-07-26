@@ -8,7 +8,7 @@
  * ./registry. The engine never sees any of this — only the derived topology.
  */
 
-import { geoNaturalEarth1, geoPath } from 'd3-geo';
+import { geoGraticule10, geoNaturalEarth1, geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
 import type { FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 import type { Topology } from 'topojson-specification';
@@ -173,6 +173,7 @@ function build(): RiskMap {
     topology: buildTopology(),
     continents: CONTINENTS,
     territories,
+    graticule: path(geoGraticule10()) ?? '',
   };
   return cached;
 }
