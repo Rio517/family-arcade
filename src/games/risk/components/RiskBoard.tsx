@@ -108,7 +108,7 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent }: Ris
 
         {map.territories.map((t) => {
           const st = state.territories[t.id];
-          if (!st) return null;
+          if (!st || st.owner === -1) return null; // unclaimed: no army badge yet
           // The token is also a (larger) tap target for the territory — vital for
           // tiny lands like Cuba or New Zealand.
           return (

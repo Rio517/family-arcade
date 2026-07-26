@@ -25,9 +25,9 @@ function completeDeploy() {
   // Deploy rotates automatically after every army, so sweeping taps across all
   // territories drains every general's reserve without any button presses.
   // Stop the instant the campaign opens so reinforce armies aren't consumed.
-  for (let guard = 0; guard < 40 && /Deploy/i.test(phaseText()); guard++) {
+  for (let guard = 0; guard < 40 && /Claim|Deploy/i.test(phaseText()); guard++) {
     for (const path of boardEl().querySelectorAll<SVGPathElement>('.risk-terr')) {
-      if (!/Deploy/i.test(phaseText())) return;
+      if (!/Claim|Deploy/i.test(phaseText())) return;
       fireEvent.click(path);
     }
   }
@@ -55,7 +55,7 @@ describe('<RiskPage>', () => {
     // The board renders every territory and opens in the deploy (setup) phase,
     // with the stage + turn banner making the active general unmistakable.
     expect(boardEl().querySelectorAll('.risk-terr').length).toBeGreaterThanOrEqual(30);
-    expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Deploy/i);
+    expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Claim/i);
     expect(screen.getByTestId('risk-stage')).toBeInTheDocument();
     expect(screen.getByTestId('risk-turn')).toBeInTheDocument();
   });
@@ -75,7 +75,7 @@ describe('<RiskPage>', () => {
       if (general() !== first) break;
     }
     expect(general()).not.toBe(first);
-    expect(phaseText()).toMatch(/Deploy/i);
+    expect(phaseText()).toMatch(/Claim|Deploy/i);
   });
 
   it('deploys the opening armies, reinforces, then begins attacks', () => {
@@ -83,7 +83,7 @@ describe('<RiskPage>', () => {
     fireEvent.click(screen.getByTestId('risk-start'));
 
     // Opens in deploy, with a starting reserve to place.
-    expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Deploy — place/i);
+    expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Claim — /i);
     completeDeploy();
 
     // Every general has deployed, so the campaign opens at reinforce.

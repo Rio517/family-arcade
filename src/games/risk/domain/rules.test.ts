@@ -8,6 +8,7 @@ import {
   endReinforce,
   endTurn,
   fortify,
+  hasUnclaimed,
   newGame,
   placeArmy,
   reinforcementCount,
@@ -65,83 +66,68 @@ function scriptedRng(seq: number[]): () => number {
 }
 
 describe('newGame', () => {
-  it('deals every territory one army and opens in the setup deploy', () => {
-    const g = newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }], scriptedRng([0.1, 0.4, 0.7, 0.2, 0.9, 0.5]));
-    // All territories owned by someone, one army each (deploy comes next).
-    expect(Object.values(g.territories).every((t) => t.owner === 0 || t.owner === 1)).toBe(true);
-    const total = Object.values(g.territories).reduce((s, t) => s + t.armies, 0);
-    expect(total).toBe(6);
-    // Split 6 territories 3/3.
-    expect(territoriesOf(g, 0)).toHaveLength(3);
-    expect(territoriesOf(g, 1)).toHaveLength(3);
-    // 2 players → 40 starting; 3 already on the board → 37 left to deploy.
+  it('opens with every territory unclaimed and the first general claiming', () => {
+    const g = newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }], scriptedRng([0.5]));
+    expect(Object.values(g.territories).every((t) => t.owner === -1 && t.armies === 0)).toBe(true);
+    expect(hasUnclaimed(g)).toBe(true);
     expect(g.phase).toBe('setup');
     expect(g.current).toBe(0);
-    expect(g.toPlace).toBe(37);
-    expect(deployReserve(g, 1)).toBe(37);
+    // 2 players → the whole 40-army allotment is still in hand.
+    expect(g.toPlace).toBe(40);
+    expect(deployReserve(g, 1)).toBe(40);
   });
 });
 
-describe('setup deploy', () => {
+describe('setup — claim then deploy, one army per turn', () => {
   const twoPlayer = () =>
-    newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }], scriptedRng([0.1, 0.4, 0.7, 0.2, 0.9, 0.5]));
+    newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }], scriptedRng([0.5]));
   const armiesOf = (g: GameState, p: number) =>
     territoriesOf(g, p).reduce((s, t) => s + g.territories[t].armies, 0);
+  /** Play one legal setup placement for whoever is current. */
+  const playOne = (g: GameState): GameState => {
+    const target = hasUnclaimed(g)
+      ? MAP.territoryIds.find((t) => g.territories[t].owner === -1)!
+      : territoriesOf(g, g.current)[0];
+    return placeArmy(g, target, MAP);
+  };
 
-  it('rotates automatically after every single army placed', () => {
+  it('claiming a free land takes it with one army and rotates automatically', () => {
     let g = twoPlayer();
-    expect(g.current).toBe(0);
+    g = placeArmy(g, 'a', MAP);
+    expect(g.territories.a).toEqual({ owner: 0, armies: 1 });
+    expect(g.current).toBe(1); // play passed straight on
+    expect(g.toPlace).toBe(40); // player 1's whole reserve
+    expect(deployReserve(g, 0)).toBe(39);
 
-    // Player 0 places one army → play passes straight to player 1.
-    g = placeArmy(g, territoriesOf(g, 0)[0], MAP);
-    expect(g.phase).toBe('setup');
-    expect(g.current).toBe(1);
-    expect(g.toPlace).toBe(37); // player 1's whole remaining reserve
-    expect(deployReserve(g, 0)).toBe(36); // player 0 used one
-
-    // Player 1 places one → back to player 0.
-    g = placeArmy(g, territoriesOf(g, 1)[0], MAP);
+    // Player 1 cannot steal a claimed land during the claim stage…
+    expect(placeArmy(g, 'a', MAP)).toBe(g);
+    // …and claims of their own rotate back.
+    g = placeArmy(g, 'b', MAP);
+    expect(g.territories.b).toEqual({ owner: 1, armies: 1 });
     expect(g.current).toBe(0);
-    expect(g.toPlace).toBe(36);
   });
 
-  it('drains both reserves alternately, then opens the campaign at reinforce', () => {
+  it('alternating claims split the board, then deploys fill it, then reinforce opens', () => {
     let g = twoPlayer();
-    for (let guard = 0; guard < 200 && g.phase === 'setup'; guard++) {
-      g = placeArmy(g, territoriesOf(g, g.current)[0], MAP);
-    }
+    // Claim all 6 lands: alternation gives each general 3.
+    for (let i = 0; i < 6; i++) g = playOne(g);
+    expect(hasUnclaimed(g)).toBe(false);
+    expect(territoriesOf(g, 0)).toHaveLength(3);
+    expect(territoriesOf(g, 1)).toHaveLength(3);
+    expect(g.phase).toBe('setup'); // deploy stage continues
+
+    // During deploy a general cannot stack an opponent's land.
+    const enemy = territoriesOf(g, 1 - g.current)[0];
+    expect(placeArmy(g, enemy, MAP)).toBe(g);
+
+    // Drain both reserves; the campaign then opens at player 0's reinforce.
+    for (let guard = 0; guard < 200 && g.phase === 'setup'; guard++) g = playOne(g);
     expect(g.phase).toBe('reinforce');
     expect(g.current).toBe(0);
     expect(armiesOf(g, 0)).toBe(40);
     expect(armiesOf(g, 1)).toBe(40);
     expect(g.toPlace).toBeGreaterThanOrEqual(3);
   });
-
-  it('keeps handing to the same general once the other has finished', () => {
-    let g = twoPlayer();
-    // Drain player 1's reserve by alternating; then check that when only
-    // player 0 has armies left, rotation returns to player 0 every time.
-    for (let guard = 0; guard < 200 && deployReserve(g, 1) > 0; guard++) {
-      g = placeArmy(g, territoriesOf(g, g.current)[0], MAP);
-    }
-    if (g.phase === 'setup') {
-      expect(g.current).toBe(0);
-      const before = deployReserve(g, 0);
-      g = placeArmy(g, territoriesOf(g, 0)[0], MAP);
-      if (g.phase === 'setup') {
-        expect(g.current).toBe(0); // no one else to hand to
-        expect(deployReserve(g, 0)).toBe(before - 1);
-      }
-    }
-  });
-
-  it('will not deploy onto another general’s land', () => {
-    const g = twoPlayer();
-    const enemy = territoriesOf(g, 1)[0];
-    const after = placeArmy(g, enemy, MAP);
-    expect(after).toBe(g); // rejected, unchanged
-  });
-
 });
 
 describe('reinforcementCount', () => {
