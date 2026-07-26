@@ -15,6 +15,7 @@
 
 import type {
   BattleResult,
+  DiceMode,
   GameState,
   MapTopology,
   PlayerState,
@@ -31,13 +32,53 @@ export interface NewPlayer {
 
 const die = (rng: () => number) => Math.floor(rng() * 6) + 1;
 
+function shuffle<T>(items: T[], rng: () => number): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/** Three of every face — the balanced-mode shuffle bag. */
+const freshBag = () => [1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6];
+
+/**
+ * Draw `n` dice. Random mode rolls independently; balanced mode pulls from the
+ * shuffle bag (reshuffling a fresh bag when it runs dry), so across every 18
+ * draws each face appears exactly three times — luck evens out by design.
+ */
+export function drawDice(
+  bag: number[],
+  n: number,
+  rng: () => number,
+  mode: DiceMode,
+): { values: number[]; bag: number[] } {
+  if (mode === 'random') {
+    return { values: Array.from({ length: n }, () => die(rng)), bag };
+  }
+  let b = [...bag];
+  const values: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (b.length === 0) b = shuffle(freshBag(), rng);
+    values.push(b.pop()!);
+  }
+  return { values, bag: b };
+}
+
 /**
  * Open the board with every territory unclaimed. Setup then runs the classic
  * two-stage draft, one army per turn with automatic rotation: first everyone
  * takes turns CLAIMING empty lands (1 army each), then everyone takes turns
  * REINFORCING their own lands until all starting armies are down.
  */
-export function newGame(map: MapTopology, newPlayers: NewPlayer[], _rng: () => number = Math.random): GameState {
+export function newGame(
+  map: MapTopology,
+  newPlayers: NewPlayer[],
+  _rng: () => number = Math.random,
+  diceMode: DiceMode = 'random',
+): GameState {
   const players: PlayerState[] = newPlayers.map((p, id) => ({
     id,
     name: p.name,
@@ -57,6 +98,8 @@ export function newGame(map: MapTopology, newPlayers: NewPlayer[], _rng: () => n
     toPlace: 0,
     conqueredThisTurn: false,
     winner: null,
+    diceMode,
+    diceBag: [],
   };
   state.toPlace = deployReserve(state, 0);
   return state;
@@ -177,8 +220,10 @@ export function resolveAttack(
   const t = state.territories[to];
   const nAtt = Math.min(3, f.armies - 1);
   const nDef = Math.min(2, t.armies);
-  const attackerDice = Array.from({ length: nAtt }, () => die(rng)).sort((a, b) => b - a);
-  const defenderDice = Array.from({ length: nDef }, () => die(rng)).sort((a, b) => b - a);
+  const attDraw = drawDice(state.diceBag, nAtt, rng, state.diceMode);
+  const defDraw = drawDice(attDraw.bag, nDef, rng, state.diceMode);
+  const attackerDice = [...attDraw.values].sort((a, b) => b - a);
+  const defenderDice = [...defDraw.values].sort((a, b) => b - a);
 
   let attackerLosses = 0;
   let defenderLosses = 0;
@@ -208,6 +253,7 @@ export function resolveAttack(
     ...state,
     territories,
     conqueredThisTurn: state.conqueredThisTurn || captured,
+    diceBag: defDraw.bag,
   };
   if (captured) next = settle(next, map);
 

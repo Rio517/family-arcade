@@ -47,6 +47,19 @@ describe('<RiskPage>', () => {
     expect(screen.getByTestId('risk-start')).toBeInTheDocument();
   });
 
+  it('offers wild vs balanced dice, defaulting to wild', () => {
+    renderPage();
+    expect(screen.getByTestId('dice-random').className).toContain('on');
+
+    fireEvent.click(screen.getByTestId('dice-balanced'));
+    expect(screen.getByTestId('dice-balanced').className).toContain('on');
+    expect(screen.getByTestId('dice-random').className).not.toContain('on');
+
+    // A balanced game still starts and plays normally.
+    fireEvent.click(screen.getByTestId('risk-start'));
+    expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Claim/i);
+  });
+
   it('starts a game and opens in the deploy phase over the whole board', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('count-4'));

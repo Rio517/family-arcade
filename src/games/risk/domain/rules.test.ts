@@ -4,6 +4,7 @@ import {
   canFortify,
   connectedOwned,
   deployReserve,
+  drawDice,
   endAttack,
   endReinforce,
   endTurn,
@@ -55,6 +56,8 @@ function state(owners: Record<string, [number, number]>, over: Partial<GameState
     toPlace: 0,
     conqueredThisTurn: false,
     winner: null,
+    diceMode: 'random',
+    diceBag: [],
     ...over,
   };
 }
@@ -127,6 +130,38 @@ describe('setup — claim then deploy, one army per turn', () => {
     expect(armiesOf(g, 0)).toBe(40);
     expect(armiesOf(g, 1)).toBe(40);
     expect(g.toPlace).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('balanced dice', () => {
+  it('draws every face equally often — three of each across a full bag', () => {
+    const rng = scriptedRng([0.73, 0.11, 0.58, 0.32, 0.91, 0.04, 0.66, 0.27, 0.85, 0.49]);
+    let bag: number[] = [];
+    const counts = new Map<number, number>();
+    for (let i = 0; i < 18; i++) {
+      const d = drawDice(bag, 1, rng, 'balanced');
+      bag = d.bag;
+      counts.set(d.values[0], (counts.get(d.values[0]) ?? 0) + 1);
+    }
+    for (let face = 1; face <= 6; face++) expect(counts.get(face)).toBe(3);
+    expect(bag).toHaveLength(0); // exactly one bag consumed
+  });
+
+  it('random mode leaves the bag untouched', () => {
+    const d = drawDice([], 3, scriptedRng([0.2, 0.6, 0.9]), 'random');
+    expect(d.values).toHaveLength(3);
+    expect(d.bag).toEqual([]);
+  });
+
+  it('a balanced battle consumes the bag and carries it in the state', () => {
+    const g = state(
+      { a: [0, 3], b: [0, 1], c: [0, 1], d: [1, 1], e: [1, 1], f: [1, 1] },
+      { diceMode: 'balanced' },
+    );
+    const { state: next } = resolveAttack(g, MAP, 'a', 'd', scriptedRng([0.5, 0.1, 0.8, 0.3, 0.7]));
+    // Attacker rolls min(3, 3-1)=2 dice (bag refills to 18 first); defender 1.
+    expect(next.diceBag).toHaveLength(18 - 2 - 1);
+    expect(next.diceMode).toBe('balanced');
   });
 });
 
