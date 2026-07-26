@@ -165,6 +165,65 @@
 .risk-compass .rc-n { fill: #6b5024; font-family: var(--font-display); font-size: 12px; font-weight: 700; text-anchor: middle; }
 .risk-frame-inner { fill: none; stroke: #8a6a2e; stroke-width: 1.5; opacity: 0.45; }
 
+/* ── The war table — the map IS the screen, everything else floats ───────── */
+.risk-stage {
+  position: relative;
+  height: calc(100dvh - 128px);
+  min-height: 420px;
+  margin: 0 -16px;
+  overflow: hidden;
+}
+/* The active general's colour rings the whole theatre. */
+.risk-stage::after {
+  content: '';
+  position: absolute; inset: 6px; pointer-events: none;
+  border: 3px solid var(--pc); border-radius: 10px;
+  box-shadow: 0 0 28px -6px var(--pc), inset 0 0 30px -14px var(--pc);
+  transition: border-color 300ms, box-shadow 300ms;
+}
+/* The board sheds its walnut frame and fills the stage. */
+.risk-stage .risk-board {
+  position: absolute; inset: 0; max-width: none; margin: 0; padding: 12px;
+  background: none; border: none; box-shadow: none; border-radius: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.risk-stage .risk-svg { width: 100%; height: 100%; }
+
+/* Floating turn banner, top centre — re-pops on every hand-off. It holds no
+   controls, so taps pass straight through to any land beneath it. */
+.risk-banner {
+  pointer-events: none;
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center;
+  max-width: min(94%, 640px); padding: 9px 16px; border-radius: 6px;
+  background: color-mix(in srgb, #241811 85%, transparent);
+  border: 1px solid var(--brass-dim); border-left: 6px solid var(--pc);
+  box-shadow: 0 10px 30px -12px #000, inset 0 1px 0 rgba(231, 207, 149, 0.1);
+  backdrop-filter: blur(3px);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .risk-banner { animation: risk-banner-pop 460ms cubic-bezier(0.2, 1.1, 0.35, 1) both; }
+}
+@keyframes risk-banner-pop {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-14px) scale(0.92); }
+  60% { transform: translateX(-50%) translateY(2px) scale(1.03); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* Floating control dock, bottom centre. */
+.risk-dock {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  width: min(94%, 680px); display: grid; gap: 8px;
+  padding: 10px 14px; border-radius: 6px;
+  background: color-mix(in srgb, #241811 84%, transparent);
+  border: 1px solid var(--brass-dim);
+  box-shadow: 0 10px 30px -12px #000;
+  backdrop-filter: blur(3px);
+}
+.risk-dock .risk-legend { background: none; border: none; padding: 0; gap: 3px 12px; }
+.risk-dock .risk-legend-item { font-size: 11.5px; }
+@media (max-height: 560px) { .risk-dock .risk-legend { display: none; } }
+
 /* ── Order of battle (HUD) ───────────────────────────────────────────────── */
 .risk-hud {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;

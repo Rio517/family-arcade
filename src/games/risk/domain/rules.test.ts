@@ -6,7 +6,6 @@ import {
   deployReserve,
   endAttack,
   endReinforce,
-  endSetup,
   endTurn,
   fortify,
   newGame,
@@ -89,42 +88,60 @@ describe('setup deploy', () => {
   const armiesOf = (g: GameState, p: number) =>
     territoriesOf(g, p).reduce((s, t) => s + g.territories[t].armies, 0);
 
-  it('deploys each general in turn, then opens the campaign at reinforce', () => {
+  it('rotates automatically after every single army placed', () => {
     let g = twoPlayer();
+    expect(g.current).toBe(0);
 
-    // Player 0 deploys their whole reserve; total climbs to 40.
-    const mine0 = territoriesOf(g, 0)[0];
-    while (g.toPlace > 0) g = placeArmy(g, mine0);
-    expect(armiesOf(g, 0)).toBe(40);
-
-    // Hand off — now player 1 deploys.
-    g = endSetup(g, MAP);
+    // Player 0 places one army → play passes straight to player 1.
+    g = placeArmy(g, territoriesOf(g, 0)[0], MAP);
     expect(g.phase).toBe('setup');
     expect(g.current).toBe(1);
-    expect(g.toPlace).toBe(37);
+    expect(g.toPlace).toBe(37); // player 1's whole remaining reserve
+    expect(deployReserve(g, 0)).toBe(36); // player 0 used one
 
-    const mine1 = territoriesOf(g, 1)[0];
-    while (g.toPlace > 0) g = placeArmy(g, mine1);
-    expect(armiesOf(g, 1)).toBe(40);
+    // Player 1 places one → back to player 0.
+    g = placeArmy(g, territoriesOf(g, 1)[0], MAP);
+    expect(g.current).toBe(0);
+    expect(g.toPlace).toBe(36);
+  });
 
-    // Last general done → real game opens at player 0's reinforce.
-    g = endSetup(g, MAP);
+  it('drains both reserves alternately, then opens the campaign at reinforce', () => {
+    let g = twoPlayer();
+    for (let guard = 0; guard < 200 && g.phase === 'setup'; guard++) {
+      g = placeArmy(g, territoriesOf(g, g.current)[0], MAP);
+    }
     expect(g.phase).toBe('reinforce');
     expect(g.current).toBe(0);
+    expect(armiesOf(g, 0)).toBe(40);
+    expect(armiesOf(g, 1)).toBe(40);
     expect(g.toPlace).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps handing to the same general once the other has finished', () => {
+    let g = twoPlayer();
+    // Drain player 1's reserve by alternating; then check that when only
+    // player 0 has armies left, rotation returns to player 0 every time.
+    for (let guard = 0; guard < 200 && deployReserve(g, 1) > 0; guard++) {
+      g = placeArmy(g, territoriesOf(g, g.current)[0], MAP);
+    }
+    if (g.phase === 'setup') {
+      expect(g.current).toBe(0);
+      const before = deployReserve(g, 0);
+      g = placeArmy(g, territoriesOf(g, 0)[0], MAP);
+      if (g.phase === 'setup') {
+        expect(g.current).toBe(0); // no one else to hand to
+        expect(deployReserve(g, 0)).toBe(before - 1);
+      }
+    }
   });
 
   it('will not deploy onto another general’s land', () => {
     const g = twoPlayer();
     const enemy = territoriesOf(g, 1)[0];
-    const after = placeArmy(g, enemy);
+    const after = placeArmy(g, enemy, MAP);
     expect(after).toBe(g); // rejected, unchanged
   });
 
-  it('endSetup is a no-op until the reserve is fully placed', () => {
-    const g = twoPlayer();
-    expect(endSetup(g, MAP)).toBe(g);
-  });
 });
 
 describe('reinforcementCount', () => {

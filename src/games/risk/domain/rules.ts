@@ -71,26 +71,27 @@ export function newGame(map: MapTopology, newPlayers: NewPlayer[], rng: () => nu
   return state;
 }
 
-/** How many starting armies a player still has to deploy (beyond the one
- *  already sitting on each of their territories). */
+/** How many starting armies a player still has to deploy (their allotment
+ *  minus every army of theirs already standing on the board). */
 export function deployReserve(state: GameState, playerId: number): number {
   const starting = STARTING_ARMIES[state.players.length] ?? 30;
-  return Math.max(0, starting - territoriesOf(state, playerId).length);
+  const placed = territoriesOf(state, playerId).reduce((s, t) => s + state.territories[t].armies, 0);
+  return Math.max(0, starting - placed);
 }
 
 /**
- * Finish the current general's deployment and hand off. When the last general
- * has deployed, the campaign opens at the first player's reinforce.
+ * The classic alternating deploy: after each single army is placed, play
+ * passes automatically to the next general who still has a reserve. When the
+ * last army lands, the campaign opens at the first player's reinforce.
  */
-export function endSetup(state: GameState, map: MapTopology): GameState {
-  if (state.phase !== 'setup' || state.toPlace > 0) return state;
-  const next = state.current + 1;
-  if (next < state.players.length) {
-    const handed: GameState = { ...state, current: next, phase: 'setup', toPlace: 0 };
-    handed.toPlace = deployReserve(handed, next);
-    return handed;
+function rotateSetup(state: GameState, map: MapTopology): GameState {
+  const n = state.players.length;
+  for (let i = 1; i <= n; i++) {
+    const cand = (state.current + i) % n;
+    const reserve = deployReserve(state, cand);
+    if (reserve > 0) return { ...state, current: cand, toPlace: reserve };
   }
-  // Everyone has deployed — begin the real game at player 0.
+  // Every reserve is empty — begin the real game at player 0.
   const started: GameState = { ...state, current: 0, phase: 'reinforce', toPlace: 0, conqueredThisTurn: false };
   started.toPlace = reinforcementCount(started, map, 0);
   return started;
@@ -113,16 +114,23 @@ export function reinforcementCount(state: GameState, map: MapTopology, playerId:
 
 const current = (state: GameState) => state.players[state.current];
 
-/** Place one army on an owned territory — during setup deploy or reinforce. */
-export function placeArmy(state: GameState, territoryId: string): GameState {
+/**
+ * Place one army on an owned territory. During the setup deploy this also
+ * rotates play to the next general with armies left (needs the map so the
+ * final placement can price the first reinforce); during reinforce it just
+ * counts the placement down.
+ */
+export function placeArmy(state: GameState, territoryId: string, map?: MapTopology): GameState {
   if ((state.phase !== 'reinforce' && state.phase !== 'setup') || state.toPlace <= 0) return state;
   const t = state.territories[territoryId];
   if (!t || t.owner !== state.current) return state;
-  return {
+  const placed: GameState = {
     ...state,
     territories: { ...state.territories, [territoryId]: { ...t, armies: t.armies + 1 } },
     toPlace: state.toPlace - 1,
   };
+  if (state.phase === 'setup' && map) return rotateSetup(placed, map);
+  return placed;
 }
 
 /** Finish placing reinforcements and move to the attack phase. */
