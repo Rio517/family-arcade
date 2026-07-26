@@ -44,6 +44,15 @@ export interface TerritoryState {
 
 export type Phase = 'setup' | 'reinforce' | 'attack' | 'fortify' | 'over';
 
+/**
+ * How battle dice behave.
+ * - `random`: every roll is pure, independent luck (classic).
+ * - `balanced`: dice are drawn from a shuffled bag holding every face equally
+ *   (refilled when empty), so results still vary but luck evens out over time
+ *   and long cruel streaks can't happen — outcomes track the true odds.
+ */
+export type DiceMode = 'random' | 'balanced';
+
 export interface GameState {
   mapId: string;
   players: PlayerState[];
@@ -56,6 +65,10 @@ export interface GameState {
   /** Set true once the current player captures a territory this turn. */
   conqueredThisTurn: boolean;
   winner: number | null;
+  /** Battle-dice behaviour, chosen at setup. */
+  diceMode: DiceMode;
+  /** Remaining faces in the balanced-mode shuffle bag (empty in random mode). */
+  diceBag: number[];
 }
 
 /** The outcome of one attack roll, kept for the UI to animate. */

@@ -21,7 +21,7 @@ import {
   territoriesOf,
   type NewPlayer,
 } from '../domain/rules';
-import type { BattleResult, GameState } from '../domain/types';
+import type { BattleResult, DiceMode, GameState } from '../domain/types';
 
 // Heraldic tinctures — a general's banner. Kept bright enough that the dark
 // border lines read against them, and the six stay easy to tell apart.
@@ -33,6 +33,7 @@ export function RiskPage() {
   const [count, setCount] = useState(3);
   const [names, setNames] = useState<string[]>(PLAYER_NAMES.slice());
   const [mapId, setMapId] = useState(MAPS[0].id);
+  const [diceMode, setDiceMode] = useState<DiceMode>('random');
 
   const [map, setMap] = useState<RiskMap | null>(null);
   const [state, setState] = useState<GameState | null>(null);
@@ -61,7 +62,7 @@ export function RiskPage() {
       color: PLAYER_COLORS[i],
     }));
     setMap(rendered);
-    setState(newGame(rendered.topology, players));
+    setState(newGame(rendered.topology, players, Math.random, diceMode));
     resetSelection();
   }
 
@@ -162,6 +163,31 @@ export function RiskPage() {
               </div>
             </div>
           )}
+
+          <div className="panel">
+            <div className="risk-eyebrow">Fortunes of war</div>
+            <div className="risk-count">
+              <button
+                className={`risk-choice ${diceMode === 'random' ? 'on' : ''}`}
+                onClick={() => setDiceMode('random')}
+                data-testid="dice-random"
+              >
+                Wild dice
+              </button>
+              <button
+                className={`risk-choice ${diceMode === 'balanced' ? 'on' : ''}`}
+                onClick={() => setDiceMode('balanced')}
+                data-testid="dice-balanced"
+              >
+                Balanced dice
+              </button>
+            </div>
+            <p className="risk-note" style={{ marginTop: 10 }}>
+              {diceMode === 'random'
+                ? 'Every roll is pure, independent luck — glorious upsets and cruel streaks alike.'
+                : 'Dice are drawn from a fair bag, so luck evens out — results stay close to the true odds, with no long cruel streaks.'}
+            </p>
+          </div>
 
           <button className="risk-btn primary block lg" onClick={start} data-testid="risk-start">Take the field</button>
         </div>
