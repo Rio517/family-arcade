@@ -42,6 +42,14 @@ export interface MapDivider {
   lines: [number, number, number, number][];
 }
 
+/** A drawn sea connection between two territories (adjacent across water). */
+export interface SeaRoute {
+  /** SVG path `d` — a gentle arc (or two edge stubs when the route wraps). */
+  d: string;
+  /** The land endpoints, for the little anchor marks. */
+  ends: [number, number][];
+}
+
 export interface RiskMap {
   id: string;
   name: string;
@@ -52,6 +60,8 @@ export interface RiskMap {
   territories: RenderedTerritory[];
   /** Internal dividing lines for split countries (Russia, USA, Canada, …). */
   dividers: MapDivider[];
+  /** Drawn sea connections between across-water neighbours. */
+  seaRoutes: SeaRoute[];
   /** Projected lat/long graticule as an SVG path — a faint antique map grid. */
   graticule: string;
 }

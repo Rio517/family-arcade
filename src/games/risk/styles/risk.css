@@ -113,6 +113,16 @@
 .risk-badge { cursor: pointer; }
 .risk-badge > text { pointer-events: none; }
 .risk-divider line { stroke: #5b4425; stroke-width: 0.6; pointer-events: none; }
+
+/* Sea routes — dotted brass shipping lines across the water. */
+.risk-searoutes { pointer-events: none; }
+.risk-searoute-shadow { fill: none; stroke: #3a2a12; stroke-width: 2.4; opacity: 0.14; stroke-linecap: round; }
+.risk-searoute { fill: none; stroke: #7a5c2a; stroke-width: 1.4; stroke-dasharray: 1 7; stroke-linecap: round; opacity: 0.85; }
+.risk-searoute-end { fill: #7a5c2a; stroke: #efe6d0; stroke-width: 0.8; }
+@media (prefers-reduced-motion: no-preference) {
+  .risk-searoute { animation: risk-searoute-flow 2.6s linear infinite; }
+}
+@keyframes risk-searoute-flow { to { stroke-dashoffset: -8; } }
 .risk-token { fill: url(#risk-brass); }
 .risk-token-ring { fill: none; stroke: #4a3212; stroke-width: 1; }
 .risk-token-num {
