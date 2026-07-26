@@ -9,6 +9,7 @@ import { normalizeCode } from '@shared/net/peer';
 import { ChessBoard } from './ChessBoard';
 import { ChessResult } from './ChessResult';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
+import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { CloseIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
 import { loadResumableChessGame } from '../storage/chessPersistence';
 import { winnerOf, status as statusOf } from '@games/chess/domain/rules';
@@ -137,6 +138,7 @@ export function ChessPage() {
           </button>
         )}
         {cx.side && <ConnectionBadge status={cx.status} detail={cx.statusDetail} />}
+        <FullscreenButton />
       </div>
 
       {/* ── Invite modal (online host waiting) ── */}
@@ -297,32 +299,35 @@ export function ChessPage() {
         </div>
       )}
 
-      {/* ── The board ── */}
+      {/* ── The board ── fills the screen; controls sit beside it in landscape,
+          below it in portrait. */}
       {cx.phase === 'play' && (
-        <div className="narrow-col">
-          <ChessBoard
-            board={cx.board}
-            orientation={cx.mode === 'online' && cx.myColor ? cx.myColor : 'w'}
-            interactive={cx.canMove}
-            movableColor={cx.mode === 'online' && cx.myColor ? cx.myColor : cx.turn}
-            lastMove={lastMoveSquares(cx.log)}
-            onMove={onMove}
-          />
-          {statusOf(cx.board) === 'check' && (
-            <p className="subtle center" style={{ marginTop: 10, color: 'var(--warn)' }} data-testid="check-banner">
-              Check!
-            </p>
-          )}
-          {cx.mode === 'local' && (
-            <div className="chess-undo-row">
-              <button
-                className="btn btn-ghost"
-                onClick={cx.undo}
-                disabled={!cx.canUndo}
-                data-testid="chess-undo"
-              >
-                ↶ Undo move
-              </button>
+        <div className="chess-play">
+          <div className="chess-board-area">
+            <ChessBoard
+              board={cx.board}
+              orientation={cx.mode === 'online' && cx.myColor ? cx.myColor : 'w'}
+              interactive={cx.canMove}
+              movableColor={cx.mode === 'online' && cx.myColor ? cx.myColor : cx.turn}
+              lastMove={lastMoveSquares(cx.log)}
+              onMove={onMove}
+            />
+          </div>
+          {(cx.mode === 'local' || statusOf(cx.board) === 'check') && (
+            <div className="chess-side">
+              {statusOf(cx.board) === 'check' && (
+                <p className="chess-check" data-testid="check-banner">Check!</p>
+              )}
+              {cx.mode === 'local' && (
+                <button
+                  className="btn btn-ghost chess-undo-btn"
+                  onClick={cx.undo}
+                  disabled={!cx.canUndo}
+                  data-testid="chess-undo"
+                >
+                  ↶ Undo
+                </button>
+              )}
             </div>
           )}
         </div>

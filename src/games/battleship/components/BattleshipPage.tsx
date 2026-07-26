@@ -11,6 +11,7 @@ import { Placement } from './Placement';
 import { Battle } from './Battle';
 import { Result } from './Result';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
+import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { CloseIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
 import { loadResumableSession } from '@games/battleship/storage/sessionStore';
 import { QRCodeSVG } from 'qrcode.react';
@@ -135,6 +136,7 @@ export function BattleshipPage() {
           </button>
         )}
         {bs.side && <ConnectionBadge status={bs.status} detail={bs.statusDetail} />}
+        <FullscreenButton />
       </div>
 
       {shareOpen && (
