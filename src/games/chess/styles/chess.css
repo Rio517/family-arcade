@@ -81,6 +81,52 @@
   box-shadow: inset 0 0 0 4px var(--accent), 0 0 12px -3px var(--accent); pointer-events: none;
 }
 
+/* ── Piece motion ───────────────────────────────────────────────────────────
+   Every piece sits in two nested wrappers: .pslide animates board-plane
+   translation (the slide from its origin square), .pstand carries the
+   tabletop-mode standing rotation — so the two transforms never fight. */
+.pslide { position: relative; width: 100%; height: 100%; display: grid; place-items: center; }
+.pstand { width: 100%; height: 100%; display: grid; place-items: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .pslide.slid { animation: piece-slide 240ms cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+}
+@keyframes piece-slide {
+  from { transform: translate(var(--dx, 0), var(--dy, 0)); }
+  to { transform: none; }
+}
+
+/* ── Tabletop view — the board tilts back, the pieces stand up ─────────────
+   Only .chess-board is transformed (never .chess-wrap), so the fixed-position
+   drag ghost and promotion overlay keep true viewport coordinates. */
+.chess-wrap.tilt { grid-template-columns: 0 1fr; grid-template-rows: 1fr 0; }
+.chess-wrap.tilt .chess-ranks, .chess-wrap.tilt .chess-files { display: none; }
+.chess-wrap.tilt .chess-board {
+  transform: perspective(1150px) rotateX(24deg);
+  transform-origin: 50% 100%;
+  transform-style: preserve-3d;
+  overflow: visible;
+  border-radius: 0;
+}
+/* Rounded corners come back via the corner squares (overflow must stay open
+   so standing pieces aren't beheaded at the board edge). */
+.chess-wrap.tilt .sq:nth-child(1) { border-top-left-radius: 12px; }
+.chess-wrap.tilt .sq:nth-child(8) { border-top-right-radius: 12px; }
+.chess-wrap.tilt .sq:nth-child(57) { border-bottom-left-radius: 12px; }
+.chess-wrap.tilt .sq:nth-child(64) { border-bottom-right-radius: 12px; }
+.chess-wrap.tilt .sq,
+.chess-wrap.tilt .pslide { transform-style: preserve-3d; }
+.chess-wrap.tilt .pstand {
+  transform: rotateX(-24deg);
+  transform-origin: 50% 96%;
+}
+/* A soft ground shadow under each standing piece, in the board plane. */
+.chess-wrap.tilt .pslide::after {
+  content: ''; position: absolute; left: 16%; right: 16%; bottom: 4%; height: 16%;
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.4), transparent 68%);
+  transform: translateZ(-1px);
+}
+
 /* The dragged piece follows the pointer, offset so it sits above the finger. */
 .chess-drag {
   position: fixed; z-index: 60; pointer-events: none;

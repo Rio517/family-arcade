@@ -37,6 +37,16 @@ export function ChessPage() {
   const [whiteName, setWhiteName] = useState('White');
   const [blackName, setBlackName] = useState('Black');
   const [logOpen, setLogOpen] = useState(false);
+  // Tabletop (3D-tilt) view — on by default, remembered per device.
+  const [tilt, setTilt] = useState(() => {
+    try { return localStorage.getItem('chess-tilt-v1') !== '0'; } catch { return true; }
+  });
+  const toggleTilt = () => {
+    setTilt((t) => {
+      try { localStorage.setItem('chess-tilt-v1', t ? '0' : '1'); } catch { /* ignore */ }
+      return !t;
+    });
+  };
 
   const onFinish = useCallback(
     (info: FinishInfo) => {
@@ -305,6 +315,7 @@ export function ChessPage() {
               interactive={cx.canMove}
               movableColor={cx.mode === 'online' && cx.myColor ? cx.myColor : cx.turn}
               lastMove={lastMoveSquares(cx.log)}
+              tilt={tilt}
               onMove={onMove}
             />
           </div>
@@ -335,6 +346,9 @@ export function ChessPage() {
             <div className="chess-side-actions">
               <button className="btn btn-ghost chess-log-btn" onClick={() => setLogOpen(true)} data-testid="chess-log-open">
                 <ListIcon size={18} /> Move log
+              </button>
+              <button className="btn btn-ghost chess-tilt-btn" onClick={toggleTilt} data-testid="chess-tilt-toggle">
+                {tilt ? '▦ Flat view' : '◇ Table view'}
               </button>
               {cx.mode === 'local' && (
                 <button

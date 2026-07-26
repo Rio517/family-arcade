@@ -22,6 +22,8 @@ interface ChessBoardProps {
   movableColor: Color;
   /** The most recent move, highlighted so both players can follow along. */
   lastMove?: { from: Square; to: Square } | null;
+  /** Tabletop view: the board tilts back and the pieces stand upright. */
+  tilt?: boolean;
   onMove: (ply: Ply) => void;
 }
 
@@ -32,6 +34,13 @@ function fromDisplay(r: number, c: number, orientation: Color): Square {
     : { row: 7 - r, col: 7 - c };
 }
 
+/** Map a board square to its on-screen row/col given the orientation. */
+function toDisplay(sq: Square, orientation: Color): { r: number; c: number } {
+  return orientation === 'w'
+    ? { r: sq.row, c: sq.col }
+    : { r: 7 - sq.row, c: 7 - sq.col };
+}
+
 const PROMO_ORDER: PromotionType[] = ['q', 'r', 'b', 'n'];
 
 export function ChessBoard({
@@ -40,6 +49,7 @@ export function ChessBoard({
   interactive,
   movableColor,
   lastMove,
+  tilt = false,
   onMove,
 }: ChessBoardProps) {
   const [selected, setSelected] = useState<Square | null>(null);
@@ -93,15 +103,18 @@ export function ChessBoard({
   };
 
   // ── Pointer drag ───────────────────────────────────────────────────────
+  // Hit-test via elementFromPoint so it stays correct under the 3D tilt
+  // transform (plain bounding-rect math breaks under perspective). The drag
+  // ghost is pointer-events:none, so the square under the finger is found.
   const squareFromPoint = (clientX: number, clientY: number): Square | null => {
-    const el = gridRef.current;
-    if (!el) return null;
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0) return null;
-    const c = Math.floor(((clientX - rect.left) / rect.width) * 8);
-    const r = Math.floor(((clientY - rect.top) / rect.height) * 8);
-    if (r < 0 || r > 7 || c < 0 || c > 7) return null;
-    return fromDisplay(r, c, orientation);
+    const el = document.elementFromPoint?.(clientX, clientY);
+    const btn = el?.closest?.('[data-testid^="sq-"]');
+    if (!btn || !gridRef.current?.contains(btn)) return null;
+    const name = btn.getAttribute('data-testid')!.slice(3); // e.g. "e4"
+    const col = FILES.indexOf(name[0]);
+    const row = RANKS.indexOf(name[1]);
+    if (col < 0 || row < 0) return null;
+    return { row, col };
   };
 
   const onPiecePointerDown = (sq: Square, e: PointerEvent) => {
@@ -139,7 +152,7 @@ export function ChessBoard({
   const rankLabels = orientation === 'w' ? RANKS.split('') : RANKS.split('').reverse();
 
   return (
-    <div className={`chess-wrap orient-${orientation}`}>
+    <div className={`chess-wrap orient-${orientation} ${tilt ? 'tilt' : ''}`}>
       <div className="chess-ranks" aria-hidden="true">
         {rankLabels.map((r) => <span key={r}>{r}</span>)}
       </div>
@@ -162,6 +175,21 @@ export function ChessBoard({
               check ? 'check' : '',
               target ? (piece ? 'capture' : 'target') : '',
             ].filter(Boolean).join(' ');
+            // The last-moved piece slides in from its origin square: the outer
+            // span animates a board-plane translate, the inner span keeps the
+            // (tilt-mode) standing rotation, so the two never fight.
+            const slidIn = lastMove && sameSquare(lastMove.to, sq);
+            const slideStyle =
+              slidIn && lastMove
+                ? (() => {
+                    const f = toDisplay(lastMove.from, orientation);
+                    const t = toDisplay(lastMove.to, orientation);
+                    return {
+                      ['--dx' as string]: `${(f.c - t.c) * 100}%`,
+                      ['--dy' as string]: `${(f.r - t.r) * 100}%`,
+                    };
+                  })()
+                : undefined;
             return (
               <button
                 key={`${r}-${c}`}
@@ -172,7 +200,17 @@ export function ChessBoard({
                 onPointerDown={piece ? (e) => onPiecePointerDown(sq, e) : undefined}
                 style={piece && canPickUp(sq) ? { touchAction: 'none' } : undefined}
               >
-                {piece && !dragging && <ChessPiece color={piece.color} type={piece.type} />}
+                {piece && !dragging && (
+                  <span
+                    className={`pslide ${slidIn ? 'slid' : ''}`}
+                    style={slideStyle}
+                    key={slidIn && lastMove ? `m-${lastMove.from.row}${lastMove.from.col}${lastMove.to.row}${lastMove.to.col}` : 'p'}
+                  >
+                    <span className="pstand">
+                      <ChessPiece color={piece.color} type={piece.type} />
+                    </span>
+                  </span>
+                )}
               </button>
             );
           }),
