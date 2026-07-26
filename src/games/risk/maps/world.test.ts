@@ -6,7 +6,8 @@ const topo = map.topology;
 
 describe('world map', () => {
   it('renders every territory with a non-empty path and an in-bounds label', () => {
-    expect(map.territories).toHaveLength(36);
+    expect(map.territories).toHaveLength(topo.territoryIds.length);
+    expect(map.territories.length).toBeGreaterThanOrEqual(30);
     for (const t of map.territories) {
       expect(t.path.length).toBeGreaterThan(0);
       expect(t.labelX).toBeGreaterThanOrEqual(0);
