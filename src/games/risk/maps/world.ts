@@ -15,7 +15,7 @@ import { merge } from 'topojson-client';
 import type { GeometryCollection, MultiPolygon, Polygon, Topology } from 'topojson-specification';
 import countries110m from 'world-atlas/countries-110m.json';
 import type { MapTopology } from '../domain/types';
-import type { ClipRect, MapDivider, RenderedContinent, RenderedTerritory, RiskMap, RiskMapModule } from './types';
+import type { ClipRect, MapDivider, RenderedContinent, RenderedTerritory, RiskMap, RiskMapModule, SeaRoute } from './types';
 
 const CONTINENTS: RenderedContinent[] = [
   { id: 'na', name: 'North America', bonus: 5, color: '#c98a52' },
@@ -153,6 +153,27 @@ const EDGES: [string, string][] = [
   ['papua', 'easternaustralia'], ['westernaustralia', 'easternaustralia'], ['easternaustralia', 'newzealand'],
 ];
 
+/**
+ * The subset of borders that cross open water — drawn on the map as antique
+ * shipping lines so the across-sea connections are visible.
+ */
+const SEA_ROUTES: [string, string][] = [
+  ['greenland', 'britain'],
+  ['brazil', 'northafrica'],
+  ['easteurope', 'middleeast'],
+  ['eastafrica', 'middleeast'],
+  ['southeurope', 'egypt'],
+  ['easternus', 'caribbean'],
+  ['caribbean', 'venezuela'],
+  ['westernus', 'kamchatka'],
+  ['kamchatka', 'japan'],
+  ['china', 'japan'],
+  ['seasia', 'japan'],
+  ['indonesia', 'westernaustralia'],
+  ['papua', 'easternaustralia'],
+  ['easternaustralia', 'newzealand'],
+];
+
 /** Every territory id (groups + split sub-regions) with its continent. */
 function allTerritories(): { id: string; continentId: string }[] {
   return [
@@ -186,6 +207,30 @@ function buildTopology(): MapTopology {
 
 const WIDTH = 1000;
 const HEIGHT = 500;
+
+/**
+ * A gentle arc between two anchors. When the two ends are more than half a map
+ * apart the route really wraps the globe (e.g. Alaska ↔ Kamchatka), so instead
+ * of a line straight across the map we draw two short stubs running off the
+ * near edges — the classic "off the edge of the board" sea route.
+ */
+function routePath(a: [number, number], b: [number, number]): SeaRoute {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  if (Math.abs(dx) > WIDTH * 0.5) {
+    const aEdge = a[0] < WIDTH / 2 ? -10 : WIDTH + 10;
+    const bEdge = b[0] < WIDTH / 2 ? -10 : WIDTH + 10;
+    const d =
+      `M${a[0]},${a[1]} Q${(a[0] + aEdge) / 2},${a[1] - 26} ${aEdge},${a[1] - 6} ` +
+      `M${b[0]},${b[1]} Q${(b[0] + bEdge) / 2},${b[1] - 26} ${bEdge},${b[1] - 6}`;
+    return { d, ends: [a, b] };
+  }
+  const len = Math.hypot(dx, dy) || 1;
+  const bow = Math.min(58, len * 0.22);
+  const cx = (a[0] + b[0]) / 2 + (-dy / len) * bow;
+  const cy = (a[1] + b[1]) / 2 + (dx / len) * bow;
+  return { d: `M${a[0]},${a[1]} Q${Math.round(cx)},${Math.round(cy)} ${b[0]},${b[1]}`, ends: [a, b] };
+}
 
 let cached: RiskMap | null = null;
 
@@ -232,6 +277,15 @@ function build(): RiskMap {
     dividers.push({ clip: d, lines: split.dividers });
   }
 
+  // Sea routes connect territory anchors across water.
+  const anchor = new Map(territories.map((t) => [t.id, [t.labelX, t.labelY] as [number, number]]));
+  const seaRoutes: SeaRoute[] = [];
+  for (const [a, b] of SEA_ROUTES) {
+    const pa = anchor.get(a);
+    const pb = anchor.get(b);
+    if (pa && pb) seaRoutes.push(routePath(pa, pb));
+  }
+
   cached = {
     id: 'world',
     name: 'World',
@@ -241,6 +295,7 @@ function build(): RiskMap {
     continents: CONTINENTS,
     territories,
     dividers,
+    seaRoutes,
     graticule: path(geoGraticule10()) ?? '',
   };
   return cached;

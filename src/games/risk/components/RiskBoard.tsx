@@ -92,6 +92,17 @@ export function RiskBoard({ map, state, selected, targets, onPick }: RiskBoardPr
           </g>
         ))}
 
+        {/* Antique shipping lines for the across-water connections. */}
+        <g className="risk-searoutes" aria-hidden="true">
+          {map.seaRoutes.map((r, i) => (
+            <g key={`sr-${i}`}>
+              <path d={r.d} className="risk-searoute-shadow" />
+              <path d={r.d} className="risk-searoute" />
+              {r.ends.map(([x, y], j) => <circle key={j} cx={x} cy={y} r={2.4} className="risk-searoute-end" />)}
+            </g>
+          ))}
+        </g>
+
         {map.territories.map((t) => {
           const st = state.territories[t.id];
           if (!st) return null;
