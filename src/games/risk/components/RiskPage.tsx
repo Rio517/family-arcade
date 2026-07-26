@@ -21,12 +21,32 @@ import {
   territoriesOf,
   type NewPlayer,
 } from '../domain/rules';
+import { clearRiskGame, loadRiskGame, saveRiskGame, type StoredRisk } from '../storage/riskPersistence';
+import { ResumeIcon } from '@shared/ui/icons';
 import type { BattleResult, DiceMode, GameState } from '../domain/types';
 
 // Heraldic tinctures — a general's banner. Kept bright enough that the dark
 // border lines read against them, and the six stay easy to tell apart.
 const PLAYER_COLORS = ['#cf3a30', '#3f78bd', '#4f9c60', '#d69a34', '#9b5aa6', '#2fa199'];
 const PLAYER_NAMES = ['Crimson', 'Cobalt', 'Forest', 'Amber', 'Plum', 'Teal'];
+
+const PHASE_NAMES: Record<string, string> = {
+  setup: 'Setting up',
+  reinforce: 'Reinforce phase',
+  attack: 'Attack phase',
+  fortify: 'Fortify phase',
+};
+
+/** "just now", "25 minutes ago", "3 hours ago", "2 days ago". */
+function timeAgo(ts: number): string {
+  const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  if (mins < 2) return 'just now';
+  if (mins < 60) return `${mins} minutes ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
 
 export function RiskPage() {
   const navigate = useNavigate();
@@ -41,6 +61,29 @@ export function RiskPage() {
   const [dest, setDest] = useState<string | null>(null);
   const [moveCount, setMoveCount] = useState(1);
   const [battle, setBattle] = useState<BattleResult | null>(null);
+  // An unfinished campaign saved on this device, offered on the setup screen.
+  const [resumable, setResumable] = useState<StoredRisk | null>(() => loadRiskGame());
+
+  // The campaign auto-saves after every action; a finished war clears itself.
+  useEffect(() => {
+    if (!state) return;
+    if (state.phase === 'over') clearRiskGame();
+    else saveRiskGame(state);
+  }, [state]);
+
+  function resume() {
+    if (!resumable) return;
+    try {
+      const rendered = mapById(resumable.state.mapId).build();
+      setMap(rendered);
+      setState(resumable.state);
+      resetSelection();
+    } catch {
+      // The saved map no longer exists (app update) — drop the stale save.
+      clearRiskGame();
+      setResumable(null);
+    }
+  }
 
   const targets = useMemo(() => {
     const set = new Set<string>();
@@ -123,6 +166,32 @@ export function RiskPage() {
     return (
       <Shell onMenu={goMenu}>
         <div className="narrow-col stack">
+          {resumable && (
+            <div className="risk-resume" data-testid="risk-resume">
+              <button className="risk-resume-main" onClick={resume} data-testid="risk-resume-btn">
+                <span className="risk-resume-icon"><ResumeIcon size={24} /></span>
+                <span className="risk-resume-text">
+                  <span className="risk-eyebrow">Unfinished campaign</span>
+                  <strong>
+                    Resume — {resumable.state.players.length} generals · {PHASE_NAMES[resumable.state.phase] ?? 'In progress'}
+                  </strong>
+                  <span className="risk-resume-sub">
+                    {resumable.state.players[resumable.state.current]?.name} to move · saved {timeAgo(resumable.savedAt)}
+                  </span>
+                </span>
+                <span className="risk-resume-chev" aria-hidden="true">›</span>
+              </button>
+              <button
+                className="risk-btn ghost risk-resume-discard"
+                onClick={() => { clearRiskGame(); setResumable(null); }}
+                data-testid="risk-resume-discard"
+                aria-label="Abandon the saved campaign"
+              >
+                Abandon
+              </button>
+            </div>
+          )}
+
           <div className="panel">
             <div className="risk-eyebrow">The war council</div>
             <h2>Muster your generals</h2>

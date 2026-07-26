@@ -47,6 +47,45 @@ describe('<RiskPage>', () => {
     expect(screen.getByTestId('risk-start')).toBeInTheDocument();
   });
 
+  it('saves the campaign automatically and resumes it after a reload', () => {
+    const first = renderPage();
+    fireEvent.click(screen.getByTestId('count-2'));
+    fireEvent.click(screen.getByTestId('risk-start'));
+
+    // Claim three lands, note where the draft stands, then "close the app".
+    let clicks = 0;
+    for (const path of boardEl().querySelectorAll<SVGPathElement>('.risk-terr')) {
+      if (clicks >= 3) break;
+      fireEvent.click(path);
+      clicks++;
+    }
+    const phaseBefore = phaseText();
+    expect(phaseBefore).toMatch(/Claim/i);
+    first.unmount();
+
+    // A fresh visit offers the unfinished campaign…
+    renderPage();
+    const card = screen.getByTestId('risk-resume');
+    expect(card).toHaveTextContent(/2 generals/i);
+
+    // …and resuming lands exactly where the family left off.
+    fireEvent.click(screen.getByTestId('risk-resume-btn'));
+    expect(phaseText()).toBe(phaseBefore);
+  });
+
+  it('abandoning a saved campaign removes it for good', () => {
+    const first = renderPage();
+    fireEvent.click(screen.getByTestId('count-2'));
+    fireEvent.click(screen.getByTestId('risk-start'));
+    fireEvent.click(boardEl().querySelectorAll<SVGPathElement>('.risk-terr')[0]);
+    first.unmount();
+
+    renderPage();
+    fireEvent.click(screen.getByTestId('risk-resume-discard'));
+    expect(screen.queryByTestId('risk-resume')).toBeNull();
+    expect(localStorage.getItem('risk-campaign-v1')).toBeNull();
+  });
+
   it('offers wild vs balanced dice, defaulting to wild', () => {
     renderPage();
     expect(screen.getByTestId('dice-random').className).toContain('on');
