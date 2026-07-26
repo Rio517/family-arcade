@@ -20,10 +20,15 @@
   grid-template-rows: repeat(8, 1fr);
   aspect-ratio: 1 / 1;
   width: 100%;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 12px 34px -14px rgba(0, 0, 0, 0.7);
-  border: 1px solid var(--border);
+  /* A dark inner rim, an accent-tinted bezel, and a deep drop shadow so the
+     board reads as a lit slab floating above the page. */
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 0 2px #0b1220,
+    0 0 0 4px color-mix(in srgb, var(--accent) 32%, #1a2740),
+    0 22px 46px -18px rgba(0, 0, 0, 0.85);
   touch-action: manipulation;
 }
 .chess-ranks, .chess-files {
@@ -40,22 +45,40 @@
   border: none; padding: 0; margin: 0; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.chess-board .sq svg { width: 82%; height: 82%; }
-.chess-board .sq.light { background: #cbd5e1; }
-.chess-board .sq.dark { background: #64748b; }
-.chess-board .sq.last { background: color-mix(in srgb, var(--warn) 42%, #cbd5e1); }
-.chess-board .sq.dark.last { background: color-mix(in srgb, var(--warn) 42%, #64748b); }
-.chess-board .sq.sel { box-shadow: inset 0 0 0 3px var(--accent); }
-.chess-board .sq.check { background: color-mix(in srgb, var(--bad) 55%, #64748b); }
+.chess-board .sq svg { width: 84%; height: 84%; }
+/* Sculpted squares — a soft diagonal gradient gives each a little depth. */
+.chess-board .sq.light { background: linear-gradient(150deg, #eaeff6, #ccd7e6); }
+.chess-board .sq.dark { background: linear-gradient(150deg, #47597c, #33435f); }
+.chess-board .sq.last { position: relative; }
+/* Last move — a warm glow ring rather than a flat fill. */
+.chess-board .sq.last::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--warn) 70%, transparent),
+    inset 0 0 14px -2px color-mix(in srgb, var(--warn) 55%, transparent);
+}
+.chess-board .sq.sel {
+  box-shadow: inset 0 0 0 3px var(--accent), inset 0 0 16px -2px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.chess-board .sq.sel svg { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 80%, transparent)); }
+.chess-board .sq.check {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--bad) 55%, #4a5a70), color-mix(in srgb, var(--bad) 60%, #33435f));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .chess-board .sq.check { animation: sq-check 1.15s ease-in-out infinite; }
+}
+@keyframes sq-check {
+  50% { box-shadow: inset 0 0 22px -2px color-mix(in srgb, var(--bad) 75%, transparent); }
+}
 
-/* Legal-move hints: a dot on empty targets, a ring on captures. */
+/* Legal-move hints: a glowing accent dot on empty targets, a ring on captures. */
 .chess-board .sq.target::after {
-  content: ''; position: absolute; width: 30%; height: 30%; border-radius: 50%;
-  background: rgba(15, 23, 42, 0.4); pointer-events: none;
+  content: ''; position: absolute; width: 28%; height: 28%; border-radius: 50%;
+  background: var(--accent); opacity: 0.9;
+  box-shadow: 0 0 10px -1px var(--accent); pointer-events: none;
 }
 .chess-board .sq.capture::before {
-  content: ''; position: absolute; inset: 8%; border-radius: 50%;
-  box-shadow: inset 0 0 0 4px rgba(15, 23, 42, 0.4); pointer-events: none;
+  content: ''; position: absolute; inset: 7%; border-radius: 50%;
+  box-shadow: inset 0 0 0 4px var(--accent), 0 0 12px -3px var(--accent); pointer-events: none;
 }
 
 /* The dragged piece follows the pointer, offset so it sits above the finger. */
@@ -195,4 +218,37 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .result-emblem.draw { animation: rise-in 600ms ease-out both; }
+}
+
+/* ── The fallen king — the checkmate emblem ────────────────────────────────── */
+.fallen-king {
+  position: relative; width: 168px; height: 150px; margin: 0 auto 18px;
+  display: grid; place-items: end center;
+}
+.fk-piece { display: inline-flex; transform-origin: 50% 92%; will-change: transform; }
+.fk-piece svg { filter: drop-shadow(0 8px 9px rgba(0, 0, 0, 0.55)); }
+.fk-shadow {
+  position: absolute; bottom: 12px; left: 50%; width: 118px; height: 16px;
+  transform: translateX(-50%); border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.55), transparent 70%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fk-piece { animation: king-topple 1500ms cubic-bezier(0.2, 0.72, 0.3, 1) both; }
+  .fk-shadow { animation: king-shadow 1500ms ease both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fk-piece { transform: rotate(84deg); }
+}
+/* Stand for a beat, then topple to the side and settle with a small bounce. */
+@keyframes king-topple {
+  0%, 40% { transform: rotate(0deg); }
+  58% { transform: rotate(91deg); }
+  70% { transform: rotate(79deg); }
+  82% { transform: rotate(87deg); }
+  100% { transform: rotate(84deg); }
+}
+@keyframes king-shadow {
+  0%, 40% { opacity: 0.45; width: 56px; }
+  58% { opacity: 0.7; width: 128px; }
+  100% { opacity: 0.6; width: 122px; }
 }

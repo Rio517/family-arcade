@@ -66,22 +66,41 @@ const PATHS: Record<PieceType, JSX.Element> = {
 };
 
 export function ChessPiece({ color, type, size = 44 }: PieceProps) {
-  const fill = color === 'w' ? '#f8fafc' : '#111827';
-  const stroke = color === 'w' ? '#0b1220' : '#cbd5e1';
+  const light = color === 'w';
+  const gid = light ? 'cp-grad-w' : 'cp-grad-b';
+  const stroke = light ? '#0b1220' : '#cbd5e1';
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 45 45"
-      fill={fill}
-      stroke={stroke}
-      strokeWidth={1.4}
       strokeLinejoin="round"
       aria-hidden="true"
       focusable="false"
-      style={{ filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.45))' }}
+      style={{ filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))' }}
     >
-      {PATHS[type]}
+      {/* A soft top-left highlight fading to a shaded base gives each piece a
+          sculpted, carved-from-stone feel rather than a flat silhouette. */}
+      <defs>
+        <radialGradient id={gid} cx="38%" cy="28%" r="82%">
+          {light ? (
+            <>
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="62%" stopColor="#e9edf3" />
+              <stop offset="100%" stopColor="#bcc7d8" />
+            </>
+          ) : (
+            <>
+              <stop offset="0%" stopColor="#46536a" />
+              <stop offset="60%" stopColor="#232f43" />
+              <stop offset="100%" stopColor="#0b1322" />
+            </>
+          )}
+        </radialGradient>
+      </defs>
+      <g fill={`url(#${gid})`} stroke={stroke} strokeWidth={1.4}>
+        {PATHS[type]}
+      </g>
     </svg>
   );
 }
