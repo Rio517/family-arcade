@@ -11,7 +11,8 @@ import { Placement } from './Placement';
 import { Battle } from './Battle';
 import { Result } from './Result';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
-import { CloseIcon, TargetIcon } from '@shared/ui/icons';
+import { CloseIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
+import { loadResumableSession } from '@games/battleship/storage/sessionStore';
 import { QRCodeSVG } from 'qrcode.react';
 import type { FinishInfo } from '@games/battleship/domain/session';
 
@@ -54,6 +55,8 @@ export function BattleshipPage() {
   const bootRef = useRef(false);
   const resumeCode = params.get('resume');
   const joinCode = params.get('g');
+  // The most recent unfinished game, offered as a Resume card on the lobby.
+  const resumable = bs.phase === 'lobby' ? loadResumableSession() : null;
   // The cleanup resets the guard so React StrictMode's mount→unmount→mount
   // (whose unmount destroys the hook's connection) re-runs resume and rebuilds
   // the connection instead of leaving it torn down.
@@ -217,7 +220,21 @@ export function BattleshipPage() {
       )}
 
       {bs.phase === 'lobby' && (
-        <div className="narrow-col">
+        <div className="narrow-col stack">
+          {resumable && (
+            <button
+              className="card violet"
+              onClick={() => bs.resumeGame(resumable.code)}
+              data-testid="resume-game"
+            >
+              <div className="icon"><ResumeIcon size={26} /></div>
+              <div className="body">
+                <div className="title">Resume game {resumable.code}</div>
+                <div className="sub">vs {resumable.oppName ?? 'opponent'} — still in progress.</div>
+              </div>
+              <div className="chev" aria-hidden="true">›</div>
+            </button>
+          )}
           <Lobby
             name={profile.profile.name}
             onName={profile.setName}

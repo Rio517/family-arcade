@@ -1,15 +1,17 @@
 import { Link } from 'react-router-dom';
 import { useProfile } from '@shared/profile/useProfile';
-import { GridIcon, ResumeIcon } from '@shared/ui/icons';
+import { GridIcon } from '@shared/ui/icons';
 import { GAMES } from './registry';
 
 /**
- * The landing page: pick a game, see your record, resume an interrupted duel.
+ * The landing page: pick a game and see your record. Resuming an interrupted
+ * game lives on that game's own screen, not here, so the menu stays a clean
+ * list of games.
  *
- * The game cards and resume prompts are generated from the game registry, so
- * this component never mentions a specific game by name — add or remove one in
- * registry.ts and the menu follows. The Yahtzee logger is the one exception: a
- * static HTML page rather than a registered React game, linked directly.
+ * The game cards are generated from the registry, so this component never
+ * mentions a specific game by name — add or remove one in registry.ts and the
+ * menu follows. The Yahtzee logger is the one exception: a static HTML page
+ * rather than a registered React game, linked directly.
  */
 export function Menu() {
   const { profile } = useProfile();
@@ -23,22 +25,6 @@ export function Menu() {
       </div>
 
       <nav className="menu">
-        {GAMES.map((game) => {
-          const resume = game.loadResumable?.();
-          return resume ? (
-            <Link key={`resume-${game.id}`} className="card violet" to={`${game.path}?resume=${resume.code}`}>
-              <div className="icon"><ResumeIcon size={30} /></div>
-              <div className="body">
-                <div className="title">Resume {game.title}</div>
-                <div className="sub">
-                  Game <strong>{resume.code}</strong> {resume.label} is still in progress.
-                </div>
-              </div>
-              <div className="chev" aria-hidden="true">›</div>
-            </Link>
-          ) : null;
-        })}
-
         <a className="card" href={`${import.meta.env.BASE_URL}calculator.html`}>
           <div className="icon"><GridIcon size={30} /></div>
           <div className="body">

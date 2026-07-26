@@ -8,13 +8,6 @@
 
 import type { ComponentType } from 'react';
 
-export interface ResumableGame {
-  /** Game code / id used to resume. */
-  code: string;
-  /** Short human label, e.g. "vs Dad". */
-  label: string;
-}
-
 export interface GameDescriptor {
   /** Stable id. */
   id: string;
@@ -30,6 +23,4 @@ export interface GameDescriptor {
   Icon: ComponentType<{ size?: number }>;
   /** The full-screen game page. */
   Page: ComponentType;
-  /** Optional: the most recent resumable game, for the menu's Resume card. */
-  loadResumable?: () => ResumableGame | null;
 }

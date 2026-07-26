@@ -9,7 +9,8 @@ import { normalizeCode } from '@shared/net/peer';
 import { ChessBoard } from './ChessBoard';
 import { ChessResult } from './ChessResult';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
-import { CloseIcon, TargetIcon } from '@shared/ui/icons';
+import { CloseIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
+import { loadResumableChessGame } from '../storage/chessPersistence';
 import { winnerOf, status as statusOf } from '@games/chess/domain/rules';
 import type { FinishInfo } from '@games/chess/domain/session';
 import type { Ply, Status } from '@games/chess/domain/types';
@@ -112,6 +113,8 @@ export function ChessPage() {
 
   const inGame = cx.phase === 'play' || cx.phase === 'over';
   const showCodeChip = cx.mode === 'online' && cx.side === 'host' && !cx.oppConnected && cx.phase === 'play';
+  // The most recent unfinished online game, offered on the mode picker.
+  const resumableChess = !inGame && setup === 'pick' ? loadResumableChessGame() : null;
 
   return (
     <div className="app">
@@ -179,6 +182,23 @@ export function ChessPage() {
             <h2>How do you want to play?</h2>
             <p className="subtle">Two players, one board.</p>
           </div>
+          {resumableChess && (
+            <button
+              className="card violet"
+              onClick={() => {
+                setSetup('online');
+                cx.resumeGame(resumableChess.code);
+              }}
+              data-testid="chess-resume"
+            >
+              <div className="icon"><ResumeIcon size={26} /></div>
+              <div className="body">
+                <div className="title">Resume game {resumableChess.code}</div>
+                <div className="sub">vs {resumableChess.oppName || 'opponent'} — still in progress.</div>
+              </div>
+              <div className="chev" aria-hidden="true">›</div>
+            </button>
+          )}
           <button className="card" onClick={() => setSetup('local')} data-testid="mode-local">
             <div className="icon"><TargetIcon size={26} /></div>
             <div className="body">
