@@ -54,7 +54,10 @@ export function FreePlay({ onExit }: { onExit: () => void }) {
       if (target) next = setSquare(target, h.piece, next); // off-board drop = removed
       return next;
     });
-    setHand(null);
+    // A tray piece stays in hand — it's a stamp: keep tapping squares to place
+    // more (fill the board with queens!). A piece moved from the board is a
+    // one-shot; dropping it empties the hand.
+    setHand(h.from === null && target ? { piece: h.piece, from: null } : null);
   };
 
   // ── Tap flow: tap to pick up (tray or board), tap a square to put down ──
@@ -171,11 +174,13 @@ export function FreePlay({ onExit }: { onExit: () => void }) {
       </div>
 
       <p className="subtle center fp-hint">
-        {hand
-          ? `Holding a ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type)} — tap any square to put it down.`
-          : view === '3d'
-            ? 'Tap a tray piece, then tap the board to place it. Tap a piece on the board to pick it up.'
-            : 'Drag pieces from the trays onto the board. Drag a piece off the board to remove it.'}
+        {hand && !hand.from
+          ? `Placing ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type).toLowerCase()}s — keep tapping squares! Tap the tray piece again to stop.`
+          : hand
+            ? `Holding a ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type).toLowerCase()} — tap any square to put it down.`
+            : view === '3d'
+              ? 'Tap a tray piece, then tap the board to place it. Tap a piece on the board to pick it up.'
+              : 'Drag pieces from the trays onto the board. Drag a piece off the board to remove it.'}
       </p>
 
       <div className="fp-actions">
