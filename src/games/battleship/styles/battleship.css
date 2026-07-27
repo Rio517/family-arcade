@@ -295,3 +295,23 @@
 .fs-ship.sunk .fs-art { color: #93a1b5; opacity: 0.6; }
 .fs-ship.sunk .fs-name { text-decoration: line-through; }
 
+
+/* ── The 3D ocean view of your fleet ──────────────────────────────────────
+   A read-only three.js scene: your ships riding the swell, fires where the
+   enemy has hit, foam rings where they missed. The radar stays 2D. */
+.fleet-dims { display: inline-flex; margin: 0 0 0 4px; }
+.fleet-dims button { flex: 0 0 auto; padding: 4px 10px; font-size: 11px; }
+.bs3d-wrap { display: flex; flex-direction: column; gap: 6px; }
+.bs3d {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 2px #0b1220,
+    0 0 0 4px color-mix(in srgb, var(--accent) 32%, #1a2740),
+    0 18px 40px -18px rgba(0, 0, 0, 0.85);
+}
+.bs3d canvas { display: block; width: 100% !important; height: 100% !important; }
+.bs3d-hint { margin: 0; font-size: 11.5px; }
+.bs3d-fallback { padding: 30px 10px; }

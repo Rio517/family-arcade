@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Board, type BoardCell, type PlacedShip } from './Board';
 import type { Burst } from './BoardFX';
 import { ShipProfile } from './ships';
+
+// three.js is heavy, so the 3D ocean loads on demand — staying in 2D never
+// downloads it.
+const Fleet3D = lazy(() => import('./Fleet3D'));
 import { FLEET, shipSpec, skinById } from '@games/battleship/domain/constants';
 import { COLUMN_LABELS, shipCells } from '@games/battleship/domain/board';
 import { ownBoardView, radarGrid, shipName, sunkByAttacker, type CellState } from '@games/battleship/domain/engine';
@@ -43,6 +47,16 @@ export function Battle({
   useEffect(() => {
     if (myTurn) setView('radar');
   }, [myTurn]);
+
+  // Your fleet board can render as the flat grid or a 3D ocean. Remembered
+  // per device; the radar stays 2D — that's where the aiming happens.
+  const [fleetDim, setFleetDim] = useState<'2d' | '3d'>(() => {
+    try { return localStorage.getItem('bs-fleet-view-v1') === '3d' ? '3d' : '2d'; } catch { return '2d'; }
+  });
+  const pickFleetDim = (d: '2d' | '3d') => {
+    setFleetDim(d);
+    try { localStorage.setItem('bs-fleet-view-v1', d); } catch { /* ignore */ }
+  };
 
   // Detect the just-resolved shot and flag it for a one-shot impact animation
   // (shockwave / ripple / explosion + a board shake). The flag auto-clears so
@@ -147,9 +161,19 @@ export function Battle({
         <span className="name">
           <ShieldIcon size={16} /> Your fleet — {myName}
         </span>
+        <span className="fleet-dims view-tabs" role="group" aria-label="Fleet view">
+          <button data-active={fleetDim === '2d'} onClick={() => pickFleetDim('2d')} data-testid="fleet-view-2d">2D</button>
+          <button data-active={fleetDim === '3d'} onClick={() => pickFleetDim('3d')} data-testid="fleet-view-3d">3D</button>
+        </span>
         <span className="hint">{FLEET.length - myLostCount}/{FLEET.length} afloat</span>
       </div>
-      <Board cells={ownCells} skinId={skinId} variant="own" ships={ownShips} shake={boardShake(false)} fx={fxFor(false)} />
+      {fleetDim === '3d' ? (
+        <Suspense fallback={<p className="subtle center bs3d-hint">Launching the fleet…</p>}>
+          <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} />
+        </Suspense>
+      ) : (
+        <Board cells={ownCells} skinId={skinId} variant="own" ships={ownShips} shake={boardShake(false)} fx={fxFor(false)} />
+      )}
       <FleetRoster sunkIds={[...own.sunkShips]} skinColor={skinById(skinId).color} />
     </div>
   );

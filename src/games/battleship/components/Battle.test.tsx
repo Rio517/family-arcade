@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Battle } from './Battle';
 import { stackFleet } from '@test/helpers';
 import { resolveShot } from '@games/battleship/domain/engine';
@@ -65,5 +65,35 @@ describe('<Battle>', () => {
     // Overlays render (in both layouts); the destroyer is sunk, the carrier isn't.
     expect(screen.getAllByTestId('ship-overlay-destroyer')[0].className).toContain('sunk');
     expect(screen.getAllByTestId('ship-overlay-carrier')[0].className).not.toContain('sunk');
+  });
+});
+
+describe('<Battle> — 3D fleet view', () => {
+  const log: GameLog = [{ type: 'start', first: 'host' }];
+
+  it('offers a 2D/3D toggle for my fleet and falls back gracefully without WebGL', async () => {
+    localStorage.removeItem('bs-fleet-view-v1');
+    render(
+      <Battle
+        log={log}
+        side="host"
+        myName="Rio"
+        oppName="Kid"
+        skinId="aqua"
+        oppSkinId="ember"
+        myFleet={stackFleet()}
+        myTurn
+        pendingFire={null}
+        onFire={vi.fn()}
+      />,
+    );
+    // 2D is the default; the toggle is rendered (once per layout).
+    const btns3d = screen.getAllByTestId('fleet-view-3d');
+    expect(btns3d.length).toBeGreaterThan(0);
+
+    fireEvent.click(btns3d[0]);
+    // jsdom has no WebGL, so the lazy 3D view resolves to its fallback.
+    expect((await screen.findAllByTestId('fleet3d-fallback')).length).toBeGreaterThan(0);
+    expect(localStorage.getItem('bs-fleet-view-v1')).toBe('3d');
   });
 });

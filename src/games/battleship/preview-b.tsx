@@ -18,6 +18,7 @@ const log: GameLog = [
   S('host', 2, 2, true), S('guest', 1, 1, true),
   S('host', 2, 3, true), S('guest', 1, 2, true),
   S('host', 2, 4, true, 'cruiser'), S('guest', 3, 2, true),
+  S('guest', 5, 8, false), S('guest', 8, 4, false), S('guest', 2, 6, false),
 ];
 function App() {
   return (<div style={{ padding: 16, maxWidth: 1180, margin: '0 auto' }}><Battle log={log} side="host" myName="Rio" oppName="Max" skinId="aqua" oppSkinId="coral" myFleet={myFleet} myTurn pendingFire={null} onFire={() => {}} /></div>);
