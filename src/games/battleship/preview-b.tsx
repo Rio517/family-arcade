@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { Battle } from './components/Battle';
 import type { Fleet, GameLog, ShipId } from '@games/battleship/domain/types';
+import '@shared/styles/tokens.css';
 import '@games/battleship/styles/battleship.css';
 const myFleet: Fleet = [
   { shipId: 'carrier', row: 1, col: 1, orientation: 'H' },
@@ -21,6 +22,6 @@ const log: GameLog = [
   S('guest', 5, 8, false), S('guest', 8, 4, false), S('guest', 2, 6, false),
 ];
 function App() {
-  return (<div style={{ padding: 16, maxWidth: 1180, margin: '0 auto' }}><Battle log={log} side="host" myName="Rio" oppName="Max" skinId="aqua" oppSkinId="coral" myFleet={myFleet} myTurn pendingFire={null} onFire={() => {}} /></div>);
+  return (<div className="app" style={{ maxWidth: 1180 }}><Battle log={log} side="host" myName="Rio" oppName="Max" skinId="aqua" oppSkinId="coral" myFleet={myFleet} myTurn pendingFire={null} onFire={() => {}} /></div>);
 }
 createRoot(document.getElementById('root')!).render(<App />);
