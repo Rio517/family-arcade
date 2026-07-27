@@ -22,6 +22,7 @@ import {
   WORLD_LIST,
   type Character,
 } from '../domain/content';
+import { pickPlayerForTouch, steerToward } from '../domain/input';
 import { renderScene } from './scene';
 
 type Phase = 'players' | 'world' | 'characters' | 'play' | 'over';
@@ -215,7 +216,10 @@ function PlayField({
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const keysRef = useRef<Set<string>>(new Set());
-  const pointerRef = useRef<{ active: boolean; x: number; y: number }>({ active: false, x: 0, y: 0 });
+  // Every active touch/mouse pointer, keyed by pointerId, each remembering which
+  // character it grabbed. This is what makes multi-touch work: one entry per
+  // finger, so several players steer at once.
+  const pointersRef = useRef<Map<number, { x: number; y: number; playerId: number }>>(new Map());
 
   // Keyboard.
   useEffect(() => {
@@ -250,7 +254,7 @@ function PlayField({
       const dt = last ? (ts - last) / 1000 : 0;
       last = ts;
 
-      applyInput(game, keysRef.current, pointerRef.current, canvas);
+      applyInput(game, keysRef.current, pointersRef.current);
       if (game.status === 'playing') step(game, dt);
 
       renderScene(canvas, game, ts / 1000);
@@ -272,14 +276,43 @@ function PlayField({
   }, [gameRef, onOver, onFrame]);
 
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.type === 'pointerdown') pointerRef.current.active = true;
-    if (e.type === 'pointerup' || e.type === 'pointercancel' || e.type === 'pointerleave') {
-      pointerRef.current.active = false;
+    const canvas = e.currentTarget;
+    const pointers = pointersRef.current;
+
+    // A finger/mouse lifted or was cancelled → let go of its character.
+    if (e.type === 'pointerup' || e.type === 'pointercancel' || e.type === 'lostpointercapture') {
+      pointers.delete(e.pointerId);
       return;
     }
-    const rect = e.currentTarget.getBoundingClientRect();
-    pointerRef.current.x = ((e.clientX - rect.left) / rect.width) * FIELD_W;
-    pointerRef.current.y = ((e.clientY - rect.top) / rect.height) * FIELD_H;
+
+    const rect = canvas.getBoundingClientRect();
+    const fx = ((e.clientX - rect.left) / rect.width) * FIELD_W;
+    const fy = ((e.clientY - rect.top) / rect.height) * FIELD_H;
+
+    if (e.type === 'pointerdown') {
+      const game = gameRef.current;
+      if (!game) return;
+      const taken = new Set<number>();
+      for (const v of pointers.values()) taken.add(v.playerId);
+      const players = game.players.map((p) => ({ id: p.id, x: p.pos.x, y: p.pos.y }));
+      const playerId = pickPlayerForTouch(players, taken, { x: fx, y: fy });
+      if (playerId == null) return; // every character already has a finger
+      // Capture so we keep getting this finger's moves even if it slides off.
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        // ignore — capture is a nicety, not required
+      }
+      pointers.set(e.pointerId, { x: fx, y: fy, playerId });
+      return;
+    }
+
+    // pointermove — update the finger this pointer already owns.
+    const entry = pointers.get(e.pointerId);
+    if (entry) {
+      entry.x = fx;
+      entry.y = fy;
+    }
   };
 
   const game = gameRef.current;
@@ -296,11 +329,16 @@ function PlayField({
         onPointerMove={onPointer}
         onPointerUp={onPointer}
         onPointerCancel={onPointer}
-        onPointerLeave={onPointer}
+        onLostPointerCapture={onPointer}
       />
       <p className="uni-hint">
-        Move: Player 1 = arrow keys{game && game.players.length > 1 ? ' · Player 2 = W A S D' : ''}
-        {game && game.players.length > 2 ? ' · Player 3 = I J K L' : ''} · or drag on the picture 🖐️
+        {game && game.players.length > 1
+          ? 'On a tablet, each player drags their own character — all at once! 🖐️'
+          : 'Drag your character around the picture — or use the arrow keys. 🖐️'}
+        {game && game.players.length > 1
+          ? ' Keys: Player 1 = arrows · Player 2 = W A S D' +
+            (game.players.length > 2 ? ' · Player 3 = I J K L' : '')
+          : ''}
       </p>
     </div>
   );
@@ -405,9 +443,12 @@ const STEER_KEYS = new Set([
 function applyInput(
   game: GameState,
   keys: Set<string>,
-  pointer: { active: boolean; x: number; y: number },
-  _canvas: HTMLCanvasElement,
+  pointers: Map<number, { x: number; y: number; playerId: number }>,
 ) {
+  // Which character each finger is holding, so we can look it up per player.
+  const touchByPlayer = new Map<number, { x: number; y: number }>();
+  for (const v of pointers.values()) touchByPlayer.set(v.playerId, v);
+
   game.players.forEach((p, seat) => {
     const map = KEYMAP[seat];
     let x = 0;
@@ -419,14 +460,13 @@ function applyInput(
       if (map.down.some((k) => keys.has(k))) y += 1;
     }
 
-    // Player 1 can also steer by dragging on the canvas (great on a tablet).
-    if (seat === 0 && pointer.active && x === 0 && y === 0) {
-      const dx = pointer.x - p.pos.x;
-      const dy = pointer.y - p.pos.y;
-      const d = Math.hypot(dx, dy);
-      if (d > 12) {
-        x = dx / d;
-        y = dy / d;
+    // A finger dragging this character steers it (keyboard, if pressed, wins).
+    if (x === 0 && y === 0) {
+      const touch = touchByPlayer.get(p.id);
+      if (touch) {
+        const dir = steerToward(p.pos, touch);
+        x = dir.x;
+        y = dir.y;
       }
     }
 
