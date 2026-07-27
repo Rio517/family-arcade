@@ -70,6 +70,12 @@ export interface GameState {
   halfmoveClock: number;
   /** Starts at 1, increments after each Black move. */
   fullmoveNumber: number;
+  /**
+   * King-hunt variant (custom games with more than one king on a side):
+   * no check or checkmate — kings are capturable like any piece, and a side
+   * loses when its LAST king is taken.
+   */
+  kingHunt?: boolean;
 }
 
 /**
@@ -95,6 +101,8 @@ export type Status =
   | 'check'
   | 'checkmate'
   | 'stalemate'
+  /** King-hunt variant: the side to move has lost its last king. */
+  | 'kings-taken'
   | 'draw-fifty'
   | 'draw-material';
 

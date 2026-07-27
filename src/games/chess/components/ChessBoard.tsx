@@ -22,8 +22,6 @@ interface ChessBoardProps {
   movableColor: Color;
   /** The most recent move, highlighted so both players can follow along. */
   lastMove?: { from: Square; to: Square } | null;
-  /** Tabletop view: the board tilts back and the pieces stand upright. */
-  tilt?: boolean;
   onMove: (ply: Ply) => void;
 }
 
@@ -49,7 +47,6 @@ export function ChessBoard({
   interactive,
   movableColor,
   lastMove,
-  tilt = false,
   onMove,
 }: ChessBoardProps) {
   const [selected, setSelected] = useState<Square | null>(null);
@@ -68,8 +65,9 @@ export function ChessBoard({
   const targets = legal.map((m) => m.to);
   const isTarget = (sq: Square) => targets.some((t) => sameSquare(t, sq));
 
+  // No check highlight in the king hunt — kings live dangerously there.
   const checkedKing =
-    inCheck(board, board.turn) ? findKing(board.board, board.turn) : null;
+    !board.kingHunt && inCheck(board, board.turn) ? findKing(board.board, board.turn) : null;
 
   const canPickUp = (sq: Square): boolean => {
     const p = board.board[sq.row][sq.col];
@@ -103,8 +101,7 @@ export function ChessBoard({
   };
 
   // ── Pointer drag ───────────────────────────────────────────────────────
-  // Hit-test via elementFromPoint so it stays correct under the 3D tilt
-  // transform (plain bounding-rect math breaks under perspective). The drag
+  // Hit-test via elementFromPoint (robust under any CSS transform). The drag
   // ghost is pointer-events:none, so the square under the finger is found.
   const squareFromPoint = (clientX: number, clientY: number): Square | null => {
     const el = document.elementFromPoint?.(clientX, clientY);
@@ -152,7 +149,7 @@ export function ChessBoard({
   const rankLabels = orientation === 'w' ? RANKS.split('') : RANKS.split('').reverse();
 
   return (
-    <div className={`chess-wrap orient-${orientation} ${tilt ? 'tilt' : ''}`}>
+    <div className={`chess-wrap orient-${orientation}`}>
       <div className="chess-ranks" aria-hidden="true">
         {rankLabels.map((r) => <span key={r}>{r}</span>)}
       </div>
@@ -175,9 +172,8 @@ export function ChessBoard({
               check ? 'check' : '',
               target ? (piece ? 'capture' : 'target') : '',
             ].filter(Boolean).join(' ');
-            // The last-moved piece slides in from its origin square: the outer
-            // span animates a board-plane translate, the inner span keeps the
-            // (tilt-mode) standing rotation, so the two never fight.
+            // The last-moved piece slides in from its origin square via a
+            // board-plane translate on the outer span.
             const slidIn = lastMove && sameSquare(lastMove.to, sq);
             const slideStyle =
               slidIn && lastMove

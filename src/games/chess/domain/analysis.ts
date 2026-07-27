@@ -37,7 +37,7 @@ function toSan(
     base = `${letter}${disamb}${cap}${squareName(move.to)}${promo}`;
   }
   const st = status(after);
-  return base + (st === 'checkmate' ? '#' : st === 'check' ? '+' : '');
+  return base + (st === 'checkmate' || st === 'kings-taken' ? '#' : st === 'check' ? '+' : '');
 }
 
 /** Walk the log once, producing per-move notation and board snapshots. */

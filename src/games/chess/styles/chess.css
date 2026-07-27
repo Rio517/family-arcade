@@ -97,38 +97,6 @@
   to { transform: none; }
 }
 
-/* ── Tabletop view — the board tilts back, the pieces stand up ─────────────
-   Only .chess-board is transformed (never .chess-wrap), so the fixed-position
-   drag ghost and promotion overlay keep true viewport coordinates. */
-.chess-wrap.tilt { grid-template-columns: 0 1fr; grid-template-rows: 1fr 0; }
-.chess-wrap.tilt .chess-ranks, .chess-wrap.tilt .chess-files { display: none; }
-.chess-wrap.tilt .chess-board {
-  transform: perspective(1150px) rotateX(24deg);
-  transform-origin: 50% 100%;
-  transform-style: preserve-3d;
-  overflow: visible;
-  border-radius: 0;
-}
-/* Rounded corners come back via the corner squares (overflow must stay open
-   so standing pieces aren't beheaded at the board edge). */
-.chess-wrap.tilt .sq:nth-child(1) { border-top-left-radius: 12px; }
-.chess-wrap.tilt .sq:nth-child(8) { border-top-right-radius: 12px; }
-.chess-wrap.tilt .sq:nth-child(57) { border-bottom-left-radius: 12px; }
-.chess-wrap.tilt .sq:nth-child(64) { border-bottom-right-radius: 12px; }
-.chess-wrap.tilt .sq,
-.chess-wrap.tilt .pslide { transform-style: preserve-3d; }
-.chess-wrap.tilt .pstand {
-  transform: rotateX(-24deg);
-  transform-origin: 50% 96%;
-}
-/* A soft ground shadow under each standing piece, in the board plane. */
-.chess-wrap.tilt .pslide::after {
-  content: ''; position: absolute; left: 16%; right: 16%; bottom: 4%; height: 16%;
-  border-radius: 50%; pointer-events: none;
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.4), transparent 68%);
-  transform: translateZ(-1px);
-}
-
 /* The dragged piece follows the pointer, offset so it sits above the finger. */
 .chess-drag {
   position: fixed; z-index: 60; pointer-events: none;
@@ -316,7 +284,11 @@
   color: var(--warn); max-width: 560px;
 }
 .fp-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: stretch; }
-.fp-view { width: 120px; }
+/* The ☰ menu: views + themes + resets + exit, stacked in a small dialog. */
+.fp-menu { max-width: 340px; }
+.fp-menu-body { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.fp-confirm-text { margin: 0 0 4px; font-size: 14px; line-height: 1.45; }
+.fp-menu-body .fp-view { width: 100%; }
 .fp-3d { width: min(100%, 720px); }
 
 @media (max-width: 640px), (orientation: portrait) {

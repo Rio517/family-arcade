@@ -16,7 +16,7 @@ import { CHESS_THEME_KEY, CHESS_THEMES, ChessThemeContext, storedChessTheme, typ
 // never downloads it.
 const Chess3D = lazy(() => import('./Chess3D'));
 
-type BoardView = 'flat' | 'table' | '3d';
+type BoardView = 'flat' | '3d';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { CloseIcon, GridIcon, ListIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
@@ -45,8 +45,8 @@ export function ChessPage() {
   const [whiteName, setWhiteName] = useState('White');
   const [blackName, setBlackName] = useState('Black');
   const [logOpen, setLogOpen] = useState(false);
-  // Board view — flat, tabletop tilt, or full 3D. Remembered per device.
-  // The set's look — classic or unicorn — shared with every view via context.
+  // Board view — flat or full 3D. Remembered per device.
+  // The set's look — classic/unicorn/galaxy — shared with every view via context.
   const [theme, setThemeState] = useState<ChessThemeId>(storedChessTheme);
   const setTheme = (t: ChessThemeId) => {
     setThemeState(t);
@@ -55,9 +55,9 @@ export function ChessPage() {
 
   const [view, setView] = useState<BoardView>(() => {
     try {
-      const v = localStorage.getItem('chess-view-v1');
-      return v === 'flat' || v === '3d' ? v : 'table';
-    } catch { return 'table'; }
+      // Older builds stored 'table' — that mode is gone; fold it into flat.
+      return localStorage.getItem('chess-view-v1') === '3d' ? '3d' : 'flat';
+    } catch { return 'flat'; }
   });
   const pickView = (v: BoardView) => {
     setView(v);
@@ -360,7 +360,6 @@ export function ChessPage() {
                 interactive={cx.canMove}
                 movableColor={cx.mode === 'online' && cx.myColor ? cx.myColor : cx.turn}
                 lastMove={lastMoveSquares(cx.log)}
-                tilt={view === 'table'}
                 onMove={onMove}
               />
             )}
@@ -394,14 +393,14 @@ export function ChessPage() {
                 <ListIcon size={18} /> Move log
               </button>
               <div className="chess-view-seg" role="group" aria-label="Board view">
-                {(['flat', 'table', '3d'] as const).map((v) => (
+                {(['flat', '3d'] as const).map((v) => (
                   <button
                     key={v}
                     className={`seg-btn ${view === v ? 'on' : ''}`}
                     onClick={() => pickView(v)}
                     data-testid={`view-${v}`}
                   >
-                    {v === 'flat' ? 'Flat' : v === 'table' ? 'Table' : '3D'}
+                    {v === 'flat' ? 'Flat' : '3D'}
                   </button>
                 ))}
               </div>
