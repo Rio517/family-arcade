@@ -8,5 +8,6 @@ import type { GameDescriptor } from '@shared/game';
 import { battleship } from '@games/battleship';
 import { chess } from '@games/chess';
 import { risk } from '@games/risk';
+import { unicorn } from '@games/unicorn';
 
-export const GAMES: GameDescriptor[] = [battleship, chess, risk];
+export const GAMES: GameDescriptor[] = [unicorn, battleship, chess, risk];

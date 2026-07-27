@@ -246,6 +246,22 @@ export const TrophyIcon = (p: IconProps) =>
     p,
   );
 
+/** A unicorn head with a horn — the menu icon for the Unicorn game. */
+export const UnicornIcon = (p: IconProps) =>
+  svg(
+    <>
+      {/* Horn */}
+      <path d="M12 2l1.4 3.3-2.8 0L12 2Z" fill="currentColor" stroke="none" />
+      {/* Head + muzzle */}
+      <path d="M10.6 5.3C7.5 6 5.5 8.6 5.5 12c0 3 1.6 5.4 4 6.6L9 22h2l.7-2.6c.4.06.86.1 1.3.1 1 0 1.9-.16 2.7-.45L16 22h2l-.6-3.4c1.3-1.1 2.1-2.7 2.1-4.6 0-1.2-.4-2.3-1-3.2" />
+      {/* Mane */}
+      <path d="M13.4 5.3c2.4.5 4.2 2 5.1 4.1M14 8.5c1.4.3 2.5 1.1 3.1 2.3" />
+      {/* Eye */}
+      <path d="M9.4 11h.01" />
+    </>,
+    p,
+  );
+
 /** Balanced scales — the emblem for a drawn game. */
 export const ScalesIcon = (p: IconProps) =>
   svg(
