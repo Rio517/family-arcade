@@ -169,6 +169,21 @@ describe('<ChessPage> — local flow', () => {
     expect(container.querySelector('.chess-theme-unicorn')).toBeTruthy();
     expect(screen.getByTestId('sq-e2').querySelector('svg')?.getAttribute('data-piece-theme')).toBe('unicorn');
     expect(localStorage.getItem('chess-theme-v1')).toBe('unicorn');
+
+    // And the Galaxy Fleet is one more tap away.
+    fireEvent.click(screen.getByTestId('theme-galaxy'));
+    expect(container.querySelector('.chess-theme-galaxy')).toBeTruthy();
+    expect(screen.getByTestId('sq-e2').querySelector('svg')?.getAttribute('data-piece-theme')).toBe('galaxy');
+    expect(localStorage.getItem('chess-theme-v1')).toBe('galaxy');
+  });
+
+  it('restores a stored galaxy theme on load', () => {
+    localStorage.setItem('chess-theme-v1', 'galaxy');
+    const { container } = renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.click(screen.getByTestId('start-local'));
+    expect(container.querySelector('.chess-theme-galaxy')).toBeTruthy();
+    expect(screen.getByTestId('sq-e2').querySelector('svg')?.getAttribute('data-piece-theme')).toBe('galaxy');
   });
 
   it('free play offers the theme picker too', () => {
@@ -181,6 +196,9 @@ describe('<ChessPage> — local flow', () => {
     fireEvent.click(screen.getByTestId('fp-tray-w-q'));
     fireEvent.click(screen.getByTestId('fp-sq-e5'));
     expect(screen.getByTestId('fp-sq-e5').querySelector('svg')?.getAttribute('data-piece-theme')).toBe('unicorn');
+
+    fireEvent.click(screen.getByTestId('fp-theme-galaxy'));
+    expect(container.querySelector('.chess-theme-galaxy')).toBeTruthy();
 
     fireEvent.click(screen.getByTestId('fp-theme-classic'));
     expect(container.querySelector('.chess-theme-classic')).toBeTruthy();

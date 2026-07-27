@@ -6,7 +6,7 @@
  */
 import { lazy, Suspense, useEffect, useState, type PointerEvent } from 'react';
 import { ChessPiece, pieceName } from './chessPieces';
-import { useChessTheme } from './chessTheme';
+import { CHESS_THEMES, useChessTheme } from './chessTheme';
 import { initialState } from '@games/chess/domain/rules';
 import { FILES, RANKS, type Board, type Color, type Piece, type PieceType, type Square } from '@games/chess/domain/types';
 
@@ -191,8 +191,16 @@ export function FreePlay({ onExit }: { onExit: () => void }) {
           <button className={`seg-btn ${view === '3d' ? 'on' : ''}`} onClick={() => pickView('3d')} data-testid="fp-view-3d">3D</button>
         </div>
         <div className="chess-view-seg fp-theme" role="group" aria-label="Set theme">
-          <button className={`seg-btn ${theme === 'classic' ? 'on' : ''}`} onClick={() => setTheme('classic')} data-testid="fp-theme-classic">Classic</button>
-          <button className={`seg-btn ${theme === 'unicorn' ? 'on' : ''}`} onClick={() => setTheme('unicorn')} data-testid="fp-theme-unicorn">Unicorn</button>
+          {CHESS_THEMES.map((t) => (
+            <button
+              key={t.id}
+              className={`seg-btn ${theme === t.id ? 'on' : ''}`}
+              onClick={() => setTheme(t.id)}
+              data-testid={`fp-theme-${t.id}`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
         {hand && (
           <button
