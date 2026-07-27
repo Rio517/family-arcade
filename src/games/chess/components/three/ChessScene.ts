@@ -374,11 +374,16 @@ function buildPiece(type: PieceType, mat: THREE.Material, black: boolean, accent
       }
       break;
     }
-    case 'b':
+    case 'b': {
+      if (accent) {
+        buildFaerie(g, mat, accent);
+        break;
+      }
       g.add(lathe([...BASE, [0.10, 0.24], [0.075, 0.44], [0.12, 0.50], [0, 0.52]], mat));
       g.add(ball(0.115, 0.60, mat, 1.35));
       g.add(ball(0.035, 0.76, mat));
       break;
+    }
     case 'q': {
       g.add(lathe([...BASE, [0.12, 0.26], [0.085, 0.52], [0.16, 0.66], [0.13, 0.70], [0, 0.72]], mat));
       const crownMat = accent ?? mat;
@@ -402,6 +407,10 @@ function buildPiece(type: PieceType, mat: THREE.Material, black: boolean, accent
       break;
     }
     case 'n': {
+      if (accent) {
+        buildUnicorn(g, mat, accent, black);
+        break;
+      }
       g.add(lathe([...BASE, [0.155, 0.20], [0.17, 0.24]], mat));
       const s = new THREE.Shape();
       const P: [number, number][] = [[-0.14, 0], [0.15, 0], [0.12, 0.12], [0.05, 0.17], [0.07, 0.26], [0.30, 0.34], [0.32, 0.42],
@@ -415,18 +424,113 @@ function buildPiece(type: PieceType, mat: THREE.Material, black: boolean, accent
       head.scale.setScalar(0.92);
       head.rotation.y = black ? Math.PI / 2 : -Math.PI / 2;
       g.add(head);
-      if (accent) {
-        // The unicorn's golden horn, rising from the forehead and leaning the
-        // way the head faces.
-        const horn = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.3, 12), accent);
-        const lean = black ? 0.5 : -0.5;
-        horn.position.set(lean * 0.14, 0.78, 0);
-        horn.rotation.z = 0; horn.rotation.x = 0;
-        horn.rotation.set(0, 0, -lean * 0.55);
-        g.add(horn);
-      }
       break;
     }
   }
   return g;
+}
+
+/**
+ * The unicorn-theme knight: a sculpted unicorn bust — arched neck, elongated
+ * head with muzzle, pricked ears, a beaded mane down the back of the neck, and
+ * the golden horn. `dir` is +1/-1 so each side faces its enemy.
+ */
+function buildUnicorn(g: THREE.Group, mat: THREE.Material, accent: THREE.Material, black: boolean) {
+  const dir = black ? 1 : -1;
+  g.add(lathe([...BASE, [0.17, 0.2], [0.185, 0.26]], mat));
+
+  // Shoulders/chest sitting on the base.
+  const chest = ball(0.155, 0.3, mat, 0.9);
+  chest.scale.x = 1.15;
+  g.add(chest);
+
+  // Arched neck, leaning toward the enemy.
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.14, 0.42, 18), mat);
+  neck.position.set(dir * 0.05, 0.5, 0);
+  neck.rotation.z = -dir * 0.38;
+  g.add(neck);
+
+  // Head — an elongated sphere with a shorter muzzle sphere at the tip.
+  const head = ball(0.105, 0.7, mat);
+  head.scale.set(1.55, 0.82, 0.78);
+  head.position.x = dir * 0.16;
+  head.rotation.z = -dir * 0.32;
+  g.add(head);
+  const muzzle = ball(0.062, 0.655, mat);
+  muzzle.scale.set(1.15, 0.8, 0.72);
+  muzzle.position.x = dir * 0.3;
+  g.add(muzzle);
+
+  // Pricked ears.
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.09, 10), mat);
+    ear.position.set(dir * 0.07, 0.795, side * 0.05);
+    ear.rotation.z = -dir * 0.25;
+    ear.castShadow = true;
+    g.add(ear);
+  }
+
+  // The golden horn, from the forehead, following the head's tilt.
+  const horn = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.27, 12), accent);
+  horn.position.set(dir * 0.135, 0.9, 0);
+  horn.rotation.z = -dir * 0.42;
+  horn.castShadow = true;
+  g.add(horn);
+
+  // A beaded mane down the back of the neck, in a deeper shade of the coat.
+  const bodyColor = (mat as THREE.MeshStandardMaterial).color;
+  const maneMat = new THREE.MeshStandardMaterial({
+    color: bodyColor.clone().multiplyScalar(0.72),
+    roughness: 0.5,
+  });
+  const maneSpots: [number, number][] = [[-0.02, 0.76], [-0.07, 0.68], [-0.11, 0.59], [-0.145, 0.5], [-0.17, 0.4]];
+  for (const [mx, my] of maneSpots) {
+    const tuft = ball(0.052, my, maneMat);
+    tuft.position.x = dir * mx;
+    g.add(tuft);
+  }
+}
+
+/**
+ * The unicorn-theme bishop: a faerie — slender gown, a small head with a gold
+ * circlet, and two gossamer wings that light passes through.
+ */
+function buildFaerie(g: THREE.Group, mat: THREE.Material, accent: THREE.Material) {
+  g.add(lathe([...BASE, [0.11, 0.2]], mat));
+
+  // The gown — a gentle A-line from base to shoulders.
+  g.add(lathe([[0.155, 0.18], [0.12, 0.3], [0.08, 0.42], [0.05, 0.52], [0.055, 0.56], [0, 0.58]], mat));
+
+  // Head with a golden circlet.
+  g.add(ball(0.075, 0.65, mat));
+  const circlet = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.012, 8, 20), accent);
+  circlet.position.y = 0.695;
+  circlet.rotation.x = Math.PI / 2 - 0.25;
+  circlet.castShadow = true;
+  g.add(circlet);
+
+  // Gossamer wings — translucent, softly glowing, catching light both sides.
+  const wingMat = new THREE.MeshStandardMaterial({
+    color: '#ffffff',
+    transparent: true,
+    opacity: 0.5,
+    roughness: 0.15,
+    side: THREE.DoubleSide,
+    emissive: '#ffd9f2',
+    emissiveIntensity: 0.3,
+    depthWrite: false,
+  });
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Mesh(new THREE.SphereGeometry(0.16, 18, 14), wingMat);
+    wing.scale.set(0.55, 1.35, 0.12);
+    wing.position.set(side * 0.14, 0.47, -0.06);
+    wing.rotation.z = side * 0.55;
+    wing.rotation.y = side * 0.25;
+    g.add(wing);
+  }
+
+  // A tiny golden wand-star held at the side.
+  const star = ball(0.028, 0.46, accent);
+  star.position.x = 0.11;
+  g.add(star);
 }
