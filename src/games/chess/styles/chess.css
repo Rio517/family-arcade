@@ -277,6 +277,10 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent), 0 0 12px -3px var(--accent);
 }
+/* The eraser sits below each tray's pieces, set apart a touch. */
+.fp-eraser { margin-top: 6px; color: var(--muted); }
+.fp-eraser:hover { color: var(--text); }
+.fp-eraser.held { color: var(--warn); }
 .fp-hint { margin: 0; min-height: 20px; }
 /* Why "Start game" was refused — one gentle line, no modal. */
 .fp-issue {

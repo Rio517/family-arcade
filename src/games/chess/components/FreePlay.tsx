@@ -7,6 +7,7 @@
  * king, and the game can't already be over — that's it).
  */
 import { lazy, Suspense, useEffect, useState, type PointerEvent } from 'react';
+import { EraserIcon } from '@shared/ui/icons';
 import { ChessPiece, pieceName } from './chessPieces';
 import { CHESS_THEMES, useChessTheme } from './chessTheme';
 import { initialState, setupIssue } from '@games/chess/domain/rules';
@@ -44,6 +45,13 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
   // lineup/clear both wipe what's on the board, so they explain themselves.
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirm, setConfirm] = useState<'lineup' | 'clear' | null>(null);
+  // The eraser: tap it on either tray, then tap pieces to delete them.
+  const [erasing, setErasing] = useState(false);
+  const toggleEraser = () => {
+    setErasing((e) => !e);
+    setHand(null);
+    setDrag(null);
+  };
 
   const tryStartGame = () => {
     const issue = setupIssue(board);
@@ -86,9 +94,15 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
 
   // ── Tap flow: tap to pick up (tray or board), tap a square to put down ──
   const tapTray = (piece: Piece) => {
+    setErasing(false);
     setHand((h) => (h && !h.from && h.piece.color === piece.color && h.piece.type === piece.type ? null : { piece, from: null }));
   };
   const tapSquare = (sq: Square) => {
+    if (erasing) {
+      // Eraser mode: tap a piece, it's gone. Stays on until toggled off.
+      if (board[sq.row][sq.col]) setBoard((prev) => setSquare(sq, null, prev));
+      return;
+    }
     if (hand) {
       drop(hand, sq);
       return;
@@ -108,6 +122,12 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
     return col >= 0 && row >= 0 ? { row, col } : null;
   };
   const startDrag = (h: Hand, e: PointerEvent) => {
+    // While erasing, a tap on a board piece deletes it (no drag); dragging a
+    // fresh piece out of a tray is a clear "I'm placing again" — eraser off.
+    if (erasing) {
+      if (h.from) return;
+      setErasing(false);
+    }
     e.preventDefault();
     setHand(null);
     setDrag({ hand: h, x: e.clientX, y: e.clientY });
@@ -151,6 +171,16 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
           </button>
         );
       })}
+      <button
+        type="button"
+        className={`fp-tray-piece fp-eraser ${erasing ? 'held' : ''}`}
+        aria-label="Eraser — tap pieces on the board to remove them"
+        aria-pressed={erasing}
+        onClick={toggleEraser}
+        data-testid={`fp-eraser-${color}`}
+      >
+        <EraserIcon size={22} />
+      </button>
     </div>
   );
 
@@ -198,25 +228,18 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
       </div>
 
       <p className="subtle center fp-hint">
-        {hand && !hand.from
-          ? `Placing ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type).toLowerCase()}s — keep tapping squares! Tap the tray piece again to stop.`
-          : hand
-            ? `Holding a ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type).toLowerCase()} — tap any square to put it down.`
-            : view === '3d'
-              ? 'Tap a tray piece, then tap the board to place it. Tap a piece on the board to pick it up.'
-              : 'Drag pieces from the trays onto the board. Drag a piece off the board to remove it.'}
+        {erasing
+          ? 'Eraser on — tap any piece to remove it. Tap the eraser again to stop.'
+          : hand && !hand.from
+            ? `Placing ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type).toLowerCase()}s — keep tapping squares! Tap the tray piece again to stop.`
+            : hand
+              ? `Holding a ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type).toLowerCase()} — tap any square to put it down.`
+              : view === '3d'
+                ? 'Tap a tray piece, then tap the board to place it. Tap a piece on the board to pick it up.'
+                : 'Drag pieces from the trays onto the board. Drag a piece off the board to remove it.'}
       </p>
 
       <div className="fp-actions">
-        {hand && (
-          <button
-            className="btn"
-            onClick={() => (hand.from ? drop(hand, null) : setHand(null))}
-            data-testid="fp-remove"
-          >
-            {hand.from ? '🗑 Remove piece' : 'Put back'}
-          </button>
-        )}
         <button className="btn btn-primary" onClick={tryStartGame} data-testid="fp-start-game">▶ Start game</button>
         <button className="btn" onClick={() => setMenuOpen(true)} data-testid="fp-menu" aria-haspopup="dialog">☰ Menu</button>
       </div>
