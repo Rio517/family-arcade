@@ -376,7 +376,7 @@ function buildPiece(type: PieceType, mat: THREE.Material, black: boolean, accent
     }
     case 'b': {
       if (accent) {
-        buildFaerie(g, mat, accent);
+        buildFaerie(g, mat, accent, black);
         break;
       }
       g.add(lathe([...BASE, [0.10, 0.24], [0.075, 0.44], [0.12, 0.50], [0, 0.52]], mat));
@@ -492,45 +492,95 @@ function buildUnicorn(g: THREE.Group, mat: THREE.Material, accent: THREE.Materia
 }
 
 /**
- * The unicorn-theme bishop: a faerie — slender gown, a small head with a gold
- * circlet, and two gossamer wings that light passes through.
+ * The unicorn-theme bishop: a faerie facing her enemy — a gowned figure with
+ * hair in a bun under a gold circlet, REAL double-lobed gossamer wings (flat
+ * translucent silhouettes, like a butterfly's), a raised golden wand, and a
+ * drift of sparkle dust.
  */
-function buildFaerie(g: THREE.Group, mat: THREE.Material, accent: THREE.Material) {
-  g.add(lathe([...BASE, [0.11, 0.2]], mat));
+function buildFaerie(g: THREE.Group, mat: THREE.Material, accent: THREE.Material, black: boolean) {
+  // White sits at +z facing -z; wings go on the back, wand out the front.
+  const back = black ? -1 : 1;
 
-  // The gown — a gentle A-line from base to shoulders.
-  g.add(lathe([[0.155, 0.18], [0.12, 0.3], [0.08, 0.42], [0.05, 0.52], [0.055, 0.56], [0, 0.58]], mat));
+  g.add(lathe([...BASE, [0.12, 0.19]], mat));
 
-  // Head with a golden circlet.
-  g.add(ball(0.075, 0.65, mat));
-  const circlet = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.012, 8, 20), accent);
-  circlet.position.y = 0.695;
-  circlet.rotation.x = Math.PI / 2 - 0.25;
+  // The gown — bell hem, drawn-in waist, small bodice and shoulders.
+  g.add(lathe([
+    [0.165, 0.17], [0.155, 0.22], [0.125, 0.3], [0.09, 0.38], [0.062, 0.46],
+    [0.052, 0.52], [0.062, 0.56], [0.052, 0.61], [0, 0.63],
+  ], mat));
+
+  // Head, hair (a deeper shade) swept into a bun, and the golden circlet.
+  g.add(ball(0.072, 0.70, mat));
+  const bodyColor = (mat as THREE.MeshStandardMaterial).color;
+  const hairMat = new THREE.MeshStandardMaterial({ color: bodyColor.clone().multiplyScalar(0.66), roughness: 0.55 });
+  const hair = ball(0.076, 0.715, hairMat);
+  hair.scale.set(1, 0.92, 1);
+  hair.position.z = back * 0.018;
+  g.add(hair);
+  const face = ball(0.062, 0.695, mat);
+  face.position.z = -back * 0.028;
+  g.add(face);
+  const bun = ball(0.034, 0.77, hairMat);
+  bun.position.z = back * 0.045;
+  g.add(bun);
+  const circlet = new THREE.Mesh(new THREE.TorusGeometry(0.056, 0.011, 8, 22), accent);
+  circlet.position.y = 0.745;
+  circlet.rotation.x = Math.PI / 2 - 0.12;
   circlet.castShadow = true;
   g.add(circlet);
 
-  // Gossamer wings — translucent, softly glowing, catching light both sides.
+  // Real fairy wings: a flat silhouette with a big upper lobe and a small
+  // lower lobe, translucent and softly glowing from both sides.
+  const wingShape = new THREE.Shape();
+  wingShape.moveTo(0, 0);
+  wingShape.quadraticCurveTo(0.10, 0.10, 0.20, 0.16);
+  wingShape.quadraticCurveTo(0.30, 0.22, 0.28, 0.10);
+  wingShape.quadraticCurveTo(0.26, 0.0, 0.12, -0.02);
+  wingShape.quadraticCurveTo(0.22, -0.06, 0.18, -0.14);
+  wingShape.quadraticCurveTo(0.13, -0.20, 0.05, -0.10);
+  wingShape.quadraticCurveTo(0.015, -0.05, 0, 0);
+  const wingGeo = new THREE.ShapeGeometry(wingShape, 18);
   const wingMat = new THREE.MeshStandardMaterial({
-    color: '#ffffff',
+    color: '#f6f8ff',
     transparent: true,
-    opacity: 0.5,
-    roughness: 0.15,
+    opacity: 0.68,
+    roughness: 0.12,
     side: THREE.DoubleSide,
     emissive: '#ffd9f2',
-    emissiveIntensity: 0.3,
+    emissiveIntensity: 0.55,
     depthWrite: false,
   });
   for (const side of [-1, 1]) {
-    const wing = new THREE.Mesh(new THREE.SphereGeometry(0.16, 18, 14), wingMat);
-    wing.scale.set(0.55, 1.35, 0.12);
-    wing.position.set(side * 0.14, 0.47, -0.06);
-    wing.rotation.z = side * 0.55;
-    wing.rotation.y = side * 0.25;
+    const wing = new THREE.Mesh(wingGeo, wingMat);
+    // Mirror the pair and make them proudly oversized.
+    wing.scale.set(side * 1.2, 1.2, 1);
+    wing.position.set(side * 0.035, 0.52, back * 0.055);
+    // Splayed mostly outward (visible from the front), a gentle sweep back
+    // and an upward rake.
+    wing.rotation.set(back * -0.12, back * side * 0.5, side * 0.3);
     g.add(wing);
   }
 
-  // A tiny golden wand-star held at the side.
-  const star = ball(0.028, 0.46, accent);
-  star.position.x = 0.11;
+  // The golden wand, raised in front, with a star at its tip.
+  const wand = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.2, 8), accent);
+  wand.position.set(0.085, 0.5, -back * 0.055);
+  wand.rotation.z = -0.5;
+  wand.castShadow = true;
+  g.add(wand);
+  const star = ball(0.026, 0.59, accent);
+  star.position.set(0.135, 0.59, -back * 0.055);
   g.add(star);
+
+  // A drift of sparkle dust trailing off the wand.
+  const dustMat = new THREE.MeshStandardMaterial({ color: '#fff3fb', emissive: '#ffc9ec', emissiveIntensity: 0.9 });
+  const dust: [number, number, number, number][] = [
+    [0.19, 0.66, -back * 0.03, 0.012],
+    [0.24, 0.60, -back * 0.08, 0.009],
+    [0.21, 0.52, -back * 0.11, 0.007],
+  ];
+  for (const [dx, dy, dz, r] of dust) {
+    const mote = ball(r, dy, dustMat);
+    mote.position.set(dx, dy, dz);
+    g.add(mote);
+  }
 }
