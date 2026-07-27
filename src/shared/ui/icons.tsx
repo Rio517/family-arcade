@@ -213,6 +213,17 @@ export const LinkIcon = (p: IconProps) =>
     p,
   );
 
+/** A slanted eraser — free play's delete-a-piece tool. */
+export const EraserIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M15.8 4.1a2.1 2.1 0 0 1 3 0l1.9 1.9a2.1 2.1 0 0 1 0 3l-9.4 9.4a2 2 0 0 1-1.4.6H6.6a2 2 0 0 1-1.4-.6l-1.7-1.7a2.1 2.1 0 0 1 0-3Z" />
+      <path d="m9.2 8.8 6 6" />
+      <path d="M9 20.5h11" />
+    </>,
+    p,
+  );
+
 /** A champion's trophy — the winner's emblem on the result screen. */
 export const TrophyIcon = (p: IconProps) =>
   svg(

@@ -137,10 +137,16 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeNull();
     expect(screen.getByTestId('fp-sq-b2').querySelector('svg')).toBeTruthy();
 
-    // Pick a piece up and remove it via the remove button (the 3D-friendly path).
+    // The eraser deletes specific pieces: toggle it on, tap pieces, they're
+    // gone; it stays on until toggled off, and empty squares are no-ops.
+    fireEvent.click(screen.getByTestId('fp-eraser-w'));
     fireEvent.click(screen.getByTestId('fp-sq-a1'));
-    fireEvent.click(screen.getByTestId('fp-remove'));
     expect(screen.getByTestId('fp-sq-a1').querySelector('svg')).toBeNull();
+    fireEvent.click(screen.getByTestId('fp-sq-h8'));
+    expect(screen.getByTestId('fp-sq-h8').querySelector('svg')).toBeNull();
+    fireEvent.click(screen.getByTestId('fp-sq-b2'));
+    expect(screen.getByTestId('fp-sq-b2').querySelector('svg')).toBeNull();
+    fireEvent.click(screen.getByTestId('fp-eraser-w')); // off again
 
     // Views, resets, and exit live in the ☰ menu.
     fireEvent.click(screen.getByTestId('fp-menu'));
