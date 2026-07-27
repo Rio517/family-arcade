@@ -36,6 +36,12 @@ export interface SessionState {
   myName: string;
   oppName: string;
   log: GameLog;
+  /**
+   * Optional custom starting position (a free-play setup promoted into a
+   * real game). Local mode only — online games always open from the
+   * standard position, so log reconciliation stays sound.
+   */
+  start?: GameState;
   iWantRematch: boolean;
   oppWantsRematch: boolean;
 }
@@ -62,7 +68,7 @@ export function colorForSide(side: Side): Color {
   return side === 'host' ? HOST_COLOR : GUEST_COLOR;
 }
 
-export function createLocalSession(whiteName: string, blackName: string): SessionState {
+export function createLocalSession(whiteName: string, blackName: string, start?: GameState): SessionState {
   return {
     mode: 'local',
     side: null,
@@ -71,6 +77,7 @@ export function createLocalSession(whiteName: string, blackName: string): Sessio
     myName: whiteName,
     oppName: blackName,
     log: [],
+    start,
     iWantRematch: false,
     oppWantsRematch: false,
   };
@@ -93,7 +100,7 @@ export function createOnlineSession(side: Side, code: string, myName: string): S
 // ── Derived views (pure functions of the log) ──────────────────────────────
 
 export function boardState(s: SessionState): GameState {
-  return replay(s.log);
+  return replay(s.log, s.start);
 }
 
 export function currentStatus(s: SessionState): Status {

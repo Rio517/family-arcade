@@ -43,12 +43,15 @@ export interface UseChessResult {
   oppWantsRematch: boolean;
   log: GameLog;
   board: GameState;
+  /** Custom starting position (free-play game), or null for the standard opening. */
+  start: GameState | null;
   turn: Color;
   canMove: boolean;
   /** Local (hotseat) only: is there a move to take back? */
   canUndo: boolean;
   // actions
-  startLocal: (whiteName: string, blackName: string) => void;
+  /** Start a hotseat game — from the standard opening, or from `start`. */
+  startLocal: (whiteName: string, blackName: string, start?: GameState) => void;
   hostGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
   resumeGame: (code: string) => void;
@@ -129,9 +132,9 @@ export function useChess(opts: UseChessOptions): UseChessResult {
   }, []);
 
   // ── Actions ──────────────────────────────────────────────────────────────
-  const startLocal = useCallback((whiteName: string, blackName: string) => {
+  const startLocal = useCallback((whiteName: string, blackName: string, start?: GameState) => {
     setStatus('idle');
-    setSessionState(Session.createLocalSession(whiteName.trim() || 'White', blackName.trim() || 'Black'));
+    setSessionState(Session.createLocalSession(whiteName.trim() || 'White', blackName.trim() || 'Black', start));
   }, [setSessionState]);
 
   const hostGame = useCallback((name: string) => {
@@ -202,6 +205,7 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     oppWantsRematch: s?.oppWantsRematch ?? false,
     log: s?.log ?? [],
     board,
+    start: s?.start ?? null,
     turn: s ? turnColor(s) : 'w',
     canMove: s ? canIMove(s) : false,
     canUndo: s?.mode === 'local' && s.log.length > 0,

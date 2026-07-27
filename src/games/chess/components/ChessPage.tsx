@@ -21,7 +21,7 @@ import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { CloseIcon, GridIcon, ListIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
 import { loadResumableChessGame } from '../storage/chessPersistence';
-import { winnerOf, status as statusOf } from '@games/chess/domain/rules';
+import { customStart, winnerOf, status as statusOf } from '@games/chess/domain/rules';
 import { analyzeGame, tallyCaptures } from '@games/chess/domain/analysis';
 import type { FinishInfo } from '@games/chess/domain/session';
 import type { Color, PieceType, Ply, Status } from '@games/chess/domain/types';
@@ -135,7 +135,7 @@ export function ChessPage() {
   const onMove = (ply: Ply) => cx.move(ply);
 
   // The move log + captured pieces are pure views of the log.
-  const moves = useMemo(() => analyzeGame(cx.log), [cx.log]);
+  const moves = useMemo(() => analyzeGame(cx.log, cx.start ?? undefined), [cx.log, cx.start]);
   const caps = useMemo(() => tallyCaptures(moves), [moves]);
   const boardOrientation: Color = cx.mode === 'online' && cx.myColor ? cx.myColor : 'w';
   const nameW = (cx.myColor === 'b' ? cx.oppName : cx.myName) || 'White';
@@ -253,8 +253,13 @@ export function ChessPage() {
         </div>
       )}
 
-      {/* ── Free play sandbox ── */}
-      {!inGame && setup === 'free' && <FreePlay onExit={() => setSetup('pick')} />}
+      {/* ── Free play sandbox — can promote its setup into a real game ── */}
+      {!inGame && setup === 'free' && (
+        <FreePlay
+          onExit={() => setSetup('pick')}
+          onStartGame={(board) => cx.startLocal(whiteName, blackName, customStart(board))}
+        />
+      )}
 
       {/* ── Setup: local (hotseat) name form ── */}
       {!inGame && setup === 'local' && (
@@ -430,6 +435,7 @@ export function ChessPage() {
       {logOpen && (
         <ChessLogModal
           moves={moves}
+          start={cx.start ?? undefined}
           orientation={boardOrientation}
           canReturn={cx.mode === 'local'}
           onReturn={(n) => { cx.goToPly(n); setLogOpen(false); }}
