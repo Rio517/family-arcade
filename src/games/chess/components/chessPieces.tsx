@@ -131,74 +131,166 @@ const UNICORN_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
 };
 
 /**
- * The Galaxy Fleet — Gold Squadron vs Blue Fleet. Original starship
- * silhouettes, nose up: fighter pawn, interceptor knight, shuttle bishop,
- * capital-wedge rook, cruiser queen, command-station king. Cockpits in the
- * pale accent; engines in the team's glow colour.
+ * The Galaxy Fleet, rebel side (light) — nose up: X-wing pawns with open
+ * S-foils, an A-wing knight, a twin-nacelle Y-wing bishop, a hammerhead
+ * blockade-runner rook, the beloved saucer freighter as queen, and the
+ * whale-backed Mon Cal flagship as king. Red squadron markings; engines
+ * burn warm.
  */
-const GALAXY_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
+const REBEL_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
   p: (c) => (
     <>
-      <path d="M22.5 12 L26 25 L22.5 22.5 L19 25 Z" />
-      <path d="M19 21 L13 29 L19 26 Z" />
-      <path d="M26 21 L32 29 L26 26 Z" />
-      <circle cx="22.5" cy="18" r="1.8" fill={c.accent} stroke="none" />
-      <circle cx="22.5" cy="25.5" r="1.3" fill={c.glow} stroke="none" />
+      <path d="M20.5 19 L9.5 12.5 L20.5 22 Z" />
+      <path d="M24.5 19 L35.5 12.5 L24.5 22 Z" />
+      <path d="M20.5 23 L9.5 29.5 L20.5 25.5 Z" />
+      <path d="M24.5 23 L35.5 29.5 L24.5 25.5 Z" />
+      <path d="M21 10 L24 10 L24.5 26 H20.5 Z" />
+      <path d="M22.5 6.5 L24 10 H21 Z" fill={c.accent} />
+      <circle cx="20" cy="27.5" r="1.4" fill={c.glow} stroke="none" />
+      <circle cx="25" cy="27.5" r="1.4" fill={c.glow} stroke="none" />
     </>
   ),
   n: (c) => (
     <>
-      <path d="M22.5 8 L25 29 L22.5 26.5 L20 29 Z" />
-      <path d="M20 19 L10 31 L20 26 Z" />
-      <path d="M25 19 L35 31 L25 26 Z" />
-      <circle cx="22.5" cy="15" r="1.7" fill={c.accent} stroke="none" />
-      <circle cx="20.5" cy="28.5" r="1.4" fill={c.glow} stroke="none" />
-      <circle cx="24.5" cy="28.5" r="1.4" fill={c.glow} stroke="none" />
+      <path d="M22.5 8 L30 29 L22.5 26 L15 29 Z" />
+      <path d="M17.5 24.5 L16 30.5 M27.5 24.5 L29 30.5" stroke={c.stroke} strokeWidth="1.3" fill="none" />
+      <path d="M22.5 13 L24.5 19 H20.5 Z" fill={c.accent} stroke="none" />
+      <circle cx="19.5" cy="30.5" r="1.5" fill={c.glow} stroke="none" />
+      <circle cx="25.5" cy="30.5" r="1.5" fill={c.glow} stroke="none" />
     </>
   ),
   b: (c) => (
     <>
-      <path d="M22.5 8 L28.5 31 H16.5 Z" />
-      <path d="M22.5 8 V31" stroke={c.stroke} strokeWidth="1.1" fill="none" />
-      <path d="M16.5 25 L11 32 L16.5 30 Z" />
-      <path d="M28.5 25 L34 32 L28.5 30 Z" />
-      <circle cx="22.5" cy="16" r="1.7" fill={c.accent} stroke="none" />
+      <circle cx="22.5" cy="11.5" r="3.2" />
+      <path d="M21.3 14 h2.4 L24.5 24 h-4 Z" />
+      <path d="M17.5 19.5 H27.5" stroke={c.stroke} strokeWidth="1.3" fill="none" />
+      <rect x="14.5" y="17.5" width="3.6" height="14" rx="1.6" />
+      <rect x="26.9" y="17.5" width="3.6" height="14" rx="1.6" />
+      <circle cx="16.3" cy="33" r="1.5" fill={c.glow} stroke="none" />
+      <circle cx="28.7" cy="33" r="1.5" fill={c.glow} stroke="none" />
+      <circle cx="22.5" cy="11" r="1.3" fill={c.accent} stroke="none" />
     </>
   ),
   r: (c) => (
     <>
-      <path d="M22.5 6 L30 33 H15 Z" />
-      <path d="M18 27 H27 M19.5 22 H25.5" stroke={c.stroke} strokeWidth="1.1" fill="none" />
-      <rect x="20.5" y="28" width="4" height="4" fill={c.accent} stroke="none" />
-      <circle cx="22.5" cy="16" r="1.6" fill={c.accent} stroke="none" />
+      <path d="M17.5 10.5 A5 3.6 0 0 1 27.5 10.5 A5 3.6 0 0 1 17.5 10.5 Z" />
+      <path d="M20.5 13.5 H24.5 L25.5 29 H19.5 Z" />
+      <path d="M17.5 29 H27.5 L28.5 34.5 H16.5 Z" />
+      <path d="M20.5 17 L24.7 17 M20.3 21 L25 21" stroke={c.accent} strokeWidth="1.3" fill="none" />
+      <circle cx="19.5" cy="32" r="1.3" fill={c.glow} stroke="none" />
+      <circle cx="22.5" cy="32.3" r="1.3" fill={c.glow} stroke="none" />
+      <circle cx="25.5" cy="32" r="1.3" fill={c.glow} stroke="none" />
     </>
   ),
   q: (c) => (
     <>
-      <path d="M22.5 7 L27 20 L31 34 H14 L18 20 Z" />
-      <path d="M18 20 L9 30 L18 27 Z" />
-      <path d="M27 20 L36 30 L27 27 Z" />
-      <circle cx="22.5" cy="15" r="2" fill={c.accent} stroke="none" />
-      <circle cx="18" cy="33" r="1.6" fill={c.glow} stroke="none" />
-      <circle cx="22.5" cy="34" r="1.9" fill={c.glow} stroke="none" />
-      <circle cx="27" cy="33" r="1.6" fill={c.glow} stroke="none" />
+      <circle cx="22.5" cy="23" r="9.5" />
+      <path d="M17.5 9 H21 V15.5 H17.5 Z" />
+      <path d="M24 9 H27.5 V15.5 H24 Z" />
+      <path d="M14.5 28.5 A9.5 9.5 0 0 0 30.5 28.5" stroke={c.glow} strokeWidth="2.2" fill="none" />
+      <circle cx="29.5" cy="17.5" r="2.1" fill={c.accent} stroke="none" />
+      <path d="M13.5 23 H31.5" stroke={c.stroke} strokeWidth="1" fill="none" />
     </>
   ),
   k: (c) => (
     <>
-      <circle cx="22.5" cy="24" r="10.5" />
-      <path d="M12 24 H33" stroke={c.stroke} strokeWidth="1.1" fill="none" />
-      <rect x="20.5" y="9.5" width="4" height="5.5" />
-      <path d="M22.5 9.5 V5.5" stroke={c.stroke} strokeWidth="1.6" fill="none" strokeLinecap="round" />
-      <circle cx="22.5" cy="24" r="3.2" fill={c.accent} stroke="none" />
+      <ellipse cx="22.5" cy="21" rx="7.2" ry="13.5" />
+      <path d="M22.5 4 V8.5" stroke={c.stroke} strokeWidth="1.4" fill="none" strokeLinecap="round" />
+      <circle cx="20" cy="14" r="1.5" fill={c.accent} stroke="none" />
+      <circle cx="25.5" cy="18.5" r="1.3" fill={c.accent} stroke="none" />
+      <circle cx="20.5" cy="24" r="1.3" fill={c.accent} stroke="none" />
+      <circle cx="19" cy="34" r="1.4" fill={c.glow} stroke="none" />
+      <circle cx="22.5" cy="35" r="1.6" fill={c.glow} stroke="none" />
+      <circle cx="26" cy="34" r="1.4" fill={c.glow} stroke="none" />
     </>
   ),
 };
 
-const THEMED_SETS = {
-  unicorn: { art: UNICORN_PIECES, colors: UNICORN_2D, shadow: 'drop-shadow(0 2px 2px rgba(60,20,60,0.35))' },
-  galaxy: { art: GALAXY_PIECES, colors: GALAXY_2D, shadow: 'drop-shadow(0 0 4px rgba(90,169,255,0.35)) drop-shadow(0 2px 2px rgba(0,0,10,0.6))' },
-} as const;
+/**
+ * The Galaxy Fleet, dark side — TIE-style ball-and-panel fighters, a
+ * trifoil shuttle, wedge destroyers (the queen a longer, crueller blade),
+ * and the moon-sized battle station as king, dish and trench included.
+ */
+const EMPIRE_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
+  p: (c) => (
+    <>
+      <path d="M13.5 10 L16 12.5 V27.5 L13.5 30 L11 27.5 V12.5 Z" />
+      <path d="M31.5 10 L34 12.5 V27.5 L31.5 30 L29 27.5 V12.5 Z" />
+      <path d="M16 20 H29" stroke={c.stroke} strokeWidth="1.2" fill="none" />
+      <circle cx="22.5" cy="20" r="4.6" />
+      <circle cx="22.5" cy="20" r="2" fill={c.accent} stroke="none" />
+    </>
+  ),
+  n: (c) => (
+    <>
+      <path d="M16.5 9.5 L19 15 L17.5 29.5 L11.5 25 Z" />
+      <path d="M28.5 9.5 L26 15 L27.5 29.5 L33.5 25 Z" />
+      <path d="M18 19.5 H27" stroke={c.stroke} strokeWidth="1.2" fill="none" />
+      <circle cx="22.5" cy="19.5" r="4.2" />
+      <circle cx="22.5" cy="19.5" r="1.8" fill={c.accent} stroke="none" />
+      <circle cx="22.5" cy="26" r="1.3" fill={c.glow} stroke="none" />
+    </>
+  ),
+  b: (c) => (
+    <>
+      <path d="M22.5 6 L24.5 21 H20.5 Z" />
+      <path d="M22.5 15 L27.5 30 H17.5 Z" />
+      <path d="M18.5 19.5 L9 32.5 L19 28.5 Z" />
+      <path d="M26.5 19.5 L36 32.5 L26 28.5 Z" />
+      <circle cx="22.5" cy="18.5" r="1.6" fill={c.accent} stroke="none" />
+      <circle cx="22.5" cy="31.5" r="1.5" fill={c.glow} stroke="none" />
+    </>
+  ),
+  r: (c) => (
+    <>
+      <path d="M22.5 6 L30.5 33 H14.5 Z" />
+      <path d="M18 27 H27 M19.5 22 H25.5" stroke={c.stroke} strokeWidth="1.1" fill="none" />
+      <rect x="20.5" y="27.5" width="4" height="4.5" />
+      <circle cx="21.4" cy="27" r="1" fill={c.accent} stroke="none" />
+      <circle cx="23.6" cy="27" r="1" fill={c.accent} stroke="none" />
+      <circle cx="19" cy="34.7" r="1.2" fill={c.glow} stroke="none" />
+      <circle cx="22.5" cy="35" r="1.4" fill={c.glow} stroke="none" />
+      <circle cx="26" cy="34.7" r="1.2" fill={c.glow} stroke="none" />
+    </>
+  ),
+  q: (c) => (
+    <>
+      <path d="M22.5 3.5 L28.5 36 H16.5 Z" />
+      <path d="M22.5 8 L24 33 H21 Z" fill={c.accent} stroke="none" opacity="0.55" />
+      <rect x="21" y="26" width="3" height="3.4" />
+      <circle cx="19" cy="37.6" r="1.2" fill={c.glow} stroke="none" />
+      <circle cx="22.5" cy="38" r="1.4" fill={c.glow} stroke="none" />
+      <circle cx="26" cy="37.6" r="1.2" fill={c.glow} stroke="none" />
+    </>
+  ),
+  k: (c) => (
+    <>
+      <circle cx="22.5" cy="22.5" r="11.5" />
+      <path d="M11 25 H34" stroke={c.stroke} strokeWidth="1.6" fill="none" />
+      <circle cx="18" cy="16.5" r="3.6" fill="none" stroke={c.stroke} strokeWidth="1.3" />
+      <circle cx="18" cy="16.5" r="1.4" fill={c.accent} stroke="none" />
+    </>
+  ),
+};
+
+interface ThemedSet {
+  art: Record<'w' | 'b', Record<PieceType, (c: PieceColors) => JSX.Element>>;
+  colors: Record<'w' | 'b', PieceColors>;
+  shadow: string;
+}
+
+const THEMED_SETS: Record<'unicorn' | 'galaxy', ThemedSet> = {
+  unicorn: {
+    art: { w: UNICORN_PIECES, b: UNICORN_PIECES },
+    colors: UNICORN_2D,
+    shadow: 'drop-shadow(0 2px 2px rgba(60,20,60,0.35))',
+  },
+  galaxy: {
+    art: { w: REBEL_PIECES, b: EMPIRE_PIECES },
+    colors: GALAXY_2D,
+    shadow: 'drop-shadow(0 0 4px rgba(90,169,255,0.35)) drop-shadow(0 2px 2px rgba(0,0,10,0.6))',
+  },
+};
 
 export function ChessPiece({ color, type, size = 44 }: PieceProps) {
   const { theme } = useChessTheme();
@@ -217,7 +309,7 @@ export function ChessPiece({ color, type, size = 44 }: PieceProps) {
         style={{ filter: set.shadow }}
       >
         <g fill={c.fill} stroke={c.stroke} strokeWidth={1.4}>
-          {set.art[type](c)}
+          {set.art[color][type](c)}
         </g>
       </svg>
     );

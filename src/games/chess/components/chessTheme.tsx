@@ -9,9 +9,11 @@
  * - `unicorn`: the enchanted set — Team Rose vs Team Lavender, sparkle pawns,
  *   unicorn knights with golden horns, faerie bishops, fairytale towers, and
  *   heart & star crowns, in a candy-pink twilight.
- * - `galaxy`: the Galaxy Fleet — Gold Squadron vs Blue Fleet, original
- *   starship silhouettes (fighters, an interceptor, a shuttle, capital
- *   wedges, a command-station king) over a deep-space board.
+ * - `galaxy`: the Galaxy Fleet — the rebels vs the dark side. Light flies
+ *   the rebel fleet (X-wing pawns, A-wing knights, Y-wing bishops, a
+ *   blockade-runner rook, a beloved freighter queen, a Mon Cal flagship
+ *   king); dark fields the Empire (TIE pawns and interceptors, a trifoil
+ *   shuttle, wedge destroyers, and a certain moon-sized battle station).
  *
  * The active theme travels by context so deep leaves (drag ghosts, promotion
  * pickers, mini boards) follow along without prop-threading.
@@ -62,8 +64,11 @@ export const UNICORN_2D: Record<'w' | 'b', PieceColors> = {
 };
 
 export const GALAXY_2D: Record<'w' | 'b', PieceColors> = {
-  w: { fill: '#ffcf4a', stroke: '#6e4e00', accent: '#fff4d0', accent2: '#ffcf4a', glow: '#ff9d3c' }, // Gold Squadron
-  b: { fill: '#5aa9ff', stroke: '#0e2b52', accent: '#e4f2ff', accent2: '#5aa9ff', glow: '#8fd0ff' }, // Blue Fleet
+  // Light = the rebels: off-white hulls with red squadron markings, engines
+  // burning orange. Dark = the dark side: gunmetal hulls picked out with pale
+  // panel lines, cold ice-blue glows.
+  w: { fill: '#e3e8f0', stroke: '#39404d', accent: '#e8543f', accent2: '#e3e8f0', glow: '#ff8a5c' },
+  b: { fill: '#4d5666', stroke: '#a9b5c9', accent: '#c3cddd', accent2: '#4d5666', glow: '#8fd0ff' },
 };
 
 /** Everything the three.js scene needs to dress itself for a theme. */
@@ -84,6 +89,9 @@ export interface ScenePalette {
   /** Per-side engine-glow colours (ships only). */
   whiteGlow?: string;
   blackGlow?: string;
+  /** Per-side detail colours (ships only) — rebel markings vs imperial trim. */
+  whiteAccent?: string;
+  blackAccent?: string;
   /** Scatter a starfield around the board. */
   stars?: boolean;
   pieceRoughness: number;
@@ -123,12 +131,14 @@ export const SCENE_PALETTES: Record<ChessThemeId, ScenePalette> = {
     frame: '#0b1120',
     edge: '#3b6ea8',
     edgeEmissive: 0.6,
-    whitePiece: '#ffcf4a', // Gold Squadron
-    blackPiece: '#5aa9ff', // Blue Fleet
-    accent: '#e8eef7', // canopy/greeble steel
+    whitePiece: '#d9dee8', // rebel hull white
+    blackPiece: '#535e71', // imperial gunmetal
+    accent: '#e8eef7',
     pieceStyle: 'ships',
-    whiteGlow: '#ff9d3c',
-    blackGlow: '#8fd0ff',
+    whiteGlow: '#ff8a5c', // rebel engines burn warm
+    blackGlow: '#8fd0ff', // imperial engines burn cold
+    whiteAccent: '#e8543f', // red squadron stripes
+    blackAccent: '#9aa7bb', // pale imperial trim
     stars: true,
     pieceRoughness: 0.3,
   },
