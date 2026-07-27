@@ -10,7 +10,7 @@ import { ChessBoard } from './ChessBoard';
 import { ChessResult } from './ChessResult';
 import { ChessLogModal, CapturedTray } from './ChessLogModal';
 import { FreePlay } from './FreePlay';
-import { CHESS_THEME_KEY, ChessThemeContext, type ChessThemeId } from './chessTheme';
+import { CHESS_THEME_KEY, CHESS_THEMES, ChessThemeContext, storedChessTheme, type ChessThemeId } from './chessTheme';
 
 // three.js is heavy, so the 3D board loads on demand — picking Flat or Table
 // never downloads it.
@@ -47,9 +47,7 @@ export function ChessPage() {
   const [logOpen, setLogOpen] = useState(false);
   // Board view — flat, tabletop tilt, or full 3D. Remembered per device.
   // The set's look — classic or unicorn — shared with every view via context.
-  const [theme, setThemeState] = useState<ChessThemeId>(() => {
-    try { return localStorage.getItem(CHESS_THEME_KEY) === 'unicorn' ? 'unicorn' : 'classic'; } catch { return 'classic'; }
-  });
+  const [theme, setThemeState] = useState<ChessThemeId>(storedChessTheme);
   const setTheme = (t: ChessThemeId) => {
     setThemeState(t);
     try { localStorage.setItem(CHESS_THEME_KEY, t); } catch { /* ignore */ }
@@ -403,14 +401,14 @@ export function ChessPage() {
                 ))}
               </div>
               <div className="chess-view-seg" role="group" aria-label="Set theme">
-                {(['classic', 'unicorn'] as const).map((t) => (
+                {CHESS_THEMES.map((t) => (
                   <button
-                    key={t}
-                    className={`seg-btn ${theme === t ? 'on' : ''}`}
-                    onClick={() => setTheme(t)}
-                    data-testid={`theme-${t}`}
+                    key={t.id}
+                    className={`seg-btn ${theme === t.id ? 'on' : ''}`}
+                    onClick={() => setTheme(t.id)}
+                    data-testid={`theme-${t.id}`}
                   >
-                    {t === 'classic' ? 'Classic' : 'Unicorn'}
+                    {t.label}
                   </button>
                 ))}
               </div>

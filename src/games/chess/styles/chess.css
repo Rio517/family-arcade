@@ -46,9 +46,11 @@
   -webkit-tap-highlight-color: transparent;
 }
 .chess-board .sq svg { width: 84%; height: 84%; }
-/* Sculpted squares — a soft diagonal gradient gives each a little depth. */
-.chess-board .sq.light { background: linear-gradient(150deg, #eaeff6, #ccd7e6); }
-.chess-board .sq.dark { background: linear-gradient(150deg, #47597c, #33435f); }
+/* Sculpted squares — a soft diagonal gradient gives each a little depth.
+   The default (classic) board is marble inlaid in walnut, a sibling of the
+   Risk table's War Room. */
+.chess-board .sq.light { background: linear-gradient(150deg, #efe8d7, #d8cbaa); }
+.chess-board .sq.dark { background: linear-gradient(150deg, #6b563b, #4c3a25); }
 .chess-board .sq.last { position: relative; }
 /* Last move — a warm glow ring rather than a flat fill. */
 .chess-board .sq.last::after {
@@ -61,7 +63,7 @@
 }
 .chess-board .sq.sel svg { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 80%, transparent)); }
 .chess-board .sq.check {
-  background: linear-gradient(150deg, color-mix(in srgb, var(--bad) 55%, #4a5a70), color-mix(in srgb, var(--bad) 60%, #33435f));
+  background: linear-gradient(150deg, color-mix(in srgb, var(--bad) 55%, #6b563b), color-mix(in srgb, var(--bad) 60%, #4c3a25));
 }
 @media (prefers-reduced-motion: no-preference) {
   .chess-board .sq.check { animation: sq-check 1.15s ease-in-out infinite; }
@@ -147,7 +149,7 @@
 .promo-row { display: flex; gap: 8px; }
 .promo-btn {
   width: 56px; height: 56px; border-radius: 10px;
-  background: #64748b; border: 1px solid var(--border); cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
 .promo-btn:hover { border-color: var(--accent); }
@@ -276,8 +278,8 @@
   border: 1px solid var(--border); box-shadow: 0 8px 22px -12px rgba(0, 0, 0, 0.7);
 }
 .mini-board .msq { display: grid; place-items: center; }
-.mini-board .msq.light { background: #cbd5e1; }
-.mini-board .msq.dark { background: #64748b; }
+.mini-board .msq.light { background: #e3d9bd; }
+.mini-board .msq.dark { background: #7a6244; }
 .mini-board .msq svg { width: 84%; height: 84%; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)); }
 .log-caption { font-size: 13px; color: var(--muted); text-align: center; min-height: 18px; }
 
@@ -318,7 +320,100 @@
   .fp-wrap { width: min(92vw, calc(100dvh - 330px), 560px); }
 }
 
-/* ── Unicorn theme — Team Rose vs Team Lavender on a pink pearl board ─────── */
+/* ── Theme chrome ───────────────────────────────────────────────────────────
+   Picking a set redecorates the whole page, not just the board. Each theme
+   scope overrides the shared design tokens (so panels, buttons, plaques and
+   glows all follow) and paints its own full-bleed backdrop on a fixed
+   ::before layer, the same trick Risk's War Room uses. */
+
+/* Classic — "The War Room": the study where the Risk table lives. Mahogany
+   panelling, walnut boards, leather buttons, brass rules, engraved serifs. */
+.chess-theme-classic {
+  --bg: #20150c;
+  --surface: #342415;
+  --surface-2: #46331e;
+  --border: #8a6a34;
+  --text: #ece0c6;
+  --muted: #b3a082;
+  --accent: #c2a15a;
+  --accent-dim: rgba(194, 161, 90, 0.2);
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, 'Times New Roman', serif;
+  color: var(--text);
+}
+.chess-theme-classic button { font-family: inherit; }
+.chess-theme-classic::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(130% 80% at 50% -12%, rgba(214, 172, 92, 0.12), transparent 55%),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 46px),
+    linear-gradient(180deg, #2b1d12, #1b120b 70%);
+}
+.chess-theme-classic .topbar h1 {
+  font-family: 'Hoefler Text', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  color: #e7cf95; text-shadow: 0 1px 0 #000;
+}
+.chess-theme-classic .panel {
+  background: linear-gradient(180deg, #3c2a19, #2c1d11);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(231, 207, 149, 0.08), 0 10px 28px -16px #000;
+}
+.chess-theme-classic .btn,
+.chess-theme-classic .back-link {
+  background: linear-gradient(#3c2818, #2c1d11);
+  border-color: #8a6a34; border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(231, 207, 149, 0.12), 0 2px 6px rgba(0, 0, 0, 0.4);
+  color: var(--text);
+}
+.chess-theme-classic .btn:hover, .chess-theme-classic .back-link:hover { border-color: var(--accent); color: #e7cf95; }
+.chess-theme-classic .btn-primary { background: linear-gradient(#6c3122, #4a1e14); border-color: var(--accent); color: #e7cf95; }
+.chess-theme-classic .btn-danger { background: transparent; border-color: var(--bad); color: var(--bad); }
+.chess-theme-classic .chess-view-seg { border-radius: 4px; }
+.chess-theme-classic .field input { background: #20150c; border-radius: 4px; }
+/* Brass-inlaid board frame instead of the sci-fi glow. */
+.chess-theme-classic .chess-board {
+  box-shadow:
+    inset 0 0 0 1px rgba(231, 207, 149, 0.12),
+    0 0 0 2px #150d07,
+    0 0 0 4px #8a6a34,
+    0 22px 46px -18px rgba(0, 0, 0, 0.9);
+}
+.chess-theme-classic .chess3d-canvas {
+  box-shadow: 0 0 0 2px #150d07, 0 0 0 4px #8a6a34, 0 22px 46px -18px rgba(0, 0, 0, 0.9);
+}
+
+/* ── Unicorn theme — Team Rose vs Team Lavender in a candy twilight ───────── */
+.chess-theme-unicorn {
+  --bg: #241030;
+  --surface: #3d2352;
+  --surface-2: #50306b;
+  --border: #7c4f9e;
+  --text: #fdeef9;
+  --muted: #d3aee0;
+  --accent: #ff8fd0;
+  --accent-dim: rgba(255, 143, 208, 0.2);
+  --violet: #c9b3ff;
+  color: var(--text);
+}
+.chess-theme-unicorn::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(2.5px 2.5px at 16% 24%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(2px 2px at 78% 14%, rgba(255, 213, 74, 0.8), transparent 60%),
+    radial-gradient(2px 2px at 62% 62%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(2.5px 2.5px at 34% 82%, rgba(255, 158, 203, 0.8), transparent 60%),
+    radial-gradient(2px 2px at 90% 78%, rgba(255, 255, 255, 0.55), transparent 60%),
+    radial-gradient(120% 70% at 50% -10%, rgba(255, 143, 208, 0.2), transparent 60%),
+    radial-gradient(90% 60% at 100% 110%, rgba(169, 140, 255, 0.26), transparent 60%),
+    linear-gradient(180deg, #331a44, #1f0f2e 70%);
+}
+.chess-theme-unicorn .topbar h1 { color: #ffc9e5; text-shadow: 0 0 14px rgba(255, 126, 192, 0.5); }
 .chess-theme-unicorn .chess-board .sq.light { background: linear-gradient(150deg, #fdeaf7, #f7d3ec); }
 .chess-theme-unicorn .chess-board .sq.dark { background: linear-gradient(150deg, #e2abdc, #cf92cf); }
 .chess-theme-unicorn .chess-board {
@@ -343,6 +438,58 @@
 .chess-theme-unicorn .sq.sel svg { filter: drop-shadow(0 0 6px rgba(247, 194, 67, 0.8)); }
 .chess-theme-unicorn .mini-board .msq.light { background: #fdeaf7; }
 .chess-theme-unicorn .mini-board .msq.dark { background: #dfa8d9; }
+
+/* ── Galaxy Fleet — Gold Squadron vs Blue Fleet in deep space ─────────────── */
+.chess-theme-galaxy {
+  --bg: #05070f;
+  --surface: #111a2e;
+  --surface-2: #1b2740;
+  --border: #2c3d61;
+  --text: #e6eefb;
+  --muted: #8fa3c8;
+  --accent: #ffcf4a;
+  --accent-dim: rgba(255, 207, 74, 0.16);
+  --violet: #8fd0ff;
+  color: var(--text);
+}
+.chess-theme-galaxy::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(1.5px 1.5px at 12% 28%, #fff, transparent 60%),
+    radial-gradient(1px 1px at 32% 68%, rgba(255, 255, 255, 0.8), transparent 60%),
+    radial-gradient(2px 2px at 54% 16%, rgba(200, 225, 255, 0.9), transparent 60%),
+    radial-gradient(1px 1px at 68% 44%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1.5px 1.5px at 82% 76%, #fff, transparent 60%),
+    radial-gradient(1px 1px at 46% 86%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 90% 12%, rgba(255, 244, 208, 0.9), transparent 60%),
+    radial-gradient(1px 1px at 8% 84%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1px 1px at 24% 50%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(110% 70% at 70% -10%, rgba(90, 169, 255, 0.14), transparent 55%),
+    radial-gradient(90% 60% at 0% 110%, rgba(255, 157, 60, 0.08), transparent 60%),
+    #05070f;
+}
+.chess-theme-galaxy .topbar h1 { color: #ffcf4a; letter-spacing: 0.08em; text-shadow: 0 0 16px rgba(255, 207, 74, 0.35); }
+.chess-theme-galaxy .chess-board .sq.light { background: linear-gradient(150deg, #2e3a58, #232e49); }
+.chess-theme-galaxy .chess-board .sq.dark { background: linear-gradient(150deg, #1a2338, #10182a); }
+.chess-theme-galaxy .chess-board {
+  box-shadow:
+    inset 0 0 0 1px rgba(143, 208, 255, 0.14),
+    0 0 0 2px #05070f,
+    0 0 0 4px #3b6ea8,
+    0 0 30px -8px rgba(90, 169, 255, 0.4),
+    0 22px 46px -18px rgba(0, 0, 10, 0.9);
+}
+.chess-theme-galaxy .chess3d-canvas {
+  box-shadow: 0 0 0 2px #05070f, 0 0 0 4px #3b6ea8, 0 0 30px -8px rgba(90, 169, 255, 0.4), 0 22px 46px -18px #000;
+}
+.chess-theme-galaxy .chess-board .sq.check {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--bad) 55%, #232e49), color-mix(in srgb, var(--bad) 60%, #10182a));
+}
+.chess-theme-galaxy .mini-board .msq.light { background: #2e3a58; }
+.chess-theme-galaxy .mini-board .msq.dark { background: #141c30; }
 
 /* Draw emblem on the result screen. */
 .result-emblem.draw { color: var(--muted); filter: drop-shadow(0 4px 10px rgba(2, 6, 20, 0.5)); }

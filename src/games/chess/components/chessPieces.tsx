@@ -6,7 +6,7 @@
  */
 
 import type { Color, PieceType } from '@games/chess/domain/types';
-import { UNICORN_2D, useChessTheme, type PieceColors } from './chessTheme';
+import { GALAXY_2D, UNICORN_2D, useChessTheme, type PieceColors } from './chessTheme';
 
 interface PieceProps {
   color: Color;
@@ -130,10 +130,81 @@ const UNICORN_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
   ),
 };
 
+/**
+ * The Galaxy Fleet — Gold Squadron vs Blue Fleet. Original starship
+ * silhouettes, nose up: fighter pawn, interceptor knight, shuttle bishop,
+ * capital-wedge rook, cruiser queen, command-station king. Cockpits in the
+ * pale accent; engines in the team's glow colour.
+ */
+const GALAXY_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
+  p: (c) => (
+    <>
+      <path d="M22.5 12 L26 25 L22.5 22.5 L19 25 Z" />
+      <path d="M19 21 L13 29 L19 26 Z" />
+      <path d="M26 21 L32 29 L26 26 Z" />
+      <circle cx="22.5" cy="18" r="1.8" fill={c.accent} stroke="none" />
+      <circle cx="22.5" cy="25.5" r="1.3" fill={c.glow} stroke="none" />
+    </>
+  ),
+  n: (c) => (
+    <>
+      <path d="M22.5 8 L25 29 L22.5 26.5 L20 29 Z" />
+      <path d="M20 19 L10 31 L20 26 Z" />
+      <path d="M25 19 L35 31 L25 26 Z" />
+      <circle cx="22.5" cy="15" r="1.7" fill={c.accent} stroke="none" />
+      <circle cx="20.5" cy="28.5" r="1.4" fill={c.glow} stroke="none" />
+      <circle cx="24.5" cy="28.5" r="1.4" fill={c.glow} stroke="none" />
+    </>
+  ),
+  b: (c) => (
+    <>
+      <path d="M22.5 8 L28.5 31 H16.5 Z" />
+      <path d="M22.5 8 V31" stroke={c.stroke} strokeWidth="1.1" fill="none" />
+      <path d="M16.5 25 L11 32 L16.5 30 Z" />
+      <path d="M28.5 25 L34 32 L28.5 30 Z" />
+      <circle cx="22.5" cy="16" r="1.7" fill={c.accent} stroke="none" />
+    </>
+  ),
+  r: (c) => (
+    <>
+      <path d="M22.5 6 L30 33 H15 Z" />
+      <path d="M18 27 H27 M19.5 22 H25.5" stroke={c.stroke} strokeWidth="1.1" fill="none" />
+      <rect x="20.5" y="28" width="4" height="4" fill={c.accent} stroke="none" />
+      <circle cx="22.5" cy="16" r="1.6" fill={c.accent} stroke="none" />
+    </>
+  ),
+  q: (c) => (
+    <>
+      <path d="M22.5 7 L27 20 L31 34 H14 L18 20 Z" />
+      <path d="M18 20 L9 30 L18 27 Z" />
+      <path d="M27 20 L36 30 L27 27 Z" />
+      <circle cx="22.5" cy="15" r="2" fill={c.accent} stroke="none" />
+      <circle cx="18" cy="33" r="1.6" fill={c.glow} stroke="none" />
+      <circle cx="22.5" cy="34" r="1.9" fill={c.glow} stroke="none" />
+      <circle cx="27" cy="33" r="1.6" fill={c.glow} stroke="none" />
+    </>
+  ),
+  k: (c) => (
+    <>
+      <circle cx="22.5" cy="24" r="10.5" />
+      <path d="M12 24 H33" stroke={c.stroke} strokeWidth="1.1" fill="none" />
+      <rect x="20.5" y="9.5" width="4" height="5.5" />
+      <path d="M22.5 9.5 V5.5" stroke={c.stroke} strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      <circle cx="22.5" cy="24" r="3.2" fill={c.accent} stroke="none" />
+    </>
+  ),
+};
+
+const THEMED_SETS = {
+  unicorn: { art: UNICORN_PIECES, colors: UNICORN_2D, shadow: 'drop-shadow(0 2px 2px rgba(60,20,60,0.35))' },
+  galaxy: { art: GALAXY_PIECES, colors: GALAXY_2D, shadow: 'drop-shadow(0 0 4px rgba(90,169,255,0.35)) drop-shadow(0 2px 2px rgba(0,0,10,0.6))' },
+} as const;
+
 export function ChessPiece({ color, type, size = 44 }: PieceProps) {
   const { theme } = useChessTheme();
-  if (theme === 'unicorn') {
-    const c = UNICORN_2D[color];
+  if (theme !== 'classic') {
+    const set = THEMED_SETS[theme];
+    const c = set.colors[color];
     return (
       <svg
         width={size}
@@ -142,18 +213,18 @@ export function ChessPiece({ color, type, size = 44 }: PieceProps) {
         strokeLinejoin="round"
         aria-hidden="true"
         focusable="false"
-        data-piece-theme="unicorn"
-        style={{ filter: 'drop-shadow(0 2px 2px rgba(60,20,60,0.35))' }}
+        data-piece-theme={theme}
+        style={{ filter: set.shadow }}
       >
         <g fill={c.fill} stroke={c.stroke} strokeWidth={1.4}>
-          {UNICORN_PIECES[type](c)}
+          {set.art[type](c)}
         </g>
       </svg>
     );
   }
   const light = color === 'w';
   const gid = light ? 'cp-grad-w' : 'cp-grad-b';
-  const stroke = light ? '#0b1220' : '#cbd5e1';
+  const stroke = light ? '#241811' : '#d8cdb4';
   return (
     <svg
       width={size}
@@ -165,20 +236,21 @@ export function ChessPiece({ color, type, size = 44 }: PieceProps) {
       style={{ filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))' }}
     >
       {/* A soft top-left highlight fading to a shaded base gives each piece a
-          sculpted, carved-from-stone feel rather than a flat silhouette. */}
+          sculpted feel — carved ivory vs polished ebony, to sit in the same
+          leather-and-marble study as the Risk table. */}
       <defs>
         <radialGradient id={gid} cx="38%" cy="28%" r="82%">
           {light ? (
             <>
-              <stop offset="0%" stopColor="#ffffff" />
-              <stop offset="62%" stopColor="#e9edf3" />
-              <stop offset="100%" stopColor="#bcc7d8" />
+              <stop offset="0%" stopColor="#fffdf6" />
+              <stop offset="62%" stopColor="#efe6d0" />
+              <stop offset="100%" stopColor="#c9b892" />
             </>
           ) : (
             <>
-              <stop offset="0%" stopColor="#46536a" />
-              <stop offset="60%" stopColor="#232f43" />
-              <stop offset="100%" stopColor="#0b1322" />
+              <stop offset="0%" stopColor="#5c4d3c" />
+              <stop offset="60%" stopColor="#2e251b" />
+              <stop offset="100%" stopColor="#120d07" />
             </>
           )}
         </radialGradient>

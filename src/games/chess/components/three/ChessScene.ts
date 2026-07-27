@@ -51,6 +51,7 @@ export class ChessScene {
 
   private palette: ScenePalette;
   private accentMat: THREE.MeshStandardMaterial | null = null;
+  private glowMats: { w: THREE.MeshStandardMaterial | null; b: THREE.MeshStandardMaterial | null } = { w: null, b: null };
 
   constructor(
     private container: HTMLElement,
@@ -65,13 +66,27 @@ export class ChessScene {
     container.appendChild(this.renderer.domElement);
 
     this.scene.background = new THREE.Color(this.palette.background);
-    this.scene.fog = new THREE.Fog(this.palette.background, 15, 28);
+    // Deep space keeps its fog further out so the starfield reads.
+    this.scene.fog = this.palette.stars
+      ? new THREE.Fog(this.palette.background, 20, 40)
+      : new THREE.Fog(this.palette.background, 15, 28);
     if (this.palette.accent) {
       this.accentMat = new THREE.MeshStandardMaterial({
         color: this.palette.accent,
         roughness: 0.25,
         metalness: 0.65,
       });
+    }
+    for (const side of ['w', 'b'] as const) {
+      const glow = side === 'w' ? this.palette.whiteGlow : this.palette.blackGlow;
+      if (glow) {
+        this.glowMats[side] = new THREE.MeshStandardMaterial({
+          color: glow,
+          emissive: glow,
+          emissiveIntensity: 2.0,
+          roughness: 0.4,
+        });
+      }
     }
 
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 60);
@@ -90,6 +105,7 @@ export class ChessScene {
 
     this.buildLights();
     this.buildBoard();
+    if (this.palette.stars) this.buildStars();
     this.scene.add(this.markGroup);
 
     // Tap vs orbit: only fire a tap when the pointer barely moved.
@@ -140,10 +156,35 @@ export class ChessScene {
     this.scene.add(frame);
     const edge = new THREE.Mesh(
       new THREE.BoxGeometry(9.06, 0.05, 9.06),
-      new THREE.MeshStandardMaterial({ color: this.palette.edge, emissive: this.palette.edge, emissiveIntensity: 1.4 }),
+      new THREE.MeshStandardMaterial({
+        color: this.palette.edge,
+        emissive: this.palette.edge,
+        emissiveIntensity: this.palette.edgeEmissive ?? 1.4,
+        metalness: (this.palette.edgeEmissive ?? 1.4) < 1 ? 0.7 : 0, // dim rim = polished brass
+      }),
     );
     edge.position.y = -0.075;
     this.scene.add(edge);
+  }
+
+  /** A still starfield around the deep-space board (seeded, so tests are stable). */
+  private buildStars() {
+    let seed = 42;
+    const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    const pts: number[] = [];
+    for (let i = 0; i < 220; i++) {
+      const r = 13 + rand() * 9;
+      const az = rand() * Math.PI * 2;
+      const el = rand() * 1.25 - 0.1; // mostly above the horizon
+      pts.push(r * Math.cos(el) * Math.cos(az), r * Math.sin(el), r * Math.cos(el) * Math.sin(az));
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    const stars = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: '#dce8ff', size: 0.09, sizeAttenuation: true,
+      transparent: true, opacity: 0.85, depthWrite: false, fog: false,
+    }));
+    this.scene.add(stars);
   }
 
   // ── Procedural pieces (lathe-turned; knight is an extruded silhouette) ──
@@ -151,7 +192,7 @@ export class ChessScene {
     return new THREE.MeshStandardMaterial({
       color: color === 'w' ? this.palette.whitePiece : this.palette.blackPiece,
       roughness: this.palette.pieceRoughness,
-      metalness: color === 'b' && !this.palette.accent ? 0.12 : 0.05,
+      metalness: this.palette.pieceStyle === 'ships' ? 0.5 : color === 'b' && !this.palette.accent ? 0.12 : 0.05,
     });
   }
 
@@ -159,7 +200,7 @@ export class ChessScene {
     const key = `${color}${type}`;
     let tpl = this.templates.get(key);
     if (!tpl) {
-      tpl = buildPiece(type, this.material(color), color === 'b', this.accentMat ?? undefined);
+      tpl = buildPiece(type, this.material(color), color === 'b', this.palette.pieceStyle, this.accentMat ?? undefined, this.glowMats[color] ?? undefined);
       this.templates.set(key, tpl);
     }
     const clone = tpl.clone(true);
@@ -353,12 +394,25 @@ function ball(r: number, y: number, mat: THREE.Material, sy = 1) {
 }
 
 /**
- * Build one piece. When `accent` is given (the unicorn set's gold), the
- * knight grows a horn and the royal details — coronet, cross, queen's orb —
- * are cast in it.
+ * Build one piece in the theme's sculpt style: `standard` turns a staunton
+ * set (royal details cast in the accent when one is given — the War Room's
+ * brass), `fantasy` swaps in the unicorn knight and faerie bishop, and
+ * `ships` builds the Galaxy Fleet — every piece a display-model starship on
+ * a slender pylon, engines burning in the team's glow colour.
  */
-function buildPiece(type: PieceType, mat: THREE.Material, black: boolean, accent?: THREE.Material): THREE.Group {
+function buildPiece(
+  type: PieceType,
+  mat: THREE.Material,
+  black: boolean,
+  style: ScenePalette['pieceStyle'],
+  accent?: THREE.Material,
+  glow?: THREE.Material,
+): THREE.Group {
   const g = new THREE.Group();
+  if (style === 'ships') {
+    buildShip(g, type, mat, black, accent ?? mat, glow ?? mat);
+    return g;
+  }
   switch (type) {
     case 'p':
       g.add(lathe([...BASE, [0.11, 0.22], [0.09, 0.34], [0.13, 0.38], [0, 0.40]], mat));
@@ -375,7 +429,7 @@ function buildPiece(type: PieceType, mat: THREE.Material, black: boolean, accent
       break;
     }
     case 'b': {
-      if (accent) {
+      if (style === 'fantasy' && accent) {
         buildFaerie(g, mat, accent, black);
         break;
       }
@@ -407,7 +461,7 @@ function buildPiece(type: PieceType, mat: THREE.Material, black: boolean, accent
       break;
     }
     case 'n': {
-      if (accent) {
+      if (style === 'fantasy' && accent) {
         buildUnicorn(g, mat, accent, black);
         break;
       }
@@ -582,5 +636,154 @@ function buildFaerie(g: THREE.Group, mat: THREE.Material, accent: THREE.Material
     const mote = ball(r, dy, dustMat);
     mote.position.set(dx, dy, dz);
     g.add(mote);
+  }
+}
+
+/**
+ * The Galaxy Fleet — every piece a little display-model starship hovering on
+ * a slender pylon, nose toward the enemy, engines burning in the team's glow
+ * colour. Pawn: fighter · knight: interceptor · bishop: shuttle · rook:
+ * capital wedge · queen: cruiser · king: command station.
+ */
+function buildShip(
+  g: THREE.Group,
+  type: PieceType,
+  mat: THREE.Material,
+  black: boolean,
+  accent: THREE.Material,
+  glow: THREE.Material,
+) {
+  // White sits at +z and flies toward -z; black the opposite.
+  const f = black ? 1 : -1;
+
+  // Display plinth + pylon — slim, so the ship is the star of the model.
+  g.add(lathe([[0, 0], [0.24, 0], [0.24, 0.04], [0.18, 0.075], [0.12, 0.11], [0.1, 0.13]], mat));
+  const HOVER: Record<PieceType, number> = { p: 0.4, n: 0.46, b: 0.48, r: 0.5, q: 0.56, k: 0.5 };
+  const h = HOVER[type];
+  const pylon = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.026, h - 0.13, 10), mat);
+  pylon.position.y = 0.13 + (h - 0.13) / 2;
+  g.add(pylon);
+
+  const ship = new THREE.Group();
+  ship.position.y = h;
+  ship.scale.setScalar(1.22);
+  g.add(ship);
+
+  /** A cone lying along z, tip toward the enemy. */
+  const zcone = (r: number, len: number, m: THREE.Material, segments = 18) => {
+    const c = new THREE.Mesh(new THREE.ConeGeometry(r, len, segments), m);
+    c.rotation.x = (f * Math.PI) / 2;
+    ship.add(c);
+    return c;
+  };
+  const engine = (x: number, z: number, r: number) => {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), glow);
+    e.position.set(x, 0, -f * z);
+    ship.add(e);
+  };
+  const canopy = (z: number, r: number) => {
+    const d = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), accent);
+    d.position.set(0, 0.04, f * z);
+    d.scale.set(1, 0.7, 1.4);
+    ship.add(d);
+  };
+  /** A thin swept wing panel; mirrored by sign of `x`. */
+  const wing = (x: number, span: number, chord: number, sweep: number) => {
+    const w = new THREE.Mesh(new THREE.BoxGeometry(span, 0.016, chord), mat);
+    w.position.set(x, 0, -f * chord * 0.2);
+    w.rotation.y = -Math.sign(x) * f * sweep;
+    ship.add(w);
+  };
+  /** A flattened 4-sided cone = the capital-ship wedge hull. */
+  const wedge = (r: number, len: number, widen: number, flatten: number) => {
+    const m = new THREE.Mesh(new THREE.ConeGeometry(r, len, 4), mat);
+    m.rotation.x = (f * Math.PI) / 2;
+    m.scale.set(widen, 1, flatten); // local z is world-vertical after the tilt
+    ship.add(m);
+    return m;
+  };
+
+  switch (type) {
+    case 'p': // fighter — stubby fuselage, swept fins, one hot engine
+      zcone(0.055, 0.36, mat);
+      canopy(0.03, 0.035);
+      wing(-0.11, 0.17, 0.1, 0.5);
+      wing(0.11, 0.17, 0.1, 0.5);
+      engine(0, 0.19, 0.034);
+      break;
+    case 'n': // interceptor — needle nose, big deltas, twin engines
+      zcone(0.045, 0.48, mat);
+      canopy(0.05, 0.032);
+      wing(-0.14, 0.22, 0.14, 0.7);
+      wing(0.14, 0.22, 0.14, 0.7);
+      engine(-0.055, 0.25, 0.028);
+      engine(0.055, 0.25, 0.028);
+      break;
+    case 'b': { // shuttle — tall dorsal fin, small side fins, one engine
+      zcone(0.075, 0.4, mat);
+      canopy(0.09, 0.036);
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.17, 0.15), mat);
+      fin.position.set(0, 0.1, -f * 0.09);
+      fin.rotation.x = -f * 0.35; // raked back
+      ship.add(fin);
+      wing(-0.09, 0.12, 0.09, 0.4);
+      wing(0.09, 0.12, 0.09, 0.4);
+      engine(0, 0.21, 0.04);
+      break;
+    }
+    case 'r': { // capital wedge — flat arrowhead hull, bridge, engine bank
+      wedge(0.15, 0.55, 1.4, 0.45);
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.08), mat);
+      bridge.position.set(0, 0.055, -f * 0.15);
+      ship.add(bridge);
+      const tower = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8), accent);
+      tower.position.set(0, 0.095, -f * 0.15);
+      ship.add(tower);
+      engine(-0.06, 0.29, 0.024);
+      engine(0, 0.29, 0.028);
+      engine(0.06, 0.29, 0.024);
+      break;
+    }
+    case 'q': { // cruiser — the fleet's long blade, pontoons, three engines
+      wedge(0.17, 0.72, 1.3, 0.42);
+      const pods = [-0.15, 0.15];
+      for (const px of pods) {
+        const pod = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.24, 12), mat);
+        pod.rotation.x = (f * Math.PI) / 2;
+        pod.position.set(px, -0.01, -f * 0.08);
+        ship.add(pod);
+        const pe = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 10), glow);
+        pe.position.set(px, -0.01, -f * 0.2);
+        ship.add(pe);
+      }
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.055, 0.09), mat);
+      bridge.position.set(0, 0.06, -f * 0.2);
+      ship.add(bridge);
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), accent);
+      dome.position.set(0, 0.105, -f * 0.2);
+      ship.add(dome);
+      engine(0, 0.37, 0.032);
+      break;
+    }
+    case 'k': { // command station — ringed core, comms spire, reactor glow
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.13, 22, 18), mat);
+      ship.add(core);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.02, 10, 36), mat);
+      ring.rotation.x = Math.PI / 2;
+      ship.add(ring);
+      const port = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 10), accent);
+      port.position.set(0, 0.02, f * 0.115);
+      ship.add(port);
+      const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.22, 8), mat);
+      spire.position.y = 0.23;
+      ship.add(spire);
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.026, 12, 10), glow);
+      beacon.position.y = 0.35;
+      ship.add(beacon);
+      const reactor = new THREE.Mesh(new THREE.SphereGeometry(0.045, 14, 12), glow);
+      reactor.position.y = -0.14;
+      ship.add(reactor);
+      break;
+    }
   }
 }
