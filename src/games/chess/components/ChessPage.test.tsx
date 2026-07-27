@@ -98,18 +98,19 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Black to move/);
   });
 
-  it('defaults to the tabletop view and remembers switching to flat', () => {
-    const { container } = renderPage();
+  it('offers exactly two views — flat (the default) and 3D', () => {
+    renderPage();
     fireEvent.click(screen.getByTestId('mode-local'));
     fireEvent.click(screen.getByTestId('start-local'));
 
-    // Tabletop view is the default; all three view buttons are offered.
-    expect(container.querySelector('.chess-wrap')?.classList.contains('tilt')).toBe(true);
+    // Flat is the default; the old tabletop mode is gone.
+    expect(screen.getByTestId('view-flat')).toBeInTheDocument();
     expect(screen.getByTestId('view-3d')).toBeInTheDocument();
+    expect(screen.queryByTestId('view-table')).toBeNull();
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
 
-    // Picking Flat un-tilts the board and persists the choice.
+    // Re-picking Flat persists the choice.
     fireEvent.click(screen.getByTestId('view-flat'));
-    expect(container.querySelector('.chess-wrap')?.classList.contains('tilt')).toBe(false);
     expect(localStorage.getItem('chess-view-v1')).toBe('flat');
   });
 
@@ -141,16 +142,27 @@ describe('<ChessPage> — local flow', () => {
     fireEvent.click(screen.getByTestId('fp-remove'));
     expect(screen.getByTestId('fp-sq-a1').querySelector('svg')).toBeNull();
 
-    // A 2D/3D toggle is offered for the sandbox too.
+    // Views, resets, and exit live in the ☰ menu.
+    fireEvent.click(screen.getByTestId('fp-menu'));
     expect(screen.getByTestId('fp-view-3d')).toBeInTheDocument();
 
-    // The starting lineup fills 32 squares; clear empties the board.
+    // Starting lineup asks first (it replaces the whole board), then fills 32.
     fireEvent.click(screen.getByTestId('fp-lineup'));
+    expect(screen.getByTestId('fp-confirm-lineup')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('fp-confirm-lineup'));
+    expect(screen.getByTestId('fp-board').querySelectorAll('svg').length).toBe(32);
+
+    // Clear also confirms — and cancelling leaves the board alone.
+    fireEvent.click(screen.getByTestId('fp-menu'));
+    fireEvent.click(screen.getByTestId('fp-clear'));
+    fireEvent.click(screen.getByTestId('fp-confirm-cancel'));
     expect(screen.getByTestId('fp-board').querySelectorAll('svg').length).toBe(32);
     fireEvent.click(screen.getByTestId('fp-clear'));
+    fireEvent.click(screen.getByTestId('fp-confirm-clear'));
     expect(screen.getByTestId('fp-board').querySelectorAll('svg').length).toBe(0);
 
-    // End play returns to the mode picker.
+    // Exit (in the menu) returns to the mode picker.
+    fireEvent.click(screen.getByTestId('fp-menu'));
     fireEvent.click(screen.getByTestId('fp-end'));
     expect(screen.getByTestId('mode-free')).toBeInTheDocument();
   });
@@ -243,7 +255,7 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.queryByTestId('chess-board')).toBeNull();
   });
 
-  it('free play offers the theme picker too', () => {
+  it('free play offers the theme picker too (in the menu)', () => {
     localStorage.setItem('chess-theme-v1', 'unicorn');
     const { container } = renderPage();
     fireEvent.click(screen.getByTestId('mode-free'));
@@ -254,6 +266,7 @@ describe('<ChessPage> — local flow', () => {
     fireEvent.click(screen.getByTestId('fp-sq-e5'));
     expect(screen.getByTestId('fp-sq-e5').querySelector('svg')?.getAttribute('data-piece-theme')).toBe('unicorn');
 
+    fireEvent.click(screen.getByTestId('fp-menu'));
     fireEvent.click(screen.getByTestId('fp-theme-galaxy'));
     expect(container.querySelector('.chess-theme-galaxy')).toBeTruthy();
 

@@ -94,7 +94,8 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
 
   useEffect(() => {
     const targets = selected && interactive ? legalMovesFrom(board, selected).map((m) => m.to) : [];
-    const checkSq = inCheck(board, board.turn) ? findKing(board.board, board.turn) : null;
+    // No check highlight in the king hunt — kings live dangerously there.
+    const checkSq = !board.kingHunt && inCheck(board, board.turn) ? findKing(board.board, board.turn) : null;
     sceneRef.current?.setMarks({ selected, targets, lastMove: lastMove ?? null, checkSq });
   }, [board, selected, interactive, lastMove]);
 

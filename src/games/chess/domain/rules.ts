@@ -411,6 +411,8 @@ export function applyMove(state: GameState, move: Move): GameState {
     enPassant,
     halfmoveClock: resetClock ? 0 : state.halfmoveClock + 1,
     fullmoveNumber: color === 'b' ? state.fullmoveNumber + 1 : state.fullmoveNumber,
+    // The king-hunt variant is for the whole game, not just the first move.
+    ...(state.kingHunt ? { kingHunt: true } : {}),
   };
 }
 
@@ -431,6 +433,11 @@ export function legalMoves(state: GameState): Move[] {
       const p = board[row][col];
       if (!p || p.color !== turn) continue;
       for (const move of pseudoMovesFrom(state, { row, col })) {
+        // King hunt: no check concept — kings move (and fall) like any piece.
+        if (state.kingHunt) {
+          moves.push(move);
+          continue;
+        }
         const next = applyMove(state, move);
         // The move is legal only if it doesn't leave our own king in check.
         if (!inCheck({ ...next, turn }, turn)) moves.push(move);
@@ -475,8 +482,27 @@ function insufficientMaterial(board: Board): boolean {
   return minor.length <= 1;
 }
 
+/** How many kings `color` still has (the king-hunt life counter). */
+export function countKings(board: Board, color: Color): number {
+  let n = 0;
+  for (const row of board) {
+    for (const p of row) {
+      if (p && p.color === color && p.type === 'k') n++;
+    }
+  }
+  return n;
+}
+
 /** Classify the position for the side to move. */
 export function status(state: GameState): Status {
+  if (state.kingHunt) {
+    // King hunt: lose your last king, lose the game. No check, no mate,
+    // no material draws (even bare kings can capture each other here).
+    if (countKings(state.board, state.turn) === 0) return 'kings-taken';
+    if (legalMoves(state).length === 0) return 'stalemate';
+    if (state.halfmoveClock >= 100) return 'draw-fifty';
+    return 'playing';
+  }
   const moves = legalMoves(state);
   const checked = inCheck(state, state.turn);
   if (moves.length === 0) return checked ? 'checkmate' : 'stalemate';
@@ -502,11 +528,18 @@ export function replay(log: Ply[], start?: GameState): GameState {
 
 /**
  * Wrap an arbitrary board (a free-play setup) into a playable GameState.
- * White moves first. Castling rights survive only where the king and rook
- * both stand on their home squares — so a hand-built standard lineup still
- * castles, but a wandered king can't.
+ * White moves first.
+ *
+ * One king per side → real chess: check, checkmate, and castling rights
+ * wherever the king and rook both stand on their home squares (so a
+ * hand-built standard lineup still castles, but a wandered king can't).
+ *
+ * More than one king on either side → the KING HUNT: no check or mate,
+ * kings are capturable like any piece (and never castle), and a side loses
+ * when its last king falls.
  */
 export function customStart(board: Board, turn: Color = 'w'): GameState {
+  const hunt = countKings(board, 'w') > 1 || countKings(board, 'b') > 1;
   const home = (row: number, col: number, color: Color, type: PieceType) => {
     const p = board[row][col];
     return !!p && p.color === color && p.type === type;
@@ -514,40 +547,38 @@ export function customStart(board: Board, turn: Color = 'w'): GameState {
   return {
     board: cloneBoard(board),
     turn,
-    castling: {
-      wK: home(7, 4, 'w', 'k') && home(7, 7, 'w', 'r'),
-      wQ: home(7, 4, 'w', 'k') && home(7, 0, 'w', 'r'),
-      bK: home(0, 4, 'b', 'k') && home(0, 7, 'b', 'r'),
-      bQ: home(0, 4, 'b', 'k') && home(0, 0, 'b', 'r'),
-    },
+    castling: hunt
+      ? { wK: false, wQ: false, bK: false, bQ: false }
+      : {
+          wK: home(7, 4, 'w', 'k') && home(7, 7, 'w', 'r'),
+          wQ: home(7, 4, 'w', 'k') && home(7, 0, 'w', 'r'),
+          bK: home(0, 4, 'b', 'k') && home(0, 7, 'b', 'r'),
+          bQ: home(0, 4, 'b', 'k') && home(0, 0, 'b', 'r'),
+        },
     enPassant: null,
     halfmoveClock: 0,
     fullmoveNumber: 1,
+    ...(hunt ? { kingHunt: true } : {}),
   };
 }
 
 /**
  * Why a free-play setup can't start as a real game (null = good to go).
- * The rules: one king per side, Black's king can't already be hanging
- * (White moves first), and the game can't be over before move one.
+ * Each side needs at least one king, and the game can't be over before
+ * move one. Extra kings are welcome — that's the king hunt.
  */
 export function setupIssue(board: Board): string | null {
-  let wk = 0;
-  let bk = 0;
-  for (const row of board) {
-    for (const p of row) {
-      if (!p || p.type !== 'k') continue;
-      if (p.color === 'w') wk++;
-      else bk++;
-    }
-  }
+  const wk = countKings(board, 'w');
+  const bk = countKings(board, 'b');
   if (wk === 0 && bk === 0) return 'Both sides need a king — place one white and one black king.';
   if (wk === 0) return 'White needs a king.';
   if (bk === 0) return 'Black needs a king.';
-  if (wk > 1) return 'Only one white king allowed.';
-  if (bk > 1) return 'Only one black king allowed.';
 
   const state = customStart(board);
+  if (state.kingHunt) {
+    // The hunt has almost no illegal positions — just make sure White can move.
+    return status(state) === 'stalemate' ? 'White has no legal moves — free something up before starting.' : null;
+  }
   if (inCheck(state, 'b')) {
     return "White moves first, and Black's king is already in its sights — shield the black king before starting.";
   }
@@ -563,15 +594,17 @@ export function setupIssue(board: Board): string | null {
   }
 }
 
-/** True once the game is over (mate, stalemate, or a draw). */
+/** True once the game is over (mate, all kings taken, stalemate, or a draw). */
 export function isGameOver(s: Status): boolean {
-  return s === 'checkmate' || s === 'stalemate' || s === 'draw-fifty' || s === 'draw-material';
+  return s === 'checkmate' || s === 'kings-taken' || s === 'stalemate' || s === 'draw-fifty' || s === 'draw-material';
 }
 
 /**
- * The winner of a finished game, or null for a draw / unfinished game. Only a
- * checkmate has a winner — it's the side that just moved (not the side to move).
+ * The winner of a finished game, or null for a draw / unfinished game. A
+ * checkmate (or, in the king hunt, taking the last king) has a winner —
+ * the side that just moved (not the side to move).
  */
 export function winnerOf(state: GameState): Color | null {
-  return status(state) === 'checkmate' ? opponent(state.turn) : null;
+  const st = status(state);
+  return st === 'checkmate' || st === 'kings-taken' ? opponent(state.turn) : null;
 }

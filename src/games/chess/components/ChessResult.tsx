@@ -28,6 +28,7 @@ const REASON: Record<Status, string> = {
   playing: '',
   check: '',
   checkmate: 'Checkmate',
+  'kings-taken': 'Every king has fallen',
   stalemate: 'Stalemate — no legal moves left',
   'draw-fifty': 'Draw — fifty moves without a capture or pawn move',
   'draw-material': 'Draw — not enough material to mate',
@@ -63,7 +64,10 @@ export function ChessResult(props: ChessResultProps) {
     const winnerName = winner === 'w' ? whiteName : blackName;
     emblem = mode === 'online' && !iWon ? 'loss' : 'win';
     headline = `${winnerName} wins!`;
-    if (mode === 'online') {
+    if (status === 'kings-taken') {
+      // King hunt (local custom games): victory by capturing every last king.
+      flavor = `${winnerName} has captured every enemy king. The hunt is over!`;
+    } else if (mode === 'online') {
       flavor = iWon
         ? `Checkmate — well played, ${myName || winnerName}!`
         : `Good game — ${oppName || winnerName} found the mate. Rematch?`;

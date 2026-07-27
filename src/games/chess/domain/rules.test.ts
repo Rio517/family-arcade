@@ -248,10 +248,9 @@ describe('custom starts (free play promoted into a real game)', () => {
     expect(after.board[1][3]).toEqual({ color: 'w', type: 'q' }); // queen on d7
   });
 
-  it('requires exactly one king per side', () => {
+  it('requires at least one king per side', () => {
     expect(setupIssue(boardOf('8/8/8/8/8/8/8/8 w - - 0 1'))).toMatch(/need a king/);
     expect(setupIssue(boardOf('8/8/8/8/8/8/8/4K3 w - - 0 1'))).toMatch(/Black needs a king/);
-    expect(setupIssue(boardOf('4k3/8/8/8/8/8/8/2K1K3 w - - 0 1'))).toMatch(/one white king/);
   });
 
   it("blocks a start when Black's king is already capturable (White moves first)", () => {
@@ -265,5 +264,43 @@ describe('custom starts (free play promoted into a real game)', () => {
     expect(setupIssue(boardOf('4k3/8/8/8/8/8/8/4K3 w - - 0 1'))).toMatch(/enough pieces/);
     // Kings + a white queen out of contact: perfectly playable.
     expect(setupIssue(boardOf('4k3/8/8/8/8/8/8/3QK3 w - - 0 1'))).toBeNull();
+  });
+});
+
+describe('the king hunt (custom games with extra kings)', () => {
+  const boardOf = (fen: string) => parseFen(fen).board;
+
+  it('extra kings switch the game into the hunt (and disable castling)', () => {
+    const start = customStart(boardOf('4k3/8/8/8/8/8/8/R2KK2R w - - 0 1'));
+    expect(start.kingHunt).toBe(true);
+    expect(start.castling).toEqual({ wK: false, wQ: false, bK: false, bQ: false });
+    expect(setupIssue(boardOf('4k3/8/8/8/8/8/8/R2KK2R w - - 0 1'))).toBeNull();
+  });
+
+  it('has no check: a king may step right next to the enemy king', () => {
+    const start = customStart(boardOf('8/8/8/3k4/8/3KK3/8/8 w - - 0 1'));
+    expect(start.kingHunt).toBe(true);
+    const dests = legalMovesFrom(start, sq('d3')).map((m) => squareName(m.to));
+    expect(dests).toContain('d4'); // adjacent to the enemy king — allowed in the hunt
+  });
+
+  it('capturing SOME kings does not end it; taking the LAST king does', () => {
+    // Black has two kings; the white queen takes one — game still on.
+    const start = customStart(boardOf('Q2kk3/8/8/8/8/8/8/3KK3 w - - 0 1'));
+    const midway = replay([{ from: sq('a8'), to: sq('d8') }], start); // Qxd8 — a king falls
+    expect(status(midway)).not.toBe('kings-taken');
+    expect(winnerOf(midway)).toBeNull();
+
+    // Black down to one king (still a hunt — White has two): taking it wins.
+    const oneLeft = customStart(boardOf('Q2k4/8/8/8/8/8/8/3KK3 w - - 0 1'));
+    expect(oneLeft.kingHunt).toBe(true);
+    const done = replay([{ from: sq('a8'), to: sq('d8') }], oneLeft);
+    expect(status(done)).toBe('kings-taken');
+    expect(winnerOf(done)).toBe('w');
+  });
+
+  it('bare kings are playable in the hunt (no material draw)', () => {
+    const start = customStart(boardOf('3kk3/8/8/8/8/8/8/4K3 w - - 0 1'));
+    expect(status(start)).toBe('playing');
   });
 });

@@ -40,6 +40,10 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
   // "Start game" tap, cleared as soon as the board changes.
   const [startIssue, setStartIssue] = useState<string | null>(null);
   useEffect(() => setStartIssue(null), [board]);
+  // The ☰ menu (views, themes, board resets, exit) and its confirm dialogs —
+  // lineup/clear both wipe what's on the board, so they explain themselves.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirm, setConfirm] = useState<'lineup' | 'clear' | null>(null);
 
   const tryStartGame = () => {
     const issue = setupIssue(board);
@@ -204,22 +208,6 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
       </p>
 
       <div className="fp-actions">
-        <div className="chess-view-seg fp-view" role="group" aria-label="Sandbox view">
-          <button className={`seg-btn ${view === '2d' ? 'on' : ''}`} onClick={() => pickView('2d')} data-testid="fp-view-2d">2D</button>
-          <button className={`seg-btn ${view === '3d' ? 'on' : ''}`} onClick={() => pickView('3d')} data-testid="fp-view-3d">3D</button>
-        </div>
-        <div className="chess-view-seg fp-theme" role="group" aria-label="Set theme">
-          {CHESS_THEMES.map((t) => (
-            <button
-              key={t.id}
-              className={`seg-btn ${theme === t.id ? 'on' : ''}`}
-              onClick={() => setTheme(t.id)}
-              data-testid={`fp-theme-${t.id}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
         {hand && (
           <button
             className="btn"
@@ -229,14 +217,78 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
             {hand.from ? '🗑 Remove piece' : 'Put back'}
           </button>
         )}
-        <button className="btn" onClick={() => setBoard(initialState().board)} data-testid="fp-lineup">Starting lineup</button>
-        <button className="btn" onClick={() => { setBoard(emptyBoard()); setHand(null); }} data-testid="fp-clear">Clear board</button>
         <button className="btn btn-primary" onClick={tryStartGame} data-testid="fp-start-game">▶ Start game</button>
-        <button className="btn" onClick={onExit} data-testid="fp-end">End play →</button>
+        <button className="btn" onClick={() => setMenuOpen(true)} data-testid="fp-menu" aria-haspopup="dialog">☰ Menu</button>
       </div>
 
       {startIssue && (
         <p className="fp-issue" role="alert" data-testid="fp-start-issue">{startIssue}</p>
+      )}
+
+      {/* ── The ☰ menu — everything that isn't moment-to-moment play ── */}
+      {menuOpen && !confirm && (
+        <div className="modal-backdrop" onClick={() => setMenuOpen(false)}>
+          <div className="modal fp-menu" role="dialog" aria-label="Free play menu" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <span className="modal-title">Free play</span>
+              <button className="icon-btn" onClick={() => setMenuOpen(false)} aria-label="Close menu" data-testid="fp-menu-close">✕</button>
+            </div>
+            <div className="fp-menu-body">
+              <div className="chess-view-seg fp-view" role="group" aria-label="Sandbox view">
+                <button className={`seg-btn ${view === '2d' ? 'on' : ''}`} onClick={() => pickView('2d')} data-testid="fp-view-2d">2D</button>
+                <button className={`seg-btn ${view === '3d' ? 'on' : ''}`} onClick={() => pickView('3d')} data-testid="fp-view-3d">3D</button>
+              </div>
+              <div className="chess-view-seg fp-theme" role="group" aria-label="Set theme">
+                {CHESS_THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    className={`seg-btn ${theme === t.id ? 'on' : ''}`}
+                    onClick={() => setTheme(t.id)}
+                    data-testid={`fp-theme-${t.id}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <button className="btn btn-block" onClick={() => setConfirm('lineup')} data-testid="fp-lineup">Starting lineup</button>
+              <button className="btn btn-block" onClick={() => setConfirm('clear')} data-testid="fp-clear">Clear board</button>
+              <button className="btn btn-block" onClick={onExit} data-testid="fp-end">← Exit</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirmations — both replace whatever's on the board ── */}
+      {confirm && (
+        <div className="modal-backdrop" onClick={() => setConfirm(null)}>
+          <div className="modal fp-menu" role="dialog" aria-label="Are you sure?" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <span className="modal-title">{confirm === 'lineup' ? 'Set the starting lineup?' : 'Clear the board?'}</span>
+              <button className="icon-btn" onClick={() => setConfirm(null)} aria-label="Cancel">✕</button>
+            </div>
+            <div className="fp-menu-body">
+              <p className="subtle fp-confirm-text">
+                {confirm === 'lineup'
+                  ? 'This sweeps away everything on the board and sets all 32 pieces on their standard home squares.'
+                  : 'This removes every piece from the board — you’ll be left with an empty board to build on.'}
+              </p>
+              <button
+                className="btn btn-primary btn-block"
+                onClick={() => {
+                  if (confirm === 'lineup') setBoard(initialState().board);
+                  else setBoard(emptyBoard());
+                  setHand(null);
+                  setConfirm(null);
+                  setMenuOpen(false);
+                }}
+                data-testid={confirm === 'lineup' ? 'fp-confirm-lineup' : 'fp-confirm-clear'}
+              >
+                {confirm === 'lineup' ? 'Set the lineup' : 'Clear the board'}
+              </button>
+              <button className="btn btn-ghost btn-block" onClick={() => setConfirm(null)} data-testid="fp-confirm-cancel">Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* The piece riding along under the finger while dragging. */}
