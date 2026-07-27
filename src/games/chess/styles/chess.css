@@ -318,6 +318,32 @@
   .fp-wrap { width: min(92vw, calc(100dvh - 330px), 560px); }
 }
 
+/* ── Unicorn theme — Team Rose vs Team Lavender on a pink pearl board ─────── */
+.chess-theme-unicorn .chess-board .sq.light { background: linear-gradient(150deg, #fdeaf7, #f7d3ec); }
+.chess-theme-unicorn .chess-board .sq.dark { background: linear-gradient(150deg, #e2abdc, #cf92cf); }
+.chess-theme-unicorn .chess-board {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.15),
+    0 0 0 2px #4a2a55,
+    0 0 0 4px #ff8fd0,
+    0 22px 46px -18px rgba(70, 20, 70, 0.75);
+}
+.chess-theme-unicorn .chess-board .sq.check {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--bad) 50%, #cf92cf), color-mix(in srgb, var(--bad) 55%, #b97cc0));
+}
+.chess-theme-unicorn .sq.target::after {
+  background: #f7c243; box-shadow: 0 0 10px -1px #f7c243;
+}
+.chess-theme-unicorn .sq.capture::before {
+  box-shadow: inset 0 0 0 4px #f7c243, 0 0 12px -3px #f7c243;
+}
+.chess-theme-unicorn .sq.sel {
+  box-shadow: inset 0 0 0 3px #f7c243, inset 0 0 16px -2px rgba(247, 194, 67, 0.7);
+}
+.chess-theme-unicorn .sq.sel svg { filter: drop-shadow(0 0 6px rgba(247, 194, 67, 0.8)); }
+.chess-theme-unicorn .mini-board .msq.light { background: #fdeaf7; }
+.chess-theme-unicorn .mini-board .msq.dark { background: #dfa8d9; }
+
 /* Draw emblem on the result screen. */
 .result-emblem.draw { color: var(--muted); filter: drop-shadow(0 4px 10px rgba(2, 6, 20, 0.5)); }
 

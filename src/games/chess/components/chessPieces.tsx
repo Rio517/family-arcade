@@ -6,6 +6,7 @@
  */
 
 import type { Color, PieceType } from '@games/chess/domain/types';
+import { UNICORN_2D, useChessTheme, type PieceColors } from './chessTheme';
 
 interface PieceProps {
   color: Color;
@@ -65,7 +66,86 @@ const PATHS: Record<PieceType, JSX.Element> = {
   ),
 };
 
+/**
+ * The enchanted set — Team Rose vs Team Lavender. Sparkle pawn, unicorn-head
+ * knight (golden horn), crystal bishop, fairytale tower, heart-crown queen,
+ * star-crown king. Same 45×45 canvas as the classic set.
+ */
+const UNICORN_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
+  p: (c) => (
+    <>
+      <path d="M22.5 7 C23.7 15 26.5 17.8 34 19 C26.5 20.2 23.7 23 22.5 31 C21.3 23 18.5 20.2 11 19 C18.5 17.8 21.3 15 22.5 7 Z" />
+      <circle cx="22.5" cy="19" r="2.4" fill={c.accent} stroke="none" />
+      <path d="M16 34 H29 L31 40 H14 Z" />
+    </>
+  ),
+  n: (c) => (
+    <>
+      <path d="M24 6 L27.5 13.5 L20.5 13 Z" fill={c.accent} />
+      <path d="M18 12 L18.5 6.5 L22 11 Z" />
+      <path d="M18.5 14 C13 16 12 22 15 24.5 C11.5 26 11 31 14.5 33 C11.5 34 12 39 16 40 L21 40 C18.5 33 19.5 20 21.5 15 Z" fill={c.accent2} />
+      <path d="M17 40 C15.5 31 15.5 24 18.5 18.5 C20.5 15 24 13 28 13.5 C31 14 32.5 18 31.5 23.5 C30.7 28 29.5 30 27 31 L27.5 40 Z" />
+      <circle cx="26.5" cy="19" r="1.3" fill={c.stroke} stroke="none" />
+      <path d="M14 40 H31 L33 44 H12 Z" />
+    </>
+  ),
+  b: (c) => (
+    <>
+      <path d="M22.5 7 L28 15 L25 32 H20 L17 15 Z" />
+      <path d="M17 15 H28 M22.5 7 V32 M19.5 22 L25.5 22" stroke={c.stroke} strokeWidth="1.2" fill="none" />
+      <path d="M30 10 l1 3 l3 1 l-3 1 l-1 3 l-1 -3 l-3 -1 l3 -1 Z" fill={c.accent} stroke="none" />
+      <path d="M15 34 H30 L32 40 H13 Z" />
+    </>
+  ),
+  r: (c) => (
+    <>
+      <path d="M14 40 V16 H31 V40 Z" />
+      <path d="M14 16 V12.5 h3 v2 h2.8 v-2 h3.4 v2 h2.8 v-2 h3 V16 Z" />
+      <path d="M22.5 25 C21 22.2 17.6 23.2 19 26 L22.5 29.5 L26 26 C27.4 23.2 24 22.2 22.5 25 Z" fill={c.accent} stroke="none" />
+      <path d="M12 40 H33 L35 44 H10 Z" />
+    </>
+  ),
+  q: (c) => (
+    <>
+      <path d="M10.5 30 L13 16 L18 22 L22.5 13 L27 22 L32 16 L34.5 30 Z" />
+      <path d="M22.5 11 C21 8.5 17.8 9.5 19.2 12.2 L22.5 15.4 L25.8 12.2 C27.2 9.5 24 8.5 22.5 11 Z" fill={c.accent} />
+      <circle cx="13" cy="15" r="1.6" fill={c.accent} stroke="none" />
+      <circle cx="32" cy="15" r="1.6" fill={c.accent} stroke="none" />
+      <path d="M12.5 30 H32.5 L30.5 39 H14.5 Z" />
+      <path d="M11.5 39 H33.5 L35.5 43 H9.5 Z" />
+    </>
+  ),
+  k: (c) => (
+    <>
+      <path d="M22.5 3.5 l1.4 3.2 l3.4 .3 l-2.6 2.3 l.8 3.4 l-3 -1.8 l-3 1.8 l.8 -3.4 l-2.6 -2.3 l3.4 -.3 Z" fill={c.accent} />
+      <path d="M11 30 L14 15 L19 21 L22.5 14 L26 21 L31 15 L34 30 Z" />
+      <path d="M13 30 H32 L30 39 H15 Z" />
+      <path d="M11.5 39 H33.5 L35.5 43 H9.5 Z" />
+    </>
+  ),
+};
+
 export function ChessPiece({ color, type, size = 44 }: PieceProps) {
+  const { theme } = useChessTheme();
+  if (theme === 'unicorn') {
+    const c = UNICORN_2D[color];
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 45 45"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        focusable="false"
+        data-piece-theme="unicorn"
+        style={{ filter: 'drop-shadow(0 2px 2px rgba(60,20,60,0.35))' }}
+      >
+        <g fill={c.fill} stroke={c.stroke} strokeWidth={1.4}>
+          {UNICORN_PIECES[type](c)}
+        </g>
+      </svg>
+    );
+  }
   const light = color === 'w';
   const gid = light ? 'cp-grad-w' : 'cp-grad-b';
   const stroke = light ? '#0b1220' : '#cbd5e1';

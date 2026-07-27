@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { FILES, RANKS, type Board, type Color, type PieceType, type Square } from '@games/chess/domain/types';
+import { SCENE_PALETTES, type ScenePalette } from '../chessTheme';
 
 const sqName = (s: Square) => `${FILES[s.col]}${8 - s.row}`;
 /** Board square → world position (a1 near white; row 0 = rank 8 = -z). */
@@ -48,10 +49,14 @@ export class ChessScene {
   private resizeObs: ResizeObserver | null = null;
   private disposed = false;
 
+  private palette: ScenePalette;
+  private accentMat: THREE.MeshStandardMaterial | null = null;
+
   constructor(
     private container: HTMLElement,
-    private opts: { orientation: Color; reducedMotion: boolean; onTap: (sq: Square) => void },
+    private opts: { orientation: Color; reducedMotion: boolean; onTap: (sq: Square) => void; palette?: ScenePalette },
   ) {
+    this.palette = opts.palette ?? SCENE_PALETTES.classic;
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
@@ -59,8 +64,15 @@ export class ChessScene {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     container.appendChild(this.renderer.domElement);
 
-    this.scene.background = new THREE.Color('#0d1524');
-    this.scene.fog = new THREE.Fog('#0d1524', 15, 28);
+    this.scene.background = new THREE.Color(this.palette.background);
+    this.scene.fog = new THREE.Fog(this.palette.background, 15, 28);
+    if (this.palette.accent) {
+      this.accentMat = new THREE.MeshStandardMaterial({
+        color: this.palette.accent,
+        roughness: 0.25,
+        metalness: 0.65,
+      });
+    }
 
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 60);
     const zSide = opts.orientation === 'w' ? 1 : -1;
@@ -106,8 +118,8 @@ export class ChessScene {
   }
 
   private buildBoard() {
-    const lightSq = new THREE.MeshStandardMaterial({ color: '#dde5ef', roughness: 0.42 });
-    const darkSq = new THREE.MeshStandardMaterial({ color: '#41546f', roughness: 0.48 });
+    const lightSq = new THREE.MeshStandardMaterial({ color: this.palette.tileLight, roughness: 0.42 });
+    const darkSq = new THREE.MeshStandardMaterial({ color: this.palette.tileDark, roughness: 0.48 });
     const tileG = new THREE.BoxGeometry(1, 0.12, 1);
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
@@ -121,14 +133,14 @@ export class ChessScene {
     }
     const frame = new THREE.Mesh(
       new THREE.BoxGeometry(9.0, 0.34, 9.0),
-      new THREE.MeshStandardMaterial({ color: '#1a2334', roughness: 0.3, metalness: 0.25 }),
+      new THREE.MeshStandardMaterial({ color: this.palette.frame, roughness: 0.3, metalness: 0.25 }),
     );
     frame.position.y = -0.24;
     frame.receiveShadow = true;
     this.scene.add(frame);
     const edge = new THREE.Mesh(
       new THREE.BoxGeometry(9.06, 0.05, 9.06),
-      new THREE.MeshStandardMaterial({ color: '#17bec9', emissive: '#0fb3c0', emissiveIntensity: 1.4 }),
+      new THREE.MeshStandardMaterial({ color: this.palette.edge, emissive: this.palette.edge, emissiveIntensity: 1.4 }),
     );
     edge.position.y = -0.075;
     this.scene.add(edge);
@@ -136,16 +148,18 @@ export class ChessScene {
 
   // ── Procedural pieces (lathe-turned; knight is an extruded silhouette) ──
   private material(color: Color) {
-    return color === 'w'
-      ? new THREE.MeshStandardMaterial({ color: '#efe8d6', roughness: 0.32 })
-      : new THREE.MeshStandardMaterial({ color: '#232b3a', roughness: 0.38, metalness: 0.12 });
+    return new THREE.MeshStandardMaterial({
+      color: color === 'w' ? this.palette.whitePiece : this.palette.blackPiece,
+      roughness: this.palette.pieceRoughness,
+      metalness: color === 'b' && !this.palette.accent ? 0.12 : 0.05,
+    });
   }
 
   private template(type: PieceType, color: Color): THREE.Group {
     const key = `${color}${type}`;
     let tpl = this.templates.get(key);
     if (!tpl) {
-      tpl = buildPiece(type, this.material(color), color === 'b');
+      tpl = buildPiece(type, this.material(color), color === 'b', this.accentMat ?? undefined);
       this.templates.set(key, tpl);
     }
     const clone = tpl.clone(true);
@@ -338,7 +352,12 @@ function ball(r: number, y: number, mat: THREE.Material, sy = 1) {
   return m;
 }
 
-function buildPiece(type: PieceType, mat: THREE.Material, black: boolean): THREE.Group {
+/**
+ * Build one piece. When `accent` is given (the unicorn set's gold), the
+ * knight grows a horn and the royal details — coronet, cross, queen's orb —
+ * are cast in it.
+ */
+function buildPiece(type: PieceType, mat: THREE.Material, black: boolean, accent?: THREE.Material): THREE.Group {
   const g = new THREE.Group();
   switch (type) {
     case 'p':
@@ -362,20 +381,22 @@ function buildPiece(type: PieceType, mat: THREE.Material, black: boolean): THREE
       break;
     case 'q': {
       g.add(lathe([...BASE, [0.12, 0.26], [0.085, 0.52], [0.16, 0.66], [0.13, 0.70], [0, 0.72]], mat));
+      const crownMat = accent ?? mat;
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2;
-        const b = ball(0.045, 0.735, mat);
+        const b = ball(0.045, 0.735, crownMat);
         b.position.set(Math.cos(a) * 0.12, 0.735, Math.sin(a) * 0.12);
         g.add(b);
       }
-      g.add(ball(0.07, 0.79, mat));
+      g.add(ball(0.07, 0.79, crownMat));
       break;
     }
     case 'k': {
       g.add(lathe([...BASE, [0.13, 0.26], [0.09, 0.56], [0.17, 0.70], [0.13, 0.74], [0.09, 0.76], [0, 0.78]], mat));
-      const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.20, 0.05), mat);
+      const crownMat = accent ?? mat;
+      const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.20, 0.05), crownMat);
       c1.position.y = 0.88;
-      const c2 = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.05, 0.05), mat);
+      const c2 = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.05, 0.05), crownMat);
       c2.position.y = 0.90;
       g.add(c1, c2);
       break;
@@ -394,6 +415,16 @@ function buildPiece(type: PieceType, mat: THREE.Material, black: boolean): THREE
       head.scale.setScalar(0.92);
       head.rotation.y = black ? Math.PI / 2 : -Math.PI / 2;
       g.add(head);
+      if (accent) {
+        // The unicorn's golden horn, rising from the forehead and leaning the
+        // way the head faces.
+        const horn = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.3, 12), accent);
+        const lean = black ? 0.5 : -0.5;
+        horn.position.set(lean * 0.14, 0.78, 0);
+        horn.rotation.z = 0; horn.rotation.x = 0;
+        horn.rotation.set(0, 0, -lean * 0.55);
+        g.add(horn);
+      }
       break;
     }
   }

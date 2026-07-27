@@ -6,6 +6,7 @@
  */
 import { lazy, Suspense, useEffect, useState, type PointerEvent } from 'react';
 import { ChessPiece, pieceName } from './chessPieces';
+import { useChessTheme } from './chessTheme';
 import { initialState } from '@games/chess/domain/rules';
 import { FILES, RANKS, type Board, type Color, type Piece, type PieceType, type Square } from '@games/chess/domain/types';
 
@@ -23,6 +24,7 @@ interface Hand {
 }
 
 export function FreePlay({ onExit }: { onExit: () => void }) {
+  const { theme, setTheme } = useChessTheme();
   const [board, setBoard] = useState<Board>(emptyBoard);
   const [hand, setHand] = useState<Hand | null>(null);
   const [drag, setDrag] = useState<{ hand: Hand; x: number; y: number } | null>(null);
@@ -187,6 +189,10 @@ export function FreePlay({ onExit }: { onExit: () => void }) {
         <div className="chess-view-seg fp-view" role="group" aria-label="Sandbox view">
           <button className={`seg-btn ${view === '2d' ? 'on' : ''}`} onClick={() => pickView('2d')} data-testid="fp-view-2d">2D</button>
           <button className={`seg-btn ${view === '3d' ? 'on' : ''}`} onClick={() => pickView('3d')} data-testid="fp-view-3d">3D</button>
+        </div>
+        <div className="chess-view-seg fp-theme" role="group" aria-label="Set theme">
+          <button className={`seg-btn ${theme === 'classic' ? 'on' : ''}`} onClick={() => setTheme('classic')} data-testid="fp-theme-classic">Classic</button>
+          <button className={`seg-btn ${theme === 'unicorn' ? 'on' : ''}`} onClick={() => setTheme('unicorn')} data-testid="fp-theme-unicorn">Unicorn</button>
         </div>
         {hand && (
           <button

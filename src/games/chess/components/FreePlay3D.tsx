@@ -5,6 +5,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { ChessScene } from './three/ChessScene';
+import { SCENE_PALETTES, useChessTheme } from './chessTheme';
 import type { Board, Square } from '@games/chess/domain/types';
 
 interface Props {
@@ -16,10 +17,13 @@ interface Props {
 
 export default function FreePlay3D({ board, lifted, onTap }: Props) {
   const holder = useRef<HTMLDivElement>(null);
+  const { theme } = useChessTheme();
   const sceneRef = useRef<ChessScene | null>(null);
   const [failed, setFailed] = useState(false);
   const onTapRef = useRef(onTap);
   onTapRef.current = onTap;
+  const boardRef = useRef(board);
+  boardRef.current = board;
 
   useEffect(() => {
     if (!holder.current) return;
@@ -27,10 +31,13 @@ export default function FreePlay3D({ board, lifted, onTap }: Props) {
     try {
       scene = new ChessScene(holder.current, {
         orientation: 'w',
+        palette: SCENE_PALETTES[theme],
         reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
         onTap: (sq) => onTapRef.current(sq),
       });
       sceneRef.current = scene;
+      // A theme switch rebuilds the scene — repopulate it right away.
+      scene.setPosition(boardRef.current, null);
     } catch {
       setFailed(true);
     }
@@ -38,7 +45,8 @@ export default function FreePlay3D({ board, lifted, onTap }: Props) {
       scene?.dispose();
       sceneRef.current = null;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme]);
 
   useEffect(() => {
     sceneRef.current?.setPosition(board, null);
