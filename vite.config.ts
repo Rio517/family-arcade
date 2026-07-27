@@ -32,9 +32,9 @@ export default defineConfig({
         navigateFallbackDenylist: [/calculator\.html$/],
       },
       manifest: {
-        name: 'Family Game Console',
-        short_name: 'Game Console',
-        description: 'A Yahtzee logger and a two-player Ship Battle game.',
+        name: 'Kny-Flores Family Arcade',
+        short_name: 'Family Arcade',
+        description: 'The Kny-Flores family arcade — Yahtzee, Ship Battle, Chess, and Risk.',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
