@@ -68,6 +68,15 @@ describe('driving', () => {
     expect(Math.hypot(s.x, s.z)).toBeLessThanOrEqual(ARENA_RADIUS + 0.001);
   });
 
+  it('bounces off the fence instead of getting pinned', () => {
+    const s = createRace({ rng: seeded(12) });
+    s.heading = Math.PI / 2; // drive straight toward the +x wall
+    // Hold forward long enough to hit the wall and keep pushing into it.
+    for (let i = 0; i < 60 * 8; i++) stepRace(s, 1 / 60, { steer: 0, boost: true, brake: false }, seeded(12));
+    // A pinned kart would sit at the fence; a bounced one drives back inward.
+    expect(Math.hypot(s.x, s.z)).toBeLessThan(ARENA_RADIUS - 5);
+  });
+
   it('forward() is a unit vector', () => {
     const s = createRace({ rng: seeded(6) });
     s.heading = 0.9;

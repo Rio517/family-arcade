@@ -142,12 +142,22 @@ export function stepRace(
   state.x += fx * state.speed * t;
   state.z += fz * state.speed * t;
 
-  // Bump softly off the round fence.
+  // Bounce off the round fence and turn back inward, so you can never get
+  // pinned against the wall holding forward.
   const r = Math.hypot(state.x, state.z);
   if (r > ARENA_RADIUS) {
-    state.x = (state.x / r) * ARENA_RADIUS;
-    state.z = (state.z / r) * ARENA_RADIUS;
-    state.speed *= 0.5;
+    const nx = state.x / r; // outward normal
+    const nz = state.z / r;
+    state.x = nx * ARENA_RADIUS;
+    state.z = nz * ARENA_RADIUS;
+    const dot = fx * nx + fz * nz;
+    if (dot > 0) {
+      // Reflect the facing about the wall so the kart heads back in.
+      const rx = fx - 2 * dot * nx;
+      const rz = fz - 2 * dot * nz;
+      state.heading = Math.atan2(rx, rz);
+    }
+    state.speed *= 0.6;
   }
 
   collect(state);
