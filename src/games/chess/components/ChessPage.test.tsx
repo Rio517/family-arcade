@@ -186,6 +186,63 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('sq-e2').querySelector('svg')?.getAttribute('data-piece-theme')).toBe('galaxy');
   });
 
+  it('free play can promote its setup into a real rules-bound game', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-free'));
+
+    // No kings on the board yet — starting is refused with a friendly reason.
+    fireEvent.click(screen.getByTestId('fp-start-game'));
+    expect(screen.getByTestId('fp-start-issue')).toHaveTextContent(/king/i);
+
+    // Place the two kings and a white queen (tray pieces stamp, so tap the
+    // tray again to stop before switching pieces).
+    fireEvent.click(screen.getByTestId('fp-tray-w-k'));
+    fireEvent.click(screen.getByTestId('fp-sq-e1'));
+    fireEvent.click(screen.getByTestId('fp-tray-w-k'));
+    fireEvent.click(screen.getByTestId('fp-tray-b-k'));
+    fireEvent.click(screen.getByTestId('fp-sq-e8'));
+    fireEvent.click(screen.getByTestId('fp-tray-b-k'));
+    fireEvent.click(screen.getByTestId('fp-tray-w-q'));
+    fireEvent.click(screen.getByTestId('fp-sq-d4'));
+    fireEvent.click(screen.getByTestId('fp-start-game'));
+
+    // A real game now: the rules board is up, White to move, position live.
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/White to move/);
+    expect(screen.getByTestId('sq-d4').querySelector('svg')).toBeTruthy();
+
+    // And it IS rules-bound: the queen may not hop like a knight.
+    fireEvent.click(screen.getByTestId('sq-d4'));
+    fireEvent.click(screen.getByTestId('sq-e6'));
+    expect(screen.getByTestId('sq-e6').querySelector('svg')).toBeNull();
+    // …but slides legally, handing the turn to Black.
+    fireEvent.click(screen.getByTestId('sq-d4'));
+    fireEvent.click(screen.getByTestId('sq-d6'));
+    expect(screen.getByTestId('sq-d6').querySelector('svg')).toBeTruthy();
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Black to move/);
+  });
+
+  it('refuses to start a free-play game that is already checkmate', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-free'));
+
+    // Ka1 trapped by Qb2 guarded by Kb3 — mate before move one.
+    fireEvent.click(screen.getByTestId('fp-tray-w-k'));
+    fireEvent.click(screen.getByTestId('fp-sq-a1'));
+    fireEvent.click(screen.getByTestId('fp-tray-w-k'));
+    fireEvent.click(screen.getByTestId('fp-tray-b-q'));
+    fireEvent.click(screen.getByTestId('fp-sq-b2'));
+    fireEvent.click(screen.getByTestId('fp-tray-b-q'));
+    fireEvent.click(screen.getByTestId('fp-tray-b-k'));
+    fireEvent.click(screen.getByTestId('fp-sq-b3'));
+    fireEvent.click(screen.getByTestId('fp-tray-b-k'));
+
+    fireEvent.click(screen.getByTestId('fp-start-game'));
+    expect(screen.getByTestId('fp-start-issue')).toHaveTextContent(/checkmated/);
+    // Still in the sandbox, not a game.
+    expect(screen.queryByTestId('chess-board')).toBeNull();
+  });
+
   it('free play offers the theme picker too', () => {
     localStorage.setItem('chess-theme-v1', 'unicorn');
     const { container } = renderPage();

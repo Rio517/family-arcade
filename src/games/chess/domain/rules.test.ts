@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyMove,
+  customStart,
   initialState,
   inCheck,
   isSquareAttacked,
@@ -8,6 +9,7 @@ import {
   legalMovesFrom,
   resolvePly,
   replay,
+  setupIssue,
   status,
   winnerOf,
 } from './rules';
@@ -224,5 +226,44 @@ describe('replay / resolvePly', () => {
 
   it('counts moves consistently after a capture', () => {
     expect(moveCount('rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2')).toBe(29);
+  });
+});
+
+describe('custom starts (free play promoted into a real game)', () => {
+  const boardOf = (fen: string) => parseFen(fen).board;
+
+  it('keeps castling rights only where king and rook sit at home', () => {
+    const standard = customStart(initialState().board);
+    expect(standard.castling).toEqual({ wK: true, wQ: true, bK: true, bQ: true });
+
+    // White king wandered to e2: White can never castle, Black still can.
+    const wandered = customStart(boardOf('r3k2r/8/8/8/8/8/4K3/R6R w - - 0 1'));
+    expect(wandered.castling).toEqual({ wK: false, wQ: false, bK: true, bQ: true });
+  });
+
+  it('replays a log from a custom start', () => {
+    const start = customStart(boardOf('4k3/8/8/8/8/8/8/3QK3 w - - 0 1'));
+    const after = replay([{ from: sq('d1'), to: sq('d7') }], start);
+    expect(after.turn).toBe('b');
+    expect(after.board[1][3]).toEqual({ color: 'w', type: 'q' }); // queen on d7
+  });
+
+  it('requires exactly one king per side', () => {
+    expect(setupIssue(boardOf('8/8/8/8/8/8/8/8 w - - 0 1'))).toMatch(/need a king/);
+    expect(setupIssue(boardOf('8/8/8/8/8/8/8/4K3 w - - 0 1'))).toMatch(/Black needs a king/);
+    expect(setupIssue(boardOf('4k3/8/8/8/8/8/8/2K1K3 w - - 0 1'))).toMatch(/one white king/);
+  });
+
+  it("blocks a start when Black's king is already capturable (White moves first)", () => {
+    expect(setupIssue(boardOf('4k3/4Q3/8/8/8/8/8/4K3 w - - 0 1'))).toMatch(/Black's king/);
+  });
+
+  it('blocks a start from checkmate or a dead draw, allows a live position', () => {
+    // White checkmated in the corner: Ka1 vs Qb2 guarded by Kb3.
+    expect(setupIssue(boardOf('8/8/8/8/8/1k6/1q6/K7 w - - 0 1'))).toMatch(/checkmated/);
+    // Bare kings can never mate.
+    expect(setupIssue(boardOf('4k3/8/8/8/8/8/8/4K3 w - - 0 1'))).toMatch(/enough pieces/);
+    // Kings + a white queen out of contact: perfectly playable.
+    expect(setupIssue(boardOf('4k3/8/8/8/8/8/8/3QK3 w - - 0 1'))).toBeNull();
   });
 });

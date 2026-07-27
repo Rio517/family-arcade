@@ -41,8 +41,8 @@ function toSan(
 }
 
 /** Walk the log once, producing per-move notation and board snapshots. */
-export function analyzeGame(log: Ply[]): MoveInfo[] {
-  let s = initialState();
+export function analyzeGame(log: Ply[], start?: GameState): MoveInfo[] {
+  let s = start ?? initialState();
   const out: MoveInfo[] = [];
   for (const ply of log) {
     const move = resolvePly(s, ply);

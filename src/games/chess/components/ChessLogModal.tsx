@@ -45,6 +45,8 @@ export function CapturedTray({ pieces, color, lead }: { pieces: PieceType[]; col
 
 interface LogModalProps {
   moves: MoveInfo[];
+  /** Custom starting position (a free-play game); standard opening if absent. */
+  start?: GameState;
   orientation: Color;
   /** Same-device games can jump back; online games are read-only. */
   canReturn: boolean;
@@ -52,11 +54,11 @@ interface LogModalProps {
   onClose: () => void;
 }
 
-export function ChessLogModal({ moves, orientation, canReturn, onReturn, onClose }: LogModalProps) {
+export function ChessLogModal({ moves, start, orientation, canReturn, onReturn, onClose }: LogModalProps) {
   const [sel, setSel] = useState(moves.length - 1);
   useEffect(() => setSel(moves.length - 1), [moves.length]);
 
-  const preview = sel >= 0 && moves[sel] ? moves[sel].after : initialState();
+  const preview = sel >= 0 && moves[sel] ? moves[sel].after : start ?? initialState();
 
   // Pair plies into numbered full-moves (White then Black).
   const rows: { no: number; w: number; b: number }[] = [];

@@ -2,12 +2,14 @@
  * Free play — a rules-free sandbox board. Piece trays sit beside the board;
  * drag (or tap) pieces onto any square, move them anywhere, drag them off to
  * remove. No turns, no legality — it's a toy chess set. Ends when the player
- * taps "End play".
+ * taps "End play"… or becomes a REAL game: "Start game" promotes whatever's
+ * on the board into a full rules-bound hotseat match (each side needs its
+ * king, and the game can't already be over — that's it).
  */
 import { lazy, Suspense, useEffect, useState, type PointerEvent } from 'react';
 import { ChessPiece, pieceName } from './chessPieces';
 import { CHESS_THEMES, useChessTheme } from './chessTheme';
-import { initialState } from '@games/chess/domain/rules';
+import { initialState, setupIssue } from '@games/chess/domain/rules';
 import { FILES, RANKS, type Board, type Color, type Piece, type PieceType, type Square } from '@games/chess/domain/types';
 
 // The 3D sandbox shares the game's three.js scene; loaded only when picked.
@@ -23,11 +25,27 @@ interface Hand {
   from: Square | null;
 }
 
-export function FreePlay({ onExit }: { onExit: () => void }) {
+interface FreePlayProps {
+  onExit: () => void;
+  /** Promote the current setup into a real rules-bound game. */
+  onStartGame: (board: Board) => void;
+}
+
+export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
   const { theme, setTheme } = useChessTheme();
   const [board, setBoard] = useState<Board>(emptyBoard);
   const [hand, setHand] = useState<Hand | null>(null);
   const [drag, setDrag] = useState<{ hand: Hand; x: number; y: number } | null>(null);
+  // Why the current setup can't start as a game — shown after a failed
+  // "Start game" tap, cleared as soon as the board changes.
+  const [startIssue, setStartIssue] = useState<string | null>(null);
+  useEffect(() => setStartIssue(null), [board]);
+
+  const tryStartGame = () => {
+    const issue = setupIssue(board);
+    if (issue) setStartIssue(issue);
+    else onStartGame(board);
+  };
   // 2D or 3D sandbox; follows the game's view if 3D was picked there.
   const [view, setView] = useState<'2d' | '3d'>(() => {
     try {
@@ -213,8 +231,13 @@ export function FreePlay({ onExit }: { onExit: () => void }) {
         )}
         <button className="btn" onClick={() => setBoard(initialState().board)} data-testid="fp-lineup">Starting lineup</button>
         <button className="btn" onClick={() => { setBoard(emptyBoard()); setHand(null); }} data-testid="fp-clear">Clear board</button>
-        <button className="btn btn-primary" onClick={onExit} data-testid="fp-end">End play →</button>
+        <button className="btn btn-primary" onClick={tryStartGame} data-testid="fp-start-game">▶ Start game</button>
+        <button className="btn" onClick={onExit} data-testid="fp-end">End play →</button>
       </div>
+
+      {startIssue && (
+        <p className="fp-issue" role="alert" data-testid="fp-start-issue">{startIssue}</p>
+      )}
 
       {/* The piece riding along under the finger while dragging. */}
       {drag && (

@@ -485,15 +485,82 @@ export function status(state: GameState): Status {
   return checked ? 'check' : 'playing';
 }
 
-/** Replay a whole log of plies from the opening, returning the final state. */
-export function replay(log: Ply[]): GameState {
-  let state = initialState();
+/**
+ * Replay a whole log of plies, returning the final state. Starts from the
+ * standard opening unless a custom `start` (e.g. a free-play setup promoted
+ * into a real game) is given.
+ */
+export function replay(log: Ply[], start?: GameState): GameState {
+  let state = start ?? initialState();
   for (const ply of log) {
     const move = resolvePly(state, ply);
     if (!move) throw new Error(`Illegal ply in log: ${JSON.stringify(ply)}`);
     state = applyMove(state, move);
   }
   return state;
+}
+
+/**
+ * Wrap an arbitrary board (a free-play setup) into a playable GameState.
+ * White moves first. Castling rights survive only where the king and rook
+ * both stand on their home squares — so a hand-built standard lineup still
+ * castles, but a wandered king can't.
+ */
+export function customStart(board: Board, turn: Color = 'w'): GameState {
+  const home = (row: number, col: number, color: Color, type: PieceType) => {
+    const p = board[row][col];
+    return !!p && p.color === color && p.type === type;
+  };
+  return {
+    board: cloneBoard(board),
+    turn,
+    castling: {
+      wK: home(7, 4, 'w', 'k') && home(7, 7, 'w', 'r'),
+      wQ: home(7, 4, 'w', 'k') && home(7, 0, 'w', 'r'),
+      bK: home(0, 4, 'b', 'k') && home(0, 7, 'b', 'r'),
+      bQ: home(0, 4, 'b', 'k') && home(0, 0, 'b', 'r'),
+    },
+    enPassant: null,
+    halfmoveClock: 0,
+    fullmoveNumber: 1,
+  };
+}
+
+/**
+ * Why a free-play setup can't start as a real game (null = good to go).
+ * The rules: one king per side, Black's king can't already be hanging
+ * (White moves first), and the game can't be over before move one.
+ */
+export function setupIssue(board: Board): string | null {
+  let wk = 0;
+  let bk = 0;
+  for (const row of board) {
+    for (const p of row) {
+      if (!p || p.type !== 'k') continue;
+      if (p.color === 'w') wk++;
+      else bk++;
+    }
+  }
+  if (wk === 0 && bk === 0) return 'Both sides need a king — place one white and one black king.';
+  if (wk === 0) return 'White needs a king.';
+  if (bk === 0) return 'Black needs a king.';
+  if (wk > 1) return 'Only one white king allowed.';
+  if (bk > 1) return 'Only one black king allowed.';
+
+  const state = customStart(board);
+  if (inCheck(state, 'b')) {
+    return "White moves first, and Black's king is already in its sights — shield the black king before starting.";
+  }
+  switch (status(state)) {
+    case 'checkmate':
+      return 'White is already checkmated — give the white king a way out before starting.';
+    case 'stalemate':
+      return 'White has no legal moves — that would be stalemate before move one.';
+    case 'draw-material':
+      return 'Neither side has enough pieces to ever checkmate — add some firepower.';
+    default:
+      return null;
+  }
 }
 
 /** True once the game is over (mate, stalemate, or a draw). */
