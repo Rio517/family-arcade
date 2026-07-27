@@ -91,9 +91,14 @@ const UNICORN_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
   ),
   b: (c) => (
     <>
-      <path d="M22.5 7 L28 15 L25 32 H20 L17 15 Z" />
-      <path d="M17 15 H28 M22.5 7 V32 M19.5 22 L25.5 22" stroke={c.stroke} strokeWidth="1.2" fill="none" />
-      <path d="M30 10 l1 3 l3 1 l-3 1 l-1 3 l-1 -3 l-3 -1 l3 -1 Z" fill={c.accent} stroke="none" />
+      {/* A faerie: gossamer wings, a little gown, a golden circlet and wand. */}
+      <path d="M18 15 C8.5 9 6 22 17.5 25 Z" fill={c.accent2} opacity="0.85" />
+      <path d="M27 15 C36.5 9 39 22 27.5 25 Z" fill={c.accent2} opacity="0.85" />
+      <circle cx="22.5" cy="11.5" r="3.4" />
+      <path d="M19.2 9.4 A4.4 4.4 0 0 1 25.8 9.4" stroke={c.accent} strokeWidth="1.6" fill="none" />
+      <path d="M22.5 15 L27.5 31 H17.5 Z" />
+      <path d="M27 22 L31.5 17.5" stroke={c.stroke} strokeWidth="1.2" fill="none" />
+      <path d="M31.5 14.6 l.9 2 l2 .9 l-2 .9 l-.9 2 l-.9 -2 l-2 -.9 l2 -.9 Z" fill={c.accent} stroke="none" />
       <path d="M15 34 H30 L32 40 H13 Z" />
     </>
   ),
