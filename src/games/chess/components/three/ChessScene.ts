@@ -375,6 +375,19 @@ export class ChessScene {
       }
     }
     if (this.checkMat) this.checkMat.opacity = 0.3 + 0.2 * Math.sin(now / 180);
+
+    // The Galaxy Fleet hovers: each ship bobs gently on its own phase.
+    // Skipped while a piece is mid-tween (the move animation owns its y),
+    // and entirely under reduced motion (they still float, just steadily).
+    if (this.palette.pieceStyle === 'ships' && !this.opts.reducedMotion) {
+      const busy = new Set(this.tweens.map((t) => t.obj));
+      for (const [key, piece] of this.pieces) {
+        if (busy.has(piece)) continue;
+        const phase = key.charCodeAt(0) * 1.7 + key.charCodeAt(1) * 2.3;
+        piece.position.y = Math.sin(now / 1150 + phase) * 0.022;
+      }
+    }
+
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -738,17 +751,12 @@ function buildShip(
   // White sits at +z and flies toward -z; black the opposite.
   const f = black ? 1 : -1;
 
-  // Display plinth + pylon — slim, so the ship is the star of the model.
-  g.add(lathe([[0, 0], [0.24, 0], [0.24, 0.04], [0.18, 0.075], [0.12, 0.11], [0.1, 0.13]], mat));
-  const HOVER: Record<PieceType, number> = { p: 0.4, n: 0.44, b: 0.48, r: 0.5, q: 0.56, k: 0.56 };
-  const h = HOVER[type];
-  const pylon = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.026, h - 0.13, 10), mat);
-  pylon.position.y = 0.13 + (h - 0.13) / 2;
-  g.add(pylon);
-
+  // No plinth, no pylon — the ships simply FLY, hanging over their squares
+  // (their cast shadows on the tiles below sell the hover).
+  const HOVER: Record<PieceType, number> = { p: 0.34, n: 0.38, b: 0.42, r: 0.44, q: 0.5, k: 0.5 };
   const ship = new THREE.Group();
-  ship.position.y = h;
-  ship.scale.setScalar(1.22);
+  ship.position.y = HOVER[type];
+  ship.scale.setScalar(1.32);
   g.add(ship);
 
   /** A cone lying along z, tip toward the enemy. */
