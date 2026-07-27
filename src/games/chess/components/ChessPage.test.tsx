@@ -155,6 +155,37 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('mode-free')).toBeInTheDocument();
   });
 
+  it('switches the whole set to the unicorn theme and remembers it', () => {
+    const { container } = renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.click(screen.getByTestId('start-local'));
+
+    // Classic by default.
+    expect(container.querySelector('.chess-theme-classic')).toBeTruthy();
+    expect(screen.getByTestId('sq-e2').querySelector('svg')?.getAttribute('data-piece-theme')).toBeNull();
+
+    // One tap: pink board class + unicorn piece art everywhere, persisted.
+    fireEvent.click(screen.getByTestId('theme-unicorn'));
+    expect(container.querySelector('.chess-theme-unicorn')).toBeTruthy();
+    expect(screen.getByTestId('sq-e2').querySelector('svg')?.getAttribute('data-piece-theme')).toBe('unicorn');
+    expect(localStorage.getItem('chess-theme-v1')).toBe('unicorn');
+  });
+
+  it('free play offers the theme picker too', () => {
+    localStorage.setItem('chess-theme-v1', 'unicorn');
+    const { container } = renderPage();
+    fireEvent.click(screen.getByTestId('mode-free'));
+
+    // The stored choice applies, and the sandbox can switch back.
+    expect(container.querySelector('.chess-theme-unicorn')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('fp-tray-w-q'));
+    fireEvent.click(screen.getByTestId('fp-sq-e5'));
+    expect(screen.getByTestId('fp-sq-e5').querySelector('svg')?.getAttribute('data-piece-theme')).toBe('unicorn');
+
+    fireEvent.click(screen.getByTestId('fp-theme-classic'));
+    expect(container.querySelector('.chess-theme-classic')).toBeTruthy();
+  });
+
   it('reaching the online lobby shows create/join controls', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));

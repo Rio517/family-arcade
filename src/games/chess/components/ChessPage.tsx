@@ -10,6 +10,7 @@ import { ChessBoard } from './ChessBoard';
 import { ChessResult } from './ChessResult';
 import { ChessLogModal, CapturedTray } from './ChessLogModal';
 import { FreePlay } from './FreePlay';
+import { CHESS_THEME_KEY, ChessThemeContext, type ChessThemeId } from './chessTheme';
 
 // three.js is heavy, so the 3D board loads on demand — picking Flat or Table
 // never downloads it.
@@ -45,6 +46,15 @@ export function ChessPage() {
   const [blackName, setBlackName] = useState('Black');
   const [logOpen, setLogOpen] = useState(false);
   // Board view — flat, tabletop tilt, or full 3D. Remembered per device.
+  // The set's look — classic or unicorn — shared with every view via context.
+  const [theme, setThemeState] = useState<ChessThemeId>(() => {
+    try { return localStorage.getItem(CHESS_THEME_KEY) === 'unicorn' ? 'unicorn' : 'classic'; } catch { return 'classic'; }
+  });
+  const setTheme = (t: ChessThemeId) => {
+    setThemeState(t);
+    try { localStorage.setItem(CHESS_THEME_KEY, t); } catch { /* ignore */ }
+  };
+
   const [view, setView] = useState<BoardView>(() => {
     try {
       const v = localStorage.getItem('chess-view-v1');
@@ -139,7 +149,8 @@ export function ChessPage() {
   const resumableChess = !inGame && setup === 'pick' ? loadResumableChessGame() : null;
 
   return (
-    <div className="app">
+    <ChessThemeContext.Provider value={{ theme, setTheme }}>
+    <div className={`app chess-theme-${theme}`}>
       <div className="topbar">
         <button className="back-link" onClick={goMenu} data-testid="chess-back">‹ Menu</button>
         <h1>Chess</h1>
@@ -391,6 +402,18 @@ export function ChessPage() {
                   </button>
                 ))}
               </div>
+              <div className="chess-view-seg" role="group" aria-label="Set theme">
+                {(['classic', 'unicorn'] as const).map((t) => (
+                  <button
+                    key={t}
+                    className={`seg-btn ${theme === t ? 'on' : ''}`}
+                    onClick={() => setTheme(t)}
+                    data-testid={`theme-${t}`}
+                  >
+                    {t === 'classic' ? 'Classic' : 'Unicorn'}
+                  </button>
+                ))}
+              </div>
               {cx.mode === 'local' && (
                 <button
                   className="btn btn-ghost chess-undo-btn"
@@ -442,6 +465,7 @@ export function ChessPage() {
         <Link to="/">Family game console</Link>
       </div>
     </div>
+    </ChessThemeContext.Provider>
   );
 }
 

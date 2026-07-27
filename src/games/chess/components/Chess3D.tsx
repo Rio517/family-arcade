@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChessScene } from './three/ChessScene';
 import { ChessPiece } from './chessPieces';
+import { SCENE_PALETTES, useChessTheme } from './chessTheme';
 import { findKing, inCheck, legalMovesFrom } from '@games/chess/domain/rules';
 import {
   sameSquare,
@@ -31,6 +32,7 @@ const PROMO_ORDER: PromotionType[] = ['q', 'r', 'b', 'n'];
 export default function Chess3D({ board, orientation, interactive, movableColor, lastMove, onMove }: Chess3DProps) {
   const holder = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<ChessScene | null>(null);
+  const { theme } = useChessTheme();
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<Square | null>(null);
   const [promotion, setPromotion] = useState<{ from: Square; to: Square } | null>(null);
@@ -55,6 +57,7 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
       scene = new ChessScene(holder.current, {
         orientation,
         reducedMotion,
+        palette: SCENE_PALETTES[theme],
         onTap: (sq) => {
           const { board: b, interactive: canAct, movableColor: mc, selected: sel } = live.current;
           const piece = b.board[sq.row][sq.col];
@@ -72,6 +75,8 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
         },
       });
       sceneRef.current = scene;
+      // A theme switch rebuilds the scene mid-game — repopulate it right away.
+      scene.setPosition(live.current.board.board, null);
     } catch {
       setFailed(true); // no WebGL on this device — the 2D views still work
     }
@@ -80,7 +85,7 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
       sceneRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orientation]);
+  }, [orientation, theme]);
 
   // Position + marks follow the game state.
   useEffect(() => {
