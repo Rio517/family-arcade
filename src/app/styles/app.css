@@ -278,42 +278,12 @@
   background: repeating-linear-gradient(90deg, var(--c) 0 22px, color-mix(in srgb, var(--c) 22%, #10182a) 22px 44px);
   opacity: 0.9;
 }
-/* The tear-off stub, with punched holes above and below the perforation. */
-.tk-stub {
-  flex: 0 0 56px;
-  display: grid;
-  place-items: center;
-  border-right: 2px dashed rgba(232, 236, 246, 0.25);
-  background: color-mix(in srgb, var(--c) 13%, transparent);
-}
-.tk-stub span {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--c);
-}
-.tk::before,
-.tk::after {
-  content: '';
-  position: absolute;
-  left: 49px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--night);
-  z-index: 1;
-}
-.tk::before { top: -7px; }
-.tk::after { bottom: -7px; }
 .tk-main {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 20px 14px 14px;
+  padding: 20px 16px 14px;
   min-width: 0;
 }
 .tk-glyph {

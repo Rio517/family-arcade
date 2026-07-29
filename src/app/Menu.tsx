@@ -38,7 +38,7 @@ function BulbString({ count, offset = 0 }: { count: number; offset?: number }) {
   );
 }
 
-/** One ADMIT-ONE ticket: stub, awning, glyph, name, blurb. */
+/** One game ticket: awning strip, glyph, name, blurb. */
 function Ticket({ title, sub, tag, children }: {
   title: string;
   sub: string;
@@ -48,7 +48,6 @@ function Ticket({ title, sub, tag, children }: {
   return (
     <>
       <span className="tk-awning" aria-hidden="true" />
-      <span className="tk-stub"><span>Admit one</span></span>
       <span className="tk-main">
         <span className="tk-glyph">{children}</span>
         <span className="tk-body">
