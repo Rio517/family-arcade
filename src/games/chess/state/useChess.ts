@@ -18,9 +18,13 @@ import { boardState, canIMove, turnColor } from '@games/chess/domain/session';
 import {
   chessToStored,
   clearChessGame,
+  clearLocalChessGame,
   loadChessGame,
+  loadLocalChessGame,
   saveChessGame,
+  saveLocalChessGame,
   storedToChess,
+  storedToLocalChess,
 } from '@games/chess/storage/chessPersistence';
 import type { Color, GameLog, GameState, Ply, Side } from '@games/chess/domain/types';
 
@@ -55,6 +59,8 @@ export interface UseChessResult {
   hostGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
   resumeGame: (code: string) => void;
+  /** Resume the saved same-device (hotseat) game. */
+  resumeLocal: () => void;
   move: (ply: Ply) => void;
   undo: () => void;
   /** Local only: rewind to the position after ply `n` (keep the first `n` plies). */
@@ -115,12 +121,19 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     return connRef.current;
   }, [applyOutcome]);
 
-  // Persist online games after every change (powers resume). Local games are
-  // ephemeral, so chessToStored returns null and nothing is written.
+  // Persist games after every change (powers resume). Online games save under
+  // their code; hotseat games autosave into the one local slot — cleared once
+  // the game finishes, or while it's an untouched standard opening (nothing
+  // worth resuming yet).
   useEffect(() => {
     if (!session) return;
     const stored = chessToStored(session, Date.now());
     if (stored) saveChessGame(stored);
+    if (session.mode === 'local') {
+      const finished = Session.phase(session) === 'over';
+      if (finished || (session.log.length === 0 && !session.start)) clearLocalChessGame();
+      else saveLocalChessGame(session, Date.now());
+    }
   }, [session]);
 
   // Tear down the connection on unmount.
@@ -158,6 +171,14 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     if (stored.side === 'host') conn.host(stored.code);
     else conn.join(stored.code);
   }, [ensureConn, setSessionState]);
+
+  /** Resume the saved same-device game, if one exists. */
+  const resumeLocal = useCallback(() => {
+    const stored = loadLocalChessGame();
+    if (!stored) return;
+    setStatus('idle');
+    setSessionState(storedToLocalChess(stored));
+  }, [setSessionState]);
 
   const move = useCallback((ply: Ply) => {
     const s = sessionRef.current;
@@ -213,6 +234,7 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     hostGame,
     joinGame,
     resumeGame,
+    resumeLocal,
     move,
     undo,
     goToPly,
