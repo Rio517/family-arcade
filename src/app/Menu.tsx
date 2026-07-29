@@ -133,9 +133,9 @@ export function Menu() {
       <div className="arcade-sky" aria-hidden="true" />
       <div className="arcade-floor" aria-hidden="true" />
 
-      {/* The striped awning and its string of lights. */}
+      {/* The striped awning and its string of lights, edge to edge. */}
       <div className="awning" aria-hidden="true" />
-      <BulbString count={12} />
+      <BulbString count={18} />
 
       <div className="arcade-main">
         {/* The sign hangs from the awning on two chains, swaying gently. */}
