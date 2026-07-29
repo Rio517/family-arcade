@@ -20,7 +20,7 @@ type BoardView = 'flat' | '3d';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { CloseIcon, GridIcon, ListIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
-import { loadResumableChessGame } from '../storage/chessPersistence';
+import { loadLocalChessGame, loadResumableChessGame } from '../storage/chessPersistence';
 import { customStart, winnerOf, status as statusOf } from '@games/chess/domain/rules';
 import { analyzeGame, tallyCaptures } from '@games/chess/domain/analysis';
 import type { FinishInfo } from '@games/chess/domain/session';
@@ -85,14 +85,18 @@ export function ChessPage() {
 
   const cx = useChess({ name: profile.profile.name, onFinish });
 
-  // Resume a saved online game, or pre-fill a join code from a shared link.
+  // Deep links: resume the saved hotseat game (?resume=local, used by the
+  // arcade's saved-games list), resume a saved online game (?resume=CODE),
+  // or pre-fill a join code from a shared link (?g=CODE).
   const bootRef = useRef(false);
   const resumeCode = params.get('resume');
   const joinCode = params.get('g');
   useEffect(() => {
     if (bootRef.current) return;
     bootRef.current = true;
-    if (resumeCode) {
+    if (resumeCode === 'local') {
+      cx.resumeLocal();
+    } else if (resumeCode) {
       setSetup('online');
       cx.resumeGame(resumeCode);
     } else if (joinCode) {
@@ -143,8 +147,10 @@ export function ChessPage() {
 
   const inGame = cx.phase === 'play' || cx.phase === 'over';
   const showCodeChip = cx.mode === 'online' && cx.side === 'host' && !cx.oppConnected && cx.phase === 'play';
-  // The most recent unfinished online game, offered on the mode picker.
+  // Unfinished games offered on the mode picker: the last online game, and
+  // the same-device autosave slot.
   const resumableChess = !inGame && setup === 'pick' ? loadResumableChessGame() : null;
+  const resumableLocal = !inGame && setup === 'pick' ? loadLocalChessGame() : null;
 
   return (
     <ChessThemeContext.Provider value={{ theme, setTheme }}>
@@ -209,6 +215,19 @@ export function ChessPage() {
             <h2>How do you want to play?</h2>
             <p className="subtle">Two players, one board.</p>
           </div>
+          {resumableLocal && (
+            <button className="card violet" onClick={() => cx.resumeLocal()} data-testid="chess-resume-local">
+              <div className="icon"><ResumeIcon size={26} /></div>
+              <div className="body">
+                <div className="title">Resume — {resumableLocal.whiteName} vs {resumableLocal.blackName}</div>
+                <div className="sub">
+                  Same device · {describeMoves(resumableLocal.log.length)}
+                  {resumableLocal.start ? ' · custom setup' : ''}
+                </div>
+              </div>
+              <div className="chev" aria-hidden="true">›</div>
+            </button>
+          )}
           {resumableChess && (
             <button
               className="card violet"
@@ -510,4 +529,11 @@ function PlayerCard({
 function lastMoveSquares(log: Ply[]) {
   const last = log[log.length - 1];
   return last ? { from: last.from, to: last.to } : null;
+}
+
+/** "3 moves in" / "fresh setup" — the resume card's progress line. */
+function describeMoves(plies: number): string {
+  if (plies === 0) return 'fresh setup';
+  const moves = Math.ceil(plies / 2);
+  return `${moves} move${moves === 1 ? '' : 's'} in`;
 }

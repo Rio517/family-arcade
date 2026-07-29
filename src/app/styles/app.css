@@ -262,6 +262,8 @@
 .tk.game-battleship { --c: #35c7e8; }
 .tk.game-chess { --c: var(--gold); }
 .tk.game-risk { --c: #ff7a5c; }
+.tk.game-unicorn { --c: var(--pink); } /* Magic Coins */
+.tk.game-racer { --c: var(--violet); } /* Rainbow Racer */
 .tk:hover,
 .tk:focus-visible {
   transform: translateY(-3px);
@@ -359,7 +361,89 @@
 }
 .tk:hover .tk-go { transform: translateX(3px); }
 
-.mid-lights { margin-top: 28px; }
+/* ── Page shape: one column on a phone; on a wide screen the games run down
+   the RIGHT while the sign, Save Station, and prize counter hold the LEFT. */
+.arcade-main { display: grid; gap: 22px; }
+@media (min-width: 940px) {
+  .arcade-main {
+    max-width: 1080px;
+    margin: 0 auto;
+    grid-template-columns: minmax(380px, 460px) minmax(420px, 1fr);
+    grid-template-areas:
+      'sign tix'
+      'saved tix'
+      'prize tix';
+    align-items: start;
+    align-content: start;
+    column-gap: 30px;
+  }
+  .arcade-main .sign-hang { grid-area: sign; max-width: none; margin: 0; }
+  .arcade-main .tix { grid-area: tix; max-width: none; }
+  .arcade-main .now-playing { grid-area: saved; max-width: none; }
+  .arcade-main .prize { grid-area: prize; max-width: none; margin: 0; }
+}
+
+/* ── The Save Station — every saved game, one tap to resume ──────────────── */
+.now-playing { max-width: 430px; width: 100%; margin: 0 auto; }
+.np-in {
+  border-radius: 12px;
+  padding: 14px 12px 8px;
+  background: linear-gradient(180deg, #152136, #101a2e);
+  border: 1px solid #31436b;
+  box-shadow: inset 0 0 26px -14px rgba(52, 224, 200, 0.35), 0 16px 30px -18px #000;
+}
+.np-h {
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--teal);
+  text-shadow: 0 0 12px rgba(52, 224, 200, 0.5);
+  margin-bottom: 8px;
+}
+.np-row {
+  --np-c: var(--teal);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 8px;
+  margin-bottom: 4px;
+  border-radius: 9px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 130ms, transform 130ms;
+}
+.np-row:hover { background: rgba(255, 255, 255, 0.05); transform: translateX(2px); }
+.np-row:focus-visible { outline: 2px solid var(--np-c); outline-offset: 2px; }
+.np-icon {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--np-c);
+  background: color-mix(in srgb, var(--np-c) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--np-c) 50%, transparent);
+}
+.np-body { min-width: 0; flex: 1; display: block; }
+.np-title {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.np-meta {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: #8fa0c0;
+  margin-top: 2px;
+}
+.np-go { color: var(--np-c); display: inline-flex; }
 
 /* ── The prize counter ───────────────────────────────────────────────────── */
 .prize { max-width: 430px; margin: 6px auto 0; }

@@ -195,6 +195,43 @@ describe('<ChessPage> — local flow', () => {
     expect(localStorage.getItem('chess-theme-v1')).toBe('galaxy');
   });
 
+  it('autosaves a hotseat game and resumes it later — names, moves and all', () => {
+    const first = renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.change(screen.getByTestId('white-name'), { target: { value: 'Alice' } });
+    fireEvent.change(screen.getByTestId('black-name'), { target: { value: 'Bob' } });
+    fireEvent.click(screen.getByTestId('start-local'));
+    fireEvent.click(screen.getByTestId('sq-e2'));
+    fireEvent.click(screen.getByTestId('sq-e4'));
+    first.unmount(); // dinner time — everyone walks away
+
+    // Back at the mode picker, the saved game is offered…
+    renderPage();
+    const card = screen.getByTestId('chess-resume-local');
+    expect(card).toHaveTextContent('Alice vs Bob');
+    expect(card).toHaveTextContent(/1 move in/);
+
+    // …and resuming restores the position and the turn.
+    fireEvent.click(card);
+    expect(screen.getByTestId('sq-e4').querySelector('svg')).toBeTruthy();
+    expect(screen.getByTestId('sq-e2').querySelector('svg')).toBeNull();
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Bob to move/);
+  });
+
+  it('deep-links straight into the saved hotseat game (?resume=local)', () => {
+    const first = renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.click(screen.getByTestId('start-local'));
+    fireEvent.click(screen.getByTestId('sq-d2'));
+    fireEvent.click(screen.getByTestId('sq-d4'));
+    first.unmount();
+
+    renderPage('/chess?resume=local');
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
+    expect(screen.getByTestId('sq-d4').querySelector('svg')).toBeTruthy();
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Black to move/);
+  });
+
   it('restores a stored galaxy theme on load', () => {
     localStorage.setItem('chess-theme-v1', 'galaxy');
     const { container } = renderPage();
