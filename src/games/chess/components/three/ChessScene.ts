@@ -45,6 +45,7 @@ export class ChessScene {
   private checkMat: THREE.MeshBasicMaterial | null = null;
   private tweens: Tween[] = [];
   private clouds: THREE.Group[] = [];
+  private sparkles: THREE.Points[] = [];
   private lastNow = 0;
   private raf = 0;
   private down: { x: number; y: number } | null = null;
@@ -69,11 +70,15 @@ export class ChessScene {
     container.appendChild(this.renderer.domElement);
 
     this.scene.background = new THREE.Color(this.palette.background);
-    // Deep space and dream skies keep their fog further out so the backdrop
-    // (starfield / rainbows) actually reads.
-    this.scene.fog = this.palette.stars || this.palette.dream
-      ? new THREE.Fog(this.palette.background, 20, 40)
-      : new THREE.Fog(this.palette.background, 15, 28);
+    // Deep space keeps its fog further out so the starfield reads; the dream
+    // world's fog is tinted to the sky's horizon so distance melts into
+    // sunlit haze (never into darkness), and pushed far enough to see the
+    // cloud sea roll away.
+    this.scene.fog = this.palette.dream
+      ? new THREE.Fog('#f2c8dc', 20, 46)
+      : this.palette.stars
+        ? new THREE.Fog(this.palette.background, 20, 40)
+        : new THREE.Fog(this.palette.background, 15, 28);
     if (this.palette.accent) {
       this.accentMat = new THREE.MeshStandardMaterial({
         color: this.palette.accent,
@@ -114,7 +119,7 @@ export class ChessScene {
     this.buildLights();
     this.buildBoard();
     if (this.palette.stars) this.buildStars();
-    if (this.palette.dream) this.buildDreamSky();
+    if (this.palette.dream) this.buildDreamWorld();
     this.scene.add(this.markGroup);
 
     // Tap vs orbit: only fire a tap when the pointer barely moved.
@@ -128,6 +133,22 @@ export class ChessScene {
   }
 
   private buildLights() {
+    if (this.palette.dream) {
+      // Golden-hour light above the clouds: warm low sun, pink sky fill.
+      this.scene.add(new THREE.HemisphereLight('#ffe9f3', '#e3b3e8', 0.95));
+      const sun = new THREE.DirectionalLight('#ffedd2', 2.1);
+      sun.position.set(7, 7, 5);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024);
+      sun.shadow.camera.left = -6; sun.shadow.camera.right = 6;
+      sun.shadow.camera.top = 6; sun.shadow.camera.bottom = -6;
+      sun.shadow.bias = -0.0004;
+      this.scene.add(sun);
+      const blush = new THREE.DirectionalLight('#ffb3dd', 0.55);
+      blush.position.set(-7, 3, -6);
+      this.scene.add(blush);
+      return;
+    }
     this.scene.add(new THREE.HemisphereLight('#cfe0ff', '#1a1408', 0.55));
     const key = new THREE.DirectionalLight('#fff2dd', 2.2);
     key.position.set(5, 9, 4);
@@ -196,64 +217,159 @@ export class ChessScene {
     this.scene.add(stars);
   }
 
-  /** A pastel rainbow arching out of the ground — six half-torus bands. */
-  private buildRainbow(x: number, z: number, ry: number, scale: number) {
+  /** A pastel rainbow arching out of the cloud sea — six half-torus bands. */
+  private buildRainbow(x: number, y: number, z: number, ry: number, scale: number, opacity: number) {
     const bands = ['#ff8f9f', '#ffb87a', '#ffe97a', '#93e6a4', '#8fc9ff', '#c9a0f5'];
     const g = new THREE.Group();
     bands.forEach((c, i) => {
       const band = new THREE.Mesh(
-        new THREE.TorusGeometry(6.4 - i * 0.36, 0.17, 10, 48, Math.PI),
+        new THREE.TorusGeometry(6.4 - i * 0.36, 0.19, 10, 56, Math.PI),
         new THREE.MeshStandardMaterial({
           color: c,
           emissive: c,
-          emissiveIntensity: 0.5,
+          emissiveIntensity: 0.6,
           roughness: 0.6,
           transparent: true,
-          opacity: 0.92,
+          opacity,
         }),
       );
       g.add(band);
     });
-    g.position.set(x, 0, z);
+    g.position.set(x, y, z);
     g.rotation.y = ry;
     g.scale.setScalar(scale);
     this.scene.add(g);
+    return g;
   }
 
   /**
-   * The unicorn theme's dream sky: rainbows arching behind either side of the
-   * board and a flock of puffy clouds that drift slowly around it (seeded, so
-   * every visit looks the same; still under reduced motion).
+   * THE CLOUD KINGDOM — the unicorn board is a marble terrace floating high
+   * above an endless sunset cloud sea. A gradient sky dome (peach horizon to
+   * violet zenith), a broken cloud deck rolling away below, a cushion of
+   * cloud hugging the board's underside, a grand rainbow with its feet
+   * buried in distant cloud banks, drifting eye-level clouds, and a slow
+   * swirl of gold-and-pink sparkle motes in the air. Everything is seeded,
+   * so the kingdom looks the same on every visit; motion (drift, swirl,
+   * twinkle) rests under prefers-reduced-motion.
    */
-  private buildDreamSky() {
-    // One rainbow behind each camp, so both players get one in view.
-    this.buildRainbow(0, -14, 0.12, 1);
-    this.buildRainbow(4, 14.5, Math.PI - 0.2, 0.8);
-
+  private buildDreamWorld() {
     let seed = 20260729;
     const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+
+    // ── The sky: a gradient dome from warm horizon to violet zenith ──
+    const skyCanvas = document.createElement('canvas');
+    skyCanvas.width = 4;
+    skyCanvas.height = 256;
+    const ctx = skyCanvas.getContext('2d');
+    if (ctx) {
+      const grad = ctx.createLinearGradient(0, 0, 0, 256); // canvas top = zenith
+      grad.addColorStop(0, '#6d4bb8');
+      grad.addColorStop(0.34, '#b98ae0');
+      grad.addColorStop(0.66, '#f3b9dd');
+      grad.addColorStop(1, '#ffd9c4');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 4, 256);
+      const dome = new THREE.Mesh(
+        new THREE.SphereGeometry(52, 24, 16),
+        new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(skyCanvas), side: THREE.BackSide, fog: false }),
+      );
+      dome.position.y = -6; // horizon sits below the board's eye line
+      this.scene.add(dome);
+    }
+    // A soft low sun glowing through the haze.
+    const sunGlow = new THREE.Mesh(
+      new THREE.CircleGeometry(7, 24),
+      new THREE.MeshBasicMaterial({ color: '#ffe3bd', transparent: true, opacity: 0.55, fog: false }),
+    );
+    sunGlow.position.set(17, 4, -38);
+    sunGlow.lookAt(0, 2, 0);
+    this.scene.add(sunGlow);
+
+    // ── Cloud materials (shared) ──
     const cloudMat = new THREE.MeshStandardMaterial({
-      color: '#ffffff',
-      emissive: '#fff2fa',
-      emissiveIntensity: 0.32,
+      color: '#fff8fc',
+      emissive: '#ffeaf6',
+      emissiveIntensity: 0.28,
       roughness: 1,
     });
-    for (let i = 0; i < 9; i++) {
-      const cloud = new THREE.Group();
-      const puffs = 3 + Math.floor(rand() * 3);
+    const puffCluster = (scale: number, stretch = 1) => {
+      const g = new THREE.Group();
+      const puffs = 4 + Math.floor(rand() * 3);
       for (let p = 0; p < puffs; p++) {
-        const r = 0.5 + rand() * 0.75;
-        const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), cloudMat);
-        puff.position.set((p - (puffs - 1) / 2) * r * 0.95, (rand() - 0.5) * 0.35, (rand() - 0.5) * 0.7);
-        puff.scale.y = 0.58;
-        cloud.add(puff);
+        const r = (0.55 + rand() * 0.8) * scale;
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), cloudMat);
+        puff.position.set(
+          (p - (puffs - 1) / 2) * r * 0.95 * stretch,
+          (rand() - 0.5) * 0.3 * scale,
+          (rand() - 0.5) * 0.9 * scale,
+        );
+        puff.scale.y = 0.55;
+        g.add(puff);
       }
+      return g;
+    };
+
+    // ── The cloud sea: a broken deck rolling away below the board ──
+    for (let i = 0; i < 26; i++) {
       const ang = rand() * Math.PI * 2;
-      const dist = 10.5 + rand() * 7;
-      cloud.position.set(Math.cos(ang) * dist, 2.4 + rand() * 4.6, Math.sin(ang) * dist);
-      cloud.userData.speed = (0.1 + rand() * 0.2) * (rand() < 0.5 ? 1 : -1);
+      const dist = 7 + rand() * 24;
+      const bank = puffCluster(1.6 + rand() * 2.6, 1.4);
+      bank.position.set(Math.cos(ang) * dist, -3.1 + rand() * 0.9, Math.sin(ang) * dist);
+      this.scene.add(bank);
+    }
+    // A soft pink floor far below closes any gaps between the banks.
+    const seaFloor = new THREE.Mesh(
+      new THREE.CircleGeometry(55, 40),
+      new THREE.MeshBasicMaterial({ color: '#f4c4de' }),
+    );
+    seaFloor.rotation.x = -Math.PI / 2;
+    seaFloor.position.y = -5.2;
+    this.scene.add(seaFloor);
+
+    // ── The board rests ON cloud: a cushion hugging its underside ──
+    for (let i = 0; i < 12; i++) {
+      const ang = (i / 12) * Math.PI * 2 + rand() * 0.3;
+      const cushion = puffCluster(0.9 + rand() * 0.5);
+      cushion.position.set(Math.cos(ang) * (4.1 + rand() * 0.7), -0.75 - rand() * 0.4, Math.sin(ang) * (4.1 + rand() * 0.7));
+      this.scene.add(cushion);
+    }
+
+    // ── The grand rainbow, feet buried in far cloud banks; a faint echo ──
+    this.buildRainbow(0, -1.5, -23, 0.1, 1.9, 0.85);
+    for (const fx of [-12.1, 12.1]) {
+      const foot = puffCluster(2.6, 1.3);
+      foot.position.set(fx, -1.6, -22.4);
+      this.scene.add(foot);
+    }
+    this.buildRainbow(19, -1, 13, Math.PI * 0.72, 1.1, 0.45);
+
+    // ── Eye-level clouds that drift past the terrace ──
+    for (let i = 0; i < 8; i++) {
+      const cloud = puffCluster(0.8 + rand() * 1.1);
+      const ang = rand() * Math.PI * 2;
+      const dist = 9.5 + rand() * 8;
+      cloud.position.set(Math.cos(ang) * dist, 1.4 + rand() * 4.6, Math.sin(ang) * dist);
+      cloud.userData.speed = (0.12 + rand() * 0.22) * (rand() < 0.5 ? 1 : -1);
       this.clouds.push(cloud);
       this.scene.add(cloud);
+    }
+
+    // ── Sparkle motes: gold and pink dust swirling slowly around the board ──
+    for (const [color, count, size] of [['#ffe9a8', 70, 0.075], ['#ffd0ef', 90, 0.06]] as const) {
+      const pts: number[] = [];
+      for (let i = 0; i < count; i++) {
+        const ang = rand() * Math.PI * 2;
+        const dist = 2.5 + rand() * 7;
+        pts.push(Math.cos(ang) * dist, 0.3 + rand() * 4.4, Math.sin(ang) * dist);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+      const motes = new THREE.Points(geo, new THREE.PointsMaterial({
+        color, size, sizeAttenuation: true, transparent: true, opacity: 0.85, depthWrite: false,
+      }));
+      motes.userData.spin = 0.02 + rand() * 0.02;
+      this.sparkles.push(motes);
+      this.scene.add(motes);
     }
   }
 
@@ -429,12 +545,17 @@ export class ChessScene {
     const dt = this.lastNow ? Math.min(0.05, (now - this.lastNow) / 1000) : 0;
     this.lastNow = now;
 
-    // Dream-sky clouds drift gently around the board.
-    if (this.clouds.length > 0 && !this.opts.reducedMotion) {
+    // Dream-world motion: clouds drift past; sparkle dust swirls and breathes.
+    if (!this.opts.reducedMotion) {
       for (const cloud of this.clouds) {
         cloud.position.x += (cloud.userData.speed as number) * dt;
         if (cloud.position.x > 19) cloud.position.x = -19;
         if (cloud.position.x < -19) cloud.position.x = 19;
+      }
+      for (let i = 0; i < this.sparkles.length; i++) {
+        const motes = this.sparkles[i];
+        motes.rotation.y += (motes.userData.spin as number) * dt;
+        (motes.material as THREE.PointsMaterial).opacity = 0.6 + 0.3 * Math.sin(now / 900 + i * 2.1);
       }
     }
 
