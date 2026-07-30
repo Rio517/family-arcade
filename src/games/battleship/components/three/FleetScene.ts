@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { CellState } from '@games/battleship/domain/engine';
 import { BOARD_SIZE, type Orientation, type ShipId } from '@games/battleship/domain/types';
+import { disposeDeep } from '@shared/three/disposeDeep';
 
 export interface SceneShip {
   shipId: ShipId;
@@ -25,20 +26,6 @@ export interface SceneShip {
 }
 
 const HALF = (BOARD_SIZE - 1) / 2; // board cell → world offset
-
-/** Free every geometry, material, and texture under `root` (all owned here —
- * ships and markers are built fresh on each update, nothing is shared). */
-function disposeDeep(root: THREE.Object3D) {
-  root.traverse((o) => {
-    const mesh = o as THREE.Mesh;
-    if (mesh.geometry) mesh.geometry.dispose();
-    const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
-    for (const m of mats) {
-      (m as THREE.MeshStandardMaterial).map?.dispose();
-      m.dispose();
-    }
-  });
-}
 
 export class FleetScene {
   private renderer: THREE.WebGLRenderer;
