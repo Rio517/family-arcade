@@ -99,8 +99,22 @@ export function createOnlineSession(side: Side, code: string, myName: string): S
 
 // ── Derived views (pure functions of the log) ──────────────────────────────
 
+/**
+ * replay() walks the whole log doing full legal-move generation per ply, and
+ * the derived views below (phase, turnColor, canIMove, …) each need the
+ * current board — unmemoized, one render of an 80-ply game paid for ~5 full
+ * replays (~100 ms on an iPad). Transitions always build a fresh log array,
+ * so array identity is a sound cache key, and the stable GameState identity
+ * also stops downstream [board] effects from re-firing on unrelated renders.
+ */
+const boardCache = new WeakMap<GameLog, { start: GameState | undefined; board: GameState }>();
+
 export function boardState(s: SessionState): GameState {
-  return replay(s.log, s.start);
+  const hit = boardCache.get(s.log);
+  if (hit && hit.start === s.start) return hit.board;
+  const board = replay(s.log, s.start);
+  boardCache.set(s.log, { start: s.start, board });
+  return board;
 }
 
 export function currentStatus(s: SessionState): Status {
