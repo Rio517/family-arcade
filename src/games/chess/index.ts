@@ -5,7 +5,7 @@ import { ChessPage } from './components/ChessPage';
 export const chess: GameDescriptor = {
   id: 'chess',
   title: 'Chess',
-  tag: '2-Player',
+  tag: '1–2 Players',
   path: '/chess',
   description: 'Drag-and-drop chess — same device or online with a code.',
   Icon: ChessIcon,
