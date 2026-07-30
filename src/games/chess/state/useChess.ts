@@ -113,7 +113,16 @@ export function useChess(opts: UseChessOptions): UseChessResult {
         },
         onMessage: (msg) => {
           const s = sessionRef.current;
-          if (s) applyOutcome(Session.applyMessage(s, msg));
+          if (!s) return;
+          try {
+            applyOutcome(Session.applyMessage(s, msg));
+          } catch (err) {
+            // A structurally valid message can still carry an illegal game
+            // continuation (replay throws). Drop it — never let a hostile or
+            // buggy peer take the app down.
+            // eslint-disable-next-line no-console
+            console.error('Rejected peer message', err);
+          }
         },
       },
       { prefix: CHESS_PREFIX, isMessage: isChessMessage },

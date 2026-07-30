@@ -98,7 +98,7 @@ export function useRacerNet(opts: { name: string; driver: string; target: number
         onMessage: (msg) => {
           switch (msg.t) {
             case 'hello': {
-              setTheirName(msg.name || 'Friend');
+              setTheirName(msg.name.slice(0, 24) || 'Friend');
               setTheirDriver(msg.driver);
               // The host kicks the race off once it knows who joined.
               if (roleRef.current === 'host' && !sentGoRef.current) {

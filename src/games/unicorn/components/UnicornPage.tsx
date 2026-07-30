@@ -216,6 +216,13 @@ function PlayField({
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const keysRef = useRef<Set<string>>(new Set());
+  // The parent passes fresh arrow functions each render; route them through
+  // refs so the animation loop's effect never restarts. (Restarting it ~10×/s
+  // reset `last` each time, silently running the whole game ~14% slow.)
+  const onOverRef = useRef(onOver);
+  onOverRef.current = onOver;
+  const onFrameRef = useRef(onFrame);
+  onFrameRef.current = onFrame;
   // Every active touch/mouse pointer, keyed by pointerId, each remembering which
   // character it grabbed. This is what makes multi-touch work: one entry per
   // finger, so several players steer at once.
@@ -263,17 +270,17 @@ function PlayField({
       hudBeat += dt;
       if (hudBeat > 0.1) {
         hudBeat = 0;
-        onFrame();
+        onFrameRef.current();
       }
 
       if (game.status === 'over' && !overFired) {
         overFired = true;
-        onOver();
+        onOverRef.current();
       }
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [gameRef, onOver, onFrame]);
+  }, [gameRef]);
 
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;
