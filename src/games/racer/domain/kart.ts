@@ -1,12 +1,15 @@
 /**
- * Rainbow Racer — the pure driving model for the 3D single-player coin game.
+ * Rainbow Racer — the pure driving + coin model for the 3D kart game.
  *
- * A Mario-Kart-style romp: you drive a character around a big grassy arena from
- * a camera parked behind you, scooping up rainbow coins. First to 20 wins.
+ * All math and no pixels (no three.js, no DOM), so the feel and the rules can be
+ * unit-tested. It is split into two reusable pieces:
  *
- * This module is all math and no pixels — no three.js, no DOM — so the driving
- * feel and coin logic can be unit-tested. Randomness is injected so tests are
- * deterministic. The 3D view (`three/scene.ts`) is a pure *reader* of this state.
+ *   • a single **kart** you can step with `stepMotion` (used by every player, in
+ *     both single- and two-player modes — each device drives its own kart), and
+ *   • a shared **coin field** the owner steps with `collectCoins`/`refillCoins`
+ *     (single-player: you own it; two-player: the host owns it and syncs it).
+ *
+ * Randomness is injected so tests are deterministic.
  */
 
 /** The round play area is a disc of this radius (world units). */
@@ -23,10 +26,12 @@ const ACCEL = 42; // how fast speed eases toward its target (units/s²)
 const TURN_RATE = 2.1; // radians/s of turning at full lock
 
 /** Scoop a coin up within this distance. Generous on purpose. */
-const COIN_COLLECT_RADIUS = 10;
+export const COIN_COLLECT_RADIUS = 10;
 
 /** How many coins sparkle in the arena at once. */
-const COIN_TARGET = 16;
+export const COIN_TARGET = 16;
+
+export type Rng = () => number;
 
 export interface Coin {
   id: number;
@@ -36,9 +41,7 @@ export interface Coin {
   hue: number;
 }
 
-export type Status = 'racing' | 'over';
-
-export interface KartState {
+export interface Kart {
   /** Position on the ground plane. */
   x: number;
   z: number;
@@ -46,13 +49,6 @@ export interface KartState {
   heading: number;
   /** Current forward speed (units/s). */
   speed: number;
-  coins: number;
-  target: number;
-  status: Status;
-  /** Seconds elapsed — shown as a friendly timer. */
-  elapsed: number;
-  items: Coin[];
-  nextCoinId: number;
 }
 
 /** Per-frame driver input. */
@@ -65,47 +61,17 @@ export interface KartInput {
   brake: boolean;
 }
 
-export type Rng = () => number;
-
-function randomCoin(id: number, rng: Rng): Coin {
-  // Uniform point in a disc (sqrt keeps it from clumping in the middle).
-  const r = Math.sqrt(rng()) * (ARENA_RADIUS - COIN_MARGIN);
-  const a = rng() * Math.PI * 2;
-  return { id, x: Math.cos(a) * r, z: Math.sin(a) * r, hue: Math.floor(rng() * 360) };
+export function createKart(x = 0, z = 0, heading = 0): Kart {
+  return { x, z, heading, speed: CRUISE_SPEED };
 }
 
-function refill(state: KartState, rng: Rng): void {
-  while (state.items.length < COIN_TARGET) {
-    // Nudge coins away from a spawn right under the kart.
-    let coin = randomCoin(state.nextCoinId, rng);
-    if (Math.hypot(coin.x - state.x, coin.z - state.z) < COIN_COLLECT_RADIUS * 2) {
-      coin = randomCoin(state.nextCoinId, rng);
-    }
-    state.items.push(coin);
-    state.nextCoinId++;
-  }
-}
-
-export interface NewRaceOptions {
-  target?: number;
-  rng?: Rng;
-}
-
-export function createRace({ target = 20, rng = Math.random }: NewRaceOptions = {}): KartState {
-  const state: KartState = {
-    x: 0,
-    z: 0,
-    heading: 0,
-    speed: CRUISE_SPEED,
-    coins: 0,
-    target,
-    status: 'racing',
-    elapsed: 0,
-    items: [],
-    nextCoinId: 1,
-  };
-  refill(state, rng);
-  return state;
+/** Where each kart starts, spread apart so nobody begins on top of a rival. */
+export function startPositions(count: number): Array<{ x: number; z: number; heading: number }> {
+  if (count <= 1) return [{ x: 0, z: 0, heading: 0 }];
+  return [
+    { x: -24, z: 0, heading: 0 },
+    { x: 24, z: 0, heading: 0 },
+  ];
 }
 
 function approach(value: number, goal: number, maxStep: number): number {
@@ -114,69 +80,99 @@ function approach(value: number, goal: number, maxStep: number): number {
   return value;
 }
 
+/** Unit forward vector — handy for the camera and the 3D model. */
+export function forward(kart: Kart): { x: number; z: number } {
+  return { x: Math.sin(kart.heading), z: Math.cos(kart.heading) };
+}
+
 /**
- * Advance the race by `dt` seconds. Mutates and returns the same state so a
- * frame allocates nothing. No-ops once the race is over.
+ * Advance ONE kart by `dt` seconds from its driver input. Mutates and returns
+ * the same kart. Coins are handled separately (see the coin field below), so a
+ * kart's motion never depends on who owns the coins.
  */
-export function stepRace(
-  state: KartState,
-  dt: number,
-  input: KartInput,
-  rng: Rng = Math.random,
-): KartState {
-  if (state.status === 'over') return state;
+export function stepMotion(kart: Kart, dt: number, input: KartInput): Kart {
   const t = Math.max(0, Math.min(dt, 0.05));
 
-  // Speed eases toward the target the throttle asks for.
   const goal = input.brake ? BRAKE_SPEED : input.boost ? BOOST_SPEED : CRUISE_SPEED;
-  state.speed = approach(state.speed, goal, ACCEL * t);
+  kart.speed = approach(kart.speed, goal, ACCEL * t);
 
   // Steering bites more the faster you roll (you can't spin in place).
-  const grip = Math.min(1, state.speed / CRUISE_SPEED);
+  const grip = Math.min(1, kart.speed / CRUISE_SPEED);
   const steer = Math.max(-1, Math.min(1, input.steer));
-  state.heading += steer * TURN_RATE * grip * t;
+  kart.heading += steer * TURN_RATE * grip * t;
 
-  // Roll forward along the facing direction.
-  const fx = Math.sin(state.heading);
-  const fz = Math.cos(state.heading);
-  state.x += fx * state.speed * t;
-  state.z += fz * state.speed * t;
+  const fx = Math.sin(kart.heading);
+  const fz = Math.cos(kart.heading);
+  kart.x += fx * kart.speed * t;
+  kart.z += fz * kart.speed * t;
 
-  // Bounce off the round fence and turn back inward, so you can never get
-  // pinned against the wall holding forward.
-  const r = Math.hypot(state.x, state.z);
+  // Bounce off the round fence and turn back inward, so you can never get pinned
+  // against the wall holding forward.
+  const r = Math.hypot(kart.x, kart.z);
   if (r > ARENA_RADIUS) {
-    const nx = state.x / r; // outward normal
-    const nz = state.z / r;
-    state.x = nx * ARENA_RADIUS;
-    state.z = nz * ARENA_RADIUS;
+    const nx = kart.x / r;
+    const nz = kart.z / r;
+    kart.x = nx * ARENA_RADIUS;
+    kart.z = nz * ARENA_RADIUS;
     const dot = fx * nx + fz * nz;
     if (dot > 0) {
-      // Reflect the facing about the wall so the kart heads back in.
       const rx = fx - 2 * dot * nx;
       const rz = fz - 2 * dot * nz;
-      state.heading = Math.atan2(rx, rz);
+      kart.heading = Math.atan2(rx, rz);
     }
-    state.speed *= 0.6;
+    kart.speed *= 0.6;
   }
-
-  collect(state);
-  refill(state, rng);
-
-  state.elapsed += t;
-  if (state.coins >= state.target) state.status = 'over';
-  return state;
+  return kart;
 }
 
-function collect(state: KartState): void {
-  state.items = state.items.filter((c) => {
-    const hit = Math.hypot(c.x - state.x, c.z - state.z) <= COIN_COLLECT_RADIUS;
-    if (hit) state.coins += 1;
-    return !hit;
+// ── the shared coin field ──────────────────────────────────────────────────
+
+export interface CoinField {
+  coins: Coin[];
+  nextId: number;
+}
+
+function randomCoin(id: number, rng: Rng): Coin {
+  // Uniform point in a disc (sqrt keeps it from clumping in the middle).
+  const r = Math.sqrt(rng()) * (ARENA_RADIUS - COIN_MARGIN);
+  const a = rng() * Math.PI * 2;
+  return { id, x: Math.cos(a) * r, z: Math.sin(a) * r, hue: Math.floor(rng() * 360) };
+}
+
+/** Refill the arena up to COIN_TARGET, avoiding spawns right on a kart. */
+export function refillCoins(field: CoinField, avoid: Array<{ x: number; z: number }>, rng: Rng = Math.random): void {
+  while (field.coins.length < COIN_TARGET) {
+    let coin = randomCoin(field.nextId, rng);
+    if (avoid.some((p) => Math.hypot(coin.x - p.x, coin.z - p.z) < COIN_COLLECT_RADIUS * 2)) {
+      coin = randomCoin(field.nextId, rng);
+    }
+    field.coins.push(coin);
+    field.nextId++;
+  }
+}
+
+export function createCoinField(rng: Rng = Math.random): CoinField {
+  const field: CoinField = { coins: [], nextId: 1 };
+  refillCoins(field, [], rng);
+  return field;
+}
+
+/**
+ * Award any coin a kart is touching. `points` are the kart positions in order;
+ * returns how many coins each one scooped this step (parallel to `points`). If
+ * two karts overlap a coin, the earlier point wins it — a stable tie-break.
+ */
+export function collectCoins(field: CoinField, points: Array<{ x: number; z: number }>): number[] {
+  const hits = points.map(() => 0);
+  field.coins = field.coins.filter((c) => {
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (Math.hypot(c.x - p.x, c.z - p.z) <= COIN_COLLECT_RADIUS) {
+        hits[i] += 1;
+        return false;
+      }
+    }
+    return true;
   });
-}
-
-/** Unit forward vector — handy for the camera and the 3D model. */
-export function forward(state: KartState): { x: number; z: number } {
-  return { x: Math.sin(state.heading), z: Math.cos(state.heading) };
+  return hits;
 }
