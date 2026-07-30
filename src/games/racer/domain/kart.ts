@@ -119,8 +119,10 @@ export function stepMotion(kart: Kart, dt: number, input: KartInput): Kart {
       const rx = fx - 2 * dot * nx;
       const rz = fz - 2 * dot * nz;
       kart.heading = Math.atan2(rx, rz);
+      // The slowdown belongs to the bounce — a kart already turning back
+      // inward just gets clamped, not punished for grazing the fence.
+      kart.speed *= 0.6;
     }
-    kart.speed *= 0.6;
   }
   return kart;
 }
@@ -142,8 +144,14 @@ function randomCoin(id: number, rng: Rng): Coin {
 /** Refill the arena up to COIN_TARGET, avoiding spawns right on a kart. */
 export function refillCoins(field: CoinField, avoid: Array<{ x: number; z: number }>, rng: Rng = Math.random): void {
   while (field.coins.length < COIN_TARGET) {
+    // Re-roll (bounded) until the spot is clear — a single unchecked retry
+    // still spawned coins directly under a kart every few races.
     let coin = randomCoin(field.nextId, rng);
-    if (avoid.some((p) => Math.hypot(coin.x - p.x, coin.z - p.z) < COIN_COLLECT_RADIUS * 2)) {
+    for (
+      let tries = 0;
+      tries < 8 && avoid.some((p) => Math.hypot(coin.x - p.x, coin.z - p.z) < COIN_COLLECT_RADIUS * 2);
+      tries++
+    ) {
       coin = randomCoin(field.nextId, rng);
     }
     field.coins.push(coin);

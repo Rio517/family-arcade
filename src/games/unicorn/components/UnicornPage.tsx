@@ -465,6 +465,12 @@ function applyInput(
       if (map.right.some((k) => keys.has(k))) x += 1;
       if (map.up.some((k) => keys.has(k))) y -= 1;
       if (map.down.some((k) => keys.has(k))) y += 1;
+      if (x !== 0 && y !== 0) {
+        // Normalize diagonals, or a keyboard seat out-accelerates a touch
+        // seat by √2 on every diagonal — unfair on a shared tablet.
+        x *= Math.SQRT1_2;
+        y *= Math.SQRT1_2;
+      }
     }
 
     // A finger dragging this character steers it (keyboard, if pressed, wins).

@@ -236,6 +236,9 @@ export function step(state: GameState, dt: number, rng: Rng = Math.random): Game
         const push = SHIELD_PUSH * t;
         other.vel.x += (dx / d) * push;
         other.vel.y += (dy / d) * push;
+        // Re-clamp: the shove must not launch a rival past their own top
+        // speed (leaning on it used to settle ~14% above MAX_SPEED).
+        clampSpeed(other.vel, MAX_SPEED * (hasPower(other, 'speed') ? SPEED_MULT : 1));
       }
     }
   }
@@ -318,7 +321,12 @@ function collectCoins(state: GameState, rng: Rng): void {
     const before = winner.coins;
     winner.coins += 1;
     winner.glow = 1;
-    if (Math.floor(winner.coins / MILESTONE) > Math.floor(before / MILESTONE)) {
+    // No power-up on the winning coin — the round is over before it could
+    // ever be used, and the win screen shouldn't show a fresh aura.
+    if (
+      winner.coins < state.target &&
+      Math.floor(winner.coins / MILESTONE) > Math.floor(before / MILESTONE)
+    ) {
       grantPower(winner, state.powers, rng);
     }
     return false; // coin consumed

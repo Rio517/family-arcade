@@ -418,7 +418,10 @@ function Track3D({
             c.elapsed += t;
             if (c.scores[0] >= c.target || c.scores[1] >= c.target) {
               c.status = 'over';
-              c.winner = c.scores[0] >= c.scores[1] ? 0 : 1;
+              // Dead heat (both cross the line on the same frame) → null,
+              // which the protocol documents as "both win the tie".
+              c.winner =
+                c.scores[0] === c.scores[1] ? null : c.scores[0] > c.scores[1] ? 0 : 1;
             }
           }
           worldBeat += t;
