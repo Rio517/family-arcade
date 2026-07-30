@@ -119,6 +119,14 @@
   stroke: var(--brass-hi) !important; stroke-width: 2;
   filter: brightness(1.2) drop-shadow(0 0 3px rgba(231, 207, 149, 0.8));
 }
+/* Territories are keyboard-operable buttons — give tabbing a clear brass ring. */
+.risk-terr:focus-visible {
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 2px;
+  stroke: var(--brass-hi);
+  stroke-width: 2;
+  filter: brightness(1.18) drop-shadow(0 0 3px rgba(231, 207, 149, 0.8));
+}
 
 .risk-badge { cursor: pointer; }
 .risk-badge > text { pointer-events: none; }
@@ -129,8 +137,10 @@
 .risk-searoute-shadow { fill: none; stroke: #3a2a12; stroke-width: 2.4; opacity: 0.14; stroke-linecap: round; }
 .risk-searoute { fill: none; stroke: #7a5c2a; stroke-width: 1.4; stroke-dasharray: 1 7; stroke-linecap: round; opacity: 0.85; }
 .risk-searoute-end { fill: #7a5c2a; stroke: #efe6d0; stroke-width: 0.8; }
+/* steps(12) keeps the dotted lines drifting but repaints the big SVG at ~5fps
+   instead of 60 — this screen idles for minutes between taps. */
 @media (prefers-reduced-motion: no-preference) {
-  .risk-searoute { animation: risk-searoute-flow 2.6s linear infinite; }
+  .risk-searoute { animation: risk-searoute-flow 2.6s steps(12) infinite; }
 }
 @keyframes risk-searoute-flow { to { stroke-dashoffset: -8; } }
 .risk-token-hit { fill: transparent; pointer-events: all; }
@@ -150,8 +160,10 @@
 .risk-ship .rs-rigging line { stroke: #6b5024; stroke-width: 0.5; opacity: 0.5; }
 .risk-ship .rs-pennant { fill: #7a2a1c; stroke: #4a1810; stroke-width: 0.5; }
 .risk-ship .rs-wake path { fill: none; stroke: #8a6a2e; stroke-width: 1; stroke-dasharray: 1 4; stroke-linecap: round; opacity: 0.4; }
+/* steps(24) per keyframe leg ≈ 8 repaints/s — the bob still reads as gentle
+   swell, without burning battery at 60fps on an idle turn-based screen. */
 @media (prefers-reduced-motion: no-preference) {
-  .risk-ship { animation: risk-ship-bob 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .risk-ship { animation: risk-ship-bob 6s steps(24) infinite; transform-box: fill-box; transform-origin: center; }
 }
 @keyframes risk-ship-bob {
   0%, 100% { transform: translateY(0) rotate(-0.6deg); }

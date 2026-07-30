@@ -33,7 +33,14 @@ function continentLabels(map: RiskMap) {
 export function RiskBoard({ map, state, selected, targets, onPick, accent }: RiskBoardProps) {
   return (
     <div className="risk-board risk-board-active" style={{ ['--pc' as string]: accent }}>
-      <svg viewBox={`0 0 ${map.width} ${map.height}`} className="risk-svg" role="img" aria-label="World map">
+      {/* No role="img" on the svg — that would hide every descendant from
+          assistive tech; the territories inside are real interactive buttons. */}
+      <svg
+        viewBox={`0 0 ${map.width} ${map.height}`}
+        className="risk-svg"
+        aria-label="World map"
+        data-testid="risk-map"
+      >
         <defs>
           <filter id="risk-paper">
             <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves={2} stitchTiles="stitch" result="n" />
@@ -60,10 +67,16 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent }: Ris
         ))}
 
         {map.territories.map((t) => {
-          const owner = state.territories[t.id]?.owner ?? -1;
+          const st = state.territories[t.id];
+          const owner = st?.owner ?? -1;
           const fill = owner >= 0 ? state.players[owner].color : '#8a7a55';
           const cls = ['risk-terr', selected === t.id ? 'sel' : '', targets.has(t.id) ? 'target' : '']
             .filter(Boolean).join(' ');
+          const armies = st?.armies ?? 0;
+          const label =
+            owner >= 0
+              ? `${t.name} — ${state.players[owner].name}, ${armies} ${armies === 1 ? 'army' : 'armies'}`
+              : `${t.name} — unclaimed`;
           return (
             <g key={t.id}>
               {t.clip && (
@@ -77,6 +90,15 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent }: Ris
                 fill={fill}
                 clipPath={t.clip ? `url(#clip-${t.id})` : undefined}
                 onClick={() => onPick(t.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onPick(t.id);
+                  }
+                }}
+                tabIndex={0}
+                role="button"
+                aria-label={label}
                 data-testid={`terr-${t.id}`}
               >
                 <title>{t.name}</title>
@@ -108,9 +130,13 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent }: Ris
 
         {map.territories.map((t) => {
           const st = state.territories[t.id];
-          if (!st || st.owner === -1) return null; // unclaimed: no army badge yet
-          // The token is also a (larger) tap target for the territory — vital for
-          // tiny lands like Cuba or New Zealand.
+          // The token doubles as a (much larger) tap target for the territory —
+          // vital for tiny lands like Cuba or New Zealand on a phone. EVERY
+          // territory gets the invisible hit circle, even unclaimed ones: the
+          // claim phase is the tappiest of all. The army badge itself only
+          // appears once someone owns the land. aria-hidden because the
+          // territory path is the accessible control — this is a duplicate
+          // pointer target and its army count is already in the path's label.
           return (
             <g
               key={`b-${t.id}`}
@@ -118,11 +144,15 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent }: Ris
               transform={`translate(${t.labelX},${t.labelY})`}
               onClick={() => onPick(t.id)}
               data-testid={`token-${t.id}`}
+              aria-hidden="true"
             >
-              {/* Invisible, generous hit area — vital for tiny lands like Cuba. */}
-              <circle r={12} className="risk-token-hit" />
-              <circle r={10.5} className="risk-token-halo" fill="url(#risk-halo)" />
-              <text className="risk-token-num" dy="3.9">{st.armies}</text>
+              <circle r={22} className="risk-token-hit" />
+              {st && st.owner !== -1 && (
+                <>
+                  <circle r={10.5} className="risk-token-halo" fill="url(#risk-halo)" />
+                  <text className="risk-token-num" dy="3.9">{st.armies}</text>
+                </>
+              )}
             </g>
           );
         })}

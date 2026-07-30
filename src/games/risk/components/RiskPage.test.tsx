@@ -13,7 +13,9 @@ function renderPage() {
   );
 }
 
-const boardEl = () => screen.getByRole('img', { name: 'World map' });
+// The svg deliberately has no role="img" (that would hide the territory
+// buttons inside it from assistive tech), so grab it by testid.
+const boardEl = () => screen.getByTestId('risk-map');
 const phaseText = () => screen.getByTestId('risk-phase').textContent ?? '';
 const tapEveryTerritory = () => {
   for (const path of boardEl().querySelectorAll<SVGPathElement>('.risk-terr')) fireEvent.click(path);
@@ -151,6 +153,47 @@ describe('<RiskPage>', () => {
 
     fireEvent.click(screen.getByTestId('end-reinforce'));
     expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Attack/i);
+  });
+
+  it('territories are labelled keyboard buttons — Enter and Space both claim', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('count-2'));
+    fireEvent.click(screen.getByTestId('risk-start'));
+
+    const terrs = boardEl().querySelectorAll<SVGPathElement>('.risk-terr');
+    const first = terrs[0];
+    expect(first).toHaveAttribute('role', 'button');
+    expect(first).toHaveAttribute('tabindex', '0');
+    expect(first.getAttribute('aria-label')).toMatch(/— unclaimed$/);
+
+    // Enter claims the land for the first general (1 army raises the flag)…
+    fireEvent.keyDown(first, { key: 'Enter' });
+    expect(first.getAttribute('aria-label')).toMatch(/, 1 army$/);
+
+    // …and Space works just the same for the next general.
+    const second = terrs[1];
+    fireEvent.keyDown(second, { key: ' ' });
+    expect(second.getAttribute('aria-label')).toMatch(/, 1 army$/);
+  });
+
+  it('every territory gets a generous hit token, even before it is claimed', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('count-2'));
+    fireEvent.click(screen.getByTestId('risk-start'));
+
+    const board = boardEl();
+    const terrCount = board.querySelectorAll('.risk-terr').length;
+    const hits = board.querySelectorAll<SVGCircleElement>('.risk-token-hit');
+    // During the claim phase — the tappiest phase — nothing is owned yet, but
+    // every single territory still has an enlarged invisible tap circle.
+    expect(hits.length).toBe(terrCount);
+    for (const c of hits) expect(Number(c.getAttribute('r'))).toBeGreaterThanOrEqual(22);
+
+    // Tapping a hit token claims the land just like tapping the shape.
+    const firstTerr = board.querySelector<SVGPathElement>('.risk-terr')!;
+    const tid = firstTerr.getAttribute('data-testid')!.replace(/^terr-/, 'token-');
+    fireEvent.click(screen.getByTestId(tid));
+    expect(firstTerr.getAttribute('aria-label')).toMatch(/, 1 army$/);
   });
 
   it('opens the how-to-play guide automatically on the first ever visit', () => {

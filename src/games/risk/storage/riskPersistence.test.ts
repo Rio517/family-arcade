@@ -30,6 +30,24 @@ describe('risk persistence', () => {
     expect(stored!.state).toEqual(g); // territories, dice bag, phase — everything
   });
 
+  it('accepts a pre-defenseBag save, defaulting the defender a fresh bag', () => {
+    // Saves written before the defender got an independent dice bag have no
+    // `defenseBag`. They must still load (same storage version) with the field
+    // defaulted to an empty bag — drawDice treats empty as a fresh bag.
+    const g = newGame(MAP, players, () => 0.5, 'balanced');
+    const legacyState: Record<string, unknown> = { ...g };
+    delete legacyState.defenseBag;
+    localStorage.setItem(
+      'risk-campaign-v1',
+      JSON.stringify({ v: 1, savedAt: 99, state: legacyState }),
+    );
+
+    const stored = loadRiskGame();
+    expect(stored).not.toBeNull();
+    expect(stored!.state.defenseBag).toEqual([]);
+    expect(stored!.state.players).toHaveLength(2);
+  });
+
   it('never offers a finished war', () => {
     const g = newGame(MAP, players);
     saveRiskGame({ ...g, phase: 'over', winner: 0 });

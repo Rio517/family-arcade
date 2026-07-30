@@ -50,6 +50,12 @@ export function loadRiskGame(): StoredRisk | null {
     ) {
       return null;
     }
+    // Saves from before the defender got an independent dice bag lack the
+    // field; an empty bag is a fresh one (drawDice refills on first draw), so
+    // old campaigns keep working without a storage-version bump.
+    if (!Array.isArray(parsed.state.defenseBag)) {
+      parsed.state.defenseBag = [];
+    }
     return parsed;
   } catch {
     return null;
