@@ -26,6 +26,20 @@ export interface SceneShip {
 
 const HALF = (BOARD_SIZE - 1) / 2; // board cell → world offset
 
+/** Free every geometry, material, and texture under `root` (all owned here —
+ * ships and markers are built fresh on each update, nothing is shared). */
+function disposeDeep(root: THREE.Object3D) {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (mesh.geometry) mesh.geometry.dispose();
+    const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+    for (const m of mats) {
+      (m as THREE.MeshStandardMaterial).map?.dispose();
+      m.dispose();
+    }
+  });
+}
+
 export class FleetScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
@@ -127,6 +141,10 @@ export class FleetScene {
 
   /** Rebuild ships + shot markers from the current battle state. */
   update(ships: SceneShip[], incoming: CellState[][]) {
+    // This runs on every shot; free the old fleet or GPU buffers accumulate
+    // for the whole battle.
+    disposeDeep(this.shipsGroup);
+    disposeDeep(this.markGroup);
     this.shipsGroup.clear();
     this.markGroup.clear();
     this.fires = [];
@@ -242,7 +260,11 @@ export class FleetScene {
     cancelAnimationFrame(this.raf);
     this.resizeObs?.disconnect();
     this.controls.dispose();
+    // Actually free the GPU on teardown — the scene rebuilds on every skin
+    // change, and leaked WebGL contexts eventually kill 3D on iPads.
+    disposeDeep(this.scene);
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
     this.container.contains(this.renderer.domElement) && this.container.removeChild(this.renderer.domElement);
   }
 }
