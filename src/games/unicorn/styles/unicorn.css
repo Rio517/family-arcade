@@ -162,10 +162,20 @@
 }
 
 .uni-score-face { font-size: 26px; line-height: 1; }
-.uni-score-coins { font-size: 20px; color: #6b4a8a; }
+.uni-score-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 20px;
+  color: #6b4a8a;
+}
+.uni-score-coins svg { flex-shrink: 0; color: #c9930a; }
 .uni-score-coins b { font-size: 24px; }
 .uni-score-target { font-size: 14px; color: #9a86b5; }
 .uni-score-power {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 13px;
   font-weight: 900;
   padding: 2px 8px;
@@ -231,6 +241,7 @@
 .uni-win-card h2 { font-size: 34px; margin: 6px 0; color: #b0479c; }
 .uni-win-faces { font-size: 64px; }
 .uni-win-score { font-size: 18px; font-weight: 800; color: #6b4a8a; margin: 4px 0 18px; }
+.uni-win-score svg { vertical-align: -2px; color: #c9930a; }
 
 .uni-win-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
@@ -254,3 +265,9 @@
 
 .uni-ghost { background: #f0e6ff; color: #6b3fa0; }
 .uni-ghost:hover { background: #e7d8ff; }
+
+/* Accessibility floor: no animation for anyone who asked for calm. */
+@media (prefers-reduced-motion: reduce) {
+  .uni-score-power, .uni-win-card { animation: none; }
+  .uni-big-btn, .uni-cast-btn { transition: none; }
+}

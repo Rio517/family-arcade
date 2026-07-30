@@ -2,6 +2,8 @@ import '../styles/unicorn.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
+import { BoltIcon } from '@shared/ui/icons';
+import { CoinIcon, MagnetIcon, SparkleIcon } from './icons';
 import {
   ALL_POWERS,
   createGame,
@@ -36,10 +38,10 @@ const KEYMAP: Record<number, { up: string[]; down: string[]; left: string[]; rig
   2: { up: ['i'], down: ['k'], left: ['j'], right: ['l'] },
 };
 
-const POWER_LABEL: Record<PowerKind, string> = {
-  speed: '⚡ Speed',
-  magnet: '🧲 Magnet',
-  shield: '✨ Shield',
+const POWER_CHIP: Record<PowerKind, { Icon: typeof BoltIcon; label: string }> = {
+  speed: { Icon: BoltIcon, label: 'Speed' },
+  magnet: { Icon: MagnetIcon, label: 'Magnet' },
+  shield: { Icon: SparkleIcon, label: 'Shield' },
 };
 
 export function UnicornPage() {
@@ -113,7 +115,12 @@ export function UnicornPage() {
         <SetupCard title="Klara's Magic Coin Game" subtitle="How many players?">
           <div className="uni-choices">
             {[1, 2, 3].map((n) => (
-              <button key={n} className="uni-big-btn" onClick={() => chooseCount(n)}>
+              <button
+                key={n}
+                className="uni-big-btn"
+                data-testid={`uni-players-${n}`}
+                onClick={() => chooseCount(n)}
+              >
                 <span className="uni-big-emoji">{n === 1 ? '🦄' : n === 2 ? '🦄🐉' : '🦄🐉🧜‍♀️'}</span>
                 <span className="uni-big-label">{n} {n === 1 ? 'Player' : 'Players'}</span>
               </button>
@@ -133,6 +140,7 @@ export function UnicornPage() {
               <button
                 key={w.id}
                 className={`uni-big-btn uni-world-${w.id}`}
+                data-testid={`uni-world-${w.id}`}
                 onClick={() => chooseWorld(w.id)}
               >
                 <span className="uni-big-emoji">{w.emoji}</span>
@@ -157,7 +165,12 @@ export function UnicornPage() {
         >
           <div className="uni-cast">
             {info.characters.map((c) => (
-              <button key={c.id} className="uni-cast-btn" onClick={() => chooseCharacter(c)}>
+              <button
+                key={c.id}
+                className="uni-cast-btn"
+                data-testid={`uni-char-${c.id}`}
+                onClick={() => chooseCharacter(c)}
+              >
                 <span className="uni-cast-emoji">
                   {c.mount ? (
                     <>
@@ -330,6 +343,7 @@ function PlayField({
       <canvas
         ref={canvasRef}
         className="uni-canvas"
+        data-testid="uni-canvas"
         width={FIELD_W}
         height={FIELD_H}
         onPointerDown={onPointer}
@@ -355,16 +369,33 @@ function Scoreboard({ game }: { game: GameState }) {
   return (
     <div className="uni-scoreboard">
       {game.players.map((p) => (
-        <div key={p.id} className="uni-score" style={{ borderColor: p.color }}>
+        <div
+          key={p.id}
+          className="uni-score"
+          data-testid={`uni-score-${p.id}`}
+          style={{ borderColor: p.color }}
+        >
           <span className="uni-score-face">{p.mount ?? p.emoji}</span>
           <span className="uni-score-coins">
-            🪙 <b style={{ color: p.color }}>{p.coins}</b>
+            <CoinIcon size={16} />
+            <b style={{ color: p.color }}>{p.coins}</b>
             <span className="uni-score-target">/{game.target}</span>
           </span>
-          {p.power && <span className="uni-score-power">{POWER_LABEL[p.power.kind]}</span>}
+          {p.power && <PowerChip kind={p.power.kind} />}
         </div>
       ))}
     </div>
+  );
+}
+
+/** A power-up badge: shared-style line icon + name, no emoji in the chrome. */
+function PowerChip({ kind }: { kind: PowerKind }) {
+  const { Icon, label } = POWER_CHIP[kind];
+  return (
+    <span className="uni-score-power">
+      <Icon size={14} />
+      {label}
+    </span>
   );
 }
 
@@ -380,7 +411,7 @@ function WinOverlay({
   const champs = winners(game);
   const tie = champs.length > 1;
   return (
-    <div className="uni-win">
+    <div className="uni-win" data-testid="uni-win">
       <div className="uni-win-card">
         <div className="uni-win-burst" aria-hidden="true">🎉✨🌈✨🎉</div>
         <h2>{tie ? "It's a tie!" : `${champs[0].name} wins!`}</h2>
@@ -392,11 +423,20 @@ function WinOverlay({
           ))}
         </div>
         <p className="uni-win-score">
-          {champs.map((c) => `${c.name}: ${c.coins} 🪙`).join('  ·  ')}
+          {champs.map((c, i) => (
+            <span key={c.id}>
+              {i > 0 && '  ·  '}
+              {c.name}: {c.coins} <CoinIcon size={14} />
+            </span>
+          ))}
         </p>
         <div className="uni-win-btns">
-          <button className="uni-primary" onClick={onAgain}>Play again 🔁</button>
-          <button className="uni-ghost" onClick={onMenu}>New game ✨</button>
+          <button className="uni-primary" data-testid="uni-again" onClick={onAgain}>
+            Play again
+          </button>
+          <button className="uni-ghost" data-testid="uni-new" onClick={onMenu}>
+            New game
+          </button>
         </div>
       </div>
     </div>
@@ -409,8 +449,8 @@ function Shell({ children, onMenu }: { children: React.ReactNode; onMenu: () => 
   return (
     <div className="uni-root">
       <div className="uni-topbar">
-        <button className="uni-back" onClick={onMenu}>‹ Menu</button>
-        <span className="uni-title-mini">🦄 Magic Coins 🪙</span>
+        <button className="uni-back" data-testid="uni-back" onClick={onMenu}>‹ Menu</button>
+        <span className="uni-title-mini">Magic Coins</span>
         <FullscreenButton />
       </div>
       {children}
