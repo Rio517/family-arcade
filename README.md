@@ -1,4 +1,4 @@
-# Family Game Console
+# Kny-Flores Family Arcade
 
 A small family-friendly game console that lives on GitHub Pages:
 
@@ -7,7 +7,7 @@ A small family-friendly game console that lives on GitHub Pages:
 - **Chess** — full-rules, drag-and-drop chess for two players: pass-and-play on one device, or online over a shared code.
 - **Risk** — world-conquest for 2–6 players on one shared board (hot-seat): reinforce, attack with dice, and take over a real-geography world map.
 
-**Play it:** https://rio517.github.io/yahtzee-calculator/
+**Play it:** https://arcade.knyflores.com/
 
 It's free and open source — the whole thing lives in this repo.
 
@@ -135,6 +135,13 @@ never imports a game (only the reverse), so games stay separable.
 
 Deployment is automated by GitHub Actions (`.github/workflows/deploy.yml`): every push to `main` builds the app, runs the tests, and publishes `dist/` to GitHub Pages.
 
-**One-time setup:** in the repo, go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
+**One-time setup:**
+
+1. In the repo, go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
+2. **Custom domain** — the arcade is served at `arcade.knyflores.com`:
+   - `public/CNAME` pins the domain (it ships in `dist/`).
+   - At the DNS provider for `knyflores.com`, add a `CNAME` record: `arcade` → `rio517.github.io`.
+   - In **Settings → Pages → Custom domain**, confirm `arcade.knyflores.com` and enable **Enforce HTTPS** once the certificate is issued.
+   - The app is built with a root base path (`/`) for the custom domain. To serve from the bare `github.io` project URL instead, build with `BASE_PATH=/yahtzee-calculator/`.
 
 The Yahtzee logger remains a single vanilla HTML file — served as `calculator.html`, no build required.

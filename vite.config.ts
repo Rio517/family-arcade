@@ -14,7 +14,7 @@ const alias = {
 // Project page on GitHub Pages is served from /<repo>/, so assets must be
 // requested with that prefix. Locally (dev/preview) BASE is unset and Vite
 // falls back to '/'.
-const base = process.env.BASE_PATH ?? '/yahtzee-calculator/';
+const base = process.env.BASE_PATH ?? '/'; // custom domain serves from the root
 
 export default defineConfig({
   base,
