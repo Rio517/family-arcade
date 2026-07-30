@@ -55,6 +55,10 @@ describe('<Menu> — the arcade landing page', () => {
         mapId: 'classic',
         phase: 'reinforce',
         players: [{ name: 'Mario' }, { name: 'Peach' }],
+        // The loader shape-checks everything the engine indexes into.
+        territories: {},
+        current: 0,
+        diceBag: [1, 2, 3],
       },
     }));
     renderMenu();

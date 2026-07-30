@@ -52,6 +52,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Agent worktrees under .claude/ carry full repo copies — never scan them.
+    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**'],
     setupFiles: ['./src/test/setup.ts'],
     css: false,
     coverage: {
