@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Menu } from './Menu';
+import { GAMES } from './registry';
 
 function renderMenu() {
   return render(
@@ -14,9 +15,10 @@ function renderMenu() {
 describe('<Menu> — the arcade landing page', () => {
   beforeEach(() => localStorage.clear());
 
-  it('lists every game as a ticket', () => {
+  it('lists every registry game (and Yahtzee) as a ticket', () => {
     renderMenu();
-    for (const name of ['Yahtzee', 'Ship Battle', 'Chess', 'Risk']) {
+    // Driven by the registry itself so a newly added game can't be missed.
+    for (const name of ['Yahtzee', ...GAMES.map((g) => g.title)]) {
       expect(screen.getAllByText(name).length).toBeGreaterThan(0);
     }
   });
