@@ -104,8 +104,8 @@ using **rebase merges** (sometimes squash). Therefore:
 
 ## Recurring rituals
 
-- `/audit` (see `.claude/skills/audit/`) — the successive codebase audit:
-  run it when asked, compare against the previous report, fix the small stuff,
-  PR the rest as findings.
+- `/audit` (see `.claude/skills/audit/`) — a fresh forward-looking sweep of
+  the current code: run it when asked, fix the small stuff directly, put the
+  rest as findings in the PR body. No report files, no audit history.
 - After any PR is opened, tell the owner; they merge fast, so re-check state
   before follow-up pushes (see workflow above).
