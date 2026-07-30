@@ -76,6 +76,16 @@ body {
 }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* One visible focus ring for every shared control — games without their own
+   focus styling (chess, battleship, racer, unicorn) inherit this floor. */
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.fs-btn:focus-visible,
+.code-chip:focus-visible,
+.seg-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .btn-primary {
   background: var(--accent-dim);
   border-color: var(--accent);
@@ -170,7 +180,10 @@ body {
   background: rgba(248, 113, 113, 0.10);
 }
 .conn[data-s='reconnecting'] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
-.conn[data-s='reconnecting'] .dot { background: var(--warn); animation: pulse 1s infinite; }
+.conn[data-s='reconnecting'] .dot { background: var(--warn); }
+@media (prefers-reduced-motion: no-preference) {
+  .conn[data-s='reconnecting'] .dot { animation: pulse 1s infinite; }
+}
 .conn[data-s='error'] { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 55%, var(--border)); }
 .conn[data-s='error'] .dot { background: var(--bad); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
@@ -248,17 +261,6 @@ body {
 .placing-wait .pw-line { font-size: 16px; margin: 2px 0; }
 .placing-wait .pw-line strong { color: var(--accent); }
 .placing-wait .ell span { opacity: 0.25; }
-
-/* ── History ─────────────────────────────────────────────────────────────── */
-.history { display: grid; gap: 6px; }
-.hentry {
-  display: flex; align-items: center; gap: 10px; font-size: 13px;
-  padding: 8px 10px; border-radius: 8px; background: var(--surface-2);
-}
-.hentry .badge { font-weight: 800; }
-.hentry .badge.win { color: var(--good); }
-.hentry .badge.loss { color: var(--bad); }
-.hentry .pts { margin-left: auto; color: var(--accent); font-weight: 700; }
 
 /* ── Result ──────────────────────────────────────────────────────────────── */
 .result-panel { position: relative; overflow: hidden; }

@@ -473,8 +473,10 @@ function Track3D({
     // arcade menu (or racing later) must not front-load the 3D library.
     import('../three/scene').then(({ RacerScene: Scene }) => {
       if (gone) return;
+      const reducedMotion =
+        typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
       try {
-        scene = new Scene(mount, ctx.looks, ctx.myIndex);
+        scene = new Scene(mount, ctx.looks, ctx.myIndex, reducedMotion);
       } catch (err) {
         mount.innerHTML =
           '<p data-testid="racer3d-fallback" style="padding:24px;text-align:center;color:#fff">Sorry, this device can\'t show 3D. 😢</p>';

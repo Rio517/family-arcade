@@ -84,6 +84,7 @@ export class RacerScene {
     private container: HTMLElement,
     looks: RacerLook[],
     private followIndex: number,
+    private reducedMotion = false,
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -254,7 +255,8 @@ export class RacerScene {
       obj.shadow.position.set(k.x, 0.06, k.z);
       const wheelSpin = k.speed * dt * 0.5;
       for (const w of obj.wheels) w.rotation.x += wheelSpin;
-      obj.driver.position.y = 9 + Math.sin(this.spin * 6 + i) * 0.4;
+      // Driving is gameplay; the happy bounce is decoration.
+      if (!this.reducedMotion) obj.driver.position.y = 9 + Math.sin(this.spin * 6 + i) * 0.4;
     });
 
     const live = this.liveCoinIds;
@@ -268,8 +270,10 @@ export class RacerScene {
       }
       mesh.position.x = coin.x;
       mesh.position.z = coin.z;
-      mesh.rotation.y += dt * 3;
-      mesh.position.y = 4 + Math.sin(this.spin * 2.5 + coin.id) * 0.6;
+      if (!this.reducedMotion) {
+        mesh.rotation.y += dt * 3;
+        mesh.position.y = 4 + Math.sin(this.spin * 2.5 + coin.id) * 0.6;
+      }
     }
     for (const [id, mesh] of this.coins) {
       if (!live.has(id)) {

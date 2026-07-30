@@ -32,7 +32,8 @@ export default function FreePlay3D({ board, lifted, onTap }: Props) {
       scene = new ChessScene(holder.current, {
         orientation: 'w',
         palette: SCENE_PALETTES[theme],
-        reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        reducedMotion:
+          typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches,
         onTap: (sq) => onTapRef.current(sq),
       });
       sceneRef.current = scene;
