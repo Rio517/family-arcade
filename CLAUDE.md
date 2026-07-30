@@ -60,7 +60,11 @@ using **rebase merges** (sometimes squash). Therefore:
 
 ## Verification protocol (every change)
 
-1. `npx tsc --noEmit` && `npx vitest run` && `npm run build` — all clean.
+1. `npx vitest run` && `npm run build` — all clean. The REAL typecheck is
+   the `tsc -b` inside `npm run build`: bare `npx tsc --noEmit` is a silent
+   no-op here (solution-style tsconfig), and `tsc -b`'s incremental cache can
+   hide errors — before trusting a build, delete stray `*.tsbuildinfo` files
+   like CI's clean room would (two type errors shipped this way once).
 2. **Prove UI changes in a real browser.** Headless chromium is preinstalled:
    - executable: `/opt/pw-browsers/chromium-*/chrome-linux/chrome`
    - playwright-core: `/opt/node22/lib/node_modules/playwright/node_modules/playwright-core/index.mjs`
