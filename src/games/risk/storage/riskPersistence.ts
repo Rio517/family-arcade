@@ -36,7 +36,17 @@ export function loadRiskGame(): StoredRisk | null {
       !Array.isArray(parsed.state.players) ||
       parsed.state.players.length < 2 ||
       typeof parsed.state.mapId !== 'string' ||
-      parsed.state.phase === 'over'
+      parsed.state.phase === 'over' ||
+      // A tampered or future-version save must not white-screen the board:
+      // every field the engine indexes into gets a shape check.
+      parsed.state.players.some((p) => typeof p !== 'object' || p === null || typeof p.name !== 'string') ||
+      typeof parsed.state.territories !== 'object' ||
+      parsed.state.territories === null ||
+      !Number.isInteger(parsed.state.current) ||
+      parsed.state.current < 0 ||
+      parsed.state.current >= parsed.state.players.length ||
+      !Array.isArray(parsed.state.diceBag) ||
+      !parsed.state.diceBag.every((d) => typeof d === 'number')
     ) {
       return null;
     }
