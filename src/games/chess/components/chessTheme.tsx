@@ -115,11 +115,12 @@ export const SCENE_PALETTES: Record<ChessThemeId, ScenePalette> = {
     pieceRoughness: 0.34,
   },
   unicorn: {
-    background: '#2a1636',
+    background: '#e9b7dd', // fallback behind the dream-sky dome
     tileLight: '#fbe3f2',
     tileDark: '#d9a0d0',
-    frame: '#43254e',
+    frame: '#d9a6de', // rose-quartz terrace — reads warm against the clouds
     edge: '#ff8fd0',
+    edgeEmissive: 0.9,
     whitePiece: '#f6bcdb', // Rose pearl
     blackPiece: '#cdb1f2', // Lavender pearl
     accent: '#e8b64c',
