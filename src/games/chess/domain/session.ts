@@ -42,6 +42,14 @@ export interface SessionState {
    * standard position, so log reconciliation stays sound.
    */
   start?: GameState;
+  /**
+   * Game epoch: how many rematch resets this session has been through. A
+   * peer's `sync` carries its epoch; a sync from an OLDER epoch is stale
+   * (its finished log must never "un-win" a rematch both sides agreed to),
+   * while a NEWER epoch is adopted wholesale — log and all. Syncs from
+   * pre-epoch builds count as epoch 0.
+   */
+  epoch: number;
   iWantRematch: boolean;
   oppWantsRematch: boolean;
 }
@@ -78,6 +86,7 @@ export function createLocalSession(whiteName: string, blackName: string, start?:
     oppName: blackName,
     log: [],
     start,
+    epoch: 0,
     iWantRematch: false,
     oppWantsRematch: false,
   };
@@ -92,6 +101,7 @@ export function createOnlineSession(side: Side, code: string, myName: string): S
     myName,
     oppName: '',
     log: [],
+    epoch: 0,
     iWantRematch: false,
     oppWantsRematch: false,
   };
@@ -156,7 +166,7 @@ export function connectHandshake(s: SessionState): ChessMessage[] {
   if (s.mode !== 'online' || !s.side) return [];
   return [
     { t: 'hello', v: CHESS_PROTOCOL_VERSION, side: s.side, name: s.myName },
-    { t: 'sync', log: s.log, wantRematch: s.iWantRematch },
+    { t: 'sync', log: s.log, epoch: s.epoch, wantRematch: s.iWantRematch },
   ];
 }
 
@@ -210,14 +220,14 @@ export function truncateLog(s: SessionState, n: number): Outcome {
  */
 export function proposeRematch(s: SessionState): Outcome {
   if (s.mode === 'local') {
-    // Local rematch is immediate — just clear the board.
-    const next: SessionState = { ...s, log: [], iWantRematch: false, oppWantsRematch: false };
+    // Local rematch is immediate — just clear the board (new epoch, new game).
+    const next: SessionState = { ...s, log: [], epoch: s.epoch + 1, iWantRematch: false, oppWantsRematch: false };
     return { state: next, outgoing: [] };
   }
   const iWant = true;
   const both = iWant && s.oppWantsRematch;
   const next: SessionState = both
-    ? { ...s, log: [], iWantRematch: false, oppWantsRematch: false }
+    ? { ...s, log: [], epoch: s.epoch + 1, iWantRematch: false, oppWantsRematch: false }
     : { ...s, iWantRematch: true };
   return { state: next, outgoing: [{ t: 'rematch' }] };
 }
@@ -233,6 +243,32 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
     }
 
     case 'sync': {
+      // Pre-epoch builds send syncs without an epoch — treat those as epoch 0.
+      const msgEpoch = msg.epoch ?? 0;
+
+      // They rematch-reset and we missed it: adopt their game wholesale —
+      // log AND epoch — and clear our own stale rematch intent.
+      if (msgEpoch > s.epoch) {
+        const next: SessionState = {
+          ...s,
+          log: msg.log,
+          epoch: msgEpoch,
+          iWantRematch: false,
+          oppWantsRematch: msg.wantRematch,
+        };
+        return { state: next, outgoing: [], finished: finishInfo(next) };
+      }
+
+      // A stale sync from before our rematch reset: its old (finished) log
+      // must not resurrect the game. Ignore it, and answer with our own sync
+      // so the lagging peer jumps to the new epoch.
+      if (msgEpoch < s.epoch) {
+        return {
+          state: s,
+          outgoing: [{ t: 'sync', log: s.log, epoch: s.epoch, wantRematch: s.iWantRematch }],
+        };
+      }
+
       const merged = reconcileLogs(s.log, msg.log);
       const next: SessionState = {
         ...s,
@@ -241,7 +277,9 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
       };
       // If they're behind, answer with our (longer) log so they catch up.
       const outgoing: ChessMessage[] =
-        merged.length > msg.log.length ? [{ t: 'sync', log: merged, wantRematch: s.iWantRematch }] : [];
+        merged.length > msg.log.length
+          ? [{ t: 'sync', log: merged, epoch: s.epoch, wantRematch: s.iWantRematch }]
+          : [];
       return { state: next, outgoing, finished: finishInfo(next) };
     }
 
@@ -265,7 +303,7 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
     case 'rematch': {
       const both = s.iWantRematch;
       const next: SessionState = both
-        ? { ...s, log: [], iWantRematch: false, oppWantsRematch: false }
+        ? { ...s, log: [], epoch: s.epoch + 1, iWantRematch: false, oppWantsRematch: false }
         : { ...s, oppWantsRematch: true };
       return { state: next, outgoing: [] };
     }

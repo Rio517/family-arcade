@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyMessage,
   canIMove,
+  connectHandshake,
   createLocalSession,
   createOnlineSession,
   makeMove,
@@ -12,6 +13,7 @@ import {
   undoMove,
   type SessionState,
 } from './session';
+import { isChessMessage } from './protocol';
 import type { Ply, Square } from './types';
 
 const sq = (name: string): Square => ({ row: 8 - Number(name[1]), col: 'abcdefgh'.indexOf(name[0]) });
@@ -208,5 +210,97 @@ describe('online rematch', () => {
     host = applyMessage(host, { t: 'rematch' }).state; // opponent also proposes
     expect(host.log).toHaveLength(0);
     expect(host.iWantRematch).toBe(false);
+  });
+});
+
+describe('rematch epochs — a stale sync cannot un-win a rematch', () => {
+  // Scholar's mate: a finished game's log (White wins on move 4).
+  const FINISHED_LOG: Ply[] = [
+    ply('e2', 'e4'), ply('e7', 'e5'),
+    ply('f1', 'c4'), ply('b8', 'c6'),
+    ply('d1', 'h5'), ply('g8', 'f6'),
+    ply('h5', 'f7'),
+  ];
+
+  /** A host session sitting on the finished game, ready to rematch. */
+  function finishedHost(): SessionState {
+    return { ...createOnlineSession('host', 'ABCD', 'Host'), log: FINISHED_LOG };
+  }
+
+  /** Run the full two-sided rematch (I propose, the peer's rematch arrives). */
+  function afterRematch(): SessionState {
+    let s = proposeRematch(finishedHost()).state;
+    s = applyMessage(s, { t: 'rematch' }).state;
+    return s;
+  }
+
+  it('the rematch reset bumps the epoch and clears the log', () => {
+    const s = afterRematch();
+    expect(s.log).toHaveLength(0);
+    expect(s.epoch).toBe(1);
+    expect(phase(s)).toBe('play');
+  });
+
+  it('ignores a stale old-epoch sync carrying the finished log (and re-syncs the laggard)', () => {
+    const s = afterRematch();
+    // The peer's pre-rematch sync arrives late, carrying the finished game.
+    const out = applyMessage(s, { t: 'sync', log: FINISHED_LOG, wantRematch: false, epoch: 0 });
+    expect(out.state.log).toHaveLength(0); // the rematch survives
+    expect(out.state.epoch).toBe(1);
+    expect(phase(out.state)).toBe('play'); // not "un-won" back to game over
+    expect(out.finished).toBeUndefined();
+    // And we answer with our own sync so the stale peer catches up.
+    expect(out.outgoing).toEqual([{ t: 'sync', log: [], epoch: 1, wantRematch: false }]);
+  });
+
+  it('treats a sync without an epoch (older build) as epoch 0 — still stale', () => {
+    const s = afterRematch();
+    const out = applyMessage(s, { t: 'sync', log: FINISHED_LOG, wantRematch: false });
+    expect(out.state.log).toHaveLength(0);
+    expect(out.state.epoch).toBe(1);
+  });
+
+  it('adopts the peer log AND epoch wholesale when theirs is newer (catch-up)', () => {
+    // Guest still holds the finished game at epoch 0 (it missed the reset,
+    // and had itself asked for the rematch).
+    const guest: SessionState = {
+      ...createOnlineSession('guest', 'ABCD', 'Guest'),
+      log: FINISHED_LOG,
+      iWantRematch: true,
+    };
+    const out = applyMessage(guest, { t: 'sync', log: [], wantRematch: false, epoch: 1 });
+    expect(out.state.log).toHaveLength(0); // shorter, but the newer game wins
+    expect(out.state.epoch).toBe(1);
+    expect(out.state.iWantRematch).toBe(false); // stale intent cleared
+    expect(phase(out.state)).toBe('play');
+  });
+
+  it('equal epochs still reconcile by longer-log-wins', () => {
+    const guest = createOnlineSession('guest', 'ABCD', 'Guest');
+    const out = applyMessage(guest, { t: 'sync', log: [ply('e2', 'e4')], wantRematch: false, epoch: 0 });
+    expect(out.state.log).toEqual([ply('e2', 'e4')]);
+  });
+
+  it('connectHandshake syncs carry my epoch', () => {
+    const s = afterRematch();
+    const sync = connectHandshake(s).find((m) => m.t === 'sync');
+    expect(sync).toEqual({ t: 'sync', log: [], epoch: 1, wantRematch: false });
+  });
+});
+
+describe('sync epoch validation (isChessMessage)', () => {
+  it('accepts a sync without an epoch (deployed pre-epoch builds)', () => {
+    expect(isChessMessage({ t: 'sync', log: [], wantRematch: false })).toBe(true);
+  });
+
+  it('accepts an in-range integer epoch', () => {
+    expect(isChessMessage({ t: 'sync', log: [], wantRematch: false, epoch: 0 })).toBe(true);
+    expect(isChessMessage({ t: 'sync', log: [], wantRematch: false, epoch: 42 })).toBe(true);
+  });
+
+  it('rejects negative, fractional, huge, or non-numeric epochs', () => {
+    for (const epoch of [-1, 1.5, 1e6 + 1, '2', NaN, null]) {
+      expect(isChessMessage({ t: 'sync', log: [], wantRematch: false, epoch })).toBe(false);
+    }
   });
 });

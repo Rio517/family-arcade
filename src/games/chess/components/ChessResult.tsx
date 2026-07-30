@@ -32,6 +32,7 @@ const REASON: Record<Status, string> = {
   stalemate: 'Stalemate — no legal moves left',
   'draw-fifty': 'Draw — fifty moves without a capture or pawn move',
   'draw-material': 'Draw — not enough material to mate',
+  repetition: "The same position three times — that's a draw!",
 };
 
 /** The defeated king, toppled — the emblem when someone is checkmated. */

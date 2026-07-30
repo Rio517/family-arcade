@@ -4,6 +4,7 @@ import {
   customStart,
   initialState,
   inCheck,
+  isGameOver,
   isSquareAttacked,
   legalMoves,
   legalMovesFrom,
@@ -204,6 +205,48 @@ describe('game endings', () => {
 
   it('flags the fifty-move rule', () => {
     expect(status(parseFen('k7/8/8/8/8/8/8/R6K w - - 100 60'))).toBe('draw-fifty');
+  });
+
+  it('K+B vs K+B with both bishops on the same square colour is a dead draw', () => {
+    // White bishop c2 and black bishop f7 both live on light squares —
+    // they can never even meet, so no mate is ever possible.
+    expect(status(parseFen('k7/5b2/8/8/8/8/2B5/K7 w - - 0 1'))).toBe('draw-material');
+  });
+
+  it('K+B vs K+B on opposite square colours stays playable', () => {
+    // White bishop c2 (light) vs black bishop c7 (dark): mates exist.
+    expect(status(parseFen('k7/2b5/8/8/8/8/2B5/K7 w - - 0 1'))).toBe('playing');
+  });
+});
+
+describe('threefold repetition', () => {
+  // Both sides bounce their kingside knights out and back: after four plies
+  // the opening position is on the board again (same side to move, same
+  // castling rights, no en-passant square).
+  const shuffle: Ply[] = [
+    { from: sq('g1'), to: sq('f3') },
+    { from: sq('g8'), to: sq('f6') },
+    { from: sq('f3'), to: sq('g1') },
+    { from: sq('f6'), to: sq('g8') },
+  ];
+
+  it('two occurrences of a position is still just playing', () => {
+    // One full shuffle: the opening position has now occurred twice.
+    expect(status(replay(shuffle))).toBe('playing');
+  });
+
+  it('the third occurrence is a repetition draw (nobody wins)', () => {
+    const state = replay([...shuffle, ...shuffle]);
+    expect(status(state)).toBe('repetition');
+    expect(winnerOf(state)).toBeNull();
+    expect(isGameOver('repetition')).toBe(true);
+  });
+
+  it('applyMove copies the position counts instead of mutating them', () => {
+    const midway = replay(shuffle);
+    const countsBefore = JSON.parse(JSON.stringify(midway.repetition));
+    replay(shuffle, midway); // shuffle again from the same state
+    expect(midway.repetition).toEqual(countsBefore); // untouched
   });
 });
 

@@ -51,7 +51,44 @@ function sessionKey(code: string): string {
   return SESSION_PREFIX + code;
 }
 
+/**
+ * Prune stored online sessions that can never be resumed: finished games
+ * (the replayed log is game-over) and unreadable/corrupt entries. Runs
+ * opportunistically before saves and resume lookups, so old game codes don't
+ * pile up in localStorage forever. Fully defensive — a bad key never throws.
+ */
+export function sweepStaleChessSessions(): void {
+  const keys: string[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(SESSION_PREFIX)) keys.push(key);
+    }
+  } catch {
+    return; // storage unavailable — nothing to sweep
+  }
+  for (const key of keys) {
+    let stale = true;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw) as StoredChessGame;
+        if (parsed && typeof parsed.code === 'string' && Array.isArray(parsed.log)) {
+          // Prove the log replays; a finished game is done and can go.
+          stale = isGameOver(status(replay(parsed.log)));
+        }
+      }
+    } catch {
+      stale = true; // bad JSON or an illegal log — either way it can't resume
+    }
+    if (stale) safeRemove(key);
+  }
+}
+
 export function saveChessGame(game: StoredChessGame): void {
+  // Sweep BEFORE saving so the game being saved (even a just-finished one,
+  // kept for its result screen) survives until a later session's sweep.
+  sweepStaleChessSessions();
   safeSet(sessionKey(game.code), JSON.stringify(game));
   safeSet(LAST_SESSION_KEY, game.code);
 }
@@ -75,6 +112,7 @@ export function clearChessGame(code: string): void {
 
 /** The most recent resumable online game (has a code, isn't finished). */
 export function loadResumableChessGame(): StoredChessGame | null {
+  sweepStaleChessSessions();
   const code = safeGet(LAST_SESSION_KEY);
   if (!code) return null;
   const game = loadChessGame(code);
