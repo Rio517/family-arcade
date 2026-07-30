@@ -101,7 +101,7 @@ function drawCoin(ctx: CanvasRenderingContext2D, x: number, y: number, hue: numb
   const cy = y + bob;
   const r = 17;
 
-  // Rainbow glow.
+  // Rainbow glow — the coin's magic colour lives in the halo, not the metal.
   const glow = ctx.createRadialGradient(x, cy, 2, x, cy, r * 2.4);
   glow.addColorStop(0, `hsla(${hue},95%,65%,0.55)`);
   glow.addColorStop(1, `hsla(${hue},95%,65%,0)`);
@@ -110,22 +110,60 @@ function drawCoin(ctx: CanvasRenderingContext2D, x: number, y: number, hue: numb
   ctx.arc(x, cy, r * 2.4, 0, Math.PI * 2);
   ctx.fill();
 
-  // Gold coin body.
-  const body = ctx.createRadialGradient(x - 5, cy - 6, 2, x, cy, r);
-  body.addColorStop(0, '#fff6c9');
-  body.addColorStop(0.5, '#ffd54a');
-  body.addColorStop(1, '#e39c1c');
-  ctx.fillStyle = body;
+  // The coin spins on its vertical axis (per-coin phase so they don't sync);
+  // squashing x by the spin is the classic canvas fake-3D flip.
+  const spin = Math.cos(time * 2.4 + x * 0.13 + hue * 0.05);
+  const w = Math.max(0.16, Math.abs(spin)); // never quite edge-on-invisible
+
+  ctx.save();
+  ctx.translate(x, cy);
+  ctx.scale(w, 1);
+
+  // Milled edge: a darker gold disc peeking out on the side turning away —
+  // strongest mid-flip, gone when the coin faces us square.
+  const thickness = 5 * (1 - w);
+  if (thickness > 0.5) {
+    ctx.fillStyle = '#b8791a';
+    ctx.beginPath();
+    ctx.arc(spin >= 0 ? -thickness : thickness, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Rim, then the brighter face inset into it.
+  ctx.fillStyle = '#e39c1c';
   ctx.beginPath();
-  ctx.arc(x, cy, r, 0, Math.PI * 2);
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = `hsl(${hue},85%,55%)`;
+
+  const face = ctx.createRadialGradient(-5, -6, 2, 0, 0, r - 2.5);
+  face.addColorStop(0, '#fff6c9');
+  face.addColorStop(0.55, '#ffd54a');
+  face.addColorStop(1, '#f0ad2b');
+  ctx.fillStyle = face;
+  ctx.beginPath();
+  ctx.arc(0, 0, r - 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Embossed inner ring, like a struck coin's raised border.
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = 'rgba(184,121,26,0.55)';
+  ctx.beginPath();
+  ctx.arc(0, 0, r - 5, 0, Math.PI * 2);
   ctx.stroke();
 
-  // A little star sparkle in the middle.
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  star(ctx, x, cy, 5, 2.2, 5);
+  // The star stamp — pressed into the metal (dark star, light catch below).
+  ctx.fillStyle = 'rgba(199,134,29,0.9)';
+  star(ctx, 0, 0.8, 8, 3.4, 5);
+  ctx.fillStyle = 'rgba(255,246,201,0.9)';
+  star(ctx, 0, -0.2, 7.2, 3, 5);
+
+  // Glint riding the top-left rim.
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.beginPath();
+  ctx.arc(-r * 0.45, -r * 0.55, 2.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 function star(ctx: CanvasRenderingContext2D, cx: number, cy: number, outer: number, inner: number, points: number) {
