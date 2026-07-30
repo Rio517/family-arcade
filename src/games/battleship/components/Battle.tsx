@@ -14,6 +14,28 @@ import { BOARD_SIZE, type Coord, type Fleet, type GameLog, type ShipId, type Sho
 
 const coordLabel = (row: number, col: number) => `${COLUMN_LABELS[col]}${row + 1}`;
 
+/** Matches the 720px CSS breakpoint that swaps the narrow/wide layouts. */
+const WIDE_QUERY = '(min-width: 720px)';
+
+/**
+ * Track which layout is live so only that one mounts. Rendering both (CSS
+ * display-switched) kept a hidden second copy of everything alive — including
+ * a second WebGL context + render loop whenever the fleet was in 3D.
+ */
+function useWideLayout(): boolean {
+  const [wide, setWide] = useState(
+    () => typeof matchMedia !== 'function' || matchMedia(WIDE_QUERY).matches,
+  );
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const mq = matchMedia(WIDE_QUERY);
+    const onChange = () => setWide(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return wide;
+}
+
 interface BattleProps {
   log: GameLog;
   side: Side;
@@ -44,6 +66,7 @@ export function Battle({
   // On narrow screens we show one board at a time; default to the radar so the
   // player is looking at their attack board when it's their move.
   const [view, setView] = useState<View>('radar');
+  const wide = useWideLayout();
   useEffect(() => {
     if (myTurn) setView('radar');
   }, [myTurn]);
@@ -180,29 +203,31 @@ export function Battle({
 
   return (
     <div className="stack">
-      {/* Narrow (< 720px): tab between one board at a time, log below. */}
-      <div className="battle-narrow">
-        <div className="view-tabs">
-          <button data-active={view === 'radar'} onClick={() => setView('radar')}>
-            <RadarIcon size={16} /> Radar
-          </button>
-          <button data-active={view === 'fleet'} onClick={() => setView('fleet')}>
-            <ShieldIcon size={16} /> My Fleet
-          </button>
+      {wide ? (
+        /* Wide (≥ 720px): both boards side by side; at ≥ 1024px the log becomes
+           a full-height column beside them to fill a landscape tablet/desktop. */
+        <div className="battle-wide">
+          <div className="boards">
+            {radarBoard}
+            {fleetBoard}
+          </div>
+          <MoveLog log={log} side={side} myName={myName} oppName={oppName} />
         </div>
-        {view === 'radar' ? radarBoard : fleetBoard}
-        <MoveLog log={log} side={side} myName={myName} oppName={oppName} />
-      </div>
-
-      {/* Wide (≥ 720px): both boards side by side; at ≥ 1024px the log becomes
-          a full-height column beside them to fill a landscape tablet/desktop. */}
-      <div className="battle-wide">
-        <div className="boards">
-          {radarBoard}
-          {fleetBoard}
+      ) : (
+        /* Narrow (< 720px): tab between one board at a time, log below. */
+        <div className="battle-narrow">
+          <div className="view-tabs">
+            <button data-active={view === 'radar'} onClick={() => setView('radar')} aria-pressed={view === 'radar'}>
+              <RadarIcon size={16} /> Radar
+            </button>
+            <button data-active={view === 'fleet'} onClick={() => setView('fleet')} aria-pressed={view === 'fleet'}>
+              <ShieldIcon size={16} /> My Fleet
+            </button>
+          </div>
+          {view === 'radar' ? radarBoard : fleetBoard}
+          <MoveLog log={log} side={side} myName={myName} oppName={oppName} />
         </div>
-        <MoveLog log={log} side={side} myName={myName} oppName={oppName} />
-      </div>
+      )}
     </div>
   );
 }

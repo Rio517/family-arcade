@@ -13,7 +13,7 @@ import { FIELD_H, FIELD_W, type GameState, type Player } from '../domain/engine'
 export function renderScene(canvas: HTMLCanvasElement, game: GameState, time: number): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  ctx.clearRect(0, 0, FIELD_W, FIELD_H);
+  // No clearRect: both backgrounds start with an opaque full-field fill.
 
   if (game.world === 'sky') drawSky(ctx, time);
   else drawOcean(ctx, time);

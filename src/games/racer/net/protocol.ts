@@ -57,6 +57,10 @@ export type RacerMsg = HelloMsg | GoMsg | PosMsg | WorldMsg | RematchMsg;
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isStr = (v: unknown): v is string => typeof v === 'string';
 
+/** More coins than any real field could hold — a forged giant array is an
+ * attack on the guest's memory, not a game state. */
+const MAX_COINS = 64;
+
 function isCoin(v: unknown): v is Coin {
   if (typeof v !== 'object' || v === null) return false;
   const c = v as Record<string, unknown>;
@@ -76,12 +80,15 @@ export function isRacerMsg(value: unknown): value is RacerMsg {
     case 'world':
       return (
         Array.isArray(m.coins) &&
+        m.coins.length <= MAX_COINS &&
         m.coins.every(isCoin) &&
         Array.isArray(m.scores) &&
         m.scores.length === 2 &&
         m.scores.every(isNum) &&
         (m.status === 'racing' || m.status === 'over') &&
-        (m.winner === null || isNum(m.winner)) &&
+        // winner indexes the two-kart arrays — anything but 0, 1, or null
+        // would crash the guest's win overlay.
+        (m.winner === null || m.winner === 0 || m.winner === 1) &&
         isNum(m.elapsed)
       );
     case 'rematch':

@@ -377,6 +377,9 @@ function Track3D({
       raf = requestAnimationFrame(loop);
       const c = ctxRef.current;
       if (!c || !scene) return;
+      // Once the win overlay is up there's nothing to simulate or send —
+      // don't keep burning GPU behind a static screen.
+      if (c.status === 'over' && overFired) return;
       const dt = last ? (ts - last) / 1000 : 0;
       last = ts;
       const t = Math.max(0, Math.min(dt, 0.05));

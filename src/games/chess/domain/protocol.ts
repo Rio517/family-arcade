@@ -61,6 +61,9 @@ function isPly(v: unknown): v is Ply {
   return true;
 }
 
+/** Hard ceiling on a synced log's length (see the sync case below). */
+export const MAX_LOG_PLIES = 1000;
+
 /**
  * Validate an arbitrary value off the wire as a well-formed ChessMessage. This
  * is the single choke point (called in the transport) that guarantees every
@@ -81,6 +84,9 @@ export function isChessMessage(value: unknown): value is ChessMessage {
       return (
         typeof m.wantRematch === 'boolean' &&
         Array.isArray(m.log) &&
+        // Longest recorded serious games sit under 300 plies; the cap only
+        // exists so a forged giant log can't stall replay() on the receiver.
+        m.log.length <= MAX_LOG_PLIES &&
         m.log.every(isPly)
       );
     case 'move':

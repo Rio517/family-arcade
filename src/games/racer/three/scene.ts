@@ -144,15 +144,19 @@ export class RacerScene {
     fence.position.y = 1.4;
     this.scene.add(fence);
 
+    // One geometry per shape, shared by all 16 trees / 8 clouds — identical
+    // meshes shouldn't each upload their own GPU buffers.
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x9a6b3f });
     const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f9d52 });
+    const trunkGeo = new THREE.CylinderGeometry(1.1, 1.4, 6, 8);
+    const leafGeo = new THREE.ConeGeometry(5, 12, 10);
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2;
       const R = ARENA_RADIUS + 22;
       const tree = new THREE.Group();
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.4, 6, 8), trunkMat);
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
       trunk.position.y = 3;
-      const leaf = new THREE.Mesh(new THREE.ConeGeometry(5, 12, 10), leafMat);
+      const leaf = new THREE.Mesh(leafGeo, leafMat);
       leaf.position.y = 11;
       tree.add(trunk, leaf);
       tree.position.set(Math.cos(a) * R, 0, Math.sin(a) * R);
@@ -160,12 +164,13 @@ export class RacerScene {
     }
 
     const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const puffGeos = [new THREE.SphereGeometry(6, 10, 10), new THREE.SphereGeometry(8, 10, 10)];
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2 + 0.4;
       const R = ARENA_RADIUS * 1.4;
       const cloud = new THREE.Group();
       for (let j = 0; j < 4; j++) {
-        const puff = new THREE.Mesh(new THREE.SphereGeometry(6 + (j % 2) * 2, 10, 10), cloudMat);
+        const puff = new THREE.Mesh(puffGeos[j % 2], cloudMat);
         puff.position.set(j * 6 - 9, (j % 2) * 2, 0);
         cloud.add(puff);
       }

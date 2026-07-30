@@ -120,7 +120,14 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
         },
         onMessage: (msg) => {
           const s = sessionRef.current;
-          if (s) applyOutcome(Session.applyMessage(s, msg));
+          if (!s) return;
+          try {
+            applyOutcome(Session.applyMessage(s, msg));
+          } catch (err) {
+            // Drop, don't die: a peer message must never crash the app.
+            // eslint-disable-next-line no-console
+            console.error('Rejected peer message', err);
+          }
         },
       },
       { prefix: 'bship-v1-', isMessage },

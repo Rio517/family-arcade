@@ -215,7 +215,7 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
       if (msg.v !== CHESS_PROTOCOL_VERSION) {
         return { state: s, outgoing: [], error: 'Your opponent is on a different app version.' };
       }
-      return { state: { ...s, oppName: msg.name || s.oppName }, outgoing: [] };
+      return { state: { ...s, oppName: msg.name.slice(0, 24) || s.oppName }, outgoing: [] };
     }
 
     case 'sync': {
