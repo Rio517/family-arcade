@@ -10,6 +10,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { FILES, RANKS, type Board, type Color, type PieceType, type Square } from '@games/chess/domain/types';
 import { SCENE_PALETTES, type ScenePalette } from '../chessTheme';
 
+const UP = new THREE.Vector3(0, 1, 0);
 const sqName = (s: Square) => `${FILES[s.col]}${8 - s.row}`;
 /** Board square → world position (a1 near white; row 0 = rank 8 = -z). */
 const worldPos = (s: Square) => new THREE.Vector3(s.col - 3.5, 0, s.row - 3.5);
@@ -276,14 +277,31 @@ export class ChessScene {
       dome.position.y = -6; // horizon sits below the board's eye line
       this.scene.add(dome);
     }
-    // A soft low sun glowing through the haze.
-    const sunGlow = new THREE.Mesh(
-      new THREE.CircleGeometry(7, 24),
-      new THREE.MeshBasicMaterial({ color: '#ffe3bd', transparent: true, opacity: 0.55, fog: false }),
-    );
-    sunGlow.position.set(17, 4, -38);
-    sunGlow.lookAt(0, 2, 0);
-    this.scene.add(sunGlow);
+    // A soft low sun glowing through the haze — a radial-gradient billboard,
+    // so it fades out instead of ending in a hard circle.
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width = glowCanvas.height = 128;
+    const gctx = glowCanvas.getContext('2d');
+    if (gctx) {
+      const rg = gctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      rg.addColorStop(0, 'rgba(255, 240, 210, 0.85)');
+      rg.addColorStop(0.4, 'rgba(255, 224, 190, 0.35)');
+      rg.addColorStop(1, 'rgba(255, 224, 190, 0)');
+      gctx.fillStyle = rg;
+      gctx.fillRect(0, 0, 128, 128);
+      const sunGlow = new THREE.Mesh(
+        new THREE.PlaneGeometry(20, 20),
+        new THREE.MeshBasicMaterial({
+          map: new THREE.CanvasTexture(glowCanvas),
+          transparent: true,
+          depthWrite: false,
+          fog: false,
+        }),
+      );
+      sunGlow.position.set(17, 5, -38);
+      sunGlow.lookAt(0, 2, 0);
+      this.scene.add(sunGlow);
+    }
 
     // ── Cloud materials (shared) ──
     const cloudMat = new THREE.MeshStandardMaterial({
@@ -317,20 +335,23 @@ export class ChessScene {
       bank.position.set(Math.cos(ang) * dist, -3.1 + rand() * 0.9, Math.sin(ang) * dist);
       this.scene.add(bank);
     }
-    // A soft pink floor far below closes any gaps between the banks.
+    // A floor far below closes any gaps between the banks. Painted EXACTLY
+    // the fog colour so it's indistinguishable from haze — no flat pink
+    // patches peeking through the clouds.
     const seaFloor = new THREE.Mesh(
-      new THREE.CircleGeometry(55, 40),
-      new THREE.MeshBasicMaterial({ color: '#f4c4de' }),
+      new THREE.CircleGeometry(80, 40),
+      new THREE.MeshBasicMaterial({ color: '#f2c8dc' }),
     );
     seaFloor.rotation.x = -Math.PI / 2;
-    seaFloor.position.y = -5.2;
+    seaFloor.position.y = -6;
     this.scene.add(seaFloor);
 
-    // ── The board rests ON cloud: a cushion hugging its underside ──
+    // ── The board rests ON cloud: a cushion hugging its underside. Kept
+    // fully BELOW the playing surface so it never blocks the view. ──
     for (let i = 0; i < 12; i++) {
       const ang = (i / 12) * Math.PI * 2 + rand() * 0.3;
-      const cushion = puffCluster(0.9 + rand() * 0.5);
-      cushion.position.set(Math.cos(ang) * (4.1 + rand() * 0.7), -0.75 - rand() * 0.4, Math.sin(ang) * (4.1 + rand() * 0.7));
+      const cushion = puffCluster(0.75 + rand() * 0.4);
+      cushion.position.set(Math.cos(ang) * (4.0 + rand() * 0.6), -1.15 - rand() * 0.4, Math.sin(ang) * (4.0 + rand() * 0.6));
       this.scene.add(cushion);
     }
 
@@ -343,13 +364,15 @@ export class ChessScene {
     }
     this.buildRainbow(19, -1, 13, Math.PI * 0.72, 1.1, 0.45);
 
-    // ── Eye-level clouds that drift past the terrace ──
-    for (let i = 0; i < 8; i++) {
+    // ── Sky clouds circling the terrace. They ORBIT on fixed rings (never
+    // cutting across the middle) and sit high and far enough that they stay
+    // out of the line of sight to the board. ──
+    for (let i = 0; i < 7; i++) {
       const cloud = puffCluster(0.8 + rand() * 1.1);
       const ang = rand() * Math.PI * 2;
-      const dist = 9.5 + rand() * 8;
-      cloud.position.set(Math.cos(ang) * dist, 1.4 + rand() * 4.6, Math.sin(ang) * dist);
-      cloud.userData.speed = (0.12 + rand() * 0.22) * (rand() < 0.5 ? 1 : -1);
+      const dist = 13.5 + rand() * 6;
+      cloud.position.set(Math.cos(ang) * dist, 3.6 + rand() * 3.2, Math.sin(ang) * dist);
+      cloud.userData.orbit = (0.014 + rand() * 0.02) * (rand() < 0.5 ? 1 : -1); // rad/s
       this.clouds.push(cloud);
       this.scene.add(cloud);
     }
@@ -545,12 +568,10 @@ export class ChessScene {
     const dt = this.lastNow ? Math.min(0.05, (now - this.lastNow) / 1000) : 0;
     this.lastNow = now;
 
-    // Dream-world motion: clouds drift past; sparkle dust swirls and breathes.
+    // Dream-world motion: clouds circle the terrace; sparkle dust swirls.
     if (!this.opts.reducedMotion) {
       for (const cloud of this.clouds) {
-        cloud.position.x += (cloud.userData.speed as number) * dt;
-        if (cloud.position.x > 19) cloud.position.x = -19;
-        if (cloud.position.x < -19) cloud.position.x = 19;
+        cloud.position.applyAxisAngle(UP, (cloud.userData.orbit as number) * dt);
       }
       for (let i = 0; i < this.sparkles.length; i++) {
         const motes = this.sparkles[i];
