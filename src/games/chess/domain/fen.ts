@@ -9,7 +9,6 @@
 
 import {
   type Board,
-  type CastleFlag,
   type Color,
   type GameState,
   type Piece,
@@ -107,5 +106,4 @@ function squareToName(sq: Square): string {
   return `${FILES[sq.col]}${8 - sq.row}`;
 }
 
-export const CASTLE_ORDER: CastleFlag[] = ['wK', 'wQ', 'bK', 'bQ'];
 export type { Color };

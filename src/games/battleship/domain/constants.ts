@@ -50,12 +50,3 @@ export const DEFAULT_UNLOCKED = SKINS.filter((s) => s.cost === 0).map((s) => s.i
 export function skinById(id: string): Skin {
   return SKINS.find((s) => s.id === id) ?? SKINS[0];
 }
-
-// ── Scoring ────────────────────────────────────────────────────────────────
-// Winners earn a base bounty plus a bonus for every ship cell that survived
-// unhit — rewarding a decisive victory. Losers get a small consolation so
-// playing always makes progress toward the next skin.
-
-export const WIN_BASE_POINTS = 100;
-export const POINTS_PER_SURVIVING_CELL = 15;
-export const LOSS_CONSOLATION_POINTS = 25;

@@ -204,15 +204,6 @@ export const LockIcon = (p: IconProps) =>
     p,
   );
 
-export const LinkIcon = (p: IconProps) =>
-  svg(
-    <>
-      <path d="M9.5 14.5 14.5 9.5" />
-      <path d="M8 12 6 14a3.5 3.5 0 0 0 5 5l2-2M16 12l2-2a3.5 3.5 0 0 0-5-5l-2 2" />
-    </>,
-    p,
-  );
-
 /** A slanted eraser — free play's delete-a-piece tool. */
 export const EraserIcon = (p: IconProps) =>
   svg(
