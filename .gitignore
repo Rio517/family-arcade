@@ -6,3 +6,6 @@ dist-ssr/
 coverage/
 node_modules/.tmp/
 *.tsbuildinfo
+
+# Agent worktrees (transient working copies)
+.claude/worktrees/
