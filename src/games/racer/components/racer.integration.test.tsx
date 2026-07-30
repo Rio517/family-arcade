@@ -83,7 +83,7 @@ vi.mock('@shared/net/peer', async (importOriginal) => {
 /** Only characters the real generateCode can emit (no look-alikes O/0, I/1, L). */
 const CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4}$/;
 
-function renderClient(): ReturnType<typeof within<HTMLElement>> {
+function renderClient() {
   const result: RenderResult = render(
     <MemoryRouter initialEntries={['/racer']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <RacerPage />
