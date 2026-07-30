@@ -35,11 +35,15 @@ export interface ReadyMsg {
  * Sync handshake. On every (re)connect each peer announces how much of the log
  * it has; whoever is behind receives the authoritative (longer) log. Ready
  * flags ride along so a mid-placement reconnect restores lobby state too.
+ * `epoch` says which game of the session the log belongs to (rematches bump
+ * it); logs only reconcile within an epoch. Optional on the wire for
+ * back-compat — a sync without it counts as epoch 0.
  */
 export interface SyncMsg {
   t: 'sync';
   log: GameLog;
   ready: boolean;
+  epoch?: number;
 }
 
 /** A fire *request* from the attacker. The defender resolves and replies. */
@@ -173,7 +177,10 @@ export function isMessage(value: unknown): value is Message {
         Array.isArray(m.log) &&
         m.log.length <= MAX_LOG_EVENTS &&
         m.log.every(isGameEvent) &&
-        typeof m.ready === 'boolean'
+        typeof m.ready === 'boolean' &&
+        // Optional game epoch (back-compat: absent = 0); bounded so a hostile
+        // peer can't park us on an absurd counter.
+        (m.epoch === undefined || isInt(m.epoch, 0, 1_000_000))
       );
     case 'fire':
       return isCell(m);

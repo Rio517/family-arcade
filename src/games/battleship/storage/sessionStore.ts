@@ -24,6 +24,9 @@ export interface GameSession {
   myReady: boolean;
   oppReady: boolean;
   log: GameLog;
+  /** Which game of the session this is (rematches bump it). Absent in blobs
+   * written before epochs existed — treated as 0 on restore. */
+  epoch?: number;
   finished: boolean;
   updatedAt: number;
 }
@@ -41,6 +44,7 @@ export function sessionToStored(s: SessionState, now: number): GameSession {
     myReady: s.myReady,
     oppReady: s.oppReady,
     log: s.log,
+    epoch: s.epoch,
     finished: winner(s.log) !== null,
     updatedAt: now,
   };
@@ -66,6 +70,7 @@ export function storedToSession(g: GameSession): SessionState {
     log: g.log,
     pendingFire: null,
     setupPhase: g.myReady ? 'waiting' : 'placing',
+    epoch: typeof g.epoch === 'number' ? g.epoch : 0,
   };
 }
 
@@ -76,6 +81,32 @@ function sessionKey(code: string): string {
 export function saveSession(session: GameSession): void {
   safeSet(sessionKey(session.code), JSON.stringify(session));
   safeSet(LAST_SESSION_KEY, session.code);
+  // Piggyback housekeeping on the write path so abandoned games (each ~10 kB)
+  // don't pile up in localStorage forever. Never touch the game being saved —
+  // a just-finished game must survive its own save (rematch/result screen).
+  sweepStaleSessions(session.code);
+}
+
+/**
+ * Remove stored sessions that are finished or unparseable. Best-effort: any
+ * storage failure is swallowed — sweeping must never break a save or a resume.
+ */
+export function sweepStaleSessions(keepCode?: string): void {
+  try {
+    const stale: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(SESSION_PREFIX)) continue;
+      const code = key.slice(SESSION_PREFIX.length);
+      if (code === keepCode) continue;
+      const session = loadSession(code); // null ⇒ missing or unparseable
+      if (!session || session.finished) stale.push(code);
+    }
+    // Remove after the scan — deleting while indexing localStorage skips keys.
+    for (const code of stale) clearSession(code);
+  } catch {
+    /* storage unavailable — non-fatal */
+  }
 }
 
 export function loadSession(code: string): GameSession | null {
@@ -100,6 +131,7 @@ export function clearSession(code: string): void {
  * menu to offer a one-tap "Resume game" prompt.
  */
 export function loadResumableSession(): GameSession | null {
+  sweepStaleSessions(); // menu-time housekeeping: drop finished/broken saves
   const code = safeGet(LAST_SESSION_KEY);
   if (!code) return null;
   const session = loadSession(code);
