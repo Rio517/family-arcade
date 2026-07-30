@@ -10,7 +10,7 @@
     radial-gradient(900px 500px at 15% -10%, rgba(255, 173, 226, 0.55), transparent 60%),
     radial-gradient(900px 500px at 100% 110%, rgba(150, 210, 255, 0.55), transparent 60%),
     linear-gradient(160deg, #fff0fb, #eef4ff);
-  font-family: 'Baloo 2', 'Comic Sans MS', -apple-system, system-ui, sans-serif;
+  font-family: 'Comic Sans MS', 'Chalkboard SE', -apple-system, system-ui, sans-serif;
 }
 
 .uni-topbar {
