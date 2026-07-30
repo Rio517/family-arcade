@@ -181,12 +181,12 @@ export function RacerPage() {
             <p>Race around a 3D arena and collect 20 coins! 🪙</p>
           </div>
           <div className="racer-choices">
-            <button className="racer-big-btn" onClick={() => chooseMode('solo')}>
+            <button className="racer-big-btn" onClick={() => chooseMode('solo')} data-testid="racer-mode-solo">
               <span className="racer-big-emoji">🦄</span>
               <span className="racer-big-label">1 Player</span>
               <span className="racer-big-sub">Race on your own</span>
             </button>
-            <button className="racer-big-btn" onClick={() => chooseMode('net')}>
+            <button className="racer-big-btn" onClick={() => chooseMode('net')} data-testid="racer-mode-net">
               <span className="racer-big-emoji">🦄🐉</span>
               <span className="racer-big-label">2 Players</span>
               <span className="racer-big-sub">Race a friend on another device</span>
@@ -207,7 +207,7 @@ export function RacerPage() {
           </div>
           <div className="racer-cast">
             {DRIVERS.map((d) => (
-              <button key={d.id} className="racer-cast-btn" style={{ borderColor: d.css }} onClick={() => pickDriver(d)}>
+              <button key={d.id} className="racer-cast-btn" style={{ borderColor: d.css }} onClick={() => pickDriver(d)} data-testid={`racer-driver-${d.id}`}>
                 <span className="racer-cast-emoji">{d.emoji}</span>
                 <span className="racer-cast-name" style={{ color: d.css }}>{d.name}</span>
               </button>
@@ -261,7 +261,7 @@ function RacerLobby({
         {net.role === 'host' ? (
           <div className="racer-lobby-card">
             <h2>Share this code</h2>
-            <div className="racer-code">{net.code}</div>
+            <div className="racer-code" data-testid="racer-code">{net.code}</div>
             <p>Ask your friend to open Rainbow Racer → 2 Players → Join, and type this code.</p>
             <p className="racer-lobby-status">
               {net.connected ? 'Connected! Starting…' : 'Waiting for your friend to join…'}
@@ -275,7 +275,7 @@ function RacerLobby({
             </p>
           </div>
         )}
-        <button className="racer-ghost" onClick={net.leave}>← Back</button>
+        <button className="racer-ghost" onClick={net.leave} data-testid="racer-lobby-back">← Back</button>
       </div>
     );
   }
@@ -288,6 +288,7 @@ function RacerLobby({
           Your name
           <input
             className="racer-name-input"
+            data-testid="racer-name-input"
             value={name}
             maxLength={16}
             onChange={(e) => setName(e.target.value)}
@@ -300,6 +301,7 @@ function RacerLobby({
           <h2>Join a game</h2>
           <input
             className="racer-code-input"
+            data-testid="racer-code-input"
             value={code}
             maxLength={4}
             inputMode="text"
@@ -309,17 +311,17 @@ function RacerLobby({
             placeholder="ABCD"
             onChange={(e) => setCode(normalizeCode(e.target.value))}
           />
-          <button className="racer-primary" disabled={code.length !== 4} onClick={() => net.join(code)}>
+          <button className="racer-primary" disabled={code.length !== 4} onClick={() => net.join(code)} data-testid="racer-join">
             Connect →
           </button>
-          <button className="racer-ghost" onClick={() => setJoinMode(false)}>← Back</button>
+          <button className="racer-ghost" onClick={() => setJoinMode(false)} data-testid="racer-join-back">← Back</button>
         </div>
       ) : (
         <div className="racer-lobby-card">
           <h2>Play with a friend</h2>
-          <button className="racer-primary" onClick={net.host}>Create a game</button>
+          <button className="racer-primary" onClick={net.host} data-testid="racer-create">Create a game</button>
           <p className="racer-lobby-status">You’ll get a code to share.</p>
-          <button className="racer-ghost" onClick={() => setJoinMode(true)}>Join with a code</button>
+          <button className="racer-ghost" onClick={() => setJoinMode(true)} data-testid="racer-show-join">Join with a code</button>
         </div>
       )}
     </div>
@@ -556,7 +558,7 @@ function WinOverlay({ ctx, onAgain, onMenu }: { ctx: RaceCtx; onAgain: () => voi
       ? 'You win! 🏆'
       : `${ctx.names[ctx.winner ?? 0]} wins!`;
   return (
-    <div className="racer-win">
+    <div className="racer-win" data-testid="racer-win">
       <div className="racer-win-card">
         <div className="racer-win-burst" aria-hidden="true">🎉✨🏆✨🎉</div>
         <h2>{title}</h2>
@@ -569,8 +571,8 @@ function WinOverlay({ ctx, onAgain, onMenu }: { ctx: RaceCtx; onAgain: () => voi
           <p className="racer-win-time">Your time: <b>{ctx.elapsed.toFixed(1)}s</b> ⏱</p>
         )}
         <div className="racer-win-btns">
-          <button className="racer-primary" onClick={onAgain}>Race again 🔁</button>
-          <button className="racer-ghost" onClick={onMenu}>Menu ✨</button>
+          <button className="racer-primary" onClick={onAgain} data-testid="racer-again">Race again 🔁</button>
+          <button className="racer-ghost" onClick={onMenu} data-testid="racer-win-menu">Menu ✨</button>
         </div>
       </div>
     </div>
@@ -581,7 +583,7 @@ function Shell({ children, onMenu }: { children: React.ReactNode; onMenu: () => 
   return (
     <div className="racer-root">
       <div className="racer-topbar">
-        <button className="racer-back" onClick={onMenu}>‹ Menu</button>
+        <button className="racer-back" onClick={onMenu} data-testid="racer-back">‹ Menu</button>
         <span className="racer-title-mini">🏎️ Rainbow Racer 🪙</span>
         <FullscreenButton />
       </div>
