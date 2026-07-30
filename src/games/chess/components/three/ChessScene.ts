@@ -11,6 +11,24 @@ import { FILES, RANKS, type Board, type Color, type PieceType, type Square } fro
 import { SCENE_PALETTES, type ScenePalette } from '../chessTheme';
 
 const UP = new THREE.Vector3(0, 1, 0);
+
+/**
+ * Free every geometry, material, and texture under `root`. Only safe when the
+ * resources are owned by that subtree (marks, or the whole scene at teardown)
+ * — piece clones share their template's geometry and must not pass through.
+ */
+function disposeDeep(root: THREE.Object3D) {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (mesh.geometry) mesh.geometry.dispose();
+    const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+    for (const m of mats) {
+      (m as THREE.MeshStandardMaterial).map?.dispose();
+      m.dispose();
+    }
+  });
+}
+
 const sqName = (s: Square) => `${FILES[s.col]}${8 - s.row}`;
 /** Board square → world position (a1 near white; row 0 = rank 8 = -z). */
 const worldPos = (s: Square) => new THREE.Vector3(s.col - 3.5, 0, s.row - 3.5);
@@ -450,7 +468,21 @@ export class ChessScene {
         const victim = this.pieces.get(toKey);
         if (victim) {
           this.pieces.delete(toKey);
-          this.tweens.push({ obj: victim, from: victim.position.clone(), to: victim.position.clone().setY(-0.9), start: performance.now(), dur: 260, arc: 0, fade: true, onDone: () => this.scene.remove(victim) });
+          // Clones share their template's materials, so fading the victim
+          // directly would turn every same-type piece transparent. Give it
+          // private copies to fade, and free them when it sinks away.
+          victim.traverse((o) => {
+            const mesh = o as THREE.Mesh;
+            if (mesh.isMesh && !Array.isArray(mesh.material)) mesh.material = mesh.material.clone();
+          });
+          this.tweens.push({
+            obj: victim, from: victim.position.clone(), to: victim.position.clone().setY(-0.9),
+            start: performance.now(), dur: 260, arc: 0, fade: true,
+            onDone: () => {
+              this.scene.remove(victim);
+              victim.traverse((o) => { const mesh = o as THREE.Mesh; if (mesh.isMesh && !Array.isArray(mesh.material)) mesh.material.dispose(); });
+            },
+          });
         }
         this.pieces.delete(fromKey);
         this.pieces.set(toKey, actor);
@@ -481,6 +513,9 @@ export class ChessScene {
 
   /** Selection ring, target dots, last-move tint, check pulse. */
   setMarks(m: Marks) {
+    // Marks own their geometry/materials, and this runs on every tap — free
+    // the old set or the GPU buffers pile up for the whole game.
+    disposeDeep(this.markGroup);
     this.markGroup.clear();
     this.checkMat = null;
     const plane = (sq: Square, color: string, opacity: number) => {
@@ -603,9 +638,9 @@ export class ChessScene {
     // Skipped while a piece is mid-tween (the move animation owns its y),
     // and entirely under reduced motion (they still float, just steadily).
     if (this.palette.pieceStyle === 'ships' && !this.opts.reducedMotion) {
-      const busy = new Set(this.tweens.map((t) => t.obj));
+      const busy = this.tweens.length ? new Set(this.tweens.map((t) => t.obj)) : null;
       for (const [key, piece] of this.pieces) {
-        if (busy.has(piece)) continue;
+        if (busy?.has(piece)) continue;
         const phase = key.charCodeAt(0) * 1.7 + key.charCodeAt(1) * 2.3;
         piece.position.y = Math.sin(now / 1150 + phase) * 0.022;
       }
@@ -621,7 +656,13 @@ export class ChessScene {
     this.renderer.domElement.removeEventListener('pointerdown', this.onDown);
     this.renderer.domElement.removeEventListener('pointerup', this.onUp);
     this.controls.dispose();
+    // Every theme switch rebuilds the whole scene (Cloud Kingdom alone holds
+    // 200+ geometries), so teardown must actually free the GPU — otherwise a
+    // few theme taps exhaust WebGL contexts on iPads and 3D goes black.
+    disposeDeep(this.scene);
+    for (const tpl of this.templates.values()) disposeDeep(tpl);
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
     this.container.contains(this.renderer.domElement) && this.container.removeChild(this.renderer.domElement);
   }
 }
