@@ -22,8 +22,28 @@ import {
   type Status,
   sameSquare,
 } from './types';
+import { toFen } from './fen';
 
 const SIZE = 8;
+
+/**
+ * The repetition key for a position: the FEN minus the move clocks (placement,
+ * side to move, castling rights, en-passant square). Two positions with the
+ * same key are "the same position" for the threefold-repetition rule.
+ */
+export function positionKey(state: GameState): string {
+  return toFen(state).split(' ').slice(0, 4).join(' ');
+}
+
+/** How often the current position has occurred (at least once — it's here now). */
+function repetitionCount(state: GameState): number {
+  return state.repetition?.[positionKey(state)] ?? 1;
+}
+
+/** Seed a starting position's repetition record: it has occurred once. */
+function seedRepetition(state: GameState): GameState {
+  return { ...state, repetition: { [positionKey(state)]: 1 } };
+}
 
 export function opponent(color: Color): Color {
   return color === 'w' ? 'b' : 'w';
@@ -53,14 +73,14 @@ export function initialState(): GameState {
     board[6][col] = { color: 'w', type: 'p' };
     board[7][col] = { color: 'w', type: BACK_RANK[col] };
   }
-  return {
+  return seedRepetition({
     board,
     turn: 'w',
     castling: { wK: true, wQ: true, bK: true, bQ: true },
     enPassant: null,
     halfmoveClock: 0,
     fullmoveNumber: 1,
-  };
+  });
 }
 
 const KNIGHT_DELTAS = [
@@ -404,7 +424,7 @@ export function applyMove(state: GameState, move: Move): GameState {
 
   const resetClock = mover.type === 'p' || move.captured !== null;
 
-  return {
+  const next: GameState = {
     board,
     turn: opponent(color),
     castling,
@@ -414,6 +434,13 @@ export function applyMove(state: GameState, move: Move): GameState {
     // The king-hunt variant is for the whole game, not just the first move.
     ...(state.kingHunt ? { kingHunt: true } : {}),
   };
+
+  // Threefold-repetition bookkeeping: count the position we just arrived at.
+  // Copy — never mutate — so replays and search (perft) can share ancestors.
+  const key = positionKey(next);
+  const repetition = { ...(state.repetition ?? {}) };
+  repetition[key] = (repetition[key] ?? 0) + 1;
+  return { ...next, repetition };
 }
 
 /** Forfeit a castling right if the square is a color's home rook square. */
@@ -470,16 +497,32 @@ export function resolvePly(state: GameState, ply: Ply): Move | null {
 
 /** Only bishops/knights (or lone kings) remain → no forced mate is possible. */
 function insufficientMaterial(board: Board): boolean {
-  const minor: Piece[] = [];
-  for (const rowArr of board) {
-    for (const p of rowArr) {
+  const minors: Array<{ piece: Piece; squareShade: number }> = [];
+  for (let row = 0; row < SIZE; row++) {
+    for (let col = 0; col < SIZE; col++) {
+      const p = board[row][col];
       if (!p || p.type === 'k') continue;
-      if (p.type === 'n' || p.type === 'b') minor.push(p);
-      else return false; // a pawn, rook, or queen can force mate
+      if (p.type === 'n' || p.type === 'b') {
+        minors.push({ piece: p, squareShade: (row + col) % 2 });
+      } else {
+        return false; // a pawn, rook, or queen can force mate
+      }
     }
   }
   // K vs K, K vs KN, K vs KB. (Two bishops / bishop+knight can mate.)
-  return minor.length <= 1;
+  if (minors.length <= 1) return true;
+  // K+B vs K+B with both bishops on the SAME square colour: a FIDE dead
+  // position — the bishops can never even meet, let alone mate.
+  if (minors.length === 2) {
+    const [a, b] = minors;
+    return (
+      a.piece.type === 'b' &&
+      b.piece.type === 'b' &&
+      a.piece.color !== b.piece.color &&
+      a.squareShade === b.squareShade
+    );
+  }
+  return false;
 }
 
 /** How many kings `color` still has (the king-hunt life counter). */
@@ -500,6 +543,7 @@ export function status(state: GameState): Status {
     // no material draws (even bare kings can capture each other here).
     if (countKings(state.board, state.turn) === 0) return 'kings-taken';
     if (legalMoves(state).length === 0) return 'stalemate';
+    if (repetitionCount(state) >= 3) return 'repetition';
     if (state.halfmoveClock >= 100) return 'draw-fifty';
     return 'playing';
   }
@@ -507,6 +551,7 @@ export function status(state: GameState): Status {
   const checked = inCheck(state, state.turn);
   if (moves.length === 0) return checked ? 'checkmate' : 'stalemate';
   if (insufficientMaterial(state.board)) return 'draw-material';
+  if (repetitionCount(state) >= 3) return 'repetition';
   if (state.halfmoveClock >= 100) return 'draw-fifty';
   return checked ? 'check' : 'playing';
 }
@@ -544,7 +589,7 @@ export function customStart(board: Board, turn: Color = 'w'): GameState {
     const p = board[row][col];
     return !!p && p.color === color && p.type === type;
   };
-  return {
+  return seedRepetition({
     board: cloneBoard(board),
     turn,
     castling: hunt
@@ -559,7 +604,7 @@ export function customStart(board: Board, turn: Color = 'w'): GameState {
     halfmoveClock: 0,
     fullmoveNumber: 1,
     ...(hunt ? { kingHunt: true } : {}),
-  };
+  });
 }
 
 /**
@@ -596,7 +641,10 @@ export function setupIssue(board: Board): string | null {
 
 /** True once the game is over (mate, all kings taken, stalemate, or a draw). */
 export function isGameOver(s: Status): boolean {
-  return s === 'checkmate' || s === 'kings-taken' || s === 'stalemate' || s === 'draw-fifty' || s === 'draw-material';
+  return (
+    s === 'checkmate' || s === 'kings-taken' || s === 'stalemate' ||
+    s === 'draw-fifty' || s === 'draw-material' || s === 'repetition'
+  );
 }
 
 /**

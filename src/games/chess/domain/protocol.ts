@@ -27,6 +27,13 @@ export interface SyncMsg {
   t: 'sync';
   log: GameLog;
   wantRematch: boolean;
+  /**
+   * The sender's game epoch (bumped on every rematch reset). A sync from an
+   * older epoch is stale — its finished log must never resurrect a game that
+   * both sides already reset. Optional for back-compat: builds that predate
+   * epochs send syncs without it, which readers treat as epoch 0.
+   */
+  epoch?: number;
 }
 
 /** A single played move. */
@@ -87,7 +94,14 @@ export function isChessMessage(value: unknown): value is ChessMessage {
         // Longest recorded serious games sit under 300 plies; the cap only
         // exists so a forged giant log can't stall replay() on the receiver.
         m.log.length <= MAX_LOG_PLIES &&
-        m.log.every(isPly)
+        m.log.every(isPly) &&
+        // Epoch is optional (older builds omit it = epoch 0) but when present
+        // it must be a sane small integer, never NaN/negative/fractional.
+        (m.epoch === undefined ||
+          (typeof m.epoch === 'number' &&
+            Number.isInteger(m.epoch) &&
+            m.epoch >= 0 &&
+            m.epoch <= 1e6))
       );
     case 'move':
       return isPly(m.ply);

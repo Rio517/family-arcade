@@ -76,6 +76,14 @@ export interface GameState {
    * loses when its LAST king is taken.
    */
   kingHunt?: boolean;
+  /**
+   * Occurrence count per position for the threefold-repetition draw, keyed by
+   * the position parts of the FEN (placement, side to move, castling rights,
+   * en-passant square — never the move clocks). Seeded with the starting
+   * position and built up by `applyMove` (copy-on-write, never mutated).
+   * Optional so hand-built states (e.g. straight from `parseFen`) still work.
+   */
+  repetition?: Record<string, number>;
 }
 
 /**
@@ -104,7 +112,9 @@ export type Status =
   /** King-hunt variant: the side to move has lost its last king. */
   | 'kings-taken'
   | 'draw-fifty'
-  | 'draw-material';
+  | 'draw-material'
+  /** The same position has occurred three times — a repetition draw. */
+  | 'repetition';
 
 export const FILES = 'abcdefgh';
 export const RANKS = '87654321'; // row 0 → rank 8, row 7 → rank 1
