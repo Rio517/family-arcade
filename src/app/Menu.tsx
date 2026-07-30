@@ -15,10 +15,12 @@ import { GAMES } from './registry';
  * the sign, the Save Station (every saved game, one tap to resume), and the
  * prize counter hold the LEFT.
  *
- * Tickets are generated from the registry, so this component never mentions
- * a specific game by name — add one in registry.ts and the carnival prints
- * another ticket. The Yahtzee logger is the one exception: a static HTML
- * page rather than a registered React game, linked directly.
+ * Tickets are generated from the registry — add a game in registry.ts and
+ * the carnival prints another ticket. Two things still hard-code games,
+ * though: the Yahtzee logger (a static HTML page, linked directly) and
+ * savedGames() below, which knows each game's save format. If a sixth game
+ * grows a save slot, consider a `savedGames` hook on GameDescriptor instead
+ * of extending that list.
  */
 
 const BULBS = ['b1', 'b2', 'b3', 'b4'];

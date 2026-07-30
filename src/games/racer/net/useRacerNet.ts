@@ -50,8 +50,6 @@ export interface RacerNet {
   requestRematch: () => void;
   remotePosRef: React.MutableRefObject<RemotePos | null>;
   remoteWorldRef: React.MutableRefObject<RemoteWorld | null>;
-  /** Bumps when the opponent taps "race again". */
-  rematchRef: React.MutableRefObject<number>;
 }
 
 export function useRacerNet(opts: { name: string; driver: string; target: number }): RacerNet {
@@ -72,7 +70,6 @@ export function useRacerNet(opts: { name: string; driver: string; target: number
 
   const remotePosRef = useRef<RemotePos | null>(null);
   const remoteWorldRef = useRef<RemoteWorld | null>(null);
-  const rematchRef = useRef(0);
 
   // Host → both: begin (or restart) the race.
   const doGo = useCallback(() => {
@@ -123,7 +120,6 @@ export function useRacerNet(opts: { name: string; driver: string; target: number
               };
               break;
             case 'rematch':
-              rematchRef.current += 1;
               // Only the host can authoritatively (re)start; it echoes a "go".
               if (roleRef.current === 'host') doGo();
               break;
@@ -201,6 +197,5 @@ export function useRacerNet(opts: { name: string; driver: string; target: number
     requestRematch,
     remotePosRef,
     remoteWorldRef,
-    rematchRef,
   };
 }

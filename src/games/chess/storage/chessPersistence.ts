@@ -8,6 +8,7 @@
  * Every read is defensive: bad JSON degrades to null rather than throwing.
  */
 
+import { safeGet, safeRemove, safeSet } from '@shared/storage/kv';
 import { createLocalSession, createOnlineSession, type SessionState } from '@games/chess/domain/session';
 import { isGameOver, replay, status } from '@games/chess/domain/rules';
 import type { GameLog, GameState, Side } from '@games/chess/domain/types';
@@ -44,30 +45,6 @@ export function chessToStored(s: SessionState, now: number): StoredChessGame | n
 /** Rebuild a session from storage. Rematch flags start clear on restore. */
 export function storedToChess(g: StoredChessGame): SessionState {
   return { ...createOnlineSession(g.side, g.code, g.myName), oppName: g.oppName, log: g.log };
-}
-
-function safeGet(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function safeSet(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    /* storage full or unavailable — non-fatal */
-  }
-}
-
-function safeRemove(key: string): void {
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    /* ignore */
-  }
 }
 
 function sessionKey(code: string): string {

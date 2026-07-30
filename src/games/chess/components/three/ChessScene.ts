@@ -8,26 +8,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { FILES, RANKS, type Board, type Color, type PieceType, type Square } from '@games/chess/domain/types';
+import { disposeDeep } from '@shared/three/disposeDeep';
 import { SCENE_PALETTES, type ScenePalette } from '../chessTheme';
 
 const UP = new THREE.Vector3(0, 1, 0);
-
-/**
- * Free every geometry, material, and texture under `root`. Only safe when the
- * resources are owned by that subtree (marks, or the whole scene at teardown)
- * — piece clones share their template's geometry and must not pass through.
- */
-function disposeDeep(root: THREE.Object3D) {
-  root.traverse((o) => {
-    const mesh = o as THREE.Mesh;
-    if (mesh.geometry) mesh.geometry.dispose();
-    const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
-    for (const m of mats) {
-      (m as THREE.MeshStandardMaterial).map?.dispose();
-      m.dispose();
-    }
-  });
-}
 
 const sqName = (s: Square) => `${FILES[s.col]}${8 - s.row}`;
 /** Board square → world position (a1 near white; row 0 = rank 8 = -z). */

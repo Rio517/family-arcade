@@ -9,6 +9,7 @@
  * PWA stays offline.
  */
 import * as THREE from 'three';
+import { disposeDeep } from '@shared/three/disposeDeep';
 import { ARENA_RADIUS, type Coin } from '../domain/kart';
 
 export interface RacerLook {
@@ -324,15 +325,7 @@ export class RacerScene {
     // Every "Race again" builds a fresh scene, so teardown must genuinely
     // free the old one — geometries, materials, canvas textures, and the
     // WebGL context itself (browsers cap live contexts).
-    this.scene.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (mesh.geometry) mesh.geometry.dispose();
-      const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
-      for (const m of mats) {
-        (m as THREE.MeshStandardMaterial).map?.dispose();
-        m.dispose();
-      }
-    });
+    disposeDeep(this.scene);
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     if (this.renderer.domElement.parentNode === this.container) {
