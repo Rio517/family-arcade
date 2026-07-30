@@ -1,5 +1,5 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
+import { describe, expect, it, afterEach, beforeEach, vi } from 'vitest';
+import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RacerPage } from './RacerPage';
 
@@ -20,13 +20,52 @@ import { RacerPage } from './RacerPage';
 // Observable spine of the mock transport, shared between the hoisted vi.mock
 // factory and the tests: every created connection and every delivered message.
 const bus = vi.hoisted(() => ({
-  conns: [] as Array<{ label: string; destroyed: boolean; send: (msg: unknown) => boolean }>,
+  conns: [] as Array<{
+    label: string;
+    destroyed: boolean;
+    send: (msg: unknown) => boolean;
+    reopen: () => void;
+  }>,
   wire: [] as Array<{ from: string; msg: { t: string; [k: string]: unknown } }>,
+  /** When set, a matching message is "sent" but never delivered — a lost packet. */
+  drop: null as null | ((msg: { t: string; [k: string]: unknown }) => boolean),
   reset(): void {
     this.conns.length = 0;
     this.wire.length = 0;
+    this.drop = null;
   },
 }));
+
+// The 3D scene is jsdom-hostile (no WebGL). By default the mock constructor
+// throws — the genuine no-WebGL failure path, which renders `racer3d-fallback`.
+// The reconnect test flips `fake3d.enabled` to get an inert scene instead, so
+// the rAF race loop actually runs and can be driven by hand.
+const fake3d = vi.hoisted(() => ({ enabled: false }));
+vi.mock('../three/scene', () => {
+  class RacerScene {
+    constructor() {
+      if (!fake3d.enabled) throw new Error('no WebGL in jsdom');
+    }
+    sync(): void {}
+    render(): void {}
+    dispose(): void {}
+  }
+  return { RacerScene };
+});
+
+// Start both karts on the coin pile so a driven test race finishes in a couple
+// of frames (with Math.random pinned to 0, every coin spawns at the arena
+// centre). The host kart is listed first, so it wins every shared coin.
+vi.mock('../domain/kart', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../domain/kart')>();
+  return {
+    ...actual,
+    startPositions: () => [
+      { x: 0, z: 0, heading: 0 },
+      { x: 0.5, z: 0, heading: 0 },
+    ],
+  };
+});
 
 // Replace the PeerJS transport with an in-memory bus linking host and guest.
 // generateCode / normalizeCode stay real (spread from the actual module), so
@@ -62,13 +101,26 @@ vi.mock('@shared/net/peer', async (importOriginal) => {
     send(msg: unknown): boolean {
       const peer = this.peer;
       if (!peer || peer.destroyed) return false;
-      bus.wire.push({ from: this.label, msg: msg as { t: string } });
+      const entry = msg as { t: string; [k: string]: unknown };
+      bus.wire.push({ from: this.label, msg: entry });
+      // A "lost packet": it went out, but the other side never sees it.
+      if (bus.drop?.(entry)) return true;
       // Deliver on the next tick, like a real data channel — avoids deep
       // synchronous re-entrancy across the two React roots.
       setTimeout(() => {
         if (!peer.destroyed) peer.handlers.onMessage(msg);
       }, 0);
       return true;
+    }
+    /** Simulate the data channel re-establishing after a blip: both ends re-run on-open. */
+    reopen() {
+      const peer = this.peer;
+      this.handlers.onStatus('connected');
+      this.handlers.onOpen();
+      if (peer && !peer.destroyed) {
+        peer.handlers.onStatus('connected');
+        peer.handlers.onOpen();
+      }
     }
     destroy() {
       this.destroyed = true;
@@ -218,6 +270,17 @@ describe('two-player racer: handshake and race start', () => {
       await guest.findByTestId('racer3d-fallback', undefined, { timeout: 15000 });
       expect(host.queryByTestId('racer-lobby-back')).toBeNull();
       expect(guest.queryByTestId('racer-lobby-back')).toBeNull();
+
+      // The race opens with exactly ONE full world snapshot from the host —
+      // after that, coin sync rides compact worldDelta messages, never a
+      // full-field rebroadcast that could head-of-line-block the pos stream.
+      await waitFor(() => {
+        const worlds = bus.wire.filter((w) => w.from === 'host' && w.msg.t === 'world');
+        expect(worlds).toHaveLength(1);
+        expect(worlds[0].msg).toMatchObject({ status: 'racing', scores: [0, 0] });
+        expect((worlds[0].msg.coins as unknown[]).length).toBeGreaterThan(0);
+      });
+      expect(bus.wire.filter((w) => w.msg.t === 'worldDelta')).toHaveLength(0);
     },
     20000,
   );
@@ -248,6 +311,89 @@ describe('two-player racer: handshake and race start', () => {
       // Both clients are still on the (freshly restarted) race screen.
       await host.findByTestId('racer3d-fallback', undefined, { timeout: 15000 });
       await guest.findByTestId('racer3d-fallback', undefined, { timeout: 15000 });
+    },
+    20000,
+  );
+});
+
+describe('two-player racer: reconnect re-sync', () => {
+  let frames: FrameRequestCallback[];
+  let now: number;
+
+  beforeEach(() => {
+    fake3d.enabled = true;
+    frames = [];
+    now = 0;
+    // Capture animation frames so the test drives both race loops by hand.
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      frames.push(cb);
+      return frames.length;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    // Every coin spawns at the arena centre — where both karts start (see the
+    // kart-module mock above) — so the host finishes in two frames.
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    fake3d.enabled = false;
+    vi.restoreAllMocks();
+  });
+
+  /** Run every pending animation frame, then let queued messages deliver. */
+  async function pump(rounds = 1) {
+    for (let r = 0; r < rounds; r++) {
+      const batch = frames.splice(0, frames.length);
+      await act(async () => {
+        for (const cb of batch) {
+          now += 50;
+          cb(now);
+        }
+        await new Promise((res) => setTimeout(res, 0));
+      });
+    }
+  }
+
+  it(
+    'a channel reopen after a lost "race over" packet re-syncs the guest with the finished world',
+    async () => {
+      const { host, guest } = connectClients();
+      await waitFor(() => expect(bus.wire.filter((w) => w.msg.t === 'go')).toHaveLength(1));
+      // Both race loops are live (the mocked scene builds fine here).
+      await waitFor(() => expect(frames.length).toBeGreaterThanOrEqual(2));
+
+      // Weak wifi: the host's final "race over" message never arrives.
+      bus.drop = (msg) => (msg.t === 'world' || msg.t === 'worldDelta') && msg.status === 'over';
+
+      // Drive the race until the host finishes (its kart sits on the coin pile).
+      for (let i = 0; i < 40 && !host.queryByTestId('racer-win'); i++) await pump();
+      expect(host.getByTestId('racer-win')).toBeInTheDocument();
+
+      // The finish went out — and was lost. The guest still thinks it's racing.
+      expect(bus.wire.some((w) => w.from === 'host' && w.msg.status === 'over')).toBe(true);
+      await pump(2);
+      expect(guest.queryByTestId('racer-win')).toBeNull();
+
+      // The connection blips and the channel comes back.
+      bus.drop = null;
+      const before = bus.wire.length;
+      const hostConn = bus.conns.find((c) => c.label === 'host' && !c.destroyed)!;
+      await act(async () => {
+        hostConn.reopen();
+        await new Promise((res) => setTimeout(res, 0));
+      });
+
+      // The host re-introduced itself and re-sent the authoritative world…
+      const resync = bus.wire.slice(before).filter((w) => w.from === 'host' && w.msg.t === 'world');
+      expect(resync).toHaveLength(1);
+      expect(resync[0].msg).toMatchObject({ status: 'over', winner: 0 });
+      // …without restarting the race (both hellos said inRace).
+      expect(bus.wire.filter((w) => w.msg.t === 'go')).toHaveLength(1);
+
+      // The guest now learns the race ended and crowns the host by name.
+      await pump(2);
+      expect(guest.getByTestId('racer-win')).toBeInTheDocument();
+      expect(guest.getByText('Mario wins!')).toBeInTheDocument();
     },
     20000,
   );
