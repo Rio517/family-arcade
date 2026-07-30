@@ -141,6 +141,9 @@ export function ChessPage() {
   // The move log + captured pieces are pure views of the log.
   const moves = useMemo(() => analyzeGame(cx.log, cx.start ?? undefined), [cx.log, cx.start]);
   const caps = useMemo(() => tallyCaptures(moves), [moves]);
+  // Stable identity: a fresh {from,to} literal per render would re-fire the
+  // 3D board's mark effect (and its geometry rebuild) on every render.
+  const lastMove = useMemo(() => lastMoveSquares(cx.log), [cx.log]);
   const boardOrientation: Color = cx.mode === 'online' && cx.myColor ? cx.myColor : 'w';
   const nameW = (cx.myColor === 'b' ? cx.oppName : cx.myName) || 'White';
   const nameB = (cx.myColor === 'b' ? cx.myName : cx.oppName) || 'Black';
@@ -368,7 +371,7 @@ export function ChessPage() {
                   orientation={boardOrientation}
                   interactive={cx.canMove}
                   movableColor={cx.mode === 'online' && cx.myColor ? cx.myColor : cx.turn}
-                  lastMove={lastMoveSquares(cx.log)}
+                  lastMove={lastMove}
                   onMove={onMove}
                 />
               </Suspense>
@@ -378,7 +381,7 @@ export function ChessPage() {
                 orientation={boardOrientation}
                 interactive={cx.canMove}
                 movableColor={cx.mode === 'online' && cx.myColor ? cx.myColor : cx.turn}
-                lastMove={lastMoveSquares(cx.log)}
+                lastMove={lastMove}
                 onMove={onMove}
               />
             )}
