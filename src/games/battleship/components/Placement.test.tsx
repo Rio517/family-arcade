@@ -118,21 +118,28 @@ describe('<Placement>', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  // Drag repositioning leans on layout APIs jsdom doesn't implement
-  // (getBoundingClientRect returns zeros, elementFromPoint returns null), so we
-  // stub them to drive the pointer lifecycle deterministically.
-  function stubDragLayout(targetTestId: string) {
-    const rect = vi
+  // Drag repositioning hit-tests against the grid cells' GEOMETRY (so the 2px
+  // gaps between cells can't flash the preview red). jsdom's
+  // getBoundingClientRect returns zeros, so we stub a 10px-pitch grid: cell
+  // (row, col) occupies x ∈ [col*10, col*10+10), y ∈ [row*10, row*10+10).
+  const CELL = 10;
+  function stubGridLayout() {
+    const spy = vi
       .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-      .mockReturnValue({ left: 0, top: 0, width: 40, height: 20, right: 40, bottom: 20, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
-    // jsdom has no elementFromPoint at all, so assign rather than spy.
-    const target = screen.getByTestId(targetTestId);
-    (document as unknown as { elementFromPoint: (x: number, y: number) => Element | null }).elementFromPoint = () =>
-      target as unknown as Element;
-    return () => {
-      rect.mockRestore();
-      delete (document as unknown as { elementFromPoint?: unknown }).elementFromPoint;
-    };
+      .mockImplementation(function (this: HTMLElement) {
+        const r = this.getAttribute('data-row');
+        const c = this.getAttribute('data-col');
+        const row = r === null ? 0 : Number(r);
+        const col = c === null ? 0 : Number(c);
+        const left = col * CELL;
+        const top = row * CELL;
+        return {
+          left, top, width: CELL, height: CELL,
+          right: left + CELL, bottom: top + CELL,
+          x: left, y: top, toJSON: () => ({}),
+        } as DOMRect;
+      });
+    return () => spy.mockRestore();
   }
 
   // jsdom lacks PointerEvent (and drops clientX from it), but a MouseEvent with
@@ -144,10 +151,11 @@ describe('<Placement>', () => {
     const onChange = vi.fn();
     const fleet: Fleet = [{ shipId: 'destroyer', row: 0, col: 0, orientation: 'H' }];
     render(<Placement skinId="aqua" fleet={fleet} onChange={onChange} onReady={vi.fn()} waiting={false} />);
-    const restore = stubDragLayout('cell-own-2-2'); // drop target C3
+    const restore = stubGridLayout();
 
-    fireEvent(screen.getByTestId('ship-overlay-destroyer'), pointer('pointerdown', 5, 5));
-    fireEvent(window, pointer('pointermove', 90, 45));
+    // Grab the destroyer near its bow, drag to the middle of cell C3 (2,2).
+    fireEvent(screen.getByTestId('ship-overlay-destroyer'), pointer('pointerdown', 2, 5));
+    fireEvent(window, pointer('pointermove', 25, 25));
     fireEvent(window, pointer('pointerup'));
     restore();
 
@@ -162,25 +170,43 @@ describe('<Placement>', () => {
       { shipId: 'destroyer', row: 5, col: 0, orientation: 'H' },
     ];
     render(<Placement skinId="aqua" fleet={fleet} onChange={onChange} onReady={vi.fn()} waiting={false} />);
-    // Drop the destroyer onto the carrier — an illegal overlap.
-    const restore = stubDragLayout('cell-own-0-0');
+    const restore = stubGridLayout();
 
-    fireEvent(screen.getByTestId('ship-overlay-destroyer'), pointer('pointerdown', 5, 5));
-    fireEvent(window, pointer('pointermove', 0, 5));
+    // Drop the destroyer onto the carrier at (0,0) — an illegal overlap.
+    fireEvent(screen.getByTestId('ship-overlay-destroyer'), pointer('pointerdown', 2, 5));
+    fireEvent(window, pointer('pointermove', 5, 5));
     fireEvent(window, pointer('pointerup'));
     restore();
 
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('crossing a cell line mid-drag keeps the preview on-board (no red flash)', () => {
+    const onChange = vi.fn();
+    const fleet: Fleet = [{ shipId: 'destroyer', row: 0, col: 0, orientation: 'H' }];
+    render(<Placement skinId="aqua" fleet={fleet} onChange={onChange} onReady={vi.fn()} waiting={false} />);
+    const restore = stubGridLayout();
+
+    fireEvent(screen.getByTestId('ship-overlay-destroyer'), pointer('pointerdown', 2, 5));
+    // Exactly on the boundary line between cells (x = 30 is the 2|3 edge):
+    // the old elementFromPoint hit-test fell into the gap here and flagged
+    // the drag off-board. Geometry maps it to a cell, so the drop commits.
+    fireEvent(window, pointer('pointermove', 30, 20));
+    fireEvent(window, pointer('pointerup'));
+    restore();
+
+    const next = onChange.mock.calls.at(-1)?.[0] as Fleet;
+    expect(next).toContainEqual({ shipId: 'destroyer', row: 2, col: 3, orientation: 'H' });
+  });
+
   it('places a ship dragged in from its sidebar chip onto the board', () => {
     const onChange = vi.fn();
     render(<Placement skinId="aqua" fleet={[]} onChange={onChange} onReady={vi.fn()} waiting={false} />);
-    const restore = stubDragLayout('cell-own-3-4'); // drop target E4
+    const restore = stubGridLayout();
 
-    // Carrier is the first (selected) ship; drag its chip onto the board.
+    // Carrier is the first (selected) ship; drag its chip to cell (3,4).
     fireEvent(screen.getByTestId('ship-chip-carrier'), pointer('pointerdown', 5, 5));
-    fireEvent(window, pointer('pointermove', 20, 20));
+    fireEvent(window, pointer('pointermove', 45, 35));
     fireEvent(window, pointer('pointerup'));
     restore();
 
@@ -191,12 +217,11 @@ describe('<Placement>', () => {
   it('does not place a sidebar-dragged ship dropped off the board', () => {
     const onChange = vi.fn();
     render(<Placement skinId="aqua" fleet={[]} onChange={onChange} onReady={vi.fn()} waiting={false} />);
-    // No elementFromPoint stub → the pointer is never "over" a cell.
-    (document as unknown as { elementFromPoint: () => Element | null }).elementFromPoint = () => null;
+    const restore = stubGridLayout();
     fireEvent(screen.getByTestId('ship-chip-carrier'), pointer('pointerdown', 5, 5));
-    fireEvent(window, pointer('pointermove', 500, 500));
+    fireEvent(window, pointer('pointermove', 500, 500)); // far outside the 100px grid
     fireEvent(window, pointer('pointerup'));
-    delete (document as unknown as { elementFromPoint?: unknown }).elementFromPoint;
+    restore();
 
     expect(onChange).not.toHaveBeenCalled();
   });
