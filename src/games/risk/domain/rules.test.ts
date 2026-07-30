@@ -58,6 +58,7 @@ function state(owners: Record<string, [number, number]>, over: Partial<GameState
     winner: null,
     diceMode: 'random',
     diceBag: [],
+    defenseBag: [],
     ...over,
   };
 }
@@ -153,15 +154,30 @@ describe('balanced dice', () => {
     expect(d.bag).toEqual([]);
   });
 
-  it('a balanced battle consumes the bag and carries it in the state', () => {
+  it('a balanced battle consumes each side\'s own bag and carries both in the state', () => {
     const g = state(
       { a: [0, 3], b: [0, 1], c: [0, 1], d: [1, 1], e: [1, 1], f: [1, 1] },
       { diceMode: 'balanced' },
     );
     const { state: next } = resolveAttack(g, MAP, 'a', 'd', scriptedRng([0.5, 0.1, 0.8, 0.3, 0.7]));
-    // Attacker rolls min(3, 3-1)=2 dice (bag refills to 18 first); defender 1.
-    expect(next.diceBag).toHaveLength(18 - 2 - 1);
+    // Attacker rolls min(3, 3-1)=2 dice from THEIR bag (refilled to 18 first);
+    // the defender's 1 die comes out of a separate bag.
+    expect(next.diceBag).toHaveLength(18 - 2);
+    expect(next.defenseBag).toHaveLength(18 - 1);
     expect(next.diceMode).toBe('balanced');
+  });
+
+  it('attacker and defender bags are independent — three attacker 6s cannot strip the defender of 6s', () => {
+    // The old shared-bag bug: a hot attacker draw removed the good dice from
+    // the defender's pool, anti-correlating the sides. With separate bags the
+    // attacker drawing ALL THREE 6s must leave the defender able to draw a 6.
+    const g = state(
+      { a: [0, 4], b: [0, 1], c: [0, 1], d: [1, 2], e: [1, 1], f: [1, 1] },
+      { diceMode: 'balanced', diceBag: [6, 6, 6], defenseBag: [3, 6] },
+    );
+    const { result } = resolveAttack(g, MAP, 'a', 'd', scriptedRng([0.5]));
+    expect(result.attackerDice).toEqual([6, 6, 6]);
+    expect(result.defenderDice).toContain(6); // still possible — its bag is untouched
   });
 });
 

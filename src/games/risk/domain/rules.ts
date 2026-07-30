@@ -100,6 +100,7 @@ export function newGame(
     winner: null,
     diceMode,
     diceBag: [],
+    defenseBag: [],
   };
   state.toPlace = deployReserve(state, 0);
   return state;
@@ -220,8 +221,11 @@ export function resolveAttack(
   const t = state.territories[to];
   const nAtt = Math.min(3, f.armies - 1);
   const nDef = Math.min(2, t.armies);
+  // Attacker and defender each draw from their OWN bag: sharing one bag would
+  // anti-correlate the sides (a hot attacker draw removes the good dice from
+  // the defender's pool) and drag balanced mode away from the true 3v2 odds.
   const attDraw = drawDice(state.diceBag, nAtt, rng, state.diceMode);
-  const defDraw = drawDice(attDraw.bag, nDef, rng, state.diceMode);
+  const defDraw = drawDice(state.defenseBag, nDef, rng, state.diceMode);
   const attackerDice = [...attDraw.values].sort((a, b) => b - a);
   const defenderDice = [...defDraw.values].sort((a, b) => b - a);
 
@@ -253,7 +257,8 @@ export function resolveAttack(
     ...state,
     territories,
     conqueredThisTurn: state.conqueredThisTurn || captured,
-    diceBag: defDraw.bag,
+    diceBag: attDraw.bag,
+    defenseBag: defDraw.bag,
   };
   if (captured) next = settle(next, map);
 

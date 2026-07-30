@@ -67,8 +67,13 @@ export interface GameState {
   winner: number | null;
   /** Battle-dice behaviour, chosen at setup. */
   diceMode: DiceMode;
-  /** Remaining faces in the balanced-mode shuffle bag (empty in random mode). */
+  /** Remaining faces in the attacker's balanced-mode shuffle bag (empty in
+   *  random mode). Attack and defense draw from SEPARATE bags — a shared bag
+   *  would anti-correlate the rolls (a hot attacker draw would literally
+   *  remove the good dice from the defender's pool). */
   diceBag: number[];
+  /** Remaining faces in the defender's balanced-mode shuffle bag. */
+  defenseBag: number[];
 }
 
 /** The outcome of one attack roll, kept for the UI to animate. */
