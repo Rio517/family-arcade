@@ -17,7 +17,7 @@ It's free and open source — the whole thing lives in this repo.
 
 | The console | Place your fleet |
 | --- | --- |
-| ![Game console menu](docs/screenshots/menu.jpg) | ![Placing ships, dragging from the tray](docs/screenshots/placement.jpg) |
+| ![The Midnight Carnival arcade landing page](docs/screenshots/arcade-landing.png) | ![Placing ships, dragging from the tray](docs/screenshots/placement.jpg) |
 
 | Battle view | Share the game code |
 | --- | --- |
