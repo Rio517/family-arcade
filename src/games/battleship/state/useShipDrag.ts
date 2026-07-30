@@ -32,6 +32,38 @@ function measureCell(): number {
   return cell ? (cell as HTMLElement).getBoundingClientRect().width : 40;
 }
 
+/** The on-screen geometry of the 10×10 cell area, from its corner cells. */
+interface GridGeom {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  pitchX: number;
+  pitchY: number;
+}
+
+/**
+ * Measure the placement grid (the placement screen has exactly one board, so
+ * the corner cells identify it). Measured fresh on every move so it stays
+ * correct through scrolls and resizes mid-drag.
+ */
+function measureGrid(): GridGeom | null {
+  const first = document.querySelector('[data-row="0"][data-col="0"]');
+  const last = document.querySelector(`[data-row="${BOARD_SIZE - 1}"][data-col="${BOARD_SIZE - 1}"]`);
+  if (!first || !last) return null;
+  const f = first.getBoundingClientRect();
+  const l = last.getBoundingClientRect();
+  if (f.width <= 0 || f.height <= 0) return null;
+  return {
+    left: f.left,
+    top: f.top,
+    right: l.right,
+    bottom: l.bottom,
+    pitchX: (l.left - f.left) / (BOARD_SIZE - 1) || f.width,
+    pitchY: (l.top - f.top) / (BOARD_SIZE - 1) || f.height,
+  };
+}
+
 /**
  * Pointer-driven ship dragging, for both moving a placed ship and dragging a
  * fresh ship in from the sidebar. Attaches window pointer listeners and
@@ -54,10 +86,18 @@ export function useShipDrag(fleet: Fleet, onChange: (fleet: Fleet) => void) {
       const cur = dragRef.current;
       if (!cur) return;
       const pointer = { x: ev.clientX, y: ev.clientY };
-      const cell = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest(
-        '[data-row]',
-      );
-      if (!cell) {
+      // Hit-test against the cell area's GEOMETRY, not per-cell elements. The
+      // old elementFromPoint test fell into the 2px gaps between cells, so
+      // every time the pointer crossed a grid line the drag briefly counted
+      // as off-board and the preview flashed red. Pure math over the grid's
+      // rect has no gaps, and a little grace margin keeps the edge friendly.
+      const g = measureGrid();
+      const grace = g ? Math.max(g.pitchX, g.pitchY) * 0.45 : 0;
+      const over =
+        g !== null &&
+        ev.clientX >= g.left - grace && ev.clientX <= g.right + grace &&
+        ev.clientY >= g.top - grace && ev.clientY <= g.bottom + grace;
+      if (!g || !over) {
         // Off the board: the in-grid preview hides, but the drag stays alive and
         // the pointer keeps updating so the carried ghost follows the cursor.
         const next = { ...cur, pointer, onBoard: false, ok: false };
@@ -65,8 +105,8 @@ export function useShipDrag(fleet: Fleet, onChange: (fleet: Fleet) => void) {
         setDrag(next);
         return;
       }
-      const hoverRow = Number(cell.getAttribute('data-row'));
-      const hoverCol = Number(cell.getAttribute('data-col'));
+      const hoverRow = clamp(Math.floor((ev.clientY - g.top) / g.pitchY), BOARD_SIZE - 1);
+      const hoverCol = clamp(Math.floor((ev.clientX - g.left) / g.pitchX), BOARD_SIZE - 1);
       const horiz = cur.orientation === 'H';
       // Back the anchor off by grabSeg *along* the ship's axis so the grabbed
       // segment lands on the hovered cell, then clamp so the whole hull stays
