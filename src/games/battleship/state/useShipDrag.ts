@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { canPlace, placeShip } from '@games/battleship/domain/board';
 import { shipSpec } from '@games/battleship/domain/constants';
 import { BOARD_SIZE, type Fleet, type Orientation, type ShipId } from '@games/battleship/domain/types';
@@ -77,6 +77,11 @@ export function useShipDrag(fleet: Fleet, onChange: (fleet: Fleet) => void) {
   // A ref shadows the state so the window listeners always see the latest drag
   // without re-binding on every pointermove.
   const dragRef = useRef<ShipDrag | null>(null);
+  const detachRef = useRef<(() => void) | null>(null);
+
+  // If the screen unmounts mid-drag (opponent readies up, connection event),
+  // the window listeners must not outlive it.
+  useEffect(() => () => detachRef.current?.(), []);
 
   function run(info: ShipDrag) {
     dragRef.current = info;
@@ -121,10 +126,14 @@ export function useShipDrag(fleet: Fleet, onChange: (fleet: Fleet) => void) {
       dragRef.current = next;
       setDrag(next);
     };
-    const end = () => {
+    const detach = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', end);
       window.removeEventListener('pointercancel', end);
+      detachRef.current = null;
+    };
+    const end = () => {
+      detach();
       const cur = dragRef.current;
       dragRef.current = null;
       setDrag(null);
@@ -142,6 +151,7 @@ export function useShipDrag(fleet: Fleet, onChange: (fleet: Fleet) => void) {
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', end);
     window.addEventListener('pointercancel', end);
+    detachRef.current = detach;
   }
 
   /** Reposition an already-placed ship, grabbed on the board. */
