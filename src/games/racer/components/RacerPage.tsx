@@ -1,5 +1,5 @@
 import '../styles/racer.css';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { createRace, stepRace, type KartInput, type KartState } from '../domain/kart';
@@ -30,16 +30,23 @@ export function RacerPage() {
   const [driver, setDriver] = useState<Driver>(DRIVERS[0]);
 
   const gameRef = useRef<KartState | null>(null);
-  const [, setTick] = useState(0);
+  // A key that changes only when a NEW race begins, so <Track> (and its 3D
+  // scene) remounts once per race — never on a HUD refresh.
+  const [raceKey, setRaceKey] = useState(0);
+
+  // Stable so <Track>'s scene effect never sees a changing prop and rebuilds.
+  const handleOver = useCallback(() => setPhase('over'), []);
 
   const start = (d: Driver) => {
     setDriver(d);
     gameRef.current = createRace({ target: TARGET });
+    setRaceKey((k) => k + 1);
     setPhase('race');
   };
 
   const playAgain = () => {
     gameRef.current = createRace({ target: TARGET });
+    setRaceKey((k) => k + 1);
     setPhase('race');
   };
 
@@ -76,12 +83,7 @@ export function RacerPage() {
 
   return (
     <Shell onMenu={backToPick}>
-      <Track
-        gameRef={gameRef}
-        driver={driver}
-        onOver={() => setPhase('over')}
-        onFrame={() => setTick((t) => (t + 1) % 1_000_000)}
-      />
+      <Track key={raceKey} gameRef={gameRef} driver={driver} onOver={handleOver} />
       {phase === 'over' && gameRef.current && (
         <WinOverlay game={gameRef.current} driver={driver} onAgain={playAgain} onMenu={backToPick} />
       )}
@@ -94,16 +96,19 @@ function Track({
   gameRef,
   driver,
   onOver,
-  onFrame,
 }: {
   gameRef: React.MutableRefObject<KartState | null>;
   driver: Driver;
   onOver: () => void;
-  onFrame: () => void;
 }) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const keysRef = useRef<Set<string>>(new Set());
   const pointerRef = useRef<{ active: boolean; nx: number }>({ active: false, nx: 0 });
+  // Repaints the HUD a few times a second WITHOUT touching the 3D scene.
+  const [, setHud] = useState(0);
+  // Latest onOver, read from the loop, so the scene effect can stay build-once.
+  const onOverRef = useRef(onOver);
+  onOverRef.current = onOver;
 
   // Keyboard.
   useEffect(() => {
@@ -157,11 +162,11 @@ function Track({
       hudBeat += dt;
       if (hudBeat > 0.1) {
         hudBeat = 0;
-        onFrame();
+        setHud((h) => (h + 1) % 1_000_000);
       }
       if (game.status === 'over' && !overFired) {
         overFired = true;
-        onOver();
+        onOverRef.current();
       }
     };
     raf = requestAnimationFrame(loop);
@@ -169,7 +174,10 @@ function Track({
       cancelAnimationFrame(raf);
       scene?.dispose();
     };
-  }, [gameRef, driver, onOver, onFrame]);
+    // Build the scene exactly once for this race. <Track> is given a per-race
+    // `key`, so a new race remounts it; HUD repaints never re-run this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Touch/mouse steering: horizontal position of the finger steers; holding
   // down also gives a little boost (so "hold and slide" drives the kart).
