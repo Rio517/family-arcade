@@ -39,12 +39,30 @@ reporting it. Dimensions:
    on phone.
 5. **Performance** — bundle split still sound (three.js lazy chunk shared,
    not duplicated), per-frame allocations in render loops, scene disposal on
-   unmount (no leaked WebGL contexts across theme switches).
+   unmount (no leaked WebGL contexts across theme switches). Then go game by
+   game — every game in the registry gets its own pass (replay/derivation
+   cost as logs grow, re-render structure per action, canvas/3D loop cost,
+   storage write frequency) with an honest "worth fixing" vs "fine at family
+   scale" verdict per finding.
 6. **Consistency** — code follows the module layout, registry pattern,
    testid conventions, per-theme CSS scoping; no game imported by shared/.
 7. **Dead weight** — orphaned components, unused CSS blocks, stale screenshots
    in `docs/screenshots/` no longer referenced anywhere, stale scratch/preview
    files.
+8. **Code quality & simplicity** — readability and naming (variables, test
+   names that state behaviour); deeply nested branching that wants early
+   returns or lookup tables; components doing too many jobs vs healthy module
+   size; real duplication worth unifying vs healthy independence between game
+   modules — and the reverse: abstractions that couple things which should
+   stay independent (premature generics, one-caller config objects). Judge
+   both directions; don't recommend deduplication for its own sake.
+9. **Security** — threat model is a malicious remote peer and untrusted
+   stored data, not a server. Wire-message validation depth in every
+   protocol.ts (types, ranges, log-length bounds, no prototype pollution);
+   peer-supplied strings never reach innerHTML; localStorage parses are
+   try/caught and validated so crafted saves can't brick boot; no external
+   scripts/CDNs; calculator.html inline JS stays injection-free. Weigh
+   findings against the family-game threat model honestly.
 
 ## Phase 2 — Verify in the browser
 

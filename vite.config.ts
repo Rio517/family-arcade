@@ -34,7 +34,8 @@ export default defineConfig({
       manifest: {
         name: 'Kny-Flores Family Arcade',
         short_name: 'Family Arcade',
-        description: 'The Kny-Flores family arcade — Yahtzee, Ship Battle, Chess, and Risk.',
+        description:
+          'The Kny-Flores family arcade — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and Yahtzee.',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
