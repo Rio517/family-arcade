@@ -9,7 +9,7 @@
     radial-gradient(900px 500px at 15% -10%, rgba(120, 200, 255, 0.55), transparent 60%),
     radial-gradient(900px 500px at 100% 110%, rgba(120, 230, 160, 0.5), transparent 60%),
     linear-gradient(160deg, #eaf6ff, #f0fff2);
-  font-family: 'Baloo 2', 'Comic Sans MS', -apple-system, system-ui, sans-serif;
+  font-family: 'Comic Sans MS', -apple-system, system-ui, sans-serif;
 }
 
 .racer-topbar {
