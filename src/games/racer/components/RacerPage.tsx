@@ -16,7 +16,7 @@ import {
   type Kart,
   type KartInput,
 } from '../domain/kart';
-import { RacerScene, type RacerLook } from '../three/scene';
+import type { RacerScene, RacerLook } from '../three/scene';
 import { useRacerNet } from '../net/useRacerNet';
 
 type Phase = 'mode' | 'pick' | 'lobby' | 'race' | 'over';
@@ -363,16 +363,8 @@ function Track3D({
     const mount = mountRef.current;
     const ctx = ctxRef.current;
     if (!mount || !ctx) return;
-    let scene: RacerScene;
-    try {
-      scene = new RacerScene(mount, ctx.looks, ctx.myIndex);
-    } catch (err) {
-      mount.innerHTML =
-        '<p style="padding:24px;text-align:center;color:#fff">Sorry, this device can\'t show 3D. 😢</p>';
-      // eslint-disable-next-line no-console
-      console.error(err);
-      return;
-    }
+    let scene: RacerScene | undefined;
+    let gone = false;
 
     let raf = 0;
     let last = 0;
@@ -384,7 +376,7 @@ function Track3D({
     const loop = (ts: number) => {
       raf = requestAnimationFrame(loop);
       const c = ctxRef.current;
-      if (!c) return;
+      if (!c || !scene) return;
       const dt = last ? (ts - last) / 1000 : 0;
       last = ts;
       const t = Math.max(0, Math.min(dt, 0.05));
@@ -477,8 +469,23 @@ function Track3D({
         onOverRef.current();
       }
     };
-    raf = requestAnimationFrame(loop);
+    // three.js loads on demand, same as chess and battleship — visiting the
+    // arcade menu (or racing later) must not front-load the 3D library.
+    import('../three/scene').then(({ RacerScene: Scene }) => {
+      if (gone) return;
+      try {
+        scene = new Scene(mount, ctx.looks, ctx.myIndex);
+      } catch (err) {
+        mount.innerHTML =
+          '<p style="padding:24px;text-align:center;color:#fff">Sorry, this device can\'t show 3D. 😢</p>';
+        // eslint-disable-next-line no-console
+        console.error(err);
+        return;
+      }
+      raf = requestAnimationFrame(loop);
+    });
     return () => {
+      gone = true;
       cancelAnimationFrame(raf);
       scene?.dispose();
     };
