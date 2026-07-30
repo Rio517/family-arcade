@@ -149,7 +149,12 @@ describe('connectHandshake', () => {
     const s: SessionState = { ...newSession('host'), myReady: true, log: [{ type: 'start', first: 'host' }] };
     const msgs = connectHandshake(s);
     expect(msgs.map((m) => m.t)).toEqual(['hello', 'sync']);
-    expect(msgs.find((m) => m.t === 'sync')).toMatchObject({ log: s.log, ready: true });
+    expect(msgs.find((m) => m.t === 'sync')).toMatchObject({ log: s.log, ready: true, epoch: 0 });
+  });
+
+  it('carries the current epoch after a rematch', () => {
+    const s: SessionState = { ...newSession('host'), epoch: 2 };
+    expect(connectHandshake(s).find((m) => m.t === 'sync')).toMatchObject({ epoch: 2 });
   });
 });
 
@@ -343,16 +348,18 @@ describe('full game via the real session module', () => {
 });
 
 describe('rematch', () => {
+  const finishedLog: SessionState['log'] = [
+    { type: 'start', first: 'host' },
+    { type: 'shot', by: 'host', row: 0, col: 0, hit: true, sunk: 'destroyer', allSunk: true },
+  ];
+  const finished: SessionState = {
+    ...newSession('host'),
+    log: finishedLog,
+    myReady: true,
+    oppReady: true,
+  };
+
   it('restarts once both sides propose, after a game is over', () => {
-    const finished: SessionState = {
-      ...newSession('host'),
-      log: [
-        { type: 'start', first: 'host' },
-        { type: 'shot', by: 'host', row: 0, col: 0, hit: true, sunk: 'destroyer', allSunk: true },
-      ],
-      myReady: true,
-      oppReady: true,
-    };
     expect(phase(finished)).toBe('over');
     const mine = proposeRematch(finished); // I propose — not yet restarted
     expect(phase(mine.state)).toBe('over');
@@ -360,5 +367,49 @@ describe('rematch', () => {
     expect(phase(both.state)).toBe('placing');
     expect(both.state.log).toEqual([]);
     expect(both.state.myReady).toBe(false);
+  });
+
+  it('bumps the epoch on every rematch reset', () => {
+    const restarted = applyMessage(proposeRematch(finished).state, { t: 'rematch' }).state;
+    expect(restarted.epoch).toBe(1);
+  });
+
+  describe('game epoch vs stale syncs (resurrection regression)', () => {
+    const restarted: SessionState = applyMessage(proposeRematch(finished).state, { t: 'rematch' }).state;
+
+    it('a rematch reset survives a stale sync carrying the old finished log', () => {
+      expect(restarted.epoch).toBe(1);
+      // The peer's pre-rematch sync (epoch 0 — or missing entirely on an old
+      // app version) still carries the finished log. Without epochs its longer
+      // log would win reconciliation and resurrect the finished game.
+      const stale = applyMessage(restarted, { t: 'sync', log: finishedLog, ready: true });
+      expect(stale.state.log).toEqual([]);
+      expect(stale.state.epoch).toBe(1);
+      expect(phase(stale.state)).toBe('placing');
+      expect(stale.finished).toBeUndefined();
+      // ...and we answer with our own sync so the lagging peer catches up.
+      expect(stale.outgoing).toContainEqual({ t: 'sync', log: [], ready: false, epoch: 1 });
+    });
+
+    it('an explicit lower epoch is ignored the same way', () => {
+      const stale = applyMessage(restarted, { t: 'sync', log: finishedLog, ready: true, epoch: 0 });
+      expect(stale.state.log).toEqual([]);
+      expect(stale.state.epoch).toBe(1);
+    });
+
+    it('adopts log and epoch wholesale from a higher-epoch sync', () => {
+      // We missed the rematch: still sitting on the finished game at epoch 0
+      // while the peer already reset to epoch 1 with a fresh empty log.
+      const behind: SessionState = { ...finished, myFleet: autoPlace(seededRng(5)), iWantRematch: true };
+      const out = applyMessage(behind, { t: 'sync', log: [], ready: false, epoch: 1 });
+      expect(out.state.epoch).toBe(1);
+      expect(out.state.log).toEqual([]);
+      expect(phase(out.state)).toBe('placing');
+      // Previous-game state is cleared exactly like a local rematch reset.
+      expect(out.state.myFleet).toEqual([]);
+      expect(out.state.myReady).toBe(false);
+      expect(out.state.iWantRematch).toBe(false);
+      expect(out.finished).toBeUndefined();
+    });
   });
 });

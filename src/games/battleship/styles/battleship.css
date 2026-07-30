@@ -157,6 +157,15 @@
   color: var(--text); cursor: pointer; padding: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
+/* Invisible tap-area extender: brings the interactive box to ≥34px without
+   growing the 21px artwork. Along the ship's axis it reaches further OUTWARD
+   (past the hull tip) than inward, so the rotate and remove handles at the two
+   ends of a 2-cell destroyer can never overlap each other's tap zones. */
+.ship-ctrl::before { content: ''; position: absolute; inset: -7px; }
+.ship-ctrl.h.start::before { left: -9px; right: -4px; }
+.ship-ctrl.h.end::before { left: -4px; right: -9px; }
+.ship-ctrl.v.start::before { top: -9px; bottom: -4px; }
+.ship-ctrl.v.end::before { top: -4px; bottom: -9px; }
 .ship-ctrl.h.start { left: 2px; top: 50%; transform: translateY(-50%); }
 .ship-ctrl.h.end { right: 2px; top: 50%; transform: translateY(-50%); }
 .ship-ctrl.v.start { top: 2px; left: 50%; transform: translateX(-50%); }
@@ -200,7 +209,7 @@
 .ship-art { display: inline-flex; align-items: center; min-width: 64px; }
 .chip-actions { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
 .chip-btn {
-  display: grid; place-items: center; width: 30px; height: 30px;
+  display: grid; place-items: center; width: 36px; height: 36px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
   color: var(--muted); cursor: pointer;
 }
@@ -299,7 +308,8 @@
    A read-only three.js scene: your ships riding the swell, fires where the
    enemy has hit, foam rings where they missed. The radar stays 2D. */
 .fleet-dims { display: inline-flex; margin: 0 0 0 4px; }
-.fleet-dims button { flex: 0 0 auto; padding: 4px 10px; font-size: 11px; }
+/* Same compact look, but a ≥32px-tall tap box (min-height, not padding). */
+.fleet-dims button { flex: 0 0 auto; padding: 4px 10px; font-size: 11px; min-height: 32px; }
 .bs3d-wrap { display: flex; flex-direction: column; gap: 6px; }
 .bs3d {
   width: 100%;

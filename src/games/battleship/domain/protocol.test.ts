@@ -54,6 +54,13 @@ describe('isMessage — accepts well-formed messages', () => {
     expect(isMessage({ t: 'rematch' })).toBe(true);
     expect(isMessage({ t: 'sync', log: [...start, shot('host', 1, 1)], ready: true })).toBe(true);
   });
+
+  it('accepts a sync with a valid epoch, and without one (older peers = epoch 0)', () => {
+    expect(isMessage({ t: 'sync', log: [...start], ready: true, epoch: 0 })).toBe(true);
+    expect(isMessage({ t: 'sync', log: [...start], ready: true, epoch: 3 })).toBe(true);
+    expect(isMessage({ t: 'sync', log: [...start], ready: true, epoch: 1_000_000 })).toBe(true);
+    expect(isMessage({ t: 'sync', log: [...start], ready: true })).toBe(true); // back-compat
+  });
 });
 
 describe('isMessage — rejects malformed / hostile input', () => {
@@ -83,6 +90,13 @@ describe('isMessage — rejects malformed / hostile input', () => {
     expect(isMessage({ t: 'sync', log: [{ type: 'shot', by: 'host', row: 99, col: 0, hit: true, sunk: null, allSunk: false }], ready: false })).toBe(false);
     expect(isMessage({ t: 'sync', log: 'not-an-array', ready: false })).toBe(false);
     expect(isMessage({ t: 'sync', log: [{ type: 'garbage' }], ready: false })).toBe(false);
+  });
+
+  it('rejects a sync with an invalid epoch', () => {
+    expect(isMessage({ t: 'sync', log: [...start], ready: true, epoch: -1 })).toBe(false);
+    expect(isMessage({ t: 'sync', log: [...start], ready: true, epoch: 1.5 })).toBe(false);
+    expect(isMessage({ t: 'sync', log: [...start], ready: true, epoch: 1_000_001 })).toBe(false);
+    expect(isMessage({ t: 'sync', log: [...start], ready: true, epoch: 'zero' })).toBe(false);
   });
 
   it('rejects a sync log longer than a whole game (memory-DoS guard)', () => {

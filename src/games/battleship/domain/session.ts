@@ -50,6 +50,14 @@ export interface SessionState {
   log: GameLog;
   pendingFire: Coord | null;
   setupPhase: SetupPhase;
+  /**
+   * Which game of this session we are on. Starts at 0 and increments on every
+   * rematch reset. "Longer log wins" reconciliation only applies within one
+   * epoch — without this, a peer's stale sync carrying the old finished log
+   * would out-length the fresh empty log and resurrect the finished game
+   * mid-placement (mirrors the identical fix in chess).
+   */
+  epoch: number;
 }
 
 /** Reported to the profile exactly once, when a game transitions to finished. */
@@ -89,6 +97,7 @@ export function createSession(side: Side, code: string, myName: string, mySkinId
     log: [],
     pendingFire: null,
     setupPhase: 'fleet',
+    epoch: 0,
   };
 }
 
@@ -134,9 +143,14 @@ export function helloOf(s: SessionState): Message {
   return { t: 'hello', v: PROTOCOL_VERSION, side: s.side, name: s.myName, skinId: s.mySkinId };
 }
 
+/** My current catch-up sync (log + readiness + which game we're on). */
+function syncOf(s: SessionState): Message {
+  return { t: 'sync', log: s.log, ready: s.myReady, epoch: s.epoch };
+}
+
 /** The identity/catch-up handshake to send whenever a channel (re)opens. */
 export function connectHandshake(s: SessionState): Message[] {
-  return [helloOf(s), { t: 'sync', log: s.log, ready: s.myReady }];
+  return [helloOf(s), syncOf(s)];
 }
 
 /** Player confirms placement. Host may author the opening move if both ready. */
@@ -182,6 +196,32 @@ export function applyMessage(s: SessionState, msg: Message, rng: () => number = 
     }
 
     case 'sync': {
+      // A missing epoch (older app version on the peer) counts as epoch 0.
+      const theirEpoch = msg.epoch ?? 0;
+      if (theirEpoch < s.epoch) {
+        // Stale sync from before our rematch reset — its old finished log must
+        // NOT resurrect the finished game. Ignore it entirely and answer with
+        // our own sync so the lagging peer can catch up to the new game.
+        return { state: s, outgoing: [syncOf(s)] };
+      }
+      if (theirEpoch > s.epoch) {
+        // The peer is a whole game ahead (we missed the rematch reset). Adopt
+        // their epoch and log wholesale, clearing our previous-game state just
+        // like maybeRestart does.
+        const adopted: SessionState = {
+          ...s,
+          epoch: theirEpoch,
+          myFleet: [],
+          myReady: false,
+          oppReady: msg.ready,
+          iWantRematch: false,
+          oppWantsRematch: false,
+          log: msg.log,
+          pendingFire: null,
+          setupPhase: 'placing',
+        };
+        return none(adopted);
+      }
       const merged = reconcileLogs(s.log, msg.log);
       const synced = advanceLog({ ...s, oppReady: msg.ready }, merged);
       // The guest's readiness may reach the host ONLY via this sync — its live
@@ -267,7 +307,8 @@ function maybeAuthorStart(s: SessionState, rng: () => number): Outcome {
 /**
  * Reset for a rematch once both sides have asked and the game is over. Returns
  * a bare SessionState (not an Outcome) because a restart emits no messages —
- * unlike maybeAuthorStart, which sends the opening `start`.
+ * unlike maybeAuthorStart, which sends the opening `start`. Bumps the epoch so
+ * a stale sync of the finished log can't resurrect the old game (see `sync`).
  */
 function maybeRestart(s: SessionState): SessionState {
   if (!s.iWantRematch || !s.oppWantsRematch || winner(s.log) === null) return s;
@@ -281,5 +322,6 @@ function maybeRestart(s: SessionState): SessionState {
     log: [],
     pendingFire: null,
     setupPhase: 'placing',
+    epoch: s.epoch + 1,
   };
 }
