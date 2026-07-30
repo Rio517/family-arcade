@@ -172,9 +172,11 @@
   border-radius: 999px;
   background: linear-gradient(90deg, #fff1a8, #ffd0ef);
   color: #6b3fa0;
-  animation: uni-pop 0.5s ease infinite alternate;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .uni-score-power { animation: uni-pop 0.5s ease infinite alternate; }
+}
 @keyframes uni-pop { from { transform: scale(1); } to { transform: scale(1.08); } }
 
 .uni-canvas {
@@ -218,9 +220,11 @@
   padding: 28px 34px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   max-width: 460px;
-  animation: uni-rise 0.35s ease;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .uni-win-card { animation: uni-rise 0.35s ease; }
+}
 @keyframes uni-rise { from { transform: translateY(20px) scale(0.95); opacity: 0; } to { transform: none; opacity: 1; } }
 
 .uni-win-burst { font-size: 34px; letter-spacing: 4px; }

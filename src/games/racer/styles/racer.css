@@ -237,7 +237,9 @@
   padding: 28px 34px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   max-width: 460px;
-  animation: racer-rise 0.35s ease;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .racer-win-card { animation: racer-rise 0.35s ease; }
 }
 @keyframes racer-rise { from { transform: translateY(20px) scale(0.95); opacity: 0; } to { transform: none; opacity: 1; } }
 .racer-win-burst { font-size: 34px; letter-spacing: 4px; }

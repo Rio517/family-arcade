@@ -51,7 +51,8 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
   // Mount the scene once.
   useEffect(() => {
     if (!holder.current) return;
-    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reducedMotion =
+      typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     let scene: ChessScene | null = null;
     try {
       scene = new ChessScene(holder.current, {
