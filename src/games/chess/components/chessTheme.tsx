@@ -94,6 +94,8 @@ export interface ScenePalette {
   blackAccent?: string;
   /** Scatter a starfield around the board. */
   stars?: boolean;
+  /** A dream sky: pastel rainbows arching behind the board, drifting clouds. */
+  dream?: boolean;
   pieceRoughness: number;
 }
 
@@ -122,6 +124,7 @@ export const SCENE_PALETTES: Record<ChessThemeId, ScenePalette> = {
     blackPiece: '#cdb1f2', // Lavender pearl
     accent: '#e8b64c',
     pieceStyle: 'fantasy',
+    dream: true, // rainbows and clouds behind the board
     pieceRoughness: 0.22, // pearlier
   },
   galaxy: {
@@ -132,13 +135,13 @@ export const SCENE_PALETTES: Record<ChessThemeId, ScenePalette> = {
     edge: '#3b6ea8',
     edgeEmissive: 0.6,
     whitePiece: '#d9dee8', // rebel hull white
-    blackPiece: '#535e71', // imperial gunmetal
+    blackPiece: '#78859c', // imperial gunmetal — light enough to read on the dark board
     accent: '#e8eef7',
     pieceStyle: 'ships',
     whiteGlow: '#ff8a5c', // rebel engines burn warm
     blackGlow: '#8fd0ff', // imperial engines burn cold
     whiteAccent: '#e8543f', // red squadron stripes
-    blackAccent: '#9aa7bb', // pale imperial trim
+    blackAccent: '#d3deee', // pale imperial trim
     stars: true,
     pieceRoughness: 0.3,
   },

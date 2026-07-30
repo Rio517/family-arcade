@@ -44,6 +44,8 @@ export class ChessScene {
   private markGroup = new THREE.Group();
   private checkMat: THREE.MeshBasicMaterial | null = null;
   private tweens: Tween[] = [];
+  private clouds: THREE.Group[] = [];
+  private lastNow = 0;
   private raf = 0;
   private down: { x: number; y: number } | null = null;
   private resizeObs: ResizeObserver | null = null;
@@ -67,8 +69,9 @@ export class ChessScene {
     container.appendChild(this.renderer.domElement);
 
     this.scene.background = new THREE.Color(this.palette.background);
-    // Deep space keeps its fog further out so the starfield reads.
-    this.scene.fog = this.palette.stars
+    // Deep space and dream skies keep their fog further out so the backdrop
+    // (starfield / rainbows) actually reads.
+    this.scene.fog = this.palette.stars || this.palette.dream
       ? new THREE.Fog(this.palette.background, 20, 40)
       : new THREE.Fog(this.palette.background, 15, 28);
     if (this.palette.accent) {
@@ -111,6 +114,7 @@ export class ChessScene {
     this.buildLights();
     this.buildBoard();
     if (this.palette.stars) this.buildStars();
+    if (this.palette.dream) this.buildDreamSky();
     this.scene.add(this.markGroup);
 
     // Tap vs orbit: only fire a tap when the pointer barely moved.
@@ -192,12 +196,78 @@ export class ChessScene {
     this.scene.add(stars);
   }
 
+  /** A pastel rainbow arching out of the ground — six half-torus bands. */
+  private buildRainbow(x: number, z: number, ry: number, scale: number) {
+    const bands = ['#ff8f9f', '#ffb87a', '#ffe97a', '#93e6a4', '#8fc9ff', '#c9a0f5'];
+    const g = new THREE.Group();
+    bands.forEach((c, i) => {
+      const band = new THREE.Mesh(
+        new THREE.TorusGeometry(6.4 - i * 0.36, 0.17, 10, 48, Math.PI),
+        new THREE.MeshStandardMaterial({
+          color: c,
+          emissive: c,
+          emissiveIntensity: 0.5,
+          roughness: 0.6,
+          transparent: true,
+          opacity: 0.92,
+        }),
+      );
+      g.add(band);
+    });
+    g.position.set(x, 0, z);
+    g.rotation.y = ry;
+    g.scale.setScalar(scale);
+    this.scene.add(g);
+  }
+
+  /**
+   * The unicorn theme's dream sky: rainbows arching behind either side of the
+   * board and a flock of puffy clouds that drift slowly around it (seeded, so
+   * every visit looks the same; still under reduced motion).
+   */
+  private buildDreamSky() {
+    // One rainbow behind each camp, so both players get one in view.
+    this.buildRainbow(0, -14, 0.12, 1);
+    this.buildRainbow(4, 14.5, Math.PI - 0.2, 0.8);
+
+    let seed = 20260729;
+    const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    const cloudMat = new THREE.MeshStandardMaterial({
+      color: '#ffffff',
+      emissive: '#fff2fa',
+      emissiveIntensity: 0.32,
+      roughness: 1,
+    });
+    for (let i = 0; i < 9; i++) {
+      const cloud = new THREE.Group();
+      const puffs = 3 + Math.floor(rand() * 3);
+      for (let p = 0; p < puffs; p++) {
+        const r = 0.5 + rand() * 0.75;
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), cloudMat);
+        puff.position.set((p - (puffs - 1) / 2) * r * 0.95, (rand() - 0.5) * 0.35, (rand() - 0.5) * 0.7);
+        puff.scale.y = 0.58;
+        cloud.add(puff);
+      }
+      const ang = rand() * Math.PI * 2;
+      const dist = 10.5 + rand() * 7;
+      cloud.position.set(Math.cos(ang) * dist, 2.4 + rand() * 4.6, Math.sin(ang) * dist);
+      cloud.userData.speed = (0.1 + rand() * 0.2) * (rand() < 0.5 ? 1 : -1);
+      this.clouds.push(cloud);
+      this.scene.add(cloud);
+    }
+  }
+
   // ── Procedural pieces (lathe-turned; knight is an extruded silhouette) ──
   private material(color: Color) {
+    const hex = color === 'w' ? this.palette.whitePiece : this.palette.blackPiece;
+    const ships = this.palette.pieceStyle === 'ships';
     return new THREE.MeshStandardMaterial({
-      color: color === 'w' ? this.palette.whitePiece : this.palette.blackPiece,
+      color: hex,
       roughness: this.palette.pieceRoughness,
-      metalness: this.palette.pieceStyle === 'ships' ? 0.5 : color === 'b' && !this.palette.accent ? 0.12 : 0.05,
+      metalness: ships ? 0.45 : color === 'b' && !this.palette.accent ? 0.12 : 0.05,
+      // Starships get a faint self-glow so hulls read against the night board
+      // — the dark side especially, which used to melt into the dark tiles.
+      ...(ships ? { emissive: new THREE.Color(hex), emissiveIntensity: color === 'b' ? 0.34 : 0.12 } : {}),
     });
   }
 
@@ -356,6 +426,17 @@ export class ChessScene {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
     this.controls.update();
+    const dt = this.lastNow ? Math.min(0.05, (now - this.lastNow) / 1000) : 0;
+    this.lastNow = now;
+
+    // Dream-sky clouds drift gently around the board.
+    if (this.clouds.length > 0 && !this.opts.reducedMotion) {
+      for (const cloud of this.clouds) {
+        cloud.position.x += (cloud.userData.speed as number) * dt;
+        if (cloud.position.x > 19) cloud.position.x = -19;
+        if (cloud.position.x < -19) cloud.position.x = 19;
+      }
+    }
 
     for (let i = this.tweens.length - 1; i >= 0; i--) {
       const t = this.tweens[i];
