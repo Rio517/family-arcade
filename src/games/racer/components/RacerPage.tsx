@@ -477,7 +477,7 @@ function Track3D({
         scene = new Scene(mount, ctx.looks, ctx.myIndex);
       } catch (err) {
         mount.innerHTML =
-          '<p style="padding:24px;text-align:center;color:#fff">Sorry, this device can\'t show 3D. 😢</p>';
+          '<p data-testid="racer3d-fallback" style="padding:24px;text-align:center;color:#fff">Sorry, this device can\'t show 3D. 😢</p>';
         // eslint-disable-next-line no-console
         console.error(err);
         return;

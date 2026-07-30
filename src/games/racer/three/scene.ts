@@ -75,6 +75,8 @@ export class RacerScene {
   private coins = new Map<number, THREE.Group>();
   private resizeObs: ResizeObserver | null = null;
   private camPos = new THREE.Vector3(0, 16, -30);
+  private camTarget = new THREE.Vector3(); // per-frame scratch, never allocated in sync()
+  private liveCoinIds = new Set<number>(); // per-frame scratch
   private disposed = false;
   private spin = 0;
 
@@ -255,7 +257,8 @@ export class RacerScene {
       obj.driver.position.y = 9 + Math.sin(this.spin * 6 + i) * 0.4;
     });
 
-    const live = new Set<number>();
+    const live = this.liveCoinIds;
+    live.clear();
     for (const coin of view.coins) {
       live.add(coin.id);
       let mesh = this.coins.get(coin.id);
@@ -272,6 +275,11 @@ export class RacerScene {
       if (!live.has(id)) {
         this.scene.remove(mesh);
         this.coins.delete(id);
+        // Each coin owns cloned tinted materials (makeCoin) — free them.
+        for (const child of mesh.children) {
+          const m = (child as THREE.Mesh).material;
+          if (m && !Array.isArray(m)) m.dispose();
+        }
       }
     }
 
@@ -280,7 +288,7 @@ export class RacerScene {
     if (me) {
       const fx = Math.sin(me.heading);
       const fz = Math.cos(me.heading);
-      const desired = new THREE.Vector3(me.x - fx * 30, 18, me.z - fz * 30);
+      const desired = this.camTarget.set(me.x - fx * 30, 18, me.z - fz * 30);
       const k = 1 - Math.pow(0.0001, dt);
       this.camPos.lerp(desired, k);
       this.camera.position.copy(this.camPos);
@@ -304,7 +312,20 @@ export class RacerScene {
   dispose(): void {
     this.disposed = true;
     this.resizeObs?.disconnect();
+    // Every "Race again" builds a fresh scene, so teardown must genuinely
+    // free the old one — geometries, materials, canvas textures, and the
+    // WebGL context itself (browsers cap live contexts).
+    this.scene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.geometry) mesh.geometry.dispose();
+      const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+      for (const m of mats) {
+        (m as THREE.MeshStandardMaterial).map?.dispose();
+        m.dispose();
+      }
+    });
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
     if (this.renderer.domElement.parentNode === this.container) {
       this.container.removeChild(this.renderer.domElement);
     }
