@@ -267,6 +267,36 @@ export const ScalesIcon = (p: IconProps) =>
     p,
   );
 
+/** A horseshoe magnet — the Coin Magnet power-up chip. */
+export const MagnetIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M6 4v7a6 6 0 0 0 12 0V4" />
+      <path d="M6 4h4v5H6zM14 4h4v5h-4z" />
+    </>,
+    p,
+  );
+
+/** A four-point sparkle — the Sparkle Shield / magic chip. */
+export const SparkleIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M12 3c.7 3.9 2.6 5.8 6.5 6.5-3.9.7-5.8 2.6-6.5 6.5-.7-3.9-2.6-5.8-6.5-6.5C9.4 8.8 11.3 6.9 12 3Z" />
+      <path d="M18.5 15.5c.35 1.9 1.3 2.85 3.2 3.2-1.9.35-2.85 1.3-3.2 3.2-.35-1.9-1.3-2.85-3.2-3.2 1.9-.35 2.85-1.3 3.2-3.2Z" />
+    </>,
+    p,
+  );
+
+/** A coin with a star stamp — score counters in the kid games. */
+export const CoinIcon = (p: IconProps) =>
+  svg(
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 8.2l1.1 2.3 2.5.3-1.85 1.75.5 2.5L12 13.8l-2.25 1.25.5-2.5L8.4 10.8l2.5-.3L12 8.2Z" />
+    </>,
+    p,
+  );
+
 /** A cracked, listing wreck — the (kind) loser's emblem on the result screen. */
 export const BrokenShipIcon = (p: IconProps) =>
   svg(
