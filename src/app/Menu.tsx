@@ -1,9 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useProfile } from '@shared/profile/useProfile';
-import { ChessIcon, GlobeIcon, GridIcon, ResumeIcon, ShipIcon } from '@shared/ui/icons';
-import { loadLocalChessGame, loadResumableChessGame } from '@games/chess/storage/chessPersistence';
-import { loadRiskGame } from '@games/risk/storage/riskPersistence';
-import { loadResumableSession } from '@games/battleship/storage/sessionStore';
+import { GridIcon, ResumeIcon } from '@shared/ui/icons';
 import { GAMES } from './registry';
 
 /**
@@ -64,70 +61,11 @@ function Ticket({ title, sub, tag, children }: {
   );
 }
 
-/** One saved game the family can jump back into. */
-interface SavedGame {
-  key: string;
-  to: string;
-  color: string;
-  icon: React.ReactNode;
-  title: string;
-  meta: string;
-}
-
-/** Gather every resumable game across the whole arcade. */
-function savedGames(): SavedGame[] {
-  const out: SavedGame[] = [];
-  const chessLocal = loadLocalChessGame();
-  if (chessLocal) {
-    const moves = Math.ceil(chessLocal.log.length / 2);
-    out.push({
-      key: 'chess-local',
-      to: '/chess?resume=local',
-      color: '#e8b64c',
-      icon: <ChessIcon size={20} />,
-      title: `Chess — ${chessLocal.whiteName} vs ${chessLocal.blackName}`,
-      meta: `same device · ${moves === 0 ? 'fresh setup' : `${moves} move${moves === 1 ? '' : 's'} in`}${chessLocal.start ? ' · custom' : ''}`,
-    });
-  }
-  const chessOnline = loadResumableChessGame();
-  if (chessOnline) {
-    out.push({
-      key: 'chess-online',
-      to: `/chess?resume=${chessOnline.code}`,
-      color: '#e8b64c',
-      icon: <ChessIcon size={20} />,
-      title: `Chess — vs ${chessOnline.oppName || 'opponent'}`,
-      meta: `online · code ${chessOnline.code}`,
-    });
-  }
-  const risk = loadRiskGame();
-  if (risk) {
-    out.push({
-      key: 'risk',
-      to: '/risk',
-      color: '#e0705a',
-      icon: <GlobeIcon size={20} />,
-      title: `Risk — ${risk.state.players.map((p) => p.name).join(', ')}`,
-      meta: `campaign · ${risk.state.players.length} generals`,
-    });
-  }
-  const ship = loadResumableSession();
-  if (ship) {
-    out.push({
-      key: 'battleship',
-      to: '/battleship',
-      color: '#35c7e8',
-      icon: <ShipIcon size={20} />,
-      title: `Ship Battle — vs ${ship.oppName || 'opponent'}`,
-      meta: `online · code ${ship.code}`,
-    });
-  }
-  return out;
-}
-
 export function Menu() {
   const { profile } = useProfile();
-  const saved = savedGames();
+  // Every resumable game across the arcade, in registry order — each game
+  // reports its own saves through the `savedGames` hook on its descriptor.
+  const saved = GAMES.flatMap((game) => game.savedGames?.() ?? []);
 
   return (
     <div className="app arcade">
@@ -176,7 +114,7 @@ export function Menu() {
               <div className="np-h">✦ Save Station ✦</div>
               {saved.map((s) => (
                 <Link key={s.key} className="np-row" to={s.to} style={{ '--np-c': s.color } as React.CSSProperties} data-testid={`resume-${s.key}`}>
-                  <span className="np-icon">{s.icon}</span>
+                  <span className="np-icon"><s.Icon size={20} /></span>
                   <span className="np-body">
                     <span className="np-title">{s.title}</span>
                     <span className="np-meta">{s.meta}</span>

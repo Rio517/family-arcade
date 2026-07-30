@@ -45,6 +45,26 @@ describe('<Menu> — the arcade landing page', () => {
     expect(chess.getAttribute('href')).toContain('/chess?resume=local');
   });
 
+  it('renders rows from a registry game’s savedGames hook (Risk)', () => {
+    // A mid-campaign Risk save — its row comes purely from the registry
+    // descriptor's savedGames() hook; Menu has no Risk-specific code.
+    localStorage.setItem('risk-campaign-v1', JSON.stringify({
+      v: 1,
+      savedAt: 456,
+      state: {
+        mapId: 'classic',
+        phase: 'reinforce',
+        players: [{ name: 'Mario' }, { name: 'Peach' }],
+      },
+    }));
+    renderMenu();
+
+    const risk = screen.getByTestId('resume-risk');
+    expect(risk).toHaveTextContent('Risk — Mario, Peach');
+    expect(risk).toHaveTextContent('campaign · 2 generals');
+    expect(risk.getAttribute('href')).toContain('/risk');
+  });
+
   it('ignores a corrupt chess save instead of crashing the arcade', () => {
     localStorage.setItem('chess:local:v1', '{not json');
     renderMenu();
