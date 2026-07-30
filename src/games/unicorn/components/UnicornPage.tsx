@@ -2,8 +2,7 @@ import '../styles/unicorn.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
-import { BoltIcon } from '@shared/ui/icons';
-import { CoinIcon, MagnetIcon, SparkleIcon } from './icons';
+import { BoltIcon, CoinIcon, MagnetIcon, SparkleIcon } from '@shared/ui/icons';
 import {
   ALL_POWERS,
   createGame,
@@ -286,9 +285,15 @@ function PlayField({
         onFrameRef.current();
       }
 
-      if (game.status === 'over' && !overFired) {
-        overFired = true;
-        onOverRef.current();
+      if (game.status === 'over') {
+        if (!overFired) {
+          overFired = true;
+          onOverRef.current();
+        }
+      } else {
+        // "Play again" swaps in a fresh game without remounting this loop —
+        // re-arm so the NEXT win fires the overlay too.
+        overFired = false;
       }
     };
     raf = requestAnimationFrame(loop);
