@@ -110,24 +110,9 @@ function drawCoin(ctx: CanvasRenderingContext2D, x: number, y: number, hue: numb
   ctx.arc(x, cy, r * 2.4, 0, Math.PI * 2);
   ctx.fill();
 
-  // The coin spins on its vertical axis (per-coin phase so they don't sync);
-  // squashing x by the spin is the classic canvas fake-3D flip.
-  const spin = Math.cos(time * 2.4 + x * 0.13 + hue * 0.05);
-  const w = Math.max(0.16, Math.abs(spin)); // never quite edge-on-invisible
-
+  // No spin flip — the family wants coins that stay perfect circles.
   ctx.save();
   ctx.translate(x, cy);
-  ctx.scale(w, 1);
-
-  // Milled edge: a darker gold disc peeking out on the side turning away —
-  // strongest mid-flip, gone when the coin faces us square.
-  const thickness = 5 * (1 - w);
-  if (thickness > 0.5) {
-    ctx.fillStyle = '#b8791a';
-    ctx.beginPath();
-    ctx.arc(spin >= 0 ? -thickness : thickness, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
 
   // Rim, then the brighter face inset into it.
   ctx.fillStyle = '#e39c1c';
@@ -151,11 +136,16 @@ function drawCoin(ctx: CanvasRenderingContext2D, x: number, y: number, hue: numb
   ctx.arc(0, 0, r - 5, 0, Math.PI * 2);
   ctx.stroke();
 
-  // The star stamp — pressed into the metal (dark star, light catch below).
-  ctx.fillStyle = 'rgba(199,134,29,0.9)';
-  star(ctx, 0, 0.8, 8, 3.4, 5);
-  ctx.fillStyle = 'rgba(255,246,201,0.9)';
-  star(ctx, 0, -0.2, 7.2, 3, 5);
+  // The star stamp — ONE engraved star. (The old two-star-with-shadow stack
+  // read as a frowny face at coin size; never layer offset stamps.)
+  const stampGrad = ctx.createLinearGradient(0, -8.5, 0, 8.5);
+  stampGrad.addColorStop(0, '#c7861d');
+  stampGrad.addColorStop(1, '#a86f14');
+  ctx.fillStyle = stampGrad;
+  star(ctx, 0, 0.3, 8.5, 3.6, 5);
+  ctx.strokeStyle = 'rgba(255,246,201,0.8)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
   // Glint riding the top-left rim.
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
