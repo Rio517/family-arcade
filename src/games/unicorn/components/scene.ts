@@ -8,7 +8,7 @@
  * sparkly 🦄 belongs.
  */
 
-import { FIELD_H, FIELD_W, type GameState, type Player } from '../domain/engine';
+import { FIELD_H, FIELD_W, type Coin, type CoinKind, type GameState, type Player } from '../domain/engine';
 
 export function renderScene(canvas: HTMLCanvasElement, game: GameState, time: number): void {
   const ctx = canvas.getContext('2d');
@@ -18,7 +18,7 @@ export function renderScene(canvas: HTMLCanvasElement, game: GameState, time: nu
   if (game.world === 'sky') drawSky(ctx, time);
   else drawOcean(ctx, time);
 
-  for (const coin of game.coins) drawCoin(ctx, coin.pos.x, coin.pos.y, coin.hue, time);
+  for (const coin of game.coins) drawCoin(ctx, coin, time);
   for (const p of game.players) drawPlayer(ctx, p, time);
 }
 
@@ -96,18 +96,24 @@ function drawOcean(ctx: CanvasRenderingContext2D, time: number) {
 
 // ----- coins -----
 
-function drawCoin(ctx: CanvasRenderingContext2D, x: number, y: number, hue: number, time: number) {
+function drawCoin(ctx: CanvasRenderingContext2D, coin: Coin, time: number) {
+  const { x, y } = { x: coin.pos.x, y: coin.pos.y };
+  const rare = coin.kind === 'rainbow';
   const bob = Math.sin(time * 3 + x) * 3;
   const cy = y + bob;
   const r = 17;
 
   // Rainbow glow — the coin's magic colour lives in the halo, not the metal.
-  const glow = ctx.createRadialGradient(x, cy, 2, x, cy, r * 2.4);
-  glow.addColorStop(0, `hsla(${hue},95%,65%,0.55)`);
-  glow.addColorStop(1, `hsla(${hue},95%,65%,0)`);
+  // The rare rainbow coin announces itself: a bigger halo that slowly
+  // breathes white, so "that one is special" needs no explaining.
+  const reach = rare ? r * 3 : r * 2.4;
+  const pulse = rare ? 0.6 + 0.15 * Math.sin(time * 4 + coin.id) : 0.55;
+  const glow = ctx.createRadialGradient(x, cy, 2, x, cy, reach);
+  glow.addColorStop(0, rare ? `hsla(${coin.hue},100%,80%,${pulse})` : `hsla(${coin.hue},95%,65%,0.55)`);
+  glow.addColorStop(1, `hsla(${coin.hue},95%,65%,0)`);
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(x, cy, r * 2.4, 0, Math.PI * 2);
+  ctx.arc(x, cy, reach, 0, Math.PI * 2);
   ctx.fill();
 
   // No spin flip — the family wants coins that stay perfect circles.
@@ -136,16 +142,7 @@ function drawCoin(ctx: CanvasRenderingContext2D, x: number, y: number, hue: numb
   ctx.arc(0, 0, r - 5, 0, Math.PI * 2);
   ctx.stroke();
 
-  // The star stamp — ONE engraved star. (The old two-star-with-shadow stack
-  // read as a frowny face at coin size; never layer offset stamps.)
-  const stampGrad = ctx.createLinearGradient(0, -8.5, 0, 8.5);
-  stampGrad.addColorStop(0, '#c7861d');
-  stampGrad.addColorStop(1, '#a86f14');
-  ctx.fillStyle = stampGrad;
-  star(ctx, 0, 0.3, 8.5, 3.6, 5);
-  ctx.strokeStyle = 'rgba(255,246,201,0.8)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
+  STAMPS[coin.kind](ctx, r);
 
   // Glint riding the top-left rim.
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
@@ -155,6 +152,74 @@ function drawCoin(ctx: CanvasRenderingContext2D, x: number, y: number, hue: numb
 
   ctx.restore();
 }
+
+// The stamp struck into each coin's face. One flat engraved layer each —
+// never stack offset copies (the old star-with-shadow read as a frowny face).
+const STAMPS: Record<CoinKind, (ctx: CanvasRenderingContext2D, r: number) => void> = {
+  star(ctx, r) {
+    const g = ctx.createLinearGradient(0, -r * 0.5, 0, r * 0.5);
+    g.addColorStop(0, '#c7861d');
+    g.addColorStop(1, '#a86f14');
+    ctx.fillStyle = g;
+    star(ctx, 0, r * 0.02, r * 0.5, r * 0.21, 5);
+    ctx.strokeStyle = 'rgba(255,246,201,0.8)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  },
+  smiley(ctx, r) {
+    ctx.fillStyle = '#a86f14';
+    ctx.beginPath(); ctx.arc(-r * 0.22, -r * 0.14, r * 0.09, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.22, -r * 0.14, r * 0.09, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#a86f14';
+    ctx.lineWidth = r * 0.1;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, r * 0.02, r * 0.32, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,170,190,0.55)'; // little blush
+    ctx.beginPath(); ctx.arc(-r * 0.4, r * 0.12, r * 0.09, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.4, r * 0.12, r * 0.09, 0, Math.PI * 2); ctx.fill();
+  },
+  heart(ctx, r) {
+    const s = r * 0.5;
+    ctx.fillStyle = '#b8791a';
+    ctx.beginPath();
+    ctx.moveTo(0, s * 0.95);
+    ctx.bezierCurveTo(-s * 1.25, s * 0.1, -s * 0.7, -s * 0.85, 0, -s * 0.25);
+    ctx.bezierCurveTo(s * 0.7, -s * 0.85, s * 1.25, s * 0.1, 0, s * 0.95);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,246,201,0.55)'; // top-left sheen
+    ctx.beginPath(); ctx.arc(-s * 0.35, -s * 0.28, s * 0.18, 0, Math.PI * 2); ctx.fill();
+  },
+  arch(ctx, r) { // the engraved monotone rainbow
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,246,201,0.85)';
+    ctx.lineWidth = r * 0.34;
+    ctx.beginPath(); ctx.arc(0, r * 0.16, r * 0.4, Math.PI * 1.06, Math.PI * 1.94); ctx.stroke();
+    ctx.strokeStyle = '#a86f14';
+    ctx.lineWidth = r * 0.26;
+    ctx.beginPath(); ctx.arc(0, r * 0.18, r * 0.4, Math.PI * 1.04, Math.PI * 1.96); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,246,201,0.95)';
+    for (const sx of [-1, 1]) {
+      ctx.beginPath(); ctx.arc(sx * r * 0.42, r * 0.22, r * 0.13, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx * r * 0.24, r * 0.28, r * 0.1, 0, Math.PI * 2); ctx.fill();
+    }
+  },
+  rainbow(ctx, r) { // the rare 2-pointer: coloured enamel bands
+    const bands = ['#ff6b8a', '#ffc23c', '#39b8ff'];
+    ctx.lineCap = 'round';
+    bands.forEach((c, i) => {
+      ctx.strokeStyle = c;
+      ctx.lineWidth = r * 0.11;
+      ctx.beginPath();
+      ctx.arc(0, r * 0.14, r * 0.5 - i * r * 0.13, Math.PI, Math.PI * 2);
+      ctx.stroke();
+    });
+    ctx.fillStyle = '#fff6c9';
+    for (const sx of [-1, 1]) {
+      ctx.beginPath(); ctx.arc(sx * r * 0.48, r * 0.14, r * 0.12, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx * r * 0.32, r * 0.2, r * 0.1, 0, Math.PI * 2); ctx.fill();
+    }
+  },
+};
 
 function star(ctx: CanvasRenderingContext2D, cx: number, cy: number, outer: number, inner: number, points: number) {
   ctx.beginPath();

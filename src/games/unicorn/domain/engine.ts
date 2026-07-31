@@ -80,11 +80,25 @@ export interface Player extends PlayerConfig {
   glow: number;
 }
 
+/**
+ * The stamp struck into a coin's face. Most are worth 1; the coloured
+ * `rainbow` is the rare treasure worth 2.
+ */
+export type CoinKind = 'star' | 'smiley' | 'heart' | 'arch' | 'rainbow';
+
+/** How likely each kind is to spawn (rainbow deliberately scarce). */
+const COMMON_KINDS: CoinKind[] = ['star', 'smiley', 'heart', 'arch'];
+export const RAINBOW_CHANCE = 0.08;
+export const RAINBOW_VALUE = 2;
+
 export interface Coin {
   id: number;
   pos: Vec;
   /** 0–360 hue — every coin shimmers a different rainbow color. */
   hue: number;
+  kind: CoinKind;
+  /** What collecting it scores (rainbows pay double). */
+  value: number;
 }
 
 export type Status = 'playing' | 'over';
@@ -180,10 +194,13 @@ export function setDir(state: GameState, playerId: number, dir: Vec): void {
 /** Top up the field so there are always COIN_TARGET coins to chase. */
 function refillCoins(state: GameState, rng: Rng): void {
   while (state.coins.length < COIN_TARGET) {
+    const rainbow = rng() < RAINBOW_CHANCE;
     state.coins.push({
       id: state.nextCoinId++,
       pos: randomCoinPos(rng),
       hue: Math.floor(rng() * 360),
+      kind: rainbow ? 'rainbow' : COMMON_KINDS[Math.floor(rng() * COMMON_KINDS.length)],
+      value: rainbow ? RAINBOW_VALUE : 1,
     });
   }
 }
@@ -319,7 +336,7 @@ function collectCoins(state: GameState, rng: Rng): void {
     if (!winner) return true; // coin survives
 
     const before = winner.coins;
-    winner.coins += 1;
+    winner.coins += coin.value; // rainbows pay double
     winner.glow = 1;
     // No power-up on the winning coin — the round is over before it could
     // ever be used, and the win screen shouldn't show a fresh aura.
