@@ -6,6 +6,8 @@ import {
   leaders,
   MILESTONE,
   setDir,
+  RAINBOW_CHANCE,
+  RAINBOW_VALUE,
   step,
   winners,
   type GameState,
@@ -34,7 +36,7 @@ const TWO: PlayerConfig[] = [
 /** Drop a single coin exactly on top of a player so the next step scoops it. */
 function planCoinOn(state: GameState, playerId: number): void {
   const p = state.players.find((pl) => pl.id === playerId)!;
-  state.coins = [{ id: 999, pos: { x: p.pos.x, y: p.pos.y }, hue: 0 }];
+  state.coins = [{ id: 999, pos: { x: p.pos.x, y: p.pos.y }, hue: 0, kind: 'star' as const, value: 1 }];
 }
 
 describe('createGame', () => {
@@ -92,7 +94,7 @@ describe('collecting coins', () => {
     const near = g.players[0];
     const far = g.players[1];
     // A coin one pixel from player 0 and far from player 1.
-    g.coins = [{ id: 999, pos: { x: near.pos.x + 1, y: near.pos.y }, hue: 0 }];
+    g.coins = [{ id: 999, pos: { x: near.pos.x + 1, y: near.pos.y }, hue: 0, kind: 'star' as const, value: 1 }];
     far.pos = { x: near.pos.x + 900 > FIELD_W ? 0 : near.pos.x + 900, y: near.pos.y };
     step(g, 1 / 60, seeded(6));
     expect(near.coins).toBe(1);
@@ -154,5 +156,50 @@ describe('winning', () => {
     planCoinOn(g, 0);
     step(g, 1 / 60, seeded(11));
     expect(g.players[0].coins).toBe(coinsAtEnd);
+  });
+});
+
+describe('coin kinds & the rare rainbow', () => {
+  it('spawns every coin with a stamp kind and a value', () => {
+    const g = createGame({ world: 'sky', players: TWO, rng: seeded(7) });
+    for (const c of g.coins) {
+      expect(['star', 'smiley', 'heart', 'arch', 'rainbow']).toContain(c.kind);
+      expect(c.value).toBe(c.kind === 'rainbow' ? RAINBOW_VALUE : 1);
+    }
+  });
+
+  it('keeps rainbows rare — roughly RAINBOW_CHANCE of a large spawn sample', () => {
+    // Spawn a big sample by repeatedly collecting everything (refill runs each step).
+    const g = createGame({ world: 'sky', players: ONE, rng: seeded(42) });
+    const rng = seeded(43);
+    let rainbows = 0;
+    let total = 0;
+    for (let i = 0; i < 400; i++) {
+      total += g.coins.length;
+      rainbows += g.coins.filter((c) => c.kind === 'rainbow').length;
+      g.coins = []; // scoop the lot; step refills
+      step(g, 0.016, rng);
+    }
+    const rate = rainbows / total;
+    expect(rate).toBeGreaterThan(RAINBOW_CHANCE * 0.5);
+    expect(rate).toBeLessThan(RAINBOW_CHANCE * 2);
+  });
+
+  it('a rainbow coin scores double', () => {
+    const g = createGame({ world: 'sky', players: ONE, rng: seeded(9) });
+    const p = g.players[0];
+    g.coins = [{ id: 1, pos: { x: p.pos.x, y: p.pos.y }, hue: 200, kind: 'rainbow', value: RAINBOW_VALUE }];
+    step(g, 0.016, seeded(10));
+    expect(p.coins).toBe(2);
+  });
+
+  it('a double-scoring rainbow can end the round from target minus two', () => {
+    const g = createGame({ world: 'sky', players: ONE, rng: seeded(11) });
+    const p = g.players[0];
+    p.coins = g.target - 2;
+    g.coins = [{ id: 1, pos: { x: p.pos.x, y: p.pos.y }, hue: 200, kind: 'rainbow', value: RAINBOW_VALUE }];
+    step(g, 0.016, seeded(12));
+    expect(p.coins).toBe(g.target);
+    expect(g.status).toBe('over');
   });
 });
