@@ -4,8 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import type { PartyValue } from './PartyContext';
 
 // A controllable useParty so we can render each party state without a network.
-const h = vi.hoisted(() => ({ value: null as any }));
-vi.mock('./PartyContext', () => ({ useParty: () => h.value }));
+const mockParty = vi.hoisted(() => ({ value: null as any }));
+vi.mock('./PartyContext', () => ({ useParty: () => mockParty.value }));
 
 import { PartyBar } from './PartyBar';
 import { FloatingVideo } from './FloatingVideo';
@@ -41,7 +41,7 @@ function makeParty(over: Partial<PartyValue> = {}): PartyValue {
 const renderBar = () => render(<MemoryRouter><PartyBar /></MemoryRouter>);
 
 beforeEach(() => {
-  h.value = makeParty();
+  mockParty.value = makeParty();
 });
 
 describe('PartyBar', () => {
@@ -53,19 +53,19 @@ describe('PartyBar', () => {
   });
 
   it('offers opt-in voice (video off) once connected', () => {
-    h.value = makeParty({ inParty: true, status: 'connected', theirName: 'Kai', role: 'host', code: 'ABCD' });
+    mockParty.value = makeParty({ inParty: true, status: 'connected', theirName: 'Kai', role: 'host', code: 'ABCD' });
     renderBar();
     fireEvent.click(screen.getByTestId('party-pill'));
     const start = screen.getByTestId('party-call-start');
     expect(start).toBeInTheDocument();
     fireEvent.click(start);
-    expect(h.value.call.start).toHaveBeenCalled();
+    expect(mockParty.value.call.start).toHaveBeenCalled();
     // no camera control until the call is active
     expect(screen.queryByTestId('party-camera')).toBeNull();
   });
 
   it('shows labelled mute/camera/end controls during a live call', () => {
-    h.value = makeParty({
+    mockParty.value = makeParty({
       inParty: true, status: 'connected', theirName: 'Kai', role: 'host', code: 'ABCD',
       call: { ...makeParty().call, active: true, status: 'live' },
     });
@@ -79,13 +79,13 @@ describe('PartyBar', () => {
 
 describe('FloatingVideo', () => {
   it('renders nothing until the call is active', () => {
-    h.value = makeParty();
+    mockParty.value = makeParty();
     const { container } = render(<FloatingVideo />);
     expect(container.firstChild).toBeNull();
   });
 
   it('appears once the call is active', () => {
-    h.value = makeParty({ theirName: 'Kai', call: { ...makeParty().call, active: true, status: 'live' } });
+    mockParty.value = makeParty({ theirName: 'Kai', call: { ...makeParty().call, active: true, status: 'live' } });
     render(<FloatingVideo />);
     expect(screen.getByTestId('party-floating-video')).toBeInTheDocument();
   });

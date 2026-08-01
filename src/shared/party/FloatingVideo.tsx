@@ -8,13 +8,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParty } from './PartyContext';
 
+// The floating card's footprint. CARD_W must match the `.pv` width in
+// party.css; CARD_H is an approximate height (video + label) and EDGE is the
+// gap we keep from the viewport edges when clamping a dragged position.
+const CARD_W = 168;
+const CARD_H = 150;
+const EDGE = 8;
+
+/** Keep a proposed top-left corner within the visible viewport. */
+function clampToViewport(x: number, y: number): { x: number; y: number } {
+  return {
+    x: Math.min(Math.max(EDGE, x), window.innerWidth - CARD_W - EDGE),
+    y: Math.min(Math.max(EDGE, y), window.innerHeight - CARD_H - EDGE),
+  };
+}
+
 export function FloatingVideo() {
   const { call, theirName } = useParty();
   const localRef = useRef<HTMLVideoElement | null>(null);
   const remoteRef = useRef<HTMLVideoElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const drag = useRef<{ dx: number; dy: number } | null>(null);
+  // Where inside the card the pointer grabbed it, so dragging doesn't jump.
+  const grab = useRef<{ grabX: number; grabY: number } | null>(null);
 
   const remoteHasVideo = !!call.remoteStream && call.remoteStream.getVideoTracks().length > 0;
 
@@ -26,23 +42,27 @@ export function FloatingVideo() {
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = call.remoteStream;
   }, [call.remoteStream, remoteHasVideo]);
 
+  // If the window shrinks, pull a dragged card back into view.
+  useEffect(() => {
+    const onResize = () => setPos((p) => (p ? clampToViewport(p.x, p.y) : p));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   if (!call.active) return null;
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
     const rect = el.getBoundingClientRect();
-    drag.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    grab.current = { grabX: e.clientX - rect.left, grabY: e.clientY - rect.top };
     el.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!drag.current) return;
-    const w = 168, h = 150;
-    const x = Math.min(Math.max(8, e.clientX - drag.current.dx), window.innerWidth - w - 8);
-    const y = Math.min(Math.max(8, e.clientY - drag.current.dy), window.innerHeight - h - 8);
-    setPos({ x, y });
+    if (!grab.current) return;
+    setPos(clampToViewport(e.clientX - grab.current.grabX, e.clientY - grab.current.grabY));
   };
   const onPointerUp = () => {
-    drag.current = null;
+    grab.current = null;
   };
 
   const style = pos ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' } : undefined;
