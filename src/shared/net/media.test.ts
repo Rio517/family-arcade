@@ -34,4 +34,22 @@ describe('MediaLink (pure surface)', () => {
     await expect(link.setCamera(true)).resolves.toBeUndefined();
     expect(link.isCameraOn).toBe(false);
   });
+
+  it('a blocked camera does not report a fatal "denied" (voice keeps going)', async () => {
+    const seen: Array<{ s: string; d?: string }> = [];
+    const link = new MediaLink({
+      onStatus: (s, d) => seen.push({ s, d }),
+      onLocalStream: () => {},
+      onRemoteStream: () => {},
+    });
+    // start() can't reach a mic under jsdom, but it records the code so the
+    // subsequent setCamera actually runs its capture path.
+    await link.start('ABCD', 'guest', false);
+    seen.length = 0; // ignore start()'s own statuses
+    await link.setCamera(true);
+    expect(link.isCameraOn).toBe(false); // camera stayed off
+    // Crucially NOT 'denied' — that would tear the whole call (and the voice) down.
+    expect(seen.map((e) => e.s)).not.toContain('denied');
+    expect(seen.some((e) => e.d === 'Camera permission was blocked.')).toBe(true);
+  });
 });
