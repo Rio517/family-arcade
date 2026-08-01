@@ -1,0 +1,136 @@
+/* Floating peer-to-peer call widget (voice + opt-in video). Fixed to the
+   bottom-left so it stays out of the way of a centered board/arena. */
+
+.call-fab,
+.call-bubble {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 30;
+}
+
+.call-fab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 800;
+  font-size: 15px;
+  color: #fff;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+.call-fab:hover {
+  filter: brightness(1.06);
+}
+
+.call-bubble {
+  width: 168px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  padding: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  color: #f1f5f9;
+  backdrop-filter: blur(6px);
+}
+
+.call-remote {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0b1220;
+  display: grid;
+  place-items: center;
+}
+
+.call-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* mirror, like every video app */
+}
+
+.call-avatar {
+  font-size: 44px;
+}
+
+.call-self {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 46px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  transform: scaleX(-1);
+  background: #000;
+}
+
+.call-status {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #e2e8f0;
+}
+
+.call-controls {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.call-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+.call-btn:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+.call-btn.active {
+  background: #f59e0b;
+}
+.call-btn.end {
+  background: #ef4444;
+}
+.call-btn.end:hover {
+  background: #dc2626;
+}
+
+.call-error {
+  width: 200px;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+.call-error p {
+  margin: 0 0 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .call-fab,
+  .call-btn {
+    transition: none;
+  }
+}
