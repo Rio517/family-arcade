@@ -11,7 +11,6 @@ import { Placement } from './Placement';
 import { Battle } from './Battle';
 import { Result } from './Result';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
-import { CallBubble } from '@shared/ui/CallBubble';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { CloseIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
 import { loadResumableSession } from '@games/battleship/storage/sessionStore';
@@ -307,10 +306,6 @@ export function BattleshipPage() {
             onExit={exitToMenu}
           />
         </div>
-      )}
-
-      {bs.side && bs.status === 'connected' && (
-        <CallBubble code={bs.code} role={bs.side} prefix="bship-call-v1-" />
       )}
 
       <div className="footer">
