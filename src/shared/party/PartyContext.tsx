@@ -68,18 +68,19 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
   const [theirName, setTheirName] = useState<string | null>(null);
 
   const connRef = useRef<GameConnection<PartyMsg> | null>(null);
-  const roleRef = useRef<Role | null>(null);
   const nameRef = useRef(myName);
   nameRef.current = myName;
 
   // ---- call (video/voice) state, driven by the MediaLink ----
   const linkRef = useRef<MediaLink | null>(null);
-  const [callActive, setCallActive] = useState(false);
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  // The mic/camera are on whenever the call is anything but idle — no separate
+  // flag to keep in sync with the status.
+  const callActive = callStatus !== 'idle';
 
   const buildConn = useCallback((): GameConnection<PartyMsg> => {
     return new GameConnection<PartyMsg>(
@@ -103,34 +104,9 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const hostParty = useCallback((): string => {
-    const c = generateCode();
-    setCode(c);
-    setRole('host');
-    roleRef.current = 'host';
-    connRef.current?.destroy();
-    connRef.current = buildConn();
-    connRef.current.host(c);
-    return c;
-  }, [buildConn]);
-
-  const joinParty = useCallback(
-    (raw: string) => {
-      const c = normalizeCode(raw);
-      setCode(c);
-      setRole('guest');
-      roleRef.current = 'guest';
-      connRef.current?.destroy();
-      connRef.current = buildConn();
-      connRef.current.join(c);
-    },
-    [buildConn],
-  );
-
   const stopCall = useCallback(() => {
     linkRef.current?.destroy();
     linkRef.current = null;
-    setCallActive(false);
     setCallStatus('idle');
     setMuted(false);
     setCameraOn(false);
@@ -138,11 +114,34 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
     setRemoteStream(null);
   }, []);
 
+  const hostParty = useCallback((): string => {
+    stopCall(); // a fresh party starts with no call carried over
+    const c = generateCode();
+    setCode(c);
+    setRole('host');
+    connRef.current?.destroy();
+    connRef.current = buildConn();
+    connRef.current.host(c);
+    return c;
+  }, [buildConn, stopCall]);
+
+  const joinParty = useCallback(
+    (raw: string) => {
+      stopCall(); // a fresh party starts with no call carried over
+      const c = normalizeCode(raw);
+      setCode(c);
+      setRole('guest');
+      connRef.current?.destroy();
+      connRef.current = buildConn();
+      connRef.current.join(c);
+    },
+    [buildConn, stopCall],
+  );
+
   const leaveParty = useCallback(() => {
     stopCall();
     connRef.current?.destroy();
     connRef.current = null;
-    roleRef.current = null;
     setStatus('idle');
     setInParty(false);
     setRole(null);
@@ -156,11 +155,14 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
   }, [myName, inParty]);
 
   const startCall = useCallback(() => {
-    if (linkRef.current || !code || !roleRef.current) return;
+    if (linkRef.current || !code || !role) return;
     const link = new MediaLink(
       {
         onStatus: (s) => {
           setCallStatus(s);
+          // 'denied'/'error' here is the *initial* mic request failing — tear
+          // down. A later camera-permission refusal keeps the voice call alive
+          // (MediaLink reports that without a fatal status; see setCamera).
           if (s === 'denied' || s === 'error') stopCall();
         },
         onLocalStream: setLocalStream,
@@ -169,9 +171,8 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
       'party-call-v1-',
     );
     linkRef.current = link;
-    setCallActive(true);
-    void link.start(code, roleRef.current, false); // voice first; camera stays OFF
-  }, [code, stopCall]);
+    void link.start(code, role, false); // voice first; camera stays OFF
+  }, [code, role, stopCall]);
 
   const toggleMute = useCallback(() => setMuted(linkRef.current?.toggleMute() ?? false), []);
 
