@@ -1,0 +1,9 @@
+# Planning
+
+A scratch space for design notes and ideas we're still thinking through — not
+finished specs, and not necessarily built yet.
+
+- [video-voice-streaming.md](./video-voice-streaming.md) — can we add see/hear-each-other
+  video & voice to the 2-player games without running a server of our own? (Short
+  answer: yes, riding on the WebRTC link the games already use — with one honest
+  caveat about strict networks.)
