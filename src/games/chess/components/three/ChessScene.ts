@@ -49,6 +49,12 @@ export class ChessScene {
   private tweens: Tween[] = [];
   private clouds: THREE.Group[] = [];
   private sparkles: THREE.Points[] = [];
+  // Deep-space life (galaxy theme): named stars that twinkle, slow planets,
+  // and two tiny ships that occasionally cross the far background.
+  private brightStars: { sprite: THREE.Sprite; phase: number; base: number }[] = [];
+  private planets: { group: THREE.Group; spin: number }[] = [];
+  private flyShips: THREE.Group[] = [];
+  private flyby: { ship: THREE.Group | null; t0: number; dur: number; from: THREE.Vector3; to: THREE.Vector3; nextAt: number; seed: number } | null = null;
   private lastNow = 0;
   private raf = 0;
   private down: { x: number; y: number } | null = null;
@@ -218,6 +224,142 @@ export class ChessScene {
       transparent: true, opacity: 0.85, depthWrite: false, fog: false,
     }));
     this.scene.add(stars);
+
+    this.buildDeepSpace(rand);
+  }
+
+  /** A soft radial glow texture shared by the bright stars. */
+  private static glowTexture(): THREE.CanvasTexture {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const ctx = cv.getContext('2d')!;
+    const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.35, 'rgba(220,235,255,0.5)');
+    g.addColorStop(1, 'rgba(220,235,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(cv);
+  }
+
+  /**
+   * The rest of the galaxy: a handful of bright named-feeling stars that
+   * twinkle, two slow planets (one ringed, one banded moonlet), and a pair of
+   * tiny ships that occasionally cross the far background — a rebel dart one
+   * pass, an imperial trifoil the next. Everything is seeded and lives far
+   * outside orbit range so it dresses the room without stealing the game.
+   */
+  private buildDeepSpace(rand: () => number) {
+    // Bright stars: sprites with their own materials so each can twinkle.
+    const glowTex = ChessScene.glowTexture();
+    for (let i = 0; i < 10; i++) {
+      const mat = new THREE.SpriteMaterial({
+        map: glowTex, transparent: true, depthWrite: false, fog: false,
+        opacity: 0.8, color: i % 3 === 0 ? '#bcd9ff' : i % 3 === 1 ? '#fff2cf' : '#ffffff',
+      });
+      const sprite = new THREE.Sprite(mat);
+      const r = 16 + rand() * 8;
+      const az = rand() * Math.PI * 2;
+      // The play camera pitches ~35deg down, so the sky the player sees at
+      // distance sits BELOW the y=0 plane — scatter into that visible band.
+      const el = -0.28 + rand() * 0.55;
+      sprite.position.set(r * Math.cos(el) * Math.cos(az), r * Math.sin(el), r * Math.cos(el) * Math.sin(az));
+      const base = 0.55 + rand() * 0.35;
+      sprite.scale.setScalar(0.5 + rand() * 0.5);
+      this.brightStars.push({ sprite, phase: rand() * Math.PI * 2, base });
+      this.scene.add(sprite);
+    }
+
+    // Planets: canvas-banded spheres, far out and low so the board stays king.
+    const planet = (radius: number, bands: string[], ringColor: string | null) => {
+      const cv = document.createElement('canvas');
+      cv.width = 128; cv.height = 64;
+      const ctx = cv.getContext('2d')!;
+      bands.forEach((c, i) => {
+        ctx.fillStyle = c;
+        ctx.fillRect(0, (i * 64) / bands.length, 128, 64 / bands.length + 1);
+      });
+      // Smudge the band edges so they read as weather, not stripes.
+      ctx.globalAlpha = 0.25;
+      for (let i = 0; i < 40; i++) {
+        ctx.fillStyle = bands[Math.floor(rand() * bands.length)];
+        const y = rand() * 64;
+        ctx.fillRect(rand() * 128, y, 20 + rand() * 40, 2 + rand() * 3);
+      }
+      ctx.globalAlpha = 1;
+      const tex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const group = new THREE.Group();
+      const ball = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 28, 20),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, fog: false, emissive: '#233046', emissiveIntensity: 0.35 }),
+      );
+      group.add(ball);
+      if (ringColor) {
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(radius * 1.45, radius * 2.05, 48),
+          new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.4, side: THREE.DoubleSide, fog: false }),
+        );
+        ring.rotation.x = Math.PI / 2.4;
+        group.add(ring);
+      }
+      return group;
+    };
+
+    const gas = planet(2.6, ['#7a5a46', '#a97b52', '#8a6448', '#c19a6b', '#7a5a46', '#96714e'], '#c9b28a');
+    gas.position.set(-10, -3.5, -25); // over White's far horizon
+    gas.rotation.z = 0.18;
+    this.planets.push({ group: gas, spin: 0.01 });
+    this.scene.add(gas);
+
+    const ice = planet(1.4, ['#5f7f9e', '#7d9cb8', '#9db8cf', '#6d8ba6', '#87a6c0'], null);
+    ice.position.set(11, -2.8, 24); // over Black's far horizon
+    this.planets.push({ group: ice, spin: -0.016 });
+    this.scene.add(ice);
+
+    // Flyby ships: built once, hidden between passes (no allocation churn).
+    const dart = new THREE.Group(); // a rebel courier
+    {
+      const hull = new THREE.MeshStandardMaterial({ color: '#d9dee8', roughness: 0.4 });
+      const body = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.9, 6), hull);
+      body.rotation.x = Math.PI / 2;
+      const wingGeo = new THREE.BoxGeometry(1.0, 0.03, 0.22);
+      const wing = new THREE.Mesh(wingGeo, hull);
+      wing.position.z = -0.15;
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ff8a5c', transparent: true, depthWrite: false, opacity: 1 }));
+      glow.scale.setScalar(0.7);
+      glow.position.z = -0.55;
+      const trail = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ff8a5c', transparent: true, depthWrite: false, opacity: 0.45 }));
+      trail.scale.set(2.6, 0.22, 1); // the streak that sells the speed
+      trail.position.z = -1.7;
+      dart.add(body, wing, glow, trail);
+    }
+    const trifoil = new THREE.Group(); // an imperial patrol
+    {
+      const hull = new THREE.MeshStandardMaterial({ color: '#78859c', roughness: 0.4 });
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), hull);
+      const winGeo = new THREE.BoxGeometry(0.05, 0.7, 0.5);
+      for (const side of [-1, 1]) {
+        const wing = new THREE.Mesh(winGeo, hull);
+        wing.position.x = side * 0.3;
+        trifoil.add(wing);
+      }
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#8fd0ff', transparent: true, depthWrite: false, opacity: 1 }));
+      glow.scale.setScalar(0.6);
+      glow.position.z = -0.3;
+      const trail = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#8fd0ff', transparent: true, depthWrite: false, opacity: 0.45 }));
+      trail.scale.set(2.2, 0.2, 1);
+      trail.position.z = -1.4;
+      trifoil.add(ball, glow, trail);
+    }
+    for (const ship of [dart, trifoil]) {
+      ship.scale.setScalar(1.6); // far away — needs presence to read at all
+      ship.visible = false;
+      this.flyShips.push(ship);
+      this.scene.add(ship);
+    }
+    // First pass a few seconds in; the seeded stream paces the rest.
+    this.flyby = { ship: null, t0: 0, dur: 0, from: new THREE.Vector3(), to: new THREE.Vector3(), nextAt: 6000, seed: 0x5eed ^ 42 };
   }
 
   /** A pastel rainbow arching out of the cloud sea — six half-torus bands. */
@@ -596,6 +738,41 @@ export class ChessScene {
         const motes = this.sparkles[i];
         motes.rotation.y += (motes.userData.spin as number) * dt;
         (motes.material as THREE.PointsMaterial).opacity = 0.6 + 0.3 * Math.sin(now / 900 + i * 2.1);
+      }
+      // Deep-space motion: stars twinkle, planets turn, and now and then a
+      // tiny ship crosses the far dark (fog fades it in and out at the edges).
+      for (const s of this.brightStars) {
+        (s.sprite.material as THREE.SpriteMaterial).opacity = s.base * (0.72 + 0.28 * Math.sin(now / 700 + s.phase));
+      }
+      for (const p of this.planets) p.group.rotation.y += p.spin * dt;
+      const fb = this.flyby;
+      if (fb) {
+        if (!fb.ship && now >= fb.nextAt) {
+          const rnd = () => ((fb.seed = (fb.seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+          fb.ship = this.flyShips[Math.floor(rnd() * this.flyShips.length)];
+          const dir = rnd() < 0.5 ? 1 : -1;
+          const y = -5 + rnd() * 4.2; // the band the tilted-down camera frames
+          const z = (16 + rnd() * 9) * (rnd() < 0.5 ? 1 : -1); // either horizon
+          fb.from.set(-34 * dir, y, z);
+          fb.to.set(34 * dir, y + (rnd() * 4 - 2), z + (rnd() * 6 - 3));
+          fb.dur = 6500 + rnd() * 3000;
+          fb.t0 = now;
+          fb.ship.position.copy(fb.from);
+          fb.ship.lookAt(fb.to);
+          fb.ship.visible = true;
+        }
+        if (fb.ship) {
+          const k = (now - fb.t0) / fb.dur;
+          if (k >= 1) {
+            fb.ship.visible = false;
+            fb.ship = null;
+            const rnd = () => ((fb.seed = (fb.seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+            fb.nextAt = now + 15000 + rnd() * 22000;
+          } else {
+            fb.ship.position.lerpVectors(fb.from, fb.to, k);
+            fb.ship.position.y += Math.sin(k * Math.PI * 2) * 0.4; // a lazy swoop
+          }
+        }
       }
     }
 
