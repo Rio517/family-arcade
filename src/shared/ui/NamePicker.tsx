@@ -1,10 +1,12 @@
 import { FAMILY_NAMES } from '@shared/profile/profile';
+import { nameSuggestions } from '@shared/profile/recentNames';
 
 /**
- * One-tap family name chips, shown beside any "your name" field. Tapping a
- * chip is the whole flow for the five household regulars; the text input
- * next to it still handles guests. The chip matching the current value
- * lights up so it doubles as a "who am I right now" readout.
+ * One-tap name chips, shown beside any "your name" field. Offers the five most
+ * recently-used names (so a returning guest like Kai is one tap away) blended
+ * with the household regulars; the text input next to it still handles brand-new
+ * names. The chip matching the current value lights up so it doubles as a
+ * "who am I right now" readout.
  */
 export function NamePicker({
   value,
@@ -22,7 +24,7 @@ export function NamePicker({
   const current = value.trim().toLowerCase();
   return (
     <div className="name-chips" role="group" aria-label="Pick a player">
-      {FAMILY_NAMES.filter((n) => !taken.includes(n.toLowerCase())).map((n) => (
+      {nameSuggestions(FAMILY_NAMES).filter((n) => !taken.includes(n.toLowerCase())).map((n) => (
         <button
           key={n}
           type="button"
