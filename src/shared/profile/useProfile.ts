@@ -8,14 +8,14 @@
  * needing to know about that game.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import {
   recordResult as pureRecordResult,
   setName as pureSetName,
   type Profile,
   type ResultInput,
 } from './profile';
-import { loadProfile, saveProfile } from './profileStore';
+import { getProfileSnapshot, setProfileState, subscribeProfile } from './profileStore';
 import { rememberName } from './recentNames';
 
 export interface UseProfile {
@@ -27,11 +27,10 @@ export interface UseProfile {
 }
 
 export function useProfile(): UseProfile {
-  const [profile, setProfile] = useState<Profile>(() => loadProfile());
-
-  useEffect(() => {
-    saveProfile(profile);
-  }, [profile]);
+  // Subscribe to the one shared profile store, so every consumer (menu, party
+  // bar, the game on screen) reflects the same identity, live. Persistence
+  // happens inside the store on each change.
+  const profile = useSyncExternalStore(subscribeProfile, getProfileSnapshot);
 
   // Remember the name for the picker's recent-names chips — but only once it
   // settles (a second after the last keystroke), so we don't store every
@@ -43,23 +42,22 @@ export function useProfile(): UseProfile {
     return () => clearTimeout(id);
   }, [profile.name]);
 
-  const setName = useCallback((name: string) => setProfile((p) => pureSetName(p, name)), []);
+  const setName = useCallback((name: string) => {
+    setProfileState(pureSetName(getProfileSnapshot(), name));
+  }, []);
 
   const recordResult = useCallback((input: ResultInput) => {
-    setProfile((p) => pureRecordResult(p, input));
+    setProfileState(pureRecordResult(getProfileSnapshot(), input));
   }, []);
 
   const update = useCallback((fn: (p: Profile) => Profile | null): boolean => {
-    let changed = false;
-    setProfile((p) => {
-      const next = fn(p);
-      if (next && next !== p) {
-        changed = true;
-        return next;
-      }
-      return p;
-    });
-    return changed;
+    const prev = getProfileSnapshot();
+    const next = fn(prev);
+    if (next && next !== prev) {
+      setProfileState(next);
+      return true;
+    }
+    return false;
   }, []);
 
   return { profile, setName, recordResult, update };
