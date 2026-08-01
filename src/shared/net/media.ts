@@ -46,6 +46,7 @@ export class MediaLink {
   private cameraOn = false;
   private muted = false;
   private destroyed = false;
+  private cameraBusy = false;
   private dialTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -100,24 +101,35 @@ export class MediaLink {
   /** Turn my camera on or off (re-opens the call with/without a video track). */
   async setCamera(on: boolean): Promise<void> {
     if (on === this.cameraOn || !this.code) return;
-    let next: MediaStream;
+    // Ignore a second toggle while one is still capturing — otherwise two
+    // getUserMedia calls race and can leave stream/track state inconsistent.
+    if (this.cameraBusy) return;
+    this.cameraBusy = true;
     try {
-      next = await this.capture(on);
-    } catch {
-      this.handlers.onStatus('denied', 'Camera permission was blocked.');
-      return;
+      let next: MediaStream;
+      try {
+        next = await this.capture(on);
+      } catch {
+        // A blocked camera must NOT drop the voice call. Report a non-fatal
+        // status (not 'denied', which upstream treats as a full teardown) and
+        // stay on whatever the call is currently doing, camera simply off.
+        this.handlers.onStatus(this.call?.open ? 'live' : 'connecting', 'Camera permission was blocked.');
+        return;
+      }
+      if (this.destroyed) {
+        next.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      this.cameraOn = on;
+      this.stopLocal();
+      this.local = next;
+      this.applyMute();
+      this.handlers.onLocalStream(this.local);
+      // Re-establish so the new track set actually reaches the other side.
+      this.reopenCall();
+    } finally {
+      this.cameraBusy = false;
     }
-    if (this.destroyed) {
-      next.getTracks().forEach((t) => t.stop());
-      return;
-    }
-    this.cameraOn = on;
-    this.stopLocal();
-    this.local = next;
-    this.applyMute();
-    this.handlers.onLocalStream(this.local);
-    // Re-establish so the new track set actually reaches the other side.
-    this.reopenCall();
   }
 
   destroy(): void {
