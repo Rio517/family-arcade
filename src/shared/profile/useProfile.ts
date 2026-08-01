@@ -16,6 +16,7 @@ import {
   type ResultInput,
 } from './profile';
 import { loadProfile, saveProfile } from './profileStore';
+import { rememberName } from './recentNames';
 
 export interface UseProfile {
   profile: Profile;
@@ -31,6 +32,16 @@ export function useProfile(): UseProfile {
   useEffect(() => {
     saveProfile(profile);
   }, [profile]);
+
+  // Remember the name for the picker's recent-names chips — but only once it
+  // settles (a second after the last keystroke), so we don't store every
+  // half-typed prefix.
+  useEffect(() => {
+    const n = profile.name.trim();
+    if (!n) return;
+    const id = setTimeout(() => rememberName(n), 1000);
+    return () => clearTimeout(id);
+  }, [profile.name]);
 
   const setName = useCallback((name: string) => setProfile((p) => pureSetName(p, name)), []);
 
