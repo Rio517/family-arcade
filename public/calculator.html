@@ -64,7 +64,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
     h1 {
       font-size: 20px;
@@ -87,6 +87,119 @@
       display: inline-block;
     }
     header h1 { margin-right: auto; }
+
+    /* ── Player tabs ─────────────────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      margin-bottom: 14px;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      display: flex;
+      align-items: center;
+      flex: 0 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+      transition: background 120ms, border-color 120ms;
+    }
+    .tab.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+    }
+    .tab-select {
+      background: none;
+      border: none;
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 8px 14px;
+      cursor: pointer;
+      touch-action: manipulation;
+      max-width: 130px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tab.active .tab-select { color: var(--accent); }
+    .tab-remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1;
+      padding: 8px 12px 8px 2px;
+      margin-left: -6px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .tab.active .tab-remove { color: var(--accent); }
+    .tab-add {
+      flex: 0 0 auto;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 17px;
+      font-weight: 600;
+      line-height: 1;
+      padding: 8px 15px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .tab-select:focus-visible,
+    .tab-remove:focus-visible,
+    .tab-add:focus-visible,
+    .roster-chip:focus-visible,
+    .btn:focus-visible,
+    .picker-option:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* ── Add-player modal bits ───────────────────────────────────────── */
+    .roster-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .roster-chip {
+      padding: 10px 18px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid transparent;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: background 100ms, border-color 100ms;
+    }
+    .roster-chip:active { background: var(--border); }
+    .add-player-form {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+    .add-player-form input {
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      min-width: 0;
+    }
+    .add-player-form input::placeholder { color: var(--muted); }
 
     /* ── Summary (Upper + Lower = Total) ─────────────────────────────── */
     .summary {
@@ -215,6 +328,10 @@
       padding: 16px 16px max(20px, env(safe-area-inset-bottom));
       animation: slide-up 200ms ease;
     }
+    @media (prefers-reduced-motion: reduce) {
+      .picker { animation: none; }
+      .tab, .roster-chip, .picker-option, .btn { transition: none; }
+    }
     @keyframes slide-up {
       from { transform: translateY(100%); }
       to { transform: translateY(0); }
@@ -284,6 +401,11 @@
       border: 1px solid var(--accent);
       color: var(--accent);
     }
+    .add-player-form .btn-primary {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
 
     /* ── Footer ──────────────────────────────────────────────────────── */
     .footer {
@@ -335,6 +457,8 @@
       <button class="btn btn-header" id="new-game" data-testid="btn-new-game">New</button>
     </header>
 
+    <div class="tabs" id="player-tabs" data-testid="player-tabs" role="tablist" aria-label="Players"></div>
+
     <div class="summary">
       <div class="stat">
         <span class="stat-label">Upper</span>
@@ -381,10 +505,41 @@
       <div class="picker-head">
         <span class="picker-title" id="confirm-new-title">Start a new game?</span>
       </div>
-      <p class="picker-desc">Your current scores will be lost.</p>
+      <p class="picker-desc">Everyone's scores will be cleared — all the players stay at the table.</p>
       <div class="picker-actions">
         <button class="btn btn-cancel" id="confirm-new-cancel" data-testid="confirm-new-cancel">Cancel</button>
         <button class="btn btn-clear" id="confirm-new-ok" data-testid="confirm-new-ok">Start New</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Remove-player confirm overlay -->
+  <div class="picker-backdrop" id="confirm-remove-backdrop" data-testid="confirm-remove-modal">
+    <div class="picker" role="dialog" aria-labelledby="confirm-remove-title">
+      <div class="picker-head">
+        <span class="picker-title" id="confirm-remove-title">Remove this player?</span>
+      </div>
+      <p class="picker-desc" id="confirm-remove-desc">Their scorecard will be gone.</p>
+      <div class="picker-actions">
+        <button class="btn btn-cancel" id="confirm-remove-cancel" data-testid="confirm-remove-cancel">Cancel</button>
+        <button class="btn btn-clear" id="confirm-remove-ok" data-testid="confirm-remove-ok">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add-player overlay -->
+  <div class="picker-backdrop" id="add-player-backdrop" data-testid="add-player-modal">
+    <div class="picker" role="dialog" aria-labelledby="add-player-title">
+      <div class="picker-head">
+        <span class="picker-title" id="add-player-title">Who's joining the game?</span>
+        <button class="picker-close" id="add-player-close" aria-label="Close add player">×</button>
+      </div>
+      <p class="picker-desc">Tap a name, or type a new one.</p>
+      <div class="roster-chips" id="roster-chips"></div>
+      <div class="add-player-form">
+        <input id="add-player-name" data-testid="add-player-input" maxlength="20"
+               placeholder="Someone else…" autocomplete="off" aria-label="New player name" />
+        <button type="button" class="btn btn-primary" id="add-player-submit" data-testid="add-player-submit">Add</button>
       </div>
     </div>
   </div>
@@ -421,7 +576,15 @@
 
   <script>
     const STORAGE_KEY = "yahtzee-logger-v1";
+    // The shared arcade profile every game reads for "who is this device's
+    // player". STRICTLY read-only here — the logger never writes it.
+    const PROFILE_KEY = "bship:profile:v1";
     const RESUME_PROMPT_AFTER_MS = 60 * 60 * 1000; // 1 hour
+    const MAX_PLAYERS = 6;
+    const MAX_NAME_LEN = 20;
+    // Family roster, in the family's order. Names already at the table are
+    // hidden from the chips.
+    const ROSTER = ["Rio", "Klara", "Flora", "Mommy", "Papa"];
 
     const initialState = () => ({
       scores: {
@@ -432,35 +595,123 @@
       yahtzeeBonusCount: 0,
     });
 
+    // Multi-player game: an ordered list of players, each with their own
+    // full scorecard, plus the index of the active tab. `state` always
+    // aliases players[active].state so the scoring code below reads simply.
+    let players = [];
+    let active = 0;
     let state = initialState();
 
+    // ── Names ──────────────────────────────────────────────────────────
+    function sanitizeName(raw) {
+      if (typeof raw !== "string") return "";
+      return raw.trim().slice(0, MAX_NAME_LEN);
+    }
+
+    function profileName() {
+      try {
+        const raw = localStorage.getItem(PROFILE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const name = parsed && sanitizeName(parsed.name);
+        return name || null;
+      } catch { return null; }
+    }
+
+    function defaultPlayerName() {
+      return profileName() || "Player 1";
+    }
+
     // ── State & persistence ────────────────────────────────────────────
+    function normalizeState(s) {
+      const base = initialState();
+      if (s && s.scores) {
+        for (const k of Object.keys(base.scores)) {
+          base.scores[k] = typeof s.scores[k] === "number" ? s.scores[k] : null;
+        }
+        if (typeof s.yahtzeeBonusCount === "number") {
+          base.yahtzeeBonusCount = s.yahtzeeBonusCount;
+        }
+      }
+      return base;
+    }
+
+    // Returns { players, active } or null. Storage is versioned:
+    //   v2 (current): { v: 2, players: [{ name, state, savedAt }], active }
+    // Older single-player forms migrate into a one-player game (player 1
+    // named from the shared profile) so nobody's half-finished card is lost:
+    //   v1 wrapped: { state, updatedAt }
+    //   legacy:     bare state object { scores, yahtzeeBonusCount }
     function loadStored() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
-        // Wrapped form: { state, updatedAt }. Legacy form: bare state object.
-        if (parsed && parsed.state && typeof parsed.updatedAt === "number") {
-          return parsed;
+        if (parsed && parsed.v === 2 && Array.isArray(parsed.players)) {
+          const loaded = parsed.players
+            .filter(p => p && p.state && p.state.scores)
+            .slice(0, MAX_PLAYERS)
+            .map((p, i) => ({
+              name: sanitizeName(p.name) || `Player ${i + 1}`,
+              state: normalizeState(p.state),
+              savedAt: typeof p.savedAt === "number" ? p.savedAt : Date.now(),
+            }));
+          if (!loaded.length) return null;
+          const idx = Number.isInteger(parsed.active) ? parsed.active : 0;
+          return {
+            players: loaded,
+            active: idx >= 0 && idx < loaded.length ? idx : 0,
+          };
+        }
+        if (parsed && parsed.state && parsed.state.scores &&
+            typeof parsed.updatedAt === "number") {
+          return {
+            players: [{
+              name: defaultPlayerName(),
+              state: normalizeState(parsed.state),
+              savedAt: parsed.updatedAt,
+            }],
+            active: 0,
+          };
         }
         if (parsed && parsed.scores) {
-          return { state: parsed, updatedAt: Date.now() };
+          return {
+            players: [{
+              name: defaultPlayerName(),
+              state: normalizeState(parsed),
+              savedAt: Date.now(),
+            }],
+            active: 0,
+          };
         }
         return null;
       } catch { return null; }
     }
-    function saveState() {
+
+    function persist() {
       try {
         localStorage.setItem(
           STORAGE_KEY,
-          JSON.stringify({ state, updatedAt: Date.now() })
+          JSON.stringify({ v: 2, players, active })
         );
       } catch {}
     }
+
+    // Save after a scoring change: stamp the active player's card, then write.
+    function saveState() {
+      players[active].savedAt = Date.now();
+      persist();
+    }
+
     function hasProgress(s) {
       return Object.values(s.scores).some(v => v !== null) ||
              s.yahtzeeBonusCount > 0;
+    }
+    function anyProgress() {
+      return players.some(p => hasProgress(p.state));
+    }
+    function newestSavedAt() {
+      return players.reduce((acc, p) => Math.max(acc, p.savedAt), 0);
     }
 
     // ── Score config ───────────────────────────────────────────────────
@@ -522,7 +773,124 @@
       return upperSubtotal() + upperBonus() + lowerSubtotal();
     }
 
+    // ── Players ────────────────────────────────────────────────────────
+    function selectPlayer(i) {
+      if (i < 0 || i >= players.length || i === active) return;
+      active = i;
+      state = players[active].state;
+      persist();
+      render();
+    }
+
+    function addPlayer(rawName) {
+      const name = sanitizeName(rawName);
+      if (!name || players.length >= MAX_PLAYERS) return;
+      // Same name already at the table? Just hop to their tab.
+      const existing = players.findIndex(
+        p => p.name.toLowerCase() === name.toLowerCase()
+      );
+      if (existing !== -1) {
+        closeAddPlayer();
+        selectPlayer(existing);
+        return;
+      }
+      players.push({ name, state: initialState(), savedAt: Date.now() });
+      active = players.length - 1;
+      state = players[active].state;
+      persist();
+      closeAddPlayer();
+      render();
+    }
+
+    function openAddPlayer() {
+      if (players.length >= MAX_PLAYERS) return;
+      renderRosterChips();
+      const input = document.getElementById("add-player-name");
+      input.value = "";
+      document.getElementById("add-player-backdrop").classList.add("open");
+    }
+    function closeAddPlayer() {
+      document.getElementById("add-player-backdrop").classList.remove("open");
+    }
+
+    function openRemovePlayer() {
+      if (players.length <= 1) return;
+      document.getElementById("confirm-remove-title").textContent =
+        `Remove ${players[active].name}?`;
+      document.getElementById("confirm-remove-backdrop").classList.add("open");
+    }
+    function closeConfirmRemove() {
+      document.getElementById("confirm-remove-backdrop").classList.remove("open");
+    }
+    function removeActivePlayer() {
+      if (players.length <= 1) return;
+      players.splice(active, 1);
+      if (active >= players.length) active = players.length - 1;
+      state = players[active].state;
+      persist();
+      render();
+    }
+
     // ── Rendering ──────────────────────────────────────────────────────
+    function renderTabs() {
+      const root = document.getElementById("player-tabs");
+      root.innerHTML = "";
+      players.forEach((p, i) => {
+        const tab = document.createElement("div");
+        tab.className = "tab" + (i === active ? " active" : "");
+
+        const select = document.createElement("button");
+        select.type = "button";
+        select.className = "tab-select";
+        select.textContent = p.name;
+        select.setAttribute("data-testid", `player-tab-${i}`);
+        select.setAttribute("role", "tab");
+        select.setAttribute("aria-selected", i === active ? "true" : "false");
+        select.addEventListener("click", () => selectPlayer(i));
+        tab.appendChild(select);
+
+        if (i === active && players.length > 1) {
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "tab-remove";
+          remove.textContent = "×";
+          remove.setAttribute("data-testid", "remove-player");
+          remove.setAttribute("aria-label", `Remove ${p.name}`);
+          remove.addEventListener("click", openRemovePlayer);
+          tab.appendChild(remove);
+        }
+        root.appendChild(tab);
+      });
+
+      if (players.length < MAX_PLAYERS) {
+        const add = document.createElement("button");
+        add.type = "button";
+        add.className = "tab-add";
+        add.textContent = "+";
+        add.setAttribute("data-testid", "add-player-tab");
+        add.setAttribute("aria-label", "Add a player");
+        add.addEventListener("click", openAddPlayer);
+        root.appendChild(add);
+      }
+    }
+
+    function renderRosterChips() {
+      const root = document.getElementById("roster-chips");
+      root.innerHTML = "";
+      const taken = new Set(players.map(p => p.name.toLowerCase()));
+      for (const name of ROSTER) {
+        if (taken.has(name.toLowerCase())) continue;
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "roster-chip";
+        chip.textContent = name;
+        chip.setAttribute("data-testid", `roster-chip-${name.toLowerCase()}`);
+        chip.addEventListener("click", () => addPlayer(name));
+        root.appendChild(chip);
+      }
+      root.style.display = root.children.length ? "" : "none";
+    }
+
     function renderSection(sectionKey) {
       const root = document.getElementById(sectionKey);
       root.innerHTML = "";
@@ -586,6 +954,7 @@
     }
 
     function render() {
+      renderTabs();
       renderSection("upper");
       renderSection("lower");
       renderSummary();
@@ -651,13 +1020,19 @@
     }
 
     // ── Game lifecycle ─────────────────────────────────────────────────
+    // "New game" clears every player's CARD but keeps the players and tabs.
     function resetGame() {
-      state = initialState();
-      saveState();
+      const now = Date.now();
+      for (const p of players) {
+        p.state = initialState();
+        p.savedAt = now;
+      }
+      state = players[active].state;
+      persist();
       render();
     }
     function newGame() {
-      if (hasProgress(state)) {
+      if (anyProgress()) {
         document.getElementById("confirm-new-backdrop").classList.add("open");
         return;
       }
@@ -676,6 +1051,8 @@
         });
       backdropDismiss("picker-backdrop", closePicker);
       backdropDismiss("confirm-new-backdrop", closeConfirmNew);
+      backdropDismiss("confirm-remove-backdrop", closeConfirmRemove);
+      backdropDismiss("add-player-backdrop", closeAddPlayer);
 
       document.getElementById("picker-close").addEventListener("click", closePicker);
       document.getElementById("picker-cancel").addEventListener("click", closePicker);
@@ -688,17 +1065,36 @@
         resetGame();
       });
 
+      document.getElementById("confirm-remove-cancel").addEventListener("click", closeConfirmRemove);
+      document.getElementById("confirm-remove-ok").addEventListener("click", () => {
+        closeConfirmRemove();
+        removeActivePlayer();
+      });
+
+      document.getElementById("add-player-close").addEventListener("click", closeAddPlayer);
+      document.getElementById("add-player-submit").addEventListener("click", () => {
+        addPlayer(document.getElementById("add-player-name").value);
+      });
+      document.getElementById("add-player-name").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          addPlayer(document.getElementById("add-player-name").value);
+        }
+      });
+
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
           if (activeKey) closePicker();
           closeConfirmNew();
+          closeConfirmRemove();
+          closeAddPlayer();
         }
       });
     }
 
     // ── Resume prompt ──────────────────────────────────────────────────
-    function promptResume(stored) {
-      const when = new Date(stored.updatedAt).toLocaleString(undefined, {
+    function promptResume(savedAt) {
+      const when = new Date(savedAt).toLocaleString(undefined, {
         dateStyle: "medium",
         timeStyle: "short",
       });
@@ -713,11 +1109,12 @@
       const fresh = document.getElementById("resume-new");
       const close = () => backdrop.classList.remove("open");
       cont.onclick = () => {
-        // Keep the previewed state; refresh the timestamp so we don't re-prompt.
+        // Keep the previewed game; refresh the timestamp so we don't re-prompt.
         saveState();
         close();
       };
       fresh.onclick = () => {
+        // Fresh cards for everyone; the players themselves stay.
         resetGame();
         close();
       };
@@ -726,16 +1123,25 @@
     function init() {
       setupEvents();
       const stored = loadStored();
-      if (stored && hasProgress(stored.state)) {
-        const age = Date.now() - stored.updatedAt;
-        if (age > RESUME_PROMPT_AFTER_MS) {
-          // Preview the loaded game behind the modal.
-          state = stored.state;
-          render();
-          promptResume(stored);
-          return;
+      if (stored) {
+        players = stored.players;
+        active = stored.active;
+        state = players[active].state;
+        if (anyProgress()) {
+          const newest = newestSavedAt();
+          if (Date.now() - newest > RESUME_PROMPT_AFTER_MS) {
+            // Preview the loaded game behind the modal.
+            render();
+            promptResume(newest);
+            return;
+          }
         }
-        state = stored.state;
+      } else {
+        // First visit: player 1 is whoever this device belongs to,
+        // per the shared arcade profile.
+        players = [{ name: defaultPlayerName(), state: initialState(), savedAt: Date.now() }];
+        active = 0;
+        state = players[0].state;
       }
       render();
     }
