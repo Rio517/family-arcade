@@ -9,7 +9,7 @@ function savedGames(): SavedGameSummary[] {
   if (!ship) return [];
   return [{
     key: 'battleship',
-    to: '/battleship',
+    to: `/play?resume=${ship.code}`,
     color: '#35c7e8',
     Icon: ShipIcon,
     title: `Ship Battle — vs ${ship.oppName || 'opponent'}`,
@@ -20,7 +20,7 @@ function savedGames(): SavedGameSummary[] {
 export const battleship: GameDescriptor = {
   id: 'battleship',
   title: 'Ship Battle',
-  tag: '2-Player',
+  tag: '2 Players',
   path: '/play',
   description: 'Two devices, one code. Pick your fleet, place your ships, and duel.',
   Icon: ShipIcon,
