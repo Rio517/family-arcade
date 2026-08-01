@@ -358,8 +358,8 @@ export class ChessScene {
       this.flyShips.push(ship);
       this.scene.add(ship);
     }
-    // First pass a few seconds in; the seeded stream paces the rest.
-    this.flyby = { ship: null, t0: 0, dur: 0, from: new THREE.Vector3(), to: new THREE.Vector3(), nextAt: 6000, seed: 0x5eed ^ 42 };
+    // First pass shortly after sitting down; then a rare treat, not traffic.
+    this.flyby = { ship: null, t0: 0, dur: 0, from: new THREE.Vector3(), to: new THREE.Vector3(), nextAt: 12000, seed: 0x5eed ^ 42 };
   }
 
   /** A pastel rainbow arching out of the cloud sea — six half-torus bands. */
@@ -767,7 +767,7 @@ export class ChessScene {
             fb.ship.visible = false;
             fb.ship = null;
             const rnd = () => ((fb.seed = (fb.seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-            fb.nextAt = now + 15000 + rnd() * 22000;
+            fb.nextAt = now + 45000 + rnd() * 45000;
           } else {
             fb.ship.position.lerpVectors(fb.from, fb.to, k);
             fb.ship.position.y += Math.sin(k * Math.PI * 2) * 0.4; // a lazy swoop
