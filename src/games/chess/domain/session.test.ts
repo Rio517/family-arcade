@@ -304,3 +304,26 @@ describe('sync epoch validation (isChessMessage)', () => {
     }
   });
 });
+
+describe('security: forged sync log', () => {
+  it('refuses a longer-but-illegal sync without crashing (no white-screen DoS)', () => {
+    // reconcileLogs only checks the prefix; a peer can send a longer log of
+    // illegal plies (a1->a1). Replaying it throws — the reducer must catch that
+    // and refuse the sync rather than propagate the throw to the UI.
+    const guest = createOnlineSession('guest', 'CODE', 'Bob');
+    const illegal = Array.from({ length: 5 }, () => ply('a1', 'a1'));
+    const run = () => applyMessage(guest, { t: 'sync', log: illegal, epoch: 0, wantRematch: false });
+    expect(run).not.toThrow();
+    const out = run();
+    expect(out.state.log).toHaveLength(0); // bad log refused
+    expect(out.outgoing.some((m) => m.t === 'sync')).toBe(true); // re-asserts ours
+  });
+
+  it('still adopts a legal longer sync', () => {
+    // Sanity: the guard must not reject honest catch-up syncs.
+    const guest = createOnlineSession('guest', 'CODE', 'Bob');
+    const legal = [ply('e2', 'e4'), ply('e7', 'e5')];
+    const out = applyMessage(guest, { t: 'sync', log: legal, epoch: 0, wantRematch: false });
+    expect(out.state.log).toHaveLength(2);
+  });
+});
