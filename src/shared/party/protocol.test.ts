@@ -13,4 +13,9 @@ describe('isPartyMsg', () => {
     expect(isPartyMsg({ t: 'nope', name: 'Kai' })).toBe(false);
     expect(isPartyMsg('hello')).toBe(false);
   });
+
+  it('rejects an absurdly long name but accepts a normal one', () => {
+    expect(isPartyMsg({ t: 'hello', name: 'x'.repeat(100) })).toBe(true);
+    expect(isPartyMsg({ t: 'hello', name: 'x'.repeat(101) })).toBe(false);
+  });
 });
