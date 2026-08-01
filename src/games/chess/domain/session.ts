@@ -275,12 +275,27 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
         log: merged,
         oppWantsRematch: msg.wantRematch,
       };
+      // `reconcileLogs` only checks that the peer's log is a longer *prefix
+      // extension* of ours — it never replays it, so a hostile peer can send a
+      // prefix-compatible but ILLEGAL log (e.g. a1→a1). Replaying that throws
+      // `Illegal ply in log`, and this reducer runs synchronously in the message
+      // handler, so an unguarded throw white-screens the victim. Force the
+      // replay here; if it's bogus, refuse the sync and re-assert our own log.
+      let finished: FinishInfo | undefined;
+      try {
+        finished = finishInfo(next);
+      } catch {
+        return {
+          state: s,
+          outgoing: [{ t: 'sync', log: s.log, epoch: s.epoch, wantRematch: s.iWantRematch }],
+        };
+      }
       // If they're behind, answer with our (longer) log so they catch up.
       const outgoing: ChessMessage[] =
         merged.length > msg.log.length
           ? [{ t: 'sync', log: merged, epoch: s.epoch, wantRematch: s.iWantRematch }]
           : [];
-      return { state: next, outgoing, finished: finishInfo(next) };
+      return { state: next, outgoing, finished };
     }
 
     case 'move': {
