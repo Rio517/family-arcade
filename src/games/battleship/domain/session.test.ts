@@ -413,3 +413,23 @@ describe('rematch', () => {
     });
   });
 });
+
+describe('security: forged shot events', () => {
+  it('ignores a shot not authored by my own side (no self-declared win)', () => {
+    // An honest `shot` is the result of MY fire, sent back authored by me. A
+    // hostile peer forging the opponent as author + allSunk would otherwise win.
+    const host = newSession('host');
+    const forged: ShotEvent = { type: 'shot', by: 'guest', row: 0, col: 0, hit: true, sunk: null, allSunk: true };
+    const out = applyMessage(host, { t: 'shot', event: forged });
+    expect(out.state.log).toHaveLength(0); // refused, not appended
+    expect(winner(out.state.log)).toBeNull();
+    expect(phase(out.state)).not.toBe('over');
+  });
+
+  it('still accepts an honestly-authored shot (my own side)', () => {
+    const host = newSession('host');
+    const honest = mkShot('host', 2, 3, true);
+    const out = applyMessage(host, { t: 'shot', event: honest });
+    expect(out.state.log).toHaveLength(1);
+  });
+});
