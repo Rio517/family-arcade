@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { normalizeCode } from '@shared/net/peer';
+import { NamePicker } from '@shared/ui/NamePicker';
 
 interface LobbyProps {
   name: string;
@@ -21,6 +22,7 @@ export function Lobby({ name, onName, onHost, onJoin, initialJoinCode }: LobbyPr
     <div className="stack">
       <div className="panel">
         <h2>Captain’s name</h2>
+        <NamePicker value={name} onPick={onName} />
         <div className="field">
           <label htmlFor="name">Shown to your opponent</label>
           <input

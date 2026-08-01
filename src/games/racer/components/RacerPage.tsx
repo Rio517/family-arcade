@@ -8,6 +8,7 @@ import '../styles/racer.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
+import { useProfile } from '@shared/profile/useProfile';
 import { createRaceCore, takeWorldSnapshot, type RaceMode } from '../domain/race';
 import { useRacerNet } from '../net/useRacerNet';
 import { DRIVERS, driverById, lookOf, ModeScreen, PickScreen, RacerLobby, type Driver } from './RacerSetup';
@@ -23,7 +24,14 @@ export function RacerPage() {
   const [phase, setPhase] = useState<Phase>('mode');
   const [mode, setMode] = useState<RaceMode>('solo');
   const [driver, setDriver] = useState<Driver>(DRIVERS[0]);
-  const [name, setName] = useState('Racer');
+  const profile = useProfile();
+  // "Player one" travels with the arcade profile; picking a name here
+  // remembers it for every game.
+  const [name, setNameState] = useState(() => profile.profile.name || 'Racer');
+  const setName = (n: string) => {
+    setNameState(n);
+    profile.setName(n);
+  };
   const [raceKey, setRaceKey] = useState(0);
 
   const ctxRef = useRef<RaceCtx | null>(null);

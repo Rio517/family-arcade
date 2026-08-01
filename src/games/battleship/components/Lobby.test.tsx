@@ -44,4 +44,14 @@ describe('<Lobby>', () => {
     render(<Lobby name="Kid" onName={vi.fn()} onHost={vi.fn()} onJoin={vi.fn()} initialJoinCode="wxyz" />);
     expect((screen.getByTestId('code-input') as HTMLInputElement).value).toBe('WXYZ');
   });
+
+  it('offers the family roster as one-tap name chips, in house order', () => {
+    const { onName } = setup('');
+    const chips = ['rio', 'klara', 'flora', 'mommy', 'papa'].map((n) =>
+      screen.getByTestId(`name-chip-${n}`),
+    );
+    expect(chips.map((c) => c.textContent)).toEqual(['Rio', 'Klara', 'Flora', 'Mommy', 'Papa']);
+    fireEvent.click(screen.getByTestId('name-chip-klara'));
+    expect(onName).toHaveBeenCalledWith('Klara');
+  });
 });

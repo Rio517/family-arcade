@@ -323,4 +323,17 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('chess-create')).toBeInTheDocument();
     expect(screen.getByTestId('chess-join-code')).toBeInTheDocument();
   });
+
+  it('white name chips set player one and remember them arcade-wide', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.click(screen.getByTestId('white-chip-flora'));
+    expect((screen.getByTestId('white-name') as HTMLInputElement).value).toBe('Flora');
+    // The pick persists to the shared profile every game reads.
+    expect(localStorage.getItem('bship:profile:v1')).toContain('Flora');
+    // Flora is taken now — Black's chips hide her, in roster order otherwise.
+    expect(screen.queryByTestId('black-chip-flora')).toBeNull();
+    fireEvent.click(screen.getByTestId('black-chip-rio'));
+    expect((screen.getByTestId('black-name') as HTMLInputElement).value).toBe('Rio');
+  });
 });
