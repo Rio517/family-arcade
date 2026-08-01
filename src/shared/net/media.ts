@@ -160,9 +160,15 @@ export class MediaLink {
       if (this.role === 'guest') this.dial();
     });
 
-    // Host answers whoever calls the media id with its current local stream.
+    // Host answers a caller with its current local stream. Only ONE guest at a
+    // time: while a call is already live, a second caller (someone else who
+    // learned the code) is refused rather than silently handed the A/V.
     peer.on('call', (incoming) => {
       if (this.destroyed) return;
+      if (this.call && this.call.open) {
+        incoming.close();
+        return;
+      }
       incoming.answer(this.local ?? undefined);
       this.bindCall(incoming);
     });
