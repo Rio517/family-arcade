@@ -248,6 +248,12 @@ export function applyMessage(s: SessionState, msg: Message, rng: () => number = 
 
     case 'shot': {
       const ev = msg.event;
+      // A `shot` is the *result* of MY fire, computed by the defender and sent
+      // back authored by me (the attacker). So an honest inbound shot always
+      // has `by === s.side`. Reject anything else — otherwise a hostile peer
+      // could forge `{ by: <opponent>, allSunk: true }` and hand itself an
+      // instant win (`winner()` trusts the event's `by`).
+      if (ev.by !== s.side) return none({ ...s, pendingFire: null });
       const already = shotsBy(s.log, ev.by).some((e) => e.row === ev.row && e.col === ev.col);
       if (already) return none({ ...s, pendingFire: null });
       return advanceLog(s, [...s.log, ev]);
