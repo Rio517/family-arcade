@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
+import { NamePicker } from '@shared/ui/NamePicker';
 import { normalizeCode } from '@shared/net/peer';
 import type { RacerLook } from '../three/scene';
 import type { RaceMode } from '../domain/race';
@@ -121,6 +122,7 @@ export function RacerLobby({
     <div className="racer-lobby">
       <div className="racer-lobby-card">
         <h2>Your racer {driver.emoji}</h2>
+        <NamePicker value={name} onPick={setName} testIdPrefix="racer-chip" />
         <label className="racer-name-label">
           Your name
           <input

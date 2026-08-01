@@ -6,6 +6,7 @@ import { useProfile } from '@shared/profile/useProfile';
 import { useChess } from '@games/chess/state/useChess';
 import { pointsForResult } from '@shared/profile/profile';
 import { normalizeCode } from '@shared/net/peer';
+import { NamePicker } from '@shared/ui/NamePicker';
 import { ChessBoard } from './ChessBoard';
 import { ChessResult } from './ChessResult';
 import { ChessLogModal, CapturedTray } from './ChessLogModal';
@@ -42,7 +43,8 @@ export function ChessPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [joinInput, setJoinInput] = useState(normalizeCode(params.get('g') ?? ''));
-  const [whiteName, setWhiteName] = useState('White');
+  // "Player one" is the arcade-wide profile name; White defaults to them.
+  const [whiteName, setWhiteName] = useState(() => profile.profile.name || 'White');
   const [blackName, setBlackName] = useState('Black');
   const [logOpen, setLogOpen] = useState(false);
   // Board view — flat or full 3D. Remembered per device.
@@ -290,10 +292,20 @@ export function ChessPage() {
             <h2>Same-device game</h2>
             <div className="field">
               <label htmlFor="wname">White player</label>
+              <NamePicker
+                value={whiteName}
+                exclude={[blackName]}
+                testIdPrefix="white-chip"
+                onPick={(n) => {
+                  setWhiteName(n);
+                  profile.setName(n); // White is "player one" — remember them arcade-wide
+                }}
+              />
               <input id="wname" value={whiteName} maxLength={20} onChange={(e) => setWhiteName(e.target.value)} data-testid="white-name" />
             </div>
             <div className="field">
               <label htmlFor="bname">Black player</label>
+              <NamePicker value={blackName} exclude={[whiteName]} testIdPrefix="black-chip" onPick={setBlackName} />
               <input id="bname" value={blackName} maxLength={20} onChange={(e) => setBlackName(e.target.value)} data-testid="black-name" />
             </div>
             <button className="btn btn-primary btn-lg btn-block" onClick={() => cx.startLocal(whiteName, blackName)} data-testid="start-local">
@@ -309,6 +321,7 @@ export function ChessPage() {
         <div className="narrow-col stack">
           <div className="panel">
             <h2>Your name</h2>
+            <NamePicker value={profile.profile.name} onPick={profile.setName} />
             <div className="field">
               <label htmlFor="oname">Shown to your opponent</label>
               <input
