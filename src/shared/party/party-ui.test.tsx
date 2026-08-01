@@ -1,0 +1,93 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import type { PartyValue } from './PartyContext';
+
+// A controllable useParty so we can render each party state without a network.
+const h = vi.hoisted(() => ({ value: null as any }));
+vi.mock('./PartyContext', () => ({ useParty: () => h.value }));
+
+import { PartyBar } from './PartyBar';
+import { FloatingVideo } from './FloatingVideo';
+
+function makeParty(over: Partial<PartyValue> = {}): PartyValue {
+  return {
+    myName: 'Rio',
+    setMyName: vi.fn(),
+    status: 'idle',
+    code: '',
+    role: null,
+    inParty: false,
+    theirName: null,
+    hostParty: vi.fn(() => 'ABCD'),
+    joinParty: vi.fn(),
+    leaveParty: vi.fn(),
+    call: {
+      active: false,
+      status: 'idle',
+      muted: false,
+      cameraOn: false,
+      localStream: null,
+      remoteStream: null,
+      start: vi.fn(),
+      stop: vi.fn(),
+      toggleMute: vi.fn(),
+      toggleCamera: vi.fn(),
+    },
+    ...over,
+  } as PartyValue;
+}
+
+const renderBar = () => render(<MemoryRouter><PartyBar /></MemoryRouter>);
+
+beforeEach(() => {
+  h.value = makeParty();
+});
+
+describe('PartyBar', () => {
+  it('offers "Start a party" when not in a party', async () => {
+    renderBar();
+    await userEvent.click(screen.getByTestId('party-pill'));
+    expect(screen.getByTestId('party-create')).toBeInTheDocument();
+    expect(screen.getByTestId('party-join')).toBeInTheDocument();
+  });
+
+  it('offers opt-in voice (video off) once connected', async () => {
+    h.value = makeParty({ inParty: true, status: 'connected', theirName: 'Kai', role: 'host', code: 'ABCD' });
+    renderBar();
+    await userEvent.click(screen.getByTestId('party-pill'));
+    const start = screen.getByTestId('party-call-start');
+    expect(start).toBeInTheDocument();
+    await userEvent.click(start);
+    expect(h.value.call.start).toHaveBeenCalled();
+    // no camera control until the call is active
+    expect(screen.queryByTestId('party-camera')).toBeNull();
+  });
+
+  it('shows labelled mute/camera/end controls during a live call', async () => {
+    h.value = makeParty({
+      inParty: true, status: 'connected', theirName: 'Kai', role: 'host', code: 'ABCD',
+      call: { ...makeParty().call, active: true, status: 'live' },
+    });
+    renderBar();
+    await userEvent.click(screen.getByTestId('party-pill'));
+    for (const id of ['party-mute', 'party-camera', 'party-call-end']) {
+      expect(screen.getByTestId(id)).toHaveAttribute('aria-label');
+    }
+  });
+});
+
+describe('FloatingVideo', () => {
+  it('renders nothing until the call is active', () => {
+    h.value = makeParty();
+    const { container } = render(<FloatingVideo />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('appears once the call is active', () => {
+    h.value = makeParty({ theirName: 'Kai', call: { ...makeParty().call, active: true, status: 'live' } });
+    render(<FloatingVideo />);
+    expect(screen.getByTestId('party-floating-video')).toBeInTheDocument();
+  });
+});

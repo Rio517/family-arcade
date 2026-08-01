@@ -145,6 +145,8 @@ export function Menu() {
       <div className="footer">
         <p>Free &amp; open source — built with love for family game night.</p>
         <p>
+          <Link to="/privacy">Privacy &amp; safety</Link>
+          {' · '}
           <a href="https://github.com/Rio517/yahtzee-calculator">View the source on GitHub ›</a>
         </p>
       </div>

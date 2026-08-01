@@ -1,0 +1,164 @@
+/* The Party bar (bottom-centre pill + popover panel) and the floating video.
+   App-level chrome, so it uses the shared tokens and sits above everything. */
+
+.party-root {
+  position: fixed;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---- collapsed pill ---- */
+.party-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border, #475569);
+  background: color-mix(in srgb, var(--surface, #1e293b) 92%, transparent);
+  color: var(--text, #f1f5f9);
+  font-weight: 800;
+  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+}
+.party-pill:hover { border-color: var(--accent, #22d3ee); }
+.party-pill.live { padding-left: 8px; }
+.party-pill:focus-visible { outline: 3px solid var(--accent, #22d3ee); outline-offset: 2px; }
+
+.party-ava {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #0b1020;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+}
+.party-ava.a { background: linear-gradient(160deg, #ff9ecb, #ff5fa2); }
+.party-ava.b { background: linear-gradient(160deg, #8fe3a0, #2fae5f); margin-left: -10px; }
+.party-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good, #4ade80); box-shadow: 0 0 10px var(--good, #4ade80); }
+.party-mini { font-size: 14px; }
+
+/* ---- popover panel ---- */
+.party-panel {
+  width: min(320px, calc(100vw - 24px));
+  background: var(--surface, #1e293b);
+  border: 1px solid var(--border, #475569);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text, #f1f5f9);
+}
+
+.party-field { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: 13px; color: var(--muted, #94a3b8); }
+.party-input {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text, #f1f5f9);
+  background: var(--bg, #0f172a);
+  border: 1px solid var(--border, #475569);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.party-input.code { text-align: center; letter-spacing: 8px; text-transform: uppercase; font-size: 22px; }
+
+.party-start, .party-join, .party-waiting, .party-live { display: flex; flex-direction: column; gap: 10px; }
+
+.party-eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 800; color: var(--muted, #94a3b8); }
+.party-code {
+  font-size: 34px; font-weight: 900; letter-spacing: 8px; text-align: center;
+  color: var(--accent, #22d3ee);
+  background: var(--bg, #0f172a); border-radius: 12px; padding: 10px;
+}
+.party-hint { font-size: 12.5px; color: var(--muted, #94a3b8); margin: 0; line-height: 1.4; }
+.party-hint a { color: var(--accent, #22d3ee); }
+
+.party-live-head { display: flex; align-items: baseline; justify-content: space-between; }
+.party-status { font-size: 12px; font-weight: 800; color: var(--muted, #94a3b8); }
+.party-status.connected { color: var(--good, #4ade80); }
+.party-with { margin: 0; font-size: 15px; }
+
+.party-btn {
+  border: none;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.party-btn.primary { background: linear-gradient(90deg, #ff7fc4, #b06bff); color: #fff; }
+.party-btn.violet { background: var(--violet-dim, rgba(167, 139, 250, 0.18)); color: var(--violet, #a78bfa); }
+.party-btn.ghost { background: transparent; color: var(--muted, #94a3b8); }
+.party-btn:hover { filter: brightness(1.06); }
+.party-btn:focus-visible { outline: 3px solid var(--accent, #22d3ee); outline-offset: 2px; }
+.party-btn:disabled { opacity: 0.5; cursor: default; }
+
+.party-callctl { display: flex; gap: 10px; justify-content: center; }
+.party-cbtn {
+  width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer; font-size: 18px;
+  background: rgba(255, 255, 255, 0.12); color: #fff; display: grid; place-items: center;
+}
+.party-cbtn:hover { background: rgba(255, 255, 255, 0.22); }
+.party-cbtn.active { background: var(--warn, #fbbf24); color: #221; }
+.party-cbtn.end { background: var(--bad, #f87171); }
+.party-cbtn:focus-visible { outline: 3px solid var(--accent, #22d3ee); outline-offset: 2px; }
+
+/* ---- floating video (PiP) ---- */
+.pv {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: 84px; /* clear of the party pill */
+  z-index: 39;
+  width: 168px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  padding: 6px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+  touch-action: none;
+}
+.pv:active { cursor: grabbing; }
+.pv-remote {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 11px;
+  overflow: hidden;
+  background: #0b1220;
+  display: grid;
+  place-items: center;
+}
+.pv-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.pv-avatar { font-size: 40px; }
+.pv-self {
+  position: absolute; right: 5px; bottom: 5px; width: 42px; height: 42px;
+  object-fit: cover; border-radius: 7px; border: 2px solid rgba(255, 255, 255, 0.6);
+  transform: scaleX(-1); background: #000;
+}
+.pv-label {
+  position: absolute; left: 5px; top: 5px; font-size: 11px; font-weight: 800; color: #e2e8f0;
+  background: rgba(0, 0, 0, 0.55); padding: 2px 7px; border-radius: 999px; max-width: 70%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .party-pill.live .party-dot { animation: party-pulse 1.8s ease-in-out infinite; }
+  @keyframes party-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+}
