@@ -1,6 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { PartyValue } from './PartyContext';
 
@@ -46,32 +45,32 @@ beforeEach(() => {
 });
 
 describe('PartyBar', () => {
-  it('offers "Start a party" when not in a party', async () => {
+  it('offers "Start a party" when not in a party', () => {
     renderBar();
-    await userEvent.click(screen.getByTestId('party-pill'));
+    fireEvent.click(screen.getByTestId('party-pill'));
     expect(screen.getByTestId('party-create')).toBeInTheDocument();
     expect(screen.getByTestId('party-join')).toBeInTheDocument();
   });
 
-  it('offers opt-in voice (video off) once connected', async () => {
+  it('offers opt-in voice (video off) once connected', () => {
     h.value = makeParty({ inParty: true, status: 'connected', theirName: 'Kai', role: 'host', code: 'ABCD' });
     renderBar();
-    await userEvent.click(screen.getByTestId('party-pill'));
+    fireEvent.click(screen.getByTestId('party-pill'));
     const start = screen.getByTestId('party-call-start');
     expect(start).toBeInTheDocument();
-    await userEvent.click(start);
+    fireEvent.click(start);
     expect(h.value.call.start).toHaveBeenCalled();
     // no camera control until the call is active
     expect(screen.queryByTestId('party-camera')).toBeNull();
   });
 
-  it('shows labelled mute/camera/end controls during a live call', async () => {
+  it('shows labelled mute/camera/end controls during a live call', () => {
     h.value = makeParty({
       inParty: true, status: 'connected', theirName: 'Kai', role: 'host', code: 'ABCD',
       call: { ...makeParty().call, active: true, status: 'live' },
     });
     renderBar();
-    await userEvent.click(screen.getByTestId('party-pill'));
+    fireEvent.click(screen.getByTestId('party-pill'));
     for (const id of ['party-mute', 'party-camera', 'party-call-end']) {
       expect(screen.getByTestId(id)).toHaveAttribute('aria-label');
     }
