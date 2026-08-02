@@ -338,10 +338,16 @@
     max-width: 1080px;
     margin: 0 auto;
     grid-template-columns: minmax(380px, 460px) minmax(420px, 1fr);
+    /* The ticket column spans every row, and span-sizing spreads its height
+       across the left column's auto rows — which stranded the Prize Counter
+       far below the sign with a dead gap. The trailing 1fr filler row absorbs
+       the tickets' height instead, so sign → saves → prizes pack at the top. */
     grid-template-areas:
       'sign tix'
       'saved tix'
-      'prize tix';
+      'prize tix'
+      '. tix';
+    grid-template-rows: auto auto auto 1fr;
     align-items: start;
     align-content: start;
     column-gap: 30px;
