@@ -17,5 +17,8 @@ export function disposeDeep(root: THREE.Object3D): void {
       (m as THREE.MeshStandardMaterial).map?.dispose();
       m.dispose();
     }
+    // InstancedMesh also holds per-instance GPU buffers (matrix/color) that a
+    // geometry/material dispose doesn't free.
+    if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
   });
 }
