@@ -91,7 +91,7 @@ export function isFleetComplete(fleet: Fleet): boolean {
   return fleet.every((p) => canPlace(removeShip(fleet, p.shipId), p));
 }
 
-export const ORIENTATIONS: Orientation[] = ['H', 'V'];
+const ORIENTATIONS: Orientation[] = ['H', 'V'];
 
 /** Find a random legal spot for one ship, or null after too many tries. */
 function tryPlaceShip(fleet: Fleet, spec: ShipSpec, rng: () => number): Placement | null {

@@ -1,7 +1,8 @@
 /**
  * The move-log popup: the full game in algebraic notation, a preview board for
  * any move you tap, and — in a same-device game — a "return to this move" jump.
- * Also exports the small captured-piece tray used beside the board.
+ * Also exports the small captured-piece tray used beside the board (the
+ * preview's mini board stays private to this file).
  */
 import { useEffect, useState } from 'react';
 import { ChessPiece } from './chessPieces';
@@ -12,7 +13,7 @@ import type { MoveInfo } from '@games/chess/domain/analysis';
 import type { Color, GameState, PieceType } from '@games/chess/domain/types';
 
 /** A non-interactive board, used for the log's position preview. */
-export function MiniBoard({ state, orientation = 'w' }: { state: GameState; orientation?: Color }) {
+function MiniBoard({ state, orientation = 'w' }: { state: GameState; orientation?: Color }) {
   const order = orientation === 'w' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
   return (
     <div className="mini-board" role="img" aria-label="Board position">

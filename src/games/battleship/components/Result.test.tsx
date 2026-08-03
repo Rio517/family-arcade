@@ -36,7 +36,9 @@ describe('<Result>', () => {
     // Kid-friendly guarantee: no "Defeat" wording and no emoji/pictographs.
     const text = document.body.textContent ?? '';
     expect(text).not.toMatch(/defeat/i);
-    expect(text).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u);
+    // The variation selector sits outside the class: mixing it with the
+    // astral ranges makes the class match surrogate halves misleadingly.
+    expect(text).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]|\u{FE0F}/u);
   });
 
   it('shows a trophy emblem on a win and a wreck emblem on a loss', () => {

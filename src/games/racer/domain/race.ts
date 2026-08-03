@@ -38,7 +38,7 @@ export type RaceMode = 'solo' | 'net';
 export type RaceStatus = 'racing' | 'over';
 
 /** Flush accumulated coin changes at most this often (≈12/s) while racing. */
-export const WORLD_SEND_INTERVAL = 0.08;
+const WORLD_SEND_INTERVAL = 0.08;
 /** Even with nothing to report, re-sync the guest's clock this often. */
 export const WORLD_KEEPALIVE_INTERVAL = 1;
 
@@ -330,7 +330,7 @@ export function applyWorldDelta(prev: MirrorWorld | null, delta: WorldDelta): Mi
 }
 
 /** Shortest-path angle lerp so a wrapping heading doesn't spin the long way. */
-export function lerpAngle(a: number, b: number, k: number): number {
+function lerpAngle(a: number, b: number, k: number): number {
   let d = b - a;
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;

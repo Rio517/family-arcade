@@ -120,7 +120,6 @@ export function useChess(opts: UseChessOptions): UseChessResult {
             // A structurally valid message can still carry an illegal game
             // continuation (replay throws). Drop it — never let a hostile or
             // buggy peer take the app down.
-            // eslint-disable-next-line no-console
             console.error('Rejected peer message', err);
           }
         },

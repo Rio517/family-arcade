@@ -69,7 +69,7 @@ function isPly(v: unknown): v is Ply {
 }
 
 /** Hard ceiling on a synced log's length (see the sync case below). */
-export const MAX_LOG_PLIES = 1000;
+const MAX_LOG_PLIES = 1000;
 
 /**
  * Validate an arbitrary value off the wire as a well-formed ChessMessage. This

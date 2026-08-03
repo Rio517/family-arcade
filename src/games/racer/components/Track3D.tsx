@@ -120,7 +120,6 @@ export function Track3D({
       } catch (err) {
         mount.innerHTML =
           '<p data-testid="racer3d-fallback" style="padding:24px;text-align:center;color:#fff">Sorry, this device can\'t show 3D. 😢</p>';
-        // eslint-disable-next-line no-console
         console.error(err);
         return;
       }

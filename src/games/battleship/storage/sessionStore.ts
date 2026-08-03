@@ -91,7 +91,7 @@ export function saveSession(session: GameSession): void {
  * Remove stored sessions that are finished or unparseable. Best-effort: any
  * storage failure is swallowed — sweeping must never break a save or a resume.
  */
-export function sweepStaleSessions(keepCode?: string): void {
+function sweepStaleSessions(keepCode?: string): void {
   try {
     const stale: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {

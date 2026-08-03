@@ -9,7 +9,6 @@
 
 import {
   type Board,
-  type Color,
   type GameState,
   type Piece,
   type PieceType,
@@ -105,5 +104,3 @@ function parseSquare(name: string): Square {
 function squareToName(sq: Square): string {
   return `${FILES[sq.col]}${8 - sq.row}`;
 }
-
-export type { Color };

@@ -78,7 +78,11 @@ vi.mock('@shared/net/peer', async (importOriginal) => {
     private peer: GameConnection | null = null;
     label = '?';
     destroyed = false;
-    constructor(private handlers: { onStatus: Function; onOpen: Function; onMessage: Function }) {
+    constructor(private handlers: {
+      onStatus: (status: string, detail?: string) => void;
+      onOpen: () => void;
+      onMessage: (msg: unknown) => void;
+    }) {
       bus.conns.push(this);
     }
     host(code: string) {

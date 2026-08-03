@@ -125,7 +125,6 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
             applyOutcome(Session.applyMessage(s, msg));
           } catch (err) {
             // Drop, don't die: a peer message must never crash the app.
-            // eslint-disable-next-line no-console
             console.error('Rejected peer message', err);
           }
         },

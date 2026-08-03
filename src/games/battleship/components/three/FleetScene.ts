@@ -252,7 +252,9 @@ export class FleetScene {
     disposeDeep(this.scene);
     this.renderer.dispose();
     this.renderer.forceContextLoss();
-    this.container.contains(this.renderer.domElement) && this.container.removeChild(this.renderer.domElement);
+    if (this.container.contains(this.renderer.domElement)) {
+      this.container.removeChild(this.renderer.domElement);
+    }
   }
 }
 

@@ -824,7 +824,9 @@ export class ChessScene {
     for (const tpl of this.templates.values()) disposeDeep(tpl);
     this.renderer.dispose();
     this.renderer.forceContextLoss();
-    this.container.contains(this.renderer.domElement) && this.container.removeChild(this.renderer.domElement);
+    if (this.container.contains(this.renderer.domElement)) {
+      this.container.removeChild(this.renderer.domElement);
+    }
   }
 }
 
