@@ -5,6 +5,7 @@
  * Lazy-loaded so three.js never weighs down the initial bundle.
  */
 import { useEffect, useRef, useState } from 'react';
+import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { ChessScene } from './three/ChessScene';
 import { ChessPiece } from './chessPieces';
 import { SCENE_PALETTES, useChessTheme } from './chessTheme';
@@ -36,6 +37,7 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<Square | null>(null);
   const [promotion, setPromotion] = useState<{ from: Square; to: Square } | null>(null);
+  useDismissOnEscape(promotion !== null, () => setPromotion(null));
 
   // Latest-props ref so the scene's stable tap callback sees fresh state.
   const live = useRef({ board, interactive, movableColor, selected });
@@ -114,6 +116,9 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
       <p className="chess3d-hint subtle center">Drag to orbit · pinch or scroll to zoom · tap a piece to move</p>
 
       {promotion && (
+        /* Backdrop click is a mouse convenience; Escape (above) and the
+           picker's own buttons are the keyboard path. */
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
         <div className="promo-backdrop" onClick={() => setPromotion(null)}>
           <div className="promo" role="dialog" aria-label="Choose promotion">
             <div className="promo-title">Promote to</div>

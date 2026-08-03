@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { ChessPiece } from './chessPieces';
 import { CloseIcon } from '@shared/ui/icons';
+import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { initialState } from '@games/chess/domain/rules';
 import type { MoveInfo } from '@games/chess/domain/analysis';
 import type { Color, GameState, PieceType } from '@games/chess/domain/types';
@@ -57,6 +58,7 @@ interface LogModalProps {
 export function ChessLogModal({ moves, start, orientation, canReturn, onReturn, onClose }: LogModalProps) {
   const [sel, setSel] = useState(moves.length - 1);
   useEffect(() => setSel(moves.length - 1), [moves.length]);
+  useDismissOnEscape(true, onClose);
 
   const preview = sel >= 0 && moves[sel] ? moves[sel].after : start ?? initialState();
 
@@ -80,6 +82,9 @@ export function ChessLogModal({ moves, start, orientation, canReturn, onReturn, 
     );
 
   return (
+    /* Backdrop click is a mouse convenience; Escape (below) and the Close
+       button are the keyboard path. */
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
     <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal chess-log-modal" role="dialog" aria-label="Move log">
         <div className="modal-head">

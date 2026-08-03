@@ -12,6 +12,7 @@ import { Battle } from './Battle';
 import { Result } from './Result';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
+import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { CloseIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
 import { loadResumableSession } from '@games/battleship/storage/sessionStore';
 import { QRCodeSVG } from 'qrcode.react';
@@ -30,6 +31,7 @@ export function BattleshipPage() {
   const [finish, setFinish] = useState<ResultSummary | null>(null);
   const [copied, setCopied] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  useDismissOnEscape(shareOpen, () => setShareOpen(false));
 
   const onFinish = useCallback(
     (info: FinishInfo) => {
@@ -140,6 +142,9 @@ export function BattleshipPage() {
       </div>
 
       {shareOpen && (
+        /* Backdrop click is a mouse convenience; Escape (above) and the
+           Close button are the keyboard path. */
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
         <div
           className="modal-backdrop"
           onClick={(e) => {
