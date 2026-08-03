@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { ChessPiece } from './chessPieces';
 import { findKing, inCheck, legalMovesFrom } from '@games/chess/domain/rules';
 import {
@@ -52,6 +53,7 @@ export function ChessBoard({
   const [selected, setSelected] = useState<Square | null>(null);
   const [drag, setDrag] = useState<{ from: Square; x: number; y: number; over: Square | null } | null>(null);
   const [promotion, setPromotion] = useState<{ from: Square; to: Square } | null>(null);
+  useDismissOnEscape(promotion !== null, () => setPromotion(null));
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Clear any in-progress selection when the position or turn changes.
@@ -228,6 +230,9 @@ export function ChessBoard({
 
       {/* Promotion picker overlay. */}
       {promotion && (
+        /* Backdrop click is a mouse convenience; Escape (above) and the
+           picker's own buttons are the keyboard path. */
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
         <div className="promo-backdrop" onClick={() => setPromotion(null)}>
           <div className="promo" role="dialog" aria-label="Choose promotion">
             <div className="promo-title">Promote to</div>

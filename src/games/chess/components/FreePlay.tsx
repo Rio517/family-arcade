@@ -8,6 +8,7 @@
  */
 import { lazy, Suspense, useEffect, useState, type PointerEvent } from 'react';
 import { EraserIcon } from '@shared/ui/icons';
+import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { ChessPiece, pieceName } from './chessPieces';
 import { CHESS_THEMES, useChessTheme } from './chessTheme';
 import { initialState, setupIssue } from '@games/chess/domain/rules';
@@ -45,6 +46,9 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
   // lineup/clear both wipe what's on the board, so they explain themselves.
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirm, setConfirm] = useState<'lineup' | 'clear' | null>(null);
+  // Escape backs out one layer at a time: confirm first, then the menu.
+  useDismissOnEscape(confirm !== null, () => setConfirm(null));
+  useDismissOnEscape(menuOpen && confirm === null, () => setMenuOpen(false));
   // The eraser: tap it on either tray, then tap pieces to delete them.
   const [erasing, setErasing] = useState(false);
   const toggleEraser = () => {
@@ -250,7 +254,11 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
 
       {/* ── The ☰ menu — everything that isn't moment-to-moment play ── */}
       {menuOpen && !confirm && (
+        /* Backdrop click is a mouse convenience; Escape and the Close button
+           are the keyboard path. Same for the inner stopPropagation guard. */
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
         <div className="modal-backdrop" onClick={() => setMenuOpen(false)}>
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
           <div className="modal fp-menu" role="dialog" aria-label="Free play menu" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <span className="modal-title">Free play</span>
@@ -283,7 +291,11 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
 
       {/* ── Confirmations — both replace whatever's on the board ── */}
       {confirm && (
+        /* Backdrop click is a mouse convenience; Escape and Cancel are the
+           keyboard path. Same for the inner stopPropagation guard. */
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
         <div className="modal-backdrop" onClick={() => setConfirm(null)}>
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
           <div className="modal fp-menu" role="dialog" aria-label="Are you sure?" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <span className="modal-title">{confirm === 'lineup' ? 'Set the starting lineup?' : 'Clear the board?'}</span>

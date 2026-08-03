@@ -167,9 +167,20 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
               <div
                 key={spec.id}
                 className="ship-chip"
+                // A chip picks a ship, so it behaves as a button — but it also
+                // starts a pointer-drag onto the grid, which a real <button>
+                // fights with. Keep the div and give it the button semantics.
+                role="button"
+                tabIndex={0}
+                aria-pressed={selected === spec.id}
                 data-selected={selected === spec.id}
                 data-placed={placed}
                 onClick={() => setSelected(spec.id)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  e.preventDefault(); // Space would scroll the placement panel.
+                  setSelected(spec.id);
+                }}
                 onPointerDown={placed ? undefined : (e) => grabNewShip(spec.id, e)}
                 style={placed ? undefined : { touchAction: 'none' }}
                 data-testid={`ship-chip-${spec.id}`}

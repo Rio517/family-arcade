@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { RiskBoard } from './RiskBoard';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
+import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { mapById, MAPS } from '../maps/registry';
 import type { RiskMap } from '../maps/types';
 import {
@@ -412,12 +413,16 @@ function Shell({ children, onMenu }: { children: React.ReactNode; onMenu: () => 
 
 /** A friendly, kid-readable rules card, themed as a field manual. */
 function RiskHelp({ onClose }: { onClose: () => void }) {
+  useDismissOnEscape(true, onClose);
   const steps: { n: number; name: string; body: string }[] = [
     { n: 1, name: 'Reinforce', body: 'You get fresh armies at the start of your turn — more if you hold whole continents. Tap your own lands to place them.' },
     { n: 2, name: 'Attack', body: 'Tap one of your lands that has 2 or more armies, then tap a touching enemy land. Dice decide the battle — the defender wins ties. Win, and the land becomes yours. Attack as often as you like, or not at all.' },
     { n: 3, name: 'Fortify', body: 'Once per turn you may slide armies between two of your connected lands. Then tap “End turn” to pass to the next general.' },
   ];
   return (
+    /* Backdrop click is a mouse convenience; Escape (above) and the "Got it"
+       button are the keyboard path. */
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
     <div className="risk-help-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="risk-help" role="dialog" aria-label="How to play Risk" aria-modal="true">
         <div className="risk-eyebrow">The field manual</div>

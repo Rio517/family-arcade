@@ -79,10 +79,15 @@ export function FloatingVideo() {
     >
       <div className="pv-remote">
         {call.status === 'live' && remoteHasVideo ? (
+          // No <track>: this is a live peer-to-peer camera feed, not recorded
+          // media — there is no caption file to point at, and we do no
+          // speech-to-text (everything stays on-device by design).
+          // eslint-disable-next-line jsx-a11y/media-has-caption
           <video ref={remoteRef} autoPlay playsInline className="pv-video" data-testid="pv-remote-video" />
         ) : (
           <div className="pv-avatar">{call.status === 'live' ? '🙂' : '⏳'}</div>
         )}
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- live peer audio, no caption file exists */}
         <audio ref={remoteAudioRef} autoPlay />
         {call.cameraOn && <video ref={localRef} autoPlay playsInline muted className="pv-self" />}
         <span className="pv-label">
