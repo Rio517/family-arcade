@@ -1,5 +1,5 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": ["src/games/battleship/preview-b.tsx"],
   "project": ["src/**/*.{ts,tsx}"],
   "ignoreExportsUsedInFile": { "interface": true, "type": true }

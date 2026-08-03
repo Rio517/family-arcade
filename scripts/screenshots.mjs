@@ -1,0 +1,176 @@
+#!/usr/bin/env node
+/**
+ * Build the app, serve it, and screenshot each view into docs/screenshots/.
+ *
+ *   npm run shots                  # every shot
+ *   npm run shots -- landing menu  # only shots whose name contains an argument
+ *
+ * Two things make this worth a script rather than ad-hoc Playwright calls:
+ *
+ * 1. `saveIfChanged` — a PNG is written only when its bytes actually differ,
+ *    so re-running doesn't churn git with visually identical images.
+ * 2. It serves the *production* build on its own port and tears it down, so a
+ *    shot never depends on whichever dev server happened to be running.
+ *
+ * Browser: Playwright's bundled Chromium. Set PW_CHROMIUM to override with an
+ * explicit executable (the cloud sandbox has one at /opt/pw-browsers/...).
+ */
+
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const OUT = path.join(ROOT, 'docs', 'screenshots');
+const PORT = Number(process.env.SHOTS_PORT ?? 4317);
+const BASE = `http://localhost:${PORT}`;
+
+/** Phone-ish and tablet-ish; the family plays on iPads and phones. */
+const PHONE = { width: 430, height: 932 };
+const TABLET = { width: 1180, height: 820 };
+
+/**
+ * Each shot: where to go, how big, and an optional `prep` that runs before
+ * the capture (dismiss an overlay, wait for a canvas to paint, …).
+ */
+const SHOTS = [
+  {
+    name: 'arcade-landing',
+    path: '/',
+    viewport: TABLET,
+    fullPage: true,
+  },
+  {
+    name: 'arcade-landing-phone',
+    path: '/',
+    viewport: PHONE,
+    fullPage: true,
+  },
+  {
+    name: 'privacy',
+    path: '/privacy',
+    viewport: TABLET,
+    fullPage: true,
+  },
+  {
+    name: 'battle-view',
+    path: '/preview-b.html',
+    viewport: TABLET,
+    // The board animates its hit/miss markers in; let them settle.
+    prep: async (page) => page.waitForTimeout(900),
+  },
+];
+
+function saveIfChanged(file, buffer) {
+  const name = path.basename(file);
+  const existing = fs.existsSync(file) ? fs.readFileSync(file) : null;
+  if (!existing) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, buffer);
+    console.log(`  new:       ${name}`);
+    return 'new';
+  }
+  if (!existing.equals(buffer)) {
+    fs.writeFileSync(file, buffer);
+    console.log(`  updated:   ${name}`);
+    return 'updated';
+  }
+  console.log(`  unchanged: ${name}`);
+  return 'unchanged';
+}
+
+function run(cmd, args, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { cwd: ROOT, stdio: 'inherit', ...opts });
+    child.on('error', reject);
+    child.on('exit', (code) =>
+      code === 0 ? resolve() : reject(new Error(`${cmd} ${args.join(' ')} exited ${code}`)),
+    );
+  });
+}
+
+/** Poll until the preview server answers, rather than sleeping a guessed amount. */
+async function waitForServer(url, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return;
+    } catch {
+      // not up yet
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error(`preview server never came up at ${url}`);
+}
+
+async function main() {
+  const filters = process.argv.slice(2);
+  const shots = filters.length
+    ? SHOTS.filter((s) => filters.some((f) => s.name.includes(f)))
+    : SHOTS;
+
+  if (shots.length === 0) {
+    console.error(`No shot matches ${filters.join(', ')}. Known shots:`);
+    for (const s of SHOTS) console.error(`  ${s.name}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log('Building (with the battle harness)…');
+  await run('npx', ['vite', 'build'], { env: { ...process.env, BUILD_HARNESS: '1' } });
+
+  console.log(`Serving dist on ${BASE}…`);
+  const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
+    cwd: ROOT,
+    stdio: 'ignore',
+  });
+
+  let browser;
+  try {
+    await waitForServer(BASE);
+
+    browser = await chromium.launch({
+      executablePath: process.env.PW_CHROMIUM || undefined,
+      // ANGLE gives the 3D scenes a real GL backend headless; without it the
+      // chess/battleship/racer canvases fall back to their error placeholder.
+      args: ['--use-gl=angle', '--use-angle=default', '--enable-unsafe-swiftshader'],
+    });
+
+    console.log(`Capturing ${shots.length} shot(s) into docs/screenshots/`);
+    const tally = { new: 0, updated: 0, unchanged: 0 };
+
+    for (const shot of shots) {
+      const page = await browser.newPage({
+        viewport: shot.viewport ?? TABLET,
+        deviceScaleFactor: 2,
+        // Screenshots are documentation, not a motion demo — and the arcade
+        // gates its animations on this, so shots come out settled.
+        reducedMotion: 'reduce',
+      });
+      await page.goto(`${BASE}${shot.path}`, { waitUntil: 'networkidle' });
+      if (shot.prep) await shot.prep(page);
+      const buffer = await page.screenshot({ fullPage: shot.fullPage ?? false });
+      tally[saveIfChanged(path.join(OUT, `${shot.name}.png`), buffer)] += 1;
+      await page.close();
+    }
+
+    console.log(
+      `Done — ${tally.new} new, ${tally.updated} updated, ${tally.unchanged} unchanged.`,
+    );
+  } finally {
+    await browser?.close();
+    server.kill();
+  }
+}
+
+main().catch((err) => {
+  console.error(err.message ?? err);
+  if (String(err).includes("Executable doesn't exist")) {
+    console.error('\nInstall the browser with: npx playwright install chromium');
+    console.error('Or point PW_CHROMIUM at an existing Chromium binary.');
+  }
+  process.exitCode = 1;
+});
