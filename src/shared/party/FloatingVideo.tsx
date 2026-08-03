@@ -6,6 +6,7 @@
  * DIFFERENT games at once. Only appears once the call is on (video is opt-in).
  */
 import { useEffect, useRef, useState } from 'react';
+import { ClockIcon, PersonIcon, SpeakerIcon } from '@shared/ui/icons';
 import { useParty } from './PartyContext';
 
 // The floating card's footprint. CARD_W must match the `.pv` width in
@@ -85,13 +86,23 @@ export function FloatingVideo() {
           // eslint-disable-next-line jsx-a11y/media-has-caption
           <video ref={remoteRef} autoPlay playsInline className="pv-video" data-testid="pv-remote-video" />
         ) : (
-          <div className="pv-avatar">{call.status === 'live' ? '🙂' : '⏳'}</div>
+          <div className="pv-avatar">
+            {call.status === 'live' ? <PersonIcon size={34} /> : <ClockIcon size={30} />}
+          </div>
         )}
         {/* eslint-disable-next-line jsx-a11y/media-has-caption -- live peer audio, no caption file exists */}
         <audio ref={remoteAudioRef} autoPlay />
         {call.cameraOn && <video ref={localRef} autoPlay playsInline muted className="pv-self" />}
         <span className="pv-label">
-          {call.status === 'live' ? (remoteHasVideo ? theirName ?? 'Friend' : '🔊 ' + (theirName ?? 'Friend')) : 'Connecting…'}
+          {call.status !== 'live' ? (
+            'Connecting…'
+          ) : remoteHasVideo ? (
+            theirName ?? 'Friend'
+          ) : (
+            <>
+              <SpeakerIcon size={13} /> {theirName ?? 'Friend'}
+            </>
+          )}
         </span>
       </div>
     </div>

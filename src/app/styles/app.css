@@ -175,7 +175,7 @@
 .sign::after { right: calc(18% - 6px); }
 
 .sign .kicker {
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.34em;
   text-transform: uppercase;
   color: var(--teal);
@@ -223,7 +223,7 @@
 .coin-line {
   margin: 12px 0 0;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 14px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--gold);
@@ -309,14 +309,14 @@
 }
 .tk-name small {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 14px;
   letter-spacing: 0.16em;
   color: var(--c);
   margin-left: 8px;
 }
 .tk-desc {
   display: block;
-  font-size: 12.5px;
+  font-size: 14px;
   color: #93a0bd;
   margin-top: 4px;
   line-height: 1.45;
@@ -369,7 +369,7 @@
 }
 .np-h {
   text-align: center;
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--teal);
@@ -404,7 +404,7 @@
 .np-body { min-width: 0; flex: 1; display: block; }
 .np-title {
   display: block;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -413,7 +413,7 @@
 .np-meta {
   display: block;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 14px;
   letter-spacing: 0.05em;
   color: #8fa0c0;
   margin-top: 2px;
@@ -431,7 +431,7 @@
   box-shadow: inset 0 0 30px -14px rgba(255, 215, 106, 0.4), 0 16px 30px -18px #000;
 }
 .prize-h {
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--gold);
@@ -442,7 +442,7 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 14px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #b9c4dc;
@@ -481,17 +481,17 @@
 }
 .card .body { min-width: 0; flex: 1; }
 .card .title { font-size: 19px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-.card .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.card .sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
 .card .chev { color: var(--muted); font-size: 22px; }
 .tag {
-  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;
+  font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;
   color: var(--card-c);
   background: color-mix(in srgb, var(--card-c) 16%, transparent);
   border: 1px solid var(--card-c);
   border-radius: 999px; padding: 2px 8px;
 }
 
-.footer { text-align: center; font-size: 12px; color: var(--muted); padding-top: 34px; }
+.footer { text-align: center; font-size: 14px; color: var(--muted); padding-top: 34px; }
 .footer p { margin: 4px 0; }
 .footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
 .footer a:hover { text-decoration: underline; }

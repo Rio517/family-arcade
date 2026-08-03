@@ -208,7 +208,7 @@
 .racer-score b { font-size: 24px; }
 .racer-score-target { font-size: 14px; color: #94a3b8; }
 .racer-hud-time { font-size: 18px; color: #6a7a8a; }
-.racer-hud-conn { font-size: 13px; font-weight: 800; color: #ef6aab; }
+.racer-hud-conn { font-size: 14px; font-weight: 800; color: #ef6aab; }
 
 .racer-hint {
   text-align: center;

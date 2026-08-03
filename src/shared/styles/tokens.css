@@ -47,7 +47,11 @@ body {
 .app {
   max-width: 1200px;
   margin: 0 auto;
-  padding: max(20px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  /* The bottom pad clears the fixed Party pill (~44px tall, sitting 12px off
+     the bottom). Without it the last row of content — on the landing page,
+     the footer's Privacy and GitHub links — ends up underneath the pill once
+     you scroll to the bottom. */
+  padding: max(20px, env(safe-area-inset-top)) 16px calc(max(24px, env(safe-area-inset-bottom)) + 52px);
 }
 
 /* Reading-width wrapper for the single-column setup screens (lobby, fleet,
@@ -156,15 +160,15 @@ body {
   border-radius: 16px; padding: 18px; margin-bottom: 14px;
 }
 .panel h2 {
-  font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+  font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--muted); margin: 0 0 12px;
 }
-.subtle { color: var(--muted); font-size: 13px; }
+.subtle { color: var(--muted); font-size: 14px; }
 .center { text-align: center; }
 .stack { display: grid; gap: 10px; }
 .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
-.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.04em; }
+.field label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.04em; }
 .field input {
   width: 100%; padding: 12px 14px; font-size: 16px;
   background: var(--bg); color: var(--text);
@@ -179,7 +183,7 @@ body {
   flex: 1; background: var(--surface); border: 1px solid var(--border);
   border-radius: 12px; padding: 10px; text-align: center; min-width: 0;
 }
-.stat .k { display: block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.stat .k { display: block; font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .stat .v { font-weight: 800; font-size: 20px; font-variant-numeric: tabular-nums; }
 .stat.points .v { color: var(--accent); }
 
@@ -187,7 +191,7 @@ body {
 /* ── Connection badge ────────────────────────────────────────────────────── */
 .conn {
   display: inline-flex; align-items: center; gap: 7px;
-  font-size: 12px; font-weight: 600; color: var(--muted);
+  font-size: 14px; font-weight: 600; color: var(--muted);
   padding: 5px 10px; border-radius: 999px;
   border: 1px solid var(--border); background: var(--surface);
 }
@@ -216,7 +220,7 @@ body {
   background: var(--surface); border: 1px solid var(--accent); border-radius: 999px;
   padding: 5px 12px; cursor: pointer; color: var(--text);
 }
-.code-chip .lbl { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.code-chip .lbl { font-size: 14px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .code-chip strong { color: var(--accent); font-variant-numeric: tabular-nums; letter-spacing: 0.14em; font-size: 15px; }
 
 .codebox { text-align: center; padding: 22px; }
@@ -224,7 +228,7 @@ body {
   font-size: 44px; font-weight: 800; letter-spacing: 0.28em;
   color: var(--accent); font-variant-numeric: tabular-nums; padding-left: 0.28em;
 }
-.codebox .lbl { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.codebox .lbl { font-size: 14px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
 
 /* ── Modal ─────────────────────────────────────────────────────────────────── */
 .modal-backdrop {

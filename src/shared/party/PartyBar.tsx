@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { normalizeCode } from '@shared/net/peer';
 import { NamePicker } from '@shared/ui/NamePicker';
+import { CameraIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
 import { useParty } from './PartyContext';
 import './party.css';
 
@@ -99,7 +100,7 @@ export function PartyBar() {
               {!call.active ? (
                 <>
                   <button className="party-btn primary" onClick={call.start} data-testid="party-call-start">
-                    🎤 Turn on voice
+                    <MicIcon size={18} /> Turn on voice
                   </button>
                   <p className="party-hint">Your camera stays off until you turn it on.</p>
                 </>
@@ -111,7 +112,7 @@ export function PartyBar() {
                     aria-label={call.muted ? 'Unmute microphone' : 'Mute microphone'}
                     data-testid="party-mute"
                   >
-                    {call.muted ? '🔇' : '🎤'}
+                    {call.muted ? <MicOffIcon size={20} /> : <MicIcon size={20} />}
                   </button>
                   <button
                     className={`party-cbtn ${call.cameraOn ? 'active' : ''}`}
@@ -119,10 +120,10 @@ export function PartyBar() {
                     aria-label={call.cameraOn ? 'Turn camera off' : 'Turn camera on'}
                     data-testid="party-camera"
                   >
-                    📷
+                    <CameraIcon size={20} />
                   </button>
                   <button className="party-cbtn end" onClick={call.stop} aria-label="End the call" data-testid="party-call-end">
-                    ✕
+                    <CloseIcon size={20} />
                   </button>
                 </div>
               )}
@@ -147,11 +148,15 @@ export function PartyBar() {
             <span className="party-ava a">{initial(party.myName)}</span>
             <span className="party-ava b">{initial(party.theirName ?? '?')}</span>
             <span className="party-dot" aria-hidden="true" />
-            {call.active && <span className="party-mini">{call.cameraOn ? '📷' : '🎤'}</span>}
+            {call.active && (
+              <span className="party-mini">
+                {call.cameraOn ? <CameraIcon size={14} /> : <MicIcon size={14} />}
+              </span>
+            )}
           </>
         ) : (
           <>
-            <span aria-hidden="true">🎉</span> Party
+            <PartyIcon size={16} /> Party
           </>
         )}
       </button>
