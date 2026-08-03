@@ -53,6 +53,18 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    // `preview-b.html` is the mid-battle harness the screenshot run uses to
+    // reach the Ship Battle board without playing a whole game. It is built
+    // only when BUILD_HARNESS is set (npm run shots does that), so the
+    // published PWA never carries a stray dev page.
+    rollupOptions: process.env.BUILD_HARNESS
+      ? {
+          input: {
+            index: fileURLToPath(new URL('./index.html', import.meta.url)),
+            'preview-b': fileURLToPath(new URL('./preview-b.html', import.meta.url)),
+          },
+        }
+      : {},
   },
   test: {
     globals: true,
