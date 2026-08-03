@@ -30,8 +30,12 @@ nothing needs a manual. Big visual changes are pitched as **mockups first**
 - **Determinism.** Seeded LCGs for any generated scenery/randomness that
   affects appearance or tests (starfields, clouds, hull plates, dice bags).
 - **Accessibility floors.** Every animation is gated behind
-  `prefers-reduced-motion`; interactive elements get `data-testid` and
-  visible `:focus-visible` states; pronouns for people default to they/them.
+  `prefers-reduced-motion`; interactive elements get `data-testid`, a keyboard
+  path, and visible `:focus-visible` states; every dialog closes on Escape via
+  `@shared/ui/useDismissOnEscape`; text is 14px or larger; icons are SVG, never
+  emoji; pronouns for people default to they/them. `npm run check` enforces the
+  JSX side of this — if you must silence a jsx-a11y rule, do it per-line with a
+  comment saying why, never globally.
 
 ## Git & PR workflow (the #1 source of wasted work)
 
@@ -60,19 +64,31 @@ using **rebase merges** (sometimes squash). Therefore:
 
 ## Verification protocol (every change)
 
-1. `npx vitest run` && `npm run build` — all clean. The REAL typecheck is
-   the `tsc -b` inside `npm run build`: bare `npx tsc --noEmit` is a silent
-   no-op here (solution-style tsconfig), and `tsc -b`'s incremental cache can
-   hide errors — before trusting a build, delete stray `*.tsbuildinfo` files
-   like CI's clean room would (two type errors shipped this way once).
-2. **Prove UI changes in a real browser.** Headless chromium is preinstalled:
-   - executable: `/opt/pw-browsers/chromium-*/chrome-linux/chrome`
-   - playwright-core: `/opt/node22/lib/node_modules/playwright/node_modules/playwright-core/index.mjs`
-   - pass `--use-gl=angle` for WebGL scenes.
-   Serve the production build (`npx vite preview --port 43XX`, increment the
-   port each run) and screenshot the actual feature.
-3. Screenshots that go in a PR are copied into `docs/screenshots/` and
-   committed WITH the change.
+1. `npm run check`, `npx vitest run`, `npm run build` — all clean.
+   - `check` = `tsc -b` + ESLint (with jsx-a11y and react-hooks) + knip
+     dead-code. Both CI workflows run it before the tests.
+   - The REAL typecheck is the `tsc -b` inside `npm run build`: bare
+     `npx tsc --noEmit` is a silent no-op here (solution-style tsconfig), and
+     `tsc -b`'s incremental cache can hide errors — before trusting a build,
+     delete stray `*.tsbuildinfo` files like CI's clean room would (two type
+     errors shipped this way once).
+   - ESLint has 60-odd *warnings* from eslint-plugin-react-hooks v6's
+     React-Compiler-readiness rules. They're deliberately not errors — see the
+     rationale in `eslint.config.js`. Don't "fix" them by rewriting the
+     game-loop refs; that pattern is intentional.
+2. **Prove UI changes in a real browser** — `npm run shots`. It builds, serves
+   `dist` on its own port, waits for a real health response, and screenshots
+   each view into `docs/screenshots/` (writing only files whose bytes changed).
+   - `npm run shots -- battle` filters to one shot while iterating.
+   - Add a view by appending to `SHOTS` in `scripts/screenshots.mjs`.
+   - `preview-b.html` is the mid-battle harness, built only under
+     `BUILD_HARNESS=1` (which `shots` sets) so it never ships in the PWA. It's
+     how you reach the Ship Battle board without playing a whole game.
+   - In the cloud sandbox, point `PW_CHROMIUM` at
+     `/opt/pw-browsers/chromium-*/chrome-linux/chrome`. Locally, Playwright's
+     own browser is used (`npx playwright install chromium` once).
+3. Screenshots that go in a PR live in `docs/screenshots/` and are committed
+   WITH the change.
 4. **Test harness pages must load `@shared/styles/tokens.css`** and wrap in
    `.app` — a harness without the design system once produced misleading
    white-background screenshots that alarmed the owner.
@@ -105,6 +121,22 @@ using **rebase merges** (sometimes squash). Therefore:
   chrome is scoped CSS under `.chess-theme-<id>` overriding shared tokens.
 - Risk: "The War Room" (`risk.css`) — mahogany/brass/parchment, serif display.
 - Icons: line-style SVGs in `src/shared/ui/icons.tsx`, `currentColor`, no emoji.
+
+## Harness enforcement (not just docs)
+
+`.claude/settings.json` carries a read-mostly permission allowlist (npm
+scripts, vitest, tsc, eslint, knip, read-only git and gh) so routine work
+doesn't prompt; force-push, remote branch deletion, and `rm -rf` stay gated.
+Two hooks back the rules that sessions actually broke:
+
+- `.claude/hooks/no-compound-commands.mjs` (PreToolUse) blocks `&&`/`||`/`;`
+  chaining. Pipes, `$(...)`, and heredocs are fine. npm-script chaining inside
+  `package.json` is exempt — the rule is about tool calls.
+- `.claude/hooks/session-critical-rules.mjs` (SessionStart) injects the short
+  rules block. Edit it when a rule changes; keep it short or it stops working.
+
+Per-machine additions go in `.claude/settings.local.json` (gitignored), not the
+shared file.
 
 ## Recurring rituals
 

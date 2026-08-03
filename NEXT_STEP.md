@@ -1,140 +1,188 @@
-# NEXT_STEP — Ship Battle visual glow-up (image-asset ships)
+# Next Steps — Session Handoff
 
-Working note so any session (or a local machine) can pick up exactly where we
-are. This is a **living plan**, not history — keep it current, delete what's done.
+> Future-focused. Anything already shipped lives in `git log`.
+> Durable rules live in `CLAUDE.md` (and `AGENTS.md` for other agents).
 
-## The goal
+---
 
-Dramatically improve **Ship Battle**'s 3D look. The scene (`src/games/battleship/
-components/three/FleetScene.ts`) is a night ocean with a 10×10 targeting grid; the
-React wrapper `Fleet3D.tsx` feeds it the fleet + incoming-shot grid, and `Battle.tsx`
-offers a 2D/3D toggle. It's read-only + orbit-only; all geometry is procedural today.
+## What to pick up next
 
-## KEY PIVOT (this is the new direction)
+Sorted by likely value. Nothing here blocks anything else.
 
-The **procedural 3D ship models were not good enough**. We are switching to
-**image-based ships**: ship art is authored as **PNG/JPEG assets** by a
-specialized image-generation agent, and the scene places those images instead of
-procedural geometry.
+### Code
 
-- **Keep** the rest of the 3D scene we designed (see "Atmosphere & FX" below):
-  moonlit water, night sky, bloom, and the impact FX. Only the **ships** become
-  image sprites.
-- **Offline invariant (must hold):** no runtime downloads. Assets must be
-  **bundled** (imported through Vite so they're hashed into `dist/`), never
-  fetched from a URL at runtime. Bundled images are fine; remote images are not.
+- **Ship Battle visual glow-up — image-asset ships.** The whole plan is in
+  "The Ship Battle glow-up" below. This is the active piece of work; assets are
+  being generated now.
 
-### How image ships should render (decision needed on the local machine)
-Leading option: each ship = a **textured quad/sprite** placed over its board cells
-on the water — either laid flat on the grid (top-down art) or a billboard that
-faces the camera (3/4 art). Recommendation: **top-down (or slight-high-angle) art
-laid onto the grid**, sized to `size × 1` cells, oriented by `orientation` (H/V),
-so it reads correctly as the camera orbits and matches hit/miss cells. Confirm the
-art's viewing angle with the image agent before generating a full set.
+- **Wire `era` through the fleet-skin system.** `domain/skins.ts` and
+  `components/FleetSelect.tsx`. Each `skinId` should imply `{era, color}` so two
+  players can field different eras in the same battle. Small and independent of
+  the art — can land before any asset exists.
 
-### Art the image agent should produce
-- **5 ship types**: `carrier, battleship, cruiser, submarine, destroyer`
-  (these are the `ShipId`s in `domain/types.ts`; `BOARD_SIZE = 10`).
-- **2 eras/themes** (see below): **modern** and **classic (WWII)**.
-  → 5 types × 2 eras = **10 base ship images** minimum.
-- **State variants** per ship (nice to have): normal, **damaged** (some hits),
-  **sunk** (dark/listing/half-submerged). The scene knows per-cell state
-  (`CellState = 'unknown' | 'miss' | 'hit' | 'sunk'`) and whether a ship is sunk.
-- **Specs to lock with the agent:** transparent background PNG; consistent
-  top-down (or fixed 3/4) angle; consistent lighting (night/neutral so our scene
-  lighting/tint can apply); horizontal orientation (bow = +x) at a known pixel
-  scale so all 5 types share one cells-per-pixel ratio; power-of-two-ish sizes.
-- **Where they live:** `src/games/battleship/assets/ships/<era>/<shipId>.png`
-  (import via `import url from '...png'`, or a small manifest map). Vite bundles them.
+- **Decide on the 62 react-hooks warnings.** `npm run check` passes with them
+  as warnings (rationale in `eslint.config.js`). Most are the deliberate
+  game-loop pattern — a ref holding per-frame state the HUD reads — but
+  `PartyContext.tsx:72` writes a ref during render, which is the one shape
+  that can actually misbehave under concurrent rendering. Worth a look on its
+  own. Scope: an hour to triage, unknown to fix.
 
-## The two eras (a selectable theme)
+- **Add game screens to the screenshot set.** `SHOTS` in
+  `scripts/screenshots.mjs` covers the landing page (tablet + phone), privacy,
+  and the battle harness. Chess, Risk, Racer, and Magic Coins have no shot, so
+  a regression in them is invisible to `npm run shots`. Each needs either a
+  route that lands somewhere interesting or a small harness page like
+  `preview-b.html`.
 
-- **MODERN** (first): supercarrier, Zumwalt-style stealth "battleship" (the modern
-  equivalent — battleships aren't modern), Ticonderoga-style cruiser, Arleigh
-  Burke-style destroyer, Virginia-style attack sub. Sleek stealth hulls.
-- **CLASSIC / WWII** (second): Iowa battleship, Fletcher destroyer, Essex carrier,
-  heavy cruiser, and a **U-boat** submarine (surfaced, conning tower + deck gun).
-- **Chosen how:** **per-player fleet skin.** Era folds into the existing fleet-skin
-  selection (`FleetSelect.tsx` + `domain/skins.ts`), so two players can even field
-  different eras in the same battle. Each player's `skinId` implies `{era, color}`.
+- **The 3D scenes have no automated visual coverage.** jsdom can't do WebGL, so
+  the tests only assert the fallback renders. The screenshot script *can* drive
+  real WebGL (ANGLE flags are already set). A shot of the Ship Battle 3D view
+  and the Racer world would turn "the scene still builds" into something CI
+  could see.
 
-## Atmosphere & FX to build into FleetScene (agreed in mockups, NOT yet in code)
+### Operations
 
-These were prototyped and approved via rendered mockups; keep them when we build:
+- Nothing pending. Branch `claude/starter-kit-alignment` is the current PR;
+  see it for what landed.
+
+---
+
+## The Ship Battle glow-up
+
+Dramatically improve Ship Battle's 3D look. The scene is
+`src/games/battleship/components/three/FleetScene.ts` — a night ocean with a
+10×10 targeting grid. `Fleet3D.tsx` feeds it the fleet plus the incoming-shot
+grid; `Battle.tsx` offers the 2D/3D toggle. It's read-only and orbit-only, and
+all geometry is procedural today.
+
+### The pivot: ships become image assets
+
+The procedural ship models weren't good enough. Ship art is authored as
+**PNG assets** by an image-generation agent, and the scene places those instead
+of procedural geometry. Everything else in the scene stays procedural.
+
+**Offline invariant (must hold):** no runtime downloads. Assets are `import`ed
+so Vite hashes them into `dist/`. Never fetch an image from a URL.
+
+### How image ships render
+
+Each ship is a **textured quad laid flat on the grid**, sized `size × 1` cells
+and oriented by `orientation` (H/V), so it stays correct as the camera orbits
+and lines up with the hit/miss cells. That means the art wants a **top-down or
+slight-high-angle** view. Confirm the angle with the image agent against one
+test ship before generating a full set — a 3/4-view sprite would need a
+billboard instead, which reads wrong against a flat grid.
+
+### Art spec to lock with the image agent
+
+- **5 ship types**: `carrier, battleship, cruiser, submarine, destroyer` (the
+  `ShipId`s in `domain/types.ts`; `BOARD_SIZE = 10`).
+- **2 eras**: **modern** first, **classic/WWII** second → 10 base images.
+  - *Modern*: supercarrier, Zumwalt-style stealth "battleship" (battleships
+    aren't modern), Ticonderoga-style cruiser, Arleigh Burke-style destroyer,
+    Virginia-class attack sub. Sleek stealth hulls.
+  - *Classic*: Iowa battleship, Essex carrier, heavy cruiser, Fletcher
+    destroyer, surfaced U-boat with conning tower and deck gun.
+- **State variants** (nice to have): normal, **damaged**, **sunk** (dark,
+  listing, half-submerged). The scene knows per-cell `CellState` —
+  `'unknown' | 'miss' | 'hit' | 'sunk'` — and whether a ship is sunk.
+- **Format**: transparent-background PNG; one consistent viewing angle across
+  all five; neutral/night lighting so the scene's own lighting and skin tint
+  can apply; bow pointing **+x** (horizontal) so `orientation` is a rotation;
+  one shared cells-per-pixel ratio across all five so a carrier reads as
+  genuinely longer than a destroyer; power-of-two-ish dimensions.
+- **Location**: `src/games/battleship/assets/ships/<era>/<shipId>.png`, behind
+  a manifest mapping `{era, shipId, state}` → imported URL.
+
+### Atmosphere and FX (approved in mockups, not yet in code)
+
 - **Remove the glowing board-rim frame** (the neon rectangle). Keep a faint grid.
-- **Night sky**: vertical gradient background + a scatter of stars (seeded Points)
-  + a low moon with a soft halo.
-- **Water**: satiny moonlit sea — a procedural ripple **normal map** + gentle vertex
-  swell; the moonlight glints off the ripples. Do NOT use a glossy mirror/env
-  reflection on the big plane (it pools the specular into ugly blobs — learned this
-  the hard way; keep `envMapIntensity: 0`, `roughness ≈ 0.5`, `metalness ≈ 0.15`).
-- **Bloom**: add `EffectComposer` + `UnrealBloomPass` to the render loop (so fires,
-  the moon, and any emissive read as glowing). Tune for iPad perf; wire resize +
-  dispose. This is the one piece with real render-loop cost — verify FPS.
-- **Impact FX** (replace the current small fire/foam markers):
-  - **Hit → fireball explosion**: white-hot core + orange/red fireballs + flung
-    sparks + a rising smoke column + a shockwave ring on the water. Bloom makes it
-    burn.
-  - **Miss → geyser splash**: a glowing water plume + foam crown + 2–3 expanding
-    foam rings + spray droplets.
-- **No glowing accent waterline stripes** on ships (they read as odd neon — dropped).
+- **Night sky**: vertical gradient background, a seeded scatter of stars
+  (Points), a low moon with a soft halo.
+- **Water**: satiny moonlit sea — procedural ripple normal map plus gentle
+  vertex swell, moonlight glinting off the ripples. Do **not** put a glossy
+  mirror/env reflection on the big plane; it pools the specular into ugly blobs
+  (learned the hard way). Keep `envMapIntensity: 0`, `roughness ≈ 0.5`,
+  `metalness ≈ 0.15`.
+- **Bloom**: `EffectComposer` + `UnrealBloomPass`, so fires, the moon, and
+  emissives read as glowing. This is the one piece with real render-loop cost —
+  tune for iPad, wire resize and dispose, and check FPS.
+- **Impact FX**, replacing the current small fire/foam markers:
+  - *Hit* → fireball: white-hot core, orange/red fireballs, flung sparks, a
+    rising smoke column, a shockwave ring on the water.
+  - *Miss* → geyser: glowing water plume, foam crown, 2–3 expanding foam rings,
+    spray droplets.
+- **No glowing accent waterline stripes** on ships — they read as odd neon.
 
-## Firing animation (after ships look good)
+### Firing animation (after the ships look right)
 
-On the **shooter's own board** (not the receiver's), animate the act of firing when
-the player takes a shot: a **muzzle flash** at the firing ship's gun + a **shell /
-tracer** arcing away. This is distinct from the impact FX that appear on the
-*receiver's* board. Hook into the game's fire event (see `Battle.tsx` / `useBattleship`
-/ `domain/session.ts` for where a shot is initiated and where the sync happens).
+On the **shooter's own board** (not the receiver's), animate taking a shot: a
+muzzle flash at the firing ship's gun and a shell/tracer arcing away. Distinct
+from the impact FX on the *receiver's* board. See `Battle.tsx`,
+`state/useBattleship.ts`, and `domain/session.ts` for where a shot starts and
+where the sync happens.
 
-## Constraints & how to verify (from CLAUDE.md)
+### Order of work
 
-- `npx vitest run` and `npm run build` must be clean. Real typecheck is the `tsc -b`
-  inside `npm run build`; delete stray `*.tsbuildinfo` before trusting it.
-- The racer's/battleship's 3D component must catch scene-construction errors and
-  render a fallback (`racer3d-fallback` / battleship equivalent); jsdom has no WebGL,
-  so tests assert the fallback. Keep that intact.
-- Prove UI in a real browser: headless chromium at
-  `/opt/pw-browsers/chromium-*/chrome-linux/chrome`, serve `vite preview`, screenshot.
-- three.js is `React.lazy`-loaded and shared by chess + battleship; keep it that way.
-- Determinism: seed any generated scenery/randomness (index-hash or an LCG), no
-  `Math.random` for anything that affects appearance/tests.
-- Git: one feature = one branch off `origin/main`; PRs merge fast; re-fetch before
-  each push. Never stack on merged history.
+1. Lock the art spec above with the image agent; generate the **modern** set.
+2. Add `assets/ships/…` plus the manifest.
+3. In `FleetScene.ts`: replace `buildWarship(...)` with a textured quad per
+   ship, sized and oriented from `SceneShip`. Then the atmosphere (sky, stars,
+   moon, water), bloom, and the impact FX; remove the neon frame.
+4. Wire `era` through `skins.ts` + `FleetSelect.tsx`.
+5. Verify: `npm run check`, `npx vitest run`, `npm run build`,
+   `npm run shots -- battle`. Open the PR.
+6. Then the **classic/WWII** set, then the shooter-side firing animation.
 
-## Anchor files
+### Anchor files
 
-- `src/games/battleship/components/three/FleetScene.ts` — the scene (ships, water,
-  grid, markers, camera). This is where image-ship placement + atmosphere + FX go.
-- `src/games/battleship/components/Fleet3D.tsx` — React wrapper; try/catch → fallback.
-- `src/games/battleship/components/Battle.tsx` — 2D/3D toggle; fire flow.
-- `src/games/battleship/components/FleetSelect.tsx` — skin picker (add era here).
-- `src/games/battleship/domain/skins.ts` — skin/color system (add era).
-- `src/games/battleship/domain/types.ts` — `BOARD_SIZE=10`, `ShipId`, `Orientation`.
-- `src/games/battleship/domain/engine.ts` — `CellState`.
-- `SceneShip` (in FleetScene.ts): `{ shipId, row, col, size, orientation, sunk? }`.
+| File | What it owns |
+| --- | --- |
+| `components/three/FleetScene.ts` | the scene — ships, water, grid, markers, camera |
+| `components/Fleet3D.tsx` | React wrapper; try/catch → `*-fallback` |
+| `components/Battle.tsx` | 2D/3D toggle, fire flow |
+| `components/FleetSelect.tsx` | skin picker (era goes here) |
+| `domain/skins.ts` | skin/colour system (era goes here) |
+| `domain/types.ts` | `BOARD_SIZE`, `ShipId`, `Orientation` |
+| `domain/engine.ts` | `CellState` |
+| `preview-b.html` + `preview-b.tsx` | mid-battle harness the screenshot run uses |
 
-## Status
+`SceneShip` (in `FleetScene.ts`) is `{ shipId, row, col, size, orientation, sunk? }`.
 
-- **Merged to main this session:** Rainbow Racer model + world glow-up
-  (`FleetScene`… no — `src/games/racer/three/scene.ts`); party name length-bound;
-  earlier: the Party system, recent names, privacy page, audits, iOS icons.
-- **Ship Battle:** nothing built yet — only rendered mockups (now superseded by the
-  image-asset pivot). Procedural ship mockups are abandoned.
-- **Reference mockups (procedural, for atmosphere/FX only, NOT the ships):** the
-  night-ocean + explosion/splash look and the moonlit water are the target for the
-  scene around the image ships.
+---
 
-## Immediate next steps (on the local machine)
+## Ground rules
 
-1. Lock the **image spec** with the image agent (angle, scale, transparency,
-   per-era set, damaged/sunk variants). Generate the **modern** set first.
-2. Add `src/games/battleship/assets/ships/…` and a manifest that maps
-   `{era, shipId, state}` → imported asset URL.
-3. In `FleetScene.ts`: replace `buildWarship(...)` geometry with a **textured quad**
-   per ship (sized/oriented from `SceneShip`), keep everything else. Add the
-   atmosphere (sky/stars/moon/water) + bloom + explosion/splash FX; remove the neon
-   board frame.
-4. Wire **era** through the skin system (`skins.ts` + `FleetSelect.tsx`).
-5. Verify (`vitest`, `build`, headless screenshot). PR.
-6. Then: the **classic/WWII** set, then the **shooter-side firing animation**.
+1. **One feature = one branch cut fresh from `origin/main`.** The owner
+   rebase-merges within minutes, mid-session. Before every push:
+   `git fetch origin main`, then `git cherry origin/main <commits>` — a `-`
+   prefix means it already landed, so re-cut a branch and cherry-pick. Never
+   stack on merged history; never make a merge commit on a PR branch.
+2. **One logical operation per Bash call** — no `&&`, `||`, `;`. A PreToolUse
+   hook enforces it.
+3. **All three gates green before a PR**: `npm run check`, `npx vitest run`,
+   `npm run build`.
+4. **UI changes need a screenshot** from `npm run shots`, committed with the
+   change.
+5. **Big visual changes are pitched as mockups first** — roughly three labelled
+   options; the family picks; then you build.
+6. **Never break the offline invariant.** No runtime downloads, ever.
+7. Remote branch deletion is the owner's job via the GitHub Branches page —
+   `git push --delete` returns 403 in the sandbox. Don't route around it.
+
+---
+
+## Tooling reminders
+
+- `npm run shots` uses port 4317; `npm run dev` uses 5173. `pkill -f "vite
+  preview"` exits 144 — run it on its own or tolerate the code.
+- Playwright browsers install per-machine: `npx playwright install chromium`.
+  In the sandbox, set `PW_CHROMIUM` instead.
+- Delete stray `*.tsbuildinfo` before trusting a build — `tsc -b`'s incremental
+  cache has hidden real type errors.
+- jsdom has no WebGL, no layout, and sometimes no `matchMedia`. 3D components
+  must catch construction errors and render a `*-fallback`; tests assert that.
+  Drag/geometry tests stub per-element rects keyed off `data-row`/`data-col`.
+- If the owner says "I don't see the change" after a merge: the deploy is
+  probably fine — the service worker serves the old build until the app is
+  fully closed and reopened. Check the deploy run, then explain that.
