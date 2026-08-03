@@ -32,7 +32,7 @@
   touch-action: manipulation;
 }
 .chess-ranks, .chess-files {
-  display: grid; color: var(--muted); font-size: 11px; font-weight: 600;
+  display: grid; color: var(--muted); font-size: 14px; font-weight: 600;
 }
 .chess-ranks { grid-column: 1; grid-row: 1; grid-template-rows: repeat(8, 1fr); }
 .chess-ranks span { display: flex; align-items: center; justify-content: center; }
@@ -113,7 +113,7 @@
   background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
   padding: 16px; box-shadow: 0 20px 50px -16px rgba(0, 0, 0, 0.7); text-align: center;
 }
-.promo-title { color: var(--muted); font-size: 13px; margin-bottom: 10px; font-weight: 600; }
+.promo-title { color: var(--muted); font-size: 14px; margin-bottom: 10px; font-weight: 600; }
 .promo-row { display: flex; gap: 8px; }
 .promo-btn {
   width: 56px; height: 56px; border-radius: 10px;
@@ -175,12 +175,12 @@
 .pl-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .pl-name { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; line-height: 1.15; }
 .pl-name strong { font-size: 16px; color: var(--text); }
-.pl-turn { font-size: 12px; color: var(--accent); font-weight: 700; }
-.pl-check { font-size: 11px; font-weight: 700; color: var(--bad); text-transform: uppercase; letter-spacing: 0.04em; }
+.pl-turn { font-size: 14px; color: var(--accent); font-weight: 700; }
+.pl-check { font-size: 14px; font-weight: 700; color: var(--bad); text-transform: uppercase; letter-spacing: 0.04em; }
 .cap-tray { display: flex; align-items: center; flex-wrap: wrap; gap: 1px; min-height: 18px; }
 .cap-tray svg { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4)); }
-.cap-none { font-size: 11px; color: var(--muted); font-style: italic; }
-.cap-lead { font-size: 12px; font-weight: 700; color: var(--muted); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.cap-none { font-size: 14px; color: var(--muted); font-style: italic; }
+.cap-lead { font-size: 14px; font-weight: 700; color: var(--muted); margin-left: 4px; font-variant-numeric: tabular-nums; }
 
 /* ── Full 3D (three.js) view ───────────────────────────────────────────────── */
 .chess3d { width: 100%; display: flex; flex-direction: column; gap: 6px; }
@@ -196,7 +196,7 @@
     0 22px 46px -18px rgba(0, 0, 0, 0.85);
 }
 .chess3d-canvas canvas { display: block; width: 100% !important; height: 100% !important; }
-.chess3d-hint { margin: 0; font-size: 12px; }
+.chess3d-hint { margin: 0; font-size: 14px; }
 .chess3d-fallback { padding: 30px 10px; }
 .chess-play .chess-board-area { flex: 1 1 auto; min-width: 0; width: 100%; }
 
@@ -205,7 +205,7 @@
   display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
 }
 .seg-btn {
-  flex: 1; padding: 9px 4px; font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+  flex: 1; padding: 9px 4px; font-size: 14px; font-weight: 700; letter-spacing: 0.02em;
   background: transparent; border: none; color: var(--muted); cursor: pointer;
 }
 .seg-btn + .seg-btn { border-left: 1px solid var(--border); }
@@ -228,7 +228,7 @@
 }
 .log-empty { color: var(--muted); font-size: 14px; margin: 4px 2px; }
 .log-row { display: grid; grid-template-columns: 30px 1fr 1fr; align-items: center; gap: 4px; }
-.log-no { color: var(--muted); font-size: 13px; text-align: right; padding-right: 4px; }
+.log-no { color: var(--muted); font-size: 14px; text-align: right; padding-right: 4px; }
 .log-move {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 5px 7px; border-radius: 7px; border: 1px solid transparent;
@@ -249,7 +249,7 @@
 .mini-board .msq.light { background: #e3d9bd; }
 .mini-board .msq.dark { background: #7a6244; }
 .mini-board .msq svg { width: 84%; height: 84%; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)); }
-.log-caption { font-size: 13px; color: var(--muted); text-align: center; min-height: 18px; }
+.log-caption { font-size: 14px; color: var(--muted); text-align: center; min-height: 18px; }
 
 @media (max-width: 560px) {
   .chess-log-body { flex-direction: column-reverse; align-items: center; }

@@ -7,14 +7,14 @@
 .info-btn {
   display: inline-flex; align-items: center; gap: 6px;
   background: transparent; border: 1px solid var(--border); border-radius: 999px;
-  color: var(--muted); font-size: 12px; font-weight: 600; padding: 5px 10px; cursor: pointer;
+  color: var(--muted); font-size: 14px; font-weight: 600; padding: 5px 10px; cursor: pointer;
 }
 .info-btn:hover { color: var(--text); border-color: var(--accent); }
 .info-box {
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
 }
-.info-box p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.info-box p { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
 .info-box p:last-child { margin-bottom: 0; }
 .info-box strong { color: var(--text); }
 
@@ -36,9 +36,9 @@
   border: 1px solid var(--skin);
 }
 .skin .nm { font-weight: 700; font-size: 15px; }
-.skin .bl { font-size: 12px; color: var(--muted); margin-top: 2px; min-height: 2.4em; }
+.skin .bl { font-size: 14px; color: var(--muted); margin-top: 2px; min-height: 2.4em; }
 .skin .cost {
-  margin-top: 8px; font-size: 12px; font-weight: 700;
+  margin-top: 8px; font-size: 14px; font-weight: 700;
   display: inline-flex; align-items: center; gap: 4px;
 }
 .skin .cost.owned { color: var(--good); }
@@ -52,7 +52,7 @@
 .board-title { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .board-title .name { font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
 .board-title .name svg { color: var(--accent); }
-.board-title .hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+.board-title .hint { font-size: 14px; color: var(--muted); margin-left: auto; }
 
 .board {
   display: grid;
@@ -72,7 +72,7 @@
 .board.enemy.active { border-color: var(--accent); box-shadow: 0 0 22px -8px var(--accent); }
 .board .hdr {
   display: grid; place-items: center;
-  font-size: 9px; color: var(--muted); font-weight: 600;
+  font-size: 14px; color: var(--muted); font-weight: 600;
 }
 .cell {
   aspect-ratio: 1 / 1;
@@ -215,18 +215,18 @@
 }
 .chip-btn:hover { color: var(--text); border-color: var(--accent); }
 .chip-btn.danger:hover { color: var(--bad); border-color: var(--bad); }
-.ship-chip .status { font-size: 12px; color: var(--warn); }
+.ship-chip .status { font-size: 14px; color: var(--warn); }
 .ship-chip .status.todo { color: var(--warn); }
 
 /* "or" divider above the Fast Start express lane. */
-.or-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; color: var(--muted); font-size: 12px; }
+.or-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; color: var(--muted); font-size: 14px; }
 .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* ── Battle ──────────────────────────────────────────────────────────────── */
 /* Compact turn indicator in the top bar (saves the old full-width banner row). */
 .turn-pill {
   display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
-  font-size: 13px; font-weight: 700; letter-spacing: 0.01em;
+  font-size: 14px; font-weight: 700; letter-spacing: 0.01em;
   padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
 }
 .turn-pill.mine { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
@@ -274,7 +274,7 @@
 
 .view-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
 .view-tabs button {
-  flex: 1; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 13px;
+  flex: 1; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 14px;
   background: var(--surface); color: var(--muted); border: 1px solid var(--border); cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
@@ -285,7 +285,7 @@
   max-height: 220px; overflow-y: auto; display: grid; gap: 3px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
-.movelog .entry { display: flex; gap: 8px; font-size: 12.5px; align-items: baseline; }
+.movelog .entry { display: flex; gap: 8px; font-size: 14px; align-items: baseline; }
 .movelog .prompt { color: var(--accent); font-weight: 700; }
 .movelog .who { font-weight: 700; min-width: 3.2em; }
 .movelog .who.me { color: var(--accent); }
@@ -299,7 +299,7 @@
 .fleet-roster { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
 .fs-ship { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 42px; }
 .fs-art { height: 16px; display: grid; place-items: center; }
-.fs-name { font-size: 10px; color: var(--muted); letter-spacing: 0.01em; }
+.fs-name { font-size: 14px; color: var(--muted); letter-spacing: 0.01em; }
 .fs-ship.sunk .fs-art { color: #93a1b5; opacity: 0.6; }
 .fs-ship.sunk .fs-name { text-decoration: line-through; }
 
@@ -309,7 +309,7 @@
    enemy has hit, foam rings where they missed. The radar stays 2D. */
 .fleet-dims { display: inline-flex; margin: 0 0 0 4px; }
 /* Same compact look, but a ≥32px-tall tap box (min-height, not padding). */
-.fleet-dims button { flex: 0 0 auto; padding: 4px 10px; font-size: 11px; min-height: 32px; }
+.fleet-dims button { flex: 0 0 auto; padding: 4px 10px; font-size: 14px; min-height: 32px; }
 .bs3d-wrap { display: flex; flex-direction: column; gap: 6px; }
 .bs3d {
   width: 100%;
@@ -322,5 +322,5 @@
     0 18px 40px -18px rgba(0, 0, 0, 0.85);
 }
 .bs3d canvas { display: block; width: 100% !important; height: 100% !important; }
-.bs3d-hint { margin: 0; font-size: 11.5px; }
+.bs3d-hint { margin: 0; font-size: 14px; }
 .bs3d-fallback { padding: 30px 10px; }

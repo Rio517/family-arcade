@@ -313,6 +313,87 @@ export const BrokenShipIcon = (p: IconProps) =>
     p,
   );
 
+/** A microphone on its stand — the party's voice controls. */
+export const MicIcon = (p: IconProps) =>
+  svg(
+    <>
+      <rect x="9" y="2.8" width="6" height="10.4" rx="3" />
+      <path d="M5.5 11.2a6.5 6.5 0 0 0 13 0" />
+      <path d="M12 17.7V21" />
+      <path d="M8.8 21h6.4" />
+    </>,
+    p,
+  );
+
+/** The same microphone, struck through — muted. */
+export const MicOffIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M9 5.6A3 3 0 0 1 15 5.8v4.4" />
+      <path d="M15 13.2a3 3 0 0 1-6-1.2V8.4" />
+      <path d="M5.5 11.2a6.5 6.5 0 0 0 9.8 5.6" />
+      <path d="M18.5 11.2a6.5 6.5 0 0 1-.5 2.5" />
+      <path d="M12 17.7V21" />
+      <path d="M8.8 21h6.4" />
+      <path d="M3.6 3.6 20.4 20.4" />
+    </>,
+    p,
+  );
+
+/** A camera body with a lens — the party's video toggle. */
+export const CameraIcon = (p: IconProps) =>
+  svg(
+    <>
+      <rect x="2.6" y="6.4" width="14.2" height="11.2" rx="2.4" />
+      <path d="M16.8 10.6 21.4 8v8l-4.6-2.6v-2.8Z" />
+    </>,
+    p,
+  );
+
+/** A speaker with sound waves — voice-only (no camera) in the call. */
+export const SpeakerIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M4 9.4h3.2L11.4 5.6v12.8L7.2 14.6H4V9.4Z" />
+      <path d="M15 9.6a3.6 3.6 0 0 1 0 4.8" />
+      <path d="M17.6 7.2a7 7 0 0 1 0 9.6" />
+    </>,
+    p,
+  );
+
+/** A party popper — the pill that opens the party panel. */
+export const PartyIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M3 21.2 8.4 8.6l7 7L3 21.2Z" />
+      <path d="M11.6 5.4c1.1-.6 2.4-.4 3 .7" />
+      <path d="M16.4 2.8c.2 1 .9 1.6 1.9 1.8" />
+      <path d="M19.6 8.6c1-.3 1.9 0 2.4.9" />
+      <path d="M15.4 10.4l1.6-1.6" />
+    </>,
+    p,
+  );
+
+/** A head and shoulders — a caller whose camera is off. */
+export const PersonIcon = (p: IconProps) =>
+  svg(
+    <>
+      <circle cx="12" cy="8.4" r="3.9" />
+      <path d="M4.8 20.2a7.2 7.2 0 0 1 14.4 0" />
+    </>,
+    p,
+  );
+
+/** A clock face — waiting for the other side to pick up. */
+export const ClockIcon = (p: IconProps) =>
+  svg(
+    <>
+      <circle cx="12" cy="12" r="8.6" />
+      <path d="M12 7v5.3l3.3 2" />
+    </>,
+    p,
+  );
+
 /**
  * A distinct filled emblem per fleet skin, drawn in the skin's colour
  * (`currentColor`, set by the caller). Replaces the old emoji skin icons.

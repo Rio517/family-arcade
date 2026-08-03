@@ -62,7 +62,7 @@
 }
 
 .risk-eyebrow {
-  font-family: var(--font-display); font-size: 11px; letter-spacing: 0.26em;
+  font-family: var(--font-display); font-size: 14px; letter-spacing: 0.26em;
   text-transform: uppercase; color: var(--brass); display: block;
 }
 
@@ -146,7 +146,7 @@
 .risk-token-hit { fill: transparent; pointer-events: all; }
 .risk-token-halo { pointer-events: none; }
 .risk-token-num {
-  fill: #fbf1d6; font-family: var(--font-display); font-weight: 700; font-size: 13px;
+  fill: #fbf1d6; font-family: var(--font-display); font-weight: 700; font-size: 14px;
   text-anchor: middle; font-variant-numeric: tabular-nums; pointer-events: none;
   paint-order: stroke; stroke: #140c04; stroke-width: 2.6; stroke-linejoin: round;
 }
@@ -174,7 +174,7 @@
 .risk-compass .rc-ring2 { fill: none; stroke: #8a6a2e; stroke-width: 0.6; opacity: 0.5; }
 .risk-compass .rc-star { fill: #8a6a2e; }
 .risk-compass .rc-star.dim { fill: #a98944; opacity: 0.7; }
-.risk-compass .rc-n { fill: #6b5024; font-family: var(--font-display); font-size: 12px; font-weight: 700; text-anchor: middle; }
+.risk-compass .rc-n { fill: #6b5024; font-family: var(--font-display); font-size: 14px; font-weight: 700; text-anchor: middle; }
 .risk-frame-inner { fill: none; stroke: #8a6a2e; stroke-width: 1.5; opacity: 0.45; }
 
 /* ── The war table — the map IS the screen, everything else floats ───────── */
@@ -233,7 +233,7 @@
   backdrop-filter: blur(3px);
 }
 .risk-dock .risk-legend { background: none; border: none; padding: 0; gap: 3px 12px; }
-.risk-dock .risk-legend-item { font-size: 11.5px; }
+.risk-dock .risk-legend-item { font-size: 14px; }
 @media (max-height: 560px) { .risk-dock .risk-legend { display: none; } }
 
 .risk-general { display: inline-flex; align-items: center; gap: 12px; }
@@ -253,7 +253,7 @@
 .risk-seal.lg { width: 42px; height: 42px; border-width: 2.5px; }
 
 .risk-phase {
-  font-family: var(--font-display); font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase;
+  font-family: var(--font-display); font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--brass-hi); border: 1px solid var(--brass-dim); border-radius: 2px; padding: 5px 12px;
   background: rgba(0, 0, 0, 0.28);
 }
@@ -288,8 +288,8 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 16px;
   background: linear-gradient(#2c1d11, #241811); border: 1px solid var(--brass-dim); border-radius: 4px;
 }
-.risk-legend-title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.2em; font-size: 12px; color: var(--brass); }
-.risk-legend-item { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.risk-legend-title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.2em; font-size: 14px; color: var(--brass); }
+.risk-legend-item { font-size: 14px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
 .risk-legend-chip { width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, 0.4); filter: saturate(0.7) brightness(0.92); }
 .risk-legend-item strong { color: var(--cream); }
 .risk-legend-held { font-style: italic; font-weight: 600; margin-left: 2px; }
@@ -315,7 +315,7 @@
 }
 .risk-resume-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .risk-resume-text strong { font-family: var(--font-display); font-size: 18px; }
-.risk-resume-sub { color: var(--muted); font-size: 13px; font-style: italic; }
+.risk-resume-sub { color: var(--muted); font-size: 14px; font-style: italic; }
 .risk-resume-chev { margin-left: auto; font-size: 26px; color: var(--brass); }
 .risk-resume-discard { flex: 0 0 auto; }
 
