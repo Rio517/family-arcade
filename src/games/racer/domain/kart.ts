@@ -26,7 +26,7 @@ const ACCEL = 42; // how fast speed eases toward its target (units/s²)
 const TURN_RATE = 2.1; // radians/s of turning at full lock
 
 /** Scoop a coin up within this distance. Generous on purpose. */
-export const COIN_COLLECT_RADIUS = 10;
+const COIN_COLLECT_RADIUS = 10;
 
 /** How many coins sparkle in the arena at once. */
 export const COIN_TARGET = 16;

@@ -70,10 +70,3 @@ export interface ShotEvent {
 
 export type GameEvent = StartEvent | ShotEvent;
 export type GameLog = GameEvent[];
-
-/** The outcome of resolving one shot against a defender's fleet. */
-export interface ShotResult {
-  hit: boolean;
-  sunk: ShipId | null;
-  allSunk: boolean;
-}

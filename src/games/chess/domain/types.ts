@@ -52,8 +52,8 @@ export type GameLog = Ply[];
 /** Which side each connected player controls (online mode). */
 export type Side = 'host' | 'guest';
 
-export const CASTLE_FLAGS = ['wK', 'wQ', 'bK', 'bQ'] as const;
-export type CastleFlag = (typeof CASTLE_FLAGS)[number];
+/** Castling rights still available: white/black, king-side/queen-side. */
+export type CastleFlag = 'wK' | 'wQ' | 'bK' | 'bQ';
 
 /**
  * A fully-derived position. Immutable — the engine never mutates a state in

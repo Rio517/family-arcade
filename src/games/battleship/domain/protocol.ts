@@ -86,7 +86,7 @@ export type Message =
 
 /** A finished game is at most one shot per cell per side, plus a few framing
  * events. Anything past this is malformed/hostile and rejected outright. */
-export const MAX_LOG_EVENTS = 2 * BOARD_SIZE * BOARD_SIZE + 4;
+const MAX_LOG_EVENTS = 2 * BOARD_SIZE * BOARD_SIZE + 4;
 
 /** True when `short` is an exact prefix of `long` (same events, same order). */
 function isPrefix(short: GameLog, long: GameLog): boolean {

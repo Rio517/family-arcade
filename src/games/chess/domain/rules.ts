@@ -31,7 +31,7 @@ const SIZE = 8;
  * side to move, castling rights, en-passant square). Two positions with the
  * same key are "the same position" for the threefold-repetition rule.
  */
-export function positionKey(state: GameState): string {
+function positionKey(state: GameState): string {
   return toFen(state).split(' ').slice(0, 4).join(' ');
 }
 
@@ -45,11 +45,11 @@ function seedRepetition(state: GameState): GameState {
   return { ...state, repetition: { [positionKey(state)]: 1 } };
 }
 
-export function opponent(color: Color): Color {
+function opponent(color: Color): Color {
   return color === 'w' ? 'b' : 'w';
 }
 
-export function onBoard(row: number, col: number): boolean {
+function onBoard(row: number, col: number): boolean {
   return row >= 0 && row < SIZE && col >= 0 && col < SIZE;
 }
 
@@ -526,7 +526,7 @@ function insufficientMaterial(board: Board): boolean {
 }
 
 /** How many kings `color` still has (the king-hunt life counter). */
-export function countKings(board: Board, color: Color): number {
+function countKings(board: Board, color: Color): number {
   let n = 0;
   for (const row of board) {
     for (const p of row) {

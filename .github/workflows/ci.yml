@@ -18,5 +18,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # Static analysis first: a type error makes the test output noise.
+      # `check` = tsc -b, eslint (incl. jsx-a11y), knip dead-code.
+      - run: npm run check
       - run: npm test
       - run: npm run build

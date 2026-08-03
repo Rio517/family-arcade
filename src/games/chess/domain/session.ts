@@ -69,10 +69,10 @@ export interface Outcome {
   error?: string;
 }
 
-export const HOST_COLOR: Color = 'w';
-export const GUEST_COLOR: Color = 'b';
+const HOST_COLOR: Color = 'w';
+const GUEST_COLOR: Color = 'b';
 
-export function colorForSide(side: Side): Color {
+function colorForSide(side: Side): Color {
   return side === 'host' ? HOST_COLOR : GUEST_COLOR;
 }
 
@@ -127,7 +127,7 @@ export function boardState(s: SessionState): GameState {
   return board;
 }
 
-export function currentStatus(s: SessionState): Status {
+function currentStatus(s: SessionState): Status {
   return status(boardState(s));
 }
 

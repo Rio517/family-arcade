@@ -14,7 +14,6 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { broken: 
   }
 
   componentDidCatch(error: unknown) {
-    // eslint-disable-next-line no-console
     console.error('Arcade crashed', error);
   }
 
