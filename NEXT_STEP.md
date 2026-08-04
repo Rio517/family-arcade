@@ -55,23 +55,71 @@ Dramatically improve Ship Battle's 3D look. The scene is
 grid; `Battle.tsx` offers the 2D/3D toggle. It's read-only and orbit-only, and
 all geometry is procedural today.
 
-### The pivot: ships become image assets
+### The pivot: ships become real meshes, generated from the art
 
-The procedural ship models weren't good enough. Ship art is authored as
-**PNG assets** by an image-generation agent, and the scene places those instead
-of procedural geometry. Everything else in the scene stays procedural.
+Procedural ship geometry failed twice — first hand-written, then again via an
+`img2threejs` agent that reconstructed a carrier as a flat slab with a lollipop
+mast. An LLM sculpting geometry in code cannot recover 3D form from one view.
+Stop trying.
+
+The art is authored as **3/4 hero PNGs** (they live in `../assets/battleship-fleet/`,
+5 modern ships, alpha-masked, ~1570×1000) and converted to **GLB meshes** with
+an image-to-3D model. Sprites were considered and dropped: the battle camera's
+azimuth is unconstrained (`FleetScene.ts` sets only polar limits, 0.15–1.35 rad),
+so a flat 3/4 sprite reads correctly from one side and wrong from the other, and
+a sprite can never animate a part.
 
 **Offline invariant (must hold):** no runtime downloads. Assets are `import`ed
-so Vite hashes them into `dist/`. Never fetch an image from a URL.
+so Vite hashes them into `dist/`. Never fetch a model or image from a URL.
 
-### How image ships render
+### Image-to-3D: what's settled and what isn't
 
-Each ship is a **textured quad laid flat on the grid**, sized `size × 1` cells
-and oriented by `orientation` (H/V), so it stays correct as the camera orbits
-and lines up with the hit/miss cells. That means the art wants a **top-down or
-slight-high-angle** view. Confirm the angle with the image agent against one
-test ship before generating a full set — a 3/4-view sprite would need a
-billboard instead, which reads wrong against a flat grid.
+**Settled — TRELLIS.2 works and the quality is good.** Run on the free
+[HF Space](https://huggingface.co/spaces/microsoft/TRELLIS.2), the modern
+destroyer came back as a correct 3D ship — hull, pyramid mast, hangar, helipad,
+bow gun — verified by viewing it at an angle the input image never showed.
+
+**Settled — it cannot run on this Mac.** TRELLIS.2 is CUDA-only (12–24 GB VRAM,
+verified on A100/H100). The GGML port, `pwilkin/trellis.cpp`, has CUDA, Vulkan,
+ROCm and CPU backends but *no Metal* and no macOS builds. The M4 mini is out.
+`model_eval`'s local-LLM setup is unrelated and gives nothing here.
+
+**The blocker — free ZeroGPU quota is about 5 minutes a day**, roughly one ship
+per day; a full fleet would take a week and a half. Options: HF PRO (~$9/mo,
+same UI), or duplicate the Space onto a paid GPU (~$0.40–1.00/hr, whole fleet in
+under an hour, then delete it). Duplicating prompts for an HF token — the Space
+itself declares no secrets, so a read-scoped token is only for HF's own dialog.
+
+**Not yet measured — a real ship's size after optimisation.** The pipeline below
+is proven on a synthetic 97k-triangle mesh, but no actual TRELLIS output has
+been through it. Do that before paying for GPU time.
+
+**Known limitation — TRELLIS emits one fused mesh, not named parts.** The
+FLEET_REVIEW requirement that the submarine's four torpedo doors be separate,
+animation-ready nodes will not come out of the generator; that needs splitting
+in Blender afterwards. Judge how hard once a real GLB is in hand.
+
+### The optimisation pipeline (built, tested)
+
+`npm run glb -- <file.glb>` — see `scripts/optimize-glb.mjs`.
+
+TRELLIS won't emit below 100k triangles with a 1024² texture, about 3 MB per
+ship, against a whole installed PWA of ~1.5 MB. The pipeline welds, simplifies
+to a triangle budget, shrinks the texture to WebP, and meshopt-compresses.
+
+On the synthetic fixture: **3109 KB → 77 KB at 4,000 triangles / 256² texture**
+(97.5% smaller), or 52 KB at 2,500 triangles / 192². So a ten-ship fleet lands
+around **520–775 KB** — real but affordable. `npm run glb -- --selftest`
+re-verifies end to end and prints the numbers.
+
+Two deliberate choices, both load-bearing:
+
+- **Node structure is preserved** — no flatten or join unless you pass
+  `--flatten`. Ship parts must stay separate nodes for the torpedo doors.
+- **Meshopt, not Draco** — three.js needs a decoder either way, but meshopt's is
+  ~30 KB against Draco's ~200 KB of wasm, and on an offline PWA that decoder
+  ships to every player. Loading requires
+  `GLTFLoader.setMeshoptDecoder(MeshoptDecoder)`.
 
 ### Art spec to lock with the image agent
 
@@ -86,13 +134,19 @@ billboard instead, which reads wrong against a flat grid.
 - **State variants** (nice to have): normal, **damaged**, **sunk** (dark,
   listing, half-submerged). The scene knows per-cell `CellState` —
   `'unknown' | 'miss' | 'hit' | 'sunk'` — and whether a ship is sunk.
-- **Format**: transparent-background PNG; one consistent viewing angle across
-  all five; neutral/night lighting so the scene's own lighting and skin tint
-  can apply; bow pointing **+x** (horizontal) so `orientation` is a rotation;
-  one shared cells-per-pixel ratio across all five so a carrier reads as
-  genuinely longer than a destroyer; power-of-two-ish dimensions.
-- **Location**: `src/games/battleship/assets/ships/<era>/<shipId>.png`, behind
-  a manifest mapping `{era, shipId, state}` → imported URL.
+- **Format**: transparent-background PNG, one object on empty background — that
+  is what the image-to-3D model wants. A consistent elevated 3/4 view across all
+  five, neutral lighting so the scene's own lighting and skin tint can apply.
+  The existing modern set already meets this.
+- **Scale**: the five hulls must share one length ratio so a carrier reads as
+  genuinely longer than a destroyer. Scale is re-established in the scene
+  anyway (each ship spans `size × 1` cells), but consistent input art keeps
+  proportions honest.
+- **Location**: source art stays in `../assets/battleship-fleet/`; optimised
+  models land in `src/games/battleship/assets/ships/<era>/<shipId>.glb`, behind
+  a manifest mapping `{era, shipId}` → imported URL. Damaged and sunk states are
+  scene effects (tint, list, sink) rather than separate assets — a second set of
+  meshes would double the bundle for something the lighting can fake.
 
 ### Atmosphere and FX (approved in mockups, not yet in code)
 
@@ -124,15 +178,25 @@ where the sync happens.
 
 ### Order of work
 
-1. Lock the art spec above with the image agent; generate the **modern** set.
-2. Add `assets/ships/…` plus the manifest.
-3. In `FleetScene.ts`: replace `buildWarship(...)` with a textured quad per
-   ship, sized and oriented from `SceneShip`. Then the atmosphere (sky, stars,
-   moon, water), bloom, and the impact FX; remove the neon frame.
-4. Wire `era` through `skins.ts` + `FleetSelect.tsx`.
-5. Verify: `npm run check`, `npx vitest run`, `npm run build`,
-   `npm run shots -- battle`. Open the PR.
-6. Then the **classic/WWII** set, then the shooter-side firing animation.
+1. **Measure one real ship before spending anything.** When the free ZeroGPU
+   quota resets, run the destroyer through the Space, download the GLB, and
+   `npm run glb -- destroyer.glb`. If the optimised result is ~80 KB and still
+   looks like a destroyer, the whole approach is confirmed. If it's 500 KB or
+   the silhouette collapses, stop and rethink before paying for GPU time.
+2. Then buy the GPU time (PRO or a duplicated Space) and generate the remaining
+   four modern ships in one sitting.
+3. Add `src/games/battleship/assets/ships/modern/…` plus the manifest.
+4. In `FleetScene.ts`: replace `buildWarship(...)` with a `GLTFLoader` (with
+   `setMeshoptDecoder`) that instantiates the ship mesh per `SceneShip`, scaled
+   to `size × 1` cells and rotated by `orientation`. Load once, clone per ship.
+   Then the atmosphere (sky, stars, moon, water), bloom, and the impact FX;
+   remove the neon frame.
+5. Wire `era` through `skins.ts` + `FleetSelect.tsx`.
+6. Verify: `npm run check`, `npx vitest run`, `npm run build`,
+   `npm run shots -- battle`. Watch the bundle size in the build output — that
+   is the number this whole approach lives or dies on. Open the PR.
+7. Then the **classic/WWII** set, then the shooter-side firing animation, then
+   splitting the submarine's torpedo doors into animatable nodes.
 
 ### Anchor files
 
@@ -146,6 +210,8 @@ where the sync happens.
 | `domain/types.ts` | `BOARD_SIZE`, `ShipId`, `Orientation` |
 | `domain/engine.ts` | `CellState` |
 | `preview-b.html` + `preview-b.tsx` | mid-battle harness the screenshot run uses |
+| `scripts/optimize-glb.mjs` | raw GLB → bundle-sized GLB (`npm run glb`) |
+| `../assets/battleship-fleet/` | source ship art + per-ship ImageGen prompts |
 
 `SceneShip` (in `FleetScene.ts`) is `{ shipId, row, col, size, orientation, sunk? }`.
 
@@ -176,6 +242,8 @@ where the sync happens.
 
 - `npm run shots` uses port 4317; `npm run dev` uses 5173. `pkill -f "vite
   preview"` exits 144 — run it on its own or tolerate the code.
+- `npm run glb -- --selftest` proves the model pipeline without needing a real
+  GLB or any GPU quota. Run it if you touch `scripts/optimize-glb.mjs`.
 - Playwright browsers install per-machine: `npx playwright install chromium`.
   In the sandbox, set `PW_CHROMIUM` instead.
 - Delete stray `*.tsbuildinfo` before trusting a build — `tsc -b`'s incremental
