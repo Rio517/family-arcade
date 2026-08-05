@@ -26,6 +26,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { ShipId } from '@games/battleship/domain/types';
 import carrierUrl from '@games/battleship/assets/ships/modern/carrier.glb';
+import carrierDeckUrl from '@games/battleship/assets/ships/modern/carrier-deck.png';
 
 /**
  * Per-ship placement. The meshes come out of the generator in their own
@@ -46,10 +47,23 @@ interface ModelSpec {
    * air above the ship.
    */
   deckFrac: number;
+  /**
+   * Optional packed deck-paint texture, authored from the ship's top view:
+   * R = white markings, G = team-colour mask, B = reserved, A = deck
+   * silhouette with the island cut out. Ships without one fall back to
+   * markings drawn on a canvas, which work but can't follow the real outline.
+   */
+  deckPaint?: string;
 }
 
 const SPECS: Partial<Record<ShipId, ModelSpec>> = {
-  carrier: { url: carrierUrl, yaw: -Math.PI / 2, sink: 0.28, deckFrac: 0.46 },
+  carrier: {
+    url: carrierUrl,
+    yaw: -Math.PI / 2,
+    sink: 0.28,
+    deckFrac: 0.46,
+    deckPaint: carrierDeckUrl,
+  },
 };
 
 const cache = new Map<ShipId, THREE.Group>();
@@ -72,6 +86,14 @@ export async function loadShipModels(): Promise<void> {
       } catch {
         // A missing or corrupt model must never take the scene down: the
         // caller falls back to procedural geometry for this hull.
+      }
+      if (spec.deckPaint && !deckPaintImages.has(id)) {
+        try {
+          const image = await new THREE.ImageLoader().loadAsync(spec.deckPaint);
+          deckPaintImages.set(id, image);
+        } catch {
+          // Falls back to canvas-drawn markings.
+        }
       }
     }),
   );
@@ -176,6 +198,115 @@ function measureDeckY(model: THREE.Object3D, dims: THREE.Vector3): number | null
 
   hits.sort((a, b) => a - b);
   return hits[Math.floor(hits.length / 2)];
+}
+
+/** Decoded deck-paint images, keyed by ship. Populated by loadShipModels(). */
+const deckPaintImages = new Map<ShipId, HTMLImageElement>();
+
+/**
+ * A composited deck-paint texture plus where its paint actually sits in the
+ * image, as fractions of the image (0–1). The paint never fills its canvas, so
+ * the plane has to be sized and offset by these or the deck lands crooked.
+ */
+interface DeckPaint {
+  texture: THREE.Texture;
+  /** Bounds of the non-transparent paint: [minU, minV, maxU, maxV]. */
+  bounds: [number, number, number, number];
+}
+
+const deckPaintCache = new Map<string, DeckPaint>();
+
+/**
+ * Turn the packed channels into something renderable.
+ *
+ * The authored file is data, not a picture: R marks the white lines, G marks
+ * the team number, A is the deck silhouette. Rendering it directly would show
+ * a red deck. So we unpack it here — dark non-skid where the silhouette is,
+ * white where the markings are, fleet colour where the team mask is — which is
+ * also what lets the deck number take each player's skin colour.
+ */
+function compositeDeckPaint(id: ShipId, skinColor: string): DeckPaint | null {
+  const key = `${id}:${skinColor}`;
+  const cached = deckPaintCache.get(key);
+  if (cached) return cached;
+
+  const image = deckPaintImages.get(id);
+  if (!image) return null;
+
+  const W = image.naturalWidth;
+  const H = image.naturalHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+
+  ctx.drawImage(image, 0, 0);
+  const src = ctx.getImageData(0, 0, W, H);
+  const px = src.data;
+
+  const tint = new THREE.Color(skinColor);
+  const teamR = Math.round(tint.r * 255);
+  const teamG = Math.round(tint.g * 255);
+  const teamB = Math.round(tint.b * 255);
+
+  let minX = W;
+  let minY = H;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let i = 0; i < px.length; i += 4) {
+    const marks = px[i];
+    const team = px[i + 1];
+    const deck = px[i + 3];
+
+    if (deck > 8) {
+      const p = i / 4;
+      const x = p % W;
+      const y = (p / W) | 0;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+
+    if (team > 8) {
+      px[i] = teamR;
+      px[i + 1] = teamG;
+      px[i + 2] = teamB;
+      px[i + 3] = Math.max(deck, team);
+    } else if (marks > 8) {
+      // Deck paint, a touch off-white so it doesn't glare under bloom.
+      px[i] = 232;
+      px[i + 1] = 238;
+      px[i + 2] = 246;
+      px[i + 3] = Math.max(deck, marks);
+    } else {
+      // Non-skid: darker than the reference charcoal, because the scene's ACES
+      // tone mapping lifts mid-tones — but not so dark it reads as a hole in
+      // the ship, which #23262c-minus-too-much did.
+      px[i] = 34;
+      px[i + 1] = 37;
+      px[i + 2] = 43;
+      px[i + 3] = deck;
+    }
+  }
+
+  ctx.putImageData(src, 0, 0);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.anisotropy = 4;
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const paint: DeckPaint =
+    maxX < 0
+      ? { texture, bounds: [0, 0, 1, 1] }
+      : {
+          texture,
+          bounds: [minX / W, minY / H, (maxX + 1) / W, (maxY + 1) / H],
+        };
+  deckPaintCache.set(key, paint);
+  return paint;
 }
 
 /** Reusable canvas → texture, one per ship type (they never change). */
@@ -296,12 +427,30 @@ function buildDeckDecal(
   deckY: number,
   skinColor: string,
 ): THREE.Mesh {
+  const painted = compositeDeckPaint(id, skinColor);
+
+  // With authored paint the plane is sized from the paint's own bounds, so the
+  // deck outline lands on the hull whatever margin the artwork happens to
+  // carry. Without it, fall back to a fraction of the bounding box — which
+  // can't follow the real outline, and shows.
+  let planeX: number;
+  let planeZ: number;
+  if (painted) {
+    const [minU, minV, maxU, maxV] = painted.bounds;
+    // Grow the plane so the *painted* part covers the hull's deck footprint.
+    // Slightly under 1 on purpose: the model's bounding box includes sponsons
+    // and the flare of the bow, which the deck itself doesn't reach.
+    planeX = (lengthX * 0.93) / Math.max(maxU - minU, 0.01);
+    planeZ = (widthZ * 0.93) / Math.max(maxV - minV, 0.01);
+  } else {
+    planeX = lengthX * 0.88;
+    planeZ = widthZ * 0.82;
+  }
+
   const plane = new THREE.Mesh(
-    // Kept inside the bounding box: it includes sponsons and the bow point, so
-    // a full-size plane hangs the deck paint out over open water.
-    new THREE.PlaneGeometry(lengthX * 0.88, widthZ * 0.82),
+    new THREE.PlaneGeometry(planeX, planeZ),
     new THREE.MeshBasicMaterial({
-      map: deckTexture(id, skinColor),
+      map: painted?.texture ?? deckTexture(id, skinColor),
       transparent: true,
       depthWrite: false,
       // Without this the decal fights the deck for the same depth and flickers.
@@ -312,6 +461,14 @@ function buildDeckDecal(
   );
   plane.rotation.x = -Math.PI / 2;
   plane.position.y = deckY + 0.004;
+
+  if (painted) {
+    // Re-centre: the paint's centre inside the image is what must sit over the
+    // hull's centre, not the image's centre.
+    const [minU, minV, maxU, maxV] = painted.bounds;
+    plane.position.x = -((minU + maxU) / 2 - 0.5) * planeX;
+    plane.position.z = ((minV + maxV) / 2 - 0.5) * planeZ;
+  }
   return plane;
 }
 
