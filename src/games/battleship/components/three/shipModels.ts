@@ -22,7 +22,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { ShipId } from '@games/battleship/domain/types';
 import carrierUrl from '@games/battleship/assets/ships/modern/carrier.glb';
-import carrierDeckUrl from '@games/battleship/assets/ships/modern/carrier-deck.png';
+import carrierDeckSvg from '@games/battleship/assets/ships/modern/carrier-deck.svg?raw';
 
 /**
  * Per-ship placement. The meshes come out of the generator in their own
@@ -44,12 +44,16 @@ interface ModelSpec {
    */
   deckFrac: number;
   /**
-   * Optional packed deck-paint texture, authored from the ship's top view:
-   * R = white markings, G = team-colour mask, B = reserved, A = deck
-   * silhouette with the island cut out. Ships without one fall back to
-   * markings drawn on a canvas, which work but can't follow the real outline.
+   * Deck paint as SVG source, traced from the ship's top view. Groups carry
+   * the ids `deck`, `markings` and `team`, which are recoloured here before
+   * rasterising — so the deck grey is set in code, not baked by the artist,
+   * and the hull number takes the player's fleet colour.
+   *
+   * Vector rather than raster because the paint is stretched across a hull
+   * several board-cells long: a traced PNG's hard edges staircase on every
+   * diagonal, and nothing downstream recovers detail that was never sampled.
    */
-  deckPaint?: string;
+  deckSvg?: string;
 }
 
 const SPECS: Partial<Record<ShipId, ModelSpec>> = {
@@ -58,9 +62,16 @@ const SPECS: Partial<Record<ShipId, ModelSpec>> = {
     yaw: -Math.PI / 2,
     sink: 0.28,
     deckFrac: 0.46,
-    deckPaint: carrierDeckUrl,
+    deckSvg: carrierDeckSvg,
   },
 };
+
+/** Dark grey non-skid. The decal skips tone mapping, so this is what shows. */
+const DECK_GREY = '#3b4048';
+const DECK_MARKINGS = '#e8edf5';
+
+/** Rasterised width. The deck is the largest flat surface the camera sees. */
+const DECK_RASTER_W = 2048;
 
 const cache = new Map<ShipId, THREE.Group>();
 
@@ -68,7 +79,7 @@ const cache = new Map<ShipId, THREE.Group>();
  * Load every available ship mesh once. Resolves when all have arrived (or
  * failed) so the caller can rebuild the fleet with real hulls.
  */
-export async function loadShipModels(): Promise<void> {
+export async function loadShipModels(skinColor: string): Promise<void> {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   const ids = Object.keys(SPECS) as ShipId[];
   await Promise.all(
@@ -83,10 +94,9 @@ export async function loadShipModels(): Promise<void> {
         // A missing or corrupt model must never take the scene down: the
         // caller falls back to procedural geometry for this hull.
       }
-      if (spec.deckPaint && !deckPaintImages.has(id)) {
+      if (spec.deckSvg && !deckPaintImages.has(id)) {
         try {
-          const image = await new THREE.ImageLoader().loadAsync(spec.deckPaint);
-          deckPaintImages.set(id, image);
+          deckPaintImages.set(id, await rasteriseDeckSvg(spec.deckSvg, skinColor));
         } catch {
           // Falls back to canvas-drawn markings.
         }
@@ -209,53 +219,86 @@ interface DeckPaint {
 const deckPaintCache = new Map<string, DeckPaint>();
 
 /**
- * Close the island-shaped hole in the deck silhouette.
+ * Recolour the deck SVG by group id, then rasterise it.
  *
- * The artwork cuts the island out so paint isn't drawn over it — but the
- * island is real 3D geometry standing well above the decal, so it occludes
- * the plane on its own. The hole just exposes bare hull grey around the
- * island's base, which reads as an unpainted patch on the deck.
- *
- * Fills transparent runs that are enclosed by deck on both sides and short
- * relative to the row, so the genuinely concave parts of the outline — the
- * bow notch, the angled deck's overhang — are left alone.
+ * The artist ships placeholder colours; the real values live here so the deck
+ * grey can be tuned without re-exporting art, and so the hull number can take
+ * each player's fleet colour. Rasterising through a data URL keeps it offline:
+ * nothing is fetched, and the browser's own rasteriser does the antialiasing
+ * that a traced PNG could never have.
  */
-function fillIslandCutout(px: Uint8ClampedArray, W: number, H: number): void {
-  for (let y = 0; y < H; y++) {
-    const row = y * W;
-    let first = -1;
-    let last = -1;
-    for (let x = 0; x < W; x++) {
-      if (px[(row + x) * 4 + 3] > 8) {
-        if (first < 0) first = x;
-        last = x;
-      }
-    }
-    if (first < 0 || last - first < 4) continue;
+async function rasteriseDeckSvg(svg: string, skinColor: string): Promise<HTMLImageElement> {
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  const root = doc.documentElement;
 
-    const maxGap = (last - first) * 0.45;
-    let gapStart = -1;
-    for (let x = first; x <= last; x++) {
-      const solid = px[(row + x) * 4 + 3] > 8;
-      if (!solid && gapStart < 0) gapStart = x;
-      if (solid && gapStart >= 0) {
-        if (x - gapStart <= maxGap) {
-          for (let g = gapStart; g < x; g++) px[(row + g) * 4 + 3] = 255;
-        }
-        gapStart = -1;
+  const paint = (id: string, colour: string) => {
+    const group = doc.getElementById(id);
+    if (!group) return;
+    for (const node of [group, ...Array.from(group.querySelectorAll('*'))]) {
+      const el = node as SVGElement;
+      if (el.getAttribute('fill') && el.getAttribute('fill') !== 'none') {
+        el.setAttribute('fill', colour);
+      }
+      if (el.getAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
+        el.setAttribute('stroke', colour);
       }
     }
+  };
+
+  paint('deck', DECK_GREY);
+  paint('markings', DECK_MARKINGS);
+  paint('team', skinColor);
+
+  // Size the raster off the viewBox so the aspect ratio is the artwork's.
+  const [, , vbW, vbH] = (root.getAttribute('viewBox') ?? '0 0 1 1').split(/\s+/).map(Number);
+  const width = DECK_RASTER_W;
+  const height = Math.max(1, Math.round((DECK_RASTER_W * vbH) / vbW));
+  root.setAttribute('width', String(width));
+  root.setAttribute('height', String(height));
+
+  const serialised = new XMLSerializer().serializeToString(doc);
+  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(serialised)}`;
+
+  const image = new Image();
+  image.width = width;
+  image.height = height;
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error('deck svg failed to rasterise'));
+    image.src = url;
+  });
+  return image;
+}
+
+/**
+ * A little non-skid grain, so the deck isn't a dead flat fill.
+ *
+ * Seeded, because the architecture requires anything that affects appearance
+ * to be deterministic — the same ship must look the same in every session and
+ * in every screenshot diff.
+ */
+function addNonSkidGrain(px: Uint8ClampedArray): void {
+  let seed = 0x5f3a71;
+  const next = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0xffffffff;
+  };
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] < 8) continue;
+    const n = (next() - 0.5) * 14;
+    px[i] = Math.max(0, Math.min(255, px[i] + n));
+    px[i + 1] = Math.max(0, Math.min(255, px[i + 1] + n));
+    px[i + 2] = Math.max(0, Math.min(255, px[i + 2] + n));
   }
 }
 
 /**
- * Turn the packed channels into something renderable.
+ * Rasterised deck paint, ready to lay on the hull.
  *
- * The authored file is data, not a picture: R marks the white lines, G marks
- * the team number, A is the deck silhouette. Rendering it directly would show
- * a red deck. So we unpack it here — dark non-skid where the silhouette is,
- * white where the markings are, fleet colour where the team mask is — which is
- * also what lets the deck number take each player's skin colour.
+ * The SVG arrives already recoloured and antialiased, so this only adds the
+ * non-skid grain and measures where the paint actually sits in the image —
+ * the artwork never fills its canvas exactly, and the plane has to be sized
+ * and offset by that or the deck lands crooked.
  */
 function compositeDeckPaint(id: ShipId, skinColor: string): DeckPaint | null {
   const key = `${id}:${skinColor}`;
@@ -265,81 +308,35 @@ function compositeDeckPaint(id: ShipId, skinColor: string): DeckPaint | null {
   const image = deckPaintImages.get(id);
   if (!image) return null;
 
-  // Supersample. The artwork is traced from the top view, so its edges are
-  // hard 1-bit steps; stretched over a five-cell hull — and more so when the
-  // inspector zooms in — those steps read as staircasing on every diagonal.
-  // Drawing it up 2x with smoothing, then blurring, gives the edges enough
-  // intermediate values to resolve as smooth lines.
-  const SS = 2;
-  const W = image.naturalWidth * SS;
-  const H = image.naturalHeight * SS;
+  const W = image.naturalWidth || image.width;
+  const H = image.naturalHeight || image.height;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
 
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  // Just over half a source pixel. Enough coverage gradient to resolve a
-  // diagonal; more than this and the paint goes soft rather than smooth.
-  ctx.filter = `blur(${0.55 * SS}px)`;
   ctx.drawImage(image, 0, 0, W, H);
-  ctx.filter = 'none';
 
   const src = ctx.getImageData(0, 0, W, H);
   const px = src.data;
+  addNonSkidGrain(px);
 
-  fillIslandCutout(px, W, H);
-
-  const tint = new THREE.Color(skinColor);
-  const teamR = Math.round(tint.r * 255);
-  const teamG = Math.round(tint.g * 255);
-  const teamB = Math.round(tint.b * 255);
-
+  // Half coverage, not "any coverage": antialiased edges throw a faint halo
+  // past the real outline, and measuring that would oversize the plane.
   let minX = W;
   let minY = H;
   let maxX = -1;
   let maxY = -1;
-
   for (let i = 0; i < px.length; i += 4) {
-    const marks = px[i];
-    const team = px[i + 1];
-    const deck = px[i + 3];
-
-    // Half coverage, not "any coverage": the blur spreads a faint halo well
-    // past the real outline, and measuring that would oversize the plane.
-    if (deck > 127) {
-      const p = i / 4;
-      const x = p % W;
-      const y = (p / W) | 0;
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
-    }
-
-    // Blend, never threshold. The blur above exists to turn the artwork's hard
-    // 1-bit edges into gradients; testing `marks > 8` and writing a solid
-    // colour threw that away and snapped every line back to a staircase.
-    // Treating the channels as coverage is what actually antialiases the paint.
-    const m = marks / 255;
-    const t = team / 255;
-
-    // Dark grey non-skid, close to the reference's #3b4048. The decal opts out
-    // of tone mapping, so this is the value that reaches the screen.
-    let r = 59 * (1 - m) + 232 * m;
-    let g = 64 * (1 - m) + 238 * m;
-    let b = 72 * (1 - m) + 246 * m;
-
-    r = r * (1 - t) + teamR * t;
-    g = g * (1 - t) + teamG * t;
-    b = b * (1 - t) + teamB * t;
-
-    px[i] = r;
-    px[i + 1] = g;
-    px[i + 2] = b;
-    px[i + 3] = deck; // a soft alpha edge antialiases the deck outline too
+    if (px[i + 3] <= 127) continue;
+    const p = i / 4;
+    const x = p % W;
+    const y = (p / W) | 0;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
   }
 
   ctx.putImageData(src, 0, 0);
@@ -354,10 +351,7 @@ function compositeDeckPaint(id: ShipId, skinColor: string): DeckPaint | null {
   const paint: DeckPaint =
     maxX < 0
       ? { texture, bounds: [0, 0, 1, 1] }
-      : {
-          texture,
-          bounds: [minX / W, minY / H, (maxX + 1) / W, (maxY + 1) / H],
-        };
+      : { texture, bounds: [minX / W, minY / H, (maxX + 1) / W, (maxY + 1) / H] };
   deckPaintCache.set(key, paint);
   return paint;
 }
