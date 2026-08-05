@@ -21,7 +21,37 @@ const log: GameLog = [
   S('host', 2, 4, true, 'cruiser'), S('guest', 3, 2, true),
   S('guest', 5, 8, false), S('guest', 8, 4, false), S('guest', 2, 6, false),
 ];
+/**
+ * Harness-only sizing. The real board keeps the 3D ocean in a square tile
+ * beside the radar grid, which is right in the game and far too small to
+ * judge a ship's deck in. Here it takes most of the viewport.
+ */
+const HARNESS_CSS = `
+  .app { max-width: none !important; }
+  .bs3d { aspect-ratio: auto !important; height: min(82vh, 900px) !important; }
+`;
+
 function App() {
-  return (<div className="app" style={{ maxWidth: 1180 }}><Battle log={log} side="host" myName="Rio" oppName="Max" skinId="aqua" oppSkinId="coral" myFleet={myFleet} myTurn pendingFire={null} onFire={() => {}} /></div>);
+  return (
+    <div className="app" style={{ maxWidth: 'none' }}>
+      <style>{HARNESS_CSS}</style>
+      <p className="subtle center" style={{ margin: '0 0 8px' }}>
+        Harness — the 3D tile is enlarged here. For one ship filling the screen, open{' '}
+        <a href="/preview-ship.html">/preview-ship.html</a>.
+      </p>
+      <Battle
+        log={log}
+        side="host"
+        myName="Rio"
+        oppName="Max"
+        skinId="aqua"
+        oppSkinId="coral"
+        myFleet={myFleet}
+        myTurn
+        pendingFire={null}
+        onFire={() => {}}
+      />
+    </div>
+  );
 }
 createRoot(document.getElementById('root')!).render(<App />);

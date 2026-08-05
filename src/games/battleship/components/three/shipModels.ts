@@ -273,20 +273,26 @@ function compositeDeckPaint(id: ShipId, skinColor: string): DeckPaint | null {
   const image = deckPaintImages.get(id);
   if (!image) return null;
 
-  const W = image.naturalWidth;
-  const H = image.naturalHeight;
+  // Supersample. The artwork is traced from the top view, so its edges are
+  // hard 1-bit steps; stretched over a five-cell hull — and more so when the
+  // inspector zooms in — those steps read as staircasing on every diagonal.
+  // Drawing it up 2x with smoothing, then blurring, gives the edges enough
+  // intermediate values to resolve as smooth lines.
+  const SS = 2;
+  const W = image.naturalWidth * SS;
+  const H = image.naturalHeight * SS;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
 
-  // The packed channels are traced from the top view, so their edges are hard
-  // 1-bit steps. Stretched over a five-cell hull that reads as visible
-  // staircasing on every line. A sub-pixel blur before unpacking turns those
-  // steps into gradients, which is what gives the paint its antialiasing.
-  ctx.filter = 'blur(0.7px)';
-  ctx.drawImage(image, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  // Just over half a source pixel. Enough coverage gradient to resolve a
+  // diagonal; more than this and the paint goes soft rather than smooth.
+  ctx.filter = `blur(${0.55 * SS}px)`;
+  ctx.drawImage(image, 0, 0, W, H);
   ctx.filter = 'none';
 
   const src = ctx.getImageData(0, 0, W, H);
@@ -309,7 +315,9 @@ function compositeDeckPaint(id: ShipId, skinColor: string): DeckPaint | null {
     const team = px[i + 1];
     const deck = px[i + 3];
 
-    if (deck > 8) {
+    // Half coverage, not "any coverage": the blur spreads a faint halo well
+    // past the real outline, and measuring that would oversize the plane.
+    if (deck > 127) {
       const p = i / 4;
       const x = p % W;
       const y = (p / W) | 0;
@@ -319,26 +327,27 @@ function compositeDeckPaint(id: ShipId, skinColor: string): DeckPaint | null {
       if (y > maxY) maxY = y;
     }
 
-    if (team > 8) {
-      px[i] = teamR;
-      px[i + 1] = teamG;
-      px[i + 2] = teamB;
-      px[i + 3] = Math.max(deck, team);
-    } else if (marks > 8) {
-      // Deck paint, a touch off-white so it doesn't glare under bloom.
-      px[i] = 232;
-      px[i + 1] = 238;
-      px[i + 2] = 246;
-      px[i + 3] = Math.max(deck, marks);
-    } else {
-      // Dark grey non-skid, close to the reference's #3b4048. The decal opts
-      // out of tone mapping below, so this is what actually reaches the
-      // screen — no more guessing at what ACES will do to it.
-      px[i] = 59;
-      px[i + 1] = 64;
-      px[i + 2] = 72;
-      px[i + 3] = deck;
-    }
+    // Blend, never threshold. The blur above exists to turn the artwork's hard
+    // 1-bit edges into gradients; testing `marks > 8` and writing a solid
+    // colour threw that away and snapped every line back to a staircase.
+    // Treating the channels as coverage is what actually antialiases the paint.
+    const m = marks / 255;
+    const t = team / 255;
+
+    // Dark grey non-skid, close to the reference's #3b4048. The decal opts out
+    // of tone mapping, so this is the value that reaches the screen.
+    let r = 59 * (1 - m) + 232 * m;
+    let g = 64 * (1 - m) + 238 * m;
+    let b = 72 * (1 - m) + 246 * m;
+
+    r = r * (1 - t) + teamR * t;
+    g = g * (1 - t) + teamG * t;
+    b = b * (1 - t) + teamB * t;
+
+    px[i] = r;
+    px[i + 1] = g;
+    px[i + 2] = b;
+    px[i + 3] = deck; // a soft alpha edge antialiases the deck outline too
   }
 
   ctx.putImageData(src, 0, 0);
