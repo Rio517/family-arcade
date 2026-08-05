@@ -138,7 +138,7 @@ export class FleetScene {
    * real models when they land, so a slow decode never blocks the first frame.
    */
   private async loadModels() {
-    await loadShipModels();
+    await loadShipModels(this.opts.skinColor);
     if (this.disposed || !this.lastState) return;
     this.update(this.lastState.ships, this.lastState.incoming);
   }

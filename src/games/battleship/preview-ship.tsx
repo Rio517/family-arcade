@@ -39,7 +39,7 @@ function Inspector() {
 
     (async () => {
       try {
-        await loadShipModels();
+        await loadShipModels(skinColor);
 
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
