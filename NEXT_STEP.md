@@ -62,7 +62,7 @@ Procedural ship geometry failed twice — first hand-written, then again via an
 mast. An LLM sculpting geometry in code cannot recover 3D form from one view.
 Stop trying.
 
-The art is authored as **3/4 hero PNGs** (they live in `../assets/battleship-fleet/`,
+The art is authored as **3/4 hero PNGs** (they live in `../assets/battlefleet/`,
 5 modern ships, alpha-masked, ~1570×1000) and converted to **GLB meshes** with
 an image-to-3D model. Sprites were considered and dropped: the battle camera's
 azimuth is unconstrained (`FleetScene.ts` sets only polar limits, 0.15–1.35 rad),
@@ -142,7 +142,7 @@ Two deliberate choices, both load-bearing:
   genuinely longer than a destroyer. Scale is re-established in the scene
   anyway (each ship spans `size × 1` cells), but consistent input art keeps
   proportions honest.
-- **Location**: source art stays in `../assets/battleship-fleet/`; optimised
+- **Location**: source art stays in `../assets/battlefleet/`; optimised
   models land in `src/games/battleship/assets/ships/<era>/<shipId>.glb`, behind
   a manifest mapping `{era, shipId}` → imported URL. Damaged and sunk states are
   scene effects (tint, list, sink) rather than separate assets — a second set of
@@ -211,7 +211,7 @@ where the sync happens.
 | `domain/engine.ts` | `CellState` |
 | `preview-b.html` + `preview-b.tsx` | mid-battle harness the screenshot run uses |
 | `scripts/optimize-glb.mjs` | raw GLB → bundle-sized GLB (`npm run glb`) |
-| `../assets/battleship-fleet/` | source ship art + per-ship ImageGen prompts |
+| `../assets/battlefleet/` | source ship art + per-ship ImageGen prompts |
 
 `SceneShip` (in `FleetScene.ts`) is `{ shipId, row, col, size, orientation, sunk? }`.
 
