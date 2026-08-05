@@ -19,6 +19,9 @@ const base = process.env.BASE_PATH ?? '/'; // custom domain serves from the root
 export default defineConfig({
   base,
   resolve: { alias },
+  // Ship meshes are bundled, not fetched: importing a .glb yields a hashed URL
+  // in dist/, which keeps the offline invariant (no runtime downloads).
+  assetsInclude: ['**/*.glb'],
   plugins: [
     react(),
     // Installable + offline app shell. On a flaky connection the console loads
