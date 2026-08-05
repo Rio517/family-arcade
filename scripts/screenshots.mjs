@@ -61,6 +61,34 @@ const SHOTS = [
     // The board animates its hit/miss markers in; let them settle.
     prep: async (page) => page.waitForTimeout(900),
   },
+  {
+    // Close-up of the 3D ocean alone — this is where ship meshes get judged.
+    name: 'battle-fleet-3d-closeup',
+    path: '/preview-b.html',
+    viewport: { width: 1500, height: 1000 },
+    selector: '[data-testid="fleet3d"]',
+    prep: async (page) => {
+      await page.click('[data-testid="fleet-view-3d"]');
+      await page.waitForSelector('[data-testid="fleet3d"], [data-testid="fleet3d-fallback"]', {
+        timeout: 20000,
+      });
+      await page.waitForTimeout(2500);
+    },
+  },
+  {
+    name: 'battle-fleet-3d',
+    path: '/preview-b.html',
+    viewport: TABLET,
+    // Switch the fleet board to the 3D ocean, then wait for three.js to load,
+    // the ship meshes to decode, and the water to settle.
+    prep: async (page) => {
+      await page.click('[data-testid="fleet-view-3d"]');
+      await page.waitForSelector('[data-testid="fleet3d"], [data-testid="fleet3d-fallback"]', {
+        timeout: 20000,
+      });
+      await page.waitForTimeout(2500);
+    },
+  },
 ];
 
 function saveIfChanged(file, buffer) {
@@ -152,7 +180,12 @@ async function main() {
       });
       await page.goto(`${BASE}${shot.path}`, { waitUntil: 'networkidle' });
       if (shot.prep) await shot.prep(page);
-      const buffer = await page.screenshot({ fullPage: shot.fullPage ?? false });
+      // `selector` crops to one element — useful when the thing under review is
+      // a canvas inside a wide layout and a full-page shot renders it tiny.
+      const target = shot.selector ? page.locator(shot.selector) : page;
+      const buffer = await target.screenshot(
+        shot.selector ? {} : { fullPage: shot.fullPage ?? false },
+      );
       tally[saveIfChanged(path.join(OUT, `${shot.name}.png`), buffer)] += 1;
       await page.close();
     }

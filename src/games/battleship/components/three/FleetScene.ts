@@ -15,6 +15,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { CellState } from '@games/battleship/domain/engine';
 import { BOARD_SIZE, type Orientation, type ShipId } from '@games/battleship/domain/types';
 import { disposeDeep } from '@shared/three/disposeDeep';
+import { buildModelShip, loadShipModels } from './shipModels';
 
 export interface SceneShip {
   shipId: ShipId;
@@ -41,6 +42,8 @@ export class FleetScene {
   private raf = 0;
   private resizeObs: ResizeObserver | null = null;
   private disposed = false;
+  /** Last state passed to update(), replayed once the ship meshes arrive. */
+  private lastState: { ships: SceneShip[]; incoming: CellState[][] } | null = null;
 
   constructor(
     private container: HTMLElement,
@@ -124,10 +127,25 @@ export class FleetScene {
     this.resizeObs.observe(container);
     this.resize();
     this.loop(performance.now());
+
+    // Ship meshes arrive asynchronously and replace the procedural stand-ins.
+    void this.loadModels();
+  }
+
+  /**
+   * Fetch the generated ship meshes, then rebuild the fleet with them. The
+   * board renders immediately with procedural hulls and swaps them for the
+   * real models when they land, so a slow decode never blocks the first frame.
+   */
+  private async loadModels() {
+    await loadShipModels();
+    if (this.disposed || !this.lastState) return;
+    this.update(this.lastState.ships, this.lastState.incoming);
   }
 
   /** Rebuild ships + shot markers from the current battle state. */
   update(ships: SceneShip[], incoming: CellState[][]) {
+    this.lastState = { ships, incoming };
     // This runs on every shot; free the old fleet or GPU buffers accumulate
     // for the whole battle.
     disposeDeep(this.shipsGroup);
@@ -138,7 +156,10 @@ export class FleetScene {
     this.bobbing = [];
 
     for (const ship of ships) {
-      const g = buildWarship(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor);
+      // Generated mesh where we have one; procedural hull everywhere else.
+      const g =
+        buildModelShip(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor) ??
+        buildWarship(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor);
       const horiz = ship.orientation === 'H';
       const cx = (horiz ? ship.col + (ship.size - 1) / 2 : ship.col) - HALF;
       const cz = (horiz ? ship.row : ship.row + (ship.size - 1) / 2) - HALF;
