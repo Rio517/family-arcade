@@ -116,6 +116,7 @@ export function buildModelShip(
   size: number,
   sunk: boolean,
   skinColor: string,
+  withDeckPaint = true,
 ): THREE.Group | null {
   const source = cache.get(id);
   const spec = SPECS[id];
@@ -169,7 +170,7 @@ export function buildModelShip(
   const hull = new THREE.Group();
   hull.add(model);
   hull.scale.setScalar(scale);
-  if (!sunk) hull.add(buildDeckDecal(id, dims.x, dims.z, deckY, skinColor));
+  if (!sunk && withDeckPaint) hull.add(buildDeckDecal(id, dims.x, dims.z, deckY, skinColor));
 
   return hull;
 }

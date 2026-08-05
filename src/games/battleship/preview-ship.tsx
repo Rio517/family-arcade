@@ -52,7 +52,9 @@ function Inspector() {
         scene.background = new THREE.Color('#0a1424');
 
         const size = FLEET.find((s) => s.id === shipId)?.size ?? 5;
-        const ship = buildModelShip(shipId, size, false, skinColor);
+        // ?paint=0 strips the deck decal — that's the view an artist needs to
+        // trace, because they must trace the *mesh*, not the reference image.
+        const ship = buildModelShip(shipId, size, false, skinColor, params.get('paint') !== '0');
         if (!ship) {
           setError(`No generated mesh for "${shipId}" — it still builds procedurally.`);
           return;
@@ -76,7 +78,10 @@ function Inspector() {
         scene.add(rim);
 
         const camera = new THREE.PerspectiveCamera(40, el.clientWidth / el.clientHeight, 0.01, 100);
-        camera.position.set(size * 0.75, size * 0.5, size * 0.75);
+        // ?view=top looks straight down — the view that shows whether the deck
+        // paint is oriented the same way round as the hull under it.
+        if (params.get('view') === 'top') camera.position.set(0.001, size * 1.25, 0);
+        else camera.position.set(size * 0.75, size * 0.5, size * 0.75);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
