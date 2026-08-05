@@ -217,6 +217,46 @@ interface DeckPaint {
 const deckPaintCache = new Map<string, DeckPaint>();
 
 /**
+ * Close the island-shaped hole in the deck silhouette.
+ *
+ * The artwork cuts the island out so paint isn't drawn over it — but the
+ * island is real 3D geometry standing well above the decal, so it occludes
+ * the plane on its own. The hole just exposes bare hull grey around the
+ * island's base, which reads as an unpainted patch on the deck.
+ *
+ * Fills transparent runs that are enclosed by deck on both sides and short
+ * relative to the row, so the genuinely concave parts of the outline — the
+ * bow notch, the angled deck's overhang — are left alone.
+ */
+function fillIslandCutout(px: Uint8ClampedArray, W: number, H: number): void {
+  for (let y = 0; y < H; y++) {
+    const row = y * W;
+    let first = -1;
+    let last = -1;
+    for (let x = 0; x < W; x++) {
+      if (px[(row + x) * 4 + 3] > 8) {
+        if (first < 0) first = x;
+        last = x;
+      }
+    }
+    if (first < 0 || last - first < 4) continue;
+
+    const maxGap = (last - first) * 0.45;
+    let gapStart = -1;
+    for (let x = first; x <= last; x++) {
+      const solid = px[(row + x) * 4 + 3] > 8;
+      if (!solid && gapStart < 0) gapStart = x;
+      if (solid && gapStart >= 0) {
+        if (x - gapStart <= maxGap) {
+          for (let g = gapStart; g < x; g++) px[(row + g) * 4 + 3] = 255;
+        }
+        gapStart = -1;
+      }
+    }
+  }
+}
+
+/**
  * Turn the packed channels into something renderable.
  *
  * The authored file is data, not a picture: R marks the white lines, G marks
@@ -241,9 +281,18 @@ function compositeDeckPaint(id: ShipId, skinColor: string): DeckPaint | null {
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
 
+  // The packed channels are traced from the top view, so their edges are hard
+  // 1-bit steps. Stretched over a five-cell hull that reads as visible
+  // staircasing on every line. A sub-pixel blur before unpacking turns those
+  // steps into gradients, which is what gives the paint its antialiasing.
+  ctx.filter = 'blur(0.7px)';
   ctx.drawImage(image, 0, 0);
+  ctx.filter = 'none';
+
   const src = ctx.getImageData(0, 0, W, H);
   const px = src.data;
+
+  fillIslandCutout(px, W, H);
 
   const tint = new THREE.Color(skinColor);
   const teamR = Math.round(tint.r * 255);
@@ -282,12 +331,12 @@ function compositeDeckPaint(id: ShipId, skinColor: string): DeckPaint | null {
       px[i + 2] = 246;
       px[i + 3] = Math.max(deck, marks);
     } else {
-      // Non-skid: darker than the reference charcoal, because the scene's ACES
-      // tone mapping lifts mid-tones — but not so dark it reads as a hole in
-      // the ship, which #23262c-minus-too-much did.
-      px[i] = 34;
-      px[i + 1] = 37;
-      px[i + 2] = 43;
+      // Dark grey non-skid, close to the reference's #3b4048. The decal opts
+      // out of tone mapping below, so this is what actually reaches the
+      // screen — no more guessing at what ACES will do to it.
+      px[i] = 59;
+      px[i + 1] = 64;
+      px[i + 2] = 72;
       px[i + 3] = deck;
     }
   }
@@ -295,8 +344,11 @@ function compositeDeckPaint(id: ShipId, skinColor: string): DeckPaint | null {
   ctx.putImageData(src, 0, 0);
 
   const texture = new THREE.CanvasTexture(canvas);
-  texture.anisotropy = 4;
+  texture.anisotropy = 8; // the deck is viewed at a grazing angle from the board
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
 
   const paint: DeckPaint =
     maxX < 0
@@ -453,6 +505,10 @@ function buildDeckDecal(
       map: painted?.texture ?? deckTexture(id, skinColor),
       transparent: true,
       depthWrite: false,
+      // The scene tone-maps with ACES, which crushes dark values — a charcoal
+      // deck came out black. Deck paint is authored art, not lit surface, so
+      // it opts out and renders at the value it was drawn at.
+      toneMapped: false,
       // Without this the decal fights the deck for the same depth and flickers.
       polygonOffset: true,
       polygonOffsetFactor: -2,
