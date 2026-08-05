@@ -343,6 +343,13 @@ function compositeDeckPaint(id: ShipId, skinColor: string): DeckPaint | null {
   ctx.putImageData(src, 0, 0);
 
   const texture = new THREE.CanvasTexture(canvas);
+  // Laying the plane flat (rotate -90° about X) reverses its V axis relative
+  // to the board's +z, so the paint comes out mirrored across the ship's long
+  // axis — port markings on the starboard side, and the hull number reversed.
+  // U is already correct: the artwork's bow-left lands on the hull's bow.
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.y = -1;
+  texture.offset.y = 1;
   texture.anisotropy = 8; // the deck is viewed at a grazing angle from the board
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
