@@ -66,6 +66,10 @@ export default defineConfig({
             index: fileURLToPath(new URL('./index.html', import.meta.url)),
             'preview-b': fileURLToPath(new URL('./preview-b.html', import.meta.url)),
             'preview-ship': fileURLToPath(new URL('./preview-ship.html', import.meta.url)),
+            'preview-carrier': fileURLToPath(new URL('./preview-carrier.html', import.meta.url)),
+            'preview-battleship': fileURLToPath(
+              new URL('./preview-battleship.html', import.meta.url),
+            ),
           },
         }
       : {},

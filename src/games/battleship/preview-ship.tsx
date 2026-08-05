@@ -14,7 +14,6 @@
  * Dev-only: it's built solely when BUILD_HARNESS is set, so it never ships.
  */
 import { useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { buildModelShip, loadShipModels } from './components/three/shipModels';
@@ -23,11 +22,12 @@ import type { ShipId } from './domain/types';
 import '@shared/styles/tokens.css';
 
 const params = new URLSearchParams(location.search);
-const shipId = (params.get('ship') ?? 'carrier') as ShipId;
 const skinColor = params.get('color') ?? '#22d3ee';
 const showGrid = params.get('grid') === '1';
 
-function Inspector() {
+/** One hull, filling the screen. `ship` fixes which; `?ship=` overrides it. */
+export function Inspector({ ship }: { ship?: ShipId }) {
+  const shipId = (params.get('ship') ?? ship ?? 'carrier') as ShipId;
   const holder = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,4 +141,3 @@ function Inspector() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<Inspector />);
