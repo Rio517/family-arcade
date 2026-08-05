@@ -155,10 +155,12 @@ export function buildModelShip(
     metalness: 0.2,
     flatShading: true, // the hulls are low-poly; smooth shading reads as melted
   });
+  body.vertexColors = true;
   model.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (mesh.isMesh) mesh.material = body;
   });
+  shadeByHeight(model, dims);
 
   // Deck height, measured rather than guessed: fire rays straight down at a
   // few points along the hull and take the highest surface that isn't the
@@ -173,6 +175,52 @@ export function buildModelShip(
   if (!sunk && withDeckPaint) hull.add(buildDeckDecal(id, dims.x, dims.z, deckY, skinColor));
 
   return hull;
+}
+
+/**
+ * Give the superstructure its own tone, from height alone.
+ *
+ * The mesh is one fused object with no UVs and no material groups, so there is
+ * nothing to texture the island with. But height is enough to tell the parts
+ * apart: hull, island, and the radome capping the mast. Writing that into
+ * vertex colours — which multiply the base colour — keeps the fleet tint
+ * working while giving the island the separation it needs to read as a
+ * structure rather than a lump on the deck.
+ *
+ * Values are relative to the hull, so this stays correct for any ship.
+ */
+function shadeByHeight(model: THREE.Object3D, dims: THREE.Vector3): void {
+  const box = new THREE.Box3().setFromObject(model);
+  const lowY = box.min.y;
+  const height = Math.max(dims.y, 1e-6);
+
+  model.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const geometry = mesh.geometry as THREE.BufferGeometry;
+    const position = geometry.getAttribute('position');
+    if (!position) return;
+
+    const colors = new Float32Array(position.count * 3);
+    for (let i = 0; i < position.count; i++) {
+      const t = (position.getY(i) - lowY) / height;
+
+      // Bands taken from the mesh's actual vertex distribution, not guessed:
+      // the hull's bulk sits below 0.40 (the spike at 0.25–0.30 is the deck
+      // plate), the island runs 0.50–0.80, and there's a distinct cluster at
+      // 0.85–0.95 — the radome.
+      let shade: number;
+      if (t < 0.42) shade = 1.0; // hull
+      else if (t < 0.84) shade = 0.74; // island — clearly darker so it reads
+      else if (t < 0.96) shade = 1.55; // the radar ball, the brightest thing aboard
+      else shade = 0.86; // antenna above it
+
+      colors[i * 3] = shade;
+      colors[i * 3 + 1] = shade;
+      colors[i * 3 + 2] = shade;
+    }
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  });
 }
 
 /**
