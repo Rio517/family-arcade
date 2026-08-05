@@ -65,6 +65,7 @@ export default defineConfig({
           input: {
             index: fileURLToPath(new URL('./index.html', import.meta.url)),
             'preview-b': fileURLToPath(new URL('./preview-b.html', import.meta.url)),
+            'preview-ship': fileURLToPath(new URL('./preview-ship.html', import.meta.url)),
           },
         }
       : {},
