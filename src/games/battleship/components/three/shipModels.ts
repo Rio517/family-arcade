@@ -14,10 +14,6 @@
  *   Seen from the battle camera the deck is the biggest surface on the board
  *   and, untextured, a carrier is an anonymous white slab. The markings are
  *   drawn as translucent paint so the skin tint still shows through.
- * - **Night lights** — small emissive points along the deck edge and at the
- *   masthead. They cost nothing, they survive any tint because they're
- *   emissive rather than coloured, and on dark water a few glowing pixels do
- *   more to sell a ship than any amount of hull detail.
  *
  * No runtime downloads: the .glb is imported so Vite hashes it into `dist/`.
  */
@@ -157,17 +153,13 @@ export function buildModelShip(
   // few points along the hull and take the highest surface that isn't the
   // island. A fraction-of-height guess doesn't survive five different ships.
   const deckY = measureDeckY(model, dims) ?? dims.y * (spec.deckFrac - spec.sink);
-  const lights = sunk ? null : buildNightLights(model, dims, skinColor);
 
   // Assemble only after measuring: adding the model to a scaled parent first
   // is what threw the raycast results off.
   const hull = new THREE.Group();
   hull.add(model);
   hull.scale.setScalar(scale);
-  if (!sunk) {
-    hull.add(buildDeckDecal(id, dims.x, dims.z, deckY, skinColor));
-    if (lights) hull.add(lights);
-  }
+  if (!sunk) hull.add(buildDeckDecal(id, dims.x, dims.z, deckY, skinColor));
 
   return hull;
 }
@@ -537,62 +529,3 @@ function buildDeckDecal(
   return plane;
 }
 
-/**
- * Deck-edge running lights and a masthead lamp. Emissive points, so they glow
- * under bloom and stay visible when the whole ship is only a few hundred
- * pixels wide.
- */
-function buildNightLights(
-  model: THREE.Object3D,
-  dims: THREE.Vector3,
-  skinColor: string,
-): THREE.Points | null {
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const tint = new THREE.Color(skinColor);
-  const warm = new THREE.Color('#ffe0a4');
-
-  const raycaster = new THREE.Raycaster();
-  const down = new THREE.Vector3(0, -1, 0);
-
-  // Every lamp is dropped onto the hull from above and kept only where it
-  // actually lands. Placing them at a fixed offset from the centreline hung
-  // them in mid-air off the narrow bow — a ship is not a rectangle.
-  const perSide = 11;
-  for (let i = 0; i < perSide; i++) {
-    const t = (i + 0.5) / perSide;
-    const x = (t - 0.5) * dims.x * 0.94;
-    for (const side of [-1, 1]) {
-      for (const inset of [0.46, 0.38, 0.3]) {
-        const z = side * dims.z * inset;
-        raycaster.set(new THREE.Vector3(x, dims.y * 2, z), down);
-        const hit = raycaster.intersectObject(model, true)[0];
-        if (!hit) continue;
-        positions.push(x, hit.point.y + 0.004, z);
-        const c = i % 4 === 0 ? tint : warm;
-        colors.push(c.r, c.g, c.b);
-        break; // one lamp per station, at the outermost point that exists
-      }
-    }
-  }
-
-  if (positions.length === 0) return null;
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-  return new THREE.Points(
-    geometry,
-    new THREE.PointsMaterial({
-      // Small: these should read as pinpricks now and bloom into glows later,
-      // not as beads sitting on the rail.
-      size: 0.035,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.9,
-      sizeAttenuation: true,
-      depthWrite: false,
-    }),
-  );
-}
