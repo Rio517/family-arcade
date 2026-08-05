@@ -22,13 +22,13 @@ const log: GameLog = [
   S('guest', 5, 8, false), S('guest', 8, 4, false), S('guest', 2, 6, false),
 ];
 /**
- * Harness-only sizing. The real board keeps the 3D ocean in a square tile
- * beside the radar grid, which is right in the game and far too small to
- * judge a ship's deck in. Here it takes most of the viewport.
+ * Harness-only sizing: wider than the app's 1180px so the three panels aren't
+ * cramped. The 3D tile keeps the game's square aspect on purpose — forcing it
+ * tall here made screenshots crop the board and stop representing the game.
+ * For a ship filling the screen, use the per-ship inspector pages instead.
  */
 const HARNESS_CSS = `
   .app { max-width: none !important; }
-  .bs3d { aspect-ratio: auto !important; height: min(82vh, 900px) !important; }
 `;
 
 function App() {
