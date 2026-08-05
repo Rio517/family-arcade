@@ -44,6 +44,7 @@ function Inspector() {
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
         renderer.setSize(el.clientWidth, el.clientHeight);
+        renderer.toneMappingExposure = 1;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         el.appendChild(renderer.domElement);
 
@@ -107,18 +108,30 @@ function Inspector() {
     };
   }, []);
 
+  // Full-bleed: the whole point of this page is to see the ship large, so the
+  // canvas takes the entire viewport and the caption floats over it.
   return (
-    <div className="app" style={{ maxWidth: 'none', padding: 12 }}>
-      <p className="subtle center" style={{ margin: '0 0 8px' }}>
+    <div style={{ position: 'fixed', inset: 0, background: '#0a1424' }}>
+      <div ref={holder} data-testid="ship-preview" style={{ width: '100vw', height: '100vh' }} />
+      <p
+        className="subtle"
+        style={{
+          position: 'fixed',
+          left: 12,
+          bottom: 10,
+          margin: 0,
+          pointerEvents: 'none',
+          opacity: 0.75,
+        }}
+      >
         {shipId} · drag to orbit · scroll to zoom · <code>?ship=</code> <code>?color=</code>{' '}
         <code>?grid=1</code>
       </p>
-      {error && <p className="subtle center" data-testid="ship-preview-error">{error}</p>}
-      <div
-        ref={holder}
-        data-testid="ship-preview"
-        style={{ width: '100%', height: 'calc(100vh - 60px)', borderRadius: 12, overflow: 'hidden' }}
-      />
+      {error && (
+        <p className="subtle center" data-testid="ship-preview-error" style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center' }}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
