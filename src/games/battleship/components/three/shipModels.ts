@@ -104,14 +104,17 @@ export function buildModelShip(
   const target = size - 0.24; // match the procedural hulls' clearance
   const scale = target / dims.x;
 
-  const hull = new THREE.Group();
-  hull.add(model);
-  hull.scale.setScalar(scale);
-
   // Re-centre on the cell span and float the hull at the waterline.
   const centre = box.getCenter(new THREE.Vector3());
   model.position.sub(centre);
   model.position.y += dims.y * (0.5 - spec.sink);
+
+  // Everything below is measured by raycast, and a Raycaster works in world
+  // space. Measure now, while the model is still parentless and unscaled, so
+  // hits come back in the same units the decal and lights are placed in —
+  // measuring after parenting it to the scaled group returned values ~5x too
+  // large and floated the whole lot above the ship.
+  model.updateMatrixWorld(true);
 
   const tint = new THREE.Color(skinColor);
   const body = new THREE.MeshStandardMaterial({
@@ -132,9 +135,15 @@ export function buildModelShip(
   // few points along the hull and take the highest surface that isn't the
   // island. A fraction-of-height guess doesn't survive five different ships.
   const deckY = measureDeckY(model, dims) ?? dims.y * (spec.deckFrac - spec.sink);
+  const lights = sunk ? null : buildNightLights(model, dims, skinColor);
+
+  // Assemble only after measuring: adding the model to a scaled parent first
+  // is what threw the raycast results off.
+  const hull = new THREE.Group();
+  hull.add(model);
+  hull.scale.setScalar(scale);
   if (!sunk) {
     hull.add(buildDeckDecal(id, dims.x, dims.z, deckY, skinColor));
-    const lights = buildNightLights(model, dims, skinColor);
     if (lights) hull.add(lights);
   }
 
