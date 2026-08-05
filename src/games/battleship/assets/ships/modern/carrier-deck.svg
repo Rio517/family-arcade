@@ -1,36 +1,55 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 708 144">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 793 238">
   <title>Modern carrier flight-deck paint</title>
   <g id="deck">
     <path
       fill="#23262c"
-      d="M4 35 22 12h82l10 4 25-5 8-6c112-1 225-1 315 2 83 3 160 20 242 34v58c-70 9-137 23-199 33h-15l-8 7H248l-12-12-10 12-196-13-26-21Z"
+      d="M4 117.75 89 167.75 134.25 194.25 198.75 195 205 201.75 220.75 204.5 222 216.75 236 223.25 305.5 221 305.75 209 321.5 196 444 199 499.25 205.75 503.75 219.5 548.75 220.5 551.25 231.25 584.5 233.25 586.75 214.5 616.25 210.75 623.75 201.75 639.25 197.25 780.5 195 788.75 183V49.75L771.75 36 665 36.25 653.25 25.5 651 7.75 610.25 4.25 577 5.5 572.75 17.25 560 28 488 28.5 350 38.5 131.25 39.5 89 65.5Z"
     />
   </g>
 
   <g id="markings">
     <path
+      id="foul-line"
       fill="none"
       stroke="#e8edf5"
-      stroke-width="1.8"
+      stroke-width="2.2"
       stroke-linecap="round"
       stroke-linejoin="round"
-      d="M8 36 25 16h78l11 4 27-5 8-6c111-1 223-1 312 2 82 3 158 20 239 33v51c-69 9-135 22-196 32h-16l-8 7H251l-15-14-12 14-191-13-25-19Zm19 31 566 8M245 106 601 44l-6 33-118 23-4 27M245 106v21h228M608 74l89-8M608 82l89-8"
+      d="M300 160 768 86"
     />
     <path
+      id="landing-centerline"
       fill="none"
       stroke="#e8edf5"
-      stroke-width="2.1"
+      stroke-width="1.55"
       stroke-linecap="butt"
-      stroke-dasharray="18 16"
-      d="M29 84 595 87"
+      stroke-dasharray="8 7"
+      d="M380 133.5 761 73"
+    />
+    <path
+      id="catapult-details"
+      fill="none"
+      stroke="#e8edf5"
+      stroke-width="1.25"
+      stroke-linecap="square"
+      stroke-linejoin="miter"
+      d="M180 82H360M185 131H355M338 73h35v18h-35ZM333 122h35v18h-35ZM205 78v8M270 78v8M210 127v8M275 127v8"
+    />
+    <path
+      id="arresting-wires"
+      fill="none"
+      stroke="#e8edf5"
+      stroke-width="1.15"
+      stroke-linecap="round"
+      d="M622.3 77 627.7 111.8M647.3 73 652.7 107.8M672.3 69 677.7 103.8M697.3 65 702.7 99.8"
     />
   </g>
 
   <g id="team">
     <path
       fill="#32d9c8"
-      d="M94 58h39v8l-24 31H96l24-30H94Zm51 8 13-8h11v39h-12V70l-12 7Z"
+      d="M96 100h38v8l-23 30H98l23-29H96Zm50 8 13-8h11v38h-12v-26l-12 7Z"
     />
   </g>
 </svg>
