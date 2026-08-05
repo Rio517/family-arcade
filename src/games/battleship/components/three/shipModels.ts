@@ -134,7 +134,8 @@ export function buildModelShip(
   const deckY = measureDeckY(model, dims) ?? dims.y * (spec.deckFrac - spec.sink);
   if (!sunk) {
     hull.add(buildDeckDecal(id, dims.x, dims.z, deckY, skinColor));
-    hull.add(buildNightLights(dims.x, dims.y, dims.z, deckY, skinColor));
+    const lights = buildNightLights(model, dims, skinColor);
+    if (lights) hull.add(lights);
   }
 
   return hull;
@@ -190,45 +191,85 @@ function deckTexture(id: ShipId, skinColor: string): THREE.Texture {
   ctx.clearRect(0, 0, W, H);
 
   if (id === 'carrier') {
-    // Angled landing strip, running bow-left to stern-right across the deck.
+    // The deck itself is near-black non-skid, not bare metal — see
+    // references/carrier-modern-top.png. Only the catwalks and island stay
+    // haze grey, so the paint is what carries the whole read from above.
+    // Bow at -x (left of the canvas), stern at +x.
     ctx.save();
-    ctx.globalAlpha = 0.5;
-    ctx.strokeStyle = '#f2f6ff';
-    ctx.lineWidth = 4;
-    ctx.setLineDash([26, 20]);
     ctx.beginPath();
-    ctx.moveTo(W * 0.08, H * 0.62);
-    ctx.lineTo(W * 0.86, H * 0.36);
-    ctx.stroke();
+    ctx.moveTo(W * 0.03, H * 0.5); // bow point
+    ctx.lineTo(W * 0.16, H * 0.24);
+    ctx.lineTo(W * 0.62, H * 0.17);
+    ctx.lineTo(W * 0.97, H * 0.2);
+    ctx.lineTo(W * 0.97, H * 0.8);
+    ctx.lineTo(W * 0.55, H * 0.85);
+    ctx.lineTo(W * 0.16, H * 0.76);
+    ctx.closePath();
+    ctx.fillStyle = '#23262c';
+    ctx.fill();
 
-    // The strip's solid edges.
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 0.42;
-    ctx.lineWidth = 3;
-    for (const off of [-30, 30]) {
-      ctx.beginPath();
-      ctx.moveTo(W * 0.08, H * 0.62 + off);
-      ctx.lineTo(W * 0.86, H * 0.36 + off);
-      ctx.stroke();
-    }
+    // The angled landing area, a shade lighter where it overlays the deck.
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = '#2b2f36';
+    ctx.beginPath();
+    ctx.moveTo(W * 0.2, H * 0.78);
+    ctx.lineTo(W * 0.52, H * 0.2);
+    ctx.lineTo(W * 0.98, H * 0.2);
+    ctx.lineTo(W * 0.98, H * 0.52);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 
-    // Bow catapult tracks.
-    ctx.globalAlpha = 0.34;
-    ctx.lineWidth = 3;
-    for (const y of [H * 0.34, H * 0.5]) {
-      ctx.beginPath();
-      ctx.moveTo(W * 0.06, y);
-      ctx.lineTo(W * 0.4, y - 8);
-      ctx.stroke();
-    }
+    ctx.strokeStyle = '#e8edf5';
+    ctx.lineCap = 'butt';
 
-    // Touchdown target in the fleet colour — the one spot of skin on the deck.
-    ctx.globalAlpha = 0.75;
-    ctx.strokeStyle = skinColor;
+    // Landing-strip centreline, dashed, running up the angled deck.
+    ctx.globalAlpha = 0.9;
     ctx.lineWidth = 5;
+    ctx.setLineDash([24, 18]);
     ctx.beginPath();
-    ctx.arc(W * 0.66, H * 0.44, 20, 0, Math.PI * 2);
+    ctx.moveTo(W * 0.24, H * 0.74);
+    ctx.lineTo(W * 0.95, H * 0.31);
     ctx.stroke();
+
+    // Its solid edge lines.
+    ctx.setLineDash([]);
+    ctx.lineWidth = 4;
+    ctx.globalAlpha = 0.85;
+    for (const off of [-42, 42]) {
+      ctx.beginPath();
+      ctx.moveTo(W * 0.24, H * 0.74 + off);
+      ctx.lineTo(W * 0.95, H * 0.31 + off);
+      ctx.stroke();
+    }
+
+    // Bow catapult tracks, running straight down the axis.
+    ctx.lineWidth = 4;
+    ctx.globalAlpha = 0.8;
+    for (const y of [H * 0.38, H * 0.56]) {
+      ctx.beginPath();
+      ctx.moveTo(W * 0.08, y);
+      ctx.lineTo(W * 0.46, y);
+      ctx.stroke();
+    }
+
+    // Deck edge stripe.
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.16, H * 0.245);
+    ctx.lineTo(W * 0.95, H * 0.205);
+    ctx.stroke();
+
+    // Hull number in the fleet colour — the one piece of team identity on an
+    // otherwise authentic deck.
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = skinColor;
+    ctx.font = 'bold 34px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('71', W * 0.13, H * 0.5);
     ctx.restore();
   }
 
@@ -247,7 +288,9 @@ function buildDeckDecal(
   skinColor: string,
 ): THREE.Mesh {
   const plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(lengthX * 0.94, widthZ * 0.9),
+    // Kept inside the bounding box: it includes sponsons and the bow point, so
+    // a full-size plane hangs the deck paint out over open water.
+    new THREE.PlaneGeometry(lengthX * 0.88, widthZ * 0.82),
     new THREE.MeshBasicMaterial({
       map: deckTexture(id, skinColor),
       transparent: true,
@@ -269,31 +312,40 @@ function buildDeckDecal(
  * pixels wide.
  */
 function buildNightLights(
-  lengthX: number,
-  heightY: number,
-  widthZ: number,
-  deckY: number,
+  model: THREE.Object3D,
+  dims: THREE.Vector3,
   skinColor: string,
-): THREE.Points {
+): THREE.Points | null {
   const positions: number[] = [];
   const colors: number[] = [];
   const tint = new THREE.Color(skinColor);
-  const warm = new THREE.Color('#ffe6b0');
+  const warm = new THREE.Color('#ffe0a4');
 
-  const perSide = 9;
+  const raycaster = new THREE.Raycaster();
+  const down = new THREE.Vector3(0, -1, 0);
+
+  // Every lamp is dropped onto the hull from above and kept only where it
+  // actually lands. Placing them at a fixed offset from the centreline hung
+  // them in mid-air off the narrow bow — a ship is not a rectangle.
+  const perSide = 11;
   for (let i = 0; i < perSide; i++) {
     const t = (i + 0.5) / perSide;
-    const x = -lengthX / 2 + t * lengthX;
+    const x = (t - 0.5) * dims.x * 0.94;
     for (const side of [-1, 1]) {
-      positions.push(x, deckY + 0.01, side * widthZ * 0.46);
-      // Alternate skin-coloured and warm lamps so the run isn't monotonous.
-      const c = i % 3 === 0 ? tint : warm;
-      colors.push(c.r, c.g, c.b);
+      for (const inset of [0.46, 0.38, 0.3]) {
+        const z = side * dims.z * inset;
+        raycaster.set(new THREE.Vector3(x, dims.y * 2, z), down);
+        const hit = raycaster.intersectObject(model, true)[0];
+        if (!hit) continue;
+        positions.push(x, hit.point.y + 0.004, z);
+        const c = i % 4 === 0 ? tint : warm;
+        colors.push(c.r, c.g, c.b);
+        break; // one lamp per station, at the outermost point that exists
+      }
     }
   }
-  // Masthead light, above the tallest point.
-  positions.push(lengthX * 0.06, heightY * 0.98, 0);
-  colors.push(1, 0.86, 0.7);
+
+  if (positions.length === 0) return null;
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -302,10 +354,12 @@ function buildNightLights(
   return new THREE.Points(
     geometry,
     new THREE.PointsMaterial({
-      size: 0.07,
+      // Small: these should read as pinpricks now and bloom into glows later,
+      // not as beads sitting on the rail.
+      size: 0.035,
       vertexColors: true,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.9,
       sizeAttenuation: true,
       depthWrite: false,
     }),
