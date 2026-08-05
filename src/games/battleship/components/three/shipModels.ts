@@ -21,8 +21,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { ShipId } from '@games/battleship/domain/types';
-import carrierUrl from '@games/battleship/assets/ships/modern/carrier.glb';
-import carrierDeckSvg from '@games/battleship/assets/ships/modern/carrier-deck.svg?raw';
+import carrierBlenderUrl from '@games/battleship/assets/ships/modern/carrier-blender.glb';
+import battleshipBlenderUrl from '@games/battleship/assets/ships/modern/battleship-blender.glb';
 
 /**
  * Per-ship placement. The meshes come out of the generator in their own
@@ -54,15 +54,36 @@ interface ModelSpec {
    * diagonal, and nothing downstream recovers detail that was never sampled.
    */
   deckSvg?: string;
+  /**
+   * Hand-authored in Blender rather than generated from an image.
+   *
+   * These arrive as finished game assets — named nodes, their own materials,
+   * real UVs, textures — so none of the machinery built for generated meshes
+   * applies. No material override, no projected deck decal, no height-banded
+   * shading: all of that existed to fake detail the generator couldn't
+   * provide, and here it would paint over work the artist already did.
+   */
+  authored?: boolean;
+  /** Material whose colour follows the player's fleet skin. */
+  teamMaterial?: string;
 }
 
 const SPECS: Partial<Record<ShipId, ModelSpec>> = {
   carrier: {
-    url: carrierUrl,
-    yaw: -Math.PI / 2,
-    sink: 0.28,
+    url: carrierBlenderUrl,
+    yaw: 0, // authored bow-along-x already
+    sink: 0.18,
     deckFrac: 0.46,
-    deckSvg: carrierDeckSvg,
+    authored: true,
+    teamMaterial: 'Carrier Team Paint',
+  },
+  battleship: {
+    url: battleshipBlenderUrl,
+    yaw: 0,
+    sink: 0.18,
+    deckFrac: 0.46,
+    authored: true,
+    teamMaterial: 'Battleship Boot Stripe',
   },
 };
 
@@ -144,6 +165,34 @@ export function buildModelShip(
   // measuring after parenting it to the scaled group returned values ~5x too
   // large and floated the whole lot above the ship.
   model.updateMatrixWorld(true);
+
+  if (spec.authored) {
+    // Keep everything the artist made; only the team stripe follows the skin.
+    const restyle = (m: THREE.Material): THREE.Material => {
+      const std = m as THREE.MeshStandardMaterial;
+      const isTeam = spec.teamMaterial !== undefined && m.name === spec.teamMaterial;
+      if (!isTeam && !sunk) return m; // leave the artist's material untouched
+      const next = std.clone();
+      if (isTeam) next.color = new THREE.Color(skinColor);
+      if (sunk && next.color) next.color = next.color.clone().multiplyScalar(0.45);
+      return next;
+    };
+
+    model.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.material) return;
+      // Preserve arity: handing a single-material mesh an array of one makes
+      // it render nothing, because three only uses arrays with geometry groups.
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map(restyle)
+        : restyle(mesh.material);
+    });
+
+    const hullAuthored = new THREE.Group();
+    hullAuthored.add(model);
+    hullAuthored.scale.setScalar(scale);
+    return hullAuthored;
+  }
 
   const tint = new THREE.Color(skinColor);
   const body = new THREE.MeshStandardMaterial({
