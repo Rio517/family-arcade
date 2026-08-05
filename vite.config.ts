@@ -31,7 +31,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['calculator.html'],
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        // .glb belongs here: ship meshes are bundled assets, and without them
+        // in the precache the app would fetch a model at runtime the first
+        // time someone opens the 3D board — which is exactly the offline
+        // invariant this project doesn't break.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,glb,webp}'],
         navigateFallbackDenylist: [/calculator\.html$/],
       },
       manifest: {
