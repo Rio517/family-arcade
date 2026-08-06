@@ -47,7 +47,12 @@ export class FleetScene {
 
   constructor(
     private container: HTMLElement,
-    private opts: { skinColor: string; reducedMotion: boolean },
+    private opts: {
+      skinColor: string;
+      reducedMotion: boolean;
+      /** Fires once the ship meshes have decoded and the fleet is rebuilt. */
+      onFleetReady?: () => void;
+    },
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -139,8 +144,9 @@ export class FleetScene {
    */
   private async loadModels() {
     await loadShipModels(this.opts.skinColor);
-    if (this.disposed || !this.lastState) return;
-    this.update(this.lastState.ships, this.lastState.incoming);
+    if (this.disposed) return;
+    if (this.lastState) this.update(this.lastState.ships, this.lastState.incoming);
+    this.opts.onFleetReady?.();
   }
 
   /** Rebuild ships + shot markers from the current battle state. */

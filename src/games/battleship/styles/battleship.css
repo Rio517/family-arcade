@@ -322,5 +322,110 @@
     0 18px 40px -18px rgba(0, 0, 0, 0.85);
 }
 .bs3d canvas { display: block; width: 100% !important; height: 100% !important; }
+
+/* ── Fleet loader: a radar scope, in the fleet's colour ─────────────────────
+   The ship meshes are a few hundred KB and decode after the first frame. This
+   covers that gap in the language the rest of the screen already speaks — the
+   opponent's board is labelled "Radar". Every moving part is gated behind
+   prefers-reduced-motion; with motion off it's a static scope, still legible. */
+.bs3d { position: relative; }
+
+.bs3d-loader {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  background: radial-gradient(circle at 50% 45%, #0d1c2e 0%, #081120 70%);
+  z-index: 2;
+}
+
+.bs3d-scope {
+  position: relative;
+  width: min(46%, 190px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--c) 55%, transparent);
+  box-shadow:
+    0 0 22px -6px var(--c),
+    inset 0 0 30px -12px var(--c);
+  overflow: hidden;
+}
+
+/* Range rings. */
+.bs3d-ring {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--c) 26%, transparent);
+}
+.bs3d-ring:nth-of-type(1) { width: 72%; height: 72%; }
+.bs3d-ring:nth-of-type(2) { width: 46%; height: 46%; }
+.bs3d-ring:nth-of-type(3) { width: 20%; height: 20%; }
+
+/* Bearing cross. */
+.bs3d-cross {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, transparent calc(50% - 0.5px), color-mix(in srgb, var(--c) 24%, transparent) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    linear-gradient(to bottom, transparent calc(50% - 0.5px), color-mix(in srgb, var(--c) 24%, transparent) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+}
+
+/* The sweeping beam: a quarter-wedge with a trailing fade. */
+.bs3d-sweep {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(
+    from 0deg,
+    color-mix(in srgb, var(--c) 42%, transparent) 0deg,
+    color-mix(in srgb, var(--c) 10%, transparent) 38deg,
+    transparent 92deg,
+    transparent 360deg
+  );
+}
+
+/* Contacts, lighting up as the beam passes. */
+.bs3d-blip {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--c) 70%, transparent);
+  opacity: 0.25;
+}
+.bs3d-blip-a { top: 26%; left: 62%; }
+.bs3d-blip-b { top: 61%; left: 33%; }
+.bs3d-blip-c { top: 47%; left: 74%; }
+
+.bs3d-loader-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--accent) 80%, #e2e8f0);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bs3d-sweep { animation: bs3d-sweep 2.4s linear infinite; }
+  .bs3d-blip { animation: bs3d-blip 2.4s linear infinite; }
+  /* Offsets match where each blip sits round the dial, so a contact brightens
+     as the beam crosses it rather than blinking at random. */
+  .bs3d-blip-a { animation-delay: -0.35s; }
+  .bs3d-blip-b { animation-delay: -1.5s; }
+  .bs3d-blip-c { animation-delay: -0.05s; }
+  .bs3d-loader-text { animation: bs3d-pulse 2.4s ease-in-out infinite; }
+
+  @keyframes bs3d-sweep { to { transform: rotate(360deg); } }
+  @keyframes bs3d-blip {
+    0% { opacity: 1; transform: scale(1.35); }
+    22% { opacity: 0.5; transform: scale(1); }
+    100% { opacity: 0.18; transform: scale(1); }
+  }
+  @keyframes bs3d-pulse { 0%, 100% { opacity: 0.65; } 50% { opacity: 1; } }
+}
 .bs3d-hint { margin: 0; font-size: 14px; }
 .bs3d-fallback { padding: 30px 10px; }
