@@ -1,5 +1,6 @@
 import type { GameState } from '../domain/types';
 import type { RiskMap } from '../maps/types';
+import type { MapZoom } from './useMapZoom';
 
 interface RiskBoardProps {
   map: RiskMap;
@@ -11,6 +12,8 @@ interface RiskBoardProps {
   onPick: (territoryId: string) => void;
   /** The active general's colour — frames the board so whose turn it is is obvious. */
   accent: string;
+  /** Pinch/scroll zoom and drag panning. Omitted, the map sits at full extent. */
+  zoom?: MapZoom;
 }
 
 /** Faint engraved continent names, placed at the centroid of their territories. */
@@ -30,16 +33,24 @@ function continentLabels(map: RiskMap) {
  * heraldic colour, and brass army tokens. A compass rose and a brass rule frame
  * the theatre. Scales to its container via the SVG viewBox.
  */
-export function RiskBoard({ map, state, selected, targets, onPick, accent }: RiskBoardProps) {
+export function RiskBoard({ map, state, selected, targets, onPick, accent, zoom }: RiskBoardProps) {
+  // A pan that ends over a country must not also select it. Every pick goes
+  // through here so the guard can't be forgotten on one of the two paths
+  // (the territory path and its larger invisible token hit-circle).
+  const pick = (id: string) => {
+    if (zoom?.wasDragged()) return;
+    onPick(id);
+  };
   return (
     <div className="risk-board risk-board-active" style={{ ['--pc' as string]: accent }}>
       {/* No role="img" on the svg — that would hide every descendant from
           assistive tech; the territories inside are real interactive buttons. */}
       <svg
-        viewBox={`0 0 ${map.width} ${map.height}`}
-        className="risk-svg"
+        viewBox={zoom ? zoom.viewBox : `0 0 ${map.width} ${map.height}`}
+        className={`risk-svg ${zoom?.panning ? 'panning' : ''}`}
         aria-label="World map"
         data-testid="risk-map"
+        {...zoom?.bind}
       >
         <defs>
           <filter id="risk-paper">
@@ -89,11 +100,11 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent }: Ris
                 className={cls}
                 fill={fill}
                 clipPath={t.clip ? `url(#clip-${t.id})` : undefined}
-                onClick={() => onPick(t.id)}
+                onClick={() => pick(t.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    onPick(t.id);
+                    pick(t.id);
                   }
                 }}
                 tabIndex={0}
@@ -142,7 +153,7 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent }: Ris
               key={`b-${t.id}`}
               className="risk-badge"
               transform={`translate(${t.labelX},${t.labelY})`}
-              onClick={() => onPick(t.id)}
+              onClick={() => pick(t.id)}
               data-testid={`token-${t.id}`}
               aria-hidden="true"
             >

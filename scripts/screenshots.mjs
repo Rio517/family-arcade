@@ -89,7 +89,54 @@ const SHOTS = [
       await page.waitForTimeout(2500);
     },
   },
+  {
+    name: 'risk-board',
+    path: '/#/risk',
+    viewport: TABLET,
+    prep: playRiskToAttack,
+  },
+  {
+    name: 'risk-board-phone',
+    path: '/#/risk',
+    viewport: PHONE,
+    prep: playRiskToAttack,
+  },
 ];
+
+/**
+ * Risk has no harness page: the board only exists once a campaign is under way,
+ * and getting there means claiming 42 lands and deploying every army — well
+ * over a hundred taps. So drive it from inside the page and stop on the attack
+ * phase, which is the state worth looking at (the stepper mid-way, the rail
+ * populated, a real spread of colours).
+ */
+async function playRiskToAttack(page) {
+  const help = page.getByTestId('risk-help-close');
+  if (await help.count()) await help.click();
+  await page.getByTestId('count-3').click();
+  await page.getByTestId('risk-start').click();
+
+  await page.evaluate(async () => {
+    const phase = () => document.querySelector('[data-testid="risk-phase"]')?.textContent ?? '';
+    const tick = () => new Promise((r) => setTimeout(r, 0));
+    // Cycling the token list spreads the claims around the world instead of
+    // handing one general a solid continent.
+    for (let i = 0; i < 600 && !/attack/i.test(phase()); i++) {
+      const tokens = document.querySelectorAll('[data-testid^="token-"]');
+      if (tokens.length === 0) break;
+      tokens[i % tokens.length].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await tick();
+      // Reinforce ends on a button, not a tap, once every army is placed.
+      if (/place 0/i.test(phase())) {
+        document.querySelector('[data-testid="end-reinforce"]')?.click();
+        await tick();
+      }
+    }
+  });
+  await page.getByTestId('risk-phase').waitFor();
+  // The plaque drops in on a spring; let it land.
+  await page.waitForTimeout(700);
+}
 
 function saveIfChanged(file, buffer) {
   const name = path.basename(file);

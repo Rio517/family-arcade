@@ -25,7 +25,7 @@ It's free and open source — the whole thing lives in this repo.
 
 | Chess | Risk |
 | --- | --- |
-| ![Chess board mid-game with legal-move hints](docs/screenshots/chess-board.jpg) | ![Risk world board with armies](docs/screenshots/risk-board.jpg) |
+| ![Chess board mid-game with legal-move hints](docs/screenshots/chess-board.jpg) | ![Risk world board with armies](docs/screenshots/risk-board.png) |
 
 ---
 
