@@ -334,7 +334,7 @@ export function RiskPage() {
         : 'Optional: tap a land, then a connected land of yours to move armies — or press Done.');
 
   return (
-    <Shell onMenu={goMenu}>
+    <Shell onMenu={goMenu} bare>
       {/* The map IS the screen: it fills the stage and every control floats over
           it, at a fixed size and place. The stage wears the active general's
           colour, and the plaque re-pops on every hand-off so whose turn it is
@@ -511,7 +511,16 @@ function CommandRail({ state }: { state: GameState }) {
 
 const HELP_SEEN_KEY = 'risk-help-seen-v1';
 
-function Shell({ children, onMenu }: { children: React.ReactNode; onMenu: () => void }) {
+function Shell({
+  children,
+  onMenu,
+  bare = false,
+}: {
+  children: React.ReactNode;
+  onMenu: () => void;
+  /** Campaign mode: no title row, no footer — the map gets the whole window. */
+  bare?: boolean;
+}) {
   const [showHelp, setShowHelp] = useState(false);
 
   // Pop the rules open the very first time someone opens Risk, so a new player
@@ -533,18 +542,40 @@ function Shell({ children, onMenu }: { children: React.ReactNode; onMenu: () => 
   }, []);
 
   return (
-    <div className="app risk-theme">
-      <div className="topbar risk-topbar">
-        <button className="risk-btn ghost" onClick={onMenu} data-testid="risk-back">‹ Menu</button>
-        <h1>Risk</h1>
-        <span className="risk-topbar-rule" aria-hidden="true" />
-        <button className="risk-btn ghost" onClick={() => setShowHelp(true)} data-testid="risk-help-open">
-          How to play
-        </button>
-        <FullscreenButton />
-      </div>
+    <div className={`app risk-theme ${bare ? 'risk-bare' : ''}`}>
+      {bare ? (
+        // Mid-campaign the title row is pure overhead — it costs a whole band
+        // of screen to tell you which game you already know you're playing. The
+        // three things it carried become icons floating over the map instead.
+        <>
+          <button className="risk-icon risk-exit" onClick={onMenu} aria-label="Back to the menu" data-testid="risk-back">
+            ‹
+          </button>
+          <div className="risk-quickbar">
+            <button
+              className="risk-icon"
+              onClick={() => setShowHelp(true)}
+              aria-label="How to play"
+              data-testid="risk-help-open"
+            >
+              ?
+            </button>
+            <FullscreenButton />
+          </div>
+        </>
+      ) : (
+        <div className="topbar risk-topbar">
+          <button className="risk-btn ghost" onClick={onMenu} data-testid="risk-back">‹ Menu</button>
+          <h1>Risk</h1>
+          <span className="risk-topbar-rule" aria-hidden="true" />
+          <button className="risk-btn ghost" onClick={() => setShowHelp(true)} data-testid="risk-help-open">
+            How to play
+          </button>
+          <FullscreenButton />
+        </div>
+      )}
       {children}
-      <div className="footer"><Link to="/">Family game console</Link></div>
+      {!bare && <div className="footer"><Link to="/">Family game console</Link></div>}
       {showHelp && <RiskHelp onClose={() => setShowHelp(false)} />}
     </div>
   );
