@@ -190,6 +190,56 @@
   margin: 0 -16px;
   overflow: hidden;
 }
+
+/* Campaign mode: the window IS the board. The shared .app gutters and the
+   title row both go, so the map gets every pixel and the controls float on
+   top of it rather than beside it. */
+/* position: relative so the floating icons — which Shell renders alongside the
+   stage, not inside it — anchor to the window rather than to whatever ancestor
+   happens to be positioned. */
+.risk-theme.risk-bare { max-width: none; padding: 0; position: relative; }
+.risk-bare .risk-stage { height: 100dvh; margin: 0; }
+/* Clear of the exit button, which now owns the top-left corner. */
+.risk-bare .risk-zoomctl { top: 62px; }
+
+/* The Party pill is fixed bottom-centre app-wide, which puts it straight on top
+   of Done ✓ once the war bar owns the bottom edge. It renders outside .app, so
+   :has() is the only way to reach it from here — and if a browser lacks :has()
+   the pill simply stays where it was, which is untidy rather than broken. */
+body:has(.risk-bare) .party-root {
+  left: calc(12px + env(safe-area-inset-left));
+  bottom: calc(66px + env(safe-area-inset-bottom));
+  transform: none;
+}
+
+/* The three controls the title row used to carry, as icons over the map. */
+.risk-icon {
+  position: absolute; z-index: 5;
+  width: 40px; height: 40px; border-radius: 10px; cursor: pointer;
+  display: grid; place-items: center;
+  background: rgba(42, 24, 12, 0.93); color: var(--brass-hi);
+  border: 1.5px solid var(--brass-dim);
+  font-family: var(--font-display); font-size: 20px; line-height: 1;
+}
+.risk-icon:hover { border-color: var(--brass); }
+.risk-exit {
+  top: calc(12px + env(safe-area-inset-top));
+  left: calc(12px + env(safe-area-inset-left));
+  font-size: 26px;
+}
+.risk-quickbar {
+  position: absolute; z-index: 5; display: flex; gap: 6px;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+}
+.risk-quickbar .risk-icon { position: static; }
+/* FullscreenButton brings its own shared styling; match it to the icons. */
+.risk-quickbar > button:not(.risk-icon) {
+  width: 40px; height: 40px; padding: 0; border-radius: 10px;
+  display: grid; place-items: center;
+  background: rgba(42, 24, 12, 0.93); color: var(--brass-hi);
+  border: 1.5px solid var(--brass-dim);
+}
 /* The active general's colour rings the whole theatre. */
 /* A tinted edge, not a stripe: the plaque and the lit rail card already say
    whose turn it is, so at full saturation this read as an error state. */
@@ -207,14 +257,6 @@
   background: none; border: none; box-shadow: none; border-radius: 0;
   display: flex; align-items: center; justify-content: center;
 }
-/* Keep the world clear of the command rail. A hidden army count is a real
-   disadvantage in Risk, and the rail was sitting on Japan and Kamchatka; the
-   map gives up a little width rather than covering them. On a wide screen the
-   map is height-constrained anyway, so this costs nothing but a nudge left. */
-@media (min-width: 561px) {
-  .risk-stage .risk-board { padding-right: 190px; }
-}
-
 /* touch-action: none so a two-finger pinch zooms the map instead of the page —
    without it the browser claims the gesture before React ever sees it. */
 .risk-stage .risk-svg { width: 100%; height: 100%; touch-action: none; cursor: grab; }
@@ -443,14 +485,20 @@
   .risk-done { width: 104px; font-size: 13.5px; }
 }
 @media (max-width: 560px) {
-  /* Two things at once. The top bar wraps to two rows at this width, so the
-     stage has to give back more than the 128px a single row costs, or the war
-     bar sits below the fold. And the world map is 2:1 — in a portrait stage it
-     letterboxes to a third of the height, leaving a large empty frame. So the
-     stage is capped to roughly what the map plus its chrome actually needs, and
-     the frame hugs the board instead of enclosing a void. Detail comes from
-     the zoom controls, not from stretching a wide map down a tall screen. */
-  .risk-stage { height: clamp(380px, calc(100dvh - 186px), 480px); }
+  /* A 2:1 world map in a portrait phone letterboxes to a fifth of the height
+     however the stage is sized, and cropping to fill would mean territories
+     you cannot tap. So rather than stretch the stage over dead space, the
+     board keeps the height it needs and the whole cluster is centred in the
+     window — the exit and help icons stay pinned to the screen's own corners.
+     Turning the phone sideways fits the map almost exactly. */
+  .risk-theme.risk-bare {
+    min-height: 100dvh;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .risk-bare .risk-stage { height: clamp(380px, 100dvh, 470px); }
+  /* The exit button is on the window corner now, not the stage's, so the zoom
+     stack has its own top edge back. */
+  .risk-bare .risk-zoomctl { top: 12px; }
   .risk-zoomctl { left: 8px; top: 8px; }
   .risk-zoomctl button { width: 34px; height: 34px; font-size: 17px; }
   .risk-plaque { padding: 5px 12px 6px; }
