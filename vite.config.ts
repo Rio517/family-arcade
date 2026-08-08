@@ -64,6 +64,11 @@ export default defineConfig({
     // reach the Ship Battle board without playing a whole game. It is built
     // only when BUILD_HARNESS is set (npm run shots does that), so the
     // published PWA never carries a stray dev page.
+    //
+    // ADDING A HARNESS? List its .tsx in knip.json's `entry` too. knip doesn't
+    // evaluate this branch, so an unlisted harness reads as a dead file and
+    // fails `npm run check` — which the deploy workflow also runs, so it takes
+    // the live site down with it rather than just going red on the PR.
     rollupOptions: process.env.BUILD_HARNESS
       ? {
           input: {
