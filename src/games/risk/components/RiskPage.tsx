@@ -2,6 +2,7 @@ import '../styles/risk.css';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { RiskBoard } from './RiskBoard';
+import { useMapZoom } from './useMapZoom';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { mapById, MAPS } from '../maps/registry';
@@ -64,6 +65,16 @@ export function RiskPage() {
   const [battle, setBattle] = useState<BattleResult | null>(null);
   // An unfinished campaign saved on this device, offered on the setup screen.
   const [resumable, setResumable] = useState<StoredRisk | null>(() => loadRiskGame());
+
+  // Forty-two territories on a phone is a lot of very small taps, so the map
+  // zooms. The hook has to run before the setup/victory early returns below —
+  // rules of hooks — hence the placeholder extent until a map is chosen.
+  const zoom = useMapZoom(map?.width ?? 1000, map?.height ?? 500);
+  const resetZoom = zoom.reset;
+  useEffect(() => {
+    // A newly built map may have a different extent than the placeholder above.
+    resetZoom();
+  }, [map, resetZoom]);
 
   // The campaign auto-saves after every action; a finished war clears itself.
   useEffect(() => {
@@ -291,82 +302,210 @@ export function RiskPage() {
   const freeLands = claiming
     ? Object.values(state.territories).filter((t) => t.owner === -1).length
     : 0;
+  // The phase element carries the whole phrase, not just the word: "place 3"
+  // is the answer to the question the player is actually asking.
   const phaseLabel =
     claiming ? `Claim — ${freeLands} lands free` :
     state.phase === 'setup' ? `Deploy — place ${state.toPlace}` :
     state.phase === 'reinforce' ? `Reinforce — place ${state.toPlace}` :
     state.phase === 'attack' ? 'Attack' : 'Fortify';
-  const turnKicker = claiming ? 'Now claiming' : state.phase === 'setup' ? 'Now deploying' : 'Now playing';
+  const marching =
+    claiming ? 'is claiming ground' :
+    state.phase === 'setup' ? 'is deploying' :
+    state.phase === 'reinforce' ? 'is mustering' :
+    state.phase === 'attack' ? 'is on the march' : 'is moving up';
+
+  // One plain-language sentence, always in the same place, telling you the one
+  // thing to do next. It replaces the old per-phase paragraphs, which moved
+  // around and pushed the buttons with them.
+  const hint =
+    claiming ? 'Tap any pale (unclaimed) land to claim it — one army raises your flag.' :
+    state.phase === 'setup' ? `Tap one of your lands to deploy — ${state.toPlace} left. Play passes on automatically.` :
+    state.phase === 'reinforce'
+      ? (state.toPlace > 0
+          ? `Tap your lands to muster ${state.toPlace} more.`
+          : 'Every army placed — press Done to begin the assault.')
+    : state.phase === 'attack'
+      ? (sel
+          ? 'Tap a neighbouring enemy land to attack it — or press Done when you’re finished.'
+          : 'Tap one of your lands with 2 or more armies, then a touching enemy land.')
+    : (sel && dest
+        ? 'Choose how many to march, then confirm.'
+        : 'Optional: tap a land, then a connected land of yours to move armies — or press Done.');
 
   return (
     <Shell onMenu={goMenu}>
-      {/* The map IS the screen: it fills the stage and everything else floats
-          over it. The stage wears the active general's colour as a glowing
-          ring, and the banner re-pops on every hand-off so whose turn it is
+      {/* The map IS the screen: it fills the stage and every control floats over
+          it, at a fixed size and place. The stage wears the active general's
+          colour, and the plaque re-pops on every hand-off so whose turn it is
           can't be missed — especially during the alternating deploy. */}
       <div className="risk-stage" style={{ ['--pc' as string]: me.color }} data-testid="risk-stage">
-        <RiskBoard map={map} state={state} selected={sel} targets={targets} onPick={onPick} accent={me.color} />
+        <RiskBoard map={map} state={state} selected={sel} targets={targets} onPick={onPick} accent={me.color} zoom={zoom} />
 
-        <div className="risk-banner" key={`${state.current}-${state.phase === 'setup' ? 's' : 'p'}`}>
-          <span className="risk-general" data-testid="risk-turn">
-            <span className="risk-seal lg" style={{ ['--pc' as string]: me.color }} />
-            <span className="risk-general-text">
-              <span className="risk-eyebrow">{turnKicker}</span>
-              <strong>{me.name}</strong>
-            </span>
-          </span>
-          <span className="risk-phase" data-testid="risk-phase">{phaseLabel}</span>
-          <span className="risk-owned"><strong>{owned}</strong> territories</span>
+        {/* A warm low sun over the whole theatre. It multiplies into the
+            parchment rather than covering it, so the map's own ink, graticule
+            and compass all still read through. */}
+        <div className="risk-sunset" aria-hidden="true" />
+
+        <div className="risk-zoomctl">
+          <button onClick={zoom.zoomIn} disabled={!zoom.canZoomIn} aria-label="Zoom in" data-testid="risk-zoom-in">+</button>
+          <button onClick={zoom.zoomOut} disabled={!zoom.canZoomOut} aria-label="Zoom out" data-testid="risk-zoom-out">−</button>
+          <button onClick={zoom.reset} disabled={zoom.isDefault} aria-label="Show the whole map" data-testid="risk-zoom-reset">⤢</button>
         </div>
 
-        <div className="risk-dock">
-        {state.phase === 'setup' && (
-          <p className="risk-note">
-            <strong style={{ color: me.color }}>{me.name}</strong>,{' '}
-            {claiming
-              ? 'tap any parchment (unclaimed) land to claim it — one army raises your flag.'
-              : `tap one of your lands — ${state.toPlace} arm${state.toPlace === 1 ? 'y' : 'ies'} left.`}{' '}
-            Play passes on automatically.
-          </p>
-        )}
+        <div className="risk-plaque" key={`${state.current}-${state.phase === 'setup' ? 's' : 'p'}`}>
+          <span className="risk-phase" data-testid="risk-phase">{phaseLabel}</span>
+          <span className="risk-plaque-who" data-testid="risk-turn">
+            <strong style={{ color: me.color }}>{me.name}</strong> {marching} — {owned} lands
+          </span>
+        </div>
 
-        {state.phase === 'reinforce' && (
-          <>
-            <p className="risk-note">Tap your lands to muster {state.toPlace} arm{state.toPlace === 1 ? 'y' : 'ies'}.</p>
-            <button className="risk-btn primary block" disabled={state.toPlace > 0} onClick={() => setState(endReinforce(state))} data-testid="end-reinforce">
-              {state.toPlace > 0 ? `Place ${state.toPlace} more` : 'Begin the assault →'}
+        <CommandRail state={state} />
+
+        <p className="risk-hintline">{hint}</p>
+
+        <div className="risk-warbar">
+          <PhaseSteps state={state} claiming={claiming} />
+
+          {state.phase === 'reinforce' && (
+            <button
+              className="risk-done"
+              disabled={state.toPlace > 0}
+              onClick={() => setState(endReinforce(state))}
+              data-testid="end-reinforce"
+            >
+              Done ✓
             </button>
-          </>
-        )}
+          )}
+          {state.phase === 'attack' && (
+            <button
+              className="risk-done"
+              onClick={() => { setState(endAttack(state)); resetSelection(); }}
+              data-testid="end-attack"
+            >
+              Done ✓
+            </button>
+          )}
+          {state.phase === 'fortify' && (
+            <button
+              className="risk-done"
+              onClick={() => { setState(endTurn(state, map.topology)); resetSelection(); }}
+              data-testid="end-turn"
+            >
+              Done ✓
+            </button>
+          )}
 
-        {state.phase === 'attack' && (
-          <>
-            {battle ? <DiceRow battle={battle} /> : <p className="risk-note">Choose one of your lands (2+ armies), then an adjacent rival to strike.</p>}
-            <button className="risk-btn block" onClick={() => { setState(endAttack(state)); resetSelection(); }} data-testid="end-attack">Hold the line →</button>
-          </>
-        )}
-
-        {state.phase === 'fortify' && (
-          <>
-            {sel && dest ? (
-              <div className="risk-fortify">
-                <p className="risk-note">March your reserves, then confirm.</p>
-                <input type="range" min={1} max={state.territories[sel].armies - 1} value={moveCount} onChange={(e) => setMoveCount(Number(e.target.value))} data-testid="fortify-range" />
-                <div className="risk-fortify-actions">
-                  <button className="risk-btn primary" onClick={() => { setState(fortify(state, map.topology, sel, dest, moveCount)); resetSelection(); }} data-testid="fortify-confirm">March {moveCount} →</button>
-                  <button className="risk-btn" onClick={resetSelection}>Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <p className="risk-note">Optional: tap a land, then a connected land of yours to move armies.</p>
-            )}
-            <button className="risk-btn block" onClick={() => { setState(endTurn(state, map.topology)); resetSelection(); }} data-testid="end-turn">End turn →</button>
-          </>
-        )}
+          <span className="risk-warbar-gap" />
+          {state.phase === 'attack' && battle && <DiceRow battle={battle} />}
           <ContinentLegend map={map} state={state} />
         </div>
+
+        {/* The march slider is the one control that has to appear mid-turn, so
+            it gets its own panel above the bar instead of resizing it. */}
+        {state.phase === 'fortify' && sel && dest && (
+          <div className="risk-march">
+            <input
+              type="range"
+              min={1}
+              max={state.territories[sel].armies - 1}
+              value={moveCount}
+              onChange={(e) => setMoveCount(Number(e.target.value))}
+              data-testid="fortify-range"
+              aria-label="Armies to march"
+            />
+            <div className="risk-march-actions">
+              <button
+                className="risk-btn primary"
+                onClick={() => { setState(fortify(state, map.topology, sel, dest, moveCount)); resetSelection(); }}
+                data-testid="fortify-confirm"
+              >
+                March {moveCount} →
+              </button>
+              <button className="risk-btn" onClick={resetSelection}>Cancel</button>
+            </div>
+          </div>
+        )}
       </div>
     </Shell>
+  );
+}
+
+const TURN_STEPS: { phase: string; label: string }[] = [
+  { phase: 'reinforce', label: 'Reinforce' },
+  { phase: 'attack', label: 'Attack' },
+  // "Fortify" is jargon a seven-year-old shouldn't have to decode.
+  { phase: 'fortify', label: 'Move one' },
+];
+
+/**
+ * The three steps of a turn, always visible at a fixed width: the lit one is
+ * where you are, the ones behind you dim. Claiming and deploying happen before
+ * the cycle starts, so they show as a single step of their own.
+ */
+function PhaseSteps({ state, claiming }: { state: GameState; claiming: boolean }) {
+  if (state.phase === 'setup') {
+    return (
+      <span className="risk-steps">
+        <span className="risk-step on">{claiming ? 'Claim' : 'Deploy'}</span>
+      </span>
+    );
+  }
+  const at = TURN_STEPS.findIndex((s) => s.phase === state.phase);
+  return (
+    <span className="risk-steps">
+      {TURN_STEPS.map((s, i) => (
+        <span key={s.phase} className={`risk-step ${i === at ? 'on' : i < at ? 'done' : ''}`}>
+          {s.label}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * Every general's strength down the right-hand side. Risk turns on knowing who
+ * is getting dangerous, and until now the board showed you only your own count
+ * — you had to survey the map by eye to find out you were losing.
+ */
+function CommandRail({ state }: { state: GameState }) {
+  const standings = state.players.map((p, i) => {
+    let lands = 0;
+    let armies = 0;
+    for (const t of Object.values(state.territories)) {
+      if (t.owner === i) {
+        lands++;
+        armies += t.armies;
+      }
+    }
+    return { name: p.name, color: p.color, lands, armies, index: i };
+  });
+  return (
+    <div className="risk-rail" data-testid="risk-rail">
+      {standings.map((s) => (
+        <span
+          key={s.index}
+          className={`risk-gen ${s.index === state.current ? 'active' : ''} ${s.lands === 0 ? 'out' : ''}`}
+          style={{ ['--pc' as string]: s.color }}
+        >
+          <span className="risk-gen-coin" />
+          <span className="risk-gen-nums">
+            <b>{s.name}</b>
+            {s.lands === 0 ? (
+              <span>Out of the war</span>
+            ) : (
+              // The units are their own elements so a phone can drop them and
+              // still show the two numbers that matter: "39 · 14".
+              <span>
+                {s.armies}<span className="risk-gen-unit"> armies</span>
+                <span className="risk-gen-sep"> · </span>
+                {s.lands}<span className="risk-gen-unit"> lands</span>
+              </span>
+            )}
+          </span>
+        </span>
+      ))}
+    </div>
   );
 }
 
