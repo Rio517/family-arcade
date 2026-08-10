@@ -38,6 +38,7 @@ export interface MapZoom {
     onPointerMove: (e: ReactPointerEvent<SVGSVGElement>) => void;
     onPointerUp: (e: ReactPointerEvent<SVGSVGElement>) => void;
     onPointerCancel: (e: ReactPointerEvent<SVGSVGElement>) => void;
+    onPointerLeave: (e: ReactPointerEvent<SVGSVGElement>) => void;
     onWheel: (e: ReactWheelEvent<SVGSVGElement>) => void;
   };
 }
@@ -175,11 +176,43 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
     [view],
   );
 
+  const endPointer = useCallback(
+    (e: ReactPointerEvent<SVGSVGElement>) => {
+      const bk = bookkeeping.current;
+      bk.origin.delete(e.pointerId);
+      bk.last.delete(e.pointerId);
+      if (e.currentTarget.releasePointerCapture) {
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          // Capture may already be gone (pointercancel, or never granted in jsdom).
+        }
+      }
+      if (bk.last.size < 2) {
+        bk.pinchStartDist = null;
+        bk.pinchStartView = null;
+      }
+      if (bk.last.size === 0 && bk.dragging) {
+        bk.dragging = false;
+        setPanning(false);
+      }
+    },
+    [],
+  );
+
   const onPointerMove = useCallback(
     (e: ReactPointerEvent<SVGSVGElement>) => {
       const bk = bookkeeping.current;
       const origin = bk.origin.get(e.pointerId);
       if (!origin) return;
+      if (e.buttons === 0) {
+        // A mouse keeps its pointerId across gestures. Below the threshold
+        // nothing is captured, so a pointerup off the map is never seen —
+        // and a later bare hover would resume the stale gesture and pan
+        // with no button held. No buttons down means this entry is stale.
+        endPointer(e);
+        return;
+      }
 
       if (bk.last.size >= 2) {
         bk.last.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
@@ -223,31 +256,20 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
       markDragged();
       setView((prev) => clampView({ x: prev.x - dx, y: prev.y - dy, w: prev.w, h: prev.h }, width, height));
     },
-    [clientDeltaToMapUnits, clientPointToMap, markDragged, width, height, maxScale],
+    [clientDeltaToMapUnits, clientPointToMap, endPointer, markDragged, width, height, maxScale],
   );
 
-  const endPointer = useCallback(
+  const onPointerLeave = useCallback(
     (e: ReactPointerEvent<SVGSVGElement>) => {
-      const bk = bookkeeping.current;
-      bk.origin.delete(e.pointerId);
-      bk.last.delete(e.pointerId);
-      if (e.currentTarget.releasePointerCapture) {
-        try {
-          e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch {
-          // Capture may already be gone (pointercancel, or never granted in jsdom).
-        }
-      }
-      if (bk.last.size < 2) {
-        bk.pinchStartDist = null;
-        bk.pinchStartView = null;
-      }
-      if (bk.last.size === 0 && bk.dragging) {
-        bk.dragging = false;
-        setPanning(false);
-      }
+      // Below the threshold (or as one finger of a pinch) nothing is
+      // captured, so a pointer that leaves the map delivers its pointerup
+      // elsewhere — its entry would go stale and poison the next gesture
+      // (a one-finger pan reading as a pinch with a ghost finger). Leaving
+      // ends that pointer's gesture. A captured pan keeps reporting from
+      // outside the element, so it must survive its boundary exit.
+      if (!bookkeeping.current.dragging) endPointer(e);
     },
-    [],
+    [endPointer],
   );
 
   const onWheel = useCallback(
@@ -284,6 +306,7 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
       onPointerMove,
       onPointerUp: endPointer,
       onPointerCancel: endPointer,
+      onPointerLeave,
       onWheel,
     },
   };

@@ -143,4 +143,46 @@ describe('useMapZoom', () => {
     expect(result.current.wasDragged()).toBe(false);
     expect(result.current.panning).toBe(false);
   });
+
+  // Below the drag threshold nothing is captured, so a pointer that slides
+  // off the map delivers its pointerup elsewhere and its bookkeeping entry
+  // would go stale. The two tests pin the two ways that stale entry bites.
+
+  it('a buttonless mouse hover after a missed pointerup does not pan the map', () => {
+    const { result } = renderHook(() => useMapZoom(WIDTH, HEIGHT));
+    act(() => result.current.zoomIn());
+    const before = result.current.viewBox;
+
+    act(() => {
+      result.current.bind.onPointerDown(pointer(1, 100, 100));
+    });
+    // The mouse leaves, releases elsewhere, and later hovers back across the
+    // map — same pointerId, no button held.
+    act(() => {
+      result.current.bind.onPointerMove({ ...pointer(1, 160, 160), buttons: 0 } as ReactPointerEvent<SVGSVGElement>);
+      result.current.bind.onPointerMove({ ...pointer(1, 220, 220), buttons: 0 } as ReactPointerEvent<SVGSVGElement>);
+    });
+
+    expect(result.current.viewBox).toBe(before);
+    expect(result.current.panning).toBe(false);
+  });
+
+  it('a finger that left the map pre-threshold does not turn the next pan into a pinch', () => {
+    const { result } = renderHook(() => useMapZoom(WIDTH, HEIGHT));
+    act(() => result.current.zoomIn());
+    const scaleAfterZoom = result.current.scale;
+
+    act(() => {
+      result.current.bind.onPointerDown(pointer(1, 10, 10));
+      // Slides off the map before the threshold; its pointerup lands elsewhere.
+      result.current.bind.onPointerLeave?.(pointer(1, 12, 12));
+      // A fresh one-finger pan must be a pan, not a pinch with a ghost finger.
+      result.current.bind.onPointerDown(pointer(2, 300, 300));
+      result.current.bind.onPointerMove(pointer(2, 360, 300));
+      result.current.bind.onPointerMove(pointer(2, 420, 300));
+    });
+
+    expect(result.current.panning).toBe(true);
+    expect(result.current.scale).toBeCloseTo(scaleAfterZoom, 6);
+  });
 });
