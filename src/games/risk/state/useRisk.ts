@@ -65,6 +65,53 @@ export function useRisk(): UseRiskResult {
     else saveRiskGame(state);
   }, [state]);
 
+  // The computer generals (ADR 0009): whenever the current seat is a bot, one
+  // step is scheduled after a short "thinking" pause — kids can follow the
+  // turn. The brain lazy-loads so campaigns without a computer seat pay zero
+  // bytes; any state change re-runs the effect, and its cleanup cancels the
+  // stale step, so the async gap can never apply a move to an old state.
+  useEffect(() => {
+    if (!state || !map || state.phase === 'over') return;
+    const seat = state.players[state.current];
+    if (!seat.bot) return;
+    const personaId = seat.bot;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const bots = await import('../domain/bots');
+      if (cancelled) return;
+      const step = bots.decide(state, map.topology, bots.personaById(personaId), Math.random);
+      switch (step.kind) {
+        case 'place':
+          setState(placeArmy(state, step.territoryId, map.topology));
+          break;
+        case 'doneReinforce':
+          setState(endReinforce(state));
+          break;
+        case 'attack': {
+          const { state: ns, result } = resolveAttack(state, map.topology, step.from, step.to);
+          setState(ns);
+          setBattle(result);
+          break;
+        }
+        case 'doneAttack':
+          setState(endAttack(state));
+          setBattle(null);
+          break;
+        case 'fortify':
+          setState(fortify(state, map.topology, step.from, step.to, step.count));
+          break;
+        case 'doneTurn':
+          setState(endTurn(state, map.topology));
+          setBattle(null);
+          break;
+      }
+    }, 500 + Math.random() * 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [state, map]);
+
   const targets = useMemo(() => {
     const set = new Set<string>();
     if (!state || !map || sel === null) return set;
