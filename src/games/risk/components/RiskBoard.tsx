@@ -1,6 +1,7 @@
 import type { GameState } from '../domain/types';
 import type { RiskMap } from '../maps/types';
 import type { MapZoom } from './useMapZoom';
+import { paperGrainDataUrl } from './paperGrain';
 
 interface RiskBoardProps {
   map: RiskMap;
@@ -41,6 +42,7 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent, zoom 
     if (zoom?.wasDragged()) return;
     onPick(id);
   };
+  const grain = paperGrainDataUrl();
   return (
     <div className="risk-board risk-board-active" style={{ ['--pc' as string]: accent }}>
       {/* No role="img" on the svg — that would hide every descendant from
@@ -53,11 +55,14 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent, zoom 
         {...zoom?.bind}
       >
         <defs>
-          <filter id="risk-paper">
-            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves={2} stitchTiles="stitch" result="n" />
-            <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.32  0 0 0 0 0.24  0 0 0 0 0.12  0 0 0 0.05 0" />
-            <feComposite operator="over" in2="SourceGraphic" />
-          </filter>
+          {/* The parchment grain is a baked bitmap tile, NOT a live filter.
+              An feTurbulence here re-generated its noise at every new zoom
+              scale — ~430ms a frame at tablet resolution — so pinch crawled. */}
+          {grain && (
+            <pattern id="risk-grain" patternUnits="userSpaceOnUse" width={256} height={256}>
+              <image href={grain} width={256} height={256} />
+            </pattern>
+          )}
           <radialGradient id="risk-vignette" cx="50%" cy="48%" r="72%">
             <stop offset="60%" stopColor="#000" stopOpacity="0" />
             <stop offset="100%" stopColor="#3a2a12" stopOpacity="0.5" />
@@ -70,7 +75,8 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent, zoom 
           </radialGradient>
         </defs>
 
-        <rect x={0} y={0} width={map.width} height={map.height} className="risk-sea" filter="url(#risk-paper)" />
+        <rect x={0} y={0} width={map.width} height={map.height} className="risk-sea" />
+        {grain && <rect x={0} y={0} width={map.width} height={map.height} className="risk-grain" fill="url(#risk-grain)" />}
         <path d={map.graticule} className="risk-graticule" />
 
         {continentLabels(map).map((c) => (

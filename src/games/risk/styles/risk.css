@@ -109,6 +109,7 @@
 }
 .risk-svg { display: block; width: 100%; height: auto; border-radius: 2px; }
 .risk-sea { fill: var(--parchment); }
+.risk-grain { pointer-events: none; }
 .risk-graticule { fill: none; stroke: rgba(122, 92, 42, 0.30); stroke-width: 0.5; }
 .risk-continent-label {
   fill: rgba(90, 66, 30, 0.28); font-family: var(--font-display); font-size: 15px;
@@ -116,7 +117,10 @@
 }
 .risk-terr {
   stroke: #43301a; cursor: pointer; fill-opacity: 0.92;
-  transition: filter 120ms;
+  /* Highlights are stroke/opacity work, never filter — a brightness() or
+     drop-shadow() on a geodata coastline costs ~20ms per repaint and rides
+     along on EVERY subsequent frame while it's applied. */
+  transition: fill-opacity 120ms;
   /* Round joins, because the coastlines are traced from real geodata and hit
      plenty of angles sharp enough for a mitre to throw a spike. Adjacent
      territories each stroke their own edge, so those spikes landed on top of
@@ -130,12 +134,14 @@
   stroke-width: 1;
   shape-rendering: geometricPrecision;
 }
-.risk-terr:hover { filter: brightness(1.12); }
+/* Hover only where hovering exists — on touch it sticks to the last tap. */
+@media (hover: hover) and (pointer: fine) {
+  .risk-terr:hover { fill-opacity: 1; }
+}
 /* These widths are screen pixels too, since .risk-terr sets non-scaling-stroke. */
-.risk-terr.target { stroke: #f2e8ca !important; stroke-width: 1.6; filter: brightness(1.1); }
+.risk-terr.target { stroke: #f2e8ca !important; stroke-width: 1.6; fill-opacity: 1; }
 .risk-terr.sel {
-  stroke: var(--brass-hi) !important; stroke-width: 2.4;
-  filter: brightness(1.2) drop-shadow(0 0 3px rgba(231, 207, 149, 0.8));
+  stroke: var(--brass-hi) !important; stroke-width: 2.6; fill-opacity: 1;
 }
 /* Territories are keyboard-operable buttons: focus lights the land itself
    with a brass stroke and glow. No `outline` — on an SVG path the browser
@@ -143,8 +149,8 @@
 .risk-terr:focus-visible {
   outline: none;
   stroke: var(--brass-hi);
-  stroke-width: 2.4;
-  filter: brightness(1.18) drop-shadow(0 0 4px rgba(231, 207, 149, 0.9));
+  stroke-width: 2.6;
+  fill-opacity: 1;
 }
 
 .risk-badge { cursor: pointer; }
@@ -160,11 +166,14 @@
 .risk-searoute-shadow { fill: none; stroke: #3a2a12; stroke-width: 2.4; opacity: 0.14; stroke-linecap: round; }
 .risk-searoute { fill: none; stroke: #7a5c2a; stroke-width: 1.4; stroke-dasharray: 1 7; stroke-linecap: round; opacity: 0.85; }
 .risk-searoute-end { fill: #7a5c2a; stroke: #efe6d0; stroke-width: 0.8; }
-/* steps(12) keeps the dotted lines drifting but repaints the big SVG at ~5fps
-   instead of 60 — this screen idles for minutes between taps. */
+/* The dash drift invalidates a region spanning 70% of the map, so its cadence
+   is the map's idle repaint rate: steps(8) over 3.4s ≈ 2.4 repaints/s reads as
+   the same slow crawl for a fraction of the churn. Paused entirely while a
+   gesture is in flight — the preview transform must not fight repaints. */
 @media (prefers-reduced-motion: no-preference) {
-  .risk-searoute { animation: risk-searoute-flow 2.6s steps(12) infinite; }
+  .risk-searoute { animation: risk-searoute-flow 3.4s steps(8) infinite; }
 }
+.risk-svg.panning .risk-searoute, .risk-svg.panning .risk-ship { animation-play-state: paused; }
 @keyframes risk-searoute-flow { to { stroke-dashoffset: -8; } }
 .risk-token-hit { fill: transparent; pointer-events: all; }
 .risk-token-halo { pointer-events: none; }
@@ -183,10 +192,10 @@
 .risk-ship .rs-rigging line { stroke: #6b5024; stroke-width: 0.5; opacity: 0.5; }
 .risk-ship .rs-pennant { fill: #7a2a1c; stroke: #4a1810; stroke-width: 0.5; }
 .risk-ship .rs-wake path { fill: none; stroke: #8a6a2e; stroke-width: 1; stroke-dasharray: 1 4; stroke-linecap: round; opacity: 0.4; }
-/* steps(24) per keyframe leg ≈ 8 repaints/s — the bob still reads as gentle
+/* steps(12) per keyframe leg ≈ 4 repaints/s — the bob still reads as gentle
    swell, without burning battery at 60fps on an idle turn-based screen. */
 @media (prefers-reduced-motion: no-preference) {
-  .risk-ship { animation: risk-ship-bob 6s steps(24) infinite; transform-box: fill-box; transform-origin: center; }
+  .risk-ship { animation: risk-ship-bob 6s steps(12) infinite; transform-box: fill-box; transform-origin: center; }
 }
 @keyframes risk-ship-bob {
   0%, 100% { transform: translateY(0) rotate(-0.6deg); }
@@ -300,8 +309,13 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
 }
 /* touch-action: none so a two-finger pinch zooms the map instead of the page —
    without it the browser claims the gesture before React ever sees it. */
-.risk-stage .risk-svg { width: 100%; height: 100%; touch-action: none; cursor: grab; }
-.risk-stage .risk-svg.panning { cursor: grabbing; }
+.risk-stage .risk-svg {
+  width: 100%; height: 100%; touch-action: none; cursor: grab;
+  /* Gestures preview as a CSS transform on this element (useMapZoom); the
+     transform maths assume the origin sits at the top-left corner. */
+  transform-origin: 0 0;
+}
+.risk-stage .risk-svg.panning { cursor: grabbing; will-change: transform; }
 
 /* Zoom instruments, top left — fixed, never move. */
 .risk-zoomctl { position: absolute; left: 12px; top: 12px; display: flex; flex-direction: column; gap: 6px; }

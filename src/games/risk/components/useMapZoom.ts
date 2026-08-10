@@ -1,8 +1,13 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
 
 const ZOOM_STEP = 1.5;
 const DRAG_THRESHOLD_PX = 6;
+/** Wheel factor per deltaY unit: one mouse notch (±100) ≈ 1.25x, trackpad ticks glide. */
+const WHEEL_SENSITIVITY = 0.0022;
+/** Trackpad pinches arrive as ctrlKey wheels with small deltas — steeper curve. */
+const WHEEL_PINCH_SENSITIVITY = 0.01;
+const WHEEL_COMMIT_MS = 140;
 
 interface ViewRect {
   x: number;
@@ -20,7 +25,7 @@ export interface MapZoom {
   canZoomOut: boolean;
   /** True when scale === 1 and there is no pan offset. */
   isDefault: boolean;
-  /** True while a drag-pan is actually in progress (for cursor styling). */
+  /** True while a drag-pan or pinch is actually in progress. */
   panning: boolean;
   zoomIn(): void;
   zoomOut(): void;
@@ -77,6 +82,14 @@ interface PointerBookkeeping {
   pinchStartView: ViewRect | null;
 }
 
+/**
+ * Pan/pinch/wheel state for the map. Gestures are PREVIEWED with a CSS
+ * transform on the <svg> — the compositor moves the already-rasterized map,
+ * which costs nothing — and the real viewBox (a full SVG re-raster) commits
+ * once, when the gesture ends. Committing per pointermove repainted 42
+ * geodata coastlines every frame and re-generated the parchment texture on
+ * every pinch step; on tablets that meant seconds per zoom.
+ */
 export function useMapZoom(width: number, height: number, opts?: { maxScale?: number }): MapZoom {
   const maxScale = opts?.maxScale ?? 5;
   const defaultView = useMemo<ViewRect>(() => ({ x: 0, y: 0, w: width, h: height }), [width, height]);
@@ -85,6 +98,12 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
   const [panning, setPanning] = useState(false);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
+  // The committed view, readable from stable callbacks without stale closures.
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  // The gesture's in-flight view: what the preview transform is showing.
+  const pendingRef = useRef<ViewRect | null>(null);
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bookkeeping = useRef<PointerBookkeeping>({
     origin: new Map(),
     last: new Map(),
@@ -109,54 +128,118 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
 
   const wasDragged = useCallback(() => draggedRef.current, []);
 
+  /** The view the user is currently LOOKING at: the preview if one is live. */
+  const liveView = useCallback((): ViewRect => pendingRef.current ?? viewRef.current, []);
+
+  /**
+   * Show `next` without committing it: a CSS transform maps the committed
+   * viewBox onto the candidate one. transform-origin must be 0 0 (set in CSS).
+   */
+  const applyPreview = useCallback((next: ViewRect) => {
+    pendingRef.current = next;
+    const el = svgRef.current;
+    if (!el) return;
+    const committed = viewRef.current;
+    const rect = el.getBoundingClientRect();
+    // Screen px per map unit under the candidate view; 1:1 without layout (jsdom).
+    const sx = rect.width > 0 ? rect.width / next.w : 1;
+    const sy = rect.height > 0 ? rect.height / next.h : 1;
+    const grow = next.w > 0 ? committed.w / next.w : 1;
+    el.style.transform = `translate(${sx * (committed.x - next.x)}px, ${sy * (committed.y - next.y)}px) scale(${grow})`;
+  }, []);
+
+  /** Commit the previewed view to the real viewBox (one repaint). */
+  const commitPreview = useCallback(() => {
+    const next = pendingRef.current;
+    if (!next) return;
+    pendingRef.current = null;
+    setView(next);
+  }, []);
+
+  // Swap the preview transform for the committed viewBox in the same paint —
+  // clearing it any later would flash the old view for a frame.
+  useLayoutEffect(() => {
+    if (!pendingRef.current && svgRef.current) svgRef.current.style.transform = '';
+  }, [view]);
+
+  useEffect(
+    () => () => {
+      if (wheelTimer.current !== null) clearTimeout(wheelTimer.current);
+      if (dragClearTimer.current !== null) clearTimeout(dragClearTimer.current);
+    },
+    [],
+  );
+
   /** Convert a client-px delta to map units using the element's measured width;
    *  jsdom (and a not-yet-laid-out element) reports zero, so fall back to 1:1. */
   const clientDeltaToMapUnits = useCallback(
     (dxClient: number, dyClient: number) => {
+      const v = liveView();
       const rect = svgRef.current?.getBoundingClientRect();
       const elW = rect?.width ?? 0;
       const elH = rect?.height ?? 0;
-      const kx = elW > 0 ? view.w / elW : 1;
-      const ky = elH > 0 ? view.h / elH : 1;
+      const kx = elW > 0 ? v.w / elW : 1;
+      const ky = elH > 0 ? v.h / elH : 1;
       return { dx: dxClient * kx, dy: dyClient * ky };
     },
-    [view.w, view.h],
+    [liveView],
   );
 
   /** Map a client point to map-space; degrades to the view centre without layout. */
   const clientPointToMap = useCallback(
     (clientX: number, clientY: number) => {
+      const v = liveView();
       const rect = svgRef.current?.getBoundingClientRect();
       const elW = rect?.width ?? 0;
       const elH = rect?.height ?? 0;
       if (elW <= 0 || elH <= 0) {
-        return { x: view.x + view.w / 2, y: view.y + view.h / 2 };
+        return { x: v.x + v.w / 2, y: v.y + v.h / 2 };
       }
       const fracX = (clientX - rect!.left) / elW;
       const fracY = (clientY - rect!.top) / elH;
-      return { x: view.x + fracX * view.w, y: view.y + fracY * view.h };
+      return { x: v.x + fracX * v.w, y: v.y + fracY * v.h };
     },
-    [view.x, view.y, view.w, view.h],
+    [liveView],
   );
 
+  /** Button/keyboard zoom: discrete, so commit immediately (one repaint each). */
   const zoomBy = useCallback(
     (factor: number, anchor?: { x: number; y: number }) => {
+      if (wheelTimer.current !== null) {
+        clearTimeout(wheelTimer.current);
+        wheelTimer.current = null;
+      }
+      commitPreview();
       setView((prev) => {
         const ax = anchor?.x ?? prev.x + prev.w / 2;
         const ay = anchor?.y ?? prev.y + prev.h / 2;
         return zoomView(prev, factor, ax, ay, width, height, maxScale);
       });
     },
-    [width, height, maxScale],
+    [commitPreview, width, height, maxScale],
   );
 
   const zoomIn = useCallback(() => zoomBy(ZOOM_STEP), [zoomBy]);
   const zoomOut = useCallback(() => zoomBy(1 / ZOOM_STEP), [zoomBy]);
-  const reset = useCallback(() => setView(defaultView), [defaultView]);
+  const reset = useCallback(() => {
+    if (wheelTimer.current !== null) {
+      clearTimeout(wheelTimer.current);
+      wheelTimer.current = null;
+    }
+    pendingRef.current = null;
+    if (svgRef.current) svgRef.current.style.transform = '';
+    setView(defaultView);
+  }, [defaultView]);
 
   const onPointerDown = useCallback(
     (e: ReactPointerEvent<SVGSVGElement>) => {
       svgRef.current = e.currentTarget;
+      // A tap while a wheel commit is pending must land on settled ground.
+      if (wheelTimer.current !== null) {
+        clearTimeout(wheelTimer.current);
+        wheelTimer.current = null;
+        commitPreview();
+      }
       const bk = bookkeeping.current;
       const pos = { clientX: e.clientX, clientY: e.clientY };
       bk.origin.set(e.pointerId, pos);
@@ -170,10 +253,11 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
       if (bk.last.size === 2) {
         const pts = [...bk.last.values()];
         bk.pinchStartDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
-        bk.pinchStartView = view;
+        bk.pinchStartView = liveView();
+        setPanning(true);
       }
     },
-    [view],
+    [commitPreview, liveView],
   );
 
   const endPointer = useCallback(
@@ -192,12 +276,16 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
         bk.pinchStartDist = null;
         bk.pinchStartView = null;
       }
-      if (bk.last.size === 0 && bk.dragging) {
-        bk.dragging = false;
-        setPanning(false);
+      if (bk.last.size === 0) {
+        // Gesture over: land the previewed view in one repaint.
+        commitPreview();
+        if (bk.dragging || panning) {
+          bk.dragging = false;
+          setPanning(false);
+        }
       }
     },
-    [],
+    [commitPreview, panning],
   );
 
   const onPointerMove = useCallback(
@@ -225,7 +313,8 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
           const midClientY = (pts[0].clientY + pts[1].clientY) / 2;
           const anchor = clientPointToMap(midClientX, midClientY);
           const factor = dist / startDist;
-          setView(zoomView(startView, factor, anchor.x, anchor.y, width, height, maxScale));
+          markDragged();
+          applyPreview(zoomView(startView, factor, anchor.x, anchor.y, width, height, maxScale));
         }
         return;
       }
@@ -254,9 +343,10 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
       const { dx, dy } = clientDeltaToMapUnits(e.clientX - last.clientX, e.clientY - last.clientY);
       bk.last.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
       markDragged();
-      setView((prev) => clampView({ x: prev.x - dx, y: prev.y - dy, w: prev.w, h: prev.h }, width, height));
+      const v = liveView();
+      applyPreview(clampView({ x: v.x - dx, y: v.y - dy, w: v.w, h: v.h }, width, height));
     },
-    [clientDeltaToMapUnits, clientPointToMap, endPointer, markDragged, width, height, maxScale],
+    [applyPreview, clientDeltaToMapUnits, clientPointToMap, endPointer, liveView, markDragged, width, height, maxScale],
   );
 
   const onPointerLeave = useCallback(
@@ -277,10 +367,20 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
       if (e.cancelable) e.preventDefault();
       svgRef.current = e.currentTarget;
       const anchor = clientPointToMap(e.clientX, e.clientY);
-      const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-      zoomBy(factor, anchor);
+      // Proportional to the delta: a gentle trackpad glide zooms gently, a
+      // mouse notch steps ~1.25x. The old fixed 1.5x per event turned
+      // high-rate trackpad streams into instant max-zoom slams.
+      const sensitivity = e.ctrlKey ? WHEEL_PINCH_SENSITIVITY : WHEEL_SENSITIVITY;
+      const factor = Math.exp(-e.deltaY * sensitivity);
+      applyPreview(zoomView(liveView(), factor, anchor.x, anchor.y, width, height, maxScale));
+      // Wheels have no "gesture end" — commit when the stream goes quiet.
+      if (wheelTimer.current !== null) clearTimeout(wheelTimer.current);
+      wheelTimer.current = setTimeout(() => {
+        wheelTimer.current = null;
+        commitPreview();
+      }, WHEEL_COMMIT_MS);
     },
-    [clientPointToMap, zoomBy],
+    [applyPreview, clientPointToMap, commitPreview, liveView, width, height, maxScale],
   );
 
   const eps = 1e-6;
