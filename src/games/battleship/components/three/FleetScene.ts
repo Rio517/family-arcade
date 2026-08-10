@@ -36,6 +36,7 @@ export class FleetScene {
   private shipsGroup = new THREE.Group();
   private markGroup = new THREE.Group();
   private fires: THREE.Group[] = [];
+  private smokes: THREE.Group[] = [];
   private bobbing: THREE.Group[] = [];
   private water: THREE.Mesh;
   private waterBase: Float32Array;
@@ -159,6 +160,7 @@ export class FleetScene {
     this.shipsGroup.clear();
     this.markGroup.clear();
     this.fires = [];
+    this.smokes = [];
     this.bobbing = [];
 
     for (const ship of ships) {
@@ -201,7 +203,6 @@ export class FleetScene {
       }
       return 3;
     };
-    const smokeMat = new THREE.MeshStandardMaterial({ color: '#20242c', transparent: true, opacity: 0.7, roughness: 1 });
     const foamMat = new THREE.MeshBasicMaterial({ color: '#cfe8f2', transparent: true, opacity: 0.55 });
     for (let r = 0; r < BOARD_SIZE; r++) {
       for (let c = 0; c < BOARD_SIZE; c++) {
@@ -219,23 +220,26 @@ export class FleetScene {
           ring2.position.set(x, 0.07, z);
           this.markGroup.add(ring2);
         } else if (state === 'sunk') {
-          // A dead hull smoulders: low dark smoke, no live flame.
-          const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), smokeMat);
-          smoke.position.set(x, 0.12, z);
-          smoke.scale.y = 1.4;
+          // A dead hull smoulders: heavy dark smoke hanging low, no live flame.
+          const smoke = buildSmoke(1.15, r * BOARD_SIZE + c, '#2b303a', 0.14, 0.16);
+          smoke.position.x = x;
+          smoke.position.z = z;
           this.markGroup.add(smoke);
+          this.smokes.push(smoke);
         } else {
           // A burning deck: crossed flame sprites sized to the ship, with a
-          // glowing base and smoke above. Flickered in the render loop.
+          // glowing base and a soft puff climbing off the tip. Both are
+          // animated in the render loop.
           const grew = 0.72 + 0.12 * shipSizeAt(r, c);
           const flame = buildFlame(grew, r * BOARD_SIZE + c);
           flame.position.set(x, 0.2, z);
           this.markGroup.add(flame);
           this.fires.push(flame);
-          const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), smokeMat);
-          smoke.position.set(x, 0.28 + 0.34 * grew, z);
-          smoke.scale.set(1.1, 1.5, 1.1);
+          const smoke = buildSmoke(0.62 * grew, r * BOARD_SIZE + c + 37, '#3a3f4a', 0.24 + 0.5 * grew, 0.34);
+          smoke.position.x = x;
+          smoke.position.z = z;
           this.markGroup.add(smoke);
+          this.smokes.push(smoke);
         }
       }
     }
@@ -278,6 +282,19 @@ export class FleetScene {
         const s = 1 + 0.14 * Math.sin(now / 95 + seed) + 0.07 * Math.sin(now / 43 + seed * 2.7);
         flame.scale.set(base * s, base * (2.05 - s), base * s);
         flame.rotation.y = seed + now / 1600;
+      }
+      for (const smoke of this.smokes) {
+        const seed = smoke.userData.seed as number;
+        const base = smoke.userData.base as number;
+        const baseY = smoke.userData.baseY as number;
+        const rise = smoke.userData.rise as number;
+        const mat = smoke.userData.mat as THREE.MeshBasicMaterial;
+        // Each puff climbs off its fire, swelling and thinning, then re-forms.
+        const t = (now / 2600 + seed) % 1;
+        smoke.position.y = baseY + rise * t;
+        smoke.scale.setScalar(base * (0.85 + 0.55 * t));
+        mat.opacity = 0.5 * Math.sin(Math.PI * t);
+        smoke.rotation.y = seed + now / 2300;
       }
     }
 
@@ -379,6 +396,73 @@ function buildFlame(base: number, seed: number): THREE.Group {
   group.userData.base = base;
   group.userData.seed = seed * 0.73;
   group.scale.setScalar(base);
+  return group;
+}
+
+let smokeTextureCache: THREE.CanvasTexture | null = null;
+
+/**
+ * A soft smoke puff: overlapping blurred blobs fading to nothing at the edge,
+ * painted white so the material's colour supplies the grey. Drawn once and
+ * shared by every plume on the board.
+ */
+function smokeTexture(): THREE.CanvasTexture {
+  if (smokeTextureCache) return smokeTextureCache;
+  const size = 96;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const blobs: Array<[number, number, number, number]> = [
+    [0.5, 0.52, 0.34, 0.55],
+    [0.36, 0.42, 0.22, 0.4],
+    [0.64, 0.4, 0.2, 0.4],
+    [0.5, 0.66, 0.24, 0.35],
+  ];
+  for (const [bx, by, radius, alpha] of blobs) {
+    const g = ctx.createRadialGradient(bx * size, by * size, 1, bx * size, by * size, radius * size);
+    g.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+    g.addColorStop(0.6, `rgba(255, 255, 255, ${alpha * 0.45})`);
+    g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  smokeTextureCache = tex;
+  return tex;
+}
+
+/**
+ * A smoke plume: two crossed soft-puff sprites (normal blending — smoke
+ * shades, it doesn't glow). The render loop walks it from `baseY` up through
+ * `rise`, swelling and thinning as it climbs; without motion it holds the
+ * mid-climb pose so reduced-motion players still see smoke, not a freeze at
+ * an odd instant.
+ */
+function buildSmoke(base: number, seed: number, tint: string, baseY: number, rise: number): THREE.Group {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({
+    map: smokeTexture(),
+    color: tint,
+    transparent: true,
+    opacity: 0.5,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const geo = new THREE.PlaneGeometry(0.5, 0.5);
+  for (let i = 0; i < 2; i++) {
+    const puff = new THREE.Mesh(geo, mat);
+    puff.rotation.y = (i * Math.PI) / 2 + (seed % 5) * 0.4;
+    group.add(puff);
+  }
+  group.userData.base = base;
+  group.userData.seed = seed * 0.61;
+  group.userData.baseY = baseY;
+  group.userData.rise = rise;
+  group.userData.mat = mat;
+  // The static (reduced-motion) pose: mid-climb, mid-swell.
+  group.position.y = baseY + rise * 0.45;
+  group.scale.setScalar(base * 1.1);
   return group;
 }
 

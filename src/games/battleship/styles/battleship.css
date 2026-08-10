@@ -461,14 +461,15 @@
 .lobby-door-solo .lobby-eyebrow { color: #fbbf24; }
 .btn-amber { border-color: #fbbf24; color: #fbbf24; background: rgba(251, 191, 36, 0.09); }
 
-/* Captain ladder rows: a level chip with pips, then name + what it means. */
+/* Captain ladder rows: a level chip with pips, then name + what it means.
+   .btn centres its content; these rows left-align so the chips share an edge. */
 .lobby-captain {
-  display: flex; flex-direction: row; align-items: center; gap: 14px;
+  display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px;
   text-align: left; padding: 12px 14px;
 }
 .lobby-captain-level {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  min-width: 52px; padding: 6px 8px;
+  min-width: 52px; padding: 6px 8px; flex-shrink: 0;
   border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
   font-size: 14px; color: #fbbf24;
 }
@@ -478,7 +479,7 @@
   background: var(--surface); border: 1px solid var(--border);
 }
 .lobby-captain-pips i.on { background: #fbbf24; border-color: #fbbf24; }
-.lobby-captain-who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.lobby-captain-who { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .lobby-captain-rank { font-style: normal; font-weight: 600; color: var(--muted); font-size: 14px; }
 .lobby-captain-tag { font-size: 14px; font-weight: 400; }
 
