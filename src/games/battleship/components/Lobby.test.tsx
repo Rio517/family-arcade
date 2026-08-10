@@ -42,7 +42,7 @@ describe('<Lobby>', () => {
   });
 
   it('pre-fills a shared join code', () => {
-    render(<Lobby name="Kid" onName={vi.fn()} onHost={vi.fn()} onJoin={vi.fn()} initialJoinCode="wxyz" />);
+    render(<Lobby name="Kid" onName={vi.fn()} onHost={vi.fn()} onJoin={vi.fn()} onSolo={vi.fn()} initialJoinCode="wxyz" />);
     expect((screen.getByTestId('code-input') as HTMLInputElement).value).toBe('WXYZ');
   });
 
