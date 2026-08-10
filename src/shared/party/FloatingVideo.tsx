@@ -63,8 +63,12 @@ export function FloatingVideo() {
 
   if (!call.active) return null;
 
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (grab.current) return; // one pointer drives the card at a time
+  const onPointerDown = (e: React.PointerEvent<HTMLElement>) => {
+    // One pointer drives the card at a time — but a grab that never saw its
+    // pointerup (the pointer slid off before the threshold, so nothing was
+    // captured and the up landed elsewhere) is stale, and a fresh press
+    // replaces it rather than being locked out.
+    if (grab.current?.dragging) return;
     const rect = e.currentTarget.getBoundingClientRect();
     grab.current = {
       pointerId: e.pointerId,
@@ -78,10 +82,17 @@ export function FloatingVideo() {
     // follow-up click to this card and starve any control inside it — the
     // bug that once made every Risk territory unclickable.
   };
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onPointerMove = (e: React.PointerEvent<HTMLElement>) => {
     const g = grab.current;
     if (!g || e.pointerId !== g.pointerId) return;
     if (!g.dragging) {
+      if (e.buttons === 0) {
+        // A mouse keeps its pointerId across gestures, so after a missed
+        // pointerup a bare hover would match the stale grab and drag the
+        // card with no button held. Touch moves always report buttons=1.
+        grab.current = null;
+        return;
+      }
       if (Math.hypot(e.clientX - g.originX, e.clientY - g.originY) <= DRAG_THRESHOLD_PX) return;
       g.dragging = true;
       const el = e.currentTarget;
@@ -95,7 +106,7 @@ export function FloatingVideo() {
     }
     setPos(clampToViewport(e.clientX - g.grabX, e.clientY - g.grabY));
   };
-  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onPointerUp = (e: React.PointerEvent<HTMLElement>) => {
     const g = grab.current;
     if (g?.dragging) {
       const el = e.currentTarget;
@@ -113,7 +124,8 @@ export function FloatingVideo() {
   const style = pos ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' } : undefined;
 
   return (
-    <div
+    <aside
+      aria-label="Video call"
       className="pv"
       style={style}
       onPointerDown={onPointerDown}
@@ -150,6 +162,6 @@ export function FloatingVideo() {
           )}
         </span>
       </div>
-    </div>
+    </aside>
   );
 }
