@@ -247,6 +247,7 @@ export function BattleshipPage() {
             onName={profile.setName}
             onHost={bs.hostGame}
             onJoin={bs.joinGame}
+            onSolo={bs.startSoloGame}
             initialJoinCode={joinCode ?? undefined}
           />
         </div>

@@ -6,8 +6,9 @@ function setup(name = 'Rio') {
   const onName = vi.fn();
   const onHost = vi.fn();
   const onJoin = vi.fn();
-  render(<Lobby name={name} onName={onName} onHost={onHost} onJoin={onJoin} />);
-  return { onName, onHost, onJoin };
+  const onSolo = vi.fn();
+  render(<Lobby name={name} onName={onName} onHost={onHost} onJoin={onJoin} onSolo={onSolo} />);
+  return { onName, onHost, onJoin, onSolo };
 }
 
 describe('<Lobby>', () => {
@@ -43,6 +44,19 @@ describe('<Lobby>', () => {
   it('pre-fills a shared join code', () => {
     render(<Lobby name="Kid" onName={vi.fn()} onHost={vi.fn()} onJoin={vi.fn()} initialJoinCode="wxyz" />);
     expect((screen.getByTestId('code-input') as HTMLInputElement).value).toBe('WXYZ');
+  });
+
+  it('offers a battle against the computer with the captain ladder', () => {
+    const { onSolo } = setup('Klara');
+    fireEvent.click(screen.getByTestId('solo-game'));
+    // Four captains, gentlest first, each a full-name button.
+    const ladder = ['bobble', 'marlin', 'wake', 'grimtide'].map((id) =>
+      screen.getByTestId(`captain-${id}`),
+    );
+    expect(ladder[0]).toHaveTextContent('Deckhand Bobble');
+    expect(ladder[3]).toHaveTextContent('Admiral Grimtide');
+    fireEvent.click(ladder[2]);
+    expect(onSolo).toHaveBeenCalledWith('wake', 'Klara');
   });
 
   it('offers the family roster as one-tap name chips, in house order', () => {
