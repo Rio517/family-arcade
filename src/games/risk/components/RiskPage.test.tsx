@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RiskPage } from './RiskPage';
 
@@ -194,6 +194,33 @@ describe('<RiskPage>', () => {
     const tid = firstTerr.getAttribute('data-testid')!.replace(/^terr-/, 'token-');
     fireEvent.click(screen.getByTestId(tid));
     expect(firstTerr.getAttribute('aria-label')).toMatch(/, 1 army$/);
+  });
+
+  it('musters a computer general from the war council', async () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('count-2'));
+
+    // Toggling seat 2 to a computer swaps its name box for the persona ladder.
+    fireEvent.click(screen.getByTestId('seat-bot-1'));
+    expect(screen.queryByTestId('name-1')).toBeNull();
+    fireEvent.click(screen.getByTestId('persona-1-flint'));
+    fireEvent.click(screen.getByTestId('risk-start'));
+
+    // The human claims one land; the plaque hands off to General Flint…
+    fireEvent.click(boardEl().querySelectorAll<SVGPathElement>('.risk-terr')[0]);
+    const general = () => screen.getByTestId('risk-turn').querySelector('strong')?.textContent ?? '';
+    expect(general()).toBe('General Flint');
+
+    // …who thinks for a moment, claims a land of his own, and hands back.
+    await waitFor(() => expect(general()).not.toBe('General Flint'), { timeout: 3000 });
+  });
+
+  it('toggling a computer seat back restores the name box', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('seat-bot-0'));
+    expect(screen.queryByTestId('name-0')).toBeNull();
+    fireEvent.click(screen.getByTestId('seat-bot-0'));
+    expect(screen.getByTestId('name-0')).toBeInTheDocument();
   });
 
   it('opens the how-to-play guide automatically on the first ever visit', () => {

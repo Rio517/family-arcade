@@ -7,9 +7,13 @@ import { useRisk } from '../state/useRisk';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { MAPS } from '../maps/registry';
+import type { RiskMap } from '../maps/types';
 import { currentPlayer, hasUnclaimed, territoriesOf, type NewPlayer } from '../domain/rules';
 import { clearRiskGame, loadRiskGame, type StoredRisk } from '../storage/riskPersistence';
-import { ResumeIcon } from '@shared/ui/icons';
+// Persona metadata only — the bot BRAIN stays behind the dynamic import in
+// useRisk, so human-only campaigns never download it.
+import { personaById, RISK_PERSONAS } from '../domain/bots/personas';
+import { BotIcon, PersonIcon, ResumeIcon } from '@shared/ui/icons';
 import type { BattleResult, DiceMode, GameState } from '../domain/types';
 
 // Heraldic tinctures — a general's banner. Kept bright enough that the dark
@@ -39,6 +43,8 @@ export function RiskPage() {
   const navigate = useNavigate();
   const [count, setCount] = useState(3);
   const [names, setNames] = useState<string[]>(PLAYER_NAMES.slice());
+  // Persona id per seat, or null for a human chair.
+  const [seats, setSeats] = useState<(string | null)[]>(Array(6).fill(null));
   const [mapId, setMapId] = useState(MAPS[0].id);
   const [diceMode, setDiceMode] = useState<DiceMode>('random');
 
@@ -63,10 +69,12 @@ export function RiskPage() {
   }
 
   function start() {
-    const players: NewPlayer[] = Array.from({ length: count }, (_, i) => ({
-      name: names[i]?.trim() || PLAYER_NAMES[i],
-      color: PLAYER_COLORS[i],
-    }));
+    const players: NewPlayer[] = Array.from({ length: count }, (_, i) => {
+      const persona = seats[i];
+      return persona
+        ? { name: personaById(persona).name, color: PLAYER_COLORS[i], bot: persona }
+        : { name: names[i]?.trim() || PLAYER_NAMES[i], color: PLAYER_COLORS[i] };
+    });
     risk.start({ mapId, players, diceMode });
   }
 
@@ -119,20 +127,63 @@ export function RiskPage() {
               {Array.from({ length: count }, (_, i) => (
                 <div className="risk-player-row" key={i}>
                   <span className="risk-seal" style={{ ['--pc' as string]: PLAYER_COLORS[i] }} />
-                  <input
-                    value={names[i] ?? ''}
-                    maxLength={16}
-                    placeholder={PLAYER_NAMES[i]}
-                    onChange={(e) => {
-                      const next = names.slice();
-                      next[i] = e.target.value;
-                      setNames(next);
+                  {seats[i] === null ? (
+                    <input
+                      value={names[i] ?? ''}
+                      maxLength={16}
+                      placeholder={PLAYER_NAMES[i]}
+                      onChange={(e) => {
+                        const next = names.slice();
+                        next[i] = e.target.value;
+                        setNames(next);
+                      }}
+                      data-testid={`name-${i}`}
+                    />
+                  ) : (
+                    <div className="risk-personas" role="radiogroup" aria-label={`Computer general for seat ${i + 1}`}>
+                      {RISK_PERSONAS.map((p) => (
+                        <button
+                          key={p.id}
+                          className={`risk-choice risk-persona ${seats[i] === p.id ? 'on' : ''}`}
+                          role="radio"
+                          aria-checked={seats[i] === p.id}
+                          title={p.tagline}
+                          onClick={() => {
+                            const next = seats.slice();
+                            next[i] = p.id;
+                            setSeats(next);
+                          }}
+                          data-testid={`persona-${i}-${p.id}`}
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    className={`risk-choice risk-seat-kind ${seats[i] !== null ? 'on' : ''}`}
+                    aria-pressed={seats[i] !== null}
+                    aria-label={
+                      seats[i] === null
+                        ? `Seat ${i + 1}: a person — tap for a computer general`
+                        : `Seat ${i + 1}: a computer general — tap for a person`
+                    }
+                    onClick={() => {
+                      const next = seats.slice();
+                      next[i] = next[i] === null ? RISK_PERSONAS[0].id : null;
+                      setSeats(next);
                     }}
-                    data-testid={`name-${i}`}
-                  />
+                    data-testid={`seat-bot-${i}`}
+                  >
+                    {seats[i] === null ? <PersonIcon size={18} /> : <BotIcon size={18} />}
+                  </button>
                 </div>
               ))}
             </div>
+            <p className="risk-note" style={{ marginTop: 10 }}>
+              Tap the little figure to seat a computer general — pick a gentler or
+              fiercer one for each chair.
+            </p>
           </div>
 
           {MAPS.length > 1 && (
