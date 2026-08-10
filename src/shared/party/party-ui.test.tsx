@@ -89,4 +89,63 @@ describe('FloatingVideo', () => {
     render(<FloatingVideo />);
     expect(screen.getByTestId('party-floating-video')).toBeInTheDocument();
   });
+
+  // Dragging the card must follow the Risk-map rule: capture the pointer only
+  // once movement crosses the drag threshold. Capturing on the bare press
+  // retargets the follow-up click to the card — which would silently kill any
+  // button (mute, close…) this card grows in the future.
+  describe('dragging', () => {
+    function renderCard() {
+      mockParty.value = makeParty({ theirName: 'Kai', call: { ...makeParty().call, active: true, status: 'live' } });
+      render(<FloatingVideo />);
+      const card = screen.getByTestId('party-floating-video') as HTMLElement & {
+        setPointerCapture: ReturnType<typeof vi.fn>;
+        releasePointerCapture: ReturnType<typeof vi.fn>;
+      };
+      // jsdom has no pointer capture; observe the calls instead.
+      card.setPointerCapture = vi.fn();
+      card.releasePointerCapture = vi.fn();
+      return card;
+    }
+
+    // jsdom has no PointerEvent, and testing-library's pointer fallback drops
+    // the coordinates — a MouseEvent with pointerId bolted on carries them.
+    function firePointer(
+      el: Element,
+      type: 'pointerdown' | 'pointermove' | 'pointerup',
+      init: { pointerId: number; clientX: number; clientY: number },
+    ) {
+      const ev = new MouseEvent(type, { bubbles: true, clientX: init.clientX, clientY: init.clientY });
+      Object.assign(ev, { pointerId: init.pointerId });
+      fireEvent(el, ev);
+    }
+
+    it('a press with sub-threshold movement neither captures nor moves the card', () => {
+      const card = renderCard();
+      firePointer(card, 'pointerdown', { pointerId: 1, clientX: 100, clientY: 100 });
+      firePointer(card, 'pointermove', { pointerId: 1, clientX: 103, clientY: 103 });
+      firePointer(card, 'pointerup', { pointerId: 1, clientX: 103, clientY: 103 });
+      expect(card.setPointerCapture).not.toHaveBeenCalled();
+      expect(card.style.left).toBe('');
+    });
+
+    it('crossing the threshold captures once, moves the card, and releases on pointerup', () => {
+      const card = renderCard();
+      firePointer(card, 'pointerdown', { pointerId: 1, clientX: 100, clientY: 100 });
+      firePointer(card, 'pointermove', { pointerId: 1, clientX: 110, clientY: 112 });
+      expect(card.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(card.style.left).not.toBe('');
+      firePointer(card, 'pointerup', { pointerId: 1, clientX: 110, clientY: 112 });
+      expect(card.releasePointerCapture).toHaveBeenCalled();
+    });
+
+    it('ignores a second pointer while the first is dragging', () => {
+      const card = renderCard();
+      firePointer(card, 'pointerdown', { pointerId: 1, clientX: 100, clientY: 100 });
+      firePointer(card, 'pointermove', { pointerId: 1, clientX: 120, clientY: 100 });
+      const after = card.style.left;
+      firePointer(card, 'pointermove', { pointerId: 2, clientX: 400, clientY: 400 });
+      expect(card.style.left).toBe(after);
+    });
+  });
 });
