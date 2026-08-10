@@ -33,8 +33,13 @@ export interface GameDescriptor {
   id: string;
   /** Menu title, e.g. "Ship Battle". */
   title: string;
-  /** Optional pill next to the title, e.g. "2-Player". */
+  /** Optional pill next to the title for extras like "3D" — player counts and
+   * computer support have their own structured badges below. */
   tag?: string;
+  /** How many people can play — worn as a badge on the landing ticket. */
+  players: { min: number; max: number };
+  /** True when the game seats computer opponents (ADR 0009). */
+  computer?: boolean;
   /** Route path, e.g. "/play". */
   path: string;
   /** One-line menu blurb. */

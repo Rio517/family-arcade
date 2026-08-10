@@ -320,6 +320,25 @@
   color: var(--c);
   margin-left: 8px;
 }
+/* Little fairground stamps on each ticket: how many players, and the robot
+   for games that seat computer opponents. Tooltips carry the long version. */
+.tk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  vertical-align: 2px;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border: 1px solid rgba(147, 160, 189, 0.45);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #b9c4dd;
+}
+.tk-badge svg { color: var(--c); }
 .tk-desc {
   display: block;
   font-size: 14px;

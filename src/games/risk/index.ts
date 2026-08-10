@@ -20,7 +20,8 @@ function savedGames(): SavedGameSummary[] {
 export const risk: GameDescriptor = {
   id: 'risk',
   title: 'Risk',
-  tag: '2–6 Players',
+  players: { min: 2, max: 6 },
+  computer: true,
   path: '/risk',
   description: 'World conquest on one shared board. Reinforce, attack with dice, and take over the map.',
   Icon: GlobeIcon,
