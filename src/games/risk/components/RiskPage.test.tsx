@@ -112,6 +112,12 @@ describe('<RiskPage>', () => {
     expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Claim/i);
     expect(screen.getByTestId('risk-stage')).toBeInTheDocument();
     expect(screen.getByTestId('risk-turn')).toBeInTheDocument();
+
+    // The parchment is a baked bitmap, never a live feTurbulence filter — the
+    // filter re-generated its noise on every zoom-scale change, which is what
+    // made pinch cost seconds per frame on tablets.
+    expect(boardEl().querySelector('feTurbulence')).toBeNull();
+    expect(boardEl().querySelector('.risk-sea')?.getAttribute('filter')).toBeNull();
   });
 
   it('deploy alternates generals automatically after each army', () => {

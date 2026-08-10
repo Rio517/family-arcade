@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
 import { useMapZoom } from './useMapZoom';
@@ -13,9 +13,12 @@ function parseViewBox(viewBox: string): [number, number, number, number] {
 }
 
 /** Mimics the real jsdom <svg>: getBoundingClientRect is all zeros, and
- *  pointer capture is unimplemented (undefined), not merely a no-op. */
+ *  pointer capture is unimplemented (undefined), not merely a no-op. The
+ *  style object is real, though — the hook writes the gesture preview
+ *  transform to it. */
 function fakeSvg() {
   return {
+    style: { transform: '' },
     getBoundingClientRect: () => ({
       x: 0,
       y: 0,
@@ -31,12 +34,18 @@ function fakeSvg() {
 }
 
 const currentTarget = fakeSvg();
+const svgStyle = (currentTarget as unknown as { style: { transform: string } }).style;
 
 function pointer(pointerId: number, clientX: number, clientY: number) {
   return { pointerId, clientX, clientY, currentTarget } as unknown as ReactPointerEvent<SVGSVGElement>;
 }
 
 describe('useMapZoom', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    svgStyle.transform = '';
+  });
+
   it('defaults to the whole map in view', () => {
     const { result } = renderHook(() => useMapZoom(WIDTH, HEIGHT));
     expect(result.current.viewBox).toBe(`0 0 ${WIDTH} ${HEIGHT}`);
@@ -165,6 +174,84 @@ describe('useMapZoom', () => {
 
     expect(result.current.viewBox).toBe(before);
     expect(result.current.panning).toBe(false);
+  });
+
+  // ── Gesture preview: pans and pinches ride a cheap CSS transform and the
+  // expensive viewBox repaint happens ONCE, when the fingers lift. ──────────
+
+  it('defers a pan to a transform preview and commits the viewBox on release', () => {
+    const { result } = renderHook(() => useMapZoom(WIDTH, HEIGHT));
+    act(() => result.current.zoomIn());
+    const before = result.current.viewBox;
+    const [bx, by] = parseViewBox(before);
+
+    act(() => {
+      result.current.bind.onPointerDown(pointer(1, 100, 100));
+      result.current.bind.onPointerMove(pointer(1, 60, 80));
+    });
+    // Mid-drag: the committed viewBox is untouched; the preview transform moves the map.
+    expect(result.current.viewBox).toBe(before);
+    expect(svgStyle.transform).not.toBe('');
+
+    act(() => {
+      result.current.bind.onPointerUp(pointer(1, 60, 80));
+    });
+    // Release: one commit, in map units (1:1 px fallback without layout), preview cleared.
+    const [ax, ay] = parseViewBox(result.current.viewBox);
+    expect(ax).toBeCloseTo(bx + 40, 4);
+    expect(ay).toBeCloseTo(by + 20, 4);
+    expect(svgStyle.transform).toBe('');
+  });
+
+  it('defers a pinch and commits the zoomed viewBox when the fingers lift', () => {
+    const { result } = renderHook(() => useMapZoom(WIDTH, HEIGHT));
+
+    act(() => {
+      result.current.bind.onPointerDown(pointer(1, 200, 250));
+      result.current.bind.onPointerDown(pointer(2, 400, 250));
+      result.current.bind.onPointerMove(pointer(2, 600, 250));
+    });
+    // Mid-pinch: committed scale still 1, the preview transform carries the zoom.
+    expect(result.current.scale).toBe(1);
+    expect(result.current.panning).toBe(true);
+    expect(svgStyle.transform).toContain('scale');
+
+    act(() => {
+      result.current.bind.onPointerUp(pointer(1, 200, 250));
+      result.current.bind.onPointerUp(pointer(2, 600, 250));
+    });
+    expect(result.current.scale).toBeCloseTo(2, 5);
+    expect(svgStyle.transform).toBe('');
+    // The pinch's trailing click must not select a territory.
+    expect(result.current.wasDragged()).toBe(true);
+  });
+
+  it('wheel zoom scales with the delta and commits after the stream goes quiet', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useMapZoom(WIDTH, HEIGHT));
+    const wheel = (deltaY: number) =>
+      ({ clientX: 500, clientY: 250, deltaY, cancelable: true, preventDefault: () => {}, currentTarget }) as unknown as ReactWheelEvent<SVGSVGElement>;
+
+    act(() => {
+      result.current.bind.onWheel(wheel(-100));
+    });
+    // Streaming: preview only, no commit yet.
+    expect(result.current.scale).toBe(1);
+    expect(svgStyle.transform).toContain('scale');
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    const gentle = result.current.scale;
+    expect(gentle).toBeGreaterThan(1);
+    expect(svgStyle.transform).toBe('');
+
+    act(() => {
+      result.current.bind.onWheel(wheel(-300));
+      vi.advanceTimersByTime(300);
+    });
+    // A bigger delta zooms further in one event — no more fixed 1.5x slam.
+    expect(result.current.scale / gentle).toBeGreaterThan(gentle);
   });
 
   it('a finger that left the map pre-threshold does not turn the next pan into a pinch', () => {
