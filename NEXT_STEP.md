@@ -11,6 +11,48 @@ Sorted by likely value. Nothing here blocks anything else.
 
 ### Code
 
+- **Cross-game player names, asked for once.** Requested 2026-08-10. Today
+  every game invents its own name entry: Risk has six text inputs on its setup
+  screen, Ship Battle asks again, chess again. The family types the same five
+  names every single time.
+
+  The shape asked for:
+
+  1. Names become an **app-level concern**, not a per-game one. Opening a game
+     raises a modal asking who's playing — player 1 first, then player 2 if the
+     game has one — rather than each game rolling its own form.
+  2. The answer is **remembered** so it's a default, not a question. Player 1 in
+     particular should effectively be set once per device.
+  3. Keep a **roster of the last ten players** and offer it for autofill, so the
+     second and third child are a tap rather than a typing exercise.
+  4. Make picking from that roster feel good — the ask was for something like a
+     **live search**: type two letters, the matching names filter down, Enter
+     takes the top one. Being fast for a seven-year-old is the whole point.
+
+  Decisions worth making before writing code, none of them settled:
+
+  - **Where it lives.** `src/shared/` — shared never imports a game, so this
+    has to be a shared provider (`PlayerProvider`?) that games read from, with
+    the registry saying how many players a game wants. `PartyContext` already
+    holds a `myName` and is the closest existing thing; check whether this
+    should extend it rather than sit beside it.
+  - **Storage.** localStorage, keyed and versioned like
+    `risk-help-seen-v1` / `riskPersistence`. The user said "local session" —
+    worth confirming whether they mean it should survive a browser restart
+    (localStorage) or not (sessionStorage). Assume localStorage; that's what
+    "so I don't retype it" implies.
+  - **Per-game overrides.** Risk names its generals Crimson/Cobalt/Forest by
+    default and those are colour names, not people. Decide whether the roster
+    replaces them or seeds them.
+  - **Online play.** Ship Battle and chess send a name over the wire
+    (`PartyMsg` length-bounds it). Any change here has to keep that path intact.
+  - **Not a login.** No accounts, no server, no personal data leaving the
+    device — the arcade is offline-first and should stay that way.
+
+  Scope: this touches shared state, storage, at least three games' setup
+  screens, and the registry. It is a session's work on its own, which is why
+  it's written down rather than bolted onto the Risk styling branch.
+
 - **Ship Battle visual glow-up — image-asset ships.** The whole plan is in
   "The Ship Battle glow-up" below. This is the active piece of work; assets are
   being generated now.
