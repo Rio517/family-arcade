@@ -51,7 +51,13 @@ export function ChessBoard({
   onMove,
 }: ChessBoardProps) {
   const [selected, setSelected] = useState<Square | null>(null);
-  const [drag, setDrag] = useState<{ from: Square; x: number; y: number; over: Square | null } | null>(null);
+  const [drag, setDrag] = useState<{
+    from: Square;
+    pointerId: number;
+    x: number;
+    y: number;
+    over: Square | null;
+  } | null>(null);
   const [promotion, setPromotion] = useState<{ from: Square; to: Square } | null>(null);
   useDismissOnEscape(promotion !== null, () => setPromotion(null));
   const gridRef = useRef<HTMLDivElement>(null);
@@ -128,16 +134,24 @@ export function ChessBoard({
     if (!canPickUp(sq)) return;
     e.preventDefault();
     setSelected(sq);
-    setDrag({ from: sq, x: e.clientX, y: e.clientY, over: sq });
+    setDrag({ from: sq, pointerId: e.pointerId, x: e.clientX, y: e.clientY, over: sq });
   };
 
   useEffect(() => {
     if (!drag) return;
     const from = drag.from;
+    const pointerId = drag.pointerId;
+    // The listeners stay attached until React flushes and cleans up, so a
+    // duplicate or foreign pointerup could otherwise commit a second time —
+    // and a doubled onMove corrupts the event-sourced game log.
+    let done = false;
     const onMoveEvt = (e: globalThis.PointerEvent) => {
+      if (done || e.pointerId !== pointerId) return;
       setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY, over: squareFromPoint(e.clientX, e.clientY) } : d));
     };
     const onUp = (e: globalThis.PointerEvent) => {
+      if (done || e.pointerId !== pointerId) return;
+      done = true;
       // Commit here in the event handler, never inside the setDrag updater —
       // an updater runs during render, where updating the parent is illegal.
       const to = squareFromPoint(e.clientX, e.clientY);
@@ -153,11 +167,18 @@ export function ChessBoard({
         }, 0);
       }
     };
+    const onCancel = (e: globalThis.PointerEvent) => {
+      if (done || e.pointerId !== pointerId) return;
+      done = true;
+      setDrag(null);
+    };
     window.addEventListener('pointermove', onMoveEvt);
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
     return () => {
       window.removeEventListener('pointermove', onMoveEvt);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag?.from, selected]);

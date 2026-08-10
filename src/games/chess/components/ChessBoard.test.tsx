@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
 import { ChessBoard } from './ChessBoard';
 import { initialState } from '@games/chess/domain/rules';
 import { parseFen } from '@games/chess/domain/fen';
@@ -109,7 +109,9 @@ describe('<ChessBoard>', () => {
     it('drag-to-move commits exactly once, with no render-phase update of the parent', () => {
       const errSpy = vi.spyOn(console, 'error');
       const onPly = vi.fn();
-      render(<Harness onPly={onPly} />);
+      // StrictMode, like the real app shell: double-invoked updaters and
+      // re-mounted effects must not double the emitted move.
+      render(<StrictMode><Harness onPly={onPly} /></StrictMode>);
       byPoint.set('50,40', 'sq-e4');
 
       fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 50, clientY: 60 });
@@ -126,6 +128,39 @@ describe('<ChessBoard>', () => {
         args.some((a) => typeof a === 'string' && a.includes('Cannot update a component')),
       );
       expect(renderPhaseWarnings).toEqual([]);
+    });
+
+    it('duplicate pointerups emit the move exactly once (event-sourced log must never double)', () => {
+      const onPly = vi.fn();
+      render(<StrictMode><Harness onPly={onPly} /></StrictMode>);
+      byPoint.set('50,40', 'sq-e4');
+
+      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 50, clientY: 60 });
+      // A two-finger lift can deliver two pointerups in one batch, before
+      // React has re-rendered and detached the drag listeners.
+      act(() => {
+        windowPointer('pointermove', 50, 40);
+        windowPointer('pointerup', 50, 40);
+        windowPointer('pointerup', 50, 40);
+      });
+
+      expect(onPly).toHaveBeenCalledTimes(1);
+    });
+
+    it('a pointercancel abandons the drag without committing', () => {
+      const onPly = vi.fn();
+      render(<Harness onPly={onPly} />);
+      byPoint.set('50,40', 'sq-e4');
+
+      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 50, clientY: 60 });
+      act(() => {
+        windowPointer('pointermove', 50, 40);
+        window.dispatchEvent(new ((window.PointerEvent ?? window.MouseEvent) as typeof MouseEvent)('pointercancel', { bubbles: true }));
+      });
+
+      expect(onPly).not.toHaveBeenCalled();
+      // The ghost is gone: no square is marked as being dragged from.
+      expect(document.querySelector('.chess-drag')).toBeNull();
     });
 
     it('a tap keeps the piece selected even when the browser delivers the trailing click', () => {
