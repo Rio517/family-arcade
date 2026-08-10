@@ -49,13 +49,14 @@ const immediate = (fn: () => void) => {
 
 describe('LoopbackConnection', () => {
   it('plays a whole game against the scripted human, to a winner', async () => {
-    let conn!: LoopbackConnection;
-    const human = humanHarness(() => conn);
-    conn = new LoopbackConnection(human.handlers, {
+    const box: { conn?: LoopbackConnection } = {};
+    const human = humanHarness(() => box.conn!);
+    const conn = new LoopbackConnection(human.handlers, {
       personaId: 'grimtide',
       rng: seededRng(5),
       schedule: immediate,
     });
+    box.conn = conn;
     conn.host('SOLO');
     await conn.ready;
 
@@ -89,13 +90,14 @@ describe('LoopbackConnection', () => {
   });
 
   it('agrees to a rematch and places a fresh fleet', async () => {
-    let conn!: LoopbackConnection;
-    const human = humanHarness(() => conn);
-    conn = new LoopbackConnection(human.handlers, {
+    const box: { conn?: LoopbackConnection } = {};
+    const human = humanHarness(() => box.conn!);
+    const conn = new LoopbackConnection(human.handlers, {
       personaId: 'bobble',
       rng: seededRng(11),
       schedule: immediate,
     });
+    box.conn = conn;
     conn.host('SOLO');
     await conn.ready;
     human.placeAndReady();
@@ -122,9 +124,9 @@ describe('LoopbackConnection', () => {
 
   it('destroy() cancels anything still scheduled', async () => {
     const pending: (() => void)[] = [];
-    let conn!: LoopbackConnection;
-    const human = humanHarness(() => conn);
-    conn = new LoopbackConnection(human.handlers, {
+    const box: { conn?: LoopbackConnection } = {};
+    const human = humanHarness(() => box.conn!);
+    const conn = new LoopbackConnection(human.handlers, {
       personaId: 'wake',
       rng: seededRng(3),
       schedule: (fn) => {
@@ -135,6 +137,7 @@ describe('LoopbackConnection', () => {
         };
       },
     });
+    box.conn = conn;
     conn.host('SOLO');
     await conn.ready;
     const before = human.state;

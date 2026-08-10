@@ -12,9 +12,9 @@
  * sunk, so "which hits still need chasing" is recovered by replaying my shots
  * and clearing the chase list at every sink.
  */
-import { radarGrid, shotsBy } from '../engine';
+import { radarGrid, shotsBy, type CellState } from '../engine';
 import { FLEET } from '../constants';
-import { BOARD_SIZE, type CellState, type Coord, type GameLog, type Side } from '../types';
+import { BOARD_SIZE, type Coord, type GameLog, type Side } from '../types';
 import type { CaptainPersona } from './personas';
 
 interface View {
