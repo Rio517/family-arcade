@@ -82,6 +82,57 @@ Sorted by likely value. Nothing here blocks anything else.
   and the Racer world would turn "the scene still builds" into something CI
   could see.
 
+### Tidewave — what we want it for
+
+Installed 2026-08-10 (`tidewave()` Vite plugin + `.mcp.json`). Setup notes and
+the offline-invariant check live in `CLAUDE.md`; this is the work it's *for*.
+
+**The reason it's here.** A pointer-capture bug made every territory in Risk
+unclickable — `useMapZoom` captured on `pointerdown`, so the browser fired the
+click on the `<svg>` and the territory's handler never ran. Neither test suite
+noticed, because both drive the board with `dispatchEvent`, and a synthetic
+click bypasses pointer capture entirely. Two green suites and a correct-looking
+screenshot, over a game nobody could play. Tidewave's value here is that it
+drives the *real* app with *real* input.
+
+- **Audit every drag interaction in the arcade for the same bug class.** This is
+  the highest-value use and it follows directly from the above. Nothing in this
+  repo has ever been driven by a real pointer: chess piece drag-and-drop, Ship
+  Battle's ship-placement drag, Racer's controls, Risk's pan and pinch. All are
+  covered only by synthetic events, which is exactly the coverage that missed
+  the Risk bug. Assume the same failure is sitting in at least one of them.
+- **Re-verify Risk from the player's side** — tap a territory, drag to pan,
+  pinch to zoom, on touch emulation as well as mouse. `npm run risk:drag` proves
+  it under Playwright; this proves it in the thing the family actually uses.
+- **Accessibility on a running page.** The a11y floors in `CLAUDE.md` are
+  currently enforced *statically* — jsx-a11y catches JSX shapes, and nothing
+  checks a live page for contrast, focus order, or an unreachable control.
+  Tidewave Pro's accessibility reports fit that gap exactly.
+- **Client-side errors during play.** Nothing watches the console today. A
+  thrown error in a game loop is invisible until someone reports the symptom.
+- **Point-and-click design review.** The Risk redesign burned several
+  screenshot round-trips on "the thing in the top-right corner". Clicking the
+  element instead is the single biggest saving for the owner's time, as opposed
+  to the agent's.
+- **The party / P2P layer, which has no meaningful coverage at all.** Video,
+  voice and peer connection need live browsers; jsdom can't go near them. Even
+  driving one side of a call would be more than exists now.
+
+Limits worth knowing before leaning on it:
+
+- **Half of Tidewave doesn't apply here.** Its runtime intelligence is database,
+  server logs and framework introspection; this is a static offline-first PWA
+  with no backend. The value is entirely the browser-side features.
+- **It runs against `npm run dev`, not the production build.** Service-worker
+  and PWA behaviour differ between the two, and that difference has already
+  bitten us — the SW served cached models and defeated network throttling while
+  capturing the fleet loader. So it *complements* `npm run shots`, which serves
+  real `dist/`; it does not replace it.
+- **Keep the Playwright scripts.** `npm run shots` and `npm run risk:drag` are
+  committed, free, need no account or dev server, and are the reproducible
+  record. Tidewave is for exploration and for catching what we didn't think to
+  script; the scripts are for making sure it stays caught.
+
 ### Operations
 
 - Nothing pending. Branch `claude/starter-kit-alignment` is the current PR;
@@ -282,8 +333,16 @@ where the sync happens.
 
 ## Tooling reminders
 
-- `npm run shots` uses port 4317; `npm run dev` uses 5173. `pkill -f "vite
-  preview"` exits 144 — run it on its own or tolerate the code.
+- `npm run shots` uses port 4317; `npm run risk:drag` 4318; `npm run dev` 5173.
+  `pkill -f "vite preview"` exits 144 — run it on its own or tolerate the code.
+- Tidewave's MCP server *is* the dev server, at `localhost:5173/tidewave/mcp`.
+  No `npm run dev`, no Tidewave tools. And MCP servers are read at session
+  start, so installing one does nothing until Claude Code restarts.
+- **A synthetic click is not a click.** `dispatchEvent` bypasses pointer
+  capture, focus and event retargeting, so a handler can be completely broken
+  while every test that fires events by hand still passes. That is how the Risk
+  board shipped unclickable. When a bug is about *input*, reach for
+  `npm run risk:drag` or Tidewave, not another unit test.
 - `npm run glb -- --selftest` proves the model pipeline without needing a real
   GLB or any GPU quota. Run it if you touch `scripts/optimize-glb.mjs`.
 - Playwright browsers install per-machine: `npx playwright install chromium`.
