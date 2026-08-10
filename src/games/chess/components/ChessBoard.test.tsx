@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, fireEvent } from '@testing-library/react';
+import { useState } from 'react';
 import { ChessBoard } from './ChessBoard';
 import { initialState } from '@games/chess/domain/rules';
 import { parseFen } from '@games/chess/domain/fen';
@@ -58,6 +59,101 @@ describe('<ChessBoard>', () => {
     expect(screen.getByTestId('promote-q')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('promote-n')); // choose a knight
     expect(onMove).toHaveBeenCalledWith({ from: { row: 1, col: 0 }, to: { row: 0, col: 0 }, promotion: 'n' });
+  });
+
+  // ── Real pointer sequences ────────────────────────────────────────────
+  // A real tap or drag is pointerdown → pointerup → (sometimes) click; the
+  // click-only tests above never exercise that path. These do. The drop
+  // hit-test goes through document.elementFromPoint, which jsdom lacks, so
+  // each test maps "clientX,clientY" → square testid explicitly.
+
+  describe('pointer sequences', () => {
+    const byPoint = new Map<string, string>();
+    const originalElementFromPoint = document.elementFromPoint;
+
+    beforeEach(() => {
+      document.elementFromPoint = (x: number, y: number) => {
+        const id = byPoint.get(`${x},${y}`);
+        return id ? screen.getByTestId(id) : null;
+      };
+    });
+
+    afterEach(() => {
+      byPoint.clear();
+      document.elementFromPoint = originalElementFromPoint;
+      vi.restoreAllMocks();
+    });
+
+    function windowPointer(type: 'pointermove' | 'pointerup', x: number, y: number) {
+      const Ctor = (window.PointerEvent ?? window.MouseEvent) as typeof MouseEvent;
+      window.dispatchEvent(new Ctor(type, { clientX: x, clientY: y, bubbles: true }));
+    }
+
+    /** ChessBoard as ChessPage hosts it: onMove updates parent state. */
+    function Harness({ onPly }: { onPly: (ply: unknown) => void }) {
+      const [, setMoves] = useState(0);
+      return (
+        <ChessBoard
+          board={initialState()}
+          orientation="w"
+          interactive
+          movableColor="w"
+          onMove={(ply) => {
+            onPly(ply);
+            setMoves((n) => n + 1);
+          }}
+        />
+      );
+    }
+
+    it('drag-to-move commits exactly once, with no render-phase update of the parent', () => {
+      const errSpy = vi.spyOn(console, 'error');
+      const onPly = vi.fn();
+      render(<Harness onPly={onPly} />);
+      byPoint.set('50,40', 'sq-e4');
+
+      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 50, clientY: 60 });
+      // Move and release land in one batch, as a fast browser drag does —
+      // this is what pushes the setDrag updater into the render phase.
+      act(() => {
+        windowPointer('pointermove', 50, 40);
+        windowPointer('pointerup', 50, 40);
+      });
+
+      expect(onPly).toHaveBeenCalledTimes(1);
+      expect(onPly).toHaveBeenCalledWith({ from: { row: 6, col: 4 }, to: { row: 4, col: 4 } });
+      const renderPhaseWarnings = errSpy.mock.calls.filter((args) =>
+        args.some((a) => typeof a === 'string' && a.includes('Cannot update a component')),
+      );
+      expect(renderPhaseWarnings).toEqual([]);
+    });
+
+    it('a tap keeps the piece selected even when the browser delivers the trailing click', () => {
+      render(
+        <ChessBoard board={initialState()} orientation="w" interactive movableColor="w" onMove={vi.fn()} />,
+      );
+      byPoint.set('50,60', 'sq-e2');
+
+      // Tap = pointerdown and pointerup on the same square, then the native
+      // click on it (Chrome suppresses that click; Safari delivers it).
+      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 50, clientY: 60 });
+      act(() => {
+        windowPointer('pointerup', 50, 60);
+      });
+      fireEvent.click(screen.getByTestId('sq-e2'));
+
+      expect(screen.getByTestId('sq-e4').className).toMatch(/target/);
+    });
+
+    it('two plain clicks still toggle the selection off (keyboard path)', () => {
+      render(
+        <ChessBoard board={initialState()} orientation="w" interactive movableColor="w" onMove={vi.fn()} />,
+      );
+      fireEvent.click(screen.getByTestId('sq-e2'));
+      expect(screen.getByTestId('sq-e4').className).toMatch(/target/);
+      fireEvent.click(screen.getByTestId('sq-e2'));
+      expect(screen.getByTestId('sq-e4').className).not.toMatch(/target/);
+    });
   });
 
   it('flips coordinates when oriented for Black', () => {
