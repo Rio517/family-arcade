@@ -75,7 +75,9 @@ const SPECS: Partial<Record<ShipId, ModelSpec>> = {
     sink: 0.18,
     deckFrac: 0.46,
     authored: true,
-    teamMaterial: 'Carrier Team Paint',
+    // The remade carrier wears its team colour on the waterline stripe,
+    // mirroring the battleship's boot stripe (no Team Paint material).
+    teamMaterial: 'Carrier Waterline',
   },
   battleship: {
     url: battleshipBlenderUrl,
