@@ -117,17 +117,18 @@ export function ChessBoard({
   };
 
   // ── Pointer drag ───────────────────────────────────────────────────────
-  // Hit-test via elementFromPoint (robust under any CSS transform). The drag
-  // ghost is pointer-events:none, so the square under the finger is found.
+  // Hit-test by geometry: map the pointer into the grid's rect and divide
+  // into the 8×8. elementFromPoint reports whatever is stacked on top (the
+  // floating video card can ride over the board) and jsdom lacks it; the
+  // rect math has neither problem. Assumes the board isn't CSS-rotated —
+  // orientation flips by remapping squares, not by transforming the grid.
   const squareFromPoint = (clientX: number, clientY: number): Square | null => {
-    const el = document.elementFromPoint?.(clientX, clientY);
-    const btn = el?.closest?.('[data-testid^="sq-"]');
-    if (!btn || !gridRef.current?.contains(btn)) return null;
-    const name = btn.getAttribute('data-testid')!.slice(3); // e.g. "e4"
-    const col = FILES.indexOf(name[0]);
-    const row = RANKS.indexOf(name[1]);
-    if (col < 0 || row < 0) return null;
-    return { row, col };
+    const rect = gridRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return null;
+    const c = Math.floor(((clientX - rect.left) / rect.width) * 8);
+    const r = Math.floor(((clientY - rect.top) / rect.height) * 8);
+    if (r < 0 || r > 7 || c < 0 || c > 7) return null;
+    return fromDisplay(r, c, orientation);
   };
 
   const onPiecePointerDown = (sq: Square, e: PointerEvent) => {
