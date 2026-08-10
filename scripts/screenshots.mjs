@@ -90,6 +90,19 @@ const SHOTS = [
     },
   },
   {
+    // The war council with a computer general seated, so the persona ladder
+    // and the person/computer toggles are captured.
+    name: 'risk-setup',
+    path: '/#/risk',
+    viewport: TABLET,
+    prep: async (page) => {
+      const help = page.getByTestId('risk-help-close');
+      if (await help.count()) await help.click();
+      await page.getByTestId('seat-bot-2').click();
+      await page.waitForTimeout(200);
+    },
+  },
+  {
     name: 'risk-board',
     path: '/#/risk',
     viewport: TABLET,

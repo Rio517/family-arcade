@@ -614,6 +614,16 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
 }
 .risk-player-row input::placeholder { color: #8a7a55; }
 .risk-player-row input:focus { outline: none; border-color: var(--brass); }
+/* The person/computer switch on each chair, and the persona ladder that
+   replaces the name box when a computer general is seated. */
+.risk-seat-kind {
+  flex: 0 0 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: center;
+  padding: 9px 11px; color: var(--brass);
+}
+.risk-seat-kind:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
+.risk-personas { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; }
+.risk-persona { font-size: 14px; padding: 8px 10px; }
+.risk-persona:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
 
 /* ── Victory plaque ──────────────────────────────────────────────────────── */
 .risk-victory {

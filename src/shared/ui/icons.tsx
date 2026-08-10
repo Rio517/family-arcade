@@ -384,6 +384,20 @@ export const PersonIcon = (p: IconProps) =>
     p,
   );
 
+/** A friendly robot head — a computer player's seat. */
+export const BotIcon = (p: IconProps) =>
+  svg(
+    <>
+      <rect x="5.2" y="8.2" width="13.6" height="10" rx="2.6" />
+      <path d="M12 8.2V4.6" />
+      <circle cx="12" cy="3.6" r="1.1" />
+      <circle cx="9.2" cy="12.6" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="14.8" cy="12.6" r="1.15" fill="currentColor" stroke="none" />
+      <path d="M9.4 15.7h5.2" />
+    </>,
+    p,
+  );
+
 /** A clock face — waiting for the other side to pick up. */
 export const ClockIcon = (p: IconProps) =>
   svg(
