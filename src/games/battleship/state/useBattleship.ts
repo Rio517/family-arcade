@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GameConnection, generateCode, type ConnStatus } from '@shared/net/peer';
 import { isMessage, type Message } from '@games/battleship/domain/protocol';
+import { LoopbackConnection } from './loopback';
 import * as Session from '@games/battleship/domain/session';
 import type { FinishInfo, Outcome, Phase as GamePhase, SessionState } from '@games/battleship/domain/session';
 import {
@@ -58,6 +59,8 @@ export interface UseBattleshipResult {
   // actions
   hostGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
+  /** Start a game against a computer captain (ADR 0009). */
+  startSoloGame: (personaId: string, name: string) => void;
   resumeGame: (code: string) => void;
   chooseSkin: (skinId: string) => void;
   setMyName: (name: string) => void;
@@ -80,7 +83,11 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
   const [status, setStatus] = useState<ConnStatus>('idle');
   const [statusDetail, setStatusDetail] = useState<string | undefined>(undefined);
 
-  const connRef = useRef<GameConnection<Message> | null>(null);
+  // Both the real network connection and the computer captain's loopback
+  // implement the same four-method surface; the hook never tells them apart.
+  const connRef = useRef<GameConnection<Message> | LoopbackConnection | null>(null);
+  // Set only for solo games: the loopback plus its persona, for persistence.
+  const soloRef = useRef<{ conn: LoopbackConnection; personaId: string } | null>(null);
   const sessionRef = useRef<SessionState | null>(null);
   // Keep refs current so connection callbacks and chained actions see the
   // freshest state/identity/onFinish without stale closures.
@@ -106,37 +113,57 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     if (o.finished) onFinishRef.current(o.finished);
   }, [setSessionState]);
 
-  const ensureConn = useCallback((): GameConnection<Message> => {
-    if (connRef.current) return connRef.current;
-    connRef.current = new GameConnection<Message>(
-      {
-        onStatus: (s, detail) => {
-          setStatus(s);
-          setStatusDetail(detail);
-        },
-        onOpen: () => {
-          const s = sessionRef.current;
-          if (s) for (const msg of Session.connectHandshake(s)) connRef.current?.send(msg);
-        },
-        onMessage: (msg) => {
-          const s = sessionRef.current;
-          if (!s) return;
-          try {
-            applyOutcome(Session.applyMessage(s, msg));
-          } catch (err) {
-            // Drop, don't die: a peer message must never crash the app.
-            console.error('Rejected peer message', err);
-          }
-        },
+  const makeHandlers = useCallback(
+    () => ({
+      onStatus: (s: ConnStatus, detail?: string) => {
+        setStatus(s);
+        setStatusDetail(detail);
       },
-      { prefix: 'bship-v1-', isMessage },
-    );
+      onOpen: () => {
+        const s = sessionRef.current;
+        if (s) for (const msg of Session.connectHandshake(s)) connRef.current?.send(msg);
+      },
+      onMessage: (msg: Message) => {
+        const s = sessionRef.current;
+        if (!s) return;
+        try {
+          applyOutcome(Session.applyMessage(s, msg));
+        } catch (err) {
+          // Drop, don't die: a peer message must never crash the app.
+          console.error('Rejected peer message', err);
+        }
+      },
+    }),
+    [applyOutcome],
+  );
+
+  const ensureConn = useCallback((): GameConnection<Message> | LoopbackConnection => {
+    if (connRef.current) return connRef.current;
+    connRef.current = new GameConnection<Message>(makeHandlers(), { prefix: 'bship-v1-', isMessage });
     return connRef.current;
-  }, [applyOutcome]);
+  }, [makeHandlers]);
+
+  const makeLoopback = useCallback(
+    (personaId: string, resume?: ConstructorParameters<typeof LoopbackConnection>[1]['resume']) => {
+      connRef.current?.destroy();
+      const conn = new LoopbackConnection(makeHandlers(), { personaId, resume });
+      connRef.current = conn;
+      soloRef.current = { conn, personaId };
+      return conn;
+    },
+    [makeHandlers],
+  );
 
   // ── Persist after every change (powers resume) ──────────────────────────
   useEffect(() => {
-    if (session) saveSession(sessionToStored(session, Date.now()));
+    if (!session) return;
+    const stored = sessionToStored(session, Date.now());
+    const solo = soloRef.current;
+    const snap = solo?.conn.snapshot();
+    if (solo && snap) {
+      stored.solo = { personaId: solo.personaId, botFleet: snap.fleet, botReady: snap.myReady };
+    }
+    saveSession(stored);
   }, [session]);
 
   // ── Fire watchdog: release the board lock if a fire goes unanswered and it's
@@ -173,14 +200,33 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     conn.join(code);
   }, [ensureConn, setSessionState]);
 
+  const startSoloGame = useCallback((personaId: string, name: string) => {
+    const conn = makeLoopback(personaId);
+    setSessionState(Session.createSession('host', 'SOLO', name.trim() || 'Captain', identityRef.current.skinId));
+    conn.host('SOLO');
+  }, [makeLoopback, setSessionState]);
+
   const resumeGame = useCallback((code: string) => {
     const stored = loadSession(code);
     if (!stored) return;
+    const restored = storedToSession(stored);
+    if (stored.solo) {
+      // A computer game: rebuild the captain from the saved extras — the log
+      // is shared, so both sides resume in perfect sync, no network involved.
+      const conn = makeLoopback(stored.solo.personaId, {
+        fleet: stored.solo.botFleet,
+        log: restored.log,
+        myReady: stored.solo.botReady,
+      });
+      setSessionState(restored);
+      conn.host(stored.code);
+      return;
+    }
     const conn = ensureConn();
-    setSessionState(storedToSession(stored));
+    setSessionState(restored);
     if (stored.side === 'host') conn.host(stored.code);
     else conn.join(stored.code);
-  }, [ensureConn, setSessionState]);
+  }, [ensureConn, makeLoopback, setSessionState]);
 
   // Transitions that only mutate local state need the latest session via ref.
   const withSession = useCallback((fn: (s: SessionState) => SessionState) => {
@@ -228,6 +274,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     if (s?.code) clearSession(s.code);
     connRef.current?.destroy();
     connRef.current = null;
+    soloRef.current = null;
   }, []);
 
   // ── Derived view ─────────────────────────────────────────────────────────
@@ -254,6 +301,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     winnerSide: s ? Session.winnerSide(s) : null,
     hostGame,
     joinGame,
+    startSoloGame,
     resumeGame,
     chooseSkin,
     setMyName,

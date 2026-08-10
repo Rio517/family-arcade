@@ -27,6 +27,9 @@ export interface GameSession {
   /** Which game of the session this is (rematches bump it). Absent in blobs
    * written before epochs existed — treated as 0 on restore. */
   epoch?: number;
+  /** Present for games against a computer captain (ADR 0009): everything the
+   * loopback peer needs to sail again after a reload. */
+  solo?: { personaId: string; botFleet: Fleet; botReady: boolean };
   finished: boolean;
   updatedAt: number;
 }
