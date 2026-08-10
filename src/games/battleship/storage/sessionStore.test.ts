@@ -59,6 +59,20 @@ describe('session persistence', () => {
     expect(loadResumableSession()).toBeNull();
   });
 
+  it('round-trips the solo-opponent extras for computer games', () => {
+    const s = sampleSession({
+      code: 'SOLO',
+      solo: { personaId: 'grimtide', botFleet: [], botReady: true },
+    });
+    saveSession(s);
+    expect(loadSession('SOLO')?.solo?.personaId).toBe('grimtide');
+    // Old blobs without the field still load and derive a normal session.
+    const older = sampleSession();
+    saveSession(older);
+    expect(loadSession('WXYZ')?.solo).toBeUndefined();
+    expect(storedToSession(older).code).toBe('WXYZ');
+  });
+
   it('returns null for a malformed session blob', () => {
     localStorage.setItem('bship:session:v1:BAD', '{"nope":true}');
     expect(loadSession('BAD')).toBeNull();
