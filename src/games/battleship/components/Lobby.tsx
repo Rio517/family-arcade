@@ -1,7 +1,16 @@
 import { useState } from 'react';
 import { normalizeCode } from '@shared/net/peer';
 import { NamePicker } from '@shared/ui/NamePicker';
+import { BotIcon, PersonIcon } from '@shared/ui/icons';
 import { CAPTAIN_PERSONAS } from '../domain/bots/personas';
+
+/** Kid-readable difficulty words for the four rungs of the captain ladder. */
+const RUNG_WORDS: Record<number, string> = {
+  1: 'easiest',
+  2: 'a fair fight',
+  3: 'sharp shooter',
+  4: 'the boss',
+};
 
 interface LobbyProps {
   name: string;
@@ -41,38 +50,55 @@ export function Lobby({ name, onName, onHost, onJoin, onSolo, initialJoinCode }:
       </div>
 
       {mode === 'choose' ? (
-        <div className="panel stack">
-          <h2>Start a battle</h2>
-          <button
-            className="btn btn-primary btn-lg btn-block"
-            onClick={() => {
-              onName(readyName);
-              onHost(readyName);
-            }}
-            data-testid="create-game"
-          >
-            Create a game
-          </button>
-          <p className="subtle center">You’ll get a code to share with the other iPad.</p>
-          <button
-            className="btn btn-violet btn-lg btn-block"
-            onClick={() => setMode('join')}
-            data-testid="show-join"
-          >
-            Join with a code
-          </button>
-          <button
-            className="btn btn-lg btn-block"
-            onClick={() => setMode('solo')}
-            data-testid="solo-game"
-          >
-            Battle the computer
-          </button>
+        <div className="lobby-doors">
+          {/* Two rooms, clearly signposted: play together across two devices,
+              or play alone against a captain — each with its own colour. */}
+          <div className="panel stack lobby-door lobby-door-duo">
+            <span className="lobby-eyebrow">
+              <PersonIcon size={14} />
+              <PersonIcon size={14} /> Play together — two devices
+            </span>
+            <button
+              className="btn btn-primary btn-lg btn-block"
+              onClick={() => {
+                onName(readyName);
+                onHost(readyName);
+              }}
+              data-testid="create-game"
+            >
+              Create a game
+            </button>
+            <p className="subtle center">You’ll get a code to share with the other iPad.</p>
+            <button
+              className="btn btn-violet btn-lg btn-block"
+              onClick={() => setMode('join')}
+              data-testid="show-join"
+            >
+              Join with a code
+            </button>
+          </div>
+
+          <div className="panel stack lobby-door lobby-door-solo">
+            <span className="lobby-eyebrow">
+              <BotIcon size={15} /> Play solo — just you
+            </span>
+            <button
+              className="btn btn-amber btn-lg btn-block"
+              onClick={() => setMode('solo')}
+              data-testid="solo-game"
+            >
+              Battle the computer
+            </button>
+            <p className="subtle center">Four captains, from easiest to the boss.</p>
+          </div>
         </div>
       ) : mode === 'solo' ? (
-        <div className="panel stack">
-          <h2>Choose your foe</h2>
-          <p className="subtle">Gentlest first — every captain up the ladder shoots a little sharper.</p>
+        <div className="panel stack lobby-door lobby-door-solo">
+          <span className="lobby-eyebrow">
+            <BotIcon size={15} /> Play solo — just you
+          </span>
+          <h2>Choose your captain</h2>
+          <p className="subtle">Level 1 is the gentlest — climb the ladder as you win.</p>
           {CAPTAIN_PERSONAS.map((p) => (
             <button
               key={p.id}
@@ -83,8 +109,20 @@ export function Lobby({ name, onName, onHost, onJoin, onSolo, initialJoinCode }:
               }}
               data-testid={`captain-${p.id}`}
             >
-              <strong>{p.name}</strong>
-              <span className="subtle lobby-captain-tag">{p.tagline}</span>
+              <span className="lobby-captain-level" aria-hidden="true">
+                <strong>Lv {p.rung}</strong>
+                <span className="lobby-captain-pips">
+                  {Array.from({ length: 4 }, (_, i) => (
+                    <i key={i} className={i < p.rung ? 'on' : ''} />
+                  ))}
+                </span>
+              </span>
+              <span className="lobby-captain-who">
+                <strong>
+                  {p.name} <em className="lobby-captain-rank">— level {p.rung}, {RUNG_WORDS[p.rung]}</em>
+                </strong>
+                <span className="subtle lobby-captain-tag">{p.tagline}</span>
+              </span>
             </button>
           ))}
           <button className="btn btn-ghost btn-block" onClick={() => setMode('choose')}>

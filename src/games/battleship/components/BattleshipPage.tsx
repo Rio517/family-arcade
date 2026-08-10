@@ -111,7 +111,7 @@ export function BattleshipPage() {
   }, [hostWaiting, bs.phase]);
 
   return (
-    <div className="app">
+    <div className={`app ${bs.phase === 'battle' ? 'bs-app-wide' : ''}`}>
       <div className="topbar">
         <button className="back-link" onClick={goMenu} data-testid="back">
           ‹ Menu
