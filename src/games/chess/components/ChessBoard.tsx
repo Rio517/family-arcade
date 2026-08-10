@@ -55,6 +55,10 @@ export function ChessBoard({
   const [promotion, setPromotion] = useState<{ from: Square; to: Square } | null>(null);
   useDismissOnEscape(promotion !== null, () => setPromotion(null));
   const gridRef = useRef<HTMLDivElement>(null);
+  // The square a tap just selected via pointerdown. Some browsers still fire
+  // the native click after a cancelled pointerdown; that click must not
+  // toggle the fresh selection back off.
+  const justPickedRef = useRef<Square | null>(null);
 
   // Clear any in-progress selection when the position or turn changes.
   useEffect(() => {
@@ -95,6 +99,10 @@ export function ChessBoard({
       commit(selected, sq);
       return;
     }
+    if (justPickedRef.current && sameSquare(justPickedRef.current, sq)) {
+      justPickedRef.current = null;
+      return; // trailing click of the tap that just selected this square
+    }
     if (canPickUp(sq)) {
       setSelected((cur) => (cur && sameSquare(cur, sq) ? null : sq));
     } else {
@@ -125,15 +133,25 @@ export function ChessBoard({
 
   useEffect(() => {
     if (!drag) return;
+    const from = drag.from;
     const onMoveEvt = (e: globalThis.PointerEvent) => {
       setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY, over: squareFromPoint(e.clientX, e.clientY) } : d));
     };
     const onUp = (e: globalThis.PointerEvent) => {
+      // Commit here in the event handler, never inside the setDrag updater —
+      // an updater runs during render, where updating the parent is illegal.
       const to = squareFromPoint(e.clientX, e.clientY);
-      setDrag((d) => {
-        if (d && to && isTarget(to)) commit(d.from, to);
-        return null;
-      });
+      setDrag(null);
+      if (to && isTarget(to)) {
+        commit(from, to);
+      } else if (to && sameSquare(to, from)) {
+        // The tap ended where it started: remember the square briefly so the
+        // browser's trailing click (if delivered) doesn't undo the selection.
+        justPickedRef.current = from;
+        window.setTimeout(() => {
+          justPickedRef.current = null;
+        }, 0);
+      }
     };
     window.addEventListener('pointermove', onMoveEvt);
     window.addEventListener('pointerup', onUp);
