@@ -47,7 +47,9 @@ const GROUPS: GroupDef[] = [
   { id: 'caribbean', name: 'Caribbean', continentId: 'na', iso: ['192', '332', '214', '388', '044', '630', '780'], labelLon: -74, labelLat: 20 },
   // South America
   { id: 'colombia', name: 'Colombia', continentId: 'sa', iso: ['170', '218'] },
-  { id: 'venezuela', name: 'Venezuela', continentId: 'sa', iso: ['862', '328', '740'], labelLon: -66, labelLat: 7 },
+  // '250-guiana' is French Guiana, carved out of world-atlas's France geometry
+  // in build() — it belongs with the Guianas, not with Europe.
+  { id: 'venezuela', name: 'Venezuela', continentId: 'sa', iso: ['862', '328', '740', '250-guiana'], labelLon: -66, labelLat: 7 },
   { id: 'peru', name: 'Peru', continentId: 'sa', iso: ['604', '068'] },
   { id: 'brazil', name: 'Brazil', continentId: 'sa', iso: ['076'] },
   { id: 'argentina', name: 'Argentina', continentId: 'sa', iso: ['032', '152', '858', '600', '238'], labelLon: -65, labelLat: -35 },
@@ -88,7 +90,8 @@ const SPLITS: SplitDef[] = [
       { id: 'yakutsk', name: 'Yakutsk', rects: [[745, 0, 90, 160]], labelLon: 120, labelLat: 65 },
       { id: 'kamchatka', name: 'Kamchatka', rects: [[835, 0, 175, 160], [0, 0, 220, 160]], labelLon: 160, labelLat: 63 },
     ],
-    dividers: [[650, 5, 650, 135], [745, 5, 745, 135], [835, 5, 835, 135]],
+    // Lines span the whole clip band; the country outline trims them to land.
+    dividers: [[650, 0, 650, 160], [745, 0, 745, 160], [835, 0, 835, 160]],
   },
   {
     baseIso: '840', continentId: 'na', // USA → Western / Eastern
@@ -96,7 +99,7 @@ const SPLITS: SplitDef[] = [
       { id: 'westernus', name: 'Western US', rects: [[0, 0, 270, 260]], labelLon: -114, labelLat: 42 },
       { id: 'easternus', name: 'Eastern US', rects: [[270, 0, 150, 260]], labelLon: -84, labelLat: 39 },
     ],
-    dividers: [[270, 118, 270, 200]],
+    dividers: [[270, 0, 270, 260]],
   },
   {
     baseIso: '124', continentId: 'na', // Canada → Western / Central / Eastern
@@ -105,7 +108,7 @@ const SPLITS: SplitDef[] = [
       { id: 'centralcanada', name: 'Central Canada', rects: [[285, 0, 62, 140]], labelLon: -92, labelLat: 57 },
       { id: 'easterncanada', name: 'Eastern Canada', rects: [[347, 0, 170, 140]], labelLon: -71, labelLat: 52 },
     ],
-    dividers: [[285, 8, 285, 128], [347, 8, 347, 128]],
+    dividers: [[285, 0, 285, 140], [347, 0, 347, 140]],
   },
   {
     baseIso: '036', continentId: 'oc', // Australia → Western / Eastern
@@ -113,7 +116,7 @@ const SPLITS: SplitDef[] = [
       { id: 'westernaustralia', name: 'Western Australia', rects: [[700, 260, 150, 160]], labelLon: 121, labelLat: -26 },
       { id: 'easternaustralia', name: 'Eastern Australia', rects: [[850, 260, 200, 160]], labelLon: 147, labelLat: -30 },
     ],
-    dividers: [[850, 288, 850, 384]],
+    dividers: [[850, 260, 850, 420]],
   },
 ];
 
@@ -234,12 +237,45 @@ function routePath(a: [number, number], b: [number, number]): SeaRoute {
 
 let cached: RiskMap | null = null;
 
+/**
+ * Partition a country's polygons at a longitude. Needed for France, whose
+ * world-atlas geometry includes French Guiana an ocean away — every polygon's
+ * first arc point tells us which side of the Atlantic it sits on.
+ */
+function splitAtLongitude(
+  topo: Topology,
+  geom: Polygon | MultiPolygon,
+  lon: number,
+): { west: MultiPolygon; east: MultiPolygon } {
+  const scale = topo.transform?.scale ?? [1, 1];
+  const translate = topo.transform?.translate ?? [0, 0];
+  const firstLon = (polyArcs: number[][]): number => {
+    const a = polyArcs[0][0];
+    const arc = topo.arcs[a < 0 ? ~a : a];
+    return arc[0][0] * scale[0] + translate[0];
+  };
+  const polys = geom.type === 'Polygon' ? [geom.arcs] : geom.arcs;
+  return {
+    west: { type: 'MultiPolygon', arcs: polys.filter((p) => firstLon(p) < lon) },
+    east: { type: 'MultiPolygon', arcs: polys.filter((p) => firstLon(p) >= lon) },
+  };
+}
+
 function build(): RiskMap {
   if (cached) return cached;
 
   const topo = countries110m as unknown as Topology;
   const geometries = (topo.objects.countries as GeometryCollection).geometries;
   const byId = new Map(geometries.map((g) => [String(g.id), g]));
+
+  // France arrives as one geometry spanning two continents: keep the mainland
+  // for Western Europe and hand French Guiana to the Guianas ('250-guiana').
+  const france = byId.get('250');
+  if (france) {
+    const { west, east } = splitAtLongitude(topo, france as Polygon | MultiPolygon, -30);
+    byId.set('250', east as never);
+    byId.set('250-guiana', west as never);
+  }
 
   const projection = geoNaturalEarth1().fitSize([WIDTH, HEIGHT], { type: 'Sphere' });
   const path = geoPath(projection);

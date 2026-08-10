@@ -137,13 +137,14 @@
   stroke: var(--brass-hi) !important; stroke-width: 2.4;
   filter: brightness(1.2) drop-shadow(0 0 3px rgba(231, 207, 149, 0.8));
 }
-/* Territories are keyboard-operable buttons — give tabbing a clear brass ring. */
+/* Territories are keyboard-operable buttons: focus lights the land itself
+   with a brass stroke and glow. No `outline` — on an SVG path the browser
+   draws that as the bounding BOX, a giant rounded rectangle over the map. */
 .risk-terr:focus-visible {
-  outline: 2px solid var(--brass-hi);
-  outline-offset: 2px;
+  outline: none;
   stroke: var(--brass-hi);
-  stroke-width: 2;
-  filter: brightness(1.18) drop-shadow(0 0 3px rgba(231, 207, 149, 0.8));
+  stroke-width: 2.4;
+  filter: brightness(1.18) drop-shadow(0 0 4px rgba(231, 207, 149, 0.9));
 }
 
 .risk-badge { cursor: pointer; }
