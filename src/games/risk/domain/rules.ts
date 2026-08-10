@@ -28,6 +28,8 @@ const STARTING_ARMIES: Record<number, number> = { 2: 40, 3: 35, 4: 30, 5: 25, 6:
 export interface NewPlayer {
   name: string;
   color: string;
+  /** Computer persona id (see domain/bots) — absent means a human seat. */
+  bot?: string;
 }
 
 const die = (rng: () => number) => Math.floor(rng() * 6) + 1;
@@ -84,6 +86,7 @@ export function newGame(
     name: p.name,
     color: p.color,
     alive: true,
+    ...(p.bot ? { bot: p.bot } : {}),
   }));
 
   const territories: Record<string, TerritoryState> = {};

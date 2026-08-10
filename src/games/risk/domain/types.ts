@@ -34,6 +34,8 @@ export interface PlayerState {
   name: string;
   color: string;
   alive: boolean;
+  /** Computer persona id (see domain/bots) — absent means a human seat. */
+  bot?: string;
 }
 
 export interface TerritoryState {
