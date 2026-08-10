@@ -90,6 +90,16 @@ const SHOTS = [
     },
   },
   {
+    // The Ship Battle lobby with the captain ladder open — the solo door.
+    name: 'battle-lobby',
+    path: '/#/play',
+    viewport: TABLET,
+    prep: async (page) => {
+      await page.getByTestId('solo-game').click();
+      await page.getByTestId('captain-grimtide').waitFor();
+    },
+  },
+  {
     // The war council with a computer general seated, so the persona ladder
     // and the person/computer toggles are captured.
     name: 'risk-setup',
