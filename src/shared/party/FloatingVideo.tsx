@@ -15,6 +15,8 @@ import { useParty } from './PartyContext';
 const CARD_W = 168;
 const CARD_H = 150;
 const EDGE = 8;
+// Movement below this is a press, not a drag (same feel as the Risk map).
+const DRAG_THRESHOLD_PX = 6;
 
 /** Keep a proposed top-left corner within the visible viewport. */
 function clampToViewport(x: number, y: number): { x: number; y: number } {
@@ -30,8 +32,17 @@ export function FloatingVideo() {
   const remoteRef = useRef<HTMLVideoElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  // Where inside the card the pointer grabbed it, so dragging doesn't jump.
-  const grab = useRef<{ grabX: number; grabY: number } | null>(null);
+  // The active grab: which pointer, where inside the card it grabbed (so
+  // dragging doesn't jump), where it started, and whether it has crossed the
+  // drag threshold yet.
+  const grab = useRef<{
+    pointerId: number;
+    grabX: number;
+    grabY: number;
+    originX: number;
+    originY: number;
+    dragging: boolean;
+  } | null>(null);
 
   const remoteHasVideo = !!call.remoteStream && call.remoteStream.getVideoTracks().length > 0;
 
@@ -53,16 +64,49 @@ export function FloatingVideo() {
   if (!call.active) return null;
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    const rect = el.getBoundingClientRect();
-    grab.current = { grabX: e.clientX - rect.left, grabY: e.clientY - rect.top };
-    el.setPointerCapture(e.pointerId);
+    if (grab.current) return; // one pointer drives the card at a time
+    const rect = e.currentTarget.getBoundingClientRect();
+    grab.current = {
+      pointerId: e.pointerId,
+      grabX: e.clientX - rect.left,
+      grabY: e.clientY - rect.top,
+      originX: e.clientX,
+      originY: e.clientY,
+      dragging: false,
+    };
+    // No capture here: capturing on the bare press would retarget the
+    // follow-up click to this card and starve any control inside it — the
+    // bug that once made every Risk territory unclickable.
   };
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!grab.current) return;
-    setPos(clampToViewport(e.clientX - grab.current.grabX, e.clientY - grab.current.grabY));
+    const g = grab.current;
+    if (!g || e.pointerId !== g.pointerId) return;
+    if (!g.dragging) {
+      if (Math.hypot(e.clientX - g.originX, e.clientY - g.originY) <= DRAG_THRESHOLD_PX) return;
+      g.dragging = true;
+      const el = e.currentTarget;
+      if (typeof el.setPointerCapture === 'function') {
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {
+          // Fake pointers (tests) have no capturable id; dragging still works.
+        }
+      }
+    }
+    setPos(clampToViewport(e.clientX - g.grabX, e.clientY - g.grabY));
   };
-  const onPointerUp = () => {
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = grab.current;
+    if (g?.dragging) {
+      const el = e.currentTarget;
+      if (typeof el.releasePointerCapture === 'function') {
+        try {
+          el.releasePointerCapture(g.pointerId);
+        } catch {
+          // Already released (e.g. pointercancel); nothing to undo.
+        }
+      }
+    }
     grab.current = null;
   };
 
@@ -76,6 +120,7 @@ export function FloatingVideo() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onLostPointerCapture={onPointerUp}
       data-testid="party-floating-video"
     >
       <div className="pv-remote">
