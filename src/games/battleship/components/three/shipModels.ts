@@ -85,7 +85,9 @@ const SPECS: Partial<Record<ShipId, ModelSpec>> = {
     sink: 0.18,
     deckFrac: 0.46,
     authored: true,
-    teamMaterial: 'Battleship Boot Stripe',
+    // The Iowa v5 wears its team colour on the antifouling band at the
+    // waterline — the same convention as the carrier's waterline stripe.
+    teamMaterial: 'Iowa V3 Antifouling Red',
   },
 };
 

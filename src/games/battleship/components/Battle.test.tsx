@@ -66,6 +66,29 @@ describe('<Battle>', () => {
     expect(screen.getAllByTestId('ship-overlay-destroyer')[0].className).toContain('sunk');
     expect(screen.getAllByTestId('ship-overlay-carrier')[0].className).not.toContain('sunk');
   });
+
+  it('pops the 3D fleet out into a big dialog and closes on Escape', async () => {
+    render(
+      <Battle
+        log={log}
+        side="host"
+        myName="Rio"
+        oppName="Kid"
+        skinId="aqua"
+        oppSkinId="ember"
+        myFleet={stackFleet()}
+        myTurn
+        pendingFire={null}
+        onFire={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getAllByTestId('fleet-view-3d')[0]);
+    fireEvent.click(await screen.findByTestId('fleet3d-pop'));
+    expect(screen.getByRole('dialog', { name: /your fleet in 3d/i })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: /your fleet in 3d/i })).toBeNull();
+  });
 });
 
 describe('<Battle> — 3D fleet view', () => {

@@ -9,7 +9,8 @@ const Fleet3D = lazy(() => import('./Fleet3D'));
 import { FLEET, shipSpec, skinById } from '@games/battleship/domain/constants';
 import { COLUMN_LABELS, shipCells } from '@games/battleship/domain/board';
 import { ownBoardView, radarGrid, shipName, sunkByAttacker, type CellState } from '@games/battleship/domain/engine';
-import { RadarIcon, ShieldIcon } from '@shared/ui/icons';
+import { CloseIcon, FullscreenIcon, RadarIcon, ShieldIcon } from '@shared/ui/icons';
+import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { BOARD_SIZE, type Coord, type Fleet, type GameLog, type ShipId, type ShotEvent, type Side } from '@games/battleship/domain/types';
 
 const coordLabel = (row: number, col: number) => `${COLUMN_LABELS[col]}${row + 1}`;
@@ -66,6 +67,9 @@ export function Battle({
   // On narrow screens we show one board at a time; default to the radar so the
   // player is looking at their attack board when it's their move.
   const [view, setView] = useState<View>('radar');
+  // The 3D ocean, popped out big enough to admire the whole fleet.
+  const [popped, setPopped] = useState(false);
+  useDismissOnEscape(popped, () => setPopped(false));
   const wide = useWideLayout();
   useEffect(() => {
     if (myTurn) setView('radar');
@@ -192,7 +196,17 @@ export function Battle({
       </div>
       {fleetDim === '3d' ? (
         <Suspense fallback={<p className="subtle center bs3d-hint">Launching the fleet…</p>}>
-          <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} />
+          <div className="bs3d-holder">
+            <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} />
+            <button
+              className="bs3d-expand"
+              onClick={() => setPopped(true)}
+              aria-label="Pop out the 3D fleet"
+              data-testid="fleet3d-pop"
+            >
+              <FullscreenIcon size={18} />
+            </button>
+          </div>
         </Suspense>
       ) : (
         <Board cells={ownCells} skinId={skinId} variant="own" ships={ownShips} shake={boardShake(false)} fx={fxFor(false)} />
@@ -203,6 +217,33 @@ export function Battle({
 
   return (
     <div className="stack">
+      {popped && (
+        /* Backdrop click is a mouse convenience; Escape (above) and the Close
+           button are the keyboard path. */
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
+        <div
+          className="modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPopped(false);
+          }}
+        >
+          <div className="bs3d-pop" role="dialog" aria-label="Your fleet in 3D">
+            <div className="bs3d-holder">
+              <Suspense fallback={<p className="subtle center bs3d-hint">Launching the fleet…</p>}>
+                <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} />
+              </Suspense>
+              <button
+                className="bs3d-expand"
+                onClick={() => setPopped(false)}
+                aria-label="Close the 3D view"
+                data-testid="fleet3d-pop-close"
+              >
+                <CloseIcon size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {wide ? (
         /* Wide (≥ 720px): both boards side by side; at ≥ 1024px the log becomes
            a full-height column beside them to fill a landscape tablet/desktop. */

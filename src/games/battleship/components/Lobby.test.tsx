@@ -46,15 +46,23 @@ describe('<Lobby>', () => {
     expect((screen.getByTestId('code-input') as HTMLInputElement).value).toBe('WXYZ');
   });
 
-  it('offers a battle against the computer with the captain ladder', () => {
+  it('signposts the two doors: play together and play solo', () => {
+    setup('Rio');
+    expect(screen.getByText(/play together — two devices/i)).toBeInTheDocument();
+    expect(screen.getByText(/play solo — just you/i)).toBeInTheDocument();
+  });
+
+  it('offers a battle against the computer with a levelled captain ladder', () => {
     const { onSolo } = setup('Klara');
     fireEvent.click(screen.getByTestId('solo-game'));
-    // Four captains, gentlest first, each a full-name button.
+    // Four captains, gentlest first — each says its level and what it means.
     const ladder = ['bobble', 'marlin', 'wake', 'grimtide'].map((id) =>
       screen.getByTestId(`captain-${id}`),
     );
     expect(ladder[0]).toHaveTextContent('Deckhand Bobble');
+    expect(ladder[0]).toHaveTextContent(/level 1, easiest/i);
     expect(ladder[3]).toHaveTextContent('Admiral Grimtide');
+    expect(ladder[3]).toHaveTextContent(/level 4, the boss/i);
     fireEvent.click(ladder[2]);
     expect(onSolo).toHaveBeenCalledWith('wake', 'Klara');
   });

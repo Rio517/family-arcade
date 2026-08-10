@@ -35,7 +35,7 @@ export class FleetScene {
   private controls: OrbitControls;
   private shipsGroup = new THREE.Group();
   private markGroup = new THREE.Group();
-  private fires: THREE.Mesh[] = [];
+  private fires: THREE.Group[] = [];
   private bobbing: THREE.Group[] = [];
   private water: THREE.Mesh;
   private waterBase: Float32Array;
@@ -188,9 +188,19 @@ export class FleetScene {
       this.shipsGroup.add(g);
     }
 
-    // Shot markers: fires on struck decks, foam rings on misses.
-    const fireMat = new THREE.MeshStandardMaterial({ color: '#ff9d3c', emissive: '#ff7a1a', emissiveIntensity: 2.2 });
-    const emberMat = new THREE.MeshStandardMaterial({ color: '#ffd76a', emissive: '#ffc23c', emissiveIntensity: 2.6 });
+    // Shot markers: real flames on struck decks, foam rings on misses.
+    // A fire's size follows the ship it burns on — a carrier blaze dwarfs a
+    // destroyer's — so work out which hull owns each struck cell first.
+    const shipSizeAt = (row: number, col: number): number => {
+      for (const s of ships) {
+        for (let i = 0; i < s.size; i++) {
+          const r = s.orientation === 'V' ? s.row + i : s.row;
+          const c = s.orientation === 'H' ? s.col + i : s.col;
+          if (r === row && c === col) return s.size;
+        }
+      }
+      return 3;
+    };
     const smokeMat = new THREE.MeshStandardMaterial({ color: '#20242c', transparent: true, opacity: 0.7, roughness: 1 });
     const foamMat = new THREE.MeshBasicMaterial({ color: '#cfe8f2', transparent: true, opacity: 0.55 });
     for (let r = 0; r < BOARD_SIZE; r++) {
@@ -208,23 +218,24 @@ export class FleetScene {
           ring2.rotation.x = Math.PI / 2;
           ring2.position.set(x, 0.07, z);
           this.markGroup.add(ring2);
+        } else if (state === 'sunk') {
+          // A dead hull smoulders: low dark smoke, no live flame.
+          const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), smokeMat);
+          smoke.position.set(x, 0.12, z);
+          smoke.scale.y = 1.4;
+          this.markGroup.add(smoke);
         } else {
-          // hit or sunk cell: a fire on deck with an ember heart and smoke.
-          const sunkCell = state === 'sunk';
-          const fire = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), sunkCell ? smokeMat : fireMat);
-          fire.position.set(x, sunkCell ? 0.12 : 0.26, z);
-          fire.scale.y = 1.4;
-          this.markGroup.add(fire);
-          if (!sunkCell) {
-            const ember = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), emberMat);
-            ember.position.set(x, 0.24, z);
-            this.markGroup.add(ember);
-            this.fires.push(fire);
-            const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), smokeMat);
-            smoke.position.set(x, 0.44, z);
-            smoke.scale.set(1, 1.3, 1);
-            this.markGroup.add(smoke);
-          }
+          // A burning deck: crossed flame sprites sized to the ship, with a
+          // glowing base and smoke above. Flickered in the render loop.
+          const grew = 0.72 + 0.12 * shipSizeAt(r, c);
+          const flame = buildFlame(grew, r * BOARD_SIZE + c);
+          flame.position.set(x, 0.2, z);
+          this.markGroup.add(flame);
+          this.fires.push(flame);
+          const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), smokeMat);
+          smoke.position.set(x, 0.28 + 0.34 * grew, z);
+          smoke.scale.set(1.1, 1.5, 1.1);
+          this.markGroup.add(smoke);
         }
       }
     }
@@ -260,9 +271,13 @@ export class FleetScene {
         g.position.y = Math.sin(now / 1300 + p) * 0.02;
         g.rotation.x = Math.sin(now / 1700 + p) * 0.012;
       }
-      for (let i = 0; i < this.fires.length; i++) {
-        const s = 1 + 0.22 * Math.sin(now / 90 + i * 2.1);
-        this.fires[i].scale.set(s, 1.4 * (2 - s), s);
+      for (const flame of this.fires) {
+        const seed = flame.userData.seed as number;
+        const base = flame.userData.base as number;
+        // Two incommensurate sine bands read as a gutter, not a metronome.
+        const s = 1 + 0.14 * Math.sin(now / 95 + seed) + 0.07 * Math.sin(now / 43 + seed * 2.7);
+        flame.scale.set(base * s, base * (2.05 - s), base * s);
+        flame.rotation.y = seed + now / 1600;
       }
     }
 
@@ -283,6 +298,88 @@ export class FleetScene {
       this.container.removeChild(this.renderer.domElement);
     }
   }
+}
+
+// ── Fire ────────────────────────────────────────────────────────────────────
+
+let flameTextureCache: THREE.CanvasTexture | null = null;
+
+/**
+ * One painted flame tongue: white-hot at the base, orange through the body,
+ * fading out at the tip. Drawn once and shared by every fire on the board.
+ */
+function flameTexture(): THREE.CanvasTexture {
+  if (flameTextureCache) return flameTextureCache;
+  const w = 64;
+  const h = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  // The tongue: a teardrop, wide at the base, licking to a point.
+  ctx.beginPath();
+  ctx.moveTo(w / 2, 4);
+  ctx.bezierCurveTo(w * 0.92, h * 0.42, w * 0.86, h * 0.8, w / 2, h - 4);
+  ctx.bezierCurveTo(w * 0.14, h * 0.8, w * 0.08, h * 0.42, w / 2, 4);
+  ctx.closePath();
+  const g = ctx.createLinearGradient(0, h, 0, 0);
+  g.addColorStop(0, 'rgba(255, 246, 214, 0.95)');
+  g.addColorStop(0.3, 'rgba(255, 194, 60, 0.9)');
+  g.addColorStop(0.62, 'rgba(255, 122, 26, 0.75)');
+  g.addColorStop(0.88, 'rgba(230, 64, 18, 0.35)');
+  g.addColorStop(1, 'rgba(210, 40, 12, 0)');
+  ctx.fillStyle = g;
+  ctx.filter = 'blur(2px)';
+  ctx.fill();
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  flameTextureCache = tex;
+  return tex;
+}
+
+/**
+ * A deck fire: three crossed flame sprites (additive, so overlaps glow), a
+ * hot ember disc at the base. Reads as a volume from every camera azimuth
+ * without billboarding. `base` scales the whole blaze to the ship it burns
+ * on; `seed` desynchronises the flicker between fires.
+ */
+function buildFlame(base: number, seed: number): THREE.Group {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({
+    map: flameTexture(),
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  });
+  const geo = new THREE.PlaneGeometry(0.34, 0.62);
+  for (let i = 0; i < 3; i++) {
+    const tongue = new THREE.Mesh(geo, mat);
+    tongue.position.y = 0.26;
+    tongue.rotation.y = (i * Math.PI) / 3 + (seed % 7) * 0.31;
+    // The tongues lean apart a little so the silhouette isn't a neat X.
+    tongue.rotation.z = (i - 1) * 0.09;
+    group.add(tongue);
+  }
+  const ember = new THREE.Mesh(
+    new THREE.CircleGeometry(0.11, 20),
+    new THREE.MeshBasicMaterial({
+      color: '#ffd76a',
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  );
+  ember.rotation.x = -Math.PI / 2;
+  ember.position.y = 0.015;
+  group.add(ember);
+  group.userData.base = base;
+  group.userData.seed = seed * 0.73;
+  group.scale.setScalar(base);
+  return group;
 }
 
 // ── Procedural warships ─────────────────────────────────────────────────────

@@ -359,10 +359,6 @@ body {
 @keyframes type-line { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes ell-blink { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 @keyframes ember-flicker { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.72; transform: scale(0.9); } }
-@keyframes board-glow {
-  0%, 100% { box-shadow: 0 0 18px -10px var(--accent); }
-  50% { box-shadow: 0 0 28px -4px var(--accent); }
-}
 @keyframes shake-soft {
   0%, 100% { transform: translate(0, 0); }
   25% { transform: translate(-3px, 1px); }
@@ -416,7 +412,8 @@ body {
       transparent 96deg 360deg);
     animation: radar-sweep 3.4s linear infinite;
   }
-  .board.enemy.active { animation: board-glow 2.2s ease-in-out infinite; }
+  /* The your-turn glow holds steady — the old 2.2s pulse read as a glitchy
+     fade against the 3D ocean rather than an invitation. */
   .qr-radar .ping { animation: qr-ping 2100ms ease-out infinite; }
   .qr-radar .ping:nth-child(2) { animation-delay: 700ms; }
   .qr-radar .ping:nth-child(3) { animation-delay: 1400ms; }
