@@ -138,6 +138,22 @@ Two hooks back the rules that sessions actually broke:
 Per-machine additions go in `.claude/settings.local.json` (gitignored), not the
 shared file.
 
+## Tidewave (in-browser agent tooling)
+
+`.mcp.json` points at `http://localhost:5173/tidewave/mcp`, served by the
+`tidewave()` Vite plugin. Two consequences worth knowing:
+
+- **It only works while `npm run dev` is running.** The MCP server is the dev
+  server. No dev server, no Tidewave tools — the session just shows it
+  disconnected, which is harmless.
+- **MCP servers are read at session start.** Installing or changing one has no
+  effect until Claude Code restarts.
+
+The plugin self-disables for `vite build`; the string `tidewave` appears nowhere
+in `dist/`, so nothing reaches the installed PWA. Re-check that if the plugin is
+ever upgraded — a dev tool leaking into the bundle would break the offline
+invariant and add weight for every player.
+
 ## Recurring rituals
 
 - `/audit` (see `.claude/skills/audit/`) — a fresh forward-looking sweep of

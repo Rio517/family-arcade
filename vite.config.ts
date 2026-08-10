@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import tidewave from 'tidewave/vite-plugin';
 
 const alias = {
   '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),
@@ -23,6 +24,10 @@ export default defineConfig({
   // in dist/, which keeps the offline invariant (no runtime downloads).
   assetsInclude: ['**/*.glb'],
   plugins: [
+    // Dev tooling only — it serves the /tidewave routes the coding agent talks
+    // to, and self-disables for `vite build`. Verified: the string "tidewave"
+    // appears nowhere in dist/, so nothing reaches the installed PWA.
+    tidewave(),
     react(),
     // Installable + offline app shell. On a flaky connection the console loads
     // instantly from cache; the peer-to-peer link itself still needs the net,
