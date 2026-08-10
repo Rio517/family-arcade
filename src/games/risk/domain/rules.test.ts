@@ -80,6 +80,16 @@ describe('newGame', () => {
     expect(g.toPlace).toBe(40);
     expect(deployReserve(g, 1)).toBe(40);
   });
+
+  it('carries a computer persona through to the player state', () => {
+    const g = newGame(
+      MAP,
+      [{ name: 'A', color: '#f00' }, { name: 'Cadet Pip', color: '#00f', bot: 'cadet' }],
+      scriptedRng([0.5]),
+    );
+    expect(g.players[0].bot).toBeUndefined();
+    expect(g.players[1].bot).toBe('cadet');
+  });
 });
 
 describe('setup — claim then deploy, one army per turn', () => {
