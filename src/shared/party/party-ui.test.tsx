@@ -113,9 +113,14 @@ describe('FloatingVideo', () => {
     function firePointer(
       el: Element,
       type: 'pointerdown' | 'pointermove' | 'pointerup',
-      init: { pointerId: number; clientX: number; clientY: number },
+      init: { pointerId: number; clientX: number; clientY: number; buttons?: number },
     ) {
-      const ev = new MouseEvent(type, { bubbles: true, clientX: init.clientX, clientY: init.clientY });
+      const ev = new MouseEvent(type, {
+        bubbles: true,
+        clientX: init.clientX,
+        clientY: init.clientY,
+        buttons: init.buttons ?? 1,
+      });
       Object.assign(ev, { pointerId: init.pointerId });
       fireEvent(el, ev);
     }
@@ -147,5 +152,29 @@ describe('FloatingVideo', () => {
       firePointer(card, 'pointermove', { pointerId: 2, clientX: 400, clientY: 400 });
       expect(card.style.left).toBe(after);
     });
+
+    // Below the threshold nothing is captured, so a pointer that slides off
+    // the card ends elsewhere and its pointerup never arrives. That stale
+    // grab must not wedge the card.
+    it('a grab whose pointerup was missed does not lock out the next touch', () => {
+      const card = renderCard();
+      firePointer(card, 'pointerdown', { pointerId: 1, clientX: 100, clientY: 100 });
+      firePointer(card, 'pointerdown', { pointerId: 7, clientX: 200, clientY: 200 });
+      firePointer(card, 'pointermove', { pointerId: 7, clientX: 215, clientY: 215 });
+      expect(card.style.left).not.toBe('');
+    });
+
+    it('a buttonless mouse hover after a missed pointerup does not drag the card', () => {
+      const card = renderCard();
+      firePointer(card, 'pointerdown', { pointerId: 1, clientX: 100, clientY: 100 });
+      firePointer(card, 'pointermove', { pointerId: 1, clientX: 140, clientY: 140, buttons: 0 });
+      expect(card.style.left).toBe('');
+    });
+  });
+
+  it('is its own labelled landmark (content in a call must not sit outside all landmarks)', () => {
+    mockParty.value = makeParty({ theirName: 'Kai', call: { ...makeParty().call, active: true, status: 'live' } });
+    render(<FloatingVideo />);
+    expect(screen.getByRole('complementary', { name: 'Video call' })).toBeInTheDocument();
   });
 });
