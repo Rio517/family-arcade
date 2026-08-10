@@ -18,3 +18,4 @@ These are backfilled from the invariants the codebase already lives by (see
 | [0006](./0006-procedural-3d-with-lazy-three.md) | Procedural 3D with lazily-loaded three.js | Accepted |
 | [0007](./0007-in-call-video-voice-over-webrtc.md) | In-game video + voice over the existing WebRTC link | Accepted |
 | [0008](./0008-app-level-party-layer.md) | An app-level party layer for connection, identity, and video | Accepted |
+| [0009](./0009-computer-players-without-llms.md) | Computer players are seeded domain policies, not LLMs | Proposed |
