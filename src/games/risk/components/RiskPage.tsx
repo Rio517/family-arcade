@@ -1,29 +1,14 @@
 import '../styles/risk.css';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { RiskBoard } from './RiskBoard';
 import { useMapZoom } from './useMapZoom';
+import { useRisk } from '../state/useRisk';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
-import { mapById, MAPS } from '../maps/registry';
-import type { RiskMap } from '../maps/types';
-import {
-  canAttack,
-  canFortify,
-  connectedOwned,
-  currentPlayer,
-  endAttack,
-  endReinforce,
-  endTurn,
-  fortify,
-  newGame,
-  hasUnclaimed,
-  placeArmy,
-  resolveAttack,
-  territoriesOf,
-  type NewPlayer,
-} from '../domain/rules';
-import { clearRiskGame, loadRiskGame, saveRiskGame, type StoredRisk } from '../storage/riskPersistence';
+import { MAPS } from '../maps/registry';
+import { currentPlayer, hasUnclaimed, territoriesOf, type NewPlayer } from '../domain/rules';
+import { clearRiskGame, loadRiskGame, type StoredRisk } from '../storage/riskPersistence';
 import { ResumeIcon } from '@shared/ui/icons';
 import type { BattleResult, DiceMode, GameState } from '../domain/types';
 
@@ -57,12 +42,8 @@ export function RiskPage() {
   const [mapId, setMapId] = useState(MAPS[0].id);
   const [diceMode, setDiceMode] = useState<DiceMode>('random');
 
-  const [map, setMap] = useState<RiskMap | null>(null);
-  const [state, setState] = useState<GameState | null>(null);
-  const [sel, setSel] = useState<string | null>(null);
-  const [dest, setDest] = useState<string | null>(null);
-  const [moveCount, setMoveCount] = useState(1);
-  const [battle, setBattle] = useState<BattleResult | null>(null);
+  const risk = useRisk();
+  const { map, state, sel, dest, moveCount, battle, targets } = risk;
   // An unfinished campaign saved on this device, offered on the setup screen.
   const [resumable, setResumable] = useState<StoredRisk | null>(() => loadRiskGame());
 
@@ -76,100 +57,20 @@ export function RiskPage() {
     resetZoom();
   }, [map, resetZoom]);
 
-  // The campaign auto-saves after every action; a finished war clears itself.
-  useEffect(() => {
-    if (!state) return;
-    if (state.phase === 'over') clearRiskGame();
-    else saveRiskGame(state);
-  }, [state]);
-
   function resume() {
     if (!resumable) return;
-    try {
-      const rendered = mapById(resumable.state.mapId).build();
-      setMap(rendered);
-      setState(resumable.state);
-      resetSelection();
-    } catch {
-      // The saved map no longer exists (app update) — drop the stale save.
-      clearRiskGame();
-      setResumable(null);
-    }
+    if (!risk.resume(resumable)) setResumable(null);
   }
 
-  const targets = useMemo(() => {
-    const set = new Set<string>();
-    if (!state || !map || sel === null) return set;
-    if (state.phase === 'attack') {
-      for (const n of map.topology.adjacency[sel] ?? []) {
-        if (canAttack(state, map.topology, sel, n)) set.add(n);
-      }
-    } else if (state.phase === 'fortify') {
-      for (const d of connectedOwned(state, map.topology, sel)) set.add(d);
-    }
-    return set;
-  }, [state, map, sel]);
-
   function start() {
-    const rendered = mapById(mapId).build();
     const players: NewPlayer[] = Array.from({ length: count }, (_, i) => ({
       name: names[i]?.trim() || PLAYER_NAMES[i],
       color: PLAYER_COLORS[i],
     }));
-    setMap(rendered);
-    setState(newGame(rendered.topology, players, Math.random, diceMode));
-    resetSelection();
+    risk.start({ mapId, players, diceMode });
   }
 
-  function resetSelection() {
-    setSel(null);
-    setDest(null);
-    setBattle(null);
-    setMoveCount(1);
-  }
-
-  function onPick(id: string) {
-    if (!state || !map) return;
-    const topo = map.topology;
-    const t = state.territories[id];
-
-    if (state.phase === 'reinforce' || state.phase === 'setup') {
-      // The engine knows the rules for each stage (claiming an empty land vs
-      // reinforcing your own); invalid taps are simply no-ops.
-      setState(placeArmy(state, id, map.topology));
-      return;
-    }
-
-    if (state.phase === 'attack') {
-      if (sel === null) {
-        if (t.owner === state.current && t.armies >= 2) setSel(id);
-      } else if (id === sel) {
-        setSel(null);
-      } else if (canAttack(state, topo, sel, id)) {
-        const { state: ns, result } = resolveAttack(state, topo, sel, id);
-        setState(ns);
-        setBattle(result);
-        if (ns.territories[sel].armies < 2 || ns.phase === 'over') setSel(null);
-      } else if (t.owner === state.current && t.armies >= 2) {
-        setSel(id);
-      }
-      return;
-    }
-
-    if (state.phase === 'fortify') {
-      if (sel === null) {
-        if (t.owner === state.current && t.armies >= 2) setSel(id);
-      } else if (id === sel) {
-        resetSelection();
-      } else if (canFortify(state, topo, sel, id)) {
-        setDest(id);
-        setMoveCount(Math.max(1, state.territories[sel].armies - 1));
-      } else if (t.owner === state.current && t.armies >= 2) {
-        setSel(id);
-        setDest(null);
-      }
-    }
-  }
+  const onPick = risk.pick;
 
   const goMenu = () => navigate('/');
 
@@ -288,7 +189,7 @@ export function RiskPage() {
             <h2 className="risk-victory-title">{w.name} holds the world</h2>
             <p className="risk-victory-sub">Every banner on the map is theirs. A decisive campaign, General.</p>
           </div>
-          <button className="risk-btn primary block lg" onClick={() => { setState(null); setMap(null); }} data-testid="risk-again">New campaign</button>
+          <button className="risk-btn primary block lg" onClick={risk.newCampaign} data-testid="risk-again">New campaign</button>
           <button className="risk-btn block" onClick={goMenu}>← Back to menu</button>
         </div>
       </Shell>
@@ -371,27 +272,19 @@ export function RiskPage() {
             <button
               className="risk-done"
               disabled={state.toPlace > 0}
-              onClick={() => setState(endReinforce(state))}
+              onClick={risk.doneReinforce}
               data-testid="end-reinforce"
             >
               Done ✓
             </button>
           )}
           {state.phase === 'attack' && (
-            <button
-              className="risk-done"
-              onClick={() => { setState(endAttack(state)); resetSelection(); }}
-              data-testid="end-attack"
-            >
+            <button className="risk-done" onClick={risk.doneAttack} data-testid="end-attack">
               Done ✓
             </button>
           )}
           {state.phase === 'fortify' && (
-            <button
-              className="risk-done"
-              onClick={() => { setState(endTurn(state, map.topology)); resetSelection(); }}
-              data-testid="end-turn"
-            >
+            <button className="risk-done" onClick={risk.doneTurn} data-testid="end-turn">
               Done ✓
             </button>
           )}
@@ -410,19 +303,15 @@ export function RiskPage() {
               min={1}
               max={state.territories[sel].armies - 1}
               value={moveCount}
-              onChange={(e) => setMoveCount(Number(e.target.value))}
+              onChange={(e) => risk.setMoveCount(Number(e.target.value))}
               data-testid="fortify-range"
               aria-label="Armies to march"
             />
             <div className="risk-march-actions">
-              <button
-                className="risk-btn primary"
-                onClick={() => { setState(fortify(state, map.topology, sel, dest, moveCount)); resetSelection(); }}
-                data-testid="fortify-confirm"
-              >
+              <button className="risk-btn primary" onClick={risk.confirmFortify} data-testid="fortify-confirm">
                 March {moveCount} →
               </button>
-              <button className="risk-btn" onClick={resetSelection}>Cancel</button>
+              <button className="risk-btn" onClick={risk.cancelSelection}>Cancel</button>
             </div>
           </div>
         )}
