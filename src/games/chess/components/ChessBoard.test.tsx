@@ -63,23 +63,26 @@ describe('<ChessBoard>', () => {
 
   // ── Real pointer sequences ────────────────────────────────────────────
   // A real tap or drag is pointerdown → pointerup → (sometimes) click; the
-  // click-only tests above never exercise that path. These do. The drop
-  // hit-test goes through document.elementFromPoint, which jsdom lacks, so
-  // each test maps "clientX,clientY" → square testid explicitly.
+  // click-only tests above never exercise that path. These do. Drops are
+  // hit-tested by board geometry, so the suite stubs one rect for the grid
+  // (800×800 at the origin — 100px squares, display coords) and drives the
+  // pointer in those coordinates: square centre = (col·100+50, row·100+50).
 
   describe('pointer sequences', () => {
-    const byPoint = new Map<string, string>();
     const originalElementFromPoint = document.elementFromPoint;
 
     beforeEach(() => {
-      document.elementFromPoint = (x: number, y: number) => {
-        const id = byPoint.get(`${x},${y}`);
-        return id ? screen.getByTestId(id) : null;
-      };
+      // jsdom has no layout: give the board a real rect and all else zeros.
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        const size = this.getAttribute?.('data-testid') === 'chess-board' ? 800 : 0;
+        return {
+          x: 0, y: 0, left: 0, top: 0, right: size, bottom: size,
+          width: size, height: size, toJSON: () => ({}),
+        } as DOMRect;
+      });
     });
 
     afterEach(() => {
-      byPoint.clear();
       document.elementFromPoint = originalElementFromPoint;
       vi.restoreAllMocks();
     });
@@ -112,14 +115,13 @@ describe('<ChessBoard>', () => {
       // StrictMode, like the real app shell: double-invoked updaters and
       // re-mounted effects must not double the emitted move.
       render(<StrictMode><Harness onPly={onPly} /></StrictMode>);
-      byPoint.set('50,40', 'sq-e4');
 
-      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 50, clientY: 60 });
+      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 450, clientY: 650 });
       // Move and release land in one batch, as a fast browser drag does —
       // this is what pushes the setDrag updater into the render phase.
       act(() => {
-        windowPointer('pointermove', 50, 40);
-        windowPointer('pointerup', 50, 40);
+        windowPointer('pointermove', 450, 450);
+        windowPointer('pointerup', 450, 450);
       });
 
       expect(onPly).toHaveBeenCalledTimes(1);
@@ -133,15 +135,14 @@ describe('<ChessBoard>', () => {
     it('duplicate pointerups emit the move exactly once (event-sourced log must never double)', () => {
       const onPly = vi.fn();
       render(<StrictMode><Harness onPly={onPly} /></StrictMode>);
-      byPoint.set('50,40', 'sq-e4');
 
-      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 50, clientY: 60 });
+      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 450, clientY: 650 });
       // A two-finger lift can deliver two pointerups in one batch, before
       // React has re-rendered and detached the drag listeners.
       act(() => {
-        windowPointer('pointermove', 50, 40);
-        windowPointer('pointerup', 50, 40);
-        windowPointer('pointerup', 50, 40);
+        windowPointer('pointermove', 450, 450);
+        windowPointer('pointerup', 450, 450);
+        windowPointer('pointerup', 450, 450);
       });
 
       expect(onPly).toHaveBeenCalledTimes(1);
@@ -150,11 +151,10 @@ describe('<ChessBoard>', () => {
     it('a pointercancel abandons the drag without committing', () => {
       const onPly = vi.fn();
       render(<Harness onPly={onPly} />);
-      byPoint.set('50,40', 'sq-e4');
 
-      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 50, clientY: 60 });
+      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 450, clientY: 650 });
       act(() => {
-        windowPointer('pointermove', 50, 40);
+        windowPointer('pointermove', 450, 450);
         window.dispatchEvent(new ((window.PointerEvent ?? window.MouseEvent) as typeof MouseEvent)('pointercancel', { bubbles: true }));
       });
 
@@ -163,21 +163,58 @@ describe('<ChessBoard>', () => {
       expect(document.querySelector('.chess-drag')).toBeNull();
     });
 
+    it('a drop lands even when another element covers the board (geometry, not stacking)', () => {
+      const onPly = vi.fn();
+      render(<Harness onPly={onPly} />);
+      // The board's rect is known even in jsdom via the suite's rect stub;
+      // meanwhile elementFromPoint sees only an overlay riding above the
+      // board — the floating video call card during online play.
+      const overlay = document.createElement('div');
+      overlay.className = 'pv';
+      document.body.appendChild(overlay);
+      document.elementFromPoint = () => overlay;
+
+      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 450, clientY: 650 });
+      act(() => {
+        windowPointer('pointermove', 450, 450);
+        windowPointer('pointerup', 450, 450);
+      });
+      overlay.remove();
+
+      expect(onPly).toHaveBeenCalledWith({ from: { row: 6, col: 4 }, to: { row: 4, col: 4 } });
+    });
+
     it('a tap keeps the piece selected even when the browser delivers the trailing click', () => {
       render(
         <ChessBoard board={initialState()} orientation="w" interactive movableColor="w" onMove={vi.fn()} />,
       );
-      byPoint.set('50,60', 'sq-e2');
 
       // Tap = pointerdown and pointerup on the same square, then the native
       // click on it (Chrome suppresses that click; Safari delivers it).
-      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 50, clientY: 60 });
+      fireEvent.pointerDown(screen.getByTestId('sq-e2'), { clientX: 450, clientY: 650 });
       act(() => {
-        windowPointer('pointerup', 50, 60);
+        windowPointer('pointerup', 450, 650);
       });
       fireEvent.click(screen.getByTestId('sq-e2'));
 
       expect(screen.getByTestId('sq-e4').className).toMatch(/target/);
+    });
+
+    it('drops map through the orientation when Black sits at the bottom', () => {
+      const onMove = vi.fn();
+      render(
+        <ChessBoard board={{ ...initialState(), turn: 'b' }} orientation="b" interactive movableColor="b" onMove={onMove} />,
+      );
+
+      // Viewed from Black's side, d7 renders at display (row 6, col 4) and
+      // d5 at display (row 4, col 4) — same screen path as White's e-pawn.
+      fireEvent.pointerDown(screen.getByTestId('sq-d7'), { clientX: 450, clientY: 650 });
+      act(() => {
+        windowPointer('pointermove', 450, 450);
+        windowPointer('pointerup', 450, 450);
+      });
+
+      expect(onMove).toHaveBeenCalledWith({ from: { row: 1, col: 3 }, to: { row: 3, col: 3 } });
     });
 
     it('two plain clicks still toggle the selection off (keyboard path)', () => {

@@ -6,7 +6,7 @@
  * on the board into a full rules-bound hotseat match (each side needs its
  * king, and the game can't already be over — that's it).
  */
-import { lazy, Suspense, useEffect, useState, type PointerEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent } from 'react';
 import { EraserIcon } from '@shared/ui/icons';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { ChessPiece, pieceName } from './chessPieces';
@@ -38,6 +38,7 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
   const [board, setBoard] = useState<Board>(emptyBoard);
   const [hand, setHand] = useState<Hand | null>(null);
   const [drag, setDrag] = useState<{ hand: Hand; x: number; y: number } | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
   // Why the current setup can't start as a game — shown after a failed
   // "Start game" tap, cleared as soon as the board changes.
   const [startIssue, setStartIssue] = useState<string | null>(null);
@@ -115,15 +116,17 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
     if (p) setHand({ piece: p, from: sq });
   };
 
-  // ── Drag flow (transform-safe, same technique as the game board) ──
+  // ── Drag flow (geometry hit-test, same technique as the game board) ──
+  // Map the pointer into the board's rect and divide into the 8×8 — an
+  // overlay riding above the board (the floating video card) can't eat the
+  // drop the way an elementFromPoint hit-test would.
   const squareFromPoint = (x: number, y: number): Square | null => {
-    const el = document.elementFromPoint?.(x, y);
-    const btn = el?.closest?.('[data-testid^="fp-sq-"]');
-    if (!btn) return null;
-    const name = btn.getAttribute('data-testid')!.slice(6);
-    const col = FILES.indexOf(name[0]);
-    const row = RANKS.indexOf(name[1]);
-    return col >= 0 && row >= 0 ? { row, col } : null;
+    const rect = boardRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return null;
+    const col = Math.floor(((x - rect.left) / rect.width) * 8);
+    const row = Math.floor(((y - rect.top) / rect.height) * 8);
+    if (row < 0 || row > 7 || col < 0 || col > 7) return null;
+    return { row, col };
   };
   const startDrag = (h: Hand, e: PointerEvent) => {
     // While erasing, a tap on a board piece deletes it (no drag); dragging a
@@ -200,7 +203,7 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
         ) : (
         <div className="chess-wrap fp-wrap">
           <div className="chess-ranks" aria-hidden="true">{RANKS.split('').map((r) => <span key={r}>{r}</span>)}</div>
-          <div className="chess-board" data-testid="fp-board">
+          <div className="chess-board" ref={boardRef} data-testid="fp-board">
             {rows.map((r) =>
               rows.map((c) => {
                 const piece = board[r][c];
