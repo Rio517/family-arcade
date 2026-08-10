@@ -115,13 +115,26 @@
   letter-spacing: 0.34em; text-transform: uppercase; text-anchor: middle; pointer-events: none;
 }
 .risk-terr {
-  stroke: #43301a; stroke-width: 0.9; cursor: pointer; fill-opacity: 0.92;
+  stroke: #43301a; cursor: pointer; fill-opacity: 0.92;
   transition: filter 120ms;
+  /* Round joins, because the coastlines are traced from real geodata and hit
+     plenty of angles sharp enough for a mitre to throw a spike. Adjacent
+     territories each stroke their own edge, so those spikes landed on top of
+     one another and read as a ragged seam. */
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  /* non-scaling-stroke keeps the border one screen pixel at every zoom level.
+     Without it a 5x zoom multiplies the stroke by five and the borders swallow
+     the small territories whole. */
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1;
+  shape-rendering: geometricPrecision;
 }
 .risk-terr:hover { filter: brightness(1.12); }
-.risk-terr.target { stroke: #f2e8ca !important; stroke-width: 1.3; filter: brightness(1.1); }
+/* These widths are screen pixels too, since .risk-terr sets non-scaling-stroke. */
+.risk-terr.target { stroke: #f2e8ca !important; stroke-width: 1.6; filter: brightness(1.1); }
 .risk-terr.sel {
-  stroke: var(--brass-hi) !important; stroke-width: 2;
+  stroke: var(--brass-hi) !important; stroke-width: 2.4;
   filter: brightness(1.2) drop-shadow(0 0 3px rgba(231, 207, 149, 0.8));
 }
 /* Territories are keyboard-operable buttons — give tabbing a clear brass ring. */
@@ -135,7 +148,11 @@
 
 .risk-badge { cursor: pointer; }
 .risk-badge > text { pointer-events: none; }
-.risk-divider line { stroke: #43301a; stroke-width: 0.8; pointer-events: none; }
+.risk-divider line {
+  stroke: #43301a; pointer-events: none;
+  vector-effect: non-scaling-stroke; stroke-width: 0.9; stroke-linecap: round;
+  shape-rendering: geometricPrecision;
+}
 
 /* Sea routes — dotted brass shipping lines across the water. */
 .risk-searoutes { pointer-events: none; }
@@ -189,6 +206,15 @@
   min-height: 420px;
   margin: 0 -16px;
   overflow: hidden;
+  /* Nothing on the board is prose. Without this a drag across the map starts a
+     text selection — usually catching the engraved continent names — and you
+     end up highlighting "SOUTH AMERICA" instead of panning. pointer-events on
+     the labels doesn't help: selection is driven by the drag, not by hits.
+     -webkit-touch-callout stops iOS raising its copy/share sheet on a long
+     press, which is otherwise easy to trigger while thinking about a move. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* Campaign mode: the window IS the board. The shared .app gutters and the
@@ -211,6 +237,20 @@ body:has(.risk-bare) .party-root {
   bottom: calc(66px + env(safe-area-inset-bottom));
   transform: none;
 }
+/* And dressed for the war room rather than the sci-fi console. The values are
+   literals, not the theme's custom properties: the pill lives outside
+   .risk-theme, so --brass and friends aren't in scope for it. */
+body:has(.risk-bare) .party-pill {
+  background: rgba(42, 24, 12, 0.93);
+  border: 1.5px solid #96702c;
+  color: #f6cf7d;
+  font-family: Copperplate, 'Copperplate Gothic Bold', 'Hoefler Text', Palatino, Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
+}
+body:has(.risk-bare) .party-pill:hover { border-color: #e0a83c; }
+body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; outline-offset: 2px; }
 
 /* The three controls the title row used to carry, as icons over the map. */
 .risk-icon {

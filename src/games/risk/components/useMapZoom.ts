@@ -160,13 +160,12 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
       const pos = { clientX: e.clientX, clientY: e.clientY };
       bk.origin.set(e.pointerId, pos);
       bk.last.set(e.pointerId, pos);
-      if (e.currentTarget.setPointerCapture) {
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {
-          // Some jsdom/browser combinations reject capture on synthetic pointers.
-        }
-      }
+      // NB: capture is deliberately NOT taken here. Capturing on pointerdown
+      // retargets the whole gesture to the <svg>, so the browser fires the
+      // click on the svg instead of on the territory under the finger and the
+      // board stops responding to taps entirely. Capture is taken in the move
+      // handler, once movement has passed the drag threshold and we know this
+      // is a pan rather than a tap.
       if (bk.last.size === 2) {
         const pts = [...bk.last.values()];
         bk.pinchStartDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
@@ -204,6 +203,15 @@ export function useMapZoom(width: number, height: number, opts?: { maxScale?: nu
         if (Math.hypot(dxTotal, dyTotal) <= DRAG_THRESHOLD_PX) return;
         bk.dragging = true;
         setPanning(true);
+        // Now that this is definitely a pan, take the pointer so it keeps
+        // reporting if the finger leaves the map mid-drag.
+        if (e.currentTarget.setPointerCapture) {
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            // Some jsdom/browser combinations reject capture on synthetic pointers.
+          }
+        }
       }
 
       // Delta since the *previous* move, not the pointerdown — movementX/Y
