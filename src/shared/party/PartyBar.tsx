@@ -21,7 +21,7 @@ export function PartyBar() {
   const { inParty, call } = party;
 
   return (
-    <div className="party-root">
+    <aside className="party-root" aria-label="Party">
       {open && (
         <div className="party-panel" role="dialog" aria-label="Party">
           {!inParty ? (
@@ -160,7 +160,7 @@ export function PartyBar() {
           </>
         )}
       </button>
-    </div>
+    </aside>
   );
 }
 
