@@ -5,6 +5,12 @@
    prize counter. One committed dark visual world; all motion is gated
    behind prefers-reduced-motion. */
 
+/* The main landmark exists for screen readers only — display:contents keeps
+   it from introducing a box between the page and its layout parents. */
+.app-main {
+  display: contents;
+}
+
 .arcade {
   --night: #0c1322;
   --gold: #ffd76a;
