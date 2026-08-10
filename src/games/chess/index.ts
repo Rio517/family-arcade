@@ -35,7 +35,7 @@ function savedGames(): SavedGameSummary[] {
 export const chess: GameDescriptor = {
   id: 'chess',
   title: 'Chess',
-  tag: '1–2 Players',
+  players: { min: 1, max: 2 },
   path: '/chess',
   description: 'Drag-and-drop chess — same device or online with a code.',
   Icon: ChessIcon,

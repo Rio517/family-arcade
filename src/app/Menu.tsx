@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useProfile } from '@shared/profile/useProfile';
-import { GridIcon, ResumeIcon } from '@shared/ui/icons';
+import { BotIcon, GridIcon, PersonIcon, ResumeIcon } from '@shared/ui/icons';
 import { GAMES } from './registry';
 
 /**
@@ -36,12 +36,19 @@ function BulbString({ count, offset = 0 }: { count: number; offset?: number }) {
 }
 
 /** One game ticket: awning strip, glyph, name, blurb. */
-function Ticket({ title, sub, tag, children }: {
+function Ticket({ title, sub, tag, players, computer, children }: {
   title: string;
   sub: string;
   tag?: string;
+  players: { min: number; max: number };
+  computer?: boolean;
   children: React.ReactNode;
 }) {
+  const count = players.min === players.max ? String(players.min) : `${players.min}–${players.max}`;
+  const playersLabel =
+    players.min === players.max
+      ? `For ${players.min} player${players.min === 1 ? '' : 's'}`
+      : `For ${players.min}–${players.max} players`;
   return (
     <>
       <span className="tk-awning" aria-hidden="true" />
@@ -50,6 +57,19 @@ function Ticket({ title, sub, tag, children }: {
         <span className="tk-body">
           <span className="tk-name">
             {title} {tag && <small>{tag}</small>}
+            <span className="tk-badge" role="img" title={playersLabel} aria-label={playersLabel}>
+              <PersonIcon size={12} /> {count}
+            </span>
+            {computer && (
+              <span
+                className="tk-badge"
+                role="img"
+                title="Plays against the computer too — nobody else needed."
+                aria-label="Has computer players"
+              >
+                <BotIcon size={13} />
+              </span>
+            )}
           </span>
           <span className="tk-desc">{sub}</span>
         </span>
@@ -91,14 +111,25 @@ export function Menu() {
 
         <nav className="tix" aria-label="Games">
           <a className="tk game-yahtzee" href={`${import.meta.env.BASE_URL}calculator.html`}>
-            <Ticket title="Yahtzee" sub="Roll real dice — tap to log the scorecard. Works offline." tag="Solo+">
+            <Ticket
+              title="Yahtzee"
+              sub="Roll real dice — tap to log the scorecard. Works offline."
+              tag="Solo+"
+              players={{ min: 1, max: 1 }}
+            >
               <GridIcon size={30} />
             </Ticket>
           </a>
 
           {GAMES.map((game) => (
             <Link key={game.id} className={`tk game-${game.id}`} to={game.path}>
-              <Ticket title={game.title} sub={game.description} tag={game.tag}>
+              <Ticket
+                title={game.title}
+                sub={game.description}
+                tag={game.tag}
+                players={game.players}
+                computer={game.computer}
+              >
                 <game.Icon size={30} />
               </Ticket>
             </Link>

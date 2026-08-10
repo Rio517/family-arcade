@@ -20,7 +20,8 @@ function savedGames(): SavedGameSummary[] {
 export const battleship: GameDescriptor = {
   id: 'battleship',
   title: 'Ship Battle',
-  tag: '2 Players',
+  players: { min: 2, max: 2 },
+  computer: true,
   path: '/play',
   description: 'Two devices, one code. Pick your fleet, place your ships, and duel.',
   Icon: ShipIcon,
