@@ -11,7 +11,7 @@ import { COLUMN_LABELS, shipCells } from '@games/battleship/domain/board';
 import { ownBoardView, radarGrid, shipName, sunkByAttacker, type CellState } from '@games/battleship/domain/engine';
 import { CloseIcon, FullscreenIcon, RadarIcon, ShieldIcon } from '@shared/ui/icons';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
-import { BOARD_SIZE, type Coord, type Fleet, type GameLog, type ShipId, type ShotEvent, type Side } from '@games/battleship/domain/types';
+import { BOARD_SIZE, type Coord, type Fleet, type FleetEra, type GameLog, type ShipId, type ShotEvent, type Side } from '@games/battleship/domain/types';
 
 const coordLabel = (row: number, col: number) => `${COLUMN_LABELS[col]}${row + 1}`;
 
@@ -44,6 +44,8 @@ interface BattleProps {
   oppName: string;
   skinId: string;
   oppSkinId: string;
+  /** Which navy my 3D fleet sails; picked on the fleet screen, local-only. */
+  era?: FleetEra;
   myFleet: Fleet;
   myTurn: boolean;
   pendingFire: Coord | null;
@@ -59,6 +61,7 @@ export function Battle({
   oppName,
   skinId,
   oppSkinId,
+  era = 'classic',
   myFleet,
   myTurn,
   pendingFire,
@@ -201,7 +204,7 @@ export function Battle({
       {fleetDim === '3d' ? (
         <Suspense fallback={<p className="subtle center bs3d-hint">Launching the fleet…</p>}>
           <div className="bs3d-holder">
-            <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} />
+            <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} era={era} />
             <button
               className="bs3d-expand"
               onClick={() => setPopped(true)}
@@ -234,7 +237,7 @@ export function Battle({
           <div className="bs3d-pop" role="dialog" aria-label="Your fleet in 3D">
             <div className="bs3d-holder">
               <Suspense fallback={<p className="subtle center bs3d-hint">Launching the fleet…</p>}>
-                <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} />
+                <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} era={era} />
               </Suspense>
               <button
                 className="bs3d-expand"

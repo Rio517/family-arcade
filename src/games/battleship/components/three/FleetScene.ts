@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { CellState } from '@games/battleship/domain/engine';
-import { BOARD_SIZE, type Orientation, type ShipId } from '@games/battleship/domain/types';
+import { BOARD_SIZE, type FleetEra, type Orientation, type ShipId } from '@games/battleship/domain/types';
 import { disposeDeep } from '@shared/three/disposeDeep';
 import { buildModelShip, loadShipModels } from './shipModels';
 
@@ -59,6 +59,8 @@ export class FleetScene {
     private container: HTMLElement,
     private opts: {
       skinColor: string;
+      /** Which navy this captain sails — classic (default) or modern. */
+      era?: FleetEra;
       reducedMotion: boolean;
       /** Fires once the ship meshes have decoded and the fleet is rebuilt. */
       onFleetReady?: () => void;
@@ -153,7 +155,7 @@ export class FleetScene {
    * real models when they land, so a slow decode never blocks the first frame.
    */
   private async loadModels() {
-    await loadShipModels(this.opts.skinColor);
+    await loadShipModels(this.opts.skinColor, this.opts.era ?? 'classic');
     if (this.disposed) return;
     if (this.lastState) this.update(this.lastState.ships, this.lastState.incoming);
     this.opts.onFleetReady?.();
@@ -176,7 +178,7 @@ export class FleetScene {
     for (const ship of ships) {
       // Generated mesh where we have one; procedural hull everywhere else.
       const g =
-        buildModelShip(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor) ??
+        buildModelShip(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor, true, this.opts.era ?? 'classic') ??
         buildWarship(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor);
       const horiz = ship.orientation === 'H';
       const cx = (horiz ? ship.col + (ship.size - 1) / 2 : ship.col) - HALF;

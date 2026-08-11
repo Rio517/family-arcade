@@ -8,10 +8,13 @@ function setup(overrides = {}) {
   const onUnlock = vi.fn(() => false);
   const onContinue = vi.fn();
   const onName = vi.fn();
+  const onEra = vi.fn();
   render(
     <FleetSelect
       profile={defaultProfile()}
       selectedSkinId="aqua"
+      era="classic"
+      onEra={onEra}
       name="Kid"
       onName={onName}
       onSelect={onSelect}
@@ -20,7 +23,7 @@ function setup(overrides = {}) {
       {...overrides}
     />,
   );
-  return { onSelect, onUnlock, onContinue, onName };
+  return { onSelect, onUnlock, onContinue, onName, onEra };
 }
 
 describe('<FleetSelect>', () => {
@@ -55,5 +58,19 @@ describe('<FleetSelect>', () => {
     const { onName } = setup();
     fireEvent.change(screen.getByTestId('fleet-name-input'), { target: { value: 'Skipper' } });
     expect(onName).toHaveBeenCalledWith('Skipper');
+  });
+
+  it('offers Classic and Modern navies as a separate choice, by those names', () => {
+    const { onEra } = setup();
+    // The words the family asked for, so players get what they're picking…
+    expect(screen.getByTestId('era-classic')).toHaveTextContent('Classic');
+    expect(screen.getByTestId('era-modern')).toHaveTextContent('Modern');
+    // …with the actual ships spelled out on each card.
+    expect(screen.getByTestId('era-classic')).toHaveTextContent(/Iowa/);
+    expect(screen.getByTestId('era-modern')).toHaveTextContent(/Virginia/);
+    expect(screen.getByTestId('era-classic')).toHaveAttribute('data-selected', 'true');
+
+    fireEvent.click(screen.getByTestId('era-modern'));
+    expect(onEra).toHaveBeenCalledWith('modern');
   });
 });

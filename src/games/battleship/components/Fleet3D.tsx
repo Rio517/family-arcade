@@ -7,14 +7,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { FleetScene, type SceneShip } from './three/FleetScene';
 import type { CellState } from '@games/battleship/domain/engine';
+import type { FleetEra } from '@games/battleship/domain/types';
 
 interface Fleet3DProps {
   ships: SceneShip[];
   incoming: CellState[][];
   skinColor: string;
+  /** Which navy this captain sails; defaults to the classic fleet. */
+  era?: FleetEra;
 }
 
-export default function Fleet3D({ ships, incoming, skinColor }: Fleet3DProps) {
+export default function Fleet3D({ ships, incoming, skinColor, era = 'classic' }: Fleet3DProps) {
   const holder = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<FleetScene | null>(null);
   const [failed, setFailed] = useState(false);
@@ -32,6 +35,7 @@ export default function Fleet3D({ ships, incoming, skinColor }: Fleet3DProps) {
       const reducedMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
       scene = new FleetScene(holder.current, {
         skinColor,
+        era,
         reducedMotion,
         onFleetReady: () => setFleetReady(true),
       });
@@ -44,7 +48,7 @@ export default function Fleet3D({ ships, incoming, skinColor }: Fleet3DProps) {
       scene?.dispose();
       sceneRef.current = null;
     };
-  }, [skinColor]);
+  }, [skinColor, era]);
 
   useEffect(() => {
     sceneRef.current?.update(ships, incoming);

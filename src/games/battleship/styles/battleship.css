@@ -48,6 +48,25 @@
   display: grid; place-items: center; color: var(--muted);
 }
 
+/* ── The navy picker: Classic vs Modern, a separate choice from the colour ── */
+.era-note { margin: -4px 0 12px; font-size: 14px; }
+.eras { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 480px) { .eras { grid-template-columns: 1fr; } }
+.era-card {
+  text-align: left; cursor: pointer; border-radius: 14px; padding: 14px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  transition: transform 120ms, border-color 120ms;
+}
+.era-card:active { transform: scale(0.98); }
+.era-card[data-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 24px -6px var(--accent);
+}
+.era-name { font-weight: 800; font-size: 17px; }
+.era-sub { font-size: 14px; color: var(--muted); margin-top: 2px; }
+.era-ships { font-size: 12.5px; color: var(--muted); margin-top: 8px; opacity: 0.9; }
+.era-card[data-selected='true'] .era-ships { color: var(--text); opacity: 0.85; }
+
 /* ── Boards ──────────────────────────────────────────────────────────────── */
 .board-title { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .board-title .name { font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }

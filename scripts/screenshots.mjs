@@ -90,6 +90,21 @@ const SHOTS = [
     },
   },
   {
+    // The same close-up sailing the MODERN navy — Ford, Kirov, Type 055,
+    // Virginia, Hobart — so both eras stay reviewable side by side.
+    name: 'battle-fleet-3d-modern',
+    path: '/preview-b.html?era=modern',
+    viewport: { width: 1500, height: 1000 },
+    selector: '[data-testid="fleet3d"]',
+    prep: async (page) => {
+      await page.click('[data-testid="fleet-view-3d"]');
+      await page.waitForSelector('[data-testid="fleet3d"], [data-testid="fleet3d-fallback"]', {
+        timeout: 20000,
+      });
+      await page.waitForTimeout(2500);
+    },
+  },
+  {
     // The Ship Battle lobby with the captain ladder open — the solo door.
     name: 'battle-lobby',
     path: '/#/play',
@@ -97,6 +112,19 @@ const SHOTS = [
     prep: async (page) => {
       await page.getByTestId('solo-game').click();
       await page.getByTestId('captain-grimtide').waitFor();
+    },
+  },
+  {
+    // The fleet screen: colour picker plus the Classic/Modern navy choice.
+    name: 'battle-fleet-select',
+    path: '/#/play',
+    viewport: TABLET,
+    fullPage: true,
+    prep: async (page) => {
+      await page.getByTestId('solo-game').click();
+      await page.getByTestId('captain-grimtide').click();
+      await page.getByTestId('era-modern').waitFor();
+      await page.waitForTimeout(300);
     },
   },
   {
