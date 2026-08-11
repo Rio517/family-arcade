@@ -79,6 +79,11 @@ export function ChessPage() {
     try { localStorage.setItem('chess-view-v1', v); } catch { /* ignore */ }
   };
 
+  // The 3D camera: a Reset view button appears in the title bar once the
+  // player has orbited or cursor-zoomed away from the opening framing.
+  const [camDirty, setCamDirty] = useState(false);
+  const resetViewRef = useRef<(() => void) | null>(null);
+
   const onFinish = useCallback(
     (info: FinishInfo) => {
       // Online decisive games move the shared profile; draws and local games don't.
@@ -170,9 +175,13 @@ export function ChessPage() {
   const resumableChess = !inGame && setup === 'pick' ? loadResumableChessGame() : null;
   const resumableLocal = !inGame && setup === 'pick' ? loadLocalChessGame() : null;
 
+  // In 3D the scene owns the whole window — stars in every direction; the
+  // title bar and the hint float over it.
+  const immersive = cx.phase === 'play' && view === '3d';
+
   return (
     <ChessThemeContext.Provider value={{ theme, setTheme }}>
-    <div className={`app chess-theme-${theme}`}>
+    <div className={`app chess-theme-${theme}${immersive ? ' chess-immersive' : ''}`}>
       <div className="topbar">
         <button className="back-link" onClick={goMenu} data-testid="chess-back">‹ Menu</button>
         <h1>Chess</h1>
@@ -193,6 +202,15 @@ export function ChessPage() {
           </button>
         )}
         {cx.side && <ConnectionBadge status={cx.status} detail={cx.statusDetail} />}
+        {cx.phase === 'play' && view === '3d' && camDirty && (
+          <button
+            className="btn btn-ghost chess-reset-btn"
+            onClick={() => resetViewRef.current?.()}
+            data-testid="chess-reset-view"
+          >
+            ⤢ Reset view
+          </button>
+        )}
         {cx.phase === 'play' && cx.mode === 'local' && (
           <button
             className="btn btn-ghost chess-undo-btn"
@@ -432,6 +450,8 @@ export function ChessPage() {
                   movableColor={cx.mode === 'online' && cx.myColor ? cx.myColor : cx.turn}
                   lastMove={lastMove}
                   onMove={onMove}
+                  onViewDirty={setCamDirty}
+                  onApi={(api) => { resetViewRef.current = api ? api.resetView : null; }}
                 />
               </Suspense>
             ) : (

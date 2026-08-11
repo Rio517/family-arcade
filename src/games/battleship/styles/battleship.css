@@ -545,7 +545,11 @@
 
 /* Mid-battle the page opens up so two full-size boards and the log all fit —
    everywhere else the standard 1200px app column stays. */
-.bs-app-wide { max-width: 1460px; }
+/* The battle owns the window: no app column cap, and the boards grow into
+   it — the 560px board cap left acres of dead margin on a desktop. */
+.bs-app-wide { max-width: none; }
+.bs-app-wide .board { max-width: 760px; }
+.bs-app-wide .battle-wide .boards { gap: 20px; }
 
 /* ── The 3D ocean pop-out ────────────────────────────────────────────────── */
 .bs3d-expand {

@@ -143,6 +143,41 @@
   .chess-wrap { width: min(calc(100dvh - 100px), 96vw); }
 }
 
+/* ── Immersive 3D: the scene owns the whole window ──────────────────────────
+   No frame, no letterbox — orbit and there are stars (or clouds, or the war
+   room's dusk) in every direction. The title bar and the hint float on top. */
+.chess-immersive { max-width: none; padding: 0; }
+.chess-immersive .chess-play { position: fixed; inset: 0; z-index: 0; }
+.chess-immersive .chess-board-area { width: 100%; height: 100%; }
+.chess-immersive .chess3d { width: 100%; height: 100%; gap: 0; }
+.chess-immersive .chess3d-canvas {
+  width: 100%; height: 100%;
+  aspect-ratio: auto; max-height: none;
+  border-radius: 0; box-shadow: none;
+}
+.chess-immersive .topbar {
+  position: fixed; z-index: 5;
+  top: env(safe-area-inset-top); left: 0; right: 0;
+  padding: 10px 14px; margin: 0; border: none;
+}
+.chess-immersive .chess3d-hint {
+  position: fixed; z-index: 5;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  margin: 0; padding: 7px 16px; border-radius: 999px; white-space: nowrap;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid var(--border);
+}
+.chess-immersive .footer { display: none; }
+/* The Party pill is fixed bottom-centre app-wide — in immersive chess that's
+   exactly where the hint floats, so dock it bottom-left instead (same move
+   Risk makes; :has() misses just leave it centred, untidy not broken). */
+body:has(.chess-immersive) .party-root {
+  left: calc(12px + env(safe-area-inset-left));
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  transform: none;
+}
+
 /* ── Title-bar turn chip + the ☰ menu ─────────────────────────────────────── */
 .turn-chip {
   display: inline-flex; align-items: center; gap: 8px; min-width: 0;
@@ -152,6 +187,7 @@
 }
 .turn-chip strong { overflow: hidden; text-overflow: ellipsis; max-width: 14ch; }
 .chess-menu-btn { font-size: 19px; }
+.chess-reset-btn { white-space: nowrap; }
 
 .chess-menu { width: min(440px, 94vw); }
 .chess-menu-body {

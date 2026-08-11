@@ -87,6 +87,9 @@ export class FleetScene {
     this.controls.maxPolarAngle = 1.35;
     this.controls.minPolarAngle = 0.15;
     this.controls.target.set(0, 0, 0);
+    // Zoom dives toward the pointer — zooming at a burning ship takes you to
+    // that ship, not to the middle of the ocean.
+    this.controls.zoomToCursor = true;
     this.controls.update();
 
     // ── Light: a moonlit night engagement ──
@@ -120,14 +123,19 @@ export class FleetScene {
     (grid.material as THREE.Material & { opacity: number }).opacity = 0.5;
     grid.position.y = 0.06;
     this.scene.add(grid);
+    // A quiet frame, not a lamp. The rim slab sits at wave height, so the
+    // rolling sea laps over its lip — with the old bright emissive that read
+    // as an irritating flickering border. Kill the glow and the lapping goes
+    // back to being water. (The inner box is the board's dark floor; it must
+    // stay ABOVE the rim slab or the tint washes the whole board.)
     const rimBar = new THREE.Mesh(
       new THREE.BoxGeometry(BOARD_SIZE + 0.5, 0.06, BOARD_SIZE + 0.5),
       new THREE.MeshStandardMaterial({
         color: opts.skinColor,
         emissive: opts.skinColor,
-        emissiveIntensity: 0.8,
+        emissiveIntensity: 0.15,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.75,
       }),
     );
     rimBar.position.y = -0.02;
