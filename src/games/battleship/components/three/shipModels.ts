@@ -21,11 +21,11 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { ShipId } from '@games/battleship/domain/types';
-// Assets carry their era in the name — modern counterparts of the classic
-// hulls are on the way, and when a full second set exists the fleet gets an
-// era switch. Until then SPECS points at the one hull each ship has, so the
-// board is a mixed museum: modern carrier, WWII-era everything else.
-import carrierModernUrl from '@games/battleship/assets/ships/carrier-modern.glb';
+// Assets carry their era in the name. The active fleet is now a complete
+// WWII navy — Essex, Iowa, Cleveland, Type VIIC, Fletcher. Modern hulls
+// (carrier and submarine so far) are banked outside the bundle until the
+// set is complete and the classic/modern fleet switch ships with it.
+import carrierClassicUrl from '@games/battleship/assets/ships/carrier-classic.glb';
 import battleshipClassicUrl from '@games/battleship/assets/ships/battleship-classic.glb';
 import cruiserClassicUrl from '@games/battleship/assets/ships/cruiser-classic.glb';
 import submarineClassicUrl from '@games/battleship/assets/ships/submarine-classic.glb';
@@ -85,14 +85,14 @@ interface ModelSpec {
 
 const SPECS: Partial<Record<ShipId, ModelSpec>> = {
   carrier: {
-    url: carrierModernUrl,
+    url: carrierClassicUrl,
     yaw: 0, // authored bow-along-x already
     sink: 0.18,
     deckFrac: 0.46,
     authored: true,
-    // The remade carrier wears its team colour on the waterline stripe,
-    // mirroring the battleship's boot stripe (no Team Paint material).
-    teamMaterial: 'Carrier Waterline',
+    // The Essex wears its team colour on the antifouling band at the
+    // waterline, like the rest of the classic navy.
+    teamMaterial: 'Essex Antifouling',
   },
   battleship: {
     url: battleshipClassicUrl,
