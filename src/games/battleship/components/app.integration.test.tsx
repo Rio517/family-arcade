@@ -71,6 +71,31 @@ beforeEach(() => {
   cleanup();
 });
 
+describe('solo games never ask you to invite anyone', () => {
+  it('starting a game against a captain shows no code chip and no share modal', async () => {
+    const app = within(renderApp().container);
+
+    fireEvent.click(app.getByTestId('solo-game'));
+    fireEvent.click(app.getByTestId('captain-grimtide'));
+
+    // On the fleet screen of a solo game: no "SOLO" code chip in the title
+    // bar, and the invite modal must not pop — the computer captain doesn't
+    // scan QR codes. (It used to: the host-waiting logic didn't know solo.)
+    expect(app.getByTestId('fleet-continue')).toBeInTheDocument();
+    expect(app.queryByTestId('share-chip')).toBeNull();
+    expect(app.queryByText(/Waiting for opponent/)).toBeNull();
+
+    // Through placement and into the wait, still nothing to share.
+    fireEvent.click(app.getByTestId('fleet-continue'));
+    fireEvent.click(app.getByTestId('auto-place'));
+    fireEvent.click(app.getByTestId('ready'));
+    await waitFor(() => {
+      expect(app.queryByText(/Waiting for opponent to join/)).toBeNull();
+      expect(app.queryByTestId('share-chip')).toBeNull();
+    });
+  });
+});
+
 describe('two-player integration: create → name → place → fire', () => {
   it('lets a host and guest connect, deploy fleets, and land a first shot', async () => {
     const host = within(renderApp().container);
