@@ -30,6 +30,13 @@ import type { Color, PieceType, Ply, Status } from '@games/chess/domain/types';
 
 type Setup = 'pick' | 'local' | 'online' | 'free';
 
+/** One line under each world in the ☰ menu, so picking isn't a guess. */
+const THEME_BLURBS: Record<ChessThemeId, string> = {
+  classic: 'The leather-and-brass War Room',
+  unicorn: 'The Cloud Kingdom, high above the clouds',
+  galaxy: 'Rebel starships against the dark side',
+};
+
 interface ResultSummary {
   status: Status;
   pointsEarned: number;
@@ -49,6 +56,10 @@ export function ChessPage() {
   const [whiteName, setWhiteName] = useState(() => profile.profile.name || 'White');
   const [blackName, setBlackName] = useState('Black');
   const [logOpen, setLogOpen] = useState(false);
+  // The ☰ options menu: board view, world, move log. Undo stays outside, in
+  // the title bar — taking back a move shouldn't cost two taps.
+  const [menuOpen, setMenuOpen] = useState(false);
+  useDismissOnEscape(menuOpen, () => setMenuOpen(false));
   // Board view — flat or full 3D. Remembered per device.
   // The set's look — classic/unicorn/galaxy — shared with every view via context.
   const [theme, setThemeState] = useState<ChessThemeId>(storedChessTheme);
@@ -165,6 +176,15 @@ export function ChessPage() {
       <div className="topbar">
         <button className="back-link" onClick={goMenu} data-testid="chess-back">‹ Menu</button>
         <h1>Chess</h1>
+        {/* Whose move it is lives in the title bar now — the side panel that
+            used to carry it gave its space back to the board. */}
+        {cx.phase === 'play' && (
+          <span className="turn-chip" data-testid="chess-turn">
+            <span className={`pl-dot ${cx.turn === 'w' ? 'light' : 'dark'}`} aria-hidden="true" />
+            <strong>{cx.turn === 'w' ? nameW : nameB}</strong>{' to move'}
+            {statusOf(cx.board) === 'check' && <span className="pl-check">Check!</span>}
+          </span>
+        )}
         <span className="spacer" />
         {showCodeChip && (
           <button className="code-chip" onClick={() => setShareOpen(true)} data-testid="chess-share-chip">
@@ -173,6 +193,27 @@ export function ChessPage() {
           </button>
         )}
         {cx.side && <ConnectionBadge status={cx.status} detail={cx.statusDetail} />}
+        {cx.phase === 'play' && cx.mode === 'local' && (
+          <button
+            className="btn btn-ghost chess-undo-btn"
+            onClick={cx.undo}
+            disabled={!cx.canUndo}
+            data-testid="chess-undo"
+          >
+            ↶ Undo
+          </button>
+        )}
+        {cx.phase === 'play' && (
+          <button
+            className="icon-btn chess-menu-btn"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Options"
+            aria-haspopup="dialog"
+            data-testid="chess-menu"
+          >
+            ☰
+          </button>
+        )}
         <FullscreenButton />
       </div>
 
@@ -377,8 +418,8 @@ export function ChessPage() {
         </div>
       )}
 
-      {/* ── The board ── fills the screen; controls sit beside it in landscape,
-          below it in portrait. */}
+      {/* ── The board ── owns the whole screen now; everything that used to sit
+          beside it lives in the title bar or behind the ☰ menu. */}
       {cx.phase === 'play' && (
         <div className="chess-play">
           <div className="chess-board-area">
@@ -404,68 +445,95 @@ export function ChessPage() {
               />
             )}
           </div>
-          <div className="chess-side">
-            <div className="chess-players">
-              {/* Black on top, White at the foot — mirroring the board. Each card
-                  names the player and shows the pieces they've captured. */}
-              <PlayerCard
-                name={nameB}
-                color="b"
-                active={cx.turn === 'b'}
-                inCheck={statusOf(cx.board) === 'check' && cx.turn === 'b'}
-                captured={caps.byBlack}
-                capColor="w"
-                lead={-caps.whiteLead}
-              />
-              <PlayerCard
-                name={nameW}
-                color="w"
-                active={cx.turn === 'w'}
-                inCheck={statusOf(cx.board) === 'check' && cx.turn === 'w'}
-                captured={caps.byWhite}
-                capColor="b"
-                lead={caps.whiteLead}
-              />
-            </div>
+        </div>
+      )}
 
-            <div className="chess-side-actions">
-              <button className="btn btn-ghost chess-log-btn" onClick={() => setLogOpen(true)} data-testid="chess-log-open">
-                <ListIcon size={18} /> Move log
+      {/* ── The ☰ options menu — players & captures, then every option spelled
+          out as its own labelled row (kid-sized targets, no cryptic segments). */}
+      {menuOpen && (
+        /* Backdrop click is a mouse convenience; Escape (above) and the Close
+           button are the keyboard path. */
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
+        <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setMenuOpen(false); }}>
+          <div className="modal chess-menu" role="dialog" aria-label="Chess options" aria-modal="true">
+            <div className="modal-head">
+              <span className="modal-title">Options</span>
+              <button className="icon-btn" onClick={() => setMenuOpen(false)} aria-label="Close options" data-testid="chess-menu-close">
+                <CloseIcon size={18} />
               </button>
-              <div className="chess-view-seg" role="group" aria-label="Board view">
-                {(['flat', '3d'] as const).map((v) => (
-                  <button
-                    key={v}
-                    className={`seg-btn ${view === v ? 'on' : ''}`}
-                    onClick={() => pickView(v)}
-                    data-testid={`view-${v}`}
-                  >
-                    {v === 'flat' ? 'Flat' : '3D'}
-                  </button>
-                ))}
+            </div>
+            <div className="chess-menu-body">
+              <div className="chess-players">
+                {/* Black then White, mirroring the board; each card names the
+                    player and shows the pieces they've captured. */}
+                <PlayerCard
+                  name={nameB}
+                  color="b"
+                  active={cx.turn === 'b'}
+                  inCheck={statusOf(cx.board) === 'check' && cx.turn === 'b'}
+                  captured={caps.byBlack}
+                  capColor="w"
+                  lead={-caps.whiteLead}
+                />
+                <PlayerCard
+                  name={nameW}
+                  color="w"
+                  active={cx.turn === 'w'}
+                  inCheck={statusOf(cx.board) === 'check' && cx.turn === 'w'}
+                  captured={caps.byWhite}
+                  capColor="b"
+                  lead={caps.whiteLead}
+                />
               </div>
-              <div className="chess-view-seg" role="group" aria-label="Set theme">
+
+              <div className="menu-group" role="group" aria-label="Board view">
+                <div className="menu-group-title">Board view</div>
+                <button
+                  className="menu-opt"
+                  data-selected={view === 'flat'}
+                  aria-pressed={view === 'flat'}
+                  onClick={() => { pickView('flat'); setMenuOpen(false); }}
+                  data-testid="view-flat"
+                >
+                  <strong>Flat</strong>
+                  <span>The classic top-down board</span>
+                </button>
+                <button
+                  className="menu-opt"
+                  data-selected={view === '3d'}
+                  aria-pressed={view === '3d'}
+                  onClick={() => { pickView('3d'); setMenuOpen(false); }}
+                  data-testid="view-3d"
+                >
+                  <strong>3D</strong>
+                  <span>Orbit the set, zoom right in, and drag the pieces themselves</span>
+                </button>
+              </div>
+
+              <div className="menu-group" role="group" aria-label="World">
+                <div className="menu-group-title">World</div>
                 {CHESS_THEMES.map((t) => (
                   <button
                     key={t.id}
-                    className={`seg-btn ${theme === t.id ? 'on' : ''}`}
-                    onClick={() => setTheme(t.id)}
+                    className="menu-opt"
+                    data-selected={theme === t.id}
+                    aria-pressed={theme === t.id}
+                    onClick={() => { setTheme(t.id); setMenuOpen(false); }}
                     data-testid={`theme-${t.id}`}
                   >
-                    {t.label}
+                    <strong>{t.label}</strong>
+                    <span>{THEME_BLURBS[t.id]}</span>
                   </button>
                 ))}
               </div>
-              {cx.mode === 'local' && (
-                <button
-                  className="btn btn-ghost chess-undo-btn"
-                  onClick={cx.undo}
-                  disabled={!cx.canUndo}
-                  data-testid="chess-undo"
-                >
-                  ↶ Undo move
-                </button>
-              )}
+
+              <button
+                className="btn btn-block"
+                onClick={() => { setMenuOpen(false); setLogOpen(true); }}
+                data-testid="chess-log-open"
+              >
+                <ListIcon size={18} /> Move log
+              </button>
             </div>
           </div>
         </div>

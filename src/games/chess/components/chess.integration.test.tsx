@@ -127,10 +127,11 @@ async function connectClients(): Promise<{ host: Client; guest: Client; code: st
   fireEvent.change(guest.getByTestId('chess-join-code'), { target: { value: code } });
   fireEvent.click(guest.getByTestId('chess-join'));
 
-  // The hello handshake introduces each player to the other by name.
+  // Both ends report the link is up. (The hello handshake also crosses the
+  // names — asserted on the wire and in the ☰ menu by the handshake test.)
   await waitFor(() => {
-    expect(host.getByText('Kiddo')).toBeInTheDocument();
-    expect(guest.getByText('Mario')).toBeInTheDocument();
+    expect(host.getAllByText('Connected').length).toBeGreaterThan(0);
+    expect(guest.getAllByText('Connected').length).toBeGreaterThan(0);
   });
   return { host, guest, code };
 }
@@ -164,6 +165,16 @@ describe('online chess: create and join', () => {
     });
     // Once the guest is in, the host's code chip disappears.
     expect(host.queryByTestId('chess-code')).toBeNull();
+
+    // The crossed names show in each player's ☰ menu (the player cards moved
+    // there when the side panel gave its space to the board). getAllBy: the
+    // active player's name is also on the title-bar turn chip.
+    fireEvent.click(host.getByTestId('chess-menu'));
+    expect(host.getAllByText('Kiddo').length).toBeGreaterThan(0);
+    fireEvent.click(host.getByTestId('chess-menu-close'));
+    fireEvent.click(guest.getByTestId('chess-menu'));
+    expect(guest.getAllByText('Mario').length).toBeGreaterThan(0);
+    fireEvent.click(guest.getByTestId('chess-menu-close'));
 
     // Both sides introduced themselves and synced their (empty) logs.
     const hellos = bus.wire.filter((w) => w.msg.t === 'hello');

@@ -65,6 +65,9 @@ function renderApp(): RenderResult {
 
 beforeEach(() => {
   localStorage.clear();
+  // This flow exercises the radar and the wire, not the 3D ocean — pin the
+  // fleet tile to the 2D grid so the lazy three.js chunk never enters the run.
+  localStorage.setItem('bs-fleet-view-v1', '2d');
   cleanup();
 });
 
@@ -112,5 +115,7 @@ describe('two-player integration: create → name → place → fire', () => {
       expect(shooter.getAllByText('A1').length).toBeGreaterThan(0);
       expect(defender.getAllByText('A1').length).toBeGreaterThan(0);
     });
-  });
+    // Two full clients in one jsdom is heavy; the default 5s flakes when the
+    // whole suite runs in parallel on a loaded machine.
+  }, 20000);
 });

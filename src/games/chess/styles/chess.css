@@ -123,9 +123,9 @@
 .promo-btn:hover { border-color: var(--accent); }
 
 /* ── In-game layout ─────────────────────────────────────────────────────────
-   The board is sized to fill the available screen (bounded by the smaller of
-   width/height). Controls sit in a slim panel beside the board in landscape —
-   the common orientation for play — and below it in portrait. */
+   The board owns the whole screen: whose turn lives in the title bar, and the
+   old side panel's contents live behind the ☰ menu. Only the header height is
+   held back from the board. */
 .chess-play {
   display: flex;
   gap: 14px;
@@ -134,23 +134,46 @@
   justify-content: center;
 }
 .chess-board-area { display: grid; place-items: center; min-width: 0; min-height: 0; }
-.chess-side { display: flex; gap: 12px; }
-.chess-undo-btn, .chess-log-btn { white-space: nowrap; }
+.chess-undo-btn { white-space: nowrap; }
 
 @media (orientation: portrait) {
-  .chess-play { flex-direction: column; }
-  .chess-side { flex-direction: column; width: min(96vw, 460px); }
-  /* Room for the header above and the panel below. */
-  .chess-wrap { width: min(96vw, calc(100dvh - 320px)); }
+  .chess-wrap { width: min(96vw, calc(100dvh - 170px)); }
 }
 @media (orientation: landscape) {
-  .chess-play { flex-direction: row; align-items: stretch; }
-  .chess-side {
-    flex-direction: column; flex: 0 0 auto; width: 208px;
-    justify-content: center; max-height: calc(100dvh - 90px); overflow-y: auto;
-  }
-  /* Height-bounded, minus the header; leave room for the side panel. */
-  .chess-wrap { width: min(calc(100dvh - 96px), calc(100vw - 244px)); }
+  .chess-wrap { width: min(calc(100dvh - 100px), 96vw); }
+}
+
+/* ── Title-bar turn chip + the ☰ menu ─────────────────────────────────────── */
+.turn-chip {
+  display: inline-flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 6px 12px; border-radius: 999px; font-size: 14px; white-space: nowrap;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border: 1px solid var(--accent);
+}
+.turn-chip strong { overflow: hidden; text-overflow: ellipsis; max-width: 14ch; }
+.chess-menu-btn { font-size: 19px; }
+
+.chess-menu { width: min(440px, 94vw); }
+.chess-menu-body {
+  display: flex; flex-direction: column; gap: 16px; padding: 16px;
+  max-height: min(76dvh, 640px); overflow-y: auto;
+}
+.menu-group { display: flex; flex-direction: column; gap: 6px; }
+.menu-group-title {
+  font-size: 12px; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+}
+.menu-opt {
+  display: flex; flex-direction: column; gap: 2px; text-align: left;
+  padding: 11px 13px; border-radius: 10px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+}
+.menu-opt strong { font-size: 15px; }
+.menu-opt span { font-size: 13px; color: var(--muted); }
+.menu-opt[data-selected='true'] {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 /* ── Player plaques + captured pieces ──────────────────────────────────────── */
@@ -187,7 +210,7 @@
 .chess3d-canvas {
   width: 100%;
   aspect-ratio: 16 / 10;
-  max-height: calc(100dvh - 170px);
+  max-height: calc(100dvh - 130px);
   border-radius: 12px;
   overflow: hidden;
   box-shadow:
@@ -210,13 +233,6 @@
 }
 .seg-btn + .seg-btn { border-left: 1px solid var(--border); }
 .seg-btn.on { background: var(--accent-dim); color: var(--accent); }
-
-.chess-side-actions { display: flex; flex-direction: column; gap: 8px; }
-.chess-side-actions .btn { justify-content: center; }
-@media (orientation: portrait) {
-  .chess-side-actions { flex-direction: row; }
-  .chess-side-actions .btn { flex: 1; }
-}
 
 /* ── Move-log modal ────────────────────────────────────────────────────────── */
 .chess-log-modal { width: min(680px, 94vw); max-width: 680px; }
