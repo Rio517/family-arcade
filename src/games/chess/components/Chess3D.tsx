@@ -26,11 +26,15 @@ interface Chess3DProps {
   movableColor: Color;
   lastMove?: { from: Square; to: Square } | null;
   onMove: (ply: Ply) => void;
+  /** The camera left (or returned to) its opening framing — for a reset button. */
+  onViewDirty?: (dirty: boolean) => void;
+  /** Hands the host a reset-view handle on mount (null on teardown). */
+  onApi?: (api: { resetView: () => void } | null) => void;
 }
 
 const PROMO_ORDER: PromotionType[] = ['q', 'r', 'b', 'n'];
 
-export default function Chess3D({ board, orientation, interactive, movableColor, lastMove, onMove }: Chess3DProps) {
+export default function Chess3D({ board, orientation, interactive, movableColor, lastMove, onMove, onViewDirty, onApi }: Chess3DProps) {
   const holder = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<ChessScene | null>(null);
   const { theme } = useChessTheme();
@@ -44,6 +48,10 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
   live.current = { board, interactive, movableColor, selected };
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
+  const onViewDirtyRef = useRef(onViewDirty);
+  onViewDirtyRef.current = onViewDirty;
+  const onApiRef = useRef(onApi);
+  onApiRef.current = onApi;
 
   useEffect(() => {
     setSelected(null);
@@ -94,16 +102,20 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
           if (moves.some((m) => m.promotion)) setPromotion({ from, to });
           else onMoveRef.current({ from, to });
         },
+        onViewDirty: (dirty) => onViewDirtyRef.current?.(dirty),
       });
       sceneRef.current = scene;
       // A theme switch rebuilds the scene mid-game — repopulate it right away.
       scene.setPosition(live.current.board.board, null);
+      onApiRef.current?.({ resetView: () => sceneRef.current?.resetView() });
     } catch {
       setFailed(true); // no WebGL on this device — the 2D views still work
     }
     return () => {
       scene?.dispose();
       sceneRef.current = null;
+      onApiRef.current?.(null);
+      onViewDirtyRef.current?.(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orientation, theme]);
@@ -131,7 +143,7 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
   return (
     <div className="chess3d">
       <div className="chess3d-canvas" ref={holder} data-testid="chess3d" />
-      <p className="chess3d-hint subtle center">Drag a piece to move it · drag the board to look around · pinch or scroll to zoom</p>
+      <p className="chess3d-hint subtle center">Click a piece, then drag to move · drag the board to look around · pinch or scroll to zoom</p>
 
       {promotion && (
         /* Backdrop click is a mouse convenience; Escape (above) and the

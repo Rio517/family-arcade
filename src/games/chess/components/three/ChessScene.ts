@@ -72,6 +72,10 @@ export class ChessScene {
   /** A piece picked up on pointerdown; becomes a real drag past the tap
    *  threshold, otherwise the release falls through to the tap flow. */
   private drag: { from: Square; grp: THREE.Group; home: THREE.Vector3; active: boolean } | null = null;
+  /** The framing the scene opened with, for resetView(). */
+  private homePos = new THREE.Vector3();
+  private homeTarget = new THREE.Vector3();
+  private viewDirty = false;
   private resizeObs: ResizeObserver | null = null;
   private disposed = false;
 
@@ -92,6 +96,8 @@ export class ChessScene {
       onDragStart?: (sq: Square) => void;
       /** A dragged piece was released (null: off the board). */
       onDrop?: (from: Square, to: Square | null) => void;
+      /** The camera left (or returned to) its opening framing. */
+      onViewDirty?: (dirty: boolean) => void;
       palette?: ScenePalette;
     },
   ) {
@@ -149,7 +155,14 @@ export class ChessScene {
     this.controls.maxPolarAngle = 1.35;
     this.controls.minPolarAngle = 0.12;
     this.controls.target.set(0, 0, 0);
+    // Zoom dives toward the pointer, not the board's centre — zooming into a
+    // corner piece should take you there. (This walks controls.target, which
+    // is why resetView() restores the target too.)
+    this.controls.zoomToCursor = true;
     this.controls.update();
+    this.homePos = this.camera.position.clone();
+    this.homeTarget = this.controls.target.clone();
+    this.controls.addEventListener('change', this.reportViewDirty);
 
     this.buildLights();
     this.buildBoard();
@@ -872,6 +885,25 @@ export class ChessScene {
     this.down = null;
   };
 
+  /** Tell the host when the camera leaves (or regains) its opening framing. */
+  private reportViewDirty = () => {
+    const dirty =
+      this.camera.position.distanceToSquared(this.homePos) > 1e-4 ||
+      this.controls.target.distanceToSquared(this.homeTarget) > 1e-4;
+    if (dirty !== this.viewDirty) {
+      this.viewDirty = dirty;
+      this.opts.onViewDirty?.(dirty);
+    }
+  };
+
+  /** Fly the camera home — undoes any orbiting and cursor-zoom drift. */
+  resetView() {
+    this.camera.position.copy(this.homePos);
+    this.controls.target.copy(this.homeTarget);
+    this.controls.update();
+    this.reportViewDirty();
+  }
+
   private tapSquare(name: string) {
     const col = FILES.indexOf(name[0]);
     const row = RANKS.indexOf(name[1]);
@@ -982,6 +1014,7 @@ export class ChessScene {
     this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove);
     this.renderer.domElement.removeEventListener('pointerup', this.onUp);
     this.renderer.domElement.removeEventListener('pointercancel', this.onCancel);
+    this.controls.removeEventListener('change', this.reportViewDirty);
     this.controls.dispose();
     // Every theme switch rebuilds the whole scene (Cloud Kingdom alone holds
     // 200+ geometries), so teardown must actually free the GPU — otherwise a
