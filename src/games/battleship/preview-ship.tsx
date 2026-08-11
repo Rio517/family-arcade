@@ -14,6 +14,7 @@
  * Dev-only: it's built solely when BUILD_HARNESS is set, so it never ships.
  */
 import { useEffect, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { buildModelShip, loadShipModels } from './components/three/shipModels';
@@ -140,4 +141,8 @@ export function Inspector({ ship }: { ship?: ShipId }) {
     </div>
   );
 }
+
+// The page IS the component — without this mount the inspector served a
+// blank #root and nobody noticed until the Fletcher needed reviewing.
+createRoot(document.getElementById('root')!).render(<Inspector />);
 

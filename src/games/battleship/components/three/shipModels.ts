@@ -29,6 +29,7 @@ import carrierModernUrl from '@games/battleship/assets/ships/carrier-modern.glb'
 import battleshipClassicUrl from '@games/battleship/assets/ships/battleship-classic.glb';
 import cruiserClassicUrl from '@games/battleship/assets/ships/cruiser-classic.glb';
 import submarineClassicUrl from '@games/battleship/assets/ships/submarine-classic.glb';
+import destroyerClassicUrl from '@games/battleship/assets/ships/destroyer-classic.glb';
 
 /**
  * Per-ship placement. The meshes come out of the generator in their own
@@ -116,6 +117,16 @@ const SPECS: Partial<Record<ShipId, ModelSpec>> = {
     // No antifouling band on the Type VIIC — the aged lower hull is its
     // below-the-waterline paint, so that's where the fleet colour goes.
     teamMaterial: 'Type VIIC Aged Lower Hull',
+  },
+  destroyer: {
+    url: destroyerClassicUrl,
+    yaw: 0,
+    sink: 0.18,
+    deckFrac: 0.46,
+    authored: true,
+    // The Fletcher closes out the fleet — every hull is authored now — and
+    // wears its colour on the waterline band like the rest of the surface navy.
+    teamMaterial: 'Fletcher Antifouling',
   },
 };
 
