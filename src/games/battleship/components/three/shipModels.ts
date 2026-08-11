@@ -21,8 +21,14 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { ShipId } from '@games/battleship/domain/types';
-import carrierBlenderUrl from '@games/battleship/assets/ships/modern/carrier-blender.glb';
-import battleshipBlenderUrl from '@games/battleship/assets/ships/modern/battleship-blender.glb';
+// Assets carry their era in the name — modern counterparts of the classic
+// hulls are on the way, and when a full second set exists the fleet gets an
+// era switch. Until then SPECS points at the one hull each ship has, so the
+// board is a mixed museum: modern carrier, WWII-era everything else.
+import carrierModernUrl from '@games/battleship/assets/ships/carrier-modern.glb';
+import battleshipClassicUrl from '@games/battleship/assets/ships/battleship-classic.glb';
+import cruiserClassicUrl from '@games/battleship/assets/ships/cruiser-classic.glb';
+import submarineClassicUrl from '@games/battleship/assets/ships/submarine-classic.glb';
 
 /**
  * Per-ship placement. The meshes come out of the generator in their own
@@ -70,7 +76,7 @@ interface ModelSpec {
 
 const SPECS: Partial<Record<ShipId, ModelSpec>> = {
   carrier: {
-    url: carrierBlenderUrl,
+    url: carrierModernUrl,
     yaw: 0, // authored bow-along-x already
     sink: 0.18,
     deckFrac: 0.46,
@@ -80,7 +86,7 @@ const SPECS: Partial<Record<ShipId, ModelSpec>> = {
     teamMaterial: 'Carrier Waterline',
   },
   battleship: {
-    url: battleshipBlenderUrl,
+    url: battleshipClassicUrl,
     yaw: 0,
     sink: 0.18,
     deckFrac: 0.46,
@@ -88,6 +94,28 @@ const SPECS: Partial<Record<ShipId, ModelSpec>> = {
     // The Iowa v5 wears its team colour on the antifouling band at the
     // waterline — the same convention as the carrier's waterline stripe.
     teamMaterial: 'Iowa V3 Antifouling Red',
+  },
+  cruiser: {
+    url: cruiserClassicUrl,
+    yaw: 0,
+    sink: 0.18,
+    deckFrac: 0.46,
+    authored: true,
+    // The Cleveland follows the Iowa's convention: team colour on the
+    // antifouling band at the waterline.
+    teamMaterial: 'Cleveland Antifouling Red',
+  },
+  submarine: {
+    url: submarineClassicUrl,
+    yaw: 0,
+    // A surfaced U-boat rides decks-awash: far more hull under the water
+    // than the surface ships.
+    sink: 0.42,
+    deckFrac: 0.5,
+    authored: true,
+    // No antifouling band on the Type VIIC — the aged lower hull is its
+    // below-the-waterline paint, so that's where the fleet colour goes.
+    teamMaterial: 'Type VIIC Aged Lower Hull',
   },
 };
 
