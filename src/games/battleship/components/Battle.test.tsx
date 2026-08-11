@@ -18,7 +18,7 @@ describe('<Battle>', () => {
     { type: 'shot', by: 'guest', row: 9, col: 9, hit: false, sunk: null, allSunk: false },
   ];
 
-  it('renders the boards and move log without crashing', () => {
+  it('renders the boards with the log collapsed to a strip', () => {
     render(
       <Battle
         log={log}
@@ -33,11 +33,42 @@ describe('<Battle>', () => {
         onFire={vi.fn()}
       />,
     );
-    // The battle log and boards are rendered in both the narrow and wide
-    // layouts (CSS hides one), so these appear more than once. (The turn
-    // indicator now lives in the page top bar, not inside Battle.)
-    expect(screen.getAllByText('Battle log').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('hit').length).toBeGreaterThan(0); // host's hit entry
+    // The full log no longer occupies the battle screen — just a strip
+    // showing the latest shot (guest's miss), with the record behind a modal.
+    const strip = screen.getByTestId('battle-log-open');
+    expect(strip).toHaveTextContent('miss'); // the latest shot…
+    expect(strip).not.toHaveTextContent('hit'); // …and only the latest
+    expect(screen.queryByRole('dialog', { name: /battle log/i })).toBeNull();
+  });
+
+  it('opens the full battle log as a modal and closes on Escape', () => {
+    render(
+      <Battle
+        log={log}
+        side="host"
+        myName="Rio"
+        oppName="Kid"
+        skinId="aqua"
+        oppSkinId="ember"
+        myFleet={stackFleet()}
+        myTurn
+        pendingFire={null}
+        onFire={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('battle-log-open'));
+    const dialog = screen.getByRole('dialog', { name: /battle log/i });
+    // The whole record is there — both shots, oldest included.
+    expect(dialog).toHaveTextContent('hit');
+    expect(dialog).toHaveTextContent('miss');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: /battle log/i })).toBeNull();
+
+    // The Close button works too.
+    fireEvent.click(screen.getByTestId('battle-log-open'));
+    fireEvent.click(screen.getByTestId('battle-log-close'));
+    expect(screen.queryByRole('dialog', { name: /battle log/i })).toBeNull();
   });
 
   it('draws my fleet as ship overlays and marks a destroyed ship sunk', () => {

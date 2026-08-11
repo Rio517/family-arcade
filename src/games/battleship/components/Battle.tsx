@@ -70,6 +70,10 @@ export function Battle({
   // The 3D ocean, popped out big enough to admire the whole fleet.
   const [popped, setPopped] = useState(false);
   useDismissOnEscape(popped, () => setPopped(false));
+  // The battle log lives behind a one-line strip — it's reference material,
+  // not something worth a whole column of the battle screen.
+  const [logOpen, setLogOpen] = useState(false);
+  useDismissOnEscape(logOpen, () => setLogOpen(false));
   const wide = useWideLayout();
   useEffect(() => {
     if (myTurn) setView('radar');
@@ -244,18 +248,43 @@ export function Battle({
           </div>
         </div>
       )}
+      {logOpen && (
+        /* Backdrop click is a mouse convenience; Escape (above) and the Close
+           button are the keyboard path. */
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
+        <div
+          className="modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setLogOpen(false);
+          }}
+        >
+          <div className="panel bs-log-pop" role="dialog" aria-label="Battle log" aria-modal="true">
+            <div className="bs-log-head">
+              <h2>Battle log</h2>
+              <button
+                className="bs-log-close"
+                onClick={() => setLogOpen(false)}
+                aria-label="Close the battle log"
+                data-testid="battle-log-close"
+              >
+                <CloseIcon size={18} />
+              </button>
+            </div>
+            <LogEntries log={log} side={side} myName={myName} oppName={oppName} />
+          </div>
+        </div>
+      )}
       {wide ? (
-        /* Wide (≥ 720px): both boards side by side; at ≥ 1024px the log becomes
-           a full-height column beside them to fill a landscape tablet/desktop. */
+        /* Wide (≥ 720px): both boards side by side, the log strip below. */
         <div className="battle-wide">
           <div className="boards">
             {radarBoard}
             {fleetBoard}
           </div>
-          <MoveLog log={log} side={side} myName={myName} oppName={oppName} />
+          <LogStrip log={log} side={side} myName={myName} oppName={oppName} onOpen={() => setLogOpen(true)} />
         </div>
       ) : (
-        /* Narrow (< 720px): tab between one board at a time, log below. */
+        /* Narrow (< 720px): tab between one board at a time, log strip below. */
         <div className="battle-narrow">
           <div className="view-tabs">
             <button data-active={view === 'radar'} onClick={() => setView('radar')} aria-pressed={view === 'radar'}>
@@ -266,7 +295,7 @@ export function Battle({
             </button>
           </div>
           {view === 'radar' ? radarBoard : fleetBoard}
-          <MoveLog log={log} side={side} myName={myName} oppName={oppName} />
+          <LogStrip log={log} side={side} myName={myName} oppName={oppName} onOpen={() => setLogOpen(true)} />
         </div>
       )}
     </div>
@@ -340,35 +369,59 @@ function describeShot(e: ShotEvent): { res: 'hit' | 'miss' | 'sunk'; label: stri
   return e.hit ? { res: 'hit', label: 'hit' } : { res: 'miss', label: 'miss' };
 }
 
-function MoveLog({ log, side, myName, oppName }: { log: GameLog; side: Side; myName: string; oppName: string }) {
+interface LogProps { log: GameLog; side: Side; myName: string; oppName: string }
+
+/**
+ * The collapsed battle log: one line showing the latest shot, tap for the
+ * whole record. The full log earned a column of the battle screen it didn't
+ * deserve — it's reference material, consulted rarely.
+ */
+function LogStrip({ log, side, myName, oppName, onOpen }: LogProps & { onOpen: () => void }) {
+  const shots = log.filter((e): e is ShotEvent => e.type === 'shot');
+  const last = shots[shots.length - 1];
+  return (
+    <button className="log-strip" onClick={onOpen} aria-haspopup="dialog" data-testid="battle-log-open">
+      <span className="log-strip-title">Battle log</span>
+      {last ? (
+        <LogLine e={last} side={side} myName={myName} oppName={oppName} />
+      ) : (
+        <span className="subtle">No shots fired yet</span>
+      )}
+      <span className="log-strip-count">{shots.length}</span>
+    </button>
+  );
+}
+
+/** One shot as a terminal line — shared by the strip and the modal. */
+function LogLine({ e, side, myName, oppName }: { e: ShotEvent; side: Side; myName: string; oppName: string }) {
+  const mine = e.by === side;
+  const { res, label } = describeShot(e);
+  return (
+    <>
+      <span className="prompt">&gt;</span>
+      <span className={`who ${mine ? 'me' : 'them'}`}>{mine ? myName || 'You' : oppName || 'Them'}</span>
+      <span className="coord">{coordLabel(e.row, e.col)}</span>
+      <span className={`res ${res}`}>{label}</span>
+    </>
+  );
+}
+
+function LogEntries({ log, side, myName, oppName }: LogProps) {
   const shots = log.filter((e): e is ShotEvent => e.type === 'shot');
   const last = shots.length - 1;
 
+  if (shots.length === 0) return <p className="subtle">No shots fired yet.</p>;
   return (
-    <div className="panel">
-      <h2>Battle log</h2>
-      {shots.length === 0 ? (
-        <p className="subtle">No shots fired yet.</p>
-      ) : (
-        <div className="movelog">
-          {/* Newest first. Stable keys by original index so only the freshest
-              entry re-mounts (and plays the terminal typing animation). */}
-          {shots
-            .map((e, origIdx) => {
-              const mine = e.by === side;
-              const { res, label } = describeShot(e);
-              return (
-                <div className={`entry ${origIdx === last ? 'new' : ''}`} key={origIdx}>
-                  <span className="prompt">&gt;</span>
-                  <span className={`who ${mine ? 'me' : 'them'}`}>{mine ? myName || 'You' : oppName || 'Them'}</span>
-                  <span className="coord">{coordLabel(e.row, e.col)}</span>
-                  <span className={`res ${res}`}>{label}</span>
-                </div>
-              );
-            })
-            .reverse()}
-        </div>
-      )}
+    <div className="movelog">
+      {/* Newest first. Stable keys by original index so only the freshest
+          entry re-mounts (and plays the terminal typing animation). */}
+      {shots
+        .map((e, origIdx) => (
+          <div className={`entry ${origIdx === last ? 'new' : ''}`} key={origIdx}>
+            <LogLine e={e} side={side} myName={myName} oppName={oppName} />
+          </div>
+        ))
+        .reverse()}
     </div>
   );
 }

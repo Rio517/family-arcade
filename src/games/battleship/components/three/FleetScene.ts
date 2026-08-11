@@ -28,6 +28,9 @@ export interface SceneShip {
 
 const HALF = (BOARD_SIZE - 1) / 2; // board cell → world offset
 
+/** A freshly-sunk hull takes this long to slip under the water. */
+const SINK_MS = 30_000;
+
 export class FleetScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
@@ -38,6 +41,12 @@ export class FleetScene {
   private fires: THREE.Group[] = [];
   private smokes: THREE.Group[] = [];
   private bobbing: THREE.Group[] = [];
+  /** Hulls partway through their 30-second foundering, advanced by the loop. */
+  private sinkers: { g: THREE.Group; start: number; drop: number; baseList: number }[] = [];
+  /** shipId → when its foundering began. Survives the per-shot rebuilds. */
+  private sunkSince = new Map<ShipId, number>();
+  /** Ships an earlier update showed afloat — a sink after that is fresh news. */
+  private seenAfloat = new Set<ShipId>();
   private water: THREE.Mesh;
   private waterBase: Float32Array;
   private raf = 0;
@@ -162,6 +171,7 @@ export class FleetScene {
     this.fires = [];
     this.smokes = [];
     this.bobbing = [];
+    this.sinkers = [];
 
     for (const ship of ships) {
       // Generated mesh where we have one; procedural hull everywhere else.
@@ -174,10 +184,30 @@ export class FleetScene {
       g.position.set(cx, 0, cz);
       if (!horiz) g.rotation.y = Math.PI / 2;
       if (ship.sunk) {
-        // Sunk: settle low and list to one side, fires out.
+        // Sunk: settle low and list, fires out — then the sea takes it. A
+        // fresh sink founders over SINK_MS in the render loop until the hull
+        // slips fully underwater (the water is opaque, so gone is gone; the
+        // smouldering smoke marker stays behind on the surface). A ship that
+        // was already sunk when this scene opened — a resumed game, the
+        // pop-out's second scene — went down long ago and starts out of sight.
+        const baseList = ship.shipId.length % 2 ? 0.14 : -0.12;
         g.position.y = -0.09;
-        g.rotation.z = ship.shipId.length % 2 ? 0.14 : -0.12;
+        g.rotation.z = baseList;
+        // How far down "fully under" is: the masthead plus a little water.
+        const drop = new THREE.Box3().setFromObject(g).max.y + 0.15;
+        if (this.seenAfloat.has(ship.shipId) && !this.sunkSince.has(ship.shipId)) {
+          this.sunkSince.set(ship.shipId, performance.now());
+        }
+        const start = this.sunkSince.get(ship.shipId);
+        if (start === undefined || this.opts.reducedMotion) {
+          // Long gone (or reduced motion: same end state, no animation).
+          g.position.y -= drop;
+        } else {
+          this.sinkers.push({ g, start, drop, baseList });
+        }
       } else {
+        this.seenAfloat.add(ship.shipId);
+        this.sunkSince.delete(ship.shipId);
         this.bobbing.push(g);
         g.userData.phase = ship.row * 1.7 + ship.col * 2.3;
       }
@@ -257,6 +287,17 @@ export class FleetScene {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
     this.controls.update();
+
+    // Foundering hulls go down whatever else animates — this is game state
+    // playing out, not decoration. (Under reduced motion sinkers stays empty:
+    // sunk ships are placed at their final depth when the fleet is built.)
+    for (const s of this.sinkers) {
+      const t = Math.min(1, (now - s.start) / SINK_MS);
+      const e = t * t; // founders slowly at first, then the sea takes it
+      s.g.position.y = -0.09 - s.drop * e;
+      // The list deepens as the hull floods.
+      s.g.rotation.z = s.baseList * (1 + 1.6 * e);
+    }
 
     if (!this.opts.reducedMotion) {
       // Roll the sea.
