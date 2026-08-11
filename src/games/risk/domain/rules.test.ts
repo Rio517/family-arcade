@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  advance,
   canAttack,
   canFortify,
   connectedOwned,
@@ -76,9 +77,9 @@ describe('newGame', () => {
     expect(hasUnclaimed(g)).toBe(true);
     expect(g.phase).toBe('setup');
     expect(g.current).toBe(0);
-    // 2 players → the whole 40-army allotment is still in hand.
-    expect(g.toPlace).toBe(40);
-    expect(deployReserve(g, 1)).toBe(40);
+    // 2 players on 6 lands → your share of the map (3) plus 8 to stack = 11.
+    expect(g.toPlace).toBe(11);
+    expect(deployReserve(g, 1)).toBe(11);
   });
 
   it('carries a computer persona through to the player state', () => {
@@ -110,8 +111,8 @@ describe('setup — claim then deploy, one army per turn', () => {
     g = placeArmy(g, 'a', MAP);
     expect(g.territories.a).toEqual({ owner: 0, armies: 1 });
     expect(g.current).toBe(1); // play passed straight on
-    expect(g.toPlace).toBe(40); // player 1's whole reserve
-    expect(deployReserve(g, 0)).toBe(39);
+    expect(g.toPlace).toBe(11); // player 1's whole reserve
+    expect(deployReserve(g, 0)).toBe(10);
 
     // Player 1 cannot steal a claimed land during the claim stage…
     expect(placeArmy(g, 'a', MAP)).toBe(g);
@@ -138,8 +139,8 @@ describe('setup — claim then deploy, one army per turn', () => {
     for (let guard = 0; guard < 200 && g.phase === 'setup'; guard++) g = playOne(g);
     expect(g.phase).toBe('reinforce');
     expect(g.current).toBe(0);
-    expect(armiesOf(g, 0)).toBe(40);
-    expect(armiesOf(g, 1)).toBe(40);
+    expect(armiesOf(g, 0)).toBe(11);
+    expect(armiesOf(g, 1)).toBe(11);
     expect(g.toPlace).toBeGreaterThanOrEqual(3);
   });
 });
@@ -250,6 +251,19 @@ describe('attack', () => {
     expect(next.territories.d.owner).toBe(1); // held
   });
 
+  it('remembers the conquest so extra armies can be marched in after', () => {
+    const g = state({ a: [0, 8], b: [0, 1], c: [0, 1], d: [1, 1], e: [1, 1], f: [1, 1] });
+    // attacker rolls [6,6,6], defender [1] → capture; 3 dice advance automatically.
+    const { state: next, result } = resolveAttack(g, MAP, 'a', 'd', scriptedRng([0.99, 0.99, 0.99, 0.0]));
+    expect(result.captured).toBe(true);
+    expect(next.lastConquest).toEqual({ from: 'a', to: 'd' });
+
+    // A following attack that does NOT capture settles the question.
+    const after = resolveAttack(next, MAP, 'a', 'f', scriptedRng([0.0, 0.0, 0.0, 0.99, 0.99]));
+    expect(after.result.captured).toBe(false);
+    expect(after.state.lastConquest).toBeNull();
+  });
+
   it('declares a winner when the last enemy territory falls', () => {
     // P1 has only d (1 army); P0 captures it → P1 eliminated, P0 wins.
     const g = state({ a: [0, 3], b: [0, 2], c: [0, 2], d: [1, 1], e: [0, 2], f: [0, 2] });
@@ -257,6 +271,45 @@ describe('attack', () => {
     expect(next.winner).toBe(0);
     expect(next.phase).toBe('over');
     expect(next.players[1].alive).toBe(false);
+  });
+});
+
+describe('advance — marching extra armies into a fresh conquest', () => {
+  /** a (P0, 5 armies) just took d (P0, 3 armies) — the dice already moved. */
+  const conquered = () =>
+    state(
+      { a: [0, 5], b: [0, 1], c: [0, 1], d: [0, 3], e: [1, 1], f: [1, 1] },
+      { lastConquest: { from: 'a', to: 'd' }, conqueredThisTurn: true },
+    );
+
+  it('moves the chosen extras and settles the conquest', () => {
+    const next = advance(conquered(), 3);
+    expect(next.territories.a.armies).toBe(2);
+    expect(next.territories.d.armies).toBe(6);
+    expect(next.lastConquest).toBeNull();
+  });
+
+  it('always leaves one army behind, and zero is a legal choice', () => {
+    const greedy = advance(conquered(), 99);
+    expect(greedy.territories.a.armies).toBe(1); // clamped to armies - 1
+    expect(greedy.territories.d.armies).toBe(7);
+
+    const stay = advance(conquered(), 0);
+    expect(stay.territories.a.armies).toBe(5);
+    expect(stay.lastConquest).toBeNull(); // settled either way
+  });
+
+  it('is a no-op without a fresh conquest or outside the attack phase', () => {
+    const plain = state({ a: [0, 5], b: [0, 1], c: [0, 1], d: [0, 3], e: [1, 1], f: [1, 1] });
+    expect(advance(plain, 2)).toBe(plain);
+    const fortifying = { ...conquered(), phase: 'fortify' as const };
+    expect(advance(fortifying, 2)).toBe(fortifying);
+  });
+
+  it('ending the attack phase settles any open conquest', () => {
+    const g = endAttack(conquered());
+    expect(g.phase).toBe('fortify');
+    expect(g.lastConquest).toBeNull();
   });
 });
 

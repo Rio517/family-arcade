@@ -11,20 +11,26 @@ interface RiskBoardProps {
   /** Territories that are valid targets right now (highlighted). */
   targets: Set<string>;
   onPick: (territoryId: string) => void;
-  /** The active general's colour — frames the board so whose turn it is is obvious. */
-  accent: string;
   /** Pinch/scroll zoom and drag panning. Omitted, the map sits at full extent. */
   zoom?: MapZoom;
 }
 
-/** Faint engraved continent names, placed at the centroid of their territories. */
-function continentLabels(map: RiskMap) {
+/**
+ * Faint engraved continent names at the centroid of their territories, each
+ * with its army bonus inked underneath — the income is ON the map, where the
+ * decision gets made, not in a legend at the screen's edge. A wholly-held
+ * continent shows its bonus in the holder's colour: someone is being paid.
+ */
+function continentLabels(map: RiskMap, state: GameState) {
   return map.continents.map((c) => {
     const ids = map.topology.continents.find((x) => x.id === c.id)?.territoryIds ?? [];
     const pts = ids.map((id) => map.territories.find((t) => t.id === id)).filter(Boolean) as RiskMap['territories'];
     const x = pts.reduce((s, p) => s + p.labelX, 0) / (pts.length || 1);
     const y = pts.reduce((s, p) => s + p.labelY, 0) / (pts.length || 1);
-    return { id: c.id, name: c.name, x, y };
+    const owners = new Set(ids.map((id) => state.territories[id]?.owner));
+    const sole = owners.size === 1 ? [...owners][0] : -1;
+    const heldBy = sole >= 0 ? state.players[sole]?.color ?? null : null;
+    return { id: c.id, name: c.name, bonus: c.bonus, x, y, heldBy };
   });
 }
 
@@ -34,7 +40,7 @@ function continentLabels(map: RiskMap) {
  * heraldic colour, and brass army tokens. A compass rose and a brass rule frame
  * the theatre. Scales to its container via the SVG viewBox.
  */
-export function RiskBoard({ map, state, selected, targets, onPick, accent, zoom }: RiskBoardProps) {
+export function RiskBoard({ map, state, selected, targets, onPick, zoom }: RiskBoardProps) {
   // A pan that ends over a country must not also select it. Every pick goes
   // through here so the guard can't be forgotten on one of the two paths
   // (the territory path and its larger invisible token hit-circle).
@@ -43,8 +49,9 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent, zoom 
     onPick(id);
   };
   const grain = paperGrainDataUrl();
+  const conts = continentLabels(map, state);
   return (
-    <div className="risk-board risk-board-active" style={{ ['--pc' as string]: accent }}>
+    <div className="risk-board">
       {/* No role="img" on the svg — that would hide every descendant from
           assistive tech; the territories inside are real interactive buttons. */}
       <svg
@@ -79,7 +86,7 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent, zoom 
         {grain && <rect x={0} y={0} width={map.width} height={map.height} className="risk-grain" fill="url(#risk-grain)" />}
         <path d={map.graticule} className="risk-graticule" />
 
-        {continentLabels(map).map((c) => (
+        {conts.map((c) => (
           <text key={c.id} className="risk-continent-label" x={c.x} y={c.y}>{c.name}</text>
         ))}
 
@@ -141,6 +148,26 @@ export function RiskBoard({ map, state, selected, targets, onPick, accent, zoom 
               <path d={r.d} className="risk-searoute-shadow" />
               <path d={r.d} className="risk-searoute" />
               {r.ends.map(([x, y], j) => <circle key={j} cx={x} cy={y} r={2.4} className="risk-searoute-end" />)}
+            </g>
+          ))}
+        </g>
+
+        {/* The continents' army bonuses, stamped ON TOP of the colour washes —
+            under them (with the engraved names) they ghosted to invisibility.
+            aria-hidden: decorative duplicates of what the help card explains. */}
+        <g aria-hidden="true">
+          {conts.map((c) => (
+            <g key={`bn-${c.id}`} className="risk-bonus" transform={`translate(${c.x},${c.y + 15})`} data-testid={`bonus-${c.id}`}>
+              <rect
+                className="risk-bonus-chip"
+                x={-15}
+                y={-8.5}
+                width={30}
+                height={17}
+                rx={8.5}
+                style={c.heldBy ? { stroke: c.heldBy } : undefined}
+              />
+              <text className="risk-bonus-num" dy="4">+{c.bonus}</text>
             </g>
           ))}
         </g>

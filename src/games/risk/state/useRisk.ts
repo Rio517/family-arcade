@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { mapById } from '../maps/registry';
 import type { RiskMap } from '../maps/types';
 import {
+  advance,
   canAttack,
   canFortify,
   connectedOwned,
@@ -42,6 +43,8 @@ export interface UseRiskResult {
   resume(saved: StoredRisk): boolean;
   pick(id: string): void;
   setMoveCount(n: number): void;
+  /** March `count` extra armies into the just-captured land (0 = leave them). */
+  advance(count: number): void;
   doneReinforce(): void;
   doneAttack(): void;
   doneTurn(): void;
@@ -202,6 +205,15 @@ export function useRisk(): UseRiskResult {
     }
   }
 
+  function advanceArmies(count: number) {
+    if (!state) return;
+    const next = advance(state, count);
+    // Marching the extras forward can strip the old source below attack
+    // strength — drop a now-useless selection rather than leave it lit.
+    if (sel !== null && next.territories[sel] && next.territories[sel].armies < 2) setSel(null);
+    setState(next);
+  }
+
   function doneReinforce() {
     if (state) setState(endReinforce(state));
   }
@@ -236,6 +248,7 @@ export function useRisk(): UseRiskResult {
     resume,
     pick,
     setMoveCount,
+    advance: advanceArmies,
     doneReinforce,
     doneAttack,
     doneTurn,

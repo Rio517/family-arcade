@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RiskPage } from './RiskPage';
@@ -16,7 +16,10 @@ function renderPage() {
 // The svg deliberately has no role="img" (that would hide the territory
 // buttons inside it from assistive tech), so grab it by testid.
 const boardEl = () => screen.getByTestId('risk-map');
-const phaseText = () => screen.getByTestId('risk-phase').textContent ?? '';
+// The plaque's name line ("Mario attacks") is always present; the quieter
+// count line ("3 left") only exists while there is a count to give.
+const turnText = () => screen.getByTestId('risk-turn').textContent ?? '';
+const phaseText = () => screen.queryByTestId('risk-phase')?.textContent ?? '';
 const tapEveryTerritory = () => {
   for (const path of boardEl().querySelectorAll<SVGPathElement>('.risk-terr')) fireEvent.click(path);
 };
@@ -26,10 +29,11 @@ const tapEveryTerritory = () => {
 function completeDeploy() {
   // Deploy rotates automatically after every army, so sweeping taps across all
   // territories drains every general's reserve without any button presses.
-  // Stop the instant the campaign opens so reinforce armies aren't consumed.
-  for (let guard = 0; guard < 40 && /Claim|Deploy/i.test(phaseText()); guard++) {
+  // The Done button only exists once the campaign reaches reinforce — stop
+  // there so reinforce armies aren't consumed.
+  for (let guard = 0; guard < 40 && !screen.queryByTestId('end-reinforce'); guard++) {
     for (const path of boardEl().querySelectorAll<SVGPathElement>('.risk-terr')) {
-      if (!/Claim|Deploy/i.test(phaseText())) return;
+      if (screen.queryByTestId('end-reinforce')) return;
       fireEvent.click(path);
     }
   }
@@ -42,6 +46,7 @@ describe('<RiskPage>', () => {
     localStorage.clear();
     localStorage.setItem(HELP_SEEN_KEY, '1');
   });
+  afterEach(() => vi.restoreAllMocks());
 
   it('shows a 2–6 player setup', () => {
     renderPage();
@@ -62,7 +67,7 @@ describe('<RiskPage>', () => {
       clicks++;
     }
     const phaseBefore = phaseText();
-    expect(phaseBefore).toMatch(/Claim/i);
+    expect(phaseBefore).toMatch(/lands free/i);
     first.unmount();
 
     // A fresh visit offers the unfinished campaign…
@@ -98,7 +103,7 @@ describe('<RiskPage>', () => {
 
     // A balanced game still starts and plays normally.
     fireEvent.click(screen.getByTestId('risk-start'));
-    expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Claim/i);
+    expect(turnText()).toMatch(/picks a land/i);
   });
 
   it('starts a game and opens in the deploy phase over the whole board', () => {
@@ -107,11 +112,11 @@ describe('<RiskPage>', () => {
     fireEvent.click(screen.getByTestId('risk-start'));
 
     // The board renders every territory and opens in the deploy (setup) phase,
-    // with the stage + turn banner making the active general unmistakable.
+    // with the stage + turn plaque making the active general unmistakable.
     expect(boardEl().querySelectorAll('.risk-terr').length).toBeGreaterThanOrEqual(30);
-    expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Claim/i);
+    expect(turnText()).toMatch(/picks a land/i);
+    expect(phaseText()).toMatch(/lands free/i);
     expect(screen.getByTestId('risk-stage')).toBeInTheDocument();
-    expect(screen.getByTestId('risk-turn')).toBeInTheDocument();
 
     // The parchment is a baked bitmap, never a live feTurbulence filter — the
     // filter re-generated its noise on every zoom-scale change, which is what
@@ -135,30 +140,31 @@ describe('<RiskPage>', () => {
       if (general() !== first) break;
     }
     expect(general()).not.toBe(first);
-    expect(phaseText()).toMatch(/Claim|Deploy/i);
+    expect(turnText()).toMatch(/picks a land|places armies/i);
   });
 
   it('deploys the opening armies, reinforces, then begins attacks', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('risk-start'));
 
-    // Opens in deploy, with a starting reserve to place.
-    expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Claim — /i);
+    // Opens in the claim stage, with the free-land count on the plaque.
+    expect(turnText()).toMatch(/picks a land/i);
+    expect(phaseText()).toMatch(/lands free/i);
     completeDeploy();
 
     // Every general has deployed, so the campaign opens at reinforce.
-    expect(phaseText()).toMatch(/Reinforce/i);
+    expect(turnText()).toMatch(/places armies/i);
     const toPlace = Number(phaseText().match(/\d+/)![0]);
     expect(toPlace).toBeGreaterThanOrEqual(3);
 
     // Tapping every territory only places on the current player's own land, so
     // reinforcements drain to zero and the "begin attacks" button unlocks.
-    for (let i = 0; i < 8 && /place [1-9]/.test(phaseText()); i++) tapEveryTerritory();
-    expect(screen.getByTestId('risk-phase')).toHaveTextContent(/place 0/i);
+    for (let i = 0; i < 8 && /[1-9]\d* left/.test(phaseText()); i++) tapEveryTerritory();
+    expect(phaseText()).toMatch(/All placed/i);
     expect(screen.getByTestId('end-reinforce')).not.toBeDisabled();
 
     fireEvent.click(screen.getByTestId('end-reinforce'));
-    expect(screen.getByTestId('risk-phase')).toHaveTextContent(/Attack/i);
+    expect(turnText()).toMatch(/attacks/i);
   });
 
   it('territories are labelled keyboard buttons — Enter and Space both claim', () => {
@@ -202,6 +208,64 @@ describe('<RiskPage>', () => {
     expect(firstTerr.getAttribute('aria-label')).toMatch(/, 1 army$/);
   });
 
+  it('inks each continent bonus onto the map instead of a legend strip', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('count-2'));
+    fireEvent.click(screen.getByTestId('risk-start'));
+
+    // Every continent carries its income right on the parchment…
+    const bonuses = boardEl().querySelectorAll('.risk-bonus');
+    expect(bonuses.length).toBeGreaterThanOrEqual(4);
+    for (const b of bonuses) expect(b.textContent).toMatch(/^\+\d+$/);
+    // …and the old cartouche in the war bar is gone.
+    expect(document.querySelector('.risk-legend')).toBeNull();
+  });
+
+  it('after a capture from a tall stack, the general chooses how many march in', () => {
+    // Loaded dice: the attacker draws 6s, the defender 1s (three attack dice +
+    // two defence dice consume exactly one cycle, so the split never drifts).
+    const seq = [0.99, 0.99, 0.99, 0.01, 0.01];
+    let at = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => seq[at++ % seq.length]);
+
+    renderPage();
+    fireEvent.click(screen.getByTestId('count-2'));
+    fireEvent.click(screen.getByTestId('risk-start'));
+    completeDeploy();
+
+    const armiesOf = (p: SVGPathElement) =>
+      Number(/(\d+) arm/.exec(p.getAttribute('aria-label') ?? '')?.[1] ?? 0);
+    const name = () => screen.getByTestId('risk-turn').querySelector('strong')?.textContent ?? '';
+    const mine = () =>
+      [...boardEl().querySelectorAll<SVGPathElement>('.risk-terr')].filter((p) =>
+        (p.getAttribute('aria-label') ?? '').includes(`— ${name()},`),
+      );
+
+    // Pile every fresh army onto one land so the attack comes from a tall stack
+    // (the dice only march 3 in by themselves — extras need armies to spare).
+    for (let guard = 0; guard < 30 && !/All placed/i.test(phaseText()); guard++) {
+      fireEvent.click(mine()[0]);
+    }
+    fireEvent.click(screen.getByTestId('end-reinforce'));
+
+    // Attack from the stack until a land falls and the march panel opens.
+    fireEvent.click(mine().sort((a, b) => armiesOf(b) - armiesOf(a))[0]);
+    for (let a = 0; a < 30 && !screen.queryByTestId('advance-panel'); a++) {
+      const target = boardEl().querySelector<SVGPathElement>('.risk-terr.target');
+      if (!target) break;
+      fireEvent.click(target);
+    }
+
+    // The panel offers every spare army, opening at "everyone forward".
+    const range = screen.getByTestId('advance-range') as HTMLInputElement;
+    expect(Number(range.max)).toBeGreaterThan(0);
+    expect(range.value).toBe(range.max);
+
+    // Confirming marches them and settles the conquest — the panel goes away.
+    fireEvent.click(screen.getByTestId('advance-confirm'));
+    expect(screen.queryByTestId('advance-panel')).toBeNull();
+  });
+
   it('musters a computer general from the war council', async () => {
     renderPage();
     fireEvent.click(screen.getByTestId('count-2'));
@@ -234,10 +298,11 @@ describe('<RiskPage>', () => {
     renderPage();
     const dialog = screen.getByRole('dialog', { name: /how to play/i });
     expect(dialog).toBeInTheDocument();
-    // The three turn steps are spelled out.
-    expect(dialog).toHaveTextContent(/Reinforce/);
+    // The three turn steps are spelled out — in words a kid already knows.
+    expect(dialog).toHaveTextContent(/Place armies/);
     expect(dialog).toHaveTextContent(/Attack/);
-    expect(dialog).toHaveTextContent(/Fortify/);
+    expect(dialog).toHaveTextContent(/Move armies/);
+    expect(dialog).not.toHaveTextContent(/Fortify|Muster/i);
     // And it only auto-opens once.
     expect(localStorage.getItem(HELP_SEEN_KEY)).toBe('1');
   });
@@ -261,18 +326,17 @@ describe('<RiskPage>', () => {
     // Deploy both generals' opening armies, then the campaign begins at reinforce.
     completeDeploy();
 
-    const phase = () => screen.getByTestId('risk-phase').textContent ?? '';
     const general = () =>
       screen.getByTestId('risk-turn').querySelector('strong')?.textContent ?? '';
 
-    // Run one player's complete turn: reinforce → attack → fortify → end turn.
+    // Run one player's complete turn: place → attack → move → end turn.
     function playTurn() {
-      // Reinforce: tapping every territory only places on the current player's
-      // own land, so reinforcements drain to zero.
-      for (let i = 0; i < 8 && !/place 0/i.test(phase()); i++) tapEveryTerritory();
-      expect(phase()).toMatch(/place 0/i);
+      // Placing: tapping every territory only places on the current player's
+      // own land, so the fresh armies drain to zero.
+      for (let i = 0; i < 8 && !/All placed/i.test(phaseText()); i++) tapEveryTerritory();
+      expect(phaseText()).toMatch(/All placed/i);
       fireEvent.click(screen.getByTestId('end-reinforce'));
-      expect(phase()).toMatch(/Attack/i);
+      expect(turnText()).toMatch(/attacks/i);
 
       // Attack: select a source, and if it lights up a legal target, strike.
       // `targets` is computed from the rules (not layout), so it works in jsdom.
@@ -294,7 +358,7 @@ describe('<RiskPage>', () => {
       expect(screen.getByTestId('dice-row')).toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId('end-attack'));
-      expect(phase()).toMatch(/Fortify/i);
+      expect(turnText()).toMatch(/moves armies/i);
       fireEvent.click(screen.getByTestId('end-turn'));
     }
 
@@ -302,14 +366,14 @@ describe('<RiskPage>', () => {
     expect(first).toBeTruthy();
 
     playTurn();
-    // The turn has passed to the other general, back at the reinforce phase.
+    // The turn has passed to the other general, back at placing armies.
     const second = general();
     expect(second).not.toBe(first);
-    expect(phase()).toMatch(/Reinforce/i);
+    expect(turnText()).toMatch(/places armies/i);
 
     playTurn();
     // Two players alternate, so play returns to the first general.
     expect(general()).toBe(first);
-    expect(phase()).toMatch(/Reinforce/i);
+    expect(turnText()).toMatch(/places armies/i);
   });
 });

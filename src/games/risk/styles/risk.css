@@ -44,6 +44,11 @@
 
 .risk-theme :focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
+/* iPads paint a translucent grey-blue box over the BOUNDING BOX of whatever
+   was tapped — on an SVG territory path that's a big rectangle flashing over
+   the map on every placement. The stroke/fill states below are the feedback. */
+.risk-theme, .risk-theme * { -webkit-tap-highlight-color: transparent; }
+
 /* Top bar as an engraved nameplate. */
 .risk-topbar { align-items: baseline; border-bottom: 1px solid var(--brass-dim); padding-bottom: 12px; gap: 14px; }
 .risk-topbar h1 {
@@ -97,16 +102,6 @@
   background: linear-gradient(#3c2a19, #241811); border: 1px solid var(--brass);
   box-shadow: 0 0 0 1px var(--walnut-edge), inset 0 0 0 1px var(--brass-dim), 0 20px 50px -22px #000;
 }
-/* Frame the board in the active general's colour so whose turn it is is unmistakable. */
-.risk-board-active {
-  border-color: color-mix(in srgb, var(--pc) 60%, var(--brass));
-  box-shadow:
-    0 0 0 1px var(--walnut-edge),
-    inset 0 0 0 3px var(--pc),
-    0 0 26px -6px color-mix(in srgb, var(--pc) 75%, transparent),
-    0 20px 50px -22px #000;
-  transition: border-color 260ms, box-shadow 260ms;
-}
 .risk-svg { display: block; width: 100%; height: auto; border-radius: 2px; }
 .risk-sea { fill: var(--parchment); }
 .risk-grain { pointer-events: none; }
@@ -114,6 +109,19 @@
 .risk-continent-label {
   fill: rgba(90, 66, 30, 0.28); font-family: var(--font-display); font-size: 15px;
   letter-spacing: 0.34em; text-transform: uppercase; text-anchor: middle; pointer-events: none;
+}
+/* The continent's army bonus on a small parchment stamp under its name — the
+   income lives on the map where the decision gets made. A wholly-held
+   continent's stamp takes the holder's colour as its border (inline stroke):
+   someone is being paid. */
+.risk-bonus { pointer-events: none; }
+.risk-bonus-chip {
+  fill: rgba(244, 230, 200, 0.92);
+  stroke: rgba(122, 92, 42, 0.7); stroke-width: 1.2;
+}
+.risk-bonus-num {
+  fill: #4a3618; font-family: var(--font-display); font-size: 12.5px;
+  font-weight: 700; text-anchor: middle;
 }
 .risk-terr {
   stroke: #43301a; cursor: pointer; fill-opacity: 0.92;
@@ -290,17 +298,8 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
   background: rgba(42, 24, 12, 0.93); color: var(--brass-hi);
   border: 1.5px solid var(--brass-dim);
 }
-/* The active general's colour rings the whole theatre. */
-/* A tinted edge, not a stripe: the plaque and the lit rail card already say
-   whose turn it is, so at full saturation this read as an error state. */
-.risk-stage::after {
-  content: '';
-  position: absolute; inset: 6px; pointer-events: none;
-  border: 2px solid color-mix(in srgb, var(--pc) 70%, var(--walnut-edge));
-  border-radius: 10px;
-  box-shadow: 0 0 22px -10px var(--pc), inset 0 0 30px -18px var(--pc);
-  transition: border-color 300ms, box-shadow 300ms;
-}
+/* No ring around the theatre: the family found it crowded the bottom controls
+   and read as misalignment. The coloured plaque carries whose-turn-it-is now. */
 /* The board sheds its walnut frame and fills the stage. */
 .risk-stage .risk-board {
   position: absolute; inset: 0; max-width: none; margin: 0; padding: 12px;
@@ -340,19 +339,33 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
     radial-gradient(90% 70% at 15% 100%, rgba(122, 62, 24, 0.28), transparent 65%);
 }
 
-/* Brass plaque hung from the top edge — re-pops on every hand-off. It holds no
-   controls, so taps pass straight through to any land beneath it. */
+/* Plaque hung from the top edge, washed in the active general's colour — with
+   the stage ring gone, this plate IS the turn indicator. Re-pops on every
+   hand-off. It holds no controls, so taps pass through to land beneath it. */
 .risk-plaque {
   pointer-events: none;
   position: absolute; top: 0; left: 50%; transform: translateX(-50%);
   text-align: center; white-space: nowrap; max-width: 94%;
-  padding: 8px 26px 9px; border-radius: 0 0 14px 14px;
-  background: linear-gradient(180deg, #4a2c18, #33200f);
-  border: 2px solid var(--brass-dim); border-top: none;
+  padding: 9px 28px 10px; border-radius: 0 0 14px 14px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pc) 80%, #1a0d06),
+    color-mix(in srgb, var(--pc) 58%, #1a0d06)
+  );
+  border: 2px solid color-mix(in srgb, var(--pc) 45%, var(--brass-dim)); border-top: none;
   box-shadow: 0 8px 22px rgba(26, 13, 6, 0.55);
+  transition: background-color 260ms, border-color 260ms;
 }
-.risk-plaque-who { display: block; font-size: 15px; color: var(--muted); margin-top: 2px; }
-.risk-plaque-who strong { font-weight: 700; }
+.risk-plaque-name {
+  display: block;
+  font-family: var(--font-display); font-size: 20px; letter-spacing: 0.05em;
+  color: #fdf6e5; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+.risk-plaque-name strong { font-weight: 700; }
+.risk-plaque-sub {
+  display: block; font-size: 14px; margin-top: 1px;
+  color: rgba(253, 246, 229, 0.85); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
 @media (prefers-reduced-motion: no-preference) {
   .risk-plaque { animation: risk-plaque-drop 460ms cubic-bezier(0.2, 1.1, 0.35, 1) both; }
 }
@@ -363,20 +376,12 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
 }
 
 /* ── Command rail — every general's strength, down the right edge ─────────── */
-/* right: 22px, not 0 — the stage is pulled 16px past the page gutter on each
-   side, so a rail flush to the stage would hang off the screen. This lands it
-   just inside the turn ring. */
+/* Flush to the screen edge: the cards' pill shape is open on the right for
+   exactly this. Only the device's own safe area may push it in. */
 .risk-rail {
-  position: absolute; right: 22px; top: 12%; max-width: 62%;
+  position: absolute; right: 0; right: env(safe-area-inset-right); top: 12%; max-width: 62%;
   display: flex; flex-direction: column; gap: 9px;
   pointer-events: none;
-}
-/* A wash behind the cards, so map slivers peeking between them read as
-   shadowed under the rail rather than as gaps. */
-.risk-rail::before {
-  content: ''; position: absolute; inset: -14px 0 -14px -20px;
-  background: linear-gradient(90deg, transparent, rgba(26, 13, 6, 0.5) 55%);
-  border-radius: 18px 0 0 18px;
 }
 .risk-gen {
   position: relative;
@@ -412,12 +417,6 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
   border: 2px solid var(--brass); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55), inset 0 0 4px rgba(0, 0, 0, 0.45);
 }
 .risk-seal.lg { width: 42px; height: 42px; border-width: 2.5px; }
-
-.risk-phase {
-  display: block;
-  font-family: var(--font-display); font-size: 20px; letter-spacing: 0.16em;
-  text-transform: uppercase; color: var(--brass-hi);
-}
 
 /* One sentence, one place, telling you the next thing to do. */
 .risk-hintline {
@@ -471,6 +470,7 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
   box-shadow: 0 12px 32px -12px #000;
 }
 .risk-march input[type='range'] { width: 100%; accent-color: var(--brass); }
+.risk-march-label { font-size: 14.5px; color: var(--cream); text-align: center; }
 .risk-march-actions { display: flex; gap: 8px; }
 .risk-march-actions .risk-btn { flex: 1; }
 
@@ -504,32 +504,11 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
 .risk-warbar .risk-dice-row { min-height: 26px; }
 .risk-warbar .risk-dice-outcome { margin-left: 0; font-size: 14px; white-space: nowrap; }
 
-/* ── Legend cartouche ────────────────────────────────────────────────────── */
-.risk-legend {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 16px;
-  background: linear-gradient(#2c1d11, #241811); border: 1px solid var(--brass-dim); border-radius: 4px;
-}
-.risk-legend-title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.2em; font-size: 14px; color: var(--brass); }
-.risk-legend-item { font-size: 14px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
-.risk-legend-chip { width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, 0.4); filter: saturate(0.7) brightness(0.92); }
-.risk-legend-item strong { color: var(--cream); }
-.risk-legend-held { font-style: italic; font-weight: 600; margin-left: 2px; }
-
-/* In the war bar the legend is a quiet reference strip, and the first thing to
-   go when the bar runs out of room — the stepper and Done must never wrap. */
-.risk-warbar .risk-legend {
-  background: none; border: none; padding: 0; gap: 2px 12px; max-width: 46%;
-}
-.risk-warbar .risk-legend-item { font-size: 13px; }
-@media (max-width: 1000px), (max-height: 620px) {
-  .risk-warbar .risk-legend { display: none; }
-}
-
 /* ── Phones: same fixed layout, scaled down so nothing overflows ──────────── */
 @media (max-width: 920px) {
-  .risk-plaque { padding: 6px 16px 7px; }
-  .risk-phase { font-size: 16px; }
-  .risk-plaque-who { font-size: 13px; }
+  .risk-plaque { padding: 6px 18px 7px; }
+  .risk-plaque-name { font-size: 16px; }
+  .risk-plaque-sub { font-size: 12.5px; }
   .risk-gen { min-width: 148px; padding: 5px 10px 5px 6px; }
   .risk-gen-coin { width: 24px; height: 24px; }
   .risk-gen-nums b { font-size: 13px; }
@@ -556,9 +535,9 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
   .risk-bare .risk-zoomctl { top: 12px; }
   .risk-zoomctl { left: 8px; top: 8px; }
   .risk-zoomctl button { width: 34px; height: 34px; font-size: 17px; }
-  .risk-plaque { padding: 5px 12px 6px; }
-  .risk-phase { font-size: 13.5px; letter-spacing: 0.12em; }
-  .risk-plaque-who { font-size: 11.5px; }
+  .risk-plaque { padding: 5px 14px 6px; }
+  .risk-plaque-name { font-size: 14px; }
+  .risk-plaque-sub { font-size: 11px; }
   /* A vertical rail down the right edge would sit on top of Japan and
      Kamchatka on a screen this size. Above the map there is dead space the
      letterboxed world can never use, so the generals go there as a compact
