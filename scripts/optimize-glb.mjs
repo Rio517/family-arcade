@@ -3,7 +3,7 @@
  * Shrink a 3D ship until it's small enough to bundle into the arcade.
  *
  *   npm run glb -- ~/Downloads/destroyer.glb
- *   npm run glb -- raw/*.glb --out src/games/battleship/assets/ships/modern
+ *   npm run glb -- raw/*.glb --out src/games/battleship/assets/ships
  *   npm run glb -- ship.glb --tris 3000 --tex 128
  *   npm run glb -- --selftest        # verify the pipeline with synthetic meshes
  *
