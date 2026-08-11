@@ -128,6 +128,25 @@ const SHOTS = [
     },
   },
   {
+    // The galaxy set in 3D — where the family's generated ships live (the
+    // X-wing pawns lead; more authored pieces land here as they're made).
+    name: 'chess-galaxy-3d',
+    path: '/#/chess',
+    viewport: TABLET,
+    prep: async (page) => {
+      await page.evaluate(() => {
+        localStorage.setItem('chess-view-v1', '3d');
+        localStorage.setItem('chess-theme-v1', 'galaxy');
+      });
+      await page.reload();
+      await page.getByTestId('mode-local').click();
+      await page.getByTestId('start-local').click();
+      await page.getByTestId('chess3d').waitFor();
+      // Scene, starfield, and the async piece models all need to land.
+      await page.waitForTimeout(3500);
+    },
+  },
+  {
     // The war council with a computer general seated, so the persona ladder
     // and the person/computer toggles are captured.
     name: 'risk-setup',

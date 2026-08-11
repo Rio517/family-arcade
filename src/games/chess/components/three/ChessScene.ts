@@ -7,6 +7,11 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+// The galaxy set's authored hero pieces (the family's generated ships), one
+// GLB per seat. Bundled imports — the offline PWA never fetches at runtime.
+import galaxyWhitePawnUrl from '@games/chess/assets/galaxy/white-pawn.glb';
 import { FILES, RANKS, type Board, type Color, type PieceType, type Square } from '@games/chess/domain/types';
 import { disposeDeep } from '@shared/three/disposeDeep';
 import { SCENE_PALETTES, type ScenePalette } from '../chessTheme';
@@ -46,6 +51,10 @@ export class ChessScene {
   private tiles: THREE.Mesh[] = [];
   private pieces = new Map<string, THREE.Group>(); // key: square name
   private templates = new Map<string, THREE.Group>(); // key: `${color}${type}`
+  /** Authored piece models (galaxy set), decoded async; win over buildPiece. */
+  private modelTemplates = new Map<string, THREE.Group>();
+  /** Last board given to setPosition — replayed when a model decodes. */
+  private lastBoard: Board | null = null;
   private markGroup = new THREE.Group();
   private checkMat: THREE.MeshBasicMaterial | null = null;
   private tweens: Tween[] = [];
@@ -146,6 +155,10 @@ export class ChessScene {
     if (this.palette.stars) this.buildStars();
     if (this.palette.dream) this.buildDreamWorld();
     this.scene.add(this.markGroup);
+
+    // The galaxy set's authored ships decode async and replace their
+    // procedural stand-ins — the board never waits on a model.
+    if (this.palette.pieceStyle === 'ships') void this.loadShipModels();
 
     // Tap vs drag vs orbit: pointerdown on your own piece claims the gesture
     // for a piece drag (orbit pauses); past the tap threshold the piece lifts
@@ -575,11 +588,59 @@ export class ChessScene {
     });
   }
 
+  /**
+   * Decode the galaxy set's authored piece models (currently the white pawn —
+   * a real X-wing, the family's first generated ship) and swap them in for
+   * the procedural stand-ins already on the board.
+   */
+  private async loadShipModels() {
+    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    const seats: { key: string; url: string }[] = [{ key: 'wp', url: galaxyWhitePawnUrl }];
+    for (const seat of seats) {
+      try {
+        const gltf = await loader.loadAsync(seat.url);
+        if (this.disposed) return;
+
+        // Normalise to the procedural ships' conventions: centred over the
+        // square, length along z with the nose flying at the enemy, sized to
+        // the stand-in's footprint, hovering at the pawns' height.
+        const model = gltf.scene;
+        const box = new THREE.Box3().setFromObject(model);
+        const dims = box.getSize(new THREE.Vector3());
+        model.position.sub(box.getCenter(new THREE.Vector3()));
+        const ship = new THREE.Group();
+        ship.add(model);
+        ship.position.y = 0.34; // the procedural pawn's HOVER height
+        ship.scale.setScalar(0.68 / Math.max(dims.z, 0.0001));
+        // The artist exports noses toward +z; white flies at -z (at black).
+        if (seat.key[0] === 'w') ship.rotation.y = Math.PI;
+        const tpl = new THREE.Group();
+        tpl.add(ship);
+
+        this.modelTemplates.set(seat.key, tpl);
+        this.templates.delete(seat.key);
+        // Any of these pieces already standing get rebuilt from the model.
+        if (this.lastBoard) {
+          for (const [sq, g] of [...this.pieces]) {
+            if (`${g.userData.color}${g.userData.type}` === seat.key) {
+              this.pieces.delete(sq);
+              this.scene.remove(g);
+            }
+          }
+          this.setPosition(this.lastBoard, null);
+        }
+      } catch {
+        // A missing or corrupt model never takes the board down — the
+        // procedural stand-in simply stays.
+      }
+    }
+  }
+
   private template(type: PieceType, color: Color): THREE.Group {
     const key = `${color}${type}`;
     let tpl = this.templates.get(key);
     if (!tpl) {
-      tpl = buildPiece(
+      tpl = this.modelTemplates.get(key) ?? buildPiece(
         type,
         this.material(color),
         color === 'b',
@@ -599,6 +660,7 @@ export class ChessScene {
     // A position change mid-drag (an online opponent's move landing) would
     // yank the carried piece around — put it down first.
     this.onCancel();
+    this.lastBoard = board;
     const wanted = new Map<string, { type: PieceType; color: Color }>();
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
