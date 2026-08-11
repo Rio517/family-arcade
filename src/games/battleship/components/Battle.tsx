@@ -82,10 +82,12 @@ export function Battle({
     if (myTurn) setView('radar');
   }, [myTurn]);
 
-  // Your fleet board can render as the flat grid or a 3D ocean. Remembered
-  // per device; the radar stays 2D — that's where the aiming happens.
+  // Your fleet board can render as the flat grid or a 3D ocean. The ocean is
+  // the default — it's the view the fleet was built for; the 2D grid is
+  // remembered per device if picked. The radar stays 2D — that's where the
+  // aiming happens.
   const [fleetDim, setFleetDim] = useState<'2d' | '3d'>(() => {
-    try { return localStorage.getItem('bs-fleet-view-v1') === '3d' ? '3d' : '2d'; } catch { return '2d'; }
+    try { return localStorage.getItem('bs-fleet-view-v1') === '2d' ? '2d' : '3d'; } catch { return '3d'; }
   });
   const pickFleetDim = (d: '2d' | '3d') => {
     setFleetDim(d);

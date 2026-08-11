@@ -143,8 +143,9 @@ export class ChessScene {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enablePan = false;
     this.controls.enableDamping = !opts.reducedMotion;
-    this.controls.minDistance = 6;
-    this.controls.maxDistance = 17;
+    // Close enough to admire one piece, far enough to frame the whole set.
+    this.controls.minDistance = 3.2;
+    this.controls.maxDistance = 20;
     this.controls.maxPolarAngle = 1.35;
     this.controls.minPolarAngle = 0.12;
     this.controls.target.set(0, 0, 0);

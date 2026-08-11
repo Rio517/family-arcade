@@ -81,7 +81,8 @@ describe('<ChessPage> — local flow', () => {
     }
     expect(screen.getByTestId('sq-f3').querySelector('svg')).toBeTruthy();
 
-    // Open the log — three plies are listed.
+    // Open the log (it lives in the ☰ menu now) — three plies are listed.
+    fireEvent.click(screen.getByTestId('chess-menu'));
     fireEvent.click(screen.getByTestId('chess-log-open'));
     expect(screen.getByRole('dialog', { name: /move log/i })).toBeInTheDocument();
     expect(screen.getByTestId('log-ply-0')).toHaveTextContent('e4');
@@ -98,20 +99,23 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Black to move/);
   });
 
-  it('offers exactly two views — flat (the default) and 3D', () => {
+  it('offers exactly two views — flat (the default) and 3D — behind the ☰ menu', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-local'));
     fireEvent.click(screen.getByTestId('start-local'));
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
 
-    // Flat is the default; the old tabletop mode is gone.
+    // The view options live in the ☰ menu now, as labelled rows.
+    fireEvent.click(screen.getByTestId('chess-menu'));
     expect(screen.getByTestId('view-flat')).toBeInTheDocument();
     expect(screen.getByTestId('view-3d')).toBeInTheDocument();
     expect(screen.queryByTestId('view-table')).toBeNull();
-    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
+    expect(screen.getByTestId('view-flat')).toHaveAttribute('data-selected', 'true');
 
-    // Re-picking Flat persists the choice.
+    // Re-picking Flat persists the choice and closes the menu.
     fireEvent.click(screen.getByTestId('view-flat'));
     expect(localStorage.getItem('chess-view-v1')).toBe('flat');
+    expect(screen.queryByTestId('view-flat')).toBeNull();
   });
 
   it('free play: place, move, clear, and end the sandbox', () => {
@@ -182,13 +186,16 @@ describe('<ChessPage> — local flow', () => {
     expect(container.querySelector('.chess-theme-classic')).toBeTruthy();
     expect(screen.getByTestId('sq-e2').querySelector('svg')?.getAttribute('data-piece-theme')).toBeNull();
 
-    // One tap: pink board class + unicorn piece art everywhere, persisted.
+    // Via the ☰ menu: pink board class + unicorn piece art everywhere,
+    // persisted; picking a world closes the menu so the change is visible.
+    fireEvent.click(screen.getByTestId('chess-menu'));
     fireEvent.click(screen.getByTestId('theme-unicorn'));
     expect(container.querySelector('.chess-theme-unicorn')).toBeTruthy();
     expect(screen.getByTestId('sq-e2').querySelector('svg')?.getAttribute('data-piece-theme')).toBe('unicorn');
     expect(localStorage.getItem('chess-theme-v1')).toBe('unicorn');
 
-    // And the Galaxy Fleet is one more tap away.
+    // And the Galaxy Fleet is two more taps away.
+    fireEvent.click(screen.getByTestId('chess-menu'));
     fireEvent.click(screen.getByTestId('theme-galaxy'));
     expect(container.querySelector('.chess-theme-galaxy')).toBeTruthy();
     expect(screen.getByTestId('sq-e2').querySelector('svg')?.getAttribute('data-piece-theme')).toBe('galaxy');

@@ -58,8 +58,14 @@ const SHOTS = [
     name: 'battle-view',
     path: '/preview-b.html',
     viewport: TABLET,
-    // The board animates its hit/miss markers in; let them settle.
-    prep: async (page) => page.waitForTimeout(900),
+    // The fleet tile opens on the 3D ocean by default now — wait for the
+    // hulls to decode and the hit/miss markers to settle.
+    prep: async (page) => {
+      await page.waitForSelector('[data-testid="fleet3d"], [data-testid="fleet3d-fallback"]', {
+        timeout: 20000,
+      });
+      await page.waitForTimeout(2500);
+    },
   },
   {
     // Close-up of the 3D ocean alone — this is where ship meshes get judged.

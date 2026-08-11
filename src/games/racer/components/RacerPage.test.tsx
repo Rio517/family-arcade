@@ -74,7 +74,7 @@ describe('<RacerPage> — solo setup flow', () => {
     fireEvent.click(screen.getByTestId('racer-driver-fairy'));
     // The race screen mounts; the 3D scene loads async and, without WebGL,
     // resolves to its fallback message.
-    expect(await screen.findByTestId('racer3d-fallback')).toBeInTheDocument();
+    expect(await screen.findByTestId('racer3d-fallback', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByTestId('racer-driver-fairy')).toBeNull();
   });
 
@@ -93,7 +93,7 @@ describe('<RacerPage> — solo setup flow', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     renderRacer();
     startSoloRace('dragon');
-    await screen.findByTestId('racer3d-fallback');
+    await screen.findByTestId('racer3d-fallback', {}, { timeout: 5000 });
 
     // The HUD scoreline: the dragon face, a bold coin count of 0, the /20 target,
     // and the elapsed-time readout.

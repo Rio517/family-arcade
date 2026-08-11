@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Battle } from './Battle';
+
+// Warm the lazy 3D chunk once per worker: three.js + the ship models are a
+// heavy cold transform, and racing them inside a findBy timeout flakes when
+// the whole suite runs in parallel.
+beforeAll(async () => {
+  await import('./Fleet3D');
+}, 30000);
 import { stackFleet } from '@test/helpers';
 import { resolveShot } from '@games/battleship/domain/engine';
 import type { GameLog } from '@games/battleship/domain/types';
@@ -12,6 +19,9 @@ import type { GameLog } from '@games/battleship/domain/types';
  * unit test via the live P2P flow).
  */
 describe('<Battle>', () => {
+  // The fleet board defaults to the 3D ocean now; these tests exercise the 2D
+  // grid (overlays, cells), so pin the remembered view.
+  beforeEach(() => localStorage.setItem('bs-fleet-view-v1', '2d'));
   const log: GameLog = [
     { type: 'start', first: 'host' },
     { type: 'shot', by: 'host', row: 0, col: 0, hit: true, sunk: null, allSunk: false },
@@ -114,7 +124,8 @@ describe('<Battle>', () => {
       />,
     );
     fireEvent.click(screen.getAllByTestId('fleet-view-3d')[0]);
-    fireEvent.click(await screen.findByTestId('fleet3d-pop'));
+    // The 3D view is a lazy chunk; give it room to arrive on a cold cache.
+    fireEvent.click(await screen.findByTestId('fleet3d-pop', {}, { timeout: 5000 }));
     expect(screen.getByRole('dialog', { name: /your fleet in 3d/i })).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -125,7 +136,7 @@ describe('<Battle>', () => {
 describe('<Battle> — 3D fleet view', () => {
   const log: GameLog = [{ type: 'start', first: 'host' }];
 
-  it('offers a 2D/3D toggle for my fleet and falls back gracefully without WebGL', async () => {
+  it('defaults the fleet to the 3D ocean and remembers a 2D pick', async () => {
     localStorage.removeItem('bs-fleet-view-v1');
     render(
       <Battle
@@ -141,13 +152,12 @@ describe('<Battle> — 3D fleet view', () => {
         onFire={vi.fn()}
       />,
     );
-    // 2D is the default; the toggle is rendered (once per layout).
-    const btns3d = screen.getAllByTestId('fleet-view-3d');
-    expect(btns3d.length).toBeGreaterThan(0);
+    // 3D is the default — jsdom has no WebGL, so the lazy view resolves to
+    // its graceful fallback without any toggle press.
+    expect((await screen.findAllByTestId('fleet3d-fallback', {}, { timeout: 5000 })).length).toBeGreaterThan(0);
 
-    fireEvent.click(btns3d[0]);
-    // jsdom has no WebGL, so the lazy 3D view resolves to its fallback.
-    expect((await screen.findAllByTestId('fleet3d-fallback')).length).toBeGreaterThan(0);
-    expect(localStorage.getItem('bs-fleet-view-v1')).toBe('3d');
+    // Choosing the 2D grid is remembered per device.
+    fireEvent.click(screen.getAllByTestId('fleet-view-2d')[0]);
+    expect(localStorage.getItem('bs-fleet-view-v1')).toBe('2d');
   });
 });
