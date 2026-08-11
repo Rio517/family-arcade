@@ -109,6 +109,14 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
       return;
     }
     if (hand) {
+      // The stamp un-stamps: with a tray piece in hand, tapping an identical
+      // piece removes it — before this, the tap re-placed the same piece and
+      // looked like it did nothing at all. The stamp stays in hand.
+      const existing = board[sq.row][sq.col];
+      if (!hand.from && existing && existing.color === hand.piece.color && existing.type === hand.piece.type) {
+        setBoard((prev) => setSquare(sq, null, prev));
+        return;
+      }
       drop(hand, sq);
       return;
     }
@@ -238,7 +246,7 @@ export function FreePlay({ onExit, onStartGame }: FreePlayProps) {
         {erasing
           ? 'Eraser on — tap any piece to remove it. Tap the eraser again to stop.'
           : hand && !hand.from
-            ? `Placing ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type).toLowerCase()}s — keep tapping squares! Tap the tray piece again to stop.`
+            ? `Placing ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type).toLowerCase()}s — keep tapping squares! Tap one you placed to remove it; tap the tray piece to stop.`
             : hand
               ? `Holding a ${hand.piece.color === 'w' ? 'white' : 'black'} ${pieceName(hand.piece.type).toLowerCase()} — tap any square to put it down.`
               : view === '3d'
