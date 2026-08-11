@@ -106,15 +106,18 @@ export function BattleshipPage() {
     navigate('/');
   };
 
+  // A solo game has nobody to invite: no code chip, no share modal — the
+  // computer captain doesn't scan QR codes.
+  const solo = bs.code === 'SOLO';
   const isSetup = bs.phase === 'fleet' || bs.phase === 'placing' || bs.phase === 'waiting';
-  const showCode = bs.side === 'host' && isSetup && !bs.oppConnected;
+  const showCode = !solo && bs.side === 'host' && isSetup && !bs.oppConnected;
 
   // The host has readied up and is waiting. Two sub-states: nobody has joined
   // yet (show the invite big), or the opponent is here but still placing their
   // ships (show that instead of hiding). The modal opens on entering the wait
   // and closes once the battle actually starts.
-  const awaitingJoin = bs.side === 'host' && bs.phase === 'waiting' && !bs.oppConnected;
-  const awaitingPlacement = bs.side === 'host' && bs.phase === 'waiting' && bs.oppConnected;
+  const awaitingJoin = !solo && bs.side === 'host' && bs.phase === 'waiting' && !bs.oppConnected;
+  const awaitingPlacement = !solo && bs.side === 'host' && bs.phase === 'waiting' && bs.oppConnected;
   const hostWaiting = awaitingJoin || awaitingPlacement;
   useEffect(() => {
     if (hostWaiting) setShareOpen(true);
@@ -265,7 +268,7 @@ export function BattleshipPage() {
       )}
 
       {bs.phase === 'fleet' && (
-        <div className="narrow-col">
+        <div className="fleet-col">
           <FleetSelect
             profile={profile.profile}
             selectedSkinId={bs.mySkinId}
