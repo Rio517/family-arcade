@@ -7,8 +7,7 @@ import { useRisk } from '../state/useRisk';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { MAPS } from '../maps/registry';
-import type { RiskMap } from '../maps/types';
-import { currentPlayer, hasUnclaimed, territoriesOf, type NewPlayer } from '../domain/rules';
+import { currentPlayer, hasUnclaimed, type NewPlayer } from '../domain/rules';
 import { clearRiskGame, loadRiskGame, type StoredRisk } from '../storage/riskPersistence';
 // Persona metadata only — the bot BRAIN stays behind the dynamic import in
 // useRisk, so human-only campaigns never download it.
@@ -23,9 +22,9 @@ const PLAYER_NAMES = ['Crimson', 'Cobalt', 'Forest', 'Amber', 'Plum', 'Teal'];
 
 const PHASE_NAMES: Record<string, string> = {
   setup: 'Setting up',
-  reinforce: 'Reinforce phase',
-  attack: 'Attack phase',
-  fortify: 'Fortify phase',
+  reinforce: 'Placing armies',
+  attack: 'Attacking',
+  fortify: 'Moving armies',
 };
 
 /** "just now", "25 minutes ago", "3 hours ago", "2 days ago". */
@@ -115,7 +114,7 @@ export function RiskPage() {
 
           <div className="panel">
             <div className="risk-eyebrow">The war council</div>
-            <h2>Muster your generals</h2>
+            <h2>Gather your generals</h2>
             <div className="risk-count">
               {[2, 3, 4, 5, 6].map((n) => (
                 <button key={n} className={`risk-choice ${count === n ? 'on' : ''}`} onClick={() => setCount(n)} data-testid={`count-${n}`}>
@@ -249,40 +248,47 @@ export function RiskPage() {
 
   // ── The campaign ──────────────────────────────────────────────────────────
   const me = currentPlayer(state);
-  const owned = territoriesOf(state, state.current).length;
   const claiming = state.phase === 'setup' && hasUnclaimed(state);
   const freeLands = claiming
     ? Object.values(state.territories).filter((t) => t.owner === -1).length
     : 0;
-  // The phase element carries the whole phrase, not just the word: "place 3"
-  // is the answer to the question the player is actually asking.
-  const phaseLabel =
-    claiming ? `Claim — ${freeLands} lands free` :
-    state.phase === 'setup' ? `Deploy — place ${state.toPlace}` :
-    state.phase === 'reinforce' ? `Reinforce — place ${state.toPlace}` :
-    state.phase === 'attack' ? 'Attack' : 'Fortify';
-  const marching =
-    claiming ? 'is claiming ground' :
-    state.phase === 'setup' ? 'is deploying' :
-    state.phase === 'reinforce' ? 'is mustering' :
-    state.phase === 'attack' ? 'is on the march' : 'is moving up';
+  // The plaque says one simple thing: whose turn, and what they're doing.
+  // "Mario attacks" — a seven-year-old shouldn't have to decode "mustering".
+  const doing =
+    claiming ? 'picks a land' :
+    state.phase === 'setup' || state.phase === 'reinforce' ? 'places armies' :
+    state.phase === 'attack' ? 'attacks' : 'moves armies';
+  // The count is the answer to the question the player is actually asking, so
+  // it gets its own quieter line — only while there's a count to give.
+  const plaqueSub =
+    claiming ? `${freeLands} lands free` :
+    state.phase === 'setup' ? `${state.toPlace} left` :
+    state.phase === 'reinforce'
+      ? (state.toPlace > 0 ? `${state.toPlace} left` : 'All placed — press Done ✓')
+      : null;
+
+  // A capture stays open until the general decides how many armies march in.
+  const conquest = state.phase === 'attack' && !me.bot ? state.lastConquest ?? null : null;
+  const conquestSpare = conquest ? state.territories[conquest.from].armies - 1 : 0;
 
   // One plain-language sentence, always in the same place, telling you the one
   // thing to do next. It replaces the old per-phase paragraphs, which moved
   // around and pushed the buttons with them.
   const hint =
     claiming ? 'Tap any pale (unclaimed) land to claim it — one army raises your flag.' :
-    state.phase === 'setup' ? `Tap one of your lands to deploy — ${state.toPlace} left. Play passes on automatically.` :
+    state.phase === 'setup' ? `Tap one of your lands to add an army — ${state.toPlace} left. Play passes on automatically.` :
     state.phase === 'reinforce'
       ? (state.toPlace > 0
-          ? `Tap your lands to muster ${state.toPlace} more.`
-          : 'Every army placed — press Done to begin the assault.')
+          ? `Tap your lands to place ${state.toPlace} more.`
+          : 'Every army placed — press Done to begin the attack.')
     : state.phase === 'attack'
-      ? (sel
-          ? 'Tap a neighbouring enemy land to attack it — or press Done when you’re finished.'
-          : 'Tap one of your lands with 2 or more armies, then a touching enemy land.')
+      ? (conquest && conquestSpare > 0
+          ? 'Land taken! Choose how many armies move into it.'
+          : sel
+            ? 'Tap a neighbouring enemy land to attack it — or press Done when you’re finished.'
+            : 'Tap one of your lands with 2 or more armies, then a touching enemy land.')
     : (sel && dest
-        ? 'Choose how many to march, then confirm.'
+        ? 'Choose how many to move, then confirm.'
         : 'Optional: tap a land, then a connected land of yours to move armies — or press Done.');
 
   return (
@@ -292,7 +298,7 @@ export function RiskPage() {
           colour, and the plaque re-pops on every hand-off so whose turn it is
           can't be missed — especially during the alternating deploy. */}
       <div className="risk-stage" style={{ ['--pc' as string]: me.color }} data-testid="risk-stage">
-        <RiskBoard map={map} state={state} selected={sel} targets={targets} onPick={onPick} accent={me.color} zoom={zoom} />
+        <RiskBoard map={map} state={state} selected={sel} targets={targets} onPick={onPick} zoom={zoom} />
 
         {/* A warm low sun over the whole theatre. It multiplies into the
             parchment rather than covering it, so the map's own ink, graticule
@@ -305,11 +311,13 @@ export function RiskPage() {
           <button onClick={zoom.reset} disabled={zoom.isDefault} aria-label="Show the whole map" data-testid="risk-zoom-reset">⤢</button>
         </div>
 
+        {/* The plaque wears the active general's colour — since the ring around
+            the stage is gone, this plate IS the turn indicator. */}
         <div className="risk-plaque" key={`${state.current}-${state.phase === 'setup' ? 's' : 'p'}`}>
-          <span className="risk-phase" data-testid="risk-phase">{phaseLabel}</span>
-          <span className="risk-plaque-who" data-testid="risk-turn">
-            <strong style={{ color: me.color }}>{me.name}</strong> {marching} — {owned} lands
+          <span className="risk-plaque-name" data-testid="risk-turn">
+            <strong>{me.name}</strong> {doing}
           </span>
+          {plaqueSub && <span className="risk-plaque-sub" data-testid="risk-phase">{plaqueSub}</span>}
         </div>
 
         <CommandRail state={state} />
@@ -342,8 +350,18 @@ export function RiskPage() {
 
           <span className="risk-warbar-gap" />
           {state.phase === 'attack' && battle && <DiceRow battle={battle} />}
-          <ContinentLegend map={map} state={state} />
         </div>
+
+        {/* A fresh conquest: choose how many armies follow the dice in. Same
+            panel as the fortify slider — the one control that appears mid-turn. */}
+        {conquest && conquestSpare > 0 && (
+          <AdvancePanel
+            key={`${conquest.from}-${conquest.to}`}
+            max={conquestSpare}
+            landName={map.territories.find((t) => t.id === conquest.to)?.name ?? 'the new land'}
+            onMove={risk.advance}
+          />
+        )}
 
         {/* The march slider is the one control that has to appear mid-turn, so
             it gets its own panel above the bar instead of resizing it. */}
@@ -356,11 +374,11 @@ export function RiskPage() {
               value={moveCount}
               onChange={(e) => risk.setMoveCount(Number(e.target.value))}
               data-testid="fortify-range"
-              aria-label="Armies to march"
+              aria-label="Armies to move"
             />
             <div className="risk-march-actions">
               <button className="risk-btn primary" onClick={risk.confirmFortify} data-testid="fortify-confirm">
-                March {moveCount} →
+                Move {moveCount} →
               </button>
               <button className="risk-btn" onClick={risk.cancelSelection}>Cancel</button>
             </div>
@@ -371,12 +389,44 @@ export function RiskPage() {
   );
 }
 
+// Plain words on the stepper — "Reinforce" and "Fortify" are jargon a
+// seven-year-old shouldn't have to decode.
 const TURN_STEPS: { phase: string; label: string }[] = [
-  { phase: 'reinforce', label: 'Reinforce' },
+  { phase: 'reinforce', label: 'Place' },
   { phase: 'attack', label: 'Attack' },
-  // "Fortify" is jargon a seven-year-old shouldn't have to decode.
-  { phase: 'fortify', label: 'Move one' },
+  { phase: 'fortify', label: 'Move' },
 ];
+
+/**
+ * After a capture: how many extra armies march into the new land? Local state,
+ * keyed on the conquest by the caller, so each capture starts the slider at
+ * "everyone forward" — the choice kids nearly always want.
+ */
+function AdvancePanel({ max, landName, onMove }: { max: number; landName: string; onMove: (n: number) => void }) {
+  const [count, setCount] = useState(max);
+  return (
+    <div className="risk-march" data-testid="advance-panel">
+      <span className="risk-march-label">Move more armies into {landName}?</span>
+      <input
+        type="range"
+        min={0}
+        max={max}
+        value={count}
+        onChange={(e) => setCount(Number(e.target.value))}
+        data-testid="advance-range"
+        aria-label={`Extra armies to move into ${landName}`}
+      />
+      <div className="risk-march-actions">
+        <button className="risk-btn primary" onClick={() => onMove(count)} data-testid="advance-confirm">
+          Move {count} →
+        </button>
+        <button className="risk-btn" onClick={() => onMove(0)} data-testid="advance-stay">
+          Leave them
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /**
  * The three steps of a turn, always visible at a fixed width: the lit one is
@@ -525,9 +575,9 @@ function Shell({
 function RiskHelp({ onClose }: { onClose: () => void }) {
   useDismissOnEscape(true, onClose);
   const steps: { n: number; name: string; body: string }[] = [
-    { n: 1, name: 'Reinforce', body: 'You get fresh armies at the start of your turn — more if you hold whole continents. Tap your own lands to place them.' },
+    { n: 1, name: 'Place armies', body: 'You get fresh armies at the start of your turn — more if you hold whole continents (the +numbers on the map). Tap your own lands to place them.' },
     { n: 2, name: 'Attack', body: 'Tap one of your lands that has 2 or more armies, then tap a touching enemy land. Dice decide the battle — the defender wins ties. Win, and the land becomes yours. Attack as often as you like, or not at all.' },
-    { n: 3, name: 'Fortify', body: 'Once per turn you may slide armies between two of your connected lands. Then tap “End turn” to pass to the next general.' },
+    { n: 3, name: 'Move armies', body: 'Once per turn you may move armies between two of your connected lands. Then press Done to pass to the next general.' },
   ];
   return (
     /* Backdrop click is a mouse convenience; Escape (above) and the "Got it"
@@ -602,26 +652,6 @@ function DiceRow({ battle }: { battle: BattleResult }) {
       <div className="risk-dice-outcome">
         {battle.captured ? 'Territory taken' : `−${battle.attackerLosses} yours · −${battle.defenderLosses} theirs`}
       </div>
-    </div>
-  );
-}
-
-function ContinentLegend({ map, state }: { map: RiskMap; state: GameState }) {
-  return (
-    <div className="risk-legend">
-      <span className="risk-legend-title">Continents</span>
-      {map.continents.map((c) => {
-        const terrs = map.topology.continents.find((x) => x.id === c.id)?.territoryIds ?? [];
-        const owners = new Set(terrs.map((t) => state.territories[t]?.owner));
-        const held = owners.size === 1 ? state.players[[...owners][0]] : null;
-        return (
-          <span key={c.id} className="risk-legend-item">
-            <span className="risk-legend-chip" style={{ background: c.color }} />
-            {c.name} <strong>+{c.bonus}</strong>
-            {held && <em className="risk-legend-held" style={{ color: held.color }}>{held.name}</em>}
-          </span>
-        );
-      })}
     </div>
   );
 }

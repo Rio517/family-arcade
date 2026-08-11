@@ -168,23 +168,24 @@ async function playRiskToAttack(page) {
   await page.getByTestId('risk-start').click();
 
   await page.evaluate(async () => {
-    const phase = () => document.querySelector('[data-testid="risk-phase"]')?.textContent ?? '';
+    const turn = () => document.querySelector('[data-testid="risk-turn"]')?.textContent ?? '';
     const tick = () => new Promise((r) => setTimeout(r, 0));
     // Cycling the token list spreads the claims around the world instead of
     // handing one general a solid continent.
-    for (let i = 0; i < 600 && !/attack/i.test(phase()); i++) {
+    for (let i = 0; i < 600 && !/attacks/i.test(turn()); i++) {
       const tokens = document.querySelectorAll('[data-testid^="token-"]');
       if (tokens.length === 0) break;
       tokens[i % tokens.length].dispatchEvent(new MouseEvent('click', { bubbles: true }));
       await tick();
-      // Reinforce ends on a button, not a tap, once every army is placed.
-      if (/place 0/i.test(phase())) {
-        document.querySelector('[data-testid="end-reinforce"]')?.click();
+      // Placing ends on a button, not a tap, once every army is down.
+      const done = document.querySelector('[data-testid="end-reinforce"]');
+      if (done && !done.disabled) {
+        done.click();
         await tick();
       }
     }
   });
-  await page.getByTestId('risk-phase').waitFor();
+  await page.getByTestId('risk-turn').waitFor();
   // The plaque drops in on a spring; let it land.
   await page.waitForTimeout(700);
 }

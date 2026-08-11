@@ -22,8 +22,16 @@ import type {
   TerritoryState,
 } from './types';
 
-/** Classic starting-army counts by player count. */
-const STARTING_ARMIES: Record<number, number> = { 2: 40, 3: 35, 4: 30, 5: 25, 6: 20 };
+/**
+ * Starting allotment: your share of the map plus eight armies to stack. The
+ * classic counts (35 a head at three players) made the opening a hundred-tap
+ * slog before anyone got to attack — the family called it out. Eight extras
+ * keeps the deploy stage short and the same length at every player count.
+ */
+function startingArmies(state: GameState): number {
+  const lands = Object.keys(state.territories).length;
+  return Math.ceil(lands / state.players.length) + 8;
+}
 
 export interface NewPlayer {
   name: string;
@@ -100,6 +108,7 @@ export function newGame(
     phase: 'setup',
     toPlace: 0,
     conqueredThisTurn: false,
+    lastConquest: null,
     winner: null,
     diceMode,
     diceBag: [],
@@ -117,9 +126,8 @@ export function hasUnclaimed(state: GameState): boolean {
 /** How many starting armies a player still has to deploy (their allotment
  *  minus every army of theirs already standing on the board). */
 export function deployReserve(state: GameState, playerId: number): number {
-  const starting = STARTING_ARMIES[state.players.length] ?? 30;
   const placed = territoriesOf(state, playerId).reduce((s, t) => s + state.territories[t].armies, 0);
-  return Math.max(0, starting - placed);
+  return Math.max(0, startingArmies(state) - placed);
 }
 
 /**
@@ -260,6 +268,9 @@ export function resolveAttack(
     ...state,
     territories,
     conqueredThisTurn: state.conqueredThisTurn || captured,
+    // A capture stays "open" so extra armies can be marched in (see advance);
+    // any following roll settles the previous one.
+    lastConquest: captured ? { from, to } : null,
     diceBag: attDraw.bag,
     defenseBag: defDraw.bag,
   };
@@ -279,10 +290,33 @@ function settle(state: GameState, _map: MapTopology): GameState {
   return { ...state, players, winner, phase: winner !== null ? 'over' : state.phase };
 }
 
+/**
+ * March extra armies from the attacking territory into a just-captured one,
+ * beyond the dice that moved automatically. Clamped so one army stays behind;
+ * zero is a legal "they hold what they have". Either way the conquest settles.
+ */
+export function advance(state: GameState, count: number): GameState {
+  const lc = state.lastConquest;
+  if (state.phase !== 'attack' || !lc) return state;
+  const f = state.territories[lc.from];
+  const t = state.territories[lc.to];
+  if (!f || !t || f.owner !== state.current || t.owner !== state.current) return state;
+  const move = Math.max(0, Math.min(count, f.armies - 1));
+  return {
+    ...state,
+    territories: {
+      ...state.territories,
+      [lc.from]: { ...f, armies: f.armies - move },
+      [lc.to]: { ...t, armies: t.armies + move },
+    },
+    lastConquest: null,
+  };
+}
+
 /** End the attack phase and move to fortify. */
 export function endAttack(state: GameState): GameState {
   if (state.phase !== 'attack') return state;
-  return { ...state, phase: 'fortify' };
+  return { ...state, phase: 'fortify', lastConquest: null };
 }
 
 /** Territories reachable from `from` through the current player's own land. */
@@ -348,6 +382,7 @@ function nextTurn(state: GameState, map: MapTopology): GameState {
     current: idx,
     phase: 'reinforce',
     conqueredThisTurn: false,
+    lastConquest: null,
     toPlace: 0,
   };
   started.toPlace = reinforcementCount(started, map, idx);
