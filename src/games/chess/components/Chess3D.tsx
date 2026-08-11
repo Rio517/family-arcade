@@ -76,6 +76,24 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
           if (canAct && piece && piece.color === mc) setSelected((cur) => (cur && sameSquare(cur, sq) ? null : sq));
           else setSelected(null);
         },
+        // Dragging a piece moves it (the natural thing to try — especially
+        // for kids); the camera only orbits from empty board or scenery.
+        canDrag: (sq) => {
+          const { board: b, interactive: canAct, movableColor: mc } = live.current;
+          const piece = b.board[sq.row][sq.col];
+          return !!(canAct && piece && piece.color === mc);
+        },
+        // Lighting the legal targets while the piece is in the air.
+        onDragStart: (sq) => setSelected(sq),
+        onDrop: (from, to) => {
+          setSelected(null);
+          if (!to) return;
+          const { board: b } = live.current;
+          const moves = legalMovesFrom(b, from).filter((m) => sameSquare(m.to, to));
+          if (moves.length === 0) return; // snaps back in the scene
+          if (moves.some((m) => m.promotion)) setPromotion({ from, to });
+          else onMoveRef.current({ from, to });
+        },
       });
       sceneRef.current = scene;
       // A theme switch rebuilds the scene mid-game — repopulate it right away.
@@ -113,7 +131,7 @@ export default function Chess3D({ board, orientation, interactive, movableColor,
   return (
     <div className="chess3d">
       <div className="chess3d-canvas" ref={holder} data-testid="chess3d" />
-      <p className="chess3d-hint subtle center">Drag to orbit · pinch or scroll to zoom · tap a piece to move</p>
+      <p className="chess3d-hint subtle center">Drag a piece to move it · drag the board to look around · pinch or scroll to zoom</p>
 
       {promotion && (
         /* Backdrop click is a mouse convenience; Escape (above) and the

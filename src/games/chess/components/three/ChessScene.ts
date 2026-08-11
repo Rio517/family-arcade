@@ -12,6 +12,8 @@ import { disposeDeep } from '@shared/three/disposeDeep';
 import { SCENE_PALETTES, type ScenePalette } from '../chessTheme';
 
 const UP = new THREE.Vector3(0, 1, 0);
+/** The board's surface — dragged pieces ride the pointer's ray across it. */
+const BOARD_PLANE = new THREE.Plane(UP, 0);
 
 const sqName = (s: Square) => `${FILES[s.col]}${8 - s.row}`;
 /** Board square → world position (a1 near white; row 0 = rank 8 = -z). */
@@ -58,6 +60,9 @@ export class ChessScene {
   private lastNow = 0;
   private raf = 0;
   private down: { x: number; y: number } | null = null;
+  /** A piece picked up on pointerdown; becomes a real drag past the tap
+   *  threshold, otherwise the release falls through to the tap flow. */
+  private drag: { from: Square; grp: THREE.Group; home: THREE.Vector3; active: boolean } | null = null;
   private resizeObs: ResizeObserver | null = null;
   private disposed = false;
 
@@ -68,7 +73,18 @@ export class ChessScene {
 
   constructor(
     private container: HTMLElement,
-    private opts: { orientation: Color; reducedMotion: boolean; onTap: (sq: Square) => void; palette?: ScenePalette },
+    private opts: {
+      orientation: Color;
+      reducedMotion: boolean;
+      onTap: (sq: Square) => void;
+      /** True for a square whose piece may be picked up and dragged. */
+      canDrag?: (sq: Square) => boolean;
+      /** A drag crossed the tap threshold — the host should mark targets. */
+      onDragStart?: (sq: Square) => void;
+      /** A dragged piece was released (null: off the board). */
+      onDrop?: (from: Square, to: Square | null) => void;
+      palette?: ScenePalette;
+    },
   ) {
     this.palette = opts.palette ?? SCENE_PALETTES.classic;
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -131,9 +147,14 @@ export class ChessScene {
     if (this.palette.dream) this.buildDreamWorld();
     this.scene.add(this.markGroup);
 
-    // Tap vs orbit: only fire a tap when the pointer barely moved.
+    // Tap vs drag vs orbit: pointerdown on your own piece claims the gesture
+    // for a piece drag (orbit pauses); past the tap threshold the piece lifts
+    // and rides the finger. Everywhere else, dragging orbits as before, and a
+    // release that barely moved is a tap either way.
     this.renderer.domElement.addEventListener('pointerdown', this.onDown);
+    this.renderer.domElement.addEventListener('pointermove', this.onPointerMove);
     this.renderer.domElement.addEventListener('pointerup', this.onUp);
+    this.renderer.domElement.addEventListener('pointercancel', this.onCancel);
 
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(container);
@@ -575,6 +596,9 @@ export class ChessScene {
 
   /** Sync every piece to `board`; if `move` is given, tween that piece. */
   setPosition(board: Board, move: { from: Square; to: Square } | null) {
+    // A position change mid-drag (an online opponent's move landing) would
+    // yank the carried piece around — put it down first.
+    this.onCancel();
     const wanted = new Map<string, { type: PieceType; color: Color }>();
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
@@ -678,34 +702,111 @@ export class ChessScene {
     }
   }
 
-  private onDown = (e: globalThis.PointerEvent) => {
-    this.down = { x: e.clientX, y: e.clientY };
-  };
-
-  private onUp = (e: globalThis.PointerEvent) => {
-    if (!this.down) return;
-    const moved = Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y);
-    this.down = null;
-    if (moved > 7) return; // that was an orbit, not a tap
+  /** Aim the shared raycaster through the pointer. */
+  private aim(e: globalThis.PointerEvent) {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(
       ((e.clientX - rect.left) / rect.width) * 2 - 1,
       -((e.clientY - rect.top) / rect.height) * 2 + 1,
     );
     this.raycaster.setFromCamera(ndc, this.camera);
-    // Prefer the tapped piece's square; fall back to the tile.
-    const pieceHit = this.raycaster.intersectObjects([...this.pieces.values()], true)[0];
-    if (pieceHit) {
-      let g: THREE.Object3D | null = pieceHit.object;
-      while (g && !g.userData.type) g = g.parent;
-      if (g) {
-        for (const [key, grp] of this.pieces) {
-          if (grp === g) return this.tapSquare(key);
-        }
-      }
+  }
+
+  /** The square-name key of the piece under the pointer, if any. */
+  private pieceKeyAt(e: globalThis.PointerEvent): string | null {
+    this.aim(e);
+    const hit = this.raycaster.intersectObjects([...this.pieces.values()], true)[0];
+    if (!hit) return null;
+    let g: THREE.Object3D | null = hit.object;
+    while (g && !g.userData.type) g = g.parent;
+    if (!g) return null;
+    for (const [key, grp] of this.pieces) {
+      if (grp === g) return key;
     }
+    return null;
+  }
+
+  /** Where the pointer's ray meets the board plane (y = 0). */
+  private pointOnBoard(e: globalThis.PointerEvent): THREE.Vector3 | null {
+    this.aim(e);
+    const out = new THREE.Vector3();
+    return this.raycaster.ray.intersectPlane(BOARD_PLANE, out) ? out : null;
+  }
+
+  private static squareOf(key: string): Square | null {
+    const col = FILES.indexOf(key[0]);
+    const row = RANKS.indexOf(key[1]);
+    return col >= 0 && row >= 0 ? { row, col } : null;
+  }
+
+  private onDown = (e: globalThis.PointerEvent) => {
+    this.down = { x: e.clientX, y: e.clientY };
+    if (!this.opts.canDrag) return;
+    const key = this.pieceKeyAt(e);
+    const sq = key ? ChessScene.squareOf(key) : null;
+    if (!key || !sq || !this.opts.canDrag(sq)) return;
+    const grp = this.pieces.get(key)!;
+    this.drag = { from: sq, grp, home: grp.position.clone(), active: false };
+    // The gesture belongs to the piece now — the camera must not orbit under it.
+    this.controls.enabled = false;
+    this.renderer.domElement.setPointerCapture(e.pointerId);
+  };
+
+  private onPointerMove = (e: globalThis.PointerEvent) => {
+    const drag = this.drag;
+    if (!drag || !this.down) return;
+    if (!drag.active) {
+      if (Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y) <= 7) return;
+      drag.active = true;
+      this.opts.onDragStart?.(drag.from);
+    }
+    const p = this.pointOnBoard(e);
+    if (p) {
+      drag.grp.position.set(
+        THREE.MathUtils.clamp(p.x, -3.9, 3.9),
+        0.55, // carried above the other pieces
+        THREE.MathUtils.clamp(p.z, -3.9, 3.9),
+      );
+    }
+  };
+
+  private onUp = (e: globalThis.PointerEvent) => {
+    const drag = this.drag;
+    if (drag) {
+      this.drag = null;
+      this.controls.enabled = true;
+      if (drag.active) {
+        this.down = null;
+        // Snap home first: a legal move re-lays the position (with its tween);
+        // an illegal one leaves the piece exactly where it started.
+        drag.grp.position.copy(drag.home);
+        const p = this.pointOnBoard(e);
+        const col = p ? Math.round(p.x + 3.5) : -1;
+        const row = p ? Math.round(p.z + 3.5) : -1;
+        const to = col >= 0 && col <= 7 && row >= 0 && row <= 7 ? { row, col } : null;
+        this.opts.onDrop?.(drag.from, to);
+        return;
+      }
+      // Never crossed the threshold — fall through to the tap flow.
+    }
+    if (!this.down) return;
+    const moved = Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y);
+    this.down = null;
+    if (moved > 7) return; // that was an orbit, not a tap
+    // Prefer the tapped piece's square; fall back to the tile.
+    const key = this.pieceKeyAt(e);
+    if (key) return this.tapSquare(key);
     const tileHit = this.raycaster.intersectObjects(this.tiles)[0];
     if (tileHit) this.tapSquare(tileHit.object.name);
+  };
+
+  private onCancel = () => {
+    if (this.drag) {
+      this.drag.grp.position.copy(this.drag.home);
+      this.controls.enabled = true;
+      this.drag = null;
+    }
+    this.down = null;
   };
 
   private tapSquare(name: string) {
@@ -815,7 +916,9 @@ export class ChessScene {
     cancelAnimationFrame(this.raf);
     this.resizeObs?.disconnect();
     this.renderer.domElement.removeEventListener('pointerdown', this.onDown);
+    this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove);
     this.renderer.domElement.removeEventListener('pointerup', this.onUp);
+    this.renderer.domElement.removeEventListener('pointercancel', this.onCancel);
     this.controls.dispose();
     // Every theme switch rebuilds the whole scene (Cloud Kingdom alone holds
     // 200+ geometries), so teardown must actually free the GPU — otherwise a

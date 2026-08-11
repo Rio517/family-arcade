@@ -48,3 +48,28 @@ describe('<FreePlay> drag', () => {
     expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeTruthy();
   });
 });
+
+describe('<FreePlay> stamp toggle', () => {
+  it('with a tray piece in hand, tapping an identical piece removes it', () => {
+    render(<FreePlay onExit={vi.fn()} onStartGame={vi.fn()} />);
+
+    // Pick up a white queen from the tray (the stamp) and place one on e5.
+    fireEvent.click(screen.getByTestId('fp-tray-w-q'));
+    fireEvent.click(screen.getByTestId('fp-sq-e5'));
+    expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeTruthy();
+
+    // Tapping the same square again removes it — before, the tap re-placed
+    // the identical piece and looked like it did nothing.
+    fireEvent.click(screen.getByTestId('fp-sq-e5'));
+    expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeNull();
+
+    // The stamp is still in hand: a third tap places again.
+    fireEvent.click(screen.getByTestId('fp-sq-e5'));
+    expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeTruthy();
+
+    // A DIFFERENT piece is replaced, not removed — the stamp paints over it.
+    fireEvent.click(screen.getByTestId('fp-tray-b-n'));
+    fireEvent.click(screen.getByTestId('fp-sq-e5'));
+    expect(screen.getByTestId('fp-sq-e5').querySelector('svg')).toBeTruthy();
+  });
+});
