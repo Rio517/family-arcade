@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { SKINS, skinById } from '@games/battleship/domain/constants';
 import { isSkinUnlocked } from '@games/battleship/domain/skins';
+import type { FleetEra } from '@games/battleship/domain/types';
 import type { Profile } from '@shared/profile/profile';
 import { InfoIcon, LockIcon, SkinGlyph } from '@shared/ui/icons';
 
 interface FleetSelectProps {
   profile: Profile;
   selectedSkinId: string;
+  /** Which navy this captain sails in 3D; a separate choice from the colour. */
+  era: FleetEra;
+  onEra: (era: FleetEra) => void;
   name: string;
   onName: (name: string) => void;
   onSelect: (skinId: string) => void;
@@ -14,12 +18,28 @@ interface FleetSelectProps {
   onContinue: () => void;
 }
 
+/** The two navies, spelled out so every captain knows what they're picking. */
+const ERAS: { id: FleetEra; name: string; sub: string; ships: string }[] = [
+  {
+    id: 'classic',
+    name: 'Classic',
+    sub: 'The great warships of 1942',
+    ships: 'Shōkaku · Iowa · Cleveland · U-boat · Fletcher',
+  },
+  {
+    id: 'modern',
+    name: 'Modern',
+    sub: 'Today’s navy',
+    ships: 'Ford · Kirov · Type 055 · Virginia · Hobart',
+  },
+];
+
 /**
  * Screen 1 of setup: set your captain's name and choose the look of your fleet.
  * Both are editable here (and any change is announced to a connected opponent).
  * Free skins are always available; premium skins are unlocked by spending points.
  */
-export function FleetSelect({ profile, selectedSkinId, name, onName, onSelect, onUnlock, onContinue }: FleetSelectProps) {
+export function FleetSelect({ profile, selectedSkinId, era, onEra, name, onName, onSelect, onUnlock, onContinue }: FleetSelectProps) {
   const [toast, setToast] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
 
@@ -123,6 +143,31 @@ export function FleetSelect({ profile, selectedSkinId, name, onName, onSelect, o
               </button>
             );
           })}
+        </div>
+      </div>
+
+      <div className="panel">
+        <h2>Choose your navy</h2>
+        <p className="subtle era-note">
+          Which ships sail for you in the 3D view. Every captain picks their own —
+          classic and modern fleets can battle each other.
+        </p>
+        <div className="eras" role="group" aria-label="Fleet era">
+          {ERAS.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              className="era-card"
+              data-selected={era === e.id}
+              aria-pressed={era === e.id}
+              onClick={() => onEra(e.id)}
+              data-testid={`era-${e.id}`}
+            >
+              <div className="era-name">{e.name}</div>
+              <div className="era-sub">{e.sub}</div>
+              <div className="era-ships">{e.ships}</div>
+            </button>
+          ))}
         </div>
       </div>
 

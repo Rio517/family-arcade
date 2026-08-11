@@ -20,6 +20,14 @@ export type ShipId =
 
 export type Orientation = 'H' | 'V';
 
+/**
+ * Which navy a captain sails in the 3D view — the classic WWII fleet or the
+ * modern one. Purely cosmetic (same ships, same sizes, same rules) and purely
+ * local: each player picks their own on the fleet screen, and nothing about
+ * it crosses the wire.
+ */
+export type FleetEra = 'classic' | 'modern';
+
 /** Which side of the connection a player is. Also drives turn order. */
 export type Side = 'host' | 'guest';
 

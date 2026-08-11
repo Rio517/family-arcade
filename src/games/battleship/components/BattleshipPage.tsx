@@ -17,6 +17,7 @@ import { CloseIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
 import { loadResumableSession } from '@games/battleship/storage/sessionStore';
 import { QRCodeSVG } from 'qrcode.react';
 import type { FinishInfo } from '@games/battleship/domain/session';
+import type { FleetEra } from '@games/battleship/domain/types';
 
 /** The finished-game summary shown on the Result screen. */
 interface ResultSummary {
@@ -32,6 +33,16 @@ export function BattleshipPage() {
   const [copied, setCopied] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   useDismissOnEscape(shareOpen, () => setShareOpen(false));
+
+  // Which navy this captain sails in 3D — classic or modern. Purely cosmetic
+  // and purely local (nothing crosses the wire), remembered per device.
+  const [fleetEra, setFleetEra] = useState<FleetEra>(() => {
+    try { return localStorage.getItem('bs-fleet-era-v1') === 'modern' ? 'modern' : 'classic'; } catch { return 'classic'; }
+  });
+  const pickFleetEra = (era: FleetEra) => {
+    setFleetEra(era);
+    try { localStorage.setItem('bs-fleet-era-v1', era); } catch { /* ignore */ }
+  };
 
   const onFinish = useCallback(
     (info: FinishInfo) => {
@@ -258,6 +269,8 @@ export function BattleshipPage() {
           <FleetSelect
             profile={profile.profile}
             selectedSkinId={bs.mySkinId}
+            era={fleetEra}
+            onEra={pickFleetEra}
             name={profile.profile.name}
             onName={(name) => {
               profile.setName(name);
@@ -291,6 +304,7 @@ export function BattleshipPage() {
           oppName={bs.oppName ?? 'Opponent'}
           skinId={bs.mySkinId}
           oppSkinId={bs.oppSkinId ?? bs.mySkinId}
+          era={fleetEra}
           myFleet={bs.myFleet}
           myTurn={bs.myTurn}
           pendingFire={bs.pendingFire}

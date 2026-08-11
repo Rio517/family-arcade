@@ -19,12 +19,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { buildModelShip, loadShipModels } from './components/three/shipModels';
 import { FLEET } from './domain/constants';
-import type { ShipId } from './domain/types';
+import type { FleetEra, ShipId } from './domain/types';
 import '@shared/styles/tokens.css';
 
 const params = new URLSearchParams(location.search);
 const skinColor = params.get('color') ?? '#22d3ee';
 const showGrid = params.get('grid') === '1';
+const era: FleetEra = params.get('era') === 'modern' ? 'modern' : 'classic';
 
 /** One hull, filling the screen. `ship` fixes which; `?ship=` overrides it. */
 export function Inspector({ ship }: { ship?: ShipId }) {
@@ -40,7 +41,7 @@ export function Inspector({ ship }: { ship?: ShipId }) {
 
     (async () => {
       try {
-        await loadShipModels(skinColor);
+        await loadShipModels(skinColor, era);
 
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -55,7 +56,7 @@ export function Inspector({ ship }: { ship?: ShipId }) {
         const size = FLEET.find((s) => s.id === shipId)?.size ?? 5;
         // ?paint=0 strips the deck decal — that's the view an artist needs to
         // trace, because they must trace the *mesh*, not the reference image.
-        const ship = buildModelShip(shipId, size, false, skinColor, params.get('paint') !== '0');
+        const ship = buildModelShip(shipId, size, false, skinColor, params.get('paint') !== '0', era);
         if (!ship) {
           setError(`No generated mesh for "${shipId}" — it still builds procedurally.`);
           return;

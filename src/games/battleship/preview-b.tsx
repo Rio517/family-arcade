@@ -32,6 +32,8 @@ const HARNESS_CSS = `
 `;
 
 function App() {
+  // ?era=modern sails the modern navy — how the screenshot run captures both.
+  const era = new URLSearchParams(location.search).get('era') === 'modern' ? 'modern' : 'classic';
   return (
     <div className="app" style={{ maxWidth: 'none' }}>
       <style>{HARNESS_CSS}</style>
@@ -46,6 +48,7 @@ function App() {
         oppName="Max"
         skinId="aqua"
         oppSkinId="coral"
+        era={era}
         myFleet={myFleet}
         myTurn
         pendingFire={null}

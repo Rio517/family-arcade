@@ -20,17 +20,21 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import type { ShipId } from '@games/battleship/domain/types';
-// Assets carry their era in the name. The active fleet is a complete WWII
-// navy — Shōkaku, Iowa, Cleveland, Type VIIC, Fletcher. Modern hulls
-// (carrier, battleship, cruiser and submarine so far — no destroyer yet)
-// are banked outside the bundle until the set is complete and the
-// classic/modern fleet switch ships with it.
+import type { FleetEra, ShipId } from '@games/battleship/domain/types';
+// Assets carry their era in the name. Two complete navies sail: the classic
+// WWII fleet (Shōkaku, Iowa, Cleveland, Type VIIC, Fletcher) and the modern
+// one (Ford, Kirov, Type 055, Virginia, Hobart). Each captain picks their
+// era on the fleet screen — a purely local, purely cosmetic choice.
 import carrierClassicUrl from '@games/battleship/assets/ships/carrier-classic.glb';
 import battleshipClassicUrl from '@games/battleship/assets/ships/battleship-classic.glb';
 import cruiserClassicUrl from '@games/battleship/assets/ships/cruiser-classic.glb';
 import submarineClassicUrl from '@games/battleship/assets/ships/submarine-classic.glb';
 import destroyerClassicUrl from '@games/battleship/assets/ships/destroyer-classic.glb';
+import carrierModernUrl from '@games/battleship/assets/ships/carrier-modern.glb';
+import battleshipModernUrl from '@games/battleship/assets/ships/battleship-modern.glb';
+import cruiserModernUrl from '@games/battleship/assets/ships/cruiser-modern.glb';
+import submarineModernUrl from '@games/battleship/assets/ships/submarine-modern.glb';
+import destroyerModernUrl from '@games/battleship/assets/ships/destroyer-modern.glb';
 
 /**
  * Per-ship placement. The meshes come out of the generator in their own
@@ -75,6 +79,13 @@ interface ModelSpec {
   /** Material whose colour follows the player's fleet skin. */
   teamMaterial?: string;
   /**
+   * Darkening factor on the team tint (default 1 — the skin colour as-is).
+   * For hulls whose whole skin is the team material (the Virginia's anechoic
+   * coat), a full-strength tint reads as a rubber toy; a deep shade keeps it
+   * a black boat with the team's cast.
+   */
+  teamShade?: number;
+  /**
    * Length multiplier on the standard cell-run fit. The flat 0.24-cell
    * clearance reads fine on a 5-cell carrier but swallows 12% of a 2-cell
    * destroyer, leaving the short hulls looking lost in their squares. Kept
@@ -84,61 +95,114 @@ interface ModelSpec {
   grow?: number;
 }
 
-const SPECS: Partial<Record<ShipId, ModelSpec>> = {
-  carrier: {
-    url: carrierClassicUrl,
-    yaw: 0, // authored bow-along-x already
-    sink: 0.18,
-    deckFrac: 0.46,
-    authored: true,
-    // The Shōkaku wears its team colour on the antifouling band at the
-    // waterline, like the rest of the classic navy.
-    teamMaterial: 'Shokaku Antifouling',
+const SPECS: Record<FleetEra, Partial<Record<ShipId, ModelSpec>>> = {
+  classic: {
+    carrier: {
+      url: carrierClassicUrl,
+      yaw: 0, // authored bow-along-x already
+      sink: 0.18,
+      deckFrac: 0.46,
+      authored: true,
+      // The Shōkaku wears its team colour on the antifouling band at the
+      // waterline, like the rest of the classic navy.
+      teamMaterial: 'Shokaku Antifouling',
+    },
+    battleship: {
+      url: battleshipClassicUrl,
+      yaw: 0,
+      sink: 0.18,
+      deckFrac: 0.46,
+      authored: true,
+      // The Iowa v5 wears its team colour on the antifouling band at the
+      // waterline — the same convention as the carrier's waterline stripe.
+      teamMaterial: 'Iowa V3 Antifouling Red',
+    },
+    cruiser: {
+      url: cruiserClassicUrl,
+      yaw: 0,
+      sink: 0.18,
+      deckFrac: 0.46,
+      authored: true,
+      // The Cleveland follows the Iowa's convention: team colour on the
+      // antifouling band at the waterline.
+      teamMaterial: 'Cleveland Antifouling Red',
+    },
+    submarine: {
+      url: submarineClassicUrl,
+      yaw: 0,
+      // A surfaced U-boat rides decks-awash: far more hull under the water
+      // than the surface ships.
+      sink: 0.42,
+      deckFrac: 0.5,
+      authored: true,
+      // No antifouling band on the Type VIIC — the aged lower hull is its
+      // below-the-waterline paint, so that's where the fleet colour goes.
+      teamMaterial: 'Type VIIC Aged Lower Hull',
+      grow: 1.12,
+    },
+    destroyer: {
+      url: destroyerClassicUrl,
+      yaw: 0,
+      sink: 0.18,
+      deckFrac: 0.46,
+      authored: true,
+      // The Fletcher wears its colour on the waterline band like the rest of
+      // the classic surface navy. (V7 renamed the material with its prefix.)
+      teamMaterial: 'Fletcher V3 Antifouling',
+      grow: 1.15,
+    },
   },
-  battleship: {
-    url: battleshipClassicUrl,
-    yaw: 0,
-    sink: 0.18,
-    deckFrac: 0.46,
-    authored: true,
-    // The Iowa v5 wears its team colour on the antifouling band at the
-    // waterline — the same convention as the carrier's waterline stripe.
-    teamMaterial: 'Iowa V3 Antifouling Red',
-  },
-  cruiser: {
-    url: cruiserClassicUrl,
-    yaw: 0,
-    sink: 0.18,
-    deckFrac: 0.46,
-    authored: true,
-    // The Cleveland follows the Iowa's convention: team colour on the
-    // antifouling band at the waterline.
-    teamMaterial: 'Cleveland Antifouling Red',
-  },
-  submarine: {
-    url: submarineClassicUrl,
-    yaw: 0,
-    // A surfaced U-boat rides decks-awash: far more hull under the water
-    // than the surface ships.
-    sink: 0.42,
-    deckFrac: 0.5,
-    authored: true,
-    // No antifouling band on the Type VIIC — the aged lower hull is its
-    // below-the-waterline paint, so that's where the fleet colour goes.
-    teamMaterial: 'Type VIIC Aged Lower Hull',
-    grow: 1.12,
-  },
-  destroyer: {
-    url: destroyerClassicUrl,
-    yaw: 0,
-    sink: 0.18,
-    deckFrac: 0.46,
-    authored: true,
-    // The Fletcher closes out the fleet — every hull is authored now — and
-    // wears its colour on the waterline band like the rest of the surface navy.
-    // (V7 renamed the material with its version prefix.)
-    teamMaterial: 'Fletcher V3 Antifouling',
-    grow: 1.15,
+  modern: {
+    carrier: {
+      url: carrierModernUrl,
+      yaw: 0,
+      sink: 0.18,
+      deckFrac: 0.46,
+      authored: true,
+      // The Ford's team colour rides its waterline band, matching the
+      // classic navy's convention.
+      teamMaterial: 'Carrier Waterline',
+    },
+    battleship: {
+      url: battleshipModernUrl,
+      yaw: 0,
+      sink: 0.18,
+      deckFrac: 0.46,
+      authored: true,
+      teamMaterial: 'Kirov Antifouling',
+    },
+    cruiser: {
+      url: cruiserModernUrl,
+      yaw: 0,
+      sink: 0.18,
+      deckFrac: 0.46,
+      authored: true,
+      teamMaterial: 'Type 055 Antifouling',
+    },
+    submarine: {
+      url: submarineModernUrl,
+      yaw: 0,
+      // A modern boat rides even lower than the U-boat — a black whale-back
+      // with only the sail proud of the water.
+      sink: 0.45,
+      deckFrac: 0.5,
+      authored: true,
+      // No waterline band on the Virginia; the whole anechoic hull takes a
+      // deep shade of the fleet colour (multiplied down in restyle below, so
+      // it stays a black boat with the team's cast, not a rubber toy).
+      teamMaterial: 'Virginia Anechoic Tile',
+      teamShade: 0.5,
+      grow: 1.12,
+    },
+    destroyer: {
+      url: destroyerModernUrl,
+      yaw: 0,
+      sink: 0.18,
+      deckFrac: 0.46,
+      authored: true,
+      teamMaterial: 'Hobart Antifouling',
+      grow: 1.15,
+    },
   },
 };
 
@@ -149,23 +213,24 @@ const DECK_MARKINGS = '#e8edf5';
 /** Rasterised width. The deck is the largest flat surface the camera sees. */
 const DECK_RASTER_W = 2048;
 
-const cache = new Map<ShipId, THREE.Group>();
+const cache = new Map<string, THREE.Group>(); // key: `${era}:${shipId}`
 
 /**
- * Load every available ship mesh once. Resolves when all have arrived (or
- * failed) so the caller can rebuild the fleet with real hulls.
+ * Load one era's ship meshes once. Resolves when all have arrived (or
+ * failed) so the caller can rebuild the fleet with real hulls. Only the era
+ * being sailed is decoded — the other navy costs nothing until picked.
  */
-export async function loadShipModels(skinColor: string): Promise<void> {
+export async function loadShipModels(skinColor: string, era: FleetEra = 'classic'): Promise<void> {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const ids = Object.keys(SPECS) as ShipId[];
+  const ids = Object.keys(SPECS[era]) as ShipId[];
   await Promise.all(
     ids.map(async (id) => {
-      if (cache.has(id)) return;
-      const spec = SPECS[id];
+      if (cache.has(`${era}:${id}`)) return;
+      const spec = SPECS[era][id];
       if (!spec) return;
       try {
         const gltf = await loader.loadAsync(spec.url);
-        cache.set(id, gltf.scene);
+        cache.set(`${era}:${id}`, gltf.scene);
       } catch {
         // A missing or corrupt model must never take the scene down: the
         // caller falls back to procedural geometry for this hull.
@@ -193,9 +258,10 @@ export function buildModelShip(
   sunk: boolean,
   skinColor: string,
   withDeckPaint = true,
+  era: FleetEra = 'classic',
 ): THREE.Group | null {
-  const source = cache.get(id);
-  const spec = SPECS[id];
+  const source = cache.get(`${era}:${id}`);
+  const spec = SPECS[era][id];
   if (!source || !spec) return null;
 
   const model = source.clone(true);
@@ -228,7 +294,7 @@ export function buildModelShip(
       const isTeam = spec.teamMaterial !== undefined && m.name === spec.teamMaterial;
       if (!isTeam && !sunk) return m; // leave the artist's material untouched
       const next = std.clone();
-      if (isTeam) next.color = new THREE.Color(skinColor);
+      if (isTeam) next.color = new THREE.Color(skinColor).multiplyScalar(spec.teamShade ?? 1);
       if (sunk && next.color) next.color = next.color.clone().multiplyScalar(0.45);
       return next;
     };
