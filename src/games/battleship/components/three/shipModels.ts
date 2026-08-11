@@ -73,6 +73,14 @@ interface ModelSpec {
   authored?: boolean;
   /** Material whose colour follows the player's fleet skin. */
   teamMaterial?: string;
+  /**
+   * Length multiplier on the standard cell-run fit. The flat 0.24-cell
+   * clearance reads fine on a 5-cell carrier but swallows 12% of a 2-cell
+   * destroyer, leaving the short hulls looking lost in their squares. Kept
+   * small enough that a hull tip pokes at most a few hundredths of a cell
+   * past its run — ships may be placed touching, and bows must not collide.
+   */
+  grow?: number;
 }
 
 const SPECS: Partial<Record<ShipId, ModelSpec>> = {
@@ -117,6 +125,7 @@ const SPECS: Partial<Record<ShipId, ModelSpec>> = {
     // No antifouling band on the Type VIIC — the aged lower hull is its
     // below-the-waterline paint, so that's where the fleet colour goes.
     teamMaterial: 'Type VIIC Aged Lower Hull',
+    grow: 1.12,
   },
   destroyer: {
     url: destroyerClassicUrl,
@@ -127,6 +136,7 @@ const SPECS: Partial<Record<ShipId, ModelSpec>> = {
     // The Fletcher closes out the fleet — every hull is authored now — and
     // wears its colour on the waterline band like the rest of the surface navy.
     teamMaterial: 'Fletcher Antifouling',
+    grow: 1.15,
   },
 };
 
@@ -194,7 +204,7 @@ export function buildModelShip(
   const dims = box.getSize(new THREE.Vector3());
   if (dims.x <= 0 || dims.y <= 0) return null;
 
-  const target = size - 0.24; // match the procedural hulls' clearance
+  const target = (size - 0.24) * (spec.grow ?? 1); // standard clearance, per-ship fill
   const scale = target / dims.x;
 
   // Re-centre on the cell span and float the hull at the waterline.
