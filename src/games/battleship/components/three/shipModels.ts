@@ -21,10 +21,11 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { ShipId } from '@games/battleship/domain/types';
-// Assets carry their era in the name. The active fleet is now a complete
-// WWII navy — Essex, Iowa, Cleveland, Type VIIC, Fletcher. Modern hulls
-// (carrier and submarine so far) are banked outside the bundle until the
-// set is complete and the classic/modern fleet switch ships with it.
+// Assets carry their era in the name. The active fleet is a complete WWII
+// navy — Shōkaku, Iowa, Cleveland, Type VIIC, Fletcher. Modern hulls
+// (carrier, battleship, cruiser and submarine so far — no destroyer yet)
+// are banked outside the bundle until the set is complete and the
+// classic/modern fleet switch ships with it.
 import carrierClassicUrl from '@games/battleship/assets/ships/carrier-classic.glb';
 import battleshipClassicUrl from '@games/battleship/assets/ships/battleship-classic.glb';
 import cruiserClassicUrl from '@games/battleship/assets/ships/cruiser-classic.glb';
@@ -90,9 +91,9 @@ const SPECS: Partial<Record<ShipId, ModelSpec>> = {
     sink: 0.18,
     deckFrac: 0.46,
     authored: true,
-    // The Essex wears its team colour on the antifouling band at the
+    // The Shōkaku wears its team colour on the antifouling band at the
     // waterline, like the rest of the classic navy.
-    teamMaterial: 'Essex Antifouling',
+    teamMaterial: 'Shokaku Antifouling',
   },
   battleship: {
     url: battleshipClassicUrl,
@@ -135,7 +136,8 @@ const SPECS: Partial<Record<ShipId, ModelSpec>> = {
     authored: true,
     // The Fletcher closes out the fleet — every hull is authored now — and
     // wears its colour on the waterline band like the rest of the surface navy.
-    teamMaterial: 'Fletcher Antifouling',
+    // (V7 renamed the material with its version prefix.)
+    teamMaterial: 'Fletcher V3 Antifouling',
     grow: 1.15,
   },
 };
