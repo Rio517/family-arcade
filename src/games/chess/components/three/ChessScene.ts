@@ -12,6 +12,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 // The galaxy set's authored hero pieces (the family's generated ships), one
 // GLB per seat. Bundled imports — the offline PWA never fetches at runtime.
 import galaxyWhitePawnUrl from '@games/chess/assets/galaxy/white-pawn.glb';
+import galaxyBlackPawnUrl from '@games/chess/assets/galaxy/black-pawn.glb';
 import { FILES, RANKS, type Board, type Color, type PieceType, type Square } from '@games/chess/domain/types';
 import { disposeDeep } from '@shared/three/disposeDeep';
 import { SCENE_PALETTES, type ScenePalette } from '../chessTheme';
@@ -603,13 +604,16 @@ export class ChessScene {
   }
 
   /**
-   * Decode the galaxy set's authored piece models (currently the white pawn —
-   * a real X-wing, the family's first generated ship) and swap them in for
-   * the procedural stand-ins already on the board.
+   * Decode the galaxy set's authored piece models (the pawns so far — a rebel
+   * X-wing for white, an imperial TIE for black) and swap them in for the
+   * procedural stand-ins already on the board.
    */
   private async loadShipModels() {
     const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    const seats: { key: string; url: string }[] = [{ key: 'wp', url: galaxyWhitePawnUrl }];
+    const seats: { key: string; url: string }[] = [
+      { key: 'wp', url: galaxyWhitePawnUrl },
+      { key: 'bp', url: galaxyBlackPawnUrl },
+    ];
     for (const seat of seats) {
       try {
         const gltf = await loader.loadAsync(seat.url);
