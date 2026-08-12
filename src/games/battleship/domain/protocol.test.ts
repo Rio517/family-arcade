@@ -108,4 +108,10 @@ describe('isMessage — rejects malformed / hostile input', () => {
     expect(isMessage({ t: 'hello', v: 1, side: 'host', name: 'A' })).toBe(false); // no skinId
     expect(isMessage({ t: 'hello', side: 'host', name: 'A', skinId: 'aqua' })).toBe(false); // no version
   });
+
+  it('rejects a hello with oversized display strings (localStorage bloat guard)', () => {
+    const huge = 'x'.repeat(101);
+    expect(isMessage({ t: 'hello', v: 1, side: 'host', name: huge, skinId: 'aqua' })).toBe(false);
+    expect(isMessage({ t: 'hello', v: 1, side: 'host', name: 'A', skinId: huge })).toBe(false);
+  });
 });

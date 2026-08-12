@@ -66,6 +66,16 @@ export class MediaLink {
   }
 
   /**
+   * The guest's registered broker id — deterministic, so the host can tell
+   * the party's own guest from a stranger who learned the code. The broker
+   * only lets one peer hold an id, so nobody can impersonate a guest who is
+   * already on the call.
+   */
+  private guestMediaId(): string {
+    return this.mediaId() + '-guest';
+  }
+
+  /**
    * Ask for the mic (and camera if `withCamera`), then open the call. Requires a
    * user gesture upstream so the browser allows capture + autoplay.
    */
@@ -163,8 +173,10 @@ export class MediaLink {
   }
 
   private createPeer(): void {
-    const id = this.role === 'host' ? this.mediaId() : undefined;
-    const peer = id ? new Peer(id, { config: ICE }) : new Peer({ config: ICE });
+    // Both roles register derived ids: the host so the guest can dial it, the
+    // guest so the host can recognise it (see guestMediaId).
+    const id = this.role === 'host' ? this.mediaId() : this.guestMediaId();
+    const peer = new Peer(id, { config: ICE });
     this.peer = peer;
 
     peer.on('open', () => {
@@ -172,12 +184,13 @@ export class MediaLink {
       if (this.role === 'guest') this.dial();
     });
 
-    // Host answers a caller with its current local stream. Only ONE guest at a
-    // time: while a call is already live, a second caller (someone else who
-    // learned the code) is refused rather than silently handed the A/V.
+    // Host answers ONLY the party's own guest — the caller must hold the
+    // derived guest id, and only one call runs at a time. Any other caller is
+    // a stranger who learned the code; answering them would silently hand
+    // over live mic (and camera) audio, so they're refused instead.
     peer.on('call', (incoming) => {
       if (this.destroyed) return;
-      if (this.call && this.call.open) {
+      if (incoming.peer !== this.guestMediaId() || (this.call && this.call.open)) {
         incoming.close();
         return;
       }

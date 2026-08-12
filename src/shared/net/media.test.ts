@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MediaLink } from './media';
 
 const noop = {
@@ -6,6 +6,109 @@ const noop = {
   onLocalStream: () => {},
   onRemoteStream: () => {},
 };
+
+// A minimal in-memory PeerJS stand-in (mirrors peer.test.ts): enough surface
+// for MediaLink to register and receive calls, driven by emitted events.
+const { FakeMediaPeer, FakeMediaConnection, fakeMediaPeers } = vi.hoisted(() => {
+  class FakeEmitter {
+    private handlers = new Map<string, Array<(...args: unknown[]) => void>>();
+    on(ev: string, fn: (...args: unknown[]) => void) {
+      const list = this.handlers.get(ev) ?? [];
+      list.push(fn);
+      this.handlers.set(ev, list);
+      return this;
+    }
+    emit(ev: string, ...args: unknown[]) {
+      for (const fn of [...(this.handlers.get(ev) ?? [])]) fn(...args);
+    }
+    removeAllListeners() {
+      this.handlers.clear();
+    }
+  }
+
+  class FakeMediaConnection extends FakeEmitter {
+    open = false;
+    closed = false;
+    /** What answer() was handed — 'unanswered' until it happens. */
+    answered: unknown = 'unanswered';
+    constructor(public peer: string) {
+      super();
+    }
+    answer(stream?: unknown) {
+      this.answered = stream ?? null;
+      this.open = true;
+    }
+    close() {
+      this.closed = true;
+      this.open = false;
+      this.emit('close');
+    }
+  }
+
+  const fakeMediaPeers: FakeMediaPeer[] = [];
+  class FakeMediaPeer extends FakeEmitter {
+    id: string | undefined;
+    constructor(...args: unknown[]) {
+      super();
+      this.id = typeof args[0] === 'string' ? args[0] : undefined;
+      fakeMediaPeers.push(this);
+    }
+    call(id: string) {
+      return new FakeMediaConnection(id);
+    }
+    reconnect() {}
+    destroy() {}
+  }
+
+  return { FakeMediaPeer, FakeMediaConnection, fakeMediaPeers };
+});
+
+vi.mock('peerjs', () => ({ default: FakeMediaPeer }));
+
+describe('MediaLink — only the party answers the party', () => {
+  // Give jsdom a mic: a stub stream so start() gets past capture and actually
+  // opens the peer. Scoped to this block — the pure-surface tests below rely
+  // on capture failing.
+  const fakeStream = { getTracks: () => [], getAudioTracks: () => [] };
+  beforeEach(() => {
+    fakeMediaPeers.length = 0;
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: { getUserMedia: () => Promise.resolve(fakeStream) },
+      configurable: true,
+    });
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'mediaDevices');
+  });
+
+  it('the guest registers the derived guest id, not an anonymous one', async () => {
+    const link = new MediaLink(noop, 'party-call-v1-');
+    await link.start('KXQZ', 'guest');
+    expect(fakeMediaPeers[fakeMediaPeers.length - 1].id).toBe('party-call-v1-KXQZ-guest');
+    link.destroy();
+  });
+
+  it('the host answers the party guest and refuses any other caller', async () => {
+    const link = new MediaLink(noop, 'party-call-v1-');
+    await link.start('KXQZ', 'host');
+    const peer = fakeMediaPeers[fakeMediaPeers.length - 1];
+    peer.emit('open');
+
+    // A stranger who learned the code dials the host's media id directly.
+    // They must never be answered — answering hands them live mic audio.
+    const stranger = new FakeMediaConnection('some-random-peer');
+    peer.emit('call', stranger);
+    expect(stranger.answered).toBe('unanswered');
+    expect(stranger.closed).toBe(true);
+
+    // The party's own guest (on the derived id) gets answered.
+    const guest = new FakeMediaConnection('party-call-v1-KXQZ-guest');
+    peer.emit('call', guest);
+    expect(guest.answered).not.toBe('unanswered');
+    expect(guest.closed).toBe(false);
+    link.destroy();
+  });
+});
 
 // The WebRTC/getUserMedia paths need a real browser; here we cover the pure
 // state surface that doesn't touch the network or media devices.

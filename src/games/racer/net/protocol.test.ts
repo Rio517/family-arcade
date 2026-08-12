@@ -50,6 +50,9 @@ describe('isRacerMsg', () => {
     expect(isRacerMsg({ t: 'pos', x: 1, z: 2 })).toBe(false); // missing fields
     expect(isRacerMsg({ t: 'hello', name: 5, driver: 'x' })).toBe(false);
     expect(isRacerMsg({ t: 'hello', name: 'K', driver: 'x', inRace: 'yes' })).toBe(false);
+    // Oversized display strings are refused at the wire.
+    expect(isRacerMsg({ t: 'hello', name: 'x'.repeat(101), driver: 'unicorn' })).toBe(false);
+    expect(isRacerMsg({ t: 'hello', name: 'K', driver: 'x'.repeat(101) })).toBe(false);
     expect(isRacerMsg({ t: 'world', coins: 'x', scores: [1, 2], status: 'racing', winner: null, elapsed: 1 })).toBe(false);
     expect(isRacerMsg({ t: 'world', coins: [], scores: [1], status: 'racing', winner: null, elapsed: 1 })).toBe(false);
     expect(isRacerMsg({ t: 'world', coins: [], scores: [1, 2], status: 'racing', winner: 2, elapsed: 1 })).toBe(false);
