@@ -151,7 +151,10 @@ export class ChessScene {
     this.controls.enablePan = false;
     this.controls.enableDamping = !opts.reducedMotion;
     // Close enough to admire one piece, far enough to frame the whole set.
-    this.controls.minDistance = 3.2;
+    // 3.2 stopped feeling close once the TIE went 40% smaller — a piece is
+    // ~0.4 units now, so the floor drops to fill the screen with one ship.
+    // (The camera's near plane is 0.1; nothing clips at this range.)
+    this.controls.minDistance = 1.9;
     this.controls.maxDistance = 20;
     this.controls.maxPolarAngle = 1.35;
     this.controls.minPolarAngle = 0.12;
