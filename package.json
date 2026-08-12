@@ -2,6 +2,9 @@
   "name": "family-arcade",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "description": "The Kny-Flores family arcade: an offline-first PWA console of peer-to-peer games — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and a Yahtzee calculator.",
   "type": "module",
   "scripts": {
