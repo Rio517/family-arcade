@@ -150,6 +150,21 @@ export class GameConnection<TMessage> {
 
     peer.on('connection', (conn) => {
       if (this.destroyed) return;
+      // One guest at a time. While a channel is live, a NEW incoming
+      // connection is a stranger who learned the code (the ids are guessable
+      // on the public broker) — refuse it rather than adopt it, or they'd be
+      // handed the hello + full log sync and kick the real guest off. The
+      // legitimate guest reconnecting only ever arrives after their old
+      // channel closed, so this never blocks a resume.
+      if (this.conn && this.conn.open && this.conn !== conn) {
+        try {
+          conn.on('open', () => conn.close());
+          conn.close();
+        } catch {
+          /* refusing a stranger must never hurt the live game */
+        }
+        return;
+      }
       // Host accepts the (re)connecting guest, replacing any stale channel.
       this.bindConnection(conn);
     });

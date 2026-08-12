@@ -101,7 +101,15 @@ export function isRacerMsg(value: unknown): value is RacerMsg {
   const m = value as Record<string, unknown>;
   switch (m.t) {
     case 'hello':
-      return isStr(m.name) && isStr(m.driver) && (m.inRace === undefined || typeof m.inRace === 'boolean');
+      // Display strings are capped at the wire (like the party protocol's
+      // MAX_NAME_LEN) so a hostile peer can't ship multi-MB payloads.
+      return (
+        isStr(m.name) &&
+        m.name.length <= 100 &&
+        isStr(m.driver) &&
+        m.driver.length <= 100 &&
+        (m.inRace === undefined || typeof m.inRace === 'boolean')
+      );
     case 'go':
       return isNum(m.target);
     case 'pos':

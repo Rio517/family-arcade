@@ -169,7 +169,17 @@ export function isMessage(value: unknown): value is Message {
   const m = value as Record<string, unknown>;
   switch (m.t) {
     case 'hello':
-      return typeof m.v === 'number' && isSide(m.side) && typeof m.name === 'string' && typeof m.skinId === 'string';
+      // Display strings are capped at the wire (like the party protocol's
+      // MAX_NAME_LEN): skinId is persisted verbatim into the saved session,
+      // so an unbounded string would let a hostile peer bloat localStorage.
+      return (
+        typeof m.v === 'number' &&
+        isSide(m.side) &&
+        typeof m.name === 'string' &&
+        m.name.length <= 100 &&
+        typeof m.skinId === 'string' &&
+        m.skinId.length <= 100
+      );
     case 'ready':
       return typeof m.ready === 'boolean';
     case 'sync':

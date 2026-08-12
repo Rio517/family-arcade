@@ -82,10 +82,13 @@ export function isChessMessage(value: unknown): value is ChessMessage {
   const m = value as Record<string, unknown>;
   switch (m.t) {
     case 'hello':
+      // Names are capped at the wire (like the party protocol's MAX_NAME_LEN)
+      // so a hostile peer can't ship multi-MB strings into session state.
       return (
         typeof m.v === 'number' &&
         SIDES.includes(m.side as Side) &&
-        typeof m.name === 'string'
+        typeof m.name === 'string' &&
+        m.name.length <= 100
       );
     case 'sync':
       return (
