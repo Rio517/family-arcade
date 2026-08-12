@@ -1,0 +1,5 @@
+# Vitest breaks under Node >= 22 (the experimental localStorage global shadows
+# jsdom's), so the repo pins the version CI already uses. mise picks this up
+# automatically; nvm/fnm users get the same pin from .nvmrc.
+[tools]
+node = "20"

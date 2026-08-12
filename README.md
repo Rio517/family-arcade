@@ -178,7 +178,9 @@ The little-kid corner of the console, and just as engineered as the rest:
 ## Development
 
 Requires **Node 20** (the version CI runs; Node 26's experimental
-`localStorage` global currently breaks the jsdom test setup).
+`localStorage` global currently breaks the jsdom test setup). The repo pins it
+machine-readably — `mise` and `nvm`/`fnm` switch automatically via `mise.toml` /
+`.nvmrc`, and `package.json`'s `engines` field documents the floor.
 
 ```bash
 npm install
