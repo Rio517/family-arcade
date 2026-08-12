@@ -47,7 +47,7 @@ const SHIELD_PUSH = 1500; // units/s² shove applied to a shielded-away rival
 
 export type World = 'sky' | 'ocean';
 export type PowerKind = 'speed' | 'magnet' | 'shield';
-export const ALL_POWERS: PowerKind[] = ['speed', 'magnet', 'shield'];
+const ALL_POWERS: PowerKind[] = ['speed', 'magnet', 'shield'];
 
 export interface Vec {
   x: number;
