@@ -172,6 +172,32 @@ describe('online session — sync between two peers', () => {
     expect(hostFinish.finished?.winner).toBe('w');
   });
 
+  it('a rematch cannot reset a game still in progress (guard parity with battleship)', () => {
+    let host = createOnlineSession('host', 'ABCD', 'Host');
+    host = makeMove(host, ply('e2', 'e4')).state;
+    // A forged mid-game 'rematch' plus our own stale intent must never wipe a
+    // live board — battleship guards this with winner(log) === null.
+    let s = applyMessage(host, { t: 'rematch' }).state;
+    s = proposeRematch(s).state;
+    expect(s.log).toHaveLength(1);
+    expect(s.epoch).toBe(0);
+  });
+
+  it('a newer-epoch sync carrying an illegal log is refused, not thrown', () => {
+    const guest = createOnlineSession('guest', 'ABCD', 'Guest');
+    // Shape-valid (in-range squares) but illegal to replay: e2 → e2. The
+    // equal-epoch branch already defends this; the adopt-newer-epoch branch
+    // must too, or a hostile peer white-screens the victim via a fake epoch.
+    const evil = { t: 'sync' as const, log: [ply('e2', 'e2')], wantRematch: false, epoch: 3 };
+    expect(() => applyMessage(guest, evil)).not.toThrow();
+    const out = applyMessage(guest, evil);
+    expect(out.state.epoch).toBe(0); // nothing adopted
+    expect(out.state.log).toHaveLength(0);
+    // The sender is answered with our own (valid) sync so an honest laggard
+    // still converges.
+    expect(out.outgoing.some((m) => m.t === 'sync')).toBe(true);
+  });
+
   it('reports the code and opponent name with the finish, for the profile history', () => {
     let guest = createOnlineSession('guest', 'ABCD', 'Guest');
     guest = applyMessage(guest, { t: 'hello', v: 1, side: 'host', name: 'Dad' }).state;
@@ -214,13 +240,20 @@ describe('online session — sync between two peers', () => {
 });
 
 describe('online rematch', () => {
-  it('resets only once both sides propose', () => {
-    let host = createOnlineSession('host', 'ABCD', 'Host');
-    host = makeMove(host, ply('e2', 'e4')).state;
+  it('resets only once both sides propose, and only on a finished game', () => {
+    // Scholar's mate — the game must actually be over for a reset to happen
+    // (a mid-game rematch is guarded; see the guard-parity test above).
+    const mate: Ply[] = [
+      ply('e2', 'e4'), ply('e7', 'e5'),
+      ply('f1', 'c4'), ply('b8', 'c6'),
+      ply('d1', 'h5'), ply('g8', 'f6'),
+      ply('h5', 'f7'),
+    ];
+    let host: SessionState = { ...createOnlineSession('host', 'ABCD', 'Host'), log: mate };
 
     host = proposeRematch(host).state;
     expect(host.iWantRematch).toBe(true);
-    expect(host.log).toHaveLength(1); // not reset yet
+    expect(host.log).toHaveLength(7); // not reset yet
 
     host = applyMessage(host, { t: 'rematch' }).state; // opponent also proposes
     expect(host.log).toHaveLength(0);

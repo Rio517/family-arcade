@@ -9,6 +9,7 @@
 
 import { BOARD_SIZE, type GameEvent, type GameLog, type ShipId, type Side } from './types';
 import { FLEET } from './constants';
+import { reconcileLogs as reconcile } from '@shared/reconcile';
 
 export const PROTOCOL_VERSION = 1;
 
@@ -98,24 +99,14 @@ function isPrefix(short: GameLog, long: GameLog): boolean {
 }
 
 /**
- * Given our log and a peer's log, return the authoritative one.
- *
- * Invariant (see engine.ts): every log position is written by exactly one
- * peer, and both peers process events in the same order, so one log is always a
- * prefix of the other. The longer log therefore supersedes the shorter with no
- * merge conflict; on a tie we keep our own copy so the result is stable and
- * idempotent. (The `full-game-through-a-disconnect` integration test exercises
- * this convergence end to end.)
- *
- * We only adopt a longer peer log when it genuinely *extends* ours. A longer log
- * that diverges from our history can't have come from an honest peer following
- * the invariant — it's corrupt or forged — so we keep our own rather than let it
- * overwrite a valid game. (Shape is already checked by `isMessage`; this is the
- * consistency check on top of it.)
+ * Given our log and a peer's log, return the authoritative one. The
+ * longer-log-wins invariant and its rationale live with the shared helper
+ * (@shared/net/reconcile); this wrapper supplies battleship's isPrefix. (The
+ * `full-game-through-a-disconnect` integration test exercises the convergence
+ * end to end.)
  */
 export function reconcileLogs(ours: GameLog, theirs: GameLog): GameLog {
-  if (theirs.length > ours.length && isPrefix(ours, theirs)) return theirs;
-  return ours;
+  return reconcile(ours, theirs, isPrefix);
 }
 
 // ── Inbound validation ───────────────────────────────────────────────────────
