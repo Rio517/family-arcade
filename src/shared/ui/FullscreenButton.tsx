@@ -28,7 +28,7 @@ function isSupported(): boolean {
   return typeof el.requestFullscreen === 'function' || typeof el.webkitRequestFullscreen === 'function';
 }
 
-export function FullscreenButton({ className = '' }: { className?: string }) {
+export function FullscreenButton() {
   const [supported] = useState(isSupported);
   const [active, setActive] = useState(false);
 
@@ -63,7 +63,7 @@ export function FullscreenButton({ className = '' }: { className?: string }) {
   return (
     <button
       type="button"
-      className={`icon-btn fs-btn ${className}`.trim()}
+      className="icon-btn fs-btn"
       onClick={toggle}
       aria-label={active ? 'Exit full screen' : 'Full screen'}
       title={active ? 'Exit full screen' : 'Full screen'}

@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { BoltIcon, CoinIcon, MagnetIcon, SparkleIcon } from '@shared/ui/icons';
 import {
-  ALL_POWERS,
   createGame,
   FIELD_H,
   FIELD_W,
@@ -28,7 +27,6 @@ import { renderScene } from './scene';
 
 type Phase = 'players' | 'world' | 'characters' | 'play' | 'over';
 
-const TARGET = 20;
 
 /** Keyboard steering for up to three seats. Player 1 can also drag/tap. */
 const KEYMAP: Record<number, { up: string[]; down: string[]; left: string[]; right: string[] }> = {
@@ -66,7 +64,7 @@ export function UnicornPage() {
         emoji: c.emoji,
         mount: c.mount,
       }));
-      gameRef.current = createGame({ world, players, target: TARGET, powers: ALL_POWERS });
+      gameRef.current = createGame({ world, players });
       setPhase('play');
     },
     [world],

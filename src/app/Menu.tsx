@@ -21,13 +21,13 @@ import { GAMES } from './registry';
 const BULBS = ['b1', 'b2', 'b3', 'b4'];
 
 /** A draped string of multicolour carnival bulbs. */
-function BulbString({ count, offset = 0 }: { count: number; offset?: number }) {
+function BulbString({ count }: { count: number }) {
   return (
     <div className="bulb-string" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
         <i
           key={i}
-          className={`bulb ${BULBS[(i + offset) % 4]}`}
+          className={`bulb ${BULBS[i % 4]}`}
           style={{ left: `${4 + (i * 92) / (count - 1)}%` }}
         />
       ))}

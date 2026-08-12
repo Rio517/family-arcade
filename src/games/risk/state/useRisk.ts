@@ -138,7 +138,7 @@ export function useRisk(): UseRiskResult {
   function start(cfg: StartConfig) {
     const rendered = mapById(cfg.mapId).build();
     setMap(rendered);
-    setState(newGame(rendered.topology, cfg.players, Math.random, cfg.diceMode));
+    setState(newGame(rendered.topology, cfg.players, cfg.diceMode));
     cancelSelection();
   }
 

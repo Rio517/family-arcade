@@ -18,12 +18,12 @@ import type { MapTopology } from '../domain/types';
 import type { ClipRect, MapDivider, RenderedContinent, RenderedTerritory, RiskMap, RiskMapModule, SeaRoute } from './types';
 
 const CONTINENTS: RenderedContinent[] = [
-  { id: 'na', name: 'North America', bonus: 5, color: '#c98a52' },
-  { id: 'sa', name: 'South America', bonus: 2, color: '#c9a24b' },
-  { id: 'eu', name: 'Europe', bonus: 5, color: '#8f7bb0' },
-  { id: 'af', name: 'Africa', bonus: 3, color: '#6fa06a' },
-  { id: 'as', name: 'Asia', bonus: 7, color: '#bd6b5e' },
-  { id: 'oc', name: 'Oceania', bonus: 2, color: '#c07aa0' },
+  { id: 'na', name: 'North America', bonus: 5 },
+  { id: 'sa', name: 'South America', bonus: 2 },
+  { id: 'eu', name: 'Europe', bonus: 5 },
+  { id: 'af', name: 'Africa', bonus: 3 },
+  { id: 'as', name: 'Asia', bonus: 7 },
+  { id: 'oc', name: 'Oceania', bonus: 2 },
 ];
 
 /** A whole-region territory: a group of countries merged into one outline. */

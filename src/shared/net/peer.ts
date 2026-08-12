@@ -92,10 +92,6 @@ export class GameConnection<TMessage> {
     this.isMessage = config.isMessage;
   }
 
-  get gameCode(): string {
-    return this.code;
-  }
-
   private peerIdForCode(code: string): string {
     return this.prefix + code;
   }

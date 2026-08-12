@@ -5,7 +5,6 @@ import {
   collectCoins,
   createCoinField,
   createKart,
-  forward,
   refillCoins,
   startPositions,
   stepMotion,
@@ -64,14 +63,8 @@ describe('kart motion', () => {
     expect(Math.hypot(k.x, k.z)).toBeLessThan(ARENA_RADIUS - 5);
   });
 
-  it('forward() is a unit vector', () => {
-    const k = createKart(0, 0, 0.9);
-    const f = forward(k);
-    expect(Math.hypot(f.x, f.z)).toBeCloseTo(1);
-  });
-
   it('spreads two karts apart at the start', () => {
-    const spots = startPositions(2);
+    const spots = startPositions();
     expect(spots).toHaveLength(2);
     expect(Math.abs(spots[0].x - spots[1].x)).toBeGreaterThan(20);
   });

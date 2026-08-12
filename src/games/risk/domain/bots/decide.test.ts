@@ -39,7 +39,6 @@ function state(owners: Record<string, [number, number]>, over: Partial<GameState
     current: 0,
     phase: 'attack',
     toPlace: 0,
-    conqueredThisTurn: false,
     winner: null,
     diceMode: 'random',
     diceBag: [],
@@ -54,11 +53,14 @@ const vex = personaById('vex');
 describe('personas', () => {
   it('ships four, ordered weakest to strongest', () => {
     expect(RISK_PERSONAS).toHaveLength(4);
-    expect(RISK_PERSONAS.map((p) => p.rung)).toEqual([1, 2, 3, 4]);
+    // Strength ordering is what the fields actually encode: temperature falls
+    // (less wobble) as the generals get stronger.
+    const temps = RISK_PERSONAS.map((p) => p.temperature);
+    expect([...temps].sort((a, b) => b - a)).toEqual(temps);
   });
 
   it('personaById falls back to the weakest for unknown ids', () => {
-    expect(personaById('nope').rung).toBe(1);
+    expect(personaById('nope').id).toBe(RISK_PERSONAS[0].id);
   });
 });
 

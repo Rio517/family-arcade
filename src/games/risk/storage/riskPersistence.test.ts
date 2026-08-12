@@ -20,7 +20,7 @@ describe('risk persistence', () => {
   beforeEach(() => localStorage.clear());
 
   it('round-trips a mid-campaign state exactly', () => {
-    let g = newGame(MAP, players, () => 0.5, 'balanced');
+    let g = newGame(MAP, players, 'balanced');
     g = placeArmy(g, 'a', MAP); // one claim in
     saveRiskGame(g, 1234);
 
@@ -34,7 +34,7 @@ describe('risk persistence', () => {
     // Saves written before the defender got an independent dice bag have no
     // `defenseBag`. They must still load (same storage version) with the field
     // defaulted to an empty bag — drawDice treats empty as a fresh bag.
-    const g = newGame(MAP, players, () => 0.5, 'balanced');
+    const g = newGame(MAP, players, 'balanced');
     const legacyState: Record<string, unknown> = { ...g };
     delete legacyState.defenseBag;
     localStorage.setItem(

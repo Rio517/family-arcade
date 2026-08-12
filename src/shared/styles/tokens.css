@@ -18,7 +18,6 @@
   --sea: #0b1c33;
   --sea-line: rgba(148, 163, 184, 0.12);
   --skin: var(--accent);
-  --tap: rgba(255, 255, 255, 0.06);
 }
 
 * {
@@ -176,16 +175,6 @@ body {
 }
 .field input:focus { outline: none; border-color: var(--accent); }
 .code-input { text-transform: uppercase; letter-spacing: 0.4em; font-weight: 700; text-align: center; font-size: 22px; }
-
-/* ── Stats bar ───────────────────────────────────────────────────────────── */
-.stats { display: flex; gap: 8px; }
-.stat {
-  flex: 1; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 10px; text-align: center; min-width: 0;
-}
-.stat .k { display: block; font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-.stat .v { font-weight: 800; font-size: 20px; font-variant-numeric: tabular-nums; }
-.stat.points .v { color: var(--accent); }
 
 
 /* ── Connection badge ────────────────────────────────────────────────────── */

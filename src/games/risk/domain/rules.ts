@@ -86,7 +86,6 @@ export function drawDice(
 export function newGame(
   map: MapTopology,
   newPlayers: NewPlayer[],
-  _rng: () => number = Math.random,
   diceMode: DiceMode = 'random',
 ): GameState {
   const players: PlayerState[] = newPlayers.map((p, id) => ({
@@ -107,7 +106,6 @@ export function newGame(
     current: 0,
     phase: 'setup',
     toPlace: 0,
-    conqueredThisTurn: false,
     lastConquest: null,
     winner: null,
     diceMode,
@@ -143,7 +141,7 @@ function rotateSetup(state: GameState, map: MapTopology): GameState {
     if (reserve > 0) return { ...state, current: cand, toPlace: reserve };
   }
   // Every reserve is empty — begin the real game at player 0.
-  const started: GameState = { ...state, current: 0, phase: 'reinforce', toPlace: 0, conqueredThisTurn: false };
+  const started: GameState = { ...state, current: 0, phase: 'reinforce', toPlace: 0 };
   started.toPlace = reinforcementCount(started, map, 0);
   return started;
 }
@@ -267,20 +265,19 @@ export function resolveAttack(
   let next: GameState = {
     ...state,
     territories,
-    conqueredThisTurn: state.conqueredThisTurn || captured,
     // A capture stays "open" so extra armies can be marched in (see advance);
     // any following roll settles the previous one.
     lastConquest: captured ? { from, to } : null,
     diceBag: attDraw.bag,
     defenseBag: defDraw.bag,
   };
-  if (captured) next = settle(next, map);
+  if (captured) next = settle(next);
 
   return { state: next, result: { from, to, attackerDice, defenderDice, attackerLosses, defenderLosses, captured } };
 }
 
 /** Mark wiped-out players dead and declare a winner if only one remains. */
-function settle(state: GameState, _map: MapTopology): GameState {
+function settle(state: GameState): GameState {
   const players = state.players.map((p) => ({
     ...p,
     alive: p.alive && territoriesOf(state, p.id).length > 0,
@@ -381,7 +378,6 @@ function nextTurn(state: GameState, map: MapTopology): GameState {
     ...state,
     current: idx,
     phase: 'reinforce',
-    conqueredThisTurn: false,
     lastConquest: null,
     toPlace: 0,
   };

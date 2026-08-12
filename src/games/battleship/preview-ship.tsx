@@ -8,7 +8,7 @@
  *
  *   /preview-ship.html                     the carrier, aqua fleet
  *   /preview-ship.html?ship=battleship     another hull
- *   /preview-ship.html?skin=ember          another fleet colour
+ *   /preview-ship.html?color=%23f43f5e     another fleet colour
  *   /preview-ship.html?grid=1              with the board grid for scale
  *
  * Dev-only: it's built solely when BUILD_HARNESS is set, so it never ships.
@@ -41,7 +41,7 @@ export function Inspector({ ship }: { ship?: ShipId }) {
 
     (async () => {
       try {
-        await loadShipModels(skinColor, era);
+        await loadShipModels(era);
 
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -54,9 +54,7 @@ export function Inspector({ ship }: { ship?: ShipId }) {
         scene.background = new THREE.Color('#0a1424');
 
         const size = FLEET.find((s) => s.id === shipId)?.size ?? 5;
-        // ?paint=0 strips the deck decal — that's the view an artist needs to
-        // trace, because they must trace the *mesh*, not the reference image.
-        const ship = buildModelShip(shipId, size, false, skinColor, params.get('paint') !== '0', era);
+        const ship = buildModelShip(shipId, size, false, skinColor, era);
         if (!ship) {
           setError(`No generated mesh for "${shipId}" — it still builds procedurally.`);
           return;

@@ -64,8 +64,10 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<ConnStatus>('idle');
   const [code, setCode] = useState('');
   const [role, setRole] = useState<Role | null>(null);
-  const [inParty, setInParty] = useState(false);
   const [theirName, setTheirName] = useState<string | null>(null);
+  // Derived, not stored — it can never disagree with the status (the same
+  // pattern callActive uses below).
+  const inParty = status === 'connected';
 
   const connRef = useRef<GameConnection<PartyMsg> | null>(null);
   const nameRef = useRef(myName);
@@ -87,7 +89,6 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
       {
         onStatus: (s) => {
           setStatus(s);
-          setInParty(s === 'connected');
         },
         onOpen: () => {
           connRef.current?.send({ t: 'hello', name: nameRef.current });
@@ -143,7 +144,6 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
     connRef.current?.destroy();
     connRef.current = null;
     setStatus('idle');
-    setInParty(false);
     setRole(null);
     setTheirName(null);
     setCode('');
