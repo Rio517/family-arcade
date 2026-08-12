@@ -12,6 +12,7 @@
  */
 
 import type { GameLog, Ply, PromotionType, Side } from './types';
+import { reconcileLogs as reconcile } from '@shared/reconcile';
 
 export const CHESS_PROTOCOL_VERSION = 1;
 
@@ -134,10 +135,9 @@ function isPrefix(short: GameLog, long: GameLog): boolean {
 
 /**
  * Adopt the peer's log only if it strictly extends ours (longer *and* a prefix
- * match). A longer-but-divergent log is treated as corrupt and rejected, which
- * preserves the single-writer guarantee.
+ * match) — the single-writer invariant, documented with the shared helper
+ * (@shared/reconcile); this wrapper supplies chess's isPrefix.
  */
 export function reconcileLogs(ours: GameLog, theirs: GameLog): GameLog {
-  if (theirs.length > ours.length && isPrefix(ours, theirs)) return theirs;
-  return ours;
+  return reconcile(ours, theirs, isPrefix);
 }

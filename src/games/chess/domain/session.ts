@@ -228,12 +228,19 @@ export function proposeRematch(s: SessionState): Outcome {
     const next: SessionState = { ...s, log: [], epoch: s.epoch + 1, iWantRematch: false, oppWantsRematch: false };
     return { state: next, outgoing: [] };
   }
-  const iWant = true;
-  const both = iWant && s.oppWantsRematch;
-  const next: SessionState = both
-    ? { ...s, log: [], epoch: s.epoch + 1, iWantRematch: false, oppWantsRematch: false }
-    : { ...s, iWantRematch: true };
+  const next = maybeRematchReset({ ...s, iWantRematch: true });
   return { state: next, outgoing: [{ t: 'rematch' }] };
+}
+
+/**
+ * Reset to the opening for an online rematch — but only when both sides want
+ * it AND the game is actually over. A forged mid-game 'rematch' (plus our own
+ * stale intent) must never wipe a live board; battleship's maybeRestart
+ * carries the identical guard (`winner(log) === null`).
+ */
+function maybeRematchReset(s: SessionState): SessionState {
+  if (!s.iWantRematch || !s.oppWantsRematch || phase(s) !== 'over') return s;
+  return { ...s, log: [], epoch: s.epoch + 1, iWantRematch: false, oppWantsRematch: false };
 }
 
 /** Inbound reducer: fold a peer message into the session. */
@@ -241,7 +248,10 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
   switch (msg.t) {
     case 'hello': {
       if (msg.v !== CHESS_PROTOCOL_VERSION) {
-        return { state: s, outgoing: [], error: 'Your opponent is on a different app version.' };
+        // Same copy as battleship's version guard — it tells the family what
+        // to actually DO, and the two games shouldn't explain one situation
+        // two different ways.
+        return { state: s, outgoing: [], error: 'Different app versions — both players refresh the page.' };
       }
       return { state: { ...s, oppName: msg.name.slice(0, 24) || s.oppName }, outgoing: [] };
     }
@@ -260,7 +270,19 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
           iWantRematch: false,
           oppWantsRematch: msg.wantRematch,
         };
-        return { state: next, outgoing: [], finished: finishInfo(next) };
+        // Same hostile-log defence as the equal-epoch branch below: the
+        // adopted log is replayed right here, and a shape-valid but illegal
+        // log (behind a forged newer epoch) must be refused, not thrown.
+        let finished: FinishInfo | undefined;
+        try {
+          finished = finishInfo(next);
+        } catch {
+          return {
+            state: s,
+            outgoing: [{ t: 'sync', log: s.log, epoch: s.epoch, wantRematch: s.iWantRematch }],
+          };
+        }
+        return { state: next, outgoing: [], finished };
       }
 
       // A stale sync from before our rematch reset: its old (finished) log
@@ -320,10 +342,7 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
     }
 
     case 'rematch': {
-      const both = s.iWantRematch;
-      const next: SessionState = both
-        ? { ...s, log: [], epoch: s.epoch + 1, iWantRematch: false, oppWantsRematch: false }
-        : { ...s, oppWantsRematch: true };
+      const next = maybeRematchReset({ ...s, oppWantsRematch: true });
       return { state: next, outgoing: [] };
     }
   }
