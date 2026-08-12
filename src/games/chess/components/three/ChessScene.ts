@@ -610,9 +610,12 @@ export class ChessScene {
    */
   private async loadShipModels() {
     const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    const seats: { key: string; url: string }[] = [
+    // `greyward`: lerp every material toward studio grey by this amount. The
+    // TIE arrived nearly black and read as a silhouette under the night
+    // lighting — the family asked for more grey, film-style.
+    const seats: { key: string; url: string; greyward?: number }[] = [
       { key: 'wp', url: galaxyWhitePawnUrl },
-      { key: 'bp', url: galaxyBlackPawnUrl },
+      { key: 'bp', url: galaxyBlackPawnUrl, greyward: 0.62 },
     ];
     for (const seat of seats) {
       try {
@@ -623,6 +626,26 @@ export class ChessScene {
         // square, length along z with the nose flying at the enemy, sized to
         // the stand-in's footprint, hovering at the pawns' height.
         const model = gltf.scene;
+        if (seat.greyward) {
+          // Collect unique materials first — panels share materials between
+          // meshes, and lerping per-mesh would shift shared ones twice.
+          const unique = new Set<THREE.Material>();
+          model.traverse((o) => {
+            const mesh = o as THREE.Mesh;
+            if (!mesh.isMesh || !mesh.material) return;
+            for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) unique.add(m);
+          });
+          const grey = new THREE.Color('#9aa2ad');
+          for (const m of unique) {
+            const std = m as THREE.MeshStandardMaterial;
+            if (std.color) std.color.lerp(grey, seat.greyward);
+            // Metallic surfaces render near-black without an environment map
+            // (this scene has none) — no amount of albedo grey fixes that, so
+            // ground the metalness and let the lights do the shading.
+            if (typeof std.metalness === 'number') std.metalness = Math.min(std.metalness, 0.3);
+            if (typeof std.roughness === 'number') std.roughness = Math.max(std.roughness, 0.55);
+          }
+        }
         const box = new THREE.Box3().setFromObject(model);
         const dims = box.getSize(new THREE.Vector3());
         model.position.sub(box.getCenter(new THREE.Vector3()));
