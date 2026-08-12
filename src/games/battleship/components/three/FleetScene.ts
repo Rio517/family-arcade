@@ -172,10 +172,16 @@ export class FleetScene {
   /** Rebuild ships + shot markers from the current battle state. */
   update(ships: SceneShip[], incoming: CellState[][]) {
     this.lastState = { ships, incoming };
-    // This runs on every shot; free the old fleet or GPU buffers accumulate
-    // for the whole battle.
-    disposeDeep(this.shipsGroup);
-    disposeDeep(this.markGroup);
+    // This runs on every shot; free what the old fleet OWNS or GPU buffers
+    // accumulate for the whole battle. Model-built hulls are clones sharing
+    // geometry/materials/textures with the module-level GLB cache — disposing
+    // them evicts the cache's GPU buffers and re-uploads every hull on every
+    // shot (the classic iPad per-shot stutter). Their few restyled material
+    // clones are CPU-tiny and left to GC. Procedural hulls own everything.
+    for (const hull of this.shipsGroup.children) {
+      if (!hull.userData.cachedResources) disposeDeep(hull);
+    }
+    disposeMarks(this.markGroup);
     this.shipsGroup.clear();
     this.markGroup.clear();
     this.fires = [];
@@ -185,9 +191,11 @@ export class FleetScene {
 
     for (const ship of ships) {
       // Generated mesh where we have one; procedural hull everywhere else.
-      const g =
-        buildModelShip(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor, true, this.opts.era ?? 'classic') ??
-        buildWarship(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor);
+      const model = buildModelShip(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor, true, this.opts.era ?? 'classic');
+      const g = model ?? buildWarship(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor);
+      // Marks whether this hull's resources belong to the GLB cache (see the
+      // selective disposal above).
+      g.userData.cachedResources = model !== null;
       const horiz = ship.orientation === 'H';
       const cx = (horiz ? ship.col + (ship.size - 1) / 2 : ship.col) - HALF;
       const cz = (horiz ? ship.row : ship.row + (ship.size - 1) / 2) - HALF;
@@ -366,6 +374,26 @@ export class FleetScene {
       this.container.removeChild(this.renderer.domElement);
     }
   }
+}
+
+/**
+ * Free the marks' own geometry and materials, but never the module-cached
+ * flame/smoke canvas textures their materials map — those are drawn once and
+ * shared by every fire on the board for the life of the page. `disposeDeep`
+ * would dispose the maps too, silently re-uploading both textures on every
+ * shot.
+ */
+function disposeMarks(root: THREE.Object3D): void {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (mesh.geometry) mesh.geometry.dispose();
+    const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+    for (const m of mats) {
+      const map = (m as THREE.MeshBasicMaterial).map;
+      if (map && map !== flameTextureCache && map !== smokeTextureCache) map.dispose();
+      m.dispose();
+    }
+  });
 }
 
 // ── Fire ────────────────────────────────────────────────────────────────────

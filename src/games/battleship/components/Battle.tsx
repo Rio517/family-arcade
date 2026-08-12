@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Board, type BoardCell, type PlacedShip } from './Board';
 import type { Burst } from './BoardFX';
 import { ShipProfile } from './ships';
@@ -124,8 +124,12 @@ export function Battle({
       ? { id: impact.id, row: impact.row, col: impact.col, kind: impact.kind }
       : null;
 
-  const radar = radarGrid(log, side);
-  const own = ownBoardView(log, myFleet, side);
+  // Stable identities matter here: `ownShips` and `own.incoming` feed the 3D
+  // ocean, whose update() tears down and rebuilds every hull. Fresh objects on
+  // every render (an aiming tap, the impact flag flipping) meant a full fleet
+  // rebuild per re-render — felt as a hitch on every tap on an iPad.
+  const radar = useMemo(() => radarGrid(log, side), [log, side]);
+  const own = useMemo(() => ownBoardView(log, myFleet, side), [log, myFleet, side]);
 
   const enemyCells: BoardCell[][] = radar.map((r, ri) =>
     r.map((state, ci) => {
@@ -147,19 +151,23 @@ export function Battle({
     }),
   );
 
-  const ownShips: PlacedShip[] = myFleet.map((p) => {
-    const sunk = own.sunkShips.has(p.shipId);
-    const damaged = !sunk && shipCells(p).some((c) => own.incoming[c.row][c.col] === 'hit');
-    return {
-      shipId: p.shipId,
-      row: p.row,
-      col: p.col,
-      size: shipSpec(p.shipId).size,
-      orientation: p.orientation,
-      sunk,
-      damaged,
-    };
-  });
+  const ownShips: PlacedShip[] = useMemo(
+    () =>
+      myFleet.map((p) => {
+        const sunk = own.sunkShips.has(p.shipId);
+        const damaged = !sunk && shipCells(p).some((c) => own.incoming[c.row][c.col] === 'hit');
+        return {
+          shipId: p.shipId,
+          row: p.row,
+          col: p.col,
+          size: shipSpec(p.shipId).size,
+          orientation: p.orientation,
+          sunk,
+          damaged,
+        };
+      }),
+    [myFleet, own],
+  );
 
   const mySunk = sunkByAttacker(log, side);
   const enemySunkCount = mySunk.length;
@@ -206,7 +214,11 @@ export function Battle({
       {fleetDim === '3d' ? (
         <Suspense fallback={<p className="subtle center bs3d-hint">Launching the fleet…</p>}>
           <div className="bs3d-holder">
-            <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} era={era} />
+            {/* While the pop-out is open it owns the ocean — mounting both
+                runs two WebGL contexts + render loops at once. */}
+            {!popped && (
+              <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} era={era} />
+            )}
             <button
               className="bs3d-expand"
               onClick={() => setPopped(true)}

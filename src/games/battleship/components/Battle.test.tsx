@@ -131,6 +131,32 @@ describe('<Battle>', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: /your fleet in 3d/i })).toBeNull();
   });
+
+  it('hands the ocean to the pop-out — only one 3D instance mounts at a time', async () => {
+    render(
+      <Battle
+        log={log}
+        side="host"
+        myName="Rio"
+        oppName="Kid"
+        skinId="aqua"
+        oppSkinId="ember"
+        myFleet={stackFleet()}
+        myTurn
+        pendingFire={null}
+        onFire={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getAllByTestId('fleet-view-3d')[0]);
+    fireEvent.click(await screen.findByTestId('fleet3d-pop', {}, { timeout: 5000 }));
+    // jsdom has no WebGL, so every mounted Fleet3D shows its fallback. The
+    // panel copy must yield while the dialog is open — mounting both runs two
+    // WebGL contexts + render loops and doubles GPU load on real iPads.
+    expect(await screen.findAllByTestId('fleet3d-fallback', {}, { timeout: 5000 })).toHaveLength(1);
+    // Closing the dialog hands the ocean back to the panel.
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(await screen.findAllByTestId('fleet3d-fallback', {}, { timeout: 5000 })).toHaveLength(1);
+  });
 });
 
 describe('<Battle> — 3D fleet view', () => {
