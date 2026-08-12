@@ -226,7 +226,9 @@
   place-items: center;
   background: rgba(30, 50, 70, 0.5);
   backdrop-filter: blur(4px);
-  z-index: 20;
+  /* Overlays sit above the app-wide Party pill (.party-root, z-index 40) —
+     at 20 the victory card rendered UNDER it. 60 matches .modal-backdrop. */
+  z-index: 60;
   padding: 20px;
 }
 .racer-win-card {
@@ -264,3 +266,22 @@
 .racer-primary:hover { filter: brightness(1.05); }
 .racer-ghost { background: #e6f0ff; color: #3f6ea0; }
 .racer-ghost:hover { background: #d8e8ff; }
+
+/* Accessibility floor: no animation for anyone who asked for calm.
+   (This stylesheet was forked from unicorn's and lost this block.) */
+@media (prefers-reduced-motion: reduce) {
+  .racer-win-card { animation: none; }
+  .racer-big-btn, .racer-cast-btn { transition: none; }
+}
+
+/* Accessibility floor: keyboard focus must be visible. These candy buttons
+   don't use the shared .btn skeleton, so tokens' focus ring never reaches
+   them — without this, tabbing through the setup showed nothing at all. */
+.racer-big-btn:focus-visible,
+.racer-cast-btn:focus-visible,
+.racer-back:focus-visible,
+.racer-primary:focus-visible,
+.racer-ghost:focus-visible {
+  outline: 3px solid #3f7ea0;
+  outline-offset: 3px;
+}

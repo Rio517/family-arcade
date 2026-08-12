@@ -52,6 +52,14 @@ describe('PartyBar', () => {
     expect(screen.getByTestId('party-join')).toBeInTheDocument();
   });
 
+  it('the panel closes on Escape, like every dialog in the arcade', () => {
+    renderBar();
+    fireEvent.click(screen.getByTestId('party-pill'));
+    expect(screen.getByRole('dialog', { name: 'Party' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Party' })).toBeNull();
+  });
+
   it('offers opt-in voice (video off) once connected', () => {
     mockParty.value = makeParty({ inParty: true, status: 'connected', theirName: 'Kai', role: 'host', code: 'ABCD' });
     renderBar();

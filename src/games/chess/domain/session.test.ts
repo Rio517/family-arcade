@@ -172,6 +172,21 @@ describe('online session — sync between two peers', () => {
     expect(hostFinish.finished?.winner).toBe('w');
   });
 
+  it('reports the code and opponent name with the finish, for the profile history', () => {
+    let guest = createOnlineSession('guest', 'ABCD', 'Guest');
+    guest = applyMessage(guest, { t: 'hello', v: 1, side: 'host', name: 'Dad' }).state;
+    // Scholar's mate arrives whole via sync; the finish must say who and where.
+    const mate: Ply[] = [
+      ply('e2', 'e4'), ply('e7', 'e5'),
+      ply('f1', 'c4'), ply('b8', 'c6'),
+      ply('d1', 'h5'), ply('g8', 'f6'),
+      ply('h5', 'f7'),
+    ];
+    const out = applyMessage(guest, { t: 'sync', log: mate, wantRematch: false });
+    expect(out.finished?.code).toBe('ABCD');
+    expect(out.finished?.opponent).toBe('Dad');
+  });
+
   it('resyncs a lagging peer via longer-log-wins', () => {
     let host = createOnlineSession('host', 'ABCD', 'Host');
     const guest = createOnlineSession('guest', 'ABCD', 'Guest');

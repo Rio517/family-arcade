@@ -83,6 +83,9 @@
   font-size: 34px; font-weight: 900; letter-spacing: 8px; text-align: center;
   color: var(--accent, #22d3ee);
   background: var(--bg, #0f172a); border-radius: 12px; padding: 10px;
+  /* letter-spacing trails the last glyph, dragging the centred text ~4px
+     left — matching left padding recentres it (same fix as tokens' .code). */
+  padding-left: calc(10px + 8px);
 }
 .party-hint { font-size: 14px; color: var(--muted, #94a3b8); margin: 0; line-height: 1.4; }
 .party-hint a { color: var(--accent, #22d3ee); }

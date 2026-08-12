@@ -208,7 +208,15 @@ function Row({
         if (clickable) cls.push('clickable');
         if (clickable && variant === 'enemy') cls.push('target');
 
-        const label = `${COLUMN_LABELS[c]}${index + 1}`;
+        // The state goes in the accessible name too — hit/miss/sunk are
+        // otherwise colour-and-shape only, unreadable without sight.
+        const outcome =
+          cell.state === 'hit' ? 'hit'
+          : cell.state === 'sunk' ? 'sunk ship'
+          : cell.state === 'miss' ? 'miss'
+          : cell.state === 'ship' ? 'your ship'
+          : variant === 'enemy' ? 'not fired at' : 'open water';
+        const label = `${COLUMN_LABELS[c]}${index + 1} — ${outcome}`;
         return (
           <button
             key={`c-${index}-${c}`}
