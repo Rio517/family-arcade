@@ -60,6 +60,10 @@ export interface FinishInfo {
   winner: Color | null;
   /** Online only: did *I* win? null in local mode or on a draw. */
   iWon: boolean | null;
+  /** The game code ('' in local mode) — the profile history keys games by it. */
+  code: string;
+  /** The opponent's hello name ('' if it never arrived). */
+  opponent: string;
 }
 
 export interface Outcome {
@@ -156,7 +160,7 @@ function finishInfo(s: SessionState): FinishInfo | undefined {
   if (!isGameOver(st)) return undefined;
   const winner = winnerOf(boardState(s));
   const iWon = s.mode === 'online' && winner !== null ? winner === s.myColor : null;
-  return { status: st, winner, iWon };
+  return { status: st, winner, iWon, code: s.code, opponent: s.oppName };
 }
 
 // ── Transitions ────────────────────────────────────────────────────────────

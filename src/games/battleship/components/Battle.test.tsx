@@ -108,6 +108,34 @@ describe('<Battle>', () => {
     expect(screen.getAllByTestId('ship-overlay-carrier')[0].className).not.toContain('sunk');
   });
 
+  it('announces each cell state in the accessible name, not just colour', () => {
+    const myFleet = stackFleet(); // destroyer sits on row 4, cols 0–1
+    const sunkLog: GameLog = [
+      { type: 'start', first: 'guest' },
+      resolveShot(myFleet, [], { row: 4, col: 0 }, 'guest'),
+      resolveShot(myFleet, [{ row: 4, col: 0 }], { row: 4, col: 1 }, 'guest'),
+    ];
+    render(
+      <Battle
+        log={sunkLog}
+        side="host"
+        myName="Rio"
+        oppName="Kid"
+        skinId="aqua"
+        oppSkinId="ember"
+        myFleet={myFleet}
+        myTurn={false}
+        pendingFire={null}
+        onFire={vi.fn()}
+      />,
+    );
+    // Hit/miss/sunk are otherwise colour-and-shape only — a screen reader
+    // needs the state in the cell's name (Risk's territories set the bar).
+    expect(screen.getByLabelText('A5 — sunk ship')).toBeInTheDocument(); // my destroyer
+    expect(screen.getByLabelText('A1 — open water')).toBeInTheDocument(); // my board, unfired
+    expect(screen.getByLabelText('A1 — not fired at')).toBeInTheDocument(); // radar, unfired
+  });
+
   it('pops the 3D fleet out into a big dialog and closes on Escape', async () => {
     render(
       <Battle

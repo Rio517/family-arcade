@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { normalizeCode } from '@shared/net/peer';
 import { NamePicker } from '@shared/ui/NamePicker';
+import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { CameraIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
 import { useParty } from './PartyContext';
 import './party.css';
@@ -17,6 +18,8 @@ export function PartyBar() {
   const [open, setOpen] = useState(false);
   const [joining, setJoining] = useState(false);
   const [codeInput, setCodeInput] = useState('');
+  // The panel is a dialog like any other in the arcade: Escape closes it.
+  useDismissOnEscape(open, () => setOpen(false));
 
   const { inParty, call } = party;
 

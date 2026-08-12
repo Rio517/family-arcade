@@ -90,11 +90,13 @@ export function ChessPage() {
       let pointsEarned = 0;
       if (info.iWon !== null) {
         pointsEarned = pointsForResult(info.iWon, 0);
+        // Record the real game, not a placeholder — every chess row in the
+        // history used to say "Opponent" even though the hello name was known.
         profile.recordResult({
           won: info.iWon,
           survivingCells: 0,
-          code: 'chess',
-          opponent: 'Opponent',
+          code: info.code || 'chess',
+          opponent: info.opponent || 'Opponent',
           finishedAt: Date.now(),
         });
       }

@@ -218,7 +218,9 @@
   place-items: center;
   background: rgba(60, 30, 90, 0.5);
   backdrop-filter: blur(4px);
-  z-index: 20;
+  /* Overlays sit above the app-wide Party pill (.party-root, z-index 40) —
+     at 20 the victory card rendered UNDER it. 60 matches .modal-backdrop. */
+  z-index: 60;
   padding: 20px;
 }
 
@@ -270,4 +272,16 @@
 @media (prefers-reduced-motion: reduce) {
   .uni-score-power, .uni-win-card { animation: none; }
   .uni-big-btn, .uni-cast-btn { transition: none; }
+}
+
+/* Accessibility floor: keyboard focus must be visible. These candy buttons
+   don't use the shared .btn skeleton, so tokens' focus ring never reaches
+   them — without this, tabbing through the setup showed nothing at all. */
+.uni-big-btn:focus-visible,
+.uni-cast-btn:focus-visible,
+.uni-back:focus-visible,
+.uni-primary:focus-visible,
+.uni-ghost:focus-visible {
+  outline: 3px solid #6b3fa0;
+  outline-offset: 3px;
 }

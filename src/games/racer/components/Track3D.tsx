@@ -109,22 +109,35 @@ export function Track3D({
         onOverRef.current();
       }
     };
+    const showFallback = (err: unknown) => {
+      const p = document.createElement('p');
+      p.dataset.testid = 'racer3d-fallback';
+      p.style.cssText = 'padding:24px;text-align:center;color:#fff';
+      p.textContent = 'Sorry, this device can’t show 3D. 😢';
+      mount.replaceChildren(p);
+      console.error(err);
+    };
     // three.js loads on demand, same as chess and battleship — visiting the
     // arcade menu (or racing later) must not front-load the 3D library.
-    import('../three/scene').then(({ RacerScene: Scene }) => {
-      if (gone) return;
-      const reducedMotion =
-        typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-      try {
-        scene = new Scene(mount, ctx.looks, ctx.myIndex, reducedMotion);
-      } catch (err) {
-        mount.innerHTML =
-          '<p data-testid="racer3d-fallback" style="padding:24px;text-align:center;color:#fff">Sorry, this device can\'t show 3D. 😢</p>';
-        console.error(err);
-        return;
-      }
-      raf = requestAnimationFrame(loop);
-    });
+    import('../three/scene')
+      .then(({ RacerScene: Scene }) => {
+        if (gone) return;
+        const reducedMotion =
+          typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        try {
+          scene = new Scene(mount, ctx.looks, ctx.myIndex, reducedMotion);
+        } catch (err) {
+          showFallback(err);
+          return;
+        }
+        raf = requestAnimationFrame(loop);
+      })
+      .catch((err) => {
+        // A failed chunk load (first visit on flaky wifi, before the service
+        // worker finishes precaching) must not leave a silently blank stage —
+        // this was the app's one unhandled promise rejection.
+        if (!gone) showFallback(err);
+      });
     return () => {
       gone = true;
       cancelAnimationFrame(raf);
