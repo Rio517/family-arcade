@@ -612,10 +612,14 @@ export class ChessScene {
     const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
     // `greyward`: lerp every material toward studio grey by this amount. The
     // TIE arrived nearly black and read as a silhouette under the night
-    // lighting — the family asked for more grey, film-style.
-    const seats: { key: string; url: string; greyward?: number }[] = [
+    // lighting — the family asked for more grey, film-style. `glass` names
+    // the materials that stay black glass instead (the cockpit window).
+    // `fit` overrides the standard 0.68-square footprint. The TIE flies 40%
+    // smaller by the family's call: at full size its panel tips grazed the
+    // board at the bottom of the hover bob (0.045 clearance vs 0.022 bob).
+    const seats: { key: string; url: string; greyward?: number; glass?: string[]; fit?: number }[] = [
       { key: 'wp', url: galaxyWhitePawnUrl },
-      { key: 'bp', url: galaxyBlackPawnUrl, greyward: 0.62 },
+      { key: 'bp', url: galaxyBlackPawnUrl, greyward: 0.62, glass: ['DarkWindow'], fit: 0.41 },
     ];
     for (const seat of seats) {
       try {
@@ -638,6 +642,14 @@ export class ChessScene {
           const grey = new THREE.Color('#9aa2ad');
           for (const m of unique) {
             const std = m as THREE.MeshStandardMaterial;
+            if (seat.glass?.includes(std.name)) {
+              // The cockpit glass stays BLACK glass: deep colour, and the
+              // artist's low roughness kept so the key light draws a glint
+              // on the pane instead of a flat grey disc. The frame around it
+              // is a different material and takes the grey like the hull.
+              if (std.color) std.color.set('#05070c');
+              continue;
+            }
             if (std.color) std.color.lerp(grey, seat.greyward);
             // Metallic surfaces render near-black without an environment map
             // (this scene has none) — no amount of albedo grey fixes that, so
@@ -652,7 +664,7 @@ export class ChessScene {
         const ship = new THREE.Group();
         ship.add(model);
         ship.position.y = 0.34; // the procedural pawn's HOVER height
-        ship.scale.setScalar(0.68 / Math.max(dims.z, 0.0001));
+        ship.scale.setScalar((seat.fit ?? 0.68) / Math.max(dims.z, 0.0001));
         // The artist exports noses toward +z; white flies at -z (at black).
         if (seat.key[0] === 'w') ship.rotation.y = Math.PI;
         const tpl = new THREE.Group();
