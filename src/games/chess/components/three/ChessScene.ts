@@ -150,11 +150,13 @@ export class ChessScene {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enablePan = false;
     this.controls.enableDamping = !opts.reducedMotion;
-    // Close enough to admire one piece, far enough to frame the whole set.
-    // 3.2 stopped feeling close once the TIE went 40% smaller — a piece is
-    // ~0.4 units now, so the floor drops to fill the screen with one ship.
-    // (The camera's near plane is 0.1; nothing clips at this range.)
-    this.controls.minDistance = 1.9;
+    // Close enough to fill the screen with a single ship, far enough to
+    // frame the whole set. The floor has come down twice by family request
+    // (3.2 → 1.9 → 1.1) — at 1.1 a 0.4-unit fighter is a wall-sized model.
+    // The near plane is 0.1, so the carried piece never clips; orbiting this
+    // close can briefly pass through a NEIGHBOURING piece, which is the
+    // accepted trade for getting nose-to-nose with one ship.
+    this.controls.minDistance = 1.1;
     this.controls.maxDistance = 20;
     this.controls.maxPolarAngle = 1.35;
     this.controls.minPolarAngle = 0.12;
