@@ -22,7 +22,6 @@ function playOut(personaIds: string[], seed: number, maxSteps: number) {
   let state: GameState = newGame(
     topo,
     personaIds.map((id, i) => ({ name: personaById(id).name, color: `#00${i}`, bot: id })),
-    rng,
     'random',
   );
   let steps = 0;

@@ -44,7 +44,6 @@ export function RiskPage() {
   const [names, setNames] = useState<string[]>(PLAYER_NAMES.slice());
   // Persona id per seat, or null for a human chair.
   const [seats, setSeats] = useState<(string | null)[]>(Array(6).fill(null));
-  const [mapId, setMapId] = useState(MAPS[0].id);
   const [diceMode, setDiceMode] = useState<DiceMode>('random');
 
   const risk = useRisk();
@@ -74,10 +73,8 @@ export function RiskPage() {
         ? { name: personaById(persona).name, color: PLAYER_COLORS[i], bot: persona }
         : { name: names[i]?.trim() || PLAYER_NAMES[i], color: PLAYER_COLORS[i] };
     });
-    risk.start({ mapId, players, diceMode });
+    risk.start({ mapId: MAPS[0].id, players, diceMode });
   }
-
-  const onPick = risk.pick;
 
   const goMenu = () => navigate('/');
 
@@ -185,17 +182,6 @@ export function RiskPage() {
             </p>
           </div>
 
-          {MAPS.length > 1 && (
-            <div className="panel">
-              <div className="risk-eyebrow">Theatre</div>
-              <div className="risk-count">
-                {MAPS.map((m) => (
-                  <button key={m.id} className={`risk-choice ${mapId === m.id ? 'on' : ''}`} onClick={() => setMapId(m.id)}>{m.name}</button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="panel">
             <div className="risk-eyebrow">Fortunes of war</div>
             <div className="risk-count">
@@ -298,7 +284,7 @@ export function RiskPage() {
           colour, and the plaque re-pops on every hand-off so whose turn it is
           can't be missed — especially during the alternating deploy. */}
       <div className="risk-stage" style={{ ['--pc' as string]: me.color }} data-testid="risk-stage">
-        <RiskBoard map={map} state={state} selected={sel} targets={targets} onPick={onPick} zoom={zoom} />
+        <RiskBoard map={map} state={state} selected={sel} targets={targets} onPick={risk.pick} zoom={zoom} />
 
         {/* A warm low sun over the whole theatre. It multiplies into the
             parchment rather than covering it, so the map's own ink, graticule

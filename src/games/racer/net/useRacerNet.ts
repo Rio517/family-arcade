@@ -27,8 +27,6 @@ import {
 
 export type Role = 'host' | 'guest';
 
-export type RemotePos = RemoteKartPos;
-
 export interface RacerNet {
   status: ConnStatus;
   statusDetail?: string;
@@ -42,7 +40,7 @@ export interface RacerNet {
   host: () => void;
   join: (code: string) => void;
   leave: () => void;
-  sendPos: (p: RemotePos) => void;
+  sendPos: (p: RemoteKartPos) => void;
   /** Host only: broadcast the full world (race start; reopens are automatic). */
   sendWorld: (snap: WorldSnapshot) => void;
   /** Host only: broadcast what changed since the last world message. */
@@ -51,7 +49,7 @@ export interface RacerNet {
   hostRestart: () => void;
   /** Guest: ask the host to run it back. */
   requestRematch: () => void;
-  remotePosRef: React.MutableRefObject<RemotePos | null>;
+  remotePosRef: React.MutableRefObject<RemoteKartPos | null>;
   remoteWorldRef: React.MutableRefObject<MirrorWorld | null>;
 }
 
@@ -79,7 +77,7 @@ export function useRacerNet(opts: {
   const identityRef = useRef(opts);
   identityRef.current = opts;
 
-  const remotePosRef = useRef<RemotePos | null>(null);
+  const remotePosRef = useRef<RemoteKartPos | null>(null);
   const remoteWorldRef = useRef<MirrorWorld | null>(null);
 
   // Host → both: begin (or restart) the race.
@@ -192,7 +190,7 @@ export function useRacerNet(opts: {
     setCode('');
   }, []);
 
-  const sendPos = useCallback((p: RemotePos) => {
+  const sendPos = useCallback((p: RemoteKartPos) => {
     connRef.current?.send({ t: 'pos', ...p });
   }, []);
 

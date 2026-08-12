@@ -64,8 +64,6 @@ export interface GameState {
   phase: Phase;
   /** Armies still to place this reinforce (or setup) phase. */
   toPlace: number;
-  /** Set true once the current player captures a territory this turn. */
-  conqueredThisTurn: boolean;
   /** The most recent capture, while extra armies may still be marched into it
    *  (see `advance`). Settled — null — by the next attack, or phase end.
    *  Optional because saves from before this field exist. */

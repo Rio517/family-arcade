@@ -7,11 +7,10 @@ import type { CSSProperties, ReactNode } from 'react';
 
 interface IconProps {
   size?: number;
-  className?: string;
   style?: CSSProperties;
 }
 
-function svg(children: ReactNode, { size = 24, className, style }: IconProps) {
+function svg(children: ReactNode, { size = 24, style }: IconProps) {
   return (
     <svg
       width={size}
@@ -22,7 +21,6 @@ function svg(children: ReactNode, { size = 24, className, style }: IconProps) {
       strokeWidth={1.7}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={className}
       style={style}
       aria-hidden="true"
       focusable="false"

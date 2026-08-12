@@ -11,8 +11,6 @@ export interface RenderedContinent {
   id: string;
   name: string;
   bonus: number;
-  /** Accent colour used for this continent's territory borders + legend. */
-  color: string;
 }
 
 /** A clip rectangle in map pixel space: [x, y, width, height]. */

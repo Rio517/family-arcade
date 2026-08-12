@@ -175,7 +175,7 @@ export function createGame({
     coins: [],
     nextCoinId: 1,
     target,
-    powers: powers.length ? powers : ALL_POWERS,
+    powers,
     status: 'playing',
     elapsed: 0,
   };

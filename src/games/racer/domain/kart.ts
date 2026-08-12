@@ -65,9 +65,9 @@ export function createKart(x = 0, z = 0, heading = 0): Kart {
   return { x, z, heading, speed: CRUISE_SPEED };
 }
 
-/** Where each kart starts, spread apart so nobody begins on top of a rival. */
-export function startPositions(count: number): Array<{ x: number; z: number; heading: number }> {
-  if (count <= 1) return [{ x: 0, z: 0, heading: 0 }];
+/** Where the two karts start, spread apart so nobody begins on top of a
+ *  rival. (Solo starts centre-stage — the caller handles that case.) */
+export function startPositions(): Array<{ x: number; z: number; heading: number }> {
   return [
     { x: -24, z: 0, heading: 0 },
     { x: 24, z: 0, heading: 0 },
@@ -78,11 +78,6 @@ function approach(value: number, goal: number, maxStep: number): number {
   if (value < goal) return Math.min(goal, value + maxStep);
   if (value > goal) return Math.max(goal, value - maxStep);
   return value;
-}
-
-/** Unit forward vector — handy for the camera and the 3D model. */
-export function forward(kart: Kart): { x: number; z: number } {
-  return { x: Math.sin(kart.heading), z: Math.cos(kart.heading) };
 }
 
 /**

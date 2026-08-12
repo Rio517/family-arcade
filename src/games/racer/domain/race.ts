@@ -128,7 +128,7 @@ export interface RaceCore {
 
 export function createRaceCore(mode: RaceMode, myIndex: number, target: number, rng: Rng): RaceCore {
   const owner = mode === 'solo' || myIndex === 0;
-  const spots = mode === 'solo' ? [{ x: 0, z: 0, heading: 0 }] : startPositions(2);
+  const spots = mode === 'solo' ? [{ x: 0, z: 0, heading: 0 }] : startPositions();
   return {
     mode,
     myIndex,

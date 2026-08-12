@@ -55,7 +55,6 @@ function state(owners: Record<string, [number, number]>, over: Partial<GameState
     current: 0,
     phase: 'attack',
     toPlace: 0,
-    conqueredThisTurn: false,
     winner: null,
     diceMode: 'random',
     diceBag: [],
@@ -72,7 +71,7 @@ function scriptedRng(seq: number[]): () => number {
 
 describe('newGame', () => {
   it('opens with every territory unclaimed and the first general claiming', () => {
-    const g = newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }], scriptedRng([0.5]));
+    const g = newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }]);
     expect(Object.values(g.territories).every((t) => t.owner === -1 && t.armies === 0)).toBe(true);
     expect(hasUnclaimed(g)).toBe(true);
     expect(g.phase).toBe('setup');
@@ -83,11 +82,7 @@ describe('newGame', () => {
   });
 
   it('carries a computer persona through to the player state', () => {
-    const g = newGame(
-      MAP,
-      [{ name: 'A', color: '#f00' }, { name: 'Cadet Pip', color: '#00f', bot: 'cadet' }],
-      scriptedRng([0.5]),
-    );
+    const g = newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'Cadet Pip', color: '#00f', bot: 'cadet' }]);
     expect(g.players[0].bot).toBeUndefined();
     expect(g.players[1].bot).toBe('cadet');
   });
@@ -95,7 +90,7 @@ describe('newGame', () => {
 
 describe('setup — claim then deploy, one army per turn', () => {
   const twoPlayer = () =>
-    newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }], scriptedRng([0.5]));
+    newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }]);
   const armiesOf = (g: GameState, p: number) =>
     territoriesOf(g, p).reduce((s, t) => s + g.territories[t].armies, 0);
   /** Play one legal setup placement for whoever is current. */
@@ -186,7 +181,7 @@ describe('balanced dice', () => {
       { a: [0, 4], b: [0, 1], c: [0, 1], d: [1, 2], e: [1, 1], f: [1, 1] },
       { diceMode: 'balanced', diceBag: [6, 6, 6], defenseBag: [3, 6] },
     );
-    const { result } = resolveAttack(g, MAP, 'a', 'd', scriptedRng([0.5]));
+    const { result } = resolveAttack(g, MAP, 'a', 'd');
     expect(result.attackerDice).toEqual([6, 6, 6]);
     expect(result.defenderDice).toContain(6); // still possible — its bag is untouched
   });
@@ -240,7 +235,6 @@ describe('attack', () => {
     expect(next.territories.d.owner).toBe(0);
     expect(next.territories.d.armies).toBe(2); // min(nAtt=2, from-1=2)
     expect(next.territories.a.armies).toBe(1); // 3 - 2 advanced
-    expect(next.conqueredThisTurn).toBe(true);
   });
 
   it('a tie favours the defender', () => {
@@ -279,7 +273,7 @@ describe('advance — marching extra armies into a fresh conquest', () => {
   const conquered = () =>
     state(
       { a: [0, 5], b: [0, 1], c: [0, 1], d: [0, 3], e: [1, 1], f: [1, 1] },
-      { lastConquest: { from: 'a', to: 'd' }, conqueredThisTurn: true },
+      { lastConquest: { from: 'a', to: 'd' } },
     );
 
   it('moves the chosen extras and settles the conquest', () => {

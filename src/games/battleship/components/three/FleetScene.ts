@@ -163,7 +163,7 @@ export class FleetScene {
    * real models when they land, so a slow decode never blocks the first frame.
    */
   private async loadModels() {
-    await loadShipModels(this.opts.skinColor, this.opts.era ?? 'classic');
+    await loadShipModels(this.opts.era ?? 'classic');
     if (this.disposed) return;
     if (this.lastState) this.update(this.lastState.ships, this.lastState.incoming);
     this.opts.onFleetReady?.();
@@ -191,7 +191,7 @@ export class FleetScene {
 
     for (const ship of ships) {
       // Generated mesh where we have one; procedural hull everywhere else.
-      const model = buildModelShip(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor, true, this.opts.era ?? 'classic');
+      const model = buildModelShip(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor, this.opts.era ?? 'classic');
       const g = model ?? buildWarship(ship.shipId, ship.size, ship.sunk === true, this.opts.skinColor);
       // Marks whether this hull's resources belong to the GLB cache (see the
       // selective disposal above).
