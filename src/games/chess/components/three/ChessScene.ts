@@ -677,6 +677,28 @@ export class ChessScene {
 
         this.modelTemplates.set(seat.key, tpl);
         this.templates.delete(seat.key);
+
+        // The ambient flybys fly the real ships too, once decoded: the
+        // authored hull replaces the procedural stand-in, keeping the engine
+        // glow + speed streak. The flyby convention is nose +z — the artist's
+        // raw orientation — so the pawn's white-side flip doesn't apply here.
+        const flyIdx = seat.key === 'wp' ? 0 : seat.key === 'bp' ? 1 : -1;
+        const fly = flyIdx >= 0 ? this.flyShips[flyIdx] : undefined;
+        if (fly) {
+          for (const child of [...fly.children]) {
+            if (!(child as THREE.Sprite).isSprite) {
+              fly.remove(child);
+              disposeDeep(child); // the stand-in owned its geometry/materials
+            }
+          }
+          const hull = ship.clone(true); // shares the cached geometry — never dispose
+          hull.position.set(0, 0, 0);
+          hull.rotation.y = 0;
+          // Re-fit from the pawn's board footprint to the stand-ins' size.
+          hull.scale.multiplyScalar(0.85 / (seat.fit ?? 0.68));
+          fly.add(hull);
+        }
+
         // Any of these pieces already standing get rebuilt from the model.
         if (this.lastBoard) {
           for (const [sq, g] of [...this.pieces]) {
