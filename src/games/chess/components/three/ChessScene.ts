@@ -13,6 +13,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 // GLB per seat. Bundled imports — the offline PWA never fetches at runtime.
 import galaxyWhitePawnUrl from '@games/chess/assets/galaxy/white-pawn.glb';
 import galaxyBlackPawnUrl from '@games/chess/assets/galaxy/black-pawn.glb';
+import galaxyBlackBishopUrl from '@games/chess/assets/galaxy/black-bishop.glb';
 import { FILES, RANKS, type Board, type Color, type PieceType, type Square } from '@games/chess/domain/types';
 import { disposeDeep } from '@shared/three/disposeDeep';
 import { SCENE_PALETTES, type ScenePalette } from '../chessTheme';
@@ -622,9 +623,21 @@ export class ChessScene {
     // `fit` overrides the standard 0.68-square footprint. The TIE flies 40%
     // smaller by the family's call: at full size its panel tips grazed the
     // board at the bottom of the hover bob (0.045 clearance vs 0.022 bob).
-    const seats: { key: string; url: string; greyward?: number; glass?: string[]; fit?: number }[] = [
+    // `hover` overrides the pawns' 0.34 float — pieces rise with rank, same
+    // ladder the procedural set uses (bishop 0.42 ... king 0.5).
+    const seats: {
+      key: string;
+      url: string;
+      greyward?: number;
+      glass?: string[];
+      fit?: number;
+      hover?: number;
+    }[] = [
       { key: 'wp', url: galaxyWhitePawnUrl },
       { key: 'bp', url: galaxyBlackPawnUrl, greyward: 0.62, glass: ['DarkWindow'], fit: 0.41 },
+      // The imperial landing craft — same dark material family as the TIE,
+      // so the same grey regrade and black cockpit glass apply.
+      { key: 'bb', url: galaxyBlackBishopUrl, greyward: 0.62, glass: ['DarkWindow'], fit: 0.5, hover: 0.42 },
     ];
     for (const seat of seats) {
       try {
@@ -668,7 +681,7 @@ export class ChessScene {
         model.position.sub(box.getCenter(new THREE.Vector3()));
         const ship = new THREE.Group();
         ship.add(model);
-        ship.position.y = 0.34; // the procedural pawn's HOVER height
+        ship.position.y = seat.hover ?? 0.34; // the procedural HOVER ladder
         ship.scale.setScalar((seat.fit ?? 0.68) / Math.max(dims.z, 0.0001));
         // The artist exports noses toward +z; white flies at -z (at black).
         if (seat.key[0] === 'w') ship.rotation.y = Math.PI;
