@@ -14,6 +14,10 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import galaxyWhitePawnUrl from '@games/chess/assets/galaxy/white-pawn.glb';
 import galaxyBlackPawnUrl from '@games/chess/assets/galaxy/black-pawn.glb';
 import galaxyBlackBishopUrl from '@games/chess/assets/galaxy/black-bishop.glb';
+import galaxyBlackKnightUrl from '@games/chess/assets/galaxy/black-knight.glb';
+import galaxyBlackRookUrl from '@games/chess/assets/galaxy/black-rook.glb';
+import galaxyBlackQueenUrl from '@games/chess/assets/galaxy/black-queen.glb';
+import galaxyBlackKingUrl from '@games/chess/assets/galaxy/black-king.glb';
 import { FILES, RANKS, type Board, type Color, type PieceType, type Square } from '@games/chess/domain/types';
 import { disposeDeep } from '@shared/three/disposeDeep';
 import { SCENE_PALETTES, type ScenePalette } from '../chessTheme';
@@ -610,9 +614,11 @@ export class ChessScene {
   }
 
   /**
-   * Decode the galaxy set's authored piece models (the pawns so far — a rebel
-   * X-wing for white, an imperial TIE for black) and swap them in for the
-   * procedural stand-ins already on the board.
+   * Decode the galaxy set's authored piece models and swap them in for the
+   * procedural stand-ins already on the board. White flies a rebel X-wing at
+   * pawn; black fields a whole imperial fleet — TIE pawns, landing-craft
+   * bishops, Vader's TIE at knight, Star Destroyer rooks, the Executor as
+   * queen, and the Death Star itself as king.
    */
   private async loadShipModels() {
     const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
@@ -638,6 +644,20 @@ export class ChessScene {
       // The imperial landing craft — same dark material family as the TIE,
       // so the same grey regrade and black cockpit glass apply.
       { key: 'bb', url: galaxyBlackBishopUrl, greyward: 0.62, glass: ['DarkWindow'], fit: 0.5, hover: 0.42 },
+      // Vader's TIE — dark blue hull, so the pawns' full regrade would wash
+      // out what makes it *his*; a lighter pull keeps it a shade meaner than
+      // the rank-and-file. Its cockpit pane is named per-part, not DarkWindow.
+      { key: 'bn', url: galaxyBlackKnightUrl, greyward: 0.5, glass: ['Sphere04_windowblack'], fit: 0.46, hover: 0.38 },
+      // The capital ships arrive painted imperial grey already — the gentle
+      // pull is mostly for the metalness/roughness clamps riding along (bare
+      // metal renders near-black in this envmap-less scene).
+      // The capital ships are daggers — the Executor famously eleven times
+      // longer than wide — so square-sized lengths render them as slivers.
+      // They overhang their square along the file instead (they fly with
+      // their noses at the enemy, and everything nearby hovers lower).
+      { key: 'br', url: galaxyBlackRookUrl, greyward: 0.4, fit: 0.72, hover: 0.44 },
+      { key: 'bq', url: galaxyBlackQueenUrl, greyward: 0.4, fit: 1.05, hover: 0.5 },
+      { key: 'bk', url: galaxyBlackKingUrl, greyward: 0.4, fit: 0.5, hover: 0.5 },
     ];
     for (const seat of seats) {
       try {
