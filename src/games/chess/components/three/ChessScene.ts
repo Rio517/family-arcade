@@ -638,6 +638,9 @@ export class ChessScene {
       glass?: string[];
       fit?: number;
       hover?: number;
+      /** Yaw correction for ships exported nose-backwards (the family caught
+       *  the rook and Vader's TIE flying stern-first at the rebels). */
+      face?: number;
     }[] = [
       { key: 'wp', url: galaxyWhitePawnUrl },
       { key: 'bp', url: galaxyBlackPawnUrl, greyward: 0.62, glass: ['DarkWindow'], fit: 0.41 },
@@ -647,15 +650,17 @@ export class ChessScene {
       // Vader's TIE — dark blue hull, so the pawns' full regrade would wash
       // out what makes it *his*; a lighter pull keeps it a shade meaner than
       // the rank-and-file. Its cockpit pane is named per-part, not DarkWindow.
-      { key: 'bn', url: galaxyBlackKnightUrl, greyward: 0.5, glass: ['Sphere04_windowblack'], fit: 0.46, hover: 0.38 },
-      // The capital ships arrive painted imperial grey already — the gentle
-      // pull is mostly for the metalness/roughness clamps riding along (bare
-      // metal renders near-black in this envmap-less scene).
+      // Vader's TIE exports nose at -z (cockpit-window centroid z=-0.83) —
+      // `face` spins it to fly at the rebels like everyone else.
+      { key: 'bn', url: galaxyBlackKnightUrl, greyward: 0.5, glass: ['Sphere04_windowblack'], fit: 0.46, hover: 0.38, face: Math.PI },
       // The capital ships are daggers — the Executor famously eleven times
       // longer than wide — so square-sized lengths render them as slivers.
       // They overhang their square along the file instead (they fly with
       // their noses at the enemy, and everything nearby hovers lower).
-      { key: 'br', url: galaxyBlackRookUrl, greyward: 0.4, fit: 0.72, hover: 0.44 },
+      // The Star Destroyer also exports backwards (wide stern at +z), and
+      // its hull read too dark on the family's screens — it takes the same
+      // regrade as the approved TIE pawns now, not the gentler capital pull.
+      { key: 'br', url: galaxyBlackRookUrl, greyward: 0.62, fit: 0.72, hover: 0.44, face: Math.PI },
       { key: 'bq', url: galaxyBlackQueenUrl, greyward: 0.4, fit: 1.05, hover: 0.5 },
       { key: 'bk', url: galaxyBlackKingUrl, greyward: 0.4, fit: 0.5, hover: 0.5 },
     ];
@@ -668,6 +673,9 @@ export class ChessScene {
         // square, length along z with the nose flying at the enemy, sized to
         // the stand-in's footprint, hovering at the pawns' height.
         const model = gltf.scene;
+        // Yaw correction happens on the inner model, before the fit measures
+        // the bounding box, so it survives the flyby's outer-rotation reset.
+        if (seat.face) model.rotation.y = seat.face;
         if (seat.greyward) {
           // Collect unique materials first — panels share materials between
           // meshes, and lerping per-mesh would shift shared ones twice.
