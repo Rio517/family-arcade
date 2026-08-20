@@ -688,6 +688,10 @@ export class ChessScene {
           const grey = new THREE.Color('#9aa2ad');
           for (const m of unique) {
             const std = m as THREE.MeshStandardMaterial;
+            // The pipeline bakes black interior baffles into leaky hulls so
+            // plate gaps read as shadow — greying them would light the gaps
+            // back up from inside.
+            if (std.name === 'GapBaffle') continue;
             if (seat.glass?.includes(std.name)) {
               // The cockpit glass stays BLACK glass: deep colour, and the
               // artist's low roughness kept so the key light draws a glint
