@@ -13,6 +13,10 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 // GLB per seat. Bundled imports — the offline PWA never fetches at runtime.
 import galaxyWhitePawnUrl from '@games/chess/assets/galaxy/white-pawn.glb';
 import galaxyWhiteQueenUrl from '@games/chess/assets/galaxy/white-queen.glb';
+import galaxyWhiteKnightUrl from '@games/chess/assets/galaxy/white-knight.glb';
+import galaxyWhiteBishopUrl from '@games/chess/assets/galaxy/white-bishop.glb';
+import galaxyWhiteRookUrl from '@games/chess/assets/galaxy/white-rook.glb';
+import galaxyWhiteKingUrl from '@games/chess/assets/galaxy/white-king.glb';
 import galaxyBlackPawnUrl from '@games/chess/assets/galaxy/black-pawn.glb';
 import galaxyBlackBishopUrl from '@games/chess/assets/galaxy/black-bishop.glb';
 import galaxyBlackKnightUrl from '@games/chess/assets/galaxy/black-knight.glb';
@@ -649,6 +653,13 @@ export class ChessScene {
       // First codex export with the nose already at +z: the standard
       // white-side flip is all she needs.
       { key: 'wq', url: galaxyWhiteQueenUrl, fit: 0.85, hover: 0.5 },
+      // The rest of the rebel fleet, one drop: all textured, watertight,
+      // noses at +z, engines glowing — every convention landed, so these
+      // four need nothing but a footprint and a hover height.
+      { key: 'wn', url: galaxyWhiteKnightUrl, fit: 0.62, hover: 0.38 },
+      { key: 'wb', url: galaxyWhiteBishopUrl, fit: 0.68, hover: 0.42 },
+      { key: 'wr', url: galaxyWhiteRookUrl, fit: 0.85, hover: 0.44 },
+      { key: 'wk', url: galaxyWhiteKingUrl, fit: 1.0, hover: 0.5 },
       { key: 'bp', url: galaxyBlackPawnUrl, greyward: 0.62, glass: ['DarkWindow'], fit: 0.41 },
       // The imperial landing craft — same dark material family as the TIE,
       // so the same grey regrade and black cockpit glass apply.
