@@ -362,9 +362,13 @@ describe('two-player racer: reconnect re-sync', () => {
     'a channel reopen after a lost "race over" packet re-syncs the guest with the finished world',
     async () => {
       const { host, guest } = connectClients();
-      await waitFor(() => expect(bus.wire.filter((w) => w.msg.t === 'go')).toHaveLength(1));
+      // Generous ceilings: both waits gate on each client's lazy scene import
+      // resolving, and under full-suite CPU load that occasionally outlives
+      // testing-library's 1s default — this test flaked three times in a week
+      // on exactly the frames.length wait before the ceilings were raised.
+      await waitFor(() => expect(bus.wire.filter((w) => w.msg.t === 'go')).toHaveLength(1), { timeout: 8000 });
       // Both race loops are live (the mocked scene builds fine here).
-      await waitFor(() => expect(frames.length).toBeGreaterThanOrEqual(2));
+      await waitFor(() => expect(frames.length).toBeGreaterThanOrEqual(2), { timeout: 8000 });
 
       // Weak wifi: the host's final "race over" message never arrives.
       bus.drop = (msg) => (msg.t === 'world' || msg.t === 'worldDelta') && msg.status === 'over';
