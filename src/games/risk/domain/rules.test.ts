@@ -76,9 +76,9 @@ describe('newGame', () => {
     expect(hasUnclaimed(g)).toBe(true);
     expect(g.phase).toBe('setup');
     expect(g.current).toBe(0);
-    // 2 players on 6 lands → your share of the map (3) plus 8 to stack = 11.
-    expect(g.toPlace).toBe(11);
-    expect(deployReserve(g, 1)).toBe(11);
+    // 2 players on 6 lands → your share of the map (3) plus 15 to stack = 18.
+    expect(g.toPlace).toBe(18);
+    expect(deployReserve(g, 1)).toBe(18);
   });
 
   it('carries a computer persona through to the player state', () => {
@@ -106,8 +106,8 @@ describe('setup — claim then deploy, one army per turn', () => {
     g = placeArmy(g, 'a', MAP);
     expect(g.territories.a).toEqual({ owner: 0, armies: 1 });
     expect(g.current).toBe(1); // play passed straight on
-    expect(g.toPlace).toBe(11); // player 1's whole reserve
-    expect(deployReserve(g, 0)).toBe(10);
+    expect(g.toPlace).toBe(18); // player 1's whole reserve
+    expect(deployReserve(g, 0)).toBe(17);
 
     // Player 1 cannot steal a claimed land during the claim stage…
     expect(placeArmy(g, 'a', MAP)).toBe(g);
@@ -134,8 +134,8 @@ describe('setup — claim then deploy, one army per turn', () => {
     for (let guard = 0; guard < 200 && g.phase === 'setup'; guard++) g = playOne(g);
     expect(g.phase).toBe('reinforce');
     expect(g.current).toBe(0);
-    expect(armiesOf(g, 0)).toBe(11);
-    expect(armiesOf(g, 1)).toBe(11);
+    expect(armiesOf(g, 0)).toBe(18);
+    expect(armiesOf(g, 1)).toBe(18);
     expect(g.toPlace).toBeGreaterThanOrEqual(3);
   });
 });

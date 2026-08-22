@@ -12,7 +12,7 @@ import { clearRiskGame, loadRiskGame, type StoredRisk } from '../storage/riskPer
 // Persona metadata only — the bot BRAIN stays behind the dynamic import in
 // useRisk, so human-only campaigns never download it.
 import { personaById, RISK_PERSONAS } from '../domain/bots/personas';
-import { BotIcon, PersonIcon, ResumeIcon } from '@shared/ui/icons';
+import { BotIcon, FullscreenExitIcon, PersonIcon, ResumeIcon } from '@shared/ui/icons';
 import type { BattleResult, DiceMode, GameState } from '../domain/types';
 
 // Heraldic tinctures — a general's banner. Kept bright enough that the dark
@@ -44,7 +44,9 @@ export function RiskPage() {
   const [names, setNames] = useState<string[]>(PLAYER_NAMES.slice());
   // Persona id per seat, or null for a human chair.
   const [seats, setSeats] = useState<(string | null)[]>(Array(6).fill(null));
-  const [diceMode, setDiceMode] = useState<DiceMode>('random');
+  // Balanced by default — the family prefers luck that evens out; pure random
+  // stays one tap away for anyone chasing glorious upsets.
+  const [diceMode, setDiceMode] = useState<DiceMode>('balanced');
 
   const risk = useRisk();
   const { map, state, sel, dest, moveCount, battle, targets } = risk;
@@ -294,7 +296,11 @@ export function RiskPage() {
         <div className="risk-zoomctl">
           <button onClick={zoom.zoomIn} disabled={!zoom.canZoomIn} aria-label="Zoom in" data-testid="risk-zoom-in">+</button>
           <button onClick={zoom.zoomOut} disabled={!zoom.canZoomOut} aria-label="Zoom out" data-testid="risk-zoom-out">−</button>
-          <button onClick={zoom.reset} disabled={zoom.isDefault} aria-label="Show the whole map" data-testid="risk-zoom-reset">⤢</button>
+          {/* SVG, not the ⤢ glyph — that codepoint is missing from several
+              family-tablet fonts and rendered as a tofu box mid-game. */}
+          <button onClick={zoom.reset} disabled={zoom.isDefault} aria-label="Show the whole map" data-testid="risk-zoom-reset">
+            <FullscreenExitIcon size={18} />
+          </button>
         </div>
 
         {/* The plaque wears the active general's colour — since the ring around

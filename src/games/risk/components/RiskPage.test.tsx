@@ -93,15 +93,15 @@ describe('<RiskPage>', () => {
     expect(localStorage.getItem('risk-campaign-v1')).toBeNull();
   });
 
-  it('offers wild vs balanced dice, defaulting to wild', () => {
+  it('offers wild vs balanced dice, defaulting to balanced', () => {
     renderPage();
-    expect(screen.getByTestId('dice-random').className).toContain('on');
-
-    fireEvent.click(screen.getByTestId('dice-balanced'));
     expect(screen.getByTestId('dice-balanced').className).toContain('on');
-    expect(screen.getByTestId('dice-random').className).not.toContain('on');
 
-    // A balanced game still starts and plays normally.
+    fireEvent.click(screen.getByTestId('dice-random'));
+    expect(screen.getByTestId('dice-random').className).toContain('on');
+    expect(screen.getByTestId('dice-balanced').className).not.toContain('on');
+
+    // A wild-dice game still starts and plays normally.
     fireEvent.click(screen.getByTestId('risk-start'));
     expect(turnText()).toMatch(/picks a land/i);
   });
@@ -230,6 +230,9 @@ describe('<RiskPage>', () => {
 
     renderPage();
     fireEvent.click(screen.getByTestId('count-2'));
+    // Pin wild dice: balanced is the default now, and its bag shuffles would
+    // consume the loaded sequence and drift the split.
+    fireEvent.click(screen.getByTestId('dice-random'));
     fireEvent.click(screen.getByTestId('risk-start'));
     completeDeploy();
 
