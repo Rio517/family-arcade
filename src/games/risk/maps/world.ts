@@ -94,19 +94,29 @@ const SPLITS: SplitDef[] = [
     dividers: [[650, 0, 650, 160], [745, 0, 745, 160], [835, 0, 835, 160]],
   },
   {
-    baseIso: '840', continentId: 'na', // USA → Western / Eastern
+    baseIso: '840', continentId: 'na', // USA → Alaska / Western / Eastern
     subs: [
-      { id: 'westernus', name: 'Western US', rects: [[0, 0, 270, 260]], labelLon: -114, labelLat: 42 },
-      { id: 'easternus', name: 'Eastern US', rects: [[270, 0, 150, 260]], labelLon: -84, labelLat: 39 },
+      // Alaska is everything USA above y=97: the Aleutians bottom out at y≈91
+      // and the lower 48 start at y≈99 (the 49th parallel), so the horizontal
+      // cut splits them cleanly with margin on both sides.
+      { id: 'alaska', name: 'Alaska', rects: [[0, 0, 240, 97]], labelLon: -152, labelLat: 64 },
+      // The Western/Eastern divider sits at x=285 to line up with Canada's
+      // first divider — misaligned bands (270 vs 285) used to make Eastern US
+      // and Western Canada touch diagonally in the 15px overlap strip.
+      { id: 'westernus', name: 'Western US', rects: [[0, 97, 285, 163]], labelLon: -114, labelLat: 42 },
+      { id: 'easternus', name: 'Eastern US', rects: [[285, 0, 135, 260]], labelLon: -84, labelLat: 39 },
     ],
-    dividers: [[270, 0, 270, 260]],
+    dividers: [[285, 97, 285, 260]],
   },
   {
     baseIso: '124', continentId: 'na', // Canada → Western / Central / Eastern
     subs: [
       { id: 'westerncanada', name: 'Western Canada', rects: [[0, 0, 285, 140]], labelLon: -119, labelLat: 62 },
       { id: 'centralcanada', name: 'Central Canada', rects: [[285, 0, 62, 140]], labelLon: -92, labelLat: 57 },
-      { id: 'easterncanada', name: 'Eastern Canada', rects: [[347, 0, 170, 140]], labelLon: -71, labelLat: 52 },
+      // Label out in Labrador: -71°E projected to x=336, inside CENTRAL
+      // Canada's band — the family caught the army number sitting on the
+      // neighbouring province.
+      { id: 'easterncanada', name: 'Eastern Canada', rects: [[347, 0, 170, 140]], labelLon: -63, labelLat: 53 },
     ],
     dividers: [[285, 0, 285, 140], [347, 0, 347, 140]],
   },
@@ -123,28 +133,30 @@ const SPLITS: SplitDef[] = [
 /** Undirected borders — land where regions touch, plus classic sea routes. */
 const EDGES: [string, string][] = [
   // North America
+  ['alaska', 'westerncanada'], ['alaska', 'kamchatka'],
   ['westerncanada', 'centralcanada'], ['centralcanada', 'easterncanada'], ['easterncanada', 'greenland'],
   ['westerncanada', 'westernus'], ['centralcanada', 'westernus'], ['centralcanada', 'easternus'], ['easterncanada', 'easternus'],
   ['westernus', 'easternus'], ['westernus', 'mexico'], ['easternus', 'mexico'], ['easternus', 'caribbean'],
-  ['westernus', 'kamchatka'], // Alaska ↔ Kamchatka
   ['mexico', 'centralamerica'], ['mexico', 'caribbean'], ['centralamerica', 'caribbean'],
   ['centralamerica', 'colombia'], ['caribbean', 'venezuela'], ['greenland', 'britain'],
   // South America
-  ['colombia', 'venezuela'], ['colombia', 'peru'], ['venezuela', 'brazil'],
+  ['colombia', 'venezuela'], ['colombia', 'peru'], ['colombia', 'brazil'], ['venezuela', 'brazil'],
   ['peru', 'brazil'], ['peru', 'argentina'], ['brazil', 'argentina'], ['brazil', 'westafrica'],
   // Europe
   ['britain', 'westeurope'], ['britain', 'scandinavia'], ['britain', 'centraleurope'],
-  ['scandinavia', 'centraleurope'], ['scandinavia', 'easteurope'],
+  ['scandinavia', 'centraleurope'], ['scandinavia', 'easteurope'], ['scandinavia', 'ural'],
   ['westeurope', 'centraleurope'], ['westeurope', 'southeurope'], ['westeurope', 'northafrica'],
   ['centraleurope', 'southeurope'], ['centraleurope', 'easteurope'],
-  ['southeurope', 'easteurope'], ['southeurope', 'egypt'], ['southeurope', 'middleeast'],
+  ['southeurope', 'easteurope'], ['southeurope', 'egypt'], ['southeurope', 'middleeast'], ['southeurope', 'northafrica'],
   ['easteurope', 'ural'], ['easteurope', 'middleeast'],
   // Africa
   ['northafrica', 'westafrica'], ['northafrica', 'egypt'], ['egypt', 'eastafrica'], ['egypt', 'middleeast'],
+  ['egypt', 'westafrica'], ['egypt', 'centralafrica'],
   ['westafrica', 'centralafrica'], ['westafrica', 'eastafrica'], ['eastafrica', 'centralafrica'],
   ['eastafrica', 'southafrica'], ['eastafrica', 'middleeast'], ['centralafrica', 'southafrica'],
   // Asia — Russia
-  ['ural', 'centralasia'], ['ural', 'siberia'], ['siberia', 'yakutsk'], ['yakutsk', 'kamchatka'],
+  ['ural', 'centralasia'], ['ural', 'siberia'], ['ural', 'middleeast'], ['siberia', 'yakutsk'], ['yakutsk', 'kamchatka'],
+  ['yakutsk', 'china'],
   ['siberia', 'centralasia'], ['siberia', 'mongolia'], ['siberia', 'china'],
   ['yakutsk', 'mongolia'], ['kamchatka', 'mongolia'], ['kamchatka', 'japan'],
   // Asia — rest
@@ -168,7 +180,8 @@ const SEA_ROUTES: [string, string][] = [
   ['southeurope', 'egypt'],
   ['easternus', 'caribbean'],
   ['caribbean', 'venezuela'],
-  ['westernus', 'kamchatka'],
+  ['southeurope', 'northafrica'],
+  ['alaska', 'kamchatka'],
   ['kamchatka', 'japan'],
   ['china', 'japan'],
   ['seasia', 'japan'],
