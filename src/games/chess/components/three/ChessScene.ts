@@ -12,6 +12,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 // The galaxy set's authored hero pieces (the family's generated ships), one
 // GLB per seat. Bundled imports — the offline PWA never fetches at runtime.
 import galaxyWhitePawnUrl from '@games/chess/assets/galaxy/white-pawn.glb';
+import galaxyWhiteQueenUrl from '@games/chess/assets/galaxy/white-queen.glb';
 import galaxyBlackPawnUrl from '@games/chess/assets/galaxy/black-pawn.glb';
 import galaxyBlackBishopUrl from '@games/chess/assets/galaxy/black-bishop.glb';
 import galaxyBlackKnightUrl from '@games/chess/assets/galaxy/black-knight.glb';
@@ -643,6 +644,11 @@ export class ChessScene {
       face?: number;
     }[] = [
       { key: 'wp', url: galaxyWhitePawnUrl },
+      // The white queen is the fastest hunk of junk in the galaxy — fully
+      // textured and watertight from the artist, so no regrade, no baffle.
+      // First codex export with the nose already at +z: the standard
+      // white-side flip is all she needs.
+      { key: 'wq', url: galaxyWhiteQueenUrl, fit: 0.85, hover: 0.5 },
       { key: 'bp', url: galaxyBlackPawnUrl, greyward: 0.62, glass: ['DarkWindow'], fit: 0.41 },
       // The imperial landing craft — same dark material family as the TIE,
       // so the same grey regrade and black cockpit glass apply.
