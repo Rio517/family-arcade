@@ -23,14 +23,16 @@ import type {
 } from './types';
 
 /**
- * Starting allotment: your share of the map plus eight armies to stack. The
- * classic counts (35 a head at three players) made the opening a hundred-tap
- * slog before anyone got to attack — the family called it out. Eight extras
- * keeps the deploy stage short and the same length at every player count.
+ * Starting allotment: your share of the map plus fifteen armies to stack.
+ * The classic counts (35 a head at three players) made the opening a
+ * hundred-tap slog — the family called it out and we went to eight extras;
+ * a season later they asked for meatier opening stacks ("enough to fill the
+ * board, then fifteen more"). Fifteen it is, still the same length at every
+ * player count.
  */
 function startingArmies(state: GameState): number {
   const lands = Object.keys(state.territories).length;
-  return Math.ceil(lands / state.players.length) + 8;
+  return Math.ceil(lands / state.players.length) + 15;
 }
 
 export interface NewPlayer {
