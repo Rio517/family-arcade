@@ -148,9 +148,21 @@
 }
 /* These widths are screen pixels too, since .risk-terr sets non-scaling-stroke. */
 .risk-terr.target { stroke: #f2e8ca !important; stroke-width: 1.6; fill-opacity: 1; }
+/* The chosen land must read from across the table: a thick brass boundary
+   with a warm lantern glow, and (motion permitting) surveyor's marching
+   ants crawling the border. Reduced-motion generals still get the glow. */
 .risk-terr.sel {
-  stroke: var(--brass-hi) !important; stroke-width: 2.6; fill-opacity: 1;
+  stroke: var(--brass-hi) !important; stroke-width: 3.2; fill-opacity: 1;
+  filter: drop-shadow(0 0 5px rgba(246, 207, 125, 0.9));
 }
+/* Dash lengths are screen px (non-scaling-stroke), so the ants march at the
+   same pace at any zoom. steps(6) over 1.3s ≈ 4.6 repaints/s — the house
+   idle-animation budget — and they halt while a pan gesture is in flight. */
+@media (prefers-reduced-motion: no-preference) {
+  .risk-terr.sel { stroke-dasharray: 8 5; animation: risk-sel-march 1.3s steps(6) infinite; }
+}
+.risk-svg.panning .risk-terr.sel { animation-play-state: paused; }
+@keyframes risk-sel-march { to { stroke-dashoffset: -13; } }
 /* Territories are keyboard-operable buttons: focus lights the land itself
    with a brass stroke and glow. No `outline` — on an SVG path the browser
    draws that as the bounding BOX, a giant rounded rectangle over the map. */

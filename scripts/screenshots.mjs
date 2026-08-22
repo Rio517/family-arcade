@@ -210,6 +210,16 @@ async function playRiskToAttack(page) {
       }
     }
   });
+  // Leave a land selected, so the shot shows the brass marching-ants
+  // highlight and its glowing targets — the state a mid-attack table sees.
+  await page.evaluate(async () => {
+    const tick = () => new Promise((r) => setTimeout(r, 0));
+    for (const tk of document.querySelectorAll('[data-testid^="token-"]')) {
+      tk.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await tick();
+      if (document.querySelector('.risk-terr.sel')) return;
+    }
+  });
   await page.getByTestId('risk-turn').waitFor();
   // The plaque drops in on a spring; let it land.
   await page.waitForTimeout(700);
