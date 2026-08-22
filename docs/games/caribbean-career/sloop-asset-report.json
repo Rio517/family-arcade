@@ -1,0 +1,38 @@
+{
+  "asset": "Caribbean Career Sloop POC",
+  "generator": "tools/caribbean-sloop/build_sloop.py",
+  "blender_version": "5.2.0 LTS",
+  "design_basis": "Original stylized small Caribbean sailing craft; no external mesh or texture inputs.",
+  "dimensions_m": {
+    "beam_x": 5.039,
+    "length_y": 14.997,
+    "height_z": 14.456
+  },
+  "object_count": 79,
+  "mesh_count": 72,
+  "triangles": 2005,
+  "vertices_before_modifiers": 1166,
+  "materials": 9,
+  "textures": 0,
+  "raw_glb_bytes": 170068,
+  "optimized_glb_bytes": 56864,
+  "optimized_nodes": 79,
+  "optimized_triangles": 2005,
+  "optimized_materials": 9,
+  "semantic_nodes": [
+    "Hull",
+    "Rudder",
+    "Sail_Main",
+    "Sail_Jib",
+    "Sail_Mark_Port",
+    "Sail_Mark_Starboard",
+    "Gun_Port_1",
+    "Gun_Port_2",
+    "Gun_Port_3",
+    "Gun_Starboard_1",
+    "Gun_Starboard_2",
+    "Gun_Starboard_3",
+    "Rig_Backstay",
+    "Rig_Forestay"
+  ]
+}
