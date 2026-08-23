@@ -18,6 +18,7 @@
     "knip": "knip",
     "check": "npm run typecheck && npm run lint && npm run knip",
     "shots": "node scripts/screenshots.mjs",
+    "caribbean:naval-check": "node scripts/caribbean-naval-check.mjs",
     "glb": "node scripts/optimize-glb.mjs",
     "risk:drag": "node scripts/risk-drag-check.mjs"
   },

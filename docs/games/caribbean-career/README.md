@@ -49,6 +49,28 @@ offline-capable—not a browser novelty.
 | [poc-review.md](./poc-review.md) | Evidence, measurements, self-review findings, and POC recommendation |
 | [production-roadmap.md](./production-roadmap.md) | Extremely structured, phase-by-phase implementation plan based on measured POC results |
 | [five-minute vertical-slice plan](../../superpowers/plans/2026-08-23-caribbean-five-minute-vertical-slice.md) | Execution-ready TDD plan for the first production loop and its stop/go gate |
+| [naval-battle-playtest.md](./naval-battle-playtest.md) | Honest three-session and target-iPad evidence ledger with exact thresholds |
+| [naval-battle-review.md](./naval-battle-review.md) | Current production naval milestone decision and implementation boundary |
+
+## Production naval evidence
+
+Run `npm run caribbean:naval-check` to build the harness-only production entry,
+serve `dist` on an OS-assigned local port, drive the Battle Lab in Chromium,
+and write changed evidence bytes only. The current evidence set includes the
+[`technical metrics`](../../screenshots/caribbean-naval/metrics.json),
+[`tablet briefing`](../../screenshots/caribbean-naval/briefing-tablet.png),
+[`tablet battle`](../../screenshots/caribbean-naval/battle-tablet-landscape.png),
+[`desktop battle`](../../screenshots/caribbean-naval/battle-desktop.png),
+[`phone battle`](../../screenshots/caribbean-naval/battle-phone.png),
+[`boarding-ready result`](../../screenshots/caribbean-naval/boarding-ready-result.png),
+[`phone HTML fallback`](../../screenshots/caribbean-naval/fallback-phone.png),
+and [`physical broadside evidence`](../../screenshots/caribbean-naval/broadside-handedness.png).
+
+The engineering gate currently passes, but the milestone remains
+`revise-battle`: human comprehension/rematch sessions and target-iPad Safari,
+touch, offline, thermal, and sustained-performance observations are incomplete.
+That boundary permits continued port/career work only on the isolated branch;
+it is not a production-ready or merge claim.
 
 ## Decision rule
 

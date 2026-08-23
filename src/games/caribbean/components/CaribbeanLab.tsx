@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RadarIcon, ShipIcon, TargetIcon } from '@shared/ui/icons';
 
 import { BATTLE_LAB_INPUT } from '../content/naval';
+import type { NavalBattleInput } from '../domain/naval/types';
 import type { NavalSessionView } from '../state/naval/NavalSession';
 import { useNavalSession } from '../state/naval/useNavalSession';
 import { NavalBattlePage, type NavalSceneFactory } from './battle/NavalBattlePage';
@@ -10,6 +11,7 @@ import '../styles/battle.css';
 
 export interface CaribbeanLabProps {
   sceneFactory?: NavalSceneFactory | null;
+  battleInput?: NavalBattleInput;
   onSessionReady?(session: NavalSessionView): void;
 }
 
@@ -38,8 +40,8 @@ function BearingThesis() {
   );
 }
 
-function BattleSession({ sceneFactory, onSessionReady }: CaribbeanLabProps) {
-  const session = useNavalSession(BATTLE_LAB_INPUT);
+function BattleSession({ sceneFactory, battleInput = BATTLE_LAB_INPUT, onSessionReady }: CaribbeanLabProps) {
+  const session = useNavalSession(battleInput);
   const deliveredSession = useRef(false);
 
   useEffect(() => {
@@ -51,7 +53,7 @@ function BattleSession({ sceneFactory, onSessionReady }: CaribbeanLabProps) {
   return <NavalBattlePage session={session} sceneFactory={sceneFactory} />;
 }
 
-export function CaribbeanLab({ sceneFactory, onSessionReady }: CaribbeanLabProps) {
+export function CaribbeanLab({ sceneFactory, battleInput, onSessionReady }: CaribbeanLabProps) {
   const [phase, setPhase] = useState<LabPhase>('decision');
   const briefingHeading = useRef<HTMLHeadingElement>(null);
 
@@ -60,7 +62,7 @@ export function CaribbeanLab({ sceneFactory, onSessionReady }: CaribbeanLabProps
   }, [phase]);
 
   if (phase === 'battle') {
-    return <BattleSession sceneFactory={sceneFactory} onSessionReady={onSessionReady} />;
+    return <BattleSession sceneFactory={sceneFactory} battleInput={battleInput} onSessionReady={onSessionReady} />;
   }
 
   return (

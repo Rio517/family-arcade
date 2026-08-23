@@ -8,7 +8,7 @@ import type {
   NavalSceneOptions,
   NavalSensorySettings,
 } from '../../components/battle/NavalViewport';
-import { broadsideVector } from '../../domain/naval/geometry';
+import { broadsideMuzzleOrigin, broadsideVector } from '../../domain/naval/geometry';
 import type {
   Damage,
   NavalEvent,
@@ -465,8 +465,9 @@ export class NavalScene implements NavalSceneAdapter {
       const ship = state.ships[event.shipId];
       const target = state.ships[event.targetShipId];
       const side = broadsideVector(ship.heading, event.result.side);
-      const originX = ship.position.x + side.x * 3.1;
-      const originZ = ship.position.z + side.z * 3.1;
+      const muzzleOrigin = broadsideMuzzleOrigin(ship.position, ship.heading, event.result.side);
+      const originX = muzzleOrigin.x;
+      const originZ = muzzleOrigin.z;
       const firingVisual = this.#ships[event.shipId];
       if (firingVisual && !this.#sensory.reducedMotion) {
         firingVisual.recoil = 1;

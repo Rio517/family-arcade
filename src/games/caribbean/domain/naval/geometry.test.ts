@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { bearingSide, broadsideVector, normalizeAngle, sailingEfficiency } from './geometry';
+import { bearingSide, broadsideMuzzleOrigin, broadsideVector, normalizeAngle, sailingEfficiency } from './geometry';
 import type { Point } from './types';
 
 function expectPoint(actual: Point, expected: Point): void {
@@ -17,6 +17,11 @@ describe('naval geometry', () => {
   ])('maps physical broadsides at heading %d', (heading, port, starboard) => {
     expectPoint(broadsideVector(heading, 'port'), port);
     expectPoint(broadsideVector(heading, 'starboard'), starboard);
+  });
+
+  it('places renderer and harness muzzle evidence on the same physical broadside', () => {
+    expectPoint(broadsideMuzzleOrigin({ x: 4, z: -3 }, 0, 'port'), { x: 7.1, z: -3 });
+    expectPoint(broadsideMuzzleOrigin({ x: 4, z: -3 }, 0, 'starboard'), { x: 0.9, z: -3 });
   });
 
   it('normalizes angles into the half-open canonical range', () => {

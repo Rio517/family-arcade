@@ -31,6 +31,18 @@ export function broadsideVector(heading: number, side: Broadside): Point {
   });
 }
 
+export function broadsideMuzzleOrigin(
+  position: Point,
+  heading: number,
+  side: Broadside,
+): Point {
+  const vector = broadsideVector(heading, side);
+  return canonicalPoint({
+    x: position.x + vector.x * 3.1,
+    z: position.z + vector.z * 3.1,
+  });
+}
+
 export function bearingSide(origin: Point, heading: number, target: Point): Broadside | null {
   const x = target.x - origin.x;
   const z = target.z - origin.z;

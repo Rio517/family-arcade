@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { BATTLE_LAB_INPUT } from '../content/naval';
 import { CaribbeanLab } from './CaribbeanLab';
 
 describe('Caribbean Battle Lab flow', () => {
@@ -48,5 +49,24 @@ describe('Caribbean Battle Lab flow', () => {
 
     await waitFor(() => expect(onSessionReady).toHaveBeenCalledTimes(1));
     expect(onSessionReady.mock.calls[0][0].getSnapshot().state.tick).toBeTypeOf('number');
+  });
+
+  it('starts from a supplied serialized harness input without changing the normal default', async () => {
+    const onSessionReady = vi.fn();
+    const input = structuredClone(BATTLE_LAB_INPUT);
+    input.battleId = 'harness-port-evidence';
+    input.seed = 8_023;
+    input.player.position = { x: 0, z: 0 };
+    input.opponent.position = { x: 20, z: 0 };
+
+    render(<CaribbeanLab sceneFactory={null} battleInput={input} onSessionReady={onSessionReady} />);
+    fireEvent.click(screen.getByTestId('lab-start-naval'));
+    fireEvent.click(screen.getByTestId('naval-enter-battle'));
+
+    await waitFor(() => expect(onSessionReady).toHaveBeenCalledTimes(1));
+    const state = onSessionReady.mock.calls[0][0].getSnapshot().state;
+    expect(state.input.battleId).toBe('harness-port-evidence');
+    expect(state.input.seed).toBe(8_023);
+    expect(state.ships.opponent.position).toEqual({ x: 20, z: 0 });
   });
 });

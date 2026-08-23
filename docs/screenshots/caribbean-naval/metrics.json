@@ -1,0 +1,423 @@
+{
+  "source": {
+    "baseCommit": "dc799912354546a740822545e384b78ed0996932",
+    "baseCommitRole": "pre-Task-8 HEAD at evidence capture; the Task 8 tree below identifies the tested implementation",
+    "worktreeDirtyAtCapture": true,
+    "task8TreeSha256": "f7e7a30b1a1d78630b2931fc0f9cb177a8383c752709594cbf2c3334828ae5f4",
+    "task8TreeFiles": [
+      "package.json",
+      "scripts/caribbean-naval-check.mjs",
+      "scripts/lib/caribbean-naval-evidence.mjs",
+      "scripts/lib/caribbean-naval-evidence.test.mjs",
+      "scripts/lib/caribbean-naval-scenario.test.mjs",
+      "src/games/caribbean/components/CaribbeanLab.test.tsx",
+      "src/games/caribbean/components/CaribbeanLab.tsx",
+      "src/games/caribbean/domain/naval/geometry.test.ts",
+      "src/games/caribbean/domain/naval/geometry.ts",
+      "src/games/caribbean/preview.tsx",
+      "src/games/caribbean/state/naval/debugBridge.test.ts",
+      "src/games/caribbean/state/naval/debugBridge.ts",
+      "src/games/caribbean/state/naval/harnessConfig.test.ts",
+      "src/games/caribbean/state/naval/harnessConfig.ts",
+      "src/games/caribbean/three/naval/NavalScene.ts"
+    ]
+  },
+  "canonicalInput": {
+    "battleId": "battle-lab-red-jackdaw",
+    "seed": 1702
+  },
+  "seed": 1702,
+  "browser": {
+    "name": "Chromium",
+    "version": "151.0.7922.34",
+    "angleArgs": [
+      "--use-gl=angle",
+      "--use-angle=default",
+      "--enable-unsafe-swiftshader"
+    ]
+  },
+  "viewports": {
+    "tablet": {
+      "width": 1180,
+      "height": 820
+    },
+    "desktop": {
+      "width": 1440,
+      "height": 900
+    },
+    "phone": {
+      "width": 430,
+      "height": 932
+    }
+  },
+  "deviceScaleFactor": 1,
+  "tiers": {
+    "tablet": "high",
+    "desktop": "high",
+    "phone": "high"
+  },
+  "fps": {
+    "samples": [
+      76,
+      79,
+      82,
+      90,
+      81,
+      88,
+      77,
+      80,
+      77,
+      77,
+      74,
+      75,
+      84,
+      83,
+      83,
+      78,
+      78,
+      85,
+      86,
+      75
+    ],
+    "sustainedFloorMethod": "minimum 3-sample moving average after warm-up while paused and rendering",
+    "sustained": 75.333
+  },
+  "maximums": {
+    "drawCalls": 34,
+    "triangles": 7567,
+    "textures": 3,
+    "geometries": 30,
+    "materials": 30,
+    "effectActive": 5,
+    "effectCapacity": 96
+  },
+  "resourcePlateau": {
+    "warmupSeconds": 2,
+    "observedSeconds": 20,
+    "samples": [
+      {
+        "fps": 76,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 79,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 82,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 90,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 81,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 88,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 77,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 80,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 77,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 77,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 74,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 75,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 84,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 83,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 83,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 85,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 86,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      },
+      {
+        "fps": 75,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96
+      }
+    ],
+    "growthAfterWarmup": {
+      "textures": 0,
+      "geometries": 0,
+      "materials": 0,
+      "activeEffects": 0,
+      "effectCapacity": 0
+    },
+    "allocationErrors": [],
+    "capacityErrors": [],
+    "poolErrors": []
+  },
+  "asset": {
+    "path": "/assets/caribbean-sloop-P-mk3eaS.glb",
+    "bytes": 56864,
+    "sha256": "36c9b53aeebe28706932af7d66d67e3a9a545ac1a4ea00ad5ffd944876270320"
+  },
+  "failures": {
+    "console": [],
+    "page": [],
+    "requests": [],
+    "unhandledRejections": [],
+    "remoteDependencies": []
+  },
+  "outcome": {
+    "ok": true,
+    "outcome": "boarding-ready",
+    "elapsedBrowserSeconds": 0.186,
+    "initial": {
+      "distance": 7.02,
+      "outcomeInjected": false,
+      "damageInjectedAfterStart": false,
+      "timeInjected": false,
+      "opponent": {
+        "hull": 72,
+        "sails": 30,
+        "crew": 18,
+        "cannon": 6
+      }
+    }
+  },
+  "handedness": {
+    "portVectorX": 1,
+    "starboardVectorX": -1,
+    "portMuzzleOriginX": 3.1,
+    "starboardMuzzleOriginX": -3.1,
+    "steeringPortHeadingDelta": 0.268667,
+    "steeringStarboardHeadingDelta": -0.234,
+    "staleRudder": false,
+    "port": {
+      "eventId": 3,
+      "side": "port",
+      "vector": {
+        "x": 1,
+        "z": 0
+      },
+      "muzzleOrigin": {
+        "x": 3.1,
+        "z": 0.18601528399999967
+      }
+    },
+    "starboard": {
+      "eventId": 3,
+      "side": "starboard",
+      "vector": {
+        "x": -1,
+        "z": 0
+      },
+      "muzzleOrigin": {
+        "x": -3.1,
+        "z": 0.19845955583999964
+      }
+    }
+  },
+  "fallback": {
+    "ok": true,
+    "chart": true,
+    "retry": true,
+    "restart": true,
+    "battleControls": true
+  },
+  "verdict": {
+    "ok": true,
+    "issues": []
+  }
+}
