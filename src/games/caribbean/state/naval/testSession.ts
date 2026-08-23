@@ -89,6 +89,7 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
     togglePause() {
       if (diagnostic) return;
       paused = !paused;
+      runner.reset();
       publish();
     },
     restart() {

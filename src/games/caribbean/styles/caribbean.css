@@ -114,6 +114,7 @@ body:has(.caribbean-app) {
 }
 
 .caribbean-briefing h2 { font-size: clamp(46px, 6vw, 84px); }
+.caribbean-briefing h2:focus { outline: 3px solid var(--caribbean-trade-wind); outline-offset: 6px; }
 
 .caribbean-decision__instrument > p:last-of-type,
 .caribbean-briefing__copy > p {

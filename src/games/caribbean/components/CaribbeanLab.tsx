@@ -53,6 +53,11 @@ function BattleSession({ sceneFactory, onSessionReady }: CaribbeanLabProps) {
 
 export function CaribbeanLab({ sceneFactory = null, onSessionReady }: CaribbeanLabProps) {
   const [phase, setPhase] = useState<LabPhase>('decision');
+  const briefingHeading = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (phase === 'briefing') briefingHeading.current?.focus();
+  }, [phase]);
 
   if (phase === 'battle') {
     return <BattleSession sceneFactory={sceneFactory} onSessionReady={onSessionReady} />;
@@ -98,7 +103,7 @@ export function CaribbeanLab({ sceneFactory = null, onSessionReady }: CaribbeanL
           <div className="caribbean-briefing__route"><BearingThesis /></div>
           <div className="caribbean-briefing__copy">
             <p className="caribbean-eyebrow"><TargetIcon size={18} /> Red Jackdaw briefing</p>
-            <h2>Disable. Close. Capture.</h2>
+            <h2 ref={briefingHeading} tabIndex={-1}>Disable. Close. Capture.</h2>
             <p>Objective: capture the Red Jackdaw. The fresh trade wind comes from 60°. Full sail gives speed; reefed sail turns harder. Steer with A/D and fire port/starboard with Q/E. Round shot breaks hull, chain cuts sails, and grape weakens crew. Disable sails and crew, then close under seven lengths to board.</p>
             <dl>
               <div><dt>Your sloop</dt><dd>Mistral / 8 cannon / 52 crew</dd></div>

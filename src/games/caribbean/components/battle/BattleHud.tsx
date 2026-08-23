@@ -67,7 +67,7 @@ export function BattleHud({ state, paused, onTogglePause }: BattleHudProps) {
     <div className="naval-hud" data-testid="naval-battle-hud">
       <div className="naval-mission-line">
         <p><TargetIcon size={18} /> <span>Objective</span> <strong>Capture Red Jackdaw</strong></p>
-        <p><span>Trade wind</span> <strong>{windBearing}° / fresh</strong></p>
+        <p aria-label={`Trade wind ${windBearing}° / fresh`}><span>Trade wind</span> <strong>{windBearing}° / fresh</strong></p>
         <button
           type="button"
           className="naval-control naval-hit-target naval-pause-control"

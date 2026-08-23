@@ -83,14 +83,32 @@ export function NavalBattlePage({ session, sceneFactory = null, onResolved }: Na
   const { state, currentCommand, paused, diagnostic } = snapshot;
   const resolvedRef = useRef<string | null>(null);
   const held = useRef({ port: false, starboard: false });
+  const portFireRef = useRef<HTMLButtonElement>(null);
+  const terminalActionRef = useRef<HTMLButtonElement>(null);
+  const underlayRef = useRef<HTMLDivElement>(null);
+  const terminal = Boolean(state.outcome || diagnostic);
 
   useEffect(() => {
-    if (!state.outcome || diagnostic || !onResolved) return;
+    if (!state.outcome) {
+      resolvedRef.current = null;
+      return;
+    }
+    if (diagnostic || !onResolved) return;
     const key = outcomeKey(state.outcome);
     if (resolvedRef.current === key) return;
     resolvedRef.current = key;
     onResolved(state.outcome);
   }, [diagnostic, onResolved, state.outcome]);
+
+  useEffect(() => {
+    const underlay = underlayRef.current;
+    if (!underlay) return;
+    if (terminal) underlay.setAttribute('inert', '');
+    else underlay.removeAttribute('inert');
+
+    if (terminal) terminalActionRef.current?.focus();
+    else portFireRef.current?.focus();
+  }, [terminal]);
 
   useDismissOnEscape(paused && !diagnostic, () => session.togglePause());
 
@@ -100,6 +118,7 @@ export function NavalBattlePage({ session, sceneFactory = null, onResolved }: Na
       return held.current.port ? -1 : 1;
     };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (terminal) return;
       if (event.code === 'Escape' && event.repeat) {
         event.stopImmediatePropagation();
         return;
@@ -123,6 +142,7 @@ export function NavalBattlePage({ session, sceneFactory = null, onResolved }: Na
       if (event.code === 'Escape' && !paused && !diagnostic) session.togglePause();
     };
     const onKeyUp = (event: KeyboardEvent) => {
+      if (terminal) return;
       if (event.code === 'KeyA' || event.code === 'ArrowLeft') held.current.port = false;
       if (event.code === 'KeyD' || event.code === 'ArrowRight') held.current.starboard = false;
       if (event.code === 'KeyA' || event.code === 'ArrowLeft' || event.code === 'KeyD' || event.code === 'ArrowRight') {
@@ -135,7 +155,7 @@ export function NavalBattlePage({ session, sceneFactory = null, onResolved }: Na
       window.removeEventListener('keydown', onKeyDown, { capture: true });
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [currentCommand.sail, diagnostic, paused, session]);
+  }, [currentCommand.sail, diagnostic, paused, session, state.outcome, terminal]);
 
   const holdRudder = (side: 'port' | 'starboard', active: boolean) => {
     held.current[side] = active;
@@ -147,63 +167,71 @@ export function NavalBattlePage({ session, sceneFactory = null, onResolved }: Na
 
   return (
     <section className="naval-battle-page" data-testid="naval-battle-page" aria-label="Caribbean naval battle">
-      <BattleHud state={state} paused={paused} onTogglePause={() => session.togglePause()} />
+      <div
+        ref={underlayRef}
+        className="naval-battle-underlay"
+        data-testid="naval-battle-underlay"
+        aria-hidden={terminal ? true : undefined}
+      >
+        <BattleHud state={state} paused={paused} onTogglePause={() => session.togglePause()} />
 
-      <div className="naval-command-deck">
-        <FireControl side="port" onFire={() => session.requestFire('port')} disabled={Boolean(outcome || diagnostic)} />
-        <div className="naval-tactical-center">
-          <TacticalViewport state={state} sceneFactory={sceneFactory} />
-          <div className="naval-steering" aria-label="Rudder controls">
-            <RudderControl side="port" onHold={holdRudder} />
-            <div className="naval-steering__keel"><span>Rudder</span><strong>A / D</strong></div>
-            <RudderControl side="starboard" onHold={holdRudder} />
+        <div className="naval-command-deck">
+          <FireControl buttonRef={portFireRef} side="port" onFire={() => session.requestFire('port')} disabled={Boolean(outcome || diagnostic)} />
+          <div className="naval-tactical-center">
+            <TacticalViewport state={state} sceneFactory={sceneFactory} />
+            <div className="naval-steering" aria-label="Rudder controls">
+              <RudderControl side="port" onHold={holdRudder} />
+              <div className="naval-steering__keel"><span>Rudder</span><strong>A / D</strong></div>
+              <RudderControl side="starboard" onHold={holdRudder} />
+            </div>
           </div>
+          <FireControl side="starboard" onFire={() => session.requestFire('starboard')} disabled={Boolean(outcome || diagnostic)} />
         </div>
-        <FireControl side="starboard" onFire={() => session.requestFire('starboard')} disabled={Boolean(outcome || diagnostic)} />
-      </div>
 
-      <div className="naval-order-controls">
-        <OrderGroup label="Sail setting">
-          {(['full', 'reefed'] as const).map((sail) => (
-            <button
-              key={sail}
-              type="button"
-              className="naval-control naval-hit-target"
-              data-testid={`naval-sail-${sail}`}
-              aria-pressed={currentCommand.sail === sail}
-              onClick={() => session.setSail(sail)}
-            >{sail === 'full' ? 'Full sail' : 'Reefed'}</button>
-          ))}
-        </OrderGroup>
-        <OrderGroup label="Ammunition">
-          {(['round', 'chain', 'grape'] as const).map((ammunition) => (
-            <button
-              key={ammunition}
-              type="button"
-              className="naval-control naval-hit-target"
-              data-testid={`naval-ammo-${ammunition}`}
-              aria-pressed={currentCommand.ammunition === ammunition}
-              onClick={() => session.setAmmunition(ammunition)}
-            >{ammunition.charAt(0).toUpperCase() + ammunition.slice(1)}</button>
-          ))}
-        </OrderGroup>
-        <button
-          type="button"
-          className="naval-control naval-hit-target naval-restart"
-          data-testid="naval-restart"
-          onClick={() => session.restart()}
-        ><RotateIcon size={18} /> Restart duel</button>
-      </div>
+        <div className="naval-order-controls">
+          <OrderGroup label="Sail setting">
+            {(['full', 'reefed'] as const).map((sail) => (
+              <button
+                key={sail}
+                type="button"
+                className="naval-control naval-hit-target"
+                data-testid={`naval-sail-${sail}`}
+                aria-pressed={currentCommand.sail === sail}
+                onClick={() => session.setSail(sail)}
+              >{sail === 'full' ? 'Full sail' : 'Reefed'}</button>
+            ))}
+          </OrderGroup>
+          <OrderGroup label="Ammunition">
+            {(['round', 'chain', 'grape'] as const).map((ammunition) => (
+              <button
+                key={ammunition}
+                type="button"
+                className="naval-control naval-hit-target"
+                data-testid={`naval-ammo-${ammunition}`}
+                aria-pressed={currentCommand.ammunition === ammunition}
+                onClick={() => session.setAmmunition(ammunition)}
+              >{ammunition.charAt(0).toUpperCase() + ammunition.slice(1)}</button>
+            ))}
+          </OrderGroup>
+          <button
+            type="button"
+            className="naval-control naval-hit-target naval-restart"
+            data-testid="naval-restart"
+            onClick={() => session.restart()}
+          ><RotateIcon size={18} /> Restart duel</button>
+        </div>
 
-      {paused && !diagnostic && !outcome && (
-        <div className="naval-pause-banner" role="status">Battle paused <span>Escape or Resume continues</span></div>
-      )}
+        {paused && !diagnostic && !outcome && (
+          <div className="naval-pause-banner" role="status">Battle paused <span>Escape or Resume continues</span></div>
+        )}
+      </div>
 
       {diagnostic && (
-        <div className="naval-diagnostic" role="alert">
+        <div className="naval-diagnostic" role="dialog" aria-modal="true" aria-labelledby="naval-diagnostic-title">
           <WarningIcon size={28} />
-          <div><strong>Battle state drift detected</strong><span>{diagnostic.issues.join(', ')}</span></div>
+          <div><strong id="naval-diagnostic-title">Battle state drift detected</strong><span>{diagnostic.issues.join(', ')}</span></div>
           <button
+            ref={terminalActionRef}
             type="button"
             className="naval-control naval-hit-target"
             data-testid="naval-restart-input"
@@ -213,11 +241,12 @@ export function NavalBattlePage({ session, sceneFactory = null, onResolved }: Na
       )}
 
       {outcome && !diagnostic && (
-        <div className="naval-result" role="status">
+        <div className="naval-result" role="dialog" aria-modal="true" aria-labelledby="naval-result-title">
           <span>Battle Lab result</span>
-          <h2>{outcome.heading}</h2>
+          <h2 id="naval-result-title">{outcome.heading}</h2>
           <p>{outcome.detail}</p>
           <button
+            ref={terminalActionRef}
             type="button"
             className="naval-control naval-hit-target"
             data-testid="naval-result-restart"
@@ -229,10 +258,21 @@ export function NavalBattlePage({ session, sceneFactory = null, onResolved }: Na
   );
 }
 
-function FireControl({ side, onFire, disabled }: { side: Broadside; onFire(): void; disabled: boolean }) {
+function FireControl({
+  side,
+  onFire,
+  disabled,
+  buttonRef,
+}: {
+  side: Broadside;
+  onFire(): void;
+  disabled: boolean;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+}) {
   const isPort = side === 'port';
   return (
     <button
+      ref={buttonRef}
       type="button"
       className={`naval-control naval-hit-target naval-fire-control naval-fire-control--${side}`}
       data-testid={`naval-fire-${side}`}

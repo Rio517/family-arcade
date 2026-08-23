@@ -2,24 +2,17 @@ import { createRoot } from 'react-dom/client';
 import '@shared/styles/tokens.css';
 
 import { CaribbeanLab } from './components/CaribbeanLab';
-import type { NavalSessionSnapshot, NavalSessionView } from './state/naval/NavalSession';
+import { createNavalDebugBridge, type NavalDebugBridge } from './state/naval/debugBridge';
+import type { NavalSessionView } from './state/naval/NavalSession';
 
 declare global {
   interface Window {
-    __CARIBBEAN_NAVAL_DEBUG__?: {
-      getSnapshot(): NavalSessionSnapshot;
-      consumeNewEvents(afterId: number): ReturnType<NavalSessionView['consumeNewEvents']>;
-      restart(): void;
-    };
+    __CARIBBEAN_NAVAL_DEBUG__?: NavalDebugBridge;
   }
 }
 
 function exposeDebugSession(session: NavalSessionView): void {
-  window.__CARIBBEAN_NAVAL_DEBUG__ = {
-    getSnapshot: session.getSnapshot,
-    consumeNewEvents: (afterId) => session.consumeNewEvents(afterId),
-    restart: () => session.restart(),
-  };
+  window.__CARIBBEAN_NAVAL_DEBUG__ = createNavalDebugBridge(session);
 }
 
 createRoot(document.getElementById('root')!).render(

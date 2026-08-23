@@ -18,6 +18,18 @@ describe('accessible naval command deck', () => {
     expect(session.opponentMemory.untilTick).toBeGreaterThan(0);
   });
 
+  it('drops capped manual-frame backlog across a pause transition like production', () => {
+    const session = manualNavalSession();
+
+    session.deliverFrame(0.5);
+    expect(session.state.tick).toBe(6);
+    session.togglePause();
+    session.togglePause();
+    session.deliverFrame(0);
+
+    expect(session.state.tick).toBe(6);
+  });
+
   it('maps keyboard controls to physical nautical commands and ignores repeated fire', () => {
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} />);
@@ -109,6 +121,32 @@ describe('accessible naval command deck', () => {
 
     rerender(<NavalBattlePage session={session} sceneFactory={null} onResolved={onResolved} />);
     expect(onResolved).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId('naval-result-restart'));
+    act(() => {
+      session.state.outcome = structuredClone(BOARDING_READY);
+      session.setSail('full');
+    });
+
+    expect(onResolved).toHaveBeenCalledTimes(2);
+  });
+
+  it('presents a terminal result as a modal, focuses recovery, and inerts the covered deck', () => {
+    const session = manualNavalSession({ outcome: BOARDING_READY });
+    render(<NavalBattlePage session={session} sceneFactory={null} />);
+
+    const dialog = screen.getByRole('dialog', { name: /ready to board/i });
+    const restart = screen.getByTestId('naval-result-restart');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(restart).toHaveFocus();
+    expect(screen.getByTestId('naval-battle-underlay')).toHaveAttribute('inert');
+
+    fireEvent.keyDown(window, { code: 'KeyQ', key: 'q' });
+    fireEvent.keyUp(window, { code: 'KeyA', key: 'a' });
+    expect(session.commandHistory()).toHaveLength(0);
+
+    fireEvent.click(restart);
+    expect(screen.getByTestId('naval-fire-port')).toHaveFocus();
   });
 
   it('pauses and offers deterministic restart when canonical validation detects drift', () => {
@@ -120,9 +158,12 @@ describe('accessible naval command deck', () => {
 
     act(() => session.deliverFrame(1 / 60));
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/battle state drift/i);
-    expect(screen.getByRole('alert')).toHaveTextContent('player.position.x:not-finite');
+    const dialog = screen.getByRole('dialog', { name: /battle state drift detected/i });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveTextContent('player.position.x:not-finite');
     expect(screen.getByTestId('naval-restart-input')).toBeEnabled();
+    expect(screen.getByTestId('naval-restart-input')).toHaveFocus();
+    expect(screen.getByTestId('naval-battle-underlay')).toHaveAttribute('inert');
     expect(session.paused).toBe(true);
     expect(onResolved).not.toHaveBeenCalled();
   });
@@ -167,5 +208,6 @@ describe('accessible naval command deck', () => {
     expect(hud).toHaveTextContent(/Full sail/);
     expect(hud).toHaveTextContent(/Trade wind/);
     expect(hud).toHaveTextContent(/Capture Red Jackdaw/);
+    expect(within(hud).getByLabelText('Trade wind 60° / fresh')).toHaveTextContent('60° / fresh');
   });
 });

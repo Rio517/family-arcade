@@ -27,15 +27,17 @@ describe('Caribbean Battle Lab flow', () => {
     expect(briefing).toHaveTextContent(/round.*chain.*grape/i);
     expect(briefing.textContent?.trim().split(/\s+/).length).toBeLessThan(90);
     expect(screen.getByTestId('naval-enter-battle')).toHaveTextContent('Enter battle');
+    expect(screen.getByRole('heading', { name: 'Disable. Close. Capture.' })).toHaveFocus();
   });
 
-  it('enters the chart-centered command deck through the real briefing action', () => {
+  it('enters the chart-centered command deck through the real briefing action', async () => {
     render(<CaribbeanLab sceneFactory={null} />);
     fireEvent.click(screen.getByTestId('lab-start-naval'));
     fireEvent.click(screen.getByTestId('naval-enter-battle'));
 
     expect(screen.getByTestId('naval-battle-page')).toBeVisible();
     expect(screen.getByTestId('naval-html-chart')).toBeVisible();
+    await waitFor(() => expect(screen.getByTestId('naval-fire-port')).toHaveFocus());
   });
 
   it('provides the live session to a harness-only debug snapshot hook', async () => {
