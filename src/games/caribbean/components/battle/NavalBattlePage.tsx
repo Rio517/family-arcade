@@ -61,7 +61,7 @@ function CannonIcon() {
 
 export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBattlePageProps) {
   const snapshot = useSessionSnapshot(session);
-  const { state, currentCommand, paused, diagnostic } = snapshot;
+  const { state, battleGeneration, currentCommand, paused, diagnostic } = snapshot;
   const resolvedRef = useRef<string | null>(null);
   const held = useRef({ port: false, starboard: false });
   const portFireRef = useRef<HTMLButtonElement>(null);
@@ -186,6 +186,7 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
             <NavalViewport
               state={state}
               events={state.events}
+              battleGeneration={battleGeneration}
               sceneFactory={sceneFactory}
               onRestart={() => session.restart()}
             />

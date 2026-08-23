@@ -6,6 +6,14 @@ import { NAVAL_RELOAD_REQUIRED_WORK } from '../../domain/naval/balance';
 import { NavalSession } from './NavalSession';
 
 describe('transient naval session', () => {
+  it('increments its transient battle generation on deterministic restart', () => {
+    const session = new NavalSession(BATTLE_LAB_INPUT);
+
+    expect(session.getSnapshot().battleGeneration).toBe(0);
+    session.restart();
+    expect(session.getSnapshot().battleGeneration).toBe(1);
+  });
+
   it('advances only canonical ticks and clears one-shot fire after the first tick', () => {
     const session = new NavalSession(BATTLE_LAB_INPUT);
     const initial = session.state;

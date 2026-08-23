@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 
-export type EffectKind = 'flash' | 'smoke' | 'splash' | 'debris';
+import type { Damage } from '../../domain/naval/types';
+
+export type EffectKind = 'flash' | 'smoke' | 'splash' | 'debris' | 'rig';
 
 export interface EffectSpawnOptions {
   life?: number;
@@ -10,27 +12,46 @@ export interface EffectSpawnOptions {
   velocityZ?: number;
 }
 
+export interface EffectCue {
+  kind: EffectKind;
+  readonly position: THREE.Vector3;
+  scale: number;
+  rotation: number;
+  active: boolean;
+}
+
 export interface EffectPoolMetrics {
   active: number;
+  activeByKind: Record<EffectKind, number>;
   capacity: number;
   resources: { meshes: number; geometries: number; materials: number };
 }
 
-interface EffectEntry {
-  mesh: THREE.Mesh;
+interface EffectEntry extends EffectCue {
   age: number;
   life: number;
   baseScale: number;
   started: number;
-  velocity: THREE.Vector3;
+  readonly velocity: THREE.Vector3;
 }
 
+const EFFECT_KINDS: readonly EffectKind[] = ['flash', 'smoke', 'splash', 'debris', 'rig'];
 const DEFAULTS: Record<EffectKind, Required<EffectSpawnOptions>> = {
   flash: { life: 0.18, scale: 0.9, velocityX: 0, velocityY: 0.1, velocityZ: 0 },
   smoke: { life: 1.8, scale: 0.48, velocityX: 0, velocityY: 0.9, velocityZ: 0 },
   splash: { life: 1.05, scale: 0.32, velocityX: 0, velocityY: 1.7, velocityZ: 0 },
   debris: { life: 1.4, scale: 0.22, velocityX: 0, velocityY: 1.1, velocityZ: 0 },
+  rig: { life: 1.1, scale: 0.72, velocityX: 0, velocityY: 0.25, velocityZ: 0 },
 };
+
+export function damageEffectKinds(damage: Damage): EffectKind[] {
+  const effects: EffectKind[] = [];
+  if (damage.hull > 0) effects.push('smoke');
+  if (damage.sails > 0) effects.push('rig');
+  const debrisCount = Math.min(4, damage.cannon + Math.ceil(damage.sails / 6));
+  for (let index = 0; index < debrisCount; index += 1) effects.push('debris');
+  return effects;
+}
 
 export class EffectPool {
   readonly #scene: THREE.Scene;
@@ -38,7 +59,12 @@ export class EffectPool {
   readonly #reducedMotion: boolean;
   readonly #geometries: Record<EffectKind, THREE.BufferGeometry>;
   readonly #materials: Record<EffectKind, THREE.MeshBasicMaterial>;
+  readonly #batches: Record<EffectKind, THREE.InstancedMesh>;
   readonly #entries: EffectEntry[];
+  readonly #matrix = new THREE.Matrix4();
+  readonly #quaternion = new THREE.Quaternion();
+  readonly #scale = new THREE.Vector3();
+  readonly #rotationAxis = new THREE.Vector3(0, 1, 0);
   #serial = 0;
   #disposed = false;
 
@@ -51,51 +77,54 @@ export class EffectPool {
       smoke: new THREE.IcosahedronGeometry(1, 1),
       splash: new THREE.ConeGeometry(0.45, 1.8, 5, 1, true),
       debris: new THREE.TetrahedronGeometry(1, 0),
+      rig: new THREE.TorusGeometry(0.7, 0.12, 4, 12, Math.PI * 1.4),
     };
     this.#materials = {
-      flash: new THREE.MeshBasicMaterial({ color: '#fff2ad', transparent: true, opacity: 1, depthWrite: false }),
-      smoke: new THREE.MeshBasicMaterial({ color: '#d8d5ca', transparent: true, opacity: 0.55, depthWrite: false }),
-      splash: new THREE.MeshBasicMaterial({ color: '#d5fff5', transparent: true, opacity: 0.72, depthWrite: false }),
-      debris: new THREE.MeshBasicMaterial({ color: '#6b4027', transparent: true, opacity: 0.9, depthWrite: false }),
+      flash: new THREE.MeshBasicMaterial({ color: '#fff2ad', transparent: true, opacity: 0.94, depthWrite: false }),
+      smoke: new THREE.MeshBasicMaterial({ color: '#d8d5ca', transparent: true, opacity: 0.48, depthWrite: false }),
+      splash: new THREE.MeshBasicMaterial({ color: '#d5fff5', transparent: true, opacity: 0.68, depthWrite: false }),
+      debris: new THREE.MeshBasicMaterial({ color: '#6b4027', transparent: true, opacity: 0.86, depthWrite: false }),
+      rig: new THREE.MeshBasicMaterial({ color: '#d8bd83', transparent: true, opacity: 0.82, depthWrite: false, side: THREE.DoubleSide }),
     };
-    this.#entries = Array.from({ length: this.#capacity }, () => {
-      const mesh = new THREE.Mesh(this.#geometries.flash, this.#materials.flash);
-      mesh.name = 'NavalEffectPoolEntry';
-      mesh.visible = false;
+    const batches = {} as Record<EffectKind, THREE.InstancedMesh>;
+    for (const kind of EFFECT_KINDS) {
+      const mesh = new THREE.InstancedMesh(this.#geometries[kind], this.#materials[kind], this.#capacity);
+      mesh.name = `NavalEffectBatch_${kind}`;
+      mesh.count = 0;
+      mesh.frustumCulled = false;
       mesh.renderOrder = 4;
       this.#scene.add(mesh);
-      return {
-        mesh,
-        age: 0,
-        life: 0,
-        baseScale: 1,
-        started: -1,
-        velocity: new THREE.Vector3(),
-      };
-    });
+      batches[kind] = mesh;
+    }
+    this.#batches = batches;
+    this.#entries = Array.from({ length: this.#capacity }, () => ({
+      kind: 'flash',
+      position: new THREE.Vector3(),
+      scale: 1,
+      rotation: 0,
+      active: false,
+      age: 0,
+      life: 0,
+      baseScale: 1,
+      started: -1,
+      velocity: new THREE.Vector3(),
+    }));
   }
 
-  spawn(
-    kind: EffectKind,
-    x: number,
-    y: number,
-    z: number,
-    options: EffectSpawnOptions = {},
-  ): THREE.Mesh {
+  spawn(kind: EffectKind, x: number, y: number, z: number, options: EffectSpawnOptions = {}): EffectCue {
     if (this.#disposed) throw new Error('Cannot spawn into a disposed effect pool');
-    const entry = this.#entries.find(({ mesh }) => !mesh.visible)
+    const entry = (this.#reducedMotion ? this.#entries.find((candidate) => candidate.active && candidate.kind === kind) : undefined)
+      ?? this.#entries.find((candidate) => !candidate.active)
       ?? this.#entries.reduce((oldest, candidate) => candidate.started < oldest.started ? candidate : oldest);
     const defaults = DEFAULTS[kind];
-    const life = options.life ?? defaults.life;
-    entry.mesh.geometry = this.#geometries[kind];
-    entry.mesh.material = this.#materials[kind];
-    entry.mesh.position.set(x, y, z);
-    entry.mesh.rotation.set(0, 0, 0);
+    entry.kind = kind;
+    entry.position.set(x, y, z);
     entry.baseScale = options.scale ?? defaults.scale;
-    entry.mesh.scale.setScalar(entry.baseScale);
-    entry.mesh.visible = true;
+    entry.scale = entry.baseScale;
+    entry.rotation = 0;
+    entry.active = true;
     entry.age = 0;
-    entry.life = this.#reducedMotion ? Math.min(life, 0.5) : life;
+    entry.life = this.#reducedMotion ? Math.max(0.8, Math.min(options.life ?? defaults.life, 1.4)) : options.life ?? defaults.life;
     entry.started = this.#serial;
     this.#serial += 1;
     entry.velocity.set(
@@ -103,39 +132,65 @@ export class EffectPool {
       options.velocityY ?? defaults.velocityY,
       options.velocityZ ?? defaults.velocityZ,
     );
-    return entry.mesh;
+    return entry;
   }
 
   update(frameSeconds: number): void {
     if (this.#disposed) return;
     const elapsed = Math.max(0, frameSeconds);
     for (const entry of this.#entries) {
-      if (!entry.mesh.visible) continue;
+      if (!entry.active) continue;
       entry.age += elapsed;
       if (entry.age >= entry.life) {
-        entry.mesh.visible = false;
+        entry.active = false;
         continue;
       }
-      entry.mesh.position.addScaledVector(entry.velocity, elapsed);
-      const progress = entry.age / entry.life;
-      entry.mesh.scale.setScalar(entry.baseScale * (1 + progress * 1.8));
-      entry.mesh.rotation.y += elapsed * 1.7;
-      (entry.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - progress) * 0.72;
+      if (!this.#reducedMotion) {
+        entry.position.addScaledVector(entry.velocity, elapsed);
+        entry.scale = entry.baseScale * (1 + entry.age / entry.life * 1.8);
+        entry.rotation += elapsed * 1.7;
+      }
     }
+    this.#writeInstances();
   }
 
   metrics(): EffectPoolMetrics {
+    const activeByKind = { flash: 0, smoke: 0, splash: 0, debris: 0, rig: 0 };
+    let active = 0;
+    for (const entry of this.#entries) {
+      if (!entry.active) continue;
+      active += 1;
+      activeByKind[entry.kind] += 1;
+    }
     return {
-      active: this.#entries.filter(({ mesh }) => mesh.visible).length,
+      active,
+      activeByKind,
       capacity: this.#capacity,
-      resources: { meshes: this.#capacity, geometries: 4, materials: 4 },
+      resources: { meshes: 5, geometries: 5, materials: 5 },
     };
+  }
+
+  #writeInstances(): void {
+    for (const kind of EFFECT_KINDS) {
+      const batch = this.#batches[kind];
+      let instance = 0;
+      for (const entry of this.#entries) {
+        if (!entry.active || entry.kind !== kind) continue;
+        this.#quaternion.setFromAxisAngle(this.#rotationAxis, entry.rotation);
+        this.#scale.setScalar(entry.scale);
+        this.#matrix.compose(entry.position, this.#quaternion, this.#scale);
+        batch.setMatrixAt(instance, this.#matrix);
+        instance += 1;
+      }
+      batch.count = instance;
+      batch.instanceMatrix.needsUpdate = true;
+    }
   }
 
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    for (const entry of this.#entries) entry.mesh.removeFromParent();
+    Object.values(this.#batches).forEach((batch) => batch.removeFromParent());
     Object.values(this.#geometries).forEach((geometry) => geometry.dispose());
     Object.values(this.#materials).forEach((material) => material.dispose());
   }

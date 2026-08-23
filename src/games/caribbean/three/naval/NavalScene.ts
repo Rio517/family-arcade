@@ -16,12 +16,18 @@ import type {
   NavalState,
 } from '../../domain/naval/types';
 import { createSloop } from '../shared/loadSloop';
-import { EffectPool } from './effects';
+import { damageEffectKinds, EffectPool } from './effects';
 import {
   QualityController,
   qualitySettings,
 } from './quality';
-import { composeWakeMatrix } from './sceneMath';
+import {
+  assertDrawCallBudget,
+  composeWakeMatrix,
+  fitEngagementCamera,
+  type EngagementCameraFit,
+  type EngagementCameraInput,
+} from './sceneMath';
 
 interface ShipVisual {
   root: THREE.Group;
@@ -168,10 +174,26 @@ export class NavalScene implements NavalSceneAdapter {
   readonly #sun: THREE.DirectionalLight;
   readonly #waterUniforms = { uTime: { value: 0 } };
   readonly #ships = {} as Record<NavalShipId, ShipVisual>;
-  readonly #seenEventIds = new Set<number>();
   readonly #cameraPosition = new THREE.Vector3(0, 31, 42);
   readonly #cameraTarget = new THREE.Vector3();
   readonly #cameraDesired = new THREE.Vector3(0, 31, 42);
+  readonly #damageTint = new THREE.Color('#382d2a');
+  readonly #renderDummy = new THREE.Object3D();
+  readonly #wakeMatrix = new THREE.Matrix4();
+  readonly #cameraFit: EngagementCameraFit = {
+    position: { x: 0, y: 31, z: 42 },
+    target: { x: 0, y: 1.5, z: 0 },
+    fov: 48,
+  };
+  readonly #cameraInput: EngagementCameraInput = {
+    player: { x: 0, z: -36 },
+    opponent: { x: 0, z: 36 },
+    playerHeading: 0,
+    width: 960,
+    height: 540,
+    shipRadius: 6,
+    safeFraction: 0.84,
+  };
   readonly #wakeMatrices = new THREE.InstancedMesh(
     wakeGeometry(),
     new THREE.MeshBasicMaterial({
@@ -227,6 +249,9 @@ export class NavalScene implements NavalSceneAdapter {
   #disposed = false;
   #contextLost = false;
   #windFrom: number | null = null;
+  #viewportWidth = 960;
+  #viewportHeight = 540;
+  #hasCameraFit = false;
 
   private constructor(container: HTMLElement, options: NavalSceneOptions) {
     this.#container = container;
@@ -360,7 +385,7 @@ export class NavalScene implements NavalSceneAdapter {
       visual.root.rotation.y = canonical.heading;
       for (const entry of visual.materials) {
         const severity = damageSeverity(canonical, entry.role);
-        entry.material.color.copy(entry.baseColor).lerp(new THREE.Color('#382d2a'), severity * 0.52);
+        entry.material.color.copy(entry.baseColor).lerp(this.#damageTint, severity * 0.52);
         entry.material.emissive.set('#42130d');
         entry.material.emissiveIntensity = severity * 0.24;
       }
@@ -372,40 +397,8 @@ export class NavalScene implements NavalSceneAdapter {
     bearingPositions.needsUpdate = true;
     this.#bearingLine.computeLineDistances();
 
-    for (const event of events) {
-      if (this.#seenEventIds.has(event.id)) continue;
-      this.#seenEventIds.add(event.id);
-      this.#emitEvent(event, state);
-    }
-    if (this.#seenEventIds.size > 512) {
-      const newest = [...this.#seenEventIds].sort((left, right) => right - left).slice(0, 256);
-      this.#seenEventIds.clear();
-      newest.forEach((id) => this.#seenEventIds.add(id));
-    }
-
-    const player = state.ships.player;
-    const opponent = state.ships.opponent;
-    const centerX = (player.position.x + opponent.position.x) * 0.5;
-    const centerZ = (player.position.z + opponent.position.z) * 0.5;
-    const separation = Math.hypot(
-      player.position.x - opponent.position.x,
-      player.position.z - opponent.position.z,
-    );
-    if (this.#camera.aspect < 1) {
-      const phone = this.#camera.aspect < 0.62;
-      this.#cameraDesired.set(centerX, phone ? 66 : 58, centerZ + (phone ? 15 : 13));
-      this.#cameraTarget.set(centerX, 1.3, centerZ);
-    } else {
-      const forwardX = Math.sin(player.heading);
-      const forwardZ = Math.cos(player.heading);
-      const height = THREE.MathUtils.clamp(25 + separation * 0.11, 28, 39);
-      this.#cameraDesired.set(
-        centerX - forwardX * 28 + 11 * Math.cos(player.heading),
-        height,
-        centerZ - forwardZ * 28 - 11 * Math.sin(player.heading),
-      );
-      this.#cameraTarget.set(centerX, 1.6, centerZ);
-    }
+    for (const event of events) this.#emitEvent(event, state);
+    this.#fitCamera(state.ships.player, state.ships.opponent);
   }
 
   #emitEvent(event: NavalEvent, state: NavalState): void {
@@ -449,22 +442,26 @@ export class NavalScene implements NavalSceneAdapter {
 
     if (event.kind === 'damage' && hasDamage(event.damage)) {
       const ship = state.ships[event.shipId];
-      if (event.damage.hull > 0) {
-        this.#effects.spawn('smoke', ship.position.x, 1.4, ship.position.z, { life: 2.2 });
-      }
-      const debrisCount = Math.min(4, event.damage.cannon + Math.ceil(event.damage.sails / 6));
-      for (let index = 0; index < debrisCount; index += 1) {
-        const direction = index % 2 === 0 ? 1 : -1;
-        this.#effects.spawn('debris', ship.position.x, 1.5 + index * 0.18, ship.position.z, {
-          velocityX: direction * (0.7 + index * 0.13),
-          velocityY: 1.1 + index * 0.12,
-          velocityZ: (index - 1.5) * 0.28,
-        });
+      let debrisIndex = 0;
+      for (const kind of damageEffectKinds(event.damage)) {
+        if (kind === 'smoke') {
+          this.#effects.spawn(kind, ship.position.x, 1.4, ship.position.z, { life: 2.2 });
+        } else if (kind === 'rig') {
+          this.#effects.spawn(kind, ship.position.x, 3.5, ship.position.z, { life: 1.3 });
+        } else {
+          const direction = debrisIndex % 2 === 0 ? 1 : -1;
+          this.#effects.spawn(kind, ship.position.x, 1.5 + debrisIndex * 0.18, ship.position.z, {
+            velocityX: direction * (0.7 + debrisIndex * 0.13),
+            velocityY: 1.1 + debrisIndex * 0.12,
+            velocityZ: (debrisIndex - 1.5) * 0.28,
+          });
+          debrisIndex += 1;
+        }
       }
     }
   }
 
-  render(frameSeconds: number): void {
+  render(frameSeconds: number, wallSeconds = frameSeconds): void {
     if (this.#disposed) return;
     if (this.#contextLost) throw new Error('Naval WebGL context lost');
     const elapsed = Math.min(0.1, Math.max(0, frameSeconds));
@@ -472,11 +469,11 @@ export class NavalScene implements NavalSceneAdapter {
     this.#waterUniforms.uTime.value = this.#time;
     this.#effects.update(elapsed);
 
-    const dummy = new THREE.Object3D();
-    SHIP_IDS.forEach((shipId, index) => {
+    for (let index = 0; index < SHIP_IDS.length; index += 1) {
+      const shipId = SHIP_IDS[index];
       const visual = this.#ships[shipId];
       const state = visual?.state;
-      if (!visual || !state) return;
+      if (!visual || !state) continue;
       const phase = shipId === 'opponent' ? 1.7 : 0;
       visual.root.position.y = this.#options.reducedMotion ? 0 : Math.sin(this.#time * 1.15 + phase) * 0.14;
       visual.root.rotation.x = this.#options.reducedMotion ? 0 : Math.sin(this.#time * 0.72 + 0.8 + phase) * 0.022;
@@ -490,15 +487,15 @@ export class NavalScene implements NavalSceneAdapter {
 
       this.#wakeMatrices.setMatrixAt(
         index,
-        composeWakeMatrix(state.position, state.heading, state.speed),
+        composeWakeMatrix(state.position, state.heading, state.speed, this.#wakeMatrix),
       );
 
-      dummy.position.set(state.position.x, 0.14, state.position.z);
-      dummy.rotation.set(-Math.PI / 2, 0, 0);
-      dummy.scale.setScalar(shipId === 'player' ? 1.05 : 0.92);
-      dummy.updateMatrix();
-      this.#selectionRings.setMatrixAt(index, dummy.matrix);
-    });
+      this.#renderDummy.position.set(state.position.x, 0.14, state.position.z);
+      this.#renderDummy.rotation.set(-Math.PI / 2, 0, 0);
+      this.#renderDummy.scale.setScalar(shipId === 'player' ? 1.05 : 0.92);
+      this.#renderDummy.updateMatrix();
+      this.#selectionRings.setMatrixAt(index, this.#renderDummy.matrix);
+    }
     this.#wakeMatrices.instanceMatrix.needsUpdate = true;
     this.#selectionRings.instanceMatrix.needsUpdate = true;
 
@@ -507,9 +504,10 @@ export class NavalScene implements NavalSceneAdapter {
     this.#camera.position.copy(this.#cameraPosition);
     this.#camera.lookAt(this.#cameraTarget);
     this.#renderer.render(this.#scene, this.#camera);
+    assertDrawCallBudget(this.#renderer.info.render.calls);
 
     this.#frameCount += 1;
-    this.#fpsElapsed += elapsed;
+    this.#fpsElapsed += Number.isFinite(wallSeconds) ? Math.max(0, wallSeconds) : 0;
     if (this.#fpsElapsed >= 1) {
       this.#fps = Math.round(this.#frameCount / this.#fpsElapsed);
       const changed = this.#quality.sample(this.#fps, this.#fpsElapsed);
@@ -524,7 +522,7 @@ export class NavalScene implements NavalSceneAdapter {
     const geometries = new Set<THREE.BufferGeometry>();
     this.#scene.traverse((object) => {
       const mesh = object as THREE.Mesh;
-      if (mesh.name === 'NavalEffectPoolEntry') return;
+      if (mesh.name.startsWith('NavalEffectBatch_')) return;
       if (mesh.geometry) geometries.add(mesh.geometry);
       if (!mesh.material) return;
       const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -562,14 +560,37 @@ export class NavalScene implements NavalSceneAdapter {
     this.#resize();
   }
 
+  #fitCamera(player: NavalShipState, opponent: NavalShipState): void {
+    this.#cameraInput.player.x = player.position.x;
+    this.#cameraInput.player.z = player.position.z;
+    this.#cameraInput.opponent.x = opponent.position.x;
+    this.#cameraInput.opponent.z = opponent.position.z;
+    this.#cameraInput.playerHeading = player.heading;
+    this.#cameraInput.width = this.#viewportWidth;
+    this.#cameraInput.height = this.#viewportHeight;
+    const fitted = fitEngagementCamera(this.#cameraInput, this.#cameraFit);
+    this.#cameraDesired.set(fitted.position.x, fitted.position.y, fitted.position.z);
+    this.#cameraTarget.set(fitted.target.x, fitted.target.y, fitted.target.z);
+    this.#camera.fov = fitted.fov;
+    this.#camera.updateProjectionMatrix();
+    if (!this.#hasCameraFit || this.#options.reducedMotion) {
+      this.#cameraPosition.copy(this.#cameraDesired);
+      this.#hasCameraFit = true;
+    }
+  }
+
   #resize = (): void => {
     if (this.#disposed) return;
     const width = Math.max(1, this.#container.clientWidth || 960);
     const height = Math.max(1, this.#container.clientHeight || 540);
+    this.#viewportWidth = width;
+    this.#viewportHeight = height;
     this.#renderer.setSize(width, height, false);
     this.#camera.aspect = width / height;
-    this.#camera.fov = this.#camera.aspect < 0.62 ? 62 : this.#camera.aspect < 1 ? 55 : 48;
     this.#camera.updateProjectionMatrix();
+    const player = this.#ships.player?.state;
+    const opponent = this.#ships.opponent?.state;
+    if (player && opponent) this.#fitCamera(player, opponent);
   };
 
   #onContextLost = (event: Event): void => {

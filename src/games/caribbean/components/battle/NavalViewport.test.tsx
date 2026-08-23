@@ -12,9 +12,10 @@ import {
 interface FakeScene {
   adapter: NavalSceneAdapter;
   disposed: number;
-  renders: number[];
+  renders: Array<{ animation: number; wall: number | undefined }>;
   syncs: Array<{ tick: number; eventIds: number[] }>;
   throwOnRender: boolean;
+  throwOnSync: boolean;
 }
 
 function fakeScene(): FakeScene {
@@ -23,15 +24,17 @@ function fakeScene(): FakeScene {
     renders: [],
     syncs: [],
     throwOnRender: false,
+    throwOnSync: false,
     adapter: undefined as unknown as NavalSceneAdapter,
   };
   fake.adapter = {
     sync(state, events) {
+      if (fake.throwOnSync) throw new Error('snapshot sync failed');
       fake.syncs.push({ tick: state.tick, eventIds: events.map(({ id }) => id) });
     },
-    render(frameSeconds) {
+    render(frameSeconds, wallSeconds) {
       if (fake.throwOnRender) throw new Error('context render failed');
-      fake.renders.push(frameSeconds);
+      fake.renders.push({ animation: frameSeconds, wall: wallSeconds });
     },
     metrics: () => ({
       fps: 60,
@@ -93,7 +96,7 @@ describe('NavalViewport', () => {
 
     await act(async () => resolveFactory(scene.adapter));
     expect(await screen.findByTestId('naval-scene-slot')).toBeVisible();
-    expect(scene.syncs).toEqual([{ tick: 0, eventIds: [7] }]);
+    expect(scene.syncs).toEqual([{ tick: 0, eventIds: [] }]);
 
     const nextState = fixture({ tick: 12 });
     rerender(<NavalViewport state={nextState} events={[]} sceneFactory={sceneFactory} onRestart={vi.fn()} />);
@@ -101,7 +104,8 @@ describe('NavalViewport', () => {
 
     act(() => frames.shift()?.(1_000));
     act(() => frames.shift()?.(1_016.667));
-    expect(scene.renders.at(-1)).toBeCloseTo(1 / 60, 3);
+    expect(scene.renders.at(-1)?.animation).toBeCloseTo(1 / 60, 3);
+    expect(scene.renders.at(-1)?.wall).toBeCloseTo(1 / 60, 3);
 
     unmount();
     expect(scene.disposed).toBe(1);
@@ -122,6 +126,8 @@ describe('NavalViewport', () => {
     fireEvent.click(screen.getByTestId('naval-scene-restart'));
     expect(onRestart).toHaveBeenCalledTimes(1);
     expect(consoleError).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/3D sea unavailable/i);
+    await waitFor(() => expect(screen.getByTestId('naval-scene-retry')).toHaveFocus());
     consoleError.mockRestore();
   });
 
@@ -131,12 +137,15 @@ describe('NavalViewport', () => {
       .mockRejectedValueOnce(new Error('temporary context loss'))
       .mockResolvedValueOnce(scene.adapter);
 
-    render(<NavalViewport state={fixture()} events={[]} sceneFactory={sceneFactory} onRestart={vi.fn()} />);
+    const historical: NavalEvent[] = [{ id: 9, kind: 'reload-ready', atTick: 0, shipId: 'player', side: 'port' }];
+    render(<NavalViewport state={fixture()} events={historical} sceneFactory={sceneFactory} onRestart={vi.fn()} />);
     await screen.findByTestId('naval-html-chart');
     fireEvent.click(screen.getByTestId('naval-scene-retry'));
 
     expect(await screen.findByTestId('naval-scene-slot')).toBeVisible();
     expect(sceneFactory).toHaveBeenCalledTimes(2);
+    expect(scene.syncs).toEqual([{ tick: 0, eventIds: [] }]);
+    expect(screen.getByTestId('naval-scene-frame')).toHaveFocus();
   });
 
   it('falls back and disposes when rendering fails', async () => {
@@ -150,6 +159,73 @@ describe('NavalViewport', () => {
 
     await waitFor(() => expect(screen.getByTestId('naval-html-chart')).toBeVisible());
     expect(scene.disposed).toBe(1);
+  });
+
+  it('routes initial snapshot sync failure through one-shot fallback disposal', async () => {
+    const scene = fakeScene();
+    scene.throwOnSync = true;
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    render(<NavalViewport state={fixture()} events={[]} sceneFactory={vi.fn().mockResolvedValue(scene.adapter)} onRestart={vi.fn()} />);
+
+    expect(await screen.findByTestId('naval-html-chart')).toBeVisible();
+    expect(scene.disposed).toBe(1);
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('routes subsequent snapshot sync failure through the same one-shot boundary', async () => {
+    const scene = fakeScene();
+    const factory = vi.fn().mockResolvedValue(scene.adapter);
+    const { rerender } = render(
+      <NavalViewport state={fixture()} events={[]} sceneFactory={factory} onRestart={vi.fn()} />,
+    );
+    await screen.findByTestId('naval-scene-slot');
+    scene.throwOnSync = true;
+
+    rerender(<NavalViewport state={fixture({ tick: 12 })} events={[]} sceneFactory={factory} onRestart={vi.fn()} />);
+
+    expect(await screen.findByTestId('naval-html-chart')).toBeVisible();
+    expect(scene.disposed).toBe(1);
+  });
+
+  it('delivers only live deltas and replays reused event ids after a rematch generation', async () => {
+    const scene = fakeScene();
+    const factory = vi.fn().mockResolvedValue(scene.adapter);
+    const event: NavalEvent = { id: 1, kind: 'reload-ready', atTick: 1, shipId: 'player', side: 'port' };
+    const { rerender } = render(
+      <NavalViewport state={fixture()} events={[]} battleGeneration={0} sceneFactory={factory} onRestart={vi.fn()} />,
+    );
+    await screen.findByTestId('naval-scene-slot');
+
+    rerender(<NavalViewport state={fixture({ tick: 1 })} events={[event]} battleGeneration={0} sceneFactory={factory} onRestart={vi.fn()} />);
+    rerender(<NavalViewport state={fixture({ tick: 2 })} events={[event]} battleGeneration={0} sceneFactory={factory} onRestart={vi.fn()} />);
+    rerender(<NavalViewport state={fixture({ tick: 1 })} events={[event]} battleGeneration={1} sceneFactory={factory} onRestart={vi.fn()} />);
+
+    expect(scene.syncs.map(({ eventIds }) => eventIds)).toEqual([[], [1], [], [1]]);
+  });
+
+  it('keeps wall time unclamped while clamping animation after a stalled frame', async () => {
+    const scene = fakeScene();
+    render(<NavalViewport state={fixture()} events={[]} sceneFactory={vi.fn().mockResolvedValue(scene.adapter)} onRestart={vi.fn()} />);
+    await screen.findByTestId('naval-scene-slot');
+
+    act(() => frames.shift()?.(1_000));
+    act(() => frames.shift()?.(1_500));
+
+    expect(scene.renders.at(-1)).toEqual({ animation: 0.1, wall: 0.5 });
+  });
+
+  it('publishes actual renderer metrics on the harness-visible scene frame', async () => {
+    const scene = fakeScene();
+    render(<NavalViewport state={fixture()} events={[]} sceneFactory={vi.fn().mockResolvedValue(scene.adapter)} onRestart={vi.fn()} />);
+    const frame = await screen.findByTestId('naval-scene-frame');
+
+    act(() => frames.shift()?.(1_000));
+
+    expect(frame).toHaveAttribute('data-scene-draw-calls', '1');
+    expect(frame).toHaveAttribute('data-scene-triangles', '2');
+    expect(frame).toHaveAttribute('data-scene-effect-capacity', '32');
   });
 
   it('uses the HTML chart immediately when 3D is explicitly disabled', () => {

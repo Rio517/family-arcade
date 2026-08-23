@@ -29,6 +29,7 @@ export interface NavalDiagnostic {
 
 export interface NavalSessionSnapshot {
   state: NavalState;
+  battleGeneration: number;
   opponentMemory: OpponentMemory;
   currentCommand: NavalCommand;
   paused: boolean;
@@ -76,6 +77,7 @@ export class NavalSession implements NavalSessionView {
   #animationHandle: number | null = null;
   #lastFrameMicros: number | null = null;
   #lastPublishedTick = -HUD_TICK_INTERVAL;
+  #battleGeneration = 0;
 
   constructor(input: NavalBattleInput, options: NavalSessionOptions = {}) {
     this.#input = structuredClone(input);
@@ -94,6 +96,10 @@ export class NavalSession implements NavalSessionView {
 
   get opponentMemory(): OpponentMemory {
     return this.#opponentController.memory;
+  }
+
+  get battleGeneration(): number {
+    return this.#battleGeneration;
   }
 
   get currentCommand(): NavalCommand {
@@ -144,6 +150,7 @@ export class NavalSession implements NavalSessionView {
     this.#lastFrameMicros = null;
     this.#lastPublishedTick = -HUD_TICK_INTERVAL;
     this.#runner.reset();
+    this.#battleGeneration += 1;
     this.#publish(true);
   }
 
@@ -211,6 +218,7 @@ export class NavalSession implements NavalSessionView {
   #makeSnapshot(): NavalSessionSnapshot {
     return {
       state: structuredClone(this.#state),
+      battleGeneration: this.#battleGeneration,
       opponentMemory: { ...this.#opponentController.memory },
       currentCommand: { ...this.#playerCommand },
       paused: this.#paused,

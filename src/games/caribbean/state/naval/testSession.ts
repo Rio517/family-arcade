@@ -50,6 +50,7 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
   let paused = false;
   let diagnostic: NavalDiagnostic | null = null;
   let restartCount = 0;
+  let battleGeneration = 0;
   let history: NavalCommand[] = [];
   let opponentController = initialOpponentController();
   const runner = new FrameRunner({ tickRate: 60, maxTicksPerFrame: 6 });
@@ -59,6 +60,7 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
 
   const makeSnapshot = (): NavalSessionSnapshot => ({
     state: structuredClone(state),
+    battleGeneration,
     opponentMemory: { ...opponentController.memory },
     currentCommand: { ...currentCommand },
     paused,
@@ -78,6 +80,7 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
   return {
     get state() { return state; },
     get opponentMemory() { return { ...opponentController.memory }; },
+    get battleGeneration() { return battleGeneration; },
     get currentCommand() { return { ...currentCommand }; },
     get paused() { return paused; },
     get diagnostic() { return diagnostic ? { issues: [...diagnostic.issues] } : null; },
@@ -98,6 +101,7 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
       paused = false;
       diagnostic = null;
       restartCount += 1;
+      battleGeneration += 1;
       history = [];
       opponentController = initialOpponentController();
       runner.reset();

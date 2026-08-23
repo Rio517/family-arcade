@@ -230,7 +230,7 @@ describe('accessible naval command deck', () => {
     expect(screen.getByTestId('naval-html-chart')).toHaveTextContent(/battle rules continue/i);
   });
 
-  it('wires canonical snapshots and semantic events into one disposable live scene', async () => {
+  it('wires live event deltas and reused rematch ids into one disposable scene', async () => {
     const session = manualNavalSession();
     session.state.events = [{
       id: 4,
@@ -264,9 +264,40 @@ describe('accessible naval command deck', () => {
     const { unmount } = render(<NavalBattlePage session={session} sceneFactory={sceneFactory} />);
     await screen.findByTestId('naval-scene-slot');
 
-    expect(sync).toHaveBeenCalledWith(
+    expect(sync).toHaveBeenLastCalledWith(
       expect.objectContaining({ tick: 0 }),
-      [expect.objectContaining({ id: 4, kind: 'reload-ready' })],
+      [],
+    );
+
+    act(() => {
+      session.state.events.push({
+        id: 5,
+        kind: 'reload-ready',
+        atTick: 1,
+        shipId: 'player',
+        side: 'starboard',
+      });
+      session.setSail('full');
+    });
+    expect(sync).toHaveBeenLastCalledWith(
+      expect.anything(),
+      [expect.objectContaining({ id: 5 })],
+    );
+
+    act(() => session.restart());
+    act(() => {
+      session.state.events.push({
+        id: 1,
+        kind: 'reload-ready',
+        atTick: 1,
+        shipId: 'player',
+        side: 'port',
+      });
+      session.setSail('full');
+    });
+    expect(sync).toHaveBeenLastCalledWith(
+      expect.anything(),
+      [expect.objectContaining({ id: 1 })],
     );
     unmount();
     expect(dispose).toHaveBeenCalledTimes(1);
