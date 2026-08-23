@@ -17,6 +17,8 @@ const LOSS_CONSOLATION_POINTS = 25;
 
 export interface GameHistoryEntry {
   code: string;
+  /** Registry id of the game this was ('' on rows saved before we recorded it). */
+  game: string;
   opponent: string;
   result: 'win' | 'loss';
   pointsEarned: number;
@@ -64,6 +66,8 @@ export interface ResultInput {
   /** Bonus units toward the win bounty (game-specific; 0 if none). */
   survivingCells: number;
   code: string;
+  /** Registry id of the game recording this result. */
+  game?: string;
   opponent: string;
   finishedAt: number;
 }
@@ -73,6 +77,7 @@ export function recordResult(profile: Profile, input: ResultInput): Profile {
   const pointsEarned = pointsForResult(input.won, input.survivingCells);
   const entry: GameHistoryEntry = {
     code: input.code,
+    game: input.game ?? '',
     opponent: input.opponent || 'Opponent',
     result: input.won ? 'win' : 'loss',
     pointsEarned,
@@ -137,6 +142,15 @@ export function normalizeProfile(raw: unknown): Profile {
     losses: Number.isFinite(r.losses) ? (r.losses as number) : base.losses,
     unlocked,
     lastSkinId: typeof r.lastSkinId === 'string' ? r.lastSkinId : base.lastSkinId,
-    history: Array.isArray(r.history) ? (r.history as GameHistoryEntry[]).slice(0, MAX_HISTORY) : [],
+    history: Array.isArray(r.history)
+      ? (r.history as Partial<GameHistoryEntry>[]).slice(0, MAX_HISTORY).map((e) => ({
+          code: typeof e.code === 'string' ? e.code : '',
+          game: typeof e.game === 'string' ? e.game : '',
+          opponent: typeof e.opponent === 'string' ? e.opponent : 'Opponent',
+          result: e.result === 'loss' ? 'loss' : 'win',
+          pointsEarned: Number.isFinite(e.pointsEarned) ? (e.pointsEarned as number) : 0,
+          finishedAt: Number.isFinite(e.finishedAt) ? (e.finishedAt as number) : 0,
+        }))
+      : [],
   };
 }

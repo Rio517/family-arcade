@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { useProfile } from '@shared/profile/useProfile';
 import { BotIcon, GridIcon, PersonIcon, ResumeIcon } from '@shared/ui/icons';
 import { GAMES } from './registry';
+import { PlayerBooth } from './PlayerBooth';
 
 /**
  * The landing page — the Kny-Flores Family Arcade as a midnight carnival:
@@ -80,7 +80,6 @@ function Ticket({ title, sub, tag, players, computer, children }: {
 }
 
 export function Menu() {
-  const { profile } = useProfile();
   // Every resumable game across the arcade, in registry order — each game
   // reports its own saves through the `savedGames` hook on its descriptor.
   const saved = GAMES.flatMap((game) => game.savedGames?.() ?? []);
@@ -155,22 +154,7 @@ export function Menu() {
           </section>
         )}
 
-        <section className="prize" aria-label="Family records">
-          <div className="prize-in">
-            <div className="prize-h">✦ Prize Counter ✦</div>
-            <div className="prize-rows">
-              <div className="prize-row points">
-                <span>Tickets · Points</span><span className="fill" aria-hidden="true" /><span className="num">{profile.points}</span>
-              </div>
-              <div className="prize-row wins">
-                <span>Wins</span><span className="fill" aria-hidden="true" /><span className="num">{profile.wins}</span>
-              </div>
-              <div className="prize-row losses">
-                <span>Losses</span><span className="fill" aria-hidden="true" /><span className="num">{profile.losses}</span>
-              </div>
-            </div>
-          </div>
-        </section>
+        <PlayerBooth />
       </div>
 
       <div className="footer">

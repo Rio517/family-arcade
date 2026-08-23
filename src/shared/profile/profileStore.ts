@@ -1,56 +1,40 @@
 /**
- * Persistence for the device profile (points, wins/losses, unlocks, history).
- * One profile per device, shared across every game. Reads are defensive: bad or
- * partial JSON degrades to a sane default rather than throwing.
+ * The profile facade every game reads and writes — now backed by the player
+ * roster (usersStore) instead of one profile per device. `getProfileSnapshot`
+ * is the signed-in player's profile; writes land on that player, so switching
+ * players at the gate or the ticket booth swaps everyone's points, unlocks,
+ * and history in one move. Games never need to know the roster exists.
  */
 
-import { normalizeProfile, type Profile } from './profile';
-import { safeGet, safeSet } from '@shared/storage/kv';
+import { defaultProfile, type Profile } from './profile';
+import { activeProfile, addUser, updateActiveProfile } from './users';
+import { getUsersSnapshot, makeUserId, resetUsersStore, setUsersState, subscribeUsers } from './usersStore';
 
-// Historical key (kept so existing players don't lose their profile).
-const PROFILE_KEY = 'bship:profile:v1';
-
-export function loadProfile(): Profile {
-  const raw = safeGet(PROFILE_KEY);
-  if (!raw) return normalizeProfile(null);
-  try {
-    return normalizeProfile(JSON.parse(raw));
-  } catch {
-    return normalizeProfile(null);
-  }
-}
-
-export function saveProfile(profile: Profile): void {
-  safeSet(PROFILE_KEY, JSON.stringify(profile));
-}
-
-// ── shared reactive store ────────────────────────────────────────────────
-// One device profile, one source of truth. Every `useProfile()` subscribes to
-// this single store (via useSyncExternalStore), so a name changed in the party
-// bar is instantly seen by the menu and by whatever game is on screen — no more
-// per-hook copies drifting apart until the next remount. (localStorage's own
-// `storage` event only fires in OTHER tabs, so it can't do this for us.)
-let current: Profile = loadProfile();
-const listeners = new Set<() => void>();
+// Signed-out placeholder. One stable reference — useSyncExternalStore treats a
+// fresh object per read as an endless re-render loop.
+const SIGNED_OUT: Profile = defaultProfile();
 
 export function getProfileSnapshot(): Profile {
-  return current;
+  return activeProfile(getUsersSnapshot()) ?? SIGNED_OUT;
 }
 
-export function subscribeProfile(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
+export const subscribeProfile = subscribeUsers;
 
-/** Replace the shared profile, persist it, and wake every subscriber. */
+/** Replace the signed-in player's profile, persist, wake subscribers. */
 export function setProfileState(next: Profile): void {
-  if (next === current) return;
-  current = next;
-  saveProfile(current);
-  listeners.forEach((l) => l());
+  const users = getUsersSnapshot();
+  if (users.activeId) {
+    if (activeProfile(users) === next) return;
+    setUsersState(updateActiveProfile(users, next));
+    return;
+  }
+  // Defensive: a profile write with nobody signed in (say, a rename from the
+  // party bar before any game door was opened) mints that person on the spot.
+  const withUser = addUser(users, makeUserId(), next.name || 'Player', Date.now());
+  setUsersState(updateActiveProfile(withUser, next));
 }
 
 /** Re-read the store from storage. For tests, to isolate between cases. */
 export function resetProfileStore(): void {
-  current = loadProfile();
+  resetUsersStore();
 }

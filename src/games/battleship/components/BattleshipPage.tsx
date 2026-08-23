@@ -51,6 +51,7 @@ export function BattleshipPage() {
         won: info.won,
         survivingCells: info.survivingCells,
         code: info.code,
+        game: 'battleship',
         opponent: info.opponent,
         finishedAt: Date.now(),
       });

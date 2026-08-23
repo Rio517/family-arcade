@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@shared/ui/ErrorBoundary';
 import { PartyProvider } from '@shared/party/PartyContext';
 import { PartyBar } from '@shared/party/PartyBar';
 import { FloatingVideo } from '@shared/party/FloatingVideo';
+import { PlayerGate } from '@shared/profile/PlayerGate';
 
 /** The whole arcade shell — routes plus the cross-game party layer. */
 export function App() {
@@ -23,7 +24,17 @@ export function App() {
               <Route path="/" element={<Menu />} />
               <Route path="/privacy" element={<Privacy />} />
               {GAMES.map((game) => (
-                <Route key={game.id} path={game.path} element={<game.Page />} />
+                <Route
+                  key={game.id}
+                  path={game.path}
+                  element={
+                    // The ticket booth at the game door: asks who's playing
+                    // only when nobody is signed in on this browser.
+                    <PlayerGate gameTitle={game.title}>
+                      <game.Page />
+                    </PlayerGate>
+                  }
+                />
               ))}
             </Routes>
           </main>

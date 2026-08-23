@@ -177,7 +177,51 @@ const SHOTS = [
     viewport: PHONE,
     prep: playRiskToAttack,
   },
+  {
+    // The ticket booth gate at a game door: players exist, nobody signed in.
+    name: 'player-gate',
+    path: '/#/chess',
+    viewport: PHONE,
+    seed: 'signedOut',
+  },
 ];
+
+/**
+ * Every shot runs with this roster already in localStorage: the gate would
+ * otherwise block each game flow before it starts. Klara is signed in with a
+ * little history so the landing's Ticket Booth has something to show; the
+ * `player-gate` shot flips activeId to null to capture the gate itself.
+ * History stays within ~24h so its labels render as the stable "today"/
+ * "yest." instead of churning absolute dates on every regeneration.
+ */
+const NOW = Date.now();
+const SEED_ROSTER = {
+  activeId: 'seed-klara',
+  users: [
+    {
+      id: 'seed-rio',
+      profile: { name: 'Rio', points: 2150, wins: 18, losses: 9 },
+    },
+    {
+      id: 'seed-klara',
+      profile: {
+        name: 'Klara',
+        points: 1240,
+        wins: 12,
+        losses: 5,
+        history: [
+          { code: 'AB12', game: 'chess', opponent: 'Rio', result: 'win', pointsEarned: 100, finishedAt: NOW - 2 * 3600e3 },
+          { code: 'CD34', game: 'battleship', opponent: 'Papa', result: 'loss', pointsEarned: 25, finishedAt: NOW - 5 * 3600e3 },
+          { code: 'EF56', game: 'battleship', opponent: 'Flora', result: 'win', pointsEarned: 145, finishedAt: NOW - 26 * 3600e3 },
+        ],
+      },
+    },
+    {
+      id: 'seed-flora',
+      profile: { name: 'Flora', points: 980, wins: 9, losses: 6 },
+    },
+  ],
+};
 
 /**
  * Risk has no harness page: the board only exists once a campaign is under way,
@@ -312,6 +356,14 @@ async function main() {
         // gates its animations on this, so shots come out settled.
         reducedMotion: 'reduce',
       });
+      const roster = shot.seed === 'signedOut' ? { ...SEED_ROSTER, activeId: null } : SEED_ROSTER;
+      await page.addInitScript((state) => {
+        try {
+          localStorage.setItem('arcade.users.v1', JSON.stringify(state));
+        } catch {
+          /* storage blocked — the gate will show instead */
+        }
+      }, roster);
       await page.goto(`${BASE}${shot.path}`, { waitUntil: 'networkidle' });
       if (shot.prep) await shot.prep(page);
       // `selector` crops to one element — useful when the thing under review is
