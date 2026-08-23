@@ -29,6 +29,7 @@ const TASK8_TREE_FILES = [
   'scripts/caribbean-naval-check.mjs',
   'scripts/lib/caribbean-naval-evidence.mjs',
   'scripts/lib/caribbean-naval-evidence.test.mjs',
+  'scripts/lib/caribbean-naval-check.test.mjs',
   'scripts/lib/caribbean-naval-scenario.test.mjs',
   'src/games/caribbean/components/CaribbeanLab.test.tsx',
   'src/games/caribbean/components/CaribbeanLab.tsx',
@@ -93,8 +94,10 @@ function fileResponsePath(requestUrl) {
   return candidate;
 }
 
-async function startStaticServer() {
-  const server = http.createServer((request, response) => {
+export async function startStaticServer(options = {}) {
+  const createServer = options.createServer ?? http.createServer;
+  const healthCheck = options.healthCheck ?? fetch;
+  const server = createServer((request, response) => {
     const file = fileResponsePath(request.url ?? '/');
     if (!file) {
       response.writeHead(403).end('Forbidden');
@@ -116,12 +119,17 @@ async function startStaticServer() {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
   });
-  const address = server.address();
-  if (!address || typeof address === 'string') throw new Error('Static server did not receive a TCP port');
-  const baseUrl = `http://127.0.0.1:${address.port}`;
-  const response = await fetch(`${baseUrl}${HARNESS_PATH}`);
-  if (response.status !== 200) throw new Error(`Harness health check returned ${response.status}`);
-  return { server, baseUrl };
+  try {
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Static server did not receive a TCP port');
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const response = await healthCheck(`${baseUrl}${HARNESS_PATH}`);
+    if (response.status !== 200) throw new Error(`Harness health check returned ${response.status}`);
+    return { server, baseUrl };
+  } catch (error) {
+    await stopStaticServer(server);
+    throw error;
+  }
 }
 
 async function stopStaticServer(server) {
@@ -155,22 +163,21 @@ function saveIfChanged(filename, bytes) {
   return true;
 }
 
-function task8SourceProvenance() {
+export function captureSourceProvenance({ root = ROOT, sourceFiles = TASK8_TREE_FILES } = {}) {
   const digest = createHash('sha256');
-  for (const relativePath of TASK8_TREE_FILES) {
+  for (const relativePath of sourceFiles) {
     digest.update(relativePath);
     digest.update('\0');
-    digest.update(fs.readFileSync(path.join(ROOT, relativePath)));
+    digest.update(fs.readFileSync(path.join(root, relativePath)));
     digest.update('\0');
   }
   return {
-    baseCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(),
-    baseCommitRole: 'pre-Task-8 HEAD at evidence capture; the Task 8 tree below identifies the tested implementation',
-    worktreeDirtyAtCapture: execFileSync(
-      'git', ['status', '--porcelain', '--untracked-files=all'], { cwd: ROOT, encoding: 'utf8' },
+    headCommitAtCapture: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+    worktreeDirtyBeforeCapture: execFileSync(
+      'git', ['status', '--porcelain', '--untracked-files=all'], { cwd: root, encoding: 'utf8' },
     ).trim().length > 0,
-    task8TreeSha256: digest.digest('hex'),
-    task8TreeFiles: TASK8_TREE_FILES,
+    sourceTreeSha256: digest.digest('hex'),
+    sourceTreeFiles: sourceFiles,
   };
 }
 
@@ -187,6 +194,21 @@ function physicalScenario(side) {
   input.player.heading = 0;
   input.opponent.position = { x: side === 'port' ? 20 : -20, z: 0 };
   input.opponent.heading = Math.PI;
+  return input;
+}
+
+function performanceScenario() {
+  const input = structuredClone(CANONICAL_INPUT);
+  input.battleId = 'naval-evidence-active-performance';
+  input.seed = 8_026;
+  input.player.position = { x: 0, z: 0 };
+  input.player.heading = 0;
+  input.player.crew = 75;
+  input.player.cannon = 12;
+  input.opponent.position = { x: 20, z: 0 };
+  input.opponent.heading = 0;
+  input.opponent.crew = 75;
+  input.opponent.cannon = 12;
   return input;
 }
 
@@ -236,6 +258,19 @@ async function readSceneMetrics(page) {
     return Boolean(element?.getAttribute('data-scene-fps'));
   }, undefined, { timeout: 20_000 });
   return frame.evaluate(sceneMetricsFrom);
+}
+
+async function readActiveSceneSample(page) {
+  const metrics = await readSceneMetrics(page);
+  const simulation = await page.evaluate(() => {
+    const snapshot = window.__CARIBBEAN_NAVAL_DEBUG__.getSnapshot();
+    return {
+      tick: snapshot.state.tick,
+      paused: snapshot.paused,
+      outcome: snapshot.state.outcome?.kind ?? null,
+    };
+  });
+  return { ...metrics, ...simulation };
 }
 
 async function enterBattle(page) {
@@ -359,15 +394,6 @@ async function captureCanonicalJourney(browser, baseUrl, aggregate) {
   await page.setViewportSize(VIEWPORTS.tablet);
   await page.waitForTimeout(1_100);
 
-  await page.getByTestId('naval-pause').click();
-  await page.waitForFunction(() => window.__CARIBBEAN_NAVAL_DEBUG__.getSnapshot().paused === true);
-  await page.waitForFunction(() => document.querySelector('[data-testid="naval-scene-frame"]')?.getAttribute('data-scene-active-effects') === '0');
-  await page.waitForTimeout(2_000);
-  const plateauSamples = [];
-  for (let second = 0; second < 20; second += 1) {
-    await page.waitForTimeout(1_000);
-    plateauSamples.push(await readSceneMetrics(page));
-  }
   await flushUnhandled(page, aggregate);
   await page.close();
 
@@ -377,8 +403,35 @@ async function captureCanonicalJourney(browser, baseUrl, aggregate) {
     staleRudder,
     canonicalInput,
     viewportMetrics: { tablet: tabletMetrics, desktop: desktopMetrics, phone: phoneMetrics },
-    plateauSamples,
   };
+}
+
+async function captureActivePlateau(browser, baseUrl, aggregate) {
+  const page = await newEvidencePage(browser, baseUrl, aggregate, VIEWPORTS.tablet);
+  await page.goto(serializedHarnessUrl(baseUrl, performanceScenario()), { waitUntil: 'networkidle' });
+  await enterBattle(page);
+  await readSceneMetrics(page);
+  await page.waitForTimeout(2_000);
+  const afterEventId = await page.evaluate(() => {
+    const events = window.__CARIBBEAN_NAVAL_DEBUG__.getSnapshot().state.events;
+    return events.at(-1)?.id ?? 0;
+  });
+  await page.keyboard.press('KeyQ');
+  await page.waitForFunction(
+    (eventId) => window.__CARIBBEAN_NAVAL_DEBUG__.getVolleyEvidence(eventId).some((event) => event.side === 'port'),
+    afterEventId,
+  );
+
+  const samples = [];
+  const started = performance.now();
+  for (let second = 1; second <= 20; second += 1) {
+    const remaining = started + second * 1_000 - performance.now();
+    if (remaining > 0) await page.waitForTimeout(remaining);
+    samples.push(await readActiveSceneSample(page));
+  }
+  await flushUnhandled(page, aggregate);
+  await page.close();
+  return samples;
 }
 
 async function captureBroadside(browser, baseUrl, aggregate, side) {
@@ -507,7 +560,7 @@ async function captureFallback(browser, baseUrl, aggregate) {
   return { ok, chart, retry, restart, battleControls };
 }
 
-function plateauEvidence(samples) {
+export function plateauEvidence(samples) {
   const allocationErrors = [];
   const capacityErrors = [];
   const poolErrors = [];
@@ -519,6 +572,8 @@ function plateauEvidence(samples) {
     if (sample.activeEffects > sample.effectCapacity) poolErrors.push(`sample ${index} active=${sample.activeEffects} capacity=${sample.effectCapacity}`);
   }
   return {
+    observedSeconds: 20,
+    samples,
     growthAfterWarmup: {
       textures: resourceGrowth(samples, 'textures'),
       geometries: resourceGrowth(samples, 'geometries'),
@@ -533,6 +588,7 @@ function plateauEvidence(samples) {
 }
 
 export async function runNavalCheck() {
+  const source = captureSourceProvenance();
   console.log('Building production bundle with the harness enabled…');
   await run('npm', ['run', 'build'], { env: { ...process.env, BUILD_HARNESS: '1' } });
   const glb = findHashedGlb();
@@ -548,6 +604,7 @@ export async function runNavalCheck() {
       requestedPaths: [], remoteDependencies: [],
     };
     const canonical = await captureCanonicalJourney(browser, baseUrl, aggregate);
+    const activePlateauSamples = await captureActivePlateau(browser, baseUrl, aggregate);
     const handednessEvents = await captureHandedness(browser, baseUrl, aggregate);
     const scenario = await captureBoardingReady(browser, baseUrl, aggregate);
     const fallback = await captureFallback(browser, baseUrl, aggregate);
@@ -557,9 +614,9 @@ export async function runNavalCheck() {
       canonical.viewportMetrics.phone,
       handednessEvents.portMetrics,
       handednessEvents.starboardMetrics,
-      ...canonical.plateauSamples,
+      ...activePlateauSamples,
     ];
-    const fpsSamples = canonical.plateauSamples.map((sample) => round(sample.fps));
+    const fpsSamples = activePlateauSamples.map((sample) => round(sample.fps));
     const handedness = {
       portVectorX: handednessEvents.port.vector.x,
       starboardVectorX: handednessEvents.starboard.vector.x,
@@ -587,14 +644,14 @@ export async function runNavalCheck() {
         maxDrawCalls: Math.max(...performanceSamples.map((sample) => sample.drawCalls)),
         maxTriangles: Math.max(...performanceSamples.map((sample) => sample.triangles)),
       },
-      resources: plateauEvidence(canonical.plateauSamples),
+      resources: plateauEvidence(activePlateauSamples),
       handedness,
       scenario,
       fallback,
     };
     const verdict = evaluateNavalEvidence(evidence);
     const metrics = {
-      source: task8SourceProvenance(),
+      source,
       canonicalInput: canonical.canonicalInput,
       seed: canonical.canonicalInput.seed,
       browser: { name: 'Chromium', version: browser.version(), angleArgs: ANGLE_ARGS },
@@ -607,7 +664,7 @@ export async function runNavalCheck() {
       },
       fps: {
         samples: fpsSamples,
-        sustainedFloorMethod: 'minimum 3-sample moving average after warm-up while paused and rendering',
+        sustainedFloorMethod: 'minimum 3-sample moving average after warm-up during an unpaused advancing battle with live effects',
         sustained: evidence.performance.sustainedFps,
       },
       maximums: {
@@ -622,7 +679,7 @@ export async function runNavalCheck() {
       resourcePlateau: {
         warmupSeconds: 2,
         observedSeconds: 20,
-        samples: canonical.plateauSamples,
+        samples: activePlateauSamples,
         ...evidence.resources,
       },
       asset: { path: glb.requestPath, bytes: glb.bytes, sha256: glb.sha256 },
