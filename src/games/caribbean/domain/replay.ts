@@ -1,3 +1,4 @@
+import { canonicalJson } from '../canonicalJson';
 import {
   type CampaignEvent,
   type CampaignEventDraft,
@@ -32,60 +33,52 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-// Task 3 needs key-order-independent replay comparison before persistence
-// exists. This stays private; Task 4 introduces the one public canonical
-// serializer used by save checksums and will replace this local comparator.
-function canonicalReplayValue(value: unknown, ancestors: Set<object>): string {
-  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
-    return JSON.stringify(value);
-  }
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new Error('non-json');
-    return JSON.stringify(value);
-  }
-  if (typeof value !== 'object') throw new Error('non-json');
-  if (ancestors.has(value)) throw new Error('non-json');
-  if (!Array.isArray(value) && !isPlainRecord(value)) throw new Error('non-json');
-
-  const keys = Reflect.ownKeys(value);
-  if (keys.some((key) => typeof key === 'symbol')) throw new Error('non-json');
-  ancestors.add(value);
-  try {
-    if (Array.isArray(value)) {
-      const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
-      if (!lengthDescriptor || !('value' in lengthDescriptor) || !Number.isInteger(lengthDescriptor.value) || lengthDescriptor.value < 0) {
-        throw new Error('non-json');
-      }
-      const length = lengthDescriptor.value;
-      const allowedKeys = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
-      if (keys.some((key) => typeof key === 'string' && !allowedKeys.has(key))) throw new Error('non-json');
-      const items: string[] = [];
-      for (let index = 0; index < length; index += 1) {
-        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-        if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) throw new Error('non-json');
-        items.push(canonicalReplayValue(descriptor.value, ancestors));
-      }
-      return `[${items.join(',')}]`;
-    }
-
-    const entries: string[] = [];
-    for (const key of keys.filter((candidate): candidate is string => typeof candidate === 'string').sort()) {
-      const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) throw new Error('non-json');
-      entries.push(`${JSON.stringify(key)}:${canonicalReplayValue(descriptor.value, ancestors)}`);
-    }
-    return `{${entries.join(',')}}`;
-  } finally {
-    ancestors.delete(value);
-  }
-}
-
-function canonicalReplayJson(value: unknown): string {
-  return canonicalReplayValue(value, new Set());
-}
-
 function cloneUntrustedJournal(value: unknown): unknown {
-  return JSON.parse(canonicalReplayJson(value)) as unknown;
+  return JSON.parse(canonicalJson(value)) as unknown;
+}
+
+function snapshotEventDraft(input: unknown): ValidationResult<CampaignEventDraft> {
+  try {
+    if (!isPlainRecord(input)) {
+      return {
+        ok: false,
+        issues: [{
+          path: '$',
+          code: input !== null && typeof input === 'object' && !Array.isArray(input)
+            ? 'non-json'
+            : 'wrong-type',
+        }],
+      };
+    }
+
+    const ownKeys = Reflect.ownKeys(input);
+    if (ownKeys.some((key) => typeof key === 'symbol')) {
+      return { ok: false, issues: [{ path: '$', code: 'non-json' }] };
+    }
+
+    const allowed = new Set(['type', 'payload']);
+    const snapshot: Record<string, unknown> = {};
+    const issues: ValidationIssue[] = [];
+    for (const key of ownKeys.filter((candidate): candidate is string => typeof candidate === 'string').sort()) {
+      const descriptor = Object.getOwnPropertyDescriptor(input, key);
+      if (!allowed.has(key)) {
+        issues.push({ path: key, code: 'unknown-key' });
+      } else if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
+        issues.push({ path: key, code: 'non-json' });
+      } else {
+        Object.defineProperty(snapshot, key, {
+          configurable: true,
+          enumerable: true,
+          value: descriptor.value,
+          writable: true,
+        });
+      }
+    }
+    if (issues.length > 0) return { ok: false, issues };
+    return { ok: true, value: snapshot as unknown as CampaignEventDraft };
+  } catch {
+    return { ok: false, issues: [{ path: '$', code: 'non-json' }] };
+  }
 }
 
 function requiredJournalField(
@@ -110,7 +103,7 @@ export function replayCampaign(
   }
   return events.reduce(
     (state, event) => reduceCampaign(state, event),
-    structuredClone(initial),
+    validation.value,
   );
 }
 
@@ -120,9 +113,9 @@ export function createJournal(initial: CampaignStateV1): CampaignJournal {
     throw new Error(`Invalid campaign journal initial state: ${formatIssues(validation.issues)}`);
   }
   return {
-    initial: structuredClone(initial),
+    initial: structuredClone(validation.value),
     events: [],
-    state: structuredClone(initial),
+    state: structuredClone(validation.value),
   };
 }
 
@@ -190,7 +183,7 @@ export function validateJournal(input: unknown): ValidationResult<CampaignJourna
     if (semanticsValid) {
       try {
         const replayed = replayCampaign(initial.value, events);
-        if (state?.ok && canonicalReplayJson(replayed) !== canonicalReplayJson(state.value)) {
+        if (state?.ok && canonicalJson(replayed) !== canonicalJson(state.value)) {
           issues.push({ path: 'state', code: 'replay-mismatch' });
         }
       } catch {
@@ -226,20 +219,12 @@ export function appendJournal(
     throw new Error('Campaign event ID space exhausted');
   }
 
-  let clonedDraft: CampaignEventDraft;
-  try {
-    clonedDraft = structuredClone(draft);
-  } catch {
-    throw new Error('Invalid campaign event: $:non-json');
-  }
-  const draftKeys = Object.keys(clonedDraft);
-  const allowedDraftKeys = new Set(['type', 'payload']);
-  const extraDraftKey = draftKeys.filter((key) => !allowedDraftKeys.has(key)).sort()[0];
-  if (extraDraftKey !== undefined) {
-    throw new Error(`Invalid campaign event: ${extraDraftKey}:unknown-key`);
+  const draftSnapshot = snapshotEventDraft(draft);
+  if (!draftSnapshot.ok) {
+    throw new Error(`Invalid campaign event: ${formatIssues(draftSnapshot.issues)}`);
   }
   const event = {
-    ...clonedDraft,
+    ...draftSnapshot.value,
     id: journal.state.lastEventId + 1,
     atDay: journal.state.calendar.elapsedDays,
   } as CampaignEvent;

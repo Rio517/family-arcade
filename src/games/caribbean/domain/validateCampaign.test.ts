@@ -19,12 +19,50 @@ function secondSloop(id = 'second-sloop'): ShipState {
 }
 
 describe('validateCampaign', () => {
-  it('returns the original canonical campaign when it is valid', () => {
+  it('returns a detached canonical campaign snapshot when it is valid', () => {
     const state = validCampaign();
 
     const result = validateCampaign(state);
     expect(result).toEqual({ ok: true, value: state });
-    if (result.ok) expect(result.value).toBe(state);
+    if (result.ok) {
+      expect(result.value).not.toBe(state);
+      expect(result.value.fleet).not.toBe(state.fleet);
+      expect(result.value.fleet.ships[0]).not.toBe(state.fleet.ships[0]);
+    }
+  });
+
+  it('returns a clone-safe snapshot without invoking live reads on a valid proxy', () => {
+    const target = validCampaign();
+    let liveReads = 0;
+    let ownKeyReads = 0;
+    let seedDescriptorReads = 0;
+    const proxy = new Proxy(target, {
+      get: () => {
+        liveReads += 1;
+        throw new Error('unsafe live read');
+      },
+      getOwnPropertyDescriptor: (current, key) => {
+        if (key === 'seed') seedDescriptorReads += 1;
+        if (seedDescriptorReads > 1) throw new Error('unsafe repeated descriptor read');
+        return Reflect.getOwnPropertyDescriptor(current, key);
+      },
+      ownKeys: (current) => {
+        ownKeyReads += 1;
+        return Reflect.ownKeys(current);
+      },
+    });
+
+    const result = validateCampaign(proxy);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(Object.is(result.value, proxy)).toBe(false);
+      expect(result.value).toEqual(target);
+      expect(() => structuredClone(result.value)).not.toThrow();
+    }
+    expect(liveReads).toBe(0);
+    expect(ownKeyReads).toBe(1);
+    expect(seedDescriptorReads).toBe(1);
   });
 
   it('collects deeply malformed fields in exact canonical order without mutation', () => {
@@ -369,6 +407,20 @@ describe('validateCampaign', () => {
     const state = validCampaign();
     state.fleet.ships[0][field] = value;
     expectIssues(state, [{ path: `fleet.ships.0.${field}`, code: 'out-of-range' }]);
+  });
+
+  it.each([
+    [11, false],
+    [12, true],
+  ] as const)('enforces the authoritative sloop crew minimum at %i', (crew, accepted) => {
+    const state = validCampaign();
+    state.fleet.ships[0].crew = crew;
+
+    if (accepted) {
+      expect(validateCampaign(state).ok).toBe(true);
+    } else {
+      expectIssues(state, [{ path: 'fleet.ships.0.crew', code: 'out-of-range' }]);
+    }
   });
 
   it('accounts for the opening 34 + 4 + (8 × 2) = 54 / 100 hold capacity', () => {

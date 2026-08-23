@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { canonicalJson as neutralCanonicalJson } from '../canonicalJson';
 import { canonicalJson, checksumPayload, fnv1aUtf8 } from './checksum';
 
 describe('fnv1aUtf8', () => {
@@ -19,6 +20,17 @@ describe('fnv1aUtf8', () => {
 });
 
 describe('canonicalJson', () => {
+  it('re-exports the one neutral canonical serializer used by campaign boundaries', () => {
+    expect(canonicalJson).toBe(neutralCanonicalJson);
+    expect(neutralCanonicalJson({
+      state: { z: 2, a: 1 },
+      events: [{ type: 'lead-accepted', payload: { leadId: 'red-jackdaw' } }],
+      initial: { seed: 1702 },
+    })).toBe(
+      '{"events":[{"payload":{"leadId":"red-jackdaw"},"type":"lead-accepted"}],"initial":{"seed":1702},"state":{"a":1,"z":2}}',
+    );
+  });
+
   it('sorts every plain-object key while preserving array order', () => {
     expect(canonicalJson({
       z: 3,

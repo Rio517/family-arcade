@@ -559,7 +559,13 @@ function validateShip(
   validateText(required(ship, 'name', path, problems, nonEnumerable, issues), `${path}.name`, 40, issues);
   validateInteger(required(ship, 'hull', path, problems, nonEnumerable, issues), `${path}.hull`, 0, SLOOP_CLASS.hullMaximum, issues);
   validateInteger(required(ship, 'sails', path, problems, nonEnumerable, issues), `${path}.sails`, 0, SLOOP_CLASS.sailsMaximum, issues);
-  validateInteger(required(ship, 'crew', path, problems, nonEnumerable, issues), `${path}.crew`, 0, SLOOP_CLASS.crew.maximum, issues);
+  validateInteger(
+    required(ship, 'crew', path, problems, nonEnumerable, issues),
+    `${path}.crew`,
+    SLOOP_CLASS.crew.minimum,
+    SLOOP_CLASS.crew.maximum,
+    issues,
+  );
   const cannon = required(ship, 'cannon', path, problems, nonEnumerable, issues);
   const cannonValid = validateInteger(cannon, `${path}.cannon`, 0, SLOOP_CLASS.cannonMaximum, issues);
   const cargo = validateCargo(ship, path, problems, nonEnumerable, issues);
@@ -689,13 +695,16 @@ function validateRng(root: PlainRecord, problems: JsonProblems, nonEnumerable: S
   validateInteger(required(rng, 'naval', path, problems, nonEnumerable, issues), `${path}.naval`, 0, 0xffff_ffff, issues);
 }
 
-function collectCampaignIssues(input: unknown, issues: ValidationIssue[]): input is CampaignStateV1 {
+function validatedCampaignSnapshot(
+  input: unknown,
+  issues: ValidationIssue[],
+): CampaignStateV1 | null {
   const snapshot = snapshotJson(input);
   const { problems, nonEnumerable } = snapshot;
-  if (emitJsonProblem('$', problems, nonEnumerable, issues)) return false;
+  if (emitJsonProblem('$', problems, nonEnumerable, issues)) return null;
   if (!isPlainRecord(snapshot.value)) {
     issue(issues, '$', 'wrong-type');
-    return false;
+    return null;
   }
   const root = snapshot.value;
 
@@ -722,11 +731,14 @@ function collectCampaignIssues(input: unknown, issues: ValidationIssue[]): input
   validateRng(root, problems, nonEnumerable, issues);
   validateInteger(required(root, 'lastEventId', '$', problems, nonEnumerable, issues), 'lastEventId', 0, 0xffff_ffff, issues);
 
-  return issues.length === 0;
+  return issues.length === 0
+    ? root as unknown as CampaignStateV1
+    : null;
 }
 
 export function validateCampaign(input: unknown): ValidationResult<CampaignStateV1> {
   const issues: ValidationIssue[] = [];
-  if (collectCampaignIssues(input, issues)) return { ok: true, value: input };
+  const value = validatedCampaignSnapshot(input, issues);
+  if (value) return { ok: true, value };
   return { ok: false, issues };
 }

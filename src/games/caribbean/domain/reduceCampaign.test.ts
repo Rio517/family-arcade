@@ -87,6 +87,102 @@ describe('campaign journal append', () => {
     } as never)).toThrowError(`Invalid campaign event: ${field}:unknown-key`);
   });
 
+  it.each(['id', 'atDay', 'surprise'] as const)(
+    'rejects a non-enumerable caller-supplied draft %s',
+    (field) => {
+      const journal = createJournal(initialCampaign());
+      const draft = structuredClone(ACCEPT_RED_JACKDAW) as CampaignEventDraft & Record<string, unknown>;
+      Object.defineProperty(draft, field, { configurable: true, value: 99 });
+
+      expect(() => appendJournal(journal, draft)).toThrowError(
+        `Invalid campaign event: ${field}:unknown-key`,
+      );
+    },
+  );
+
+  it('rejects a symbol-keyed draft instead of silently dropping it', () => {
+    const journal = createJournal(initialCampaign());
+    const draft = structuredClone(ACCEPT_RED_JACKDAW) as CampaignEventDraft & Record<PropertyKey, unknown>;
+    draft[Symbol('hidden')] = true;
+
+    expect(() => appendJournal(journal, draft)).toThrowError(
+      'Invalid campaign event: $:non-json',
+    );
+  });
+
+  it('rejects prohibited and canonical accessors without invoking their getters', () => {
+    const journal = createJournal(initialCampaign());
+    const prohibited = structuredClone(ACCEPT_RED_JACKDAW) as CampaignEventDraft & Record<string, unknown>;
+    let reads = 0;
+    Object.defineProperty(prohibited, 'id', {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return 99;
+      },
+    });
+
+    expect(() => appendJournal(journal, prohibited)).toThrowError(
+      'Invalid campaign event: id:unknown-key',
+    );
+    expect(reads).toBe(0);
+
+    const canonical = structuredClone(ACCEPT_RED_JACKDAW) as CampaignEventDraft & Record<string, unknown>;
+    Object.defineProperty(canonical, 'type', {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return 'lead-accepted';
+      },
+    });
+    expect(() => appendJournal(journal, canonical)).toThrowError(
+      'Invalid campaign event: type:non-json',
+    );
+    expect(reads).toBe(0);
+  });
+
+  it('inspects a descriptor-safe proxy draft without invoking its live get trap', () => {
+    const journal = createJournal(initialCampaign());
+    const target = { ...structuredClone(ACCEPT_RED_JACKDAW), id: 99 };
+    let liveReads = 0;
+    let ownKeyReads = 0;
+    const descriptorReads = new Map<PropertyKey, number>();
+    const draft = new Proxy(target, {
+      get: () => {
+        liveReads += 1;
+        throw new Error('unsafe live read');
+      },
+      getOwnPropertyDescriptor: (current, key) => {
+        descriptorReads.set(key, (descriptorReads.get(key) ?? 0) + 1);
+        return Reflect.getOwnPropertyDescriptor(current, key);
+      },
+      ownKeys: (current) => {
+        ownKeyReads += 1;
+        return Reflect.ownKeys(current);
+      },
+    });
+
+    expect(() => appendJournal(journal, draft as never)).toThrowError(
+      'Invalid campaign event: id:unknown-key',
+    );
+    expect(liveReads).toBe(0);
+    expect(ownKeyReads).toBe(1);
+    expect([...descriptorReads.values()]).toEqual([1, 1, 1]);
+  });
+
+  it('does not mutate or reuse a valid caller draft', () => {
+    const journal = createJournal(initialCampaign());
+    const draft = structuredClone(ACCEPT_RED_JACKDAW);
+    const before = structuredClone(draft);
+
+    const next = appendJournal(journal, draft);
+
+    expect(draft).toEqual(before);
+    expect(next.events[0].payload).not.toBe(draft.payload);
+  });
+
   it('rejects append when the uint32 event ID space is exhausted', () => {
     const initial = initialCampaign();
     initial.lastEventId = 0xffff_ffff;
@@ -125,6 +221,23 @@ describe('reduceCampaign', () => {
     expect(next.fleet).not.toBe(initial.fleet);
     expect(next.fleet.ships[0]).not.toBe(initial.fleet.ships[0]);
     expect(next.leads).not.toBe(initial.leads);
+  });
+
+  it('uses the validated state snapshot instead of live-reading a descriptor-safe proxy', () => {
+    const target = initialCampaign();
+    let liveReads = 0;
+    const proxy = new Proxy(target, {
+      get: () => {
+        liveReads += 1;
+        throw new Error('unsafe live read');
+      },
+    });
+
+    const next = reduceCampaign(proxy, acceptEvent());
+
+    expect(next.lastEventId).toBe(1);
+    expect(next.leads).toHaveLength(1);
+    expect(liveReads).toBe(0);
   });
 
   it.each([

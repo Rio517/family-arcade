@@ -78,6 +78,23 @@ describe('replayCampaign', () => {
     expect(replayed).not.toBe(journal.initial);
     expect(replayed.leads).not.toBe(journal.initial.leads);
   });
+
+  it('uses the validated snapshot when replaying a descriptor-safe proxy state', () => {
+    const target = initialCampaign();
+    let liveReads = 0;
+    const proxy = new Proxy(target, {
+      get: () => {
+        liveReads += 1;
+        throw new Error('unsafe live read');
+      },
+    });
+
+    const replayed = replayCampaign(proxy, []);
+
+    expect(replayed).toEqual(target);
+    expect(Object.is(replayed, proxy)).toBe(false);
+    expect(liveReads).toBe(0);
+  });
 });
 
 describe('validateJournal', () => {
@@ -201,5 +218,23 @@ describe('checkpoint append', () => {
       'Invalid campaign journal: state:replay-mismatch',
     );
     expect(journal).toEqual(before);
+  });
+
+  it('uses the validated snapshot when creating a journal from a descriptor-safe proxy', () => {
+    const target = initialCampaign();
+    let liveReads = 0;
+    const proxy = new Proxy(target, {
+      get: () => {
+        liveReads += 1;
+        throw new Error('unsafe live read');
+      },
+    });
+
+    const journal = createJournal(proxy);
+
+    expect(journal.initial).toEqual(target);
+    expect(journal.state).toEqual(target);
+    expect(Object.is(journal.initial, proxy)).toBe(false);
+    expect(liveReads).toBe(0);
   });
 });

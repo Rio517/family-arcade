@@ -15,13 +15,14 @@ function assertNever(value: never): never {
 }
 
 export function reduceCampaign(
-  state: CampaignStateV1,
+  inputState: CampaignStateV1,
   inputEvent: CampaignEvent,
 ): CampaignStateV1 {
-  const prior = validateCampaign(state);
+  const prior = validateCampaign(inputState);
   if (!prior.ok) {
     throw new Error(`Invalid prior campaign state: ${formatIssues(prior.issues)}`);
   }
+  const state = prior.value;
 
   const validatedEvent = validateCampaignEvent(inputEvent);
   if (!validatedEvent.ok) {
