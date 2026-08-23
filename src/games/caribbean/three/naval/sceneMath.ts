@@ -81,6 +81,17 @@ export function writeShipRecoil(
   );
 }
 
+export function settleShipRecoilForReducedMotion(
+  reducedMotion: boolean,
+  recoil: number,
+  rest: THREE.Vector3,
+  modelPosition: THREE.Vector3,
+): number {
+  if (!reducedMotion) return recoil;
+  modelPosition.copy(rest);
+  return 0;
+}
+
 export function fitEngagementCamera(
   input: EngagementCameraInput,
   output?: EngagementCameraFit,

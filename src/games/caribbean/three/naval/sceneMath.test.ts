@@ -6,6 +6,7 @@ import {
   composeWakeMatrix,
   decayCameraShake,
   fitEngagementCamera,
+  settleShipRecoilForReducedMotion,
   writeCameraShake,
   writeShipRecoil,
 } from './sceneMath';
@@ -141,5 +142,26 @@ describe('naval scene visual transforms', () => {
     expect(recoilScratch.x).toBeCloseTo(0.68, 12);
     expect(recoilScratch.y).toBe(2);
     expect(recoilScratch.z).toBe(3);
+  });
+
+  it('restores active recoil before the next frame when reduced motion changes live and permits future recoil after disabling it', () => {
+    const rest = new THREE.Vector3(1, 2, 3);
+    const modelPosition = new THREE.Vector3();
+    writeShipRecoil(rest, -1, 0.5, 1, modelPosition);
+    expect(modelPosition.equals(rest)).toBe(false);
+
+    let recoil = settleShipRecoilForReducedMotion(true, 1, rest, modelPosition);
+    expect(recoil).toBe(0);
+    expect(modelPosition).toEqual(rest);
+    for (let frame = 0; frame < 4; frame += 1) {
+      writeShipRecoil(rest, -1, 0.5, recoil, modelPosition);
+      expect(modelPosition).toEqual(rest);
+    }
+
+    recoil = settleShipRecoilForReducedMotion(false, recoil, rest, modelPosition);
+    expect(recoil).toBe(0);
+    recoil = 1;
+    writeShipRecoil(rest, -1, 0.5, recoil, modelPosition);
+    expect(modelPosition.equals(rest)).toBe(false);
   });
 });

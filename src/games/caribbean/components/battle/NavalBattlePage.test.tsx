@@ -413,18 +413,99 @@ describe('accessible naval command deck', () => {
     expect(syncSensorySettings).toHaveBeenLastCalledWith(expect.objectContaining({ aimCue: expect.objectContaining({ side: 'starboard' }), reducedFlashes: true }));
   });
 
-  it('announces each player reload-ready event once without making aim feedback live', () => {
+  it('mutates one established reload live region in two phases for repeated same-side events and cleans pending frames', () => {
+    const frames = new Map<number, FrameRequestCallback>();
+    let nextFrame = 0;
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      nextFrame += 1;
+      frames.set(nextFrame, callback);
+      return nextFrame;
+    }));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn((handle: number) => frames.delete(handle)));
     const session = manualNavalSession();
-    render(<NavalBattlePage session={session} sceneFactory={null} />);
-    expect(screen.getByTestId('naval-reload-announcement')).toHaveAttribute('aria-live', 'polite');
+    const { unmount } = render(<StrictMode><NavalBattlePage session={session} sceneFactory={null} /></StrictMode>);
+    const region = screen.getByTestId('naval-reload-announcement');
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    expect(region).toHaveAttribute('aria-atomic', 'true');
+
     act(() => {
       session.state.events.push({ id: 1, kind: 'reload-ready', atTick: 1, shipId: 'player', side: 'port' });
       session.setSail('full');
     });
-    expect(screen.getByTestId('naval-reload-announcement')).toHaveTextContent('Port battery ready');
+    expect(screen.getByTestId('naval-reload-announcement')).toBe(region);
+    expect(region).toHaveTextContent('');
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+    act(() => frames.get(1)?.(16));
+    expect(region).toHaveTextContent('Port battery ready');
+
     act(() => session.setSail('full'));
-    expect(screen.getByTestId('naval-reload-announcement')).toHaveTextContent('Port battery ready');
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(region).toHaveTextContent('Port battery ready');
+
+    act(() => {
+      session.state.events.push({ id: 2, kind: 'reload-ready', atTick: 2, shipId: 'player', side: 'port' });
+      session.setSail('full');
+    });
+    const repeatedFrame = frames.get(2);
+    expect(screen.getByTestId('naval-reload-announcement')).toBe(region);
+    expect(region).toHaveTextContent('');
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
+
+    act(() => session.restart());
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(2);
+    expect(region).toHaveTextContent('');
+    expect(screen.getByTestId('naval-reload-announcement')).toBe(region);
+    act(() => repeatedFrame?.(32));
+    expect(region).toHaveTextContent('');
+
+    act(() => {
+      session.state.events.push({ id: 1, kind: 'reload-ready', atTick: 1, shipId: 'player', side: 'starboard' });
+      session.setSail('full');
+    });
+    expect(region).toHaveTextContent('');
+    act(() => frames.get(3)?.(48));
+    expect(region).toHaveTextContent('Starboard battery ready');
+
+    act(() => {
+      session.state.events.push({ id: 2, kind: 'reload-ready', atTick: 2, shipId: 'opponent', side: 'port' });
+      session.setSail('full');
+    });
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(3);
+    expect(region).toHaveTextContent('Starboard battery ready');
     expect(screen.getByTestId('naval-aim-cue')).not.toHaveAttribute('aria-live');
+
+    act(() => {
+      session.state.events.push({ id: 3, kind: 'reload-ready', atTick: 3, shipId: 'player', side: 'port' });
+      session.setSail('full');
+    });
+    unmount();
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(4);
+    vi.unstubAllGlobals();
+  });
+
+  it('reschedules an initial reload announcement after the StrictMode effect rehearsal', () => {
+    const frames = new Map<number, FrameRequestCallback>();
+    let nextFrame = 0;
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      nextFrame += 1;
+      frames.set(nextFrame, callback);
+      return nextFrame;
+    }));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn((handle: number) => frames.delete(handle)));
+    const session = manualNavalSession();
+    session.state.events.push({ id: 1, kind: 'reload-ready', atTick: 1, shipId: 'player', side: 'port' });
+    session.setSail('full');
+
+    const { unmount } = render(<StrictMode><NavalBattlePage session={session} sceneFactory={null} /></StrictMode>);
+    const region = screen.getByTestId('naval-reload-announcement');
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
+    expect(region).toHaveTextContent('');
+    act(() => frames.get(2)?.(16));
+    expect(region).toHaveTextContent('Port battery ready');
+
+    unmount();
+    vi.unstubAllGlobals();
   });
 
   it('plays one newly reached visible terminal surrender cue after activation', async () => {

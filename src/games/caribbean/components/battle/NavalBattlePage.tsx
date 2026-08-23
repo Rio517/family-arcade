@@ -4,6 +4,7 @@ import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 
 import type {
   Broadside,
+  NavalEvent,
   NavalOutcome,
   Rudder,
 } from '../../domain/naval/types';
@@ -32,6 +33,10 @@ function useSessionSnapshot(session: NavalSessionView) {
 
 function outcomeKey(outcome: NavalOutcome): string {
   return JSON.stringify(outcome);
+}
+
+function isPlayerReloadReady(event: NavalEvent): event is Extract<NavalEvent, { kind: 'reload-ready' }> {
+  return event.kind === 'reload-ready' && event.shipId === 'player';
 }
 
 function outcomeCopy(outcome: NavalOutcome, state: ReturnType<NavalSessionView['getSnapshot']>['state']): { heading: string; detail: string; action: string } {
@@ -101,16 +106,20 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
   const terminalActionRef = useRef<HTMLButtonElement>(null);
   const underlayRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<BattleAudio | null>(null);
+  const reloadAnnouncementRef = useRef<HTMLParagraphElement>(null);
+  const reloadAnnouncementFrameRef = useRef<number | null>(null);
+  const reloadAnnouncementKeyRef = useRef('');
   const [visible, setVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden');
   const [sensory, setSensory] = useState({ aim: true, steeringHint: true, shake: true, reducedFlashes: false, effects: 0.9, muted: false });
   const reducedMotion = useReducedMotionPreference();
   const terminal = Boolean(state.outcome || diagnostic);
   const effectiveShake = sensory.shake && !reducedMotion;
   const aimCue = sensory.aim ? selectAimCue(state, 'player') : null;
-  const latestReload = [...state.events].reverse().find((event) => event.kind === 'reload-ready' && event.shipId === 'player');
-  const reloadAnnouncement = latestReload?.kind === 'reload-ready'
+  const latestReload = [...state.events].reverse().find(isPlayerReloadReady);
+  const reloadAnnouncementKey = `${battleGeneration}:${latestReload?.id ?? 'none'}`;
+  const reloadAnnouncementMessage = latestReload
     ? `${latestReload.side === 'port' ? 'Port' : 'Starboard'} battery ready`
-    : '';
+    : null;
   const activateAudio = useCallback(() => { void audioRef.current?.activate(); }, []);
   const clearHeldRudder = useCallback(() => {
     held.current = { port: false, starboard: false };
@@ -149,6 +158,35 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
     audio?.syncSettings({ effects: sensory.effects, muted: sensory.muted, active: visible && !paused && !diagnostic });
     audio?.handle(state.events, battleGeneration);
   }, [battleGeneration, diagnostic, paused, sensory.effects, sensory.muted, state.events, terminal, visible]);
+
+  useEffect(() => {
+    const region = reloadAnnouncementRef.current;
+    if (!region) return;
+    if (reloadAnnouncementKeyRef.current === reloadAnnouncementKey) return;
+    reloadAnnouncementKeyRef.current = reloadAnnouncementKey;
+    if (reloadAnnouncementFrameRef.current !== null) {
+      cancelAnimationFrame(reloadAnnouncementFrameRef.current);
+      reloadAnnouncementFrameRef.current = null;
+    }
+    region.textContent = '';
+    if (!reloadAnnouncementMessage) return;
+
+    const frame = requestAnimationFrame(() => {
+      if (reloadAnnouncementKeyRef.current !== reloadAnnouncementKey) return;
+      reloadAnnouncementFrameRef.current = null;
+      if (reloadAnnouncementRef.current === region) region.textContent = reloadAnnouncementMessage;
+    });
+    reloadAnnouncementFrameRef.current = frame;
+    return () => {
+      if (reloadAnnouncementFrameRef.current === frame) {
+        cancelAnimationFrame(frame);
+        reloadAnnouncementFrameRef.current = null;
+      }
+      if (reloadAnnouncementKeyRef.current === reloadAnnouncementKey) {
+        reloadAnnouncementKeyRef.current = '';
+      }
+    };
+  }, [reloadAnnouncementKey, reloadAnnouncementMessage]);
 
   useEffect(() => {
     const underlay = underlayRef.current;
@@ -313,7 +351,7 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
           <SensoryToggle testId="naval-setting-mute" label="Mute" pressed={sensory.muted} onToggle={() => setSensory((value) => ({ ...value, muted: !value.muted }))} />
           <span data-testid="naval-effective-shake" className="naval-visually-hidden">Camera shake {effectiveShake ? 'enabled' : 'disabled'}</span>
         </fieldset>
-        <p className="naval-visually-hidden" aria-live="polite" aria-atomic="true" data-testid="naval-reload-announcement" key={`${battleGeneration}-${latestReload?.id ?? 'none'}`}>{reloadAnnouncement}</p>
+        <p ref={reloadAnnouncementRef} className="naval-visually-hidden" aria-live="polite" aria-atomic="true" data-testid="naval-reload-announcement" />
         {aimCue && <p className="naval-aim-cue" data-testid="naval-aim-cue">{aimCue.message}</p>}
 
         {paused && !diagnostic && !outcome && (

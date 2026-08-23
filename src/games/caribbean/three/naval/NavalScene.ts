@@ -27,6 +27,7 @@ import {
   composeWakeMatrix,
   decayCameraShake,
   fitEngagementCamera,
+  settleShipRecoilForReducedMotion,
   writeCameraShake,
   writeShipRecoil,
   type EngagementCameraFit,
@@ -421,6 +422,18 @@ export class NavalScene implements NavalSceneAdapter {
     const changedMotion = this.#sensory.reducedMotion !== settings.reducedMotion;
     this.#sensory = settings;
     if (settings.reducedMotion || !settings.cameraShake) this.#cameraShake = 0;
+    if (settings.reducedMotion) {
+      for (const shipId of SHIP_IDS) {
+        const visual = this.#ships[shipId];
+        if (!visual) continue;
+        visual.recoil = settleShipRecoilForReducedMotion(
+          true,
+          visual.recoil,
+          visual.modelRest,
+          visual.model.position,
+        );
+      }
+    }
     if (this.#latestState) this.#updateAimArc(this.#latestState);
     if (changedMotion) {
       const capacity = qualitySettings(this.#quality.tier, this.#deviceDpr()).effectCapacity;
