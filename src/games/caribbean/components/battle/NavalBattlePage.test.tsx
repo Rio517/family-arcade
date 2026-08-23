@@ -149,6 +149,42 @@ describe('accessible naval command deck', () => {
     expect(screen.getByTestId('naval-fire-port')).toHaveFocus();
   });
 
+  it('clears a held rudder across terminal suppression before rematch steering', () => {
+    const session = manualNavalSession();
+    render(<NavalBattlePage session={session} sceneFactory={null} />);
+
+    fireEvent.keyDown(window, { code: 'KeyA', key: 'a' });
+    expect(session.currentCommand.rudder).toBe(-1);
+
+    act(() => {
+      session.state.outcome = structuredClone(BOARDING_READY);
+      session.setSail('full');
+    });
+    expect(screen.getByRole('dialog', { name: /ready to board/i })).toBeVisible();
+
+    const terminalHistoryLength = session.commandHistory().length;
+    fireEvent.keyUp(window, { code: 'KeyA', key: 'a' });
+    expect(session.commandHistory()).toHaveLength(terminalHistoryLength);
+
+    fireEvent.click(screen.getByTestId('naval-result-restart'));
+    fireEvent.keyDown(window, { code: 'KeyD', key: 'd' });
+    fireEvent.keyUp(window, { code: 'KeyD', key: 'd' });
+
+    expect(session.commandHistory().map(({ rudder }) => rudder)).toEqual([1, 0]);
+  });
+
+  it('releases held keyboard steering when the battle window loses focus', () => {
+    const session = manualNavalSession();
+    render(<NavalBattlePage session={session} sceneFactory={null} />);
+
+    fireEvent.keyDown(window, { code: 'KeyA', key: 'a' });
+    expect(session.currentCommand.rudder).toBe(-1);
+
+    fireEvent.blur(window);
+
+    expect(session.currentCommand.rudder).toBe(0);
+  });
+
   it('pauses and offers deterministic restart when canonical validation detects drift', () => {
     const onResolved = vi.fn();
     const session = manualNavalSession({

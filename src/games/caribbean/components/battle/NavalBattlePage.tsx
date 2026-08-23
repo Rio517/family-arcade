@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RotateIcon, WarningIcon } from '@shared/ui/icons';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 
@@ -87,6 +87,9 @@ export function NavalBattlePage({ session, sceneFactory = null, onResolved }: Na
   const terminalActionRef = useRef<HTMLButtonElement>(null);
   const underlayRef = useRef<HTMLDivElement>(null);
   const terminal = Boolean(state.outcome || diagnostic);
+  const clearHeldRudder = useCallback(() => {
+    held.current = { port: false, starboard: false };
+  }, []);
 
   useEffect(() => {
     if (!state.outcome) {
@@ -109,6 +112,23 @@ export function NavalBattlePage({ session, sceneFactory = null, onResolved }: Na
     if (terminal) terminalActionRef.current?.focus();
     else portFireRef.current?.focus();
   }, [terminal]);
+
+  useEffect(() => {
+    if (terminal) clearHeldRudder();
+  }, [clearHeldRudder, terminal]);
+
+  useEffect(() => {
+    const releaseOnBlur = () => {
+      const wasHeld = held.current.port || held.current.starboard;
+      clearHeldRudder();
+      if (wasHeld && !terminal) session.setRudder(0);
+    };
+    window.addEventListener('blur', releaseOnBlur);
+    return () => {
+      window.removeEventListener('blur', releaseOnBlur);
+      clearHeldRudder();
+    };
+  }, [clearHeldRudder, session, terminal]);
 
   useDismissOnEscape(paused && !diagnostic, () => session.togglePause());
 
@@ -158,6 +178,10 @@ export function NavalBattlePage({ session, sceneFactory = null, onResolved }: Na
   }, [currentCommand.sail, diagnostic, paused, session, state.outcome, terminal]);
 
   const holdRudder = (side: 'port' | 'starboard', active: boolean) => {
+    if (terminal) {
+      clearHeldRudder();
+      return;
+    }
     held.current[side] = active;
     const rudder: Rudder = held.current.port === held.current.starboard ? 0 : held.current.port ? -1 : 1;
     session.setRudder(rudder);
