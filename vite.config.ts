@@ -87,6 +87,9 @@ export default defineConfig({
             'preview-caribbean': fileURLToPath(
               new URL('./preview-caribbean.html', import.meta.url),
             ),
+            'preview-caribbean-game': fileURLToPath(
+              new URL('./preview-caribbean-game.html', import.meta.url),
+            ),
           },
         }
       : {},

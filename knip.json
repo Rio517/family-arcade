@@ -5,7 +5,8 @@
     "src/games/battleship/preview-ship.tsx",
     "src/games/battleship/preview-carrier.tsx",
     "src/games/battleship/preview-battleship.tsx",
-    "src/games/caribbean-poc/preview.tsx"
+    "src/games/caribbean-poc/preview.tsx",
+    "src/games/caribbean/preview.tsx"
   ],
   "project": ["src/**/*.{ts,tsx}"],
   "ignoreExportsUsedInFile": { "interface": true, "type": true }
