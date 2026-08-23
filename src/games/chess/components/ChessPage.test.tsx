@@ -331,13 +331,13 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('chess-join-code')).toBeInTheDocument();
   });
 
-  it('white name chips set player one and remember them arcade-wide', () => {
+  it('white name chips set player one without renaming the signed-in player', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-local'));
     fireEvent.click(screen.getByTestId('white-chip-flora'));
     expect((screen.getByTestId('white-name') as HTMLInputElement).value).toBe('Flora');
-    // The pick persists to the shared profile every game reads.
-    expect(localStorage.getItem('bship:profile:v1')).toContain('Flora');
+    // Pass-and-play names are game-local — the roster must not gain "Flora".
+    expect(localStorage.getItem('arcade.users.v1') ?? '').not.toContain('Flora');
     // Flora is taken now — Black's chips hide her, in roster order otherwise.
     expect(screen.queryByTestId('black-chip-flora')).toBeNull();
     fireEvent.click(screen.getByTestId('black-chip-rio'));

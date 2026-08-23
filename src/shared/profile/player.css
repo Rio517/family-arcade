@@ -1,0 +1,152 @@
+/* Player tickets: the sign-in gate at every game door and the shared
+   stub/medallion pieces the arcade's ticket booth reuses. Matches the
+   landing page's ADMIT-ONE ticket language. */
+
+/* ── the gate page ── */
+.pgate {
+  display: flex;
+  justify-content: center;
+  padding-top: 40px;
+}
+.pgate-card {
+  width: 100%;
+  max-width: 430px;
+  background: linear-gradient(180deg, #131c30, #0e1626);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 0 18px 18px;
+  overflow: hidden;
+}
+.pgate-awning {
+  height: 26px;
+  margin: 0 -18px 16px;
+  background: repeating-linear-gradient(90deg, #e0405f 0 26px, #f6ead2 26px 52px);
+}
+.pgate-title {
+  text-align: center;
+  font-size: 1.5rem;
+  margin: 0 0 4px;
+  letter-spacing: 0.02em;
+}
+.pgate-sub {
+  text-align: center;
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+
+/* ── a player's ticket stub (shared with the booth) ── */
+.pstub {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 52px 11px 16px;
+  margin: 0 0 10px;
+  border-radius: 10px;
+  position: relative;
+  background: #16203a;
+  border: 1px solid var(--border);
+  border-left: 6px solid var(--c, var(--accent));
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pstub:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Perforation notches before the ADMIT ONE strip. */
+.pstub::before,
+.pstub::after {
+  content: '';
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--bg);
+  right: 44px;
+  border: 1px solid var(--border);
+}
+.pstub::before { top: -8px; }
+.pstub::after { bottom: -8px; }
+.pstub-admit {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%) rotate(90deg);
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+.pstub-name { font-weight: 800; font-size: 1.05rem; display: block; }
+.pstub-stats {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.pstub-stats b { color: var(--c, var(--accent)); font-weight: 600; }
+.pstub-new {
+  border: 2px dashed var(--border);
+  background: none;
+  justify-content: center;
+  color: var(--muted);
+  font-weight: 700;
+  padding: 14px;
+}
+.pstub-new::before,
+.pstub-new::after { display: none; }
+
+.pmedal {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: #0c1322;
+  background: var(--c, var(--accent));
+  flex: none;
+}
+
+/* ── the new-player form ── */
+.pgate-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.pgate-chip {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pgate-chip:focus-visible,
+.pgate-create:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.pgate-row { display: flex; flex-direction: column; gap: 8px; }
+.pgate-label { color: var(--muted); font-size: 0.85rem; }
+.pgate-row input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.pgate-create {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 224, 200, 0.4);
+  background: rgba(52, 224, 200, 0.12);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pgate-back { text-align: center; margin: 14px 0 2px; }
+.pgate-back a { color: var(--muted); }

@@ -96,6 +96,7 @@ export function ChessPage() {
           won: info.iWon,
           survivingCells: 0,
           code: info.code || 'chess',
+          game: 'chess',
           opponent: info.opponent || 'Opponent',
           finishedAt: Date.now(),
         });
@@ -362,10 +363,9 @@ export function ChessPage() {
                 value={whiteName}
                 exclude={[blackName]}
                 testIdPrefix="white-chip"
-                onPick={(n) => {
-                  setWhiteName(n);
-                  profile.setName(n); // White is "player one" — remember them arcade-wide
-                }}
+                // Pass-and-play names are game-local: picking a chip must not
+                // rename whoever is signed in on this browser.
+                onPick={setWhiteName}
               />
               <input id="wname" value={whiteName} maxLength={20} onChange={(e) => setWhiteName(e.target.value)} data-testid="white-name" />
             </div>

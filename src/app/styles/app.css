@@ -462,22 +462,92 @@
   color: var(--gold);
   text-shadow: 0 0 12px rgba(255, 215, 106, 0.5);
 }
-.prize-rows { margin-top: 10px; font-family: var(--mono); }
-.prize-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+/* The booth body sits under the prize shell; stubs come from player.css. */
+.booth .prize-in { text-align: left; }
+.booth .prize-h { text-align: center; margin-bottom: 12px; }
+.booth-hero { cursor: default; }
+.booth-actions { display: flex; gap: 8px; margin: 2px 0 12px; }
+.booth-actions button {
+  flex: 1;
+  padding: 8px 6px;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 700;
   font-size: 14px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #b9c4dc;
-  padding: 3px 0;
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--muted);
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  cursor: pointer;
 }
-.prize-row .fill { flex: 1; border-bottom: 2px dotted rgba(185, 196, 220, 0.25); transform: translateY(-3px); }
-.prize-row .num { font-variant-numeric: tabular-nums; font-weight: 700; }
-.prize-row.points .num { color: var(--gold); }
-.prize-row.wins .num { color: var(--teal); }
-.prize-row.losses .num { color: var(--pink); }
+.booth-actions button.on,
+.booth-actions button:focus-visible {
+  color: var(--teal);
+  border-color: rgba(52, 224, 200, 0.5);
+  background: rgba(52, 224, 200, 0.1);
+  outline: none;
+}
+.booth-roster { margin-top: 4px; }
+.booth-empty { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 6px 2px; }
+.booth-form label { display: block; color: var(--muted); font-size: 14px; margin: 4px 0 6px; }
+.booth-form-row { display: flex; gap: 8px; }
+.booth-form-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.booth-form-row button {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 224, 200, 0.4);
+  background: rgba(52, 224, 200, 0.12);
+  color: var(--teal);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+/* History: little used-ticket stubs strung on a dashed thread. */
+.booth-thread {
+  list-style: none;
+  margin: 10px 0 0;
+  border-left: 2px dashed rgba(148, 163, 184, 0.35);
+  margin-left: 14px;
+  padding: 2px 0 0 16px;
+}
+.booth-used {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  margin: 0 0 8px;
+  background: rgba(246, 234, 210, 0.06);
+  border: 1px solid rgba(246, 234, 210, 0.18);
+  border-radius: 8px;
+  font-size: 14px;
+  position: relative;
+}
+.booth-used::before {
+  content: '';
+  position: absolute;
+  left: -22.5px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--night, #0c1322);
+  border: 2px solid rgba(148, 163, 184, 0.45);
+  transform: translateY(-50%);
+}
+.booth-when { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); flex: none; width: 46px; }
+.booth-game { font-weight: 700; display: block; }
+.booth-foe { color: var(--muted); font-size: 0.8rem; }
+.booth-pts { margin-left: auto; font-family: var(--mono); font-size: 0.74rem; font-weight: 700; }
+.booth-pts.w { color: #7ef0b2; }
+.booth-pts.l { color: #ff9e9e; }
 
 /* ── Shared card styles (used by the games' own mode pickers) ────────────── */
 .menu { display: grid; gap: 14px; max-width: 640px; margin: 0 auto; }
