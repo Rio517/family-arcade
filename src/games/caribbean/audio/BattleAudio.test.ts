@@ -97,6 +97,18 @@ describe('BattleAudio', () => {
     await expect(first).resolves.toBe(true);
   });
 
+  it('delivers only post-gesture events that arrive during a deferred activation', async () => {
+    const fake = fakeAudioFactory({ deferredResume: true });
+    const audio = new BattleAudio(fake.factory);
+    audio.handle([volley], 0);
+    const activating = audio.activate();
+    audio.handle([{ ...volley, id: 2 }], 0);
+    fake.resolveResume();
+    await activating;
+    expect(fake.cues).toContain('cannon');
+    expect(fake.cues.filter((cue) => cue === 'cannon')).toHaveLength(1);
+  });
+
   it('mutes immediately, never replays muted events, and disposes safely', async () => {
     const fake = fakeAudioFactory();
     const audio = new BattleAudio(fake.factory);
@@ -109,5 +121,14 @@ describe('BattleAudio', () => {
     audio.dispose();
     expect(fake.cues).toEqual([]);
     expect(fake.nodes.length).toBeGreaterThan(0);
+  });
+
+  it('allows a new surrender cue through terminal silence but not muted terminal history', async () => {
+    const fake = fakeAudioFactory();
+    const audio = new BattleAudio(fake.factory);
+    await audio.activate();
+    audio.syncSettings({ ...settings, active: false });
+    audio.handle([{ id: 8, kind: 'outcome', atTick: 8, outcome: { kind: 'surrender', victorShipId: 'player' } }], 0);
+    expect(fake.cues).toContain('surrender-bell');
   });
 });

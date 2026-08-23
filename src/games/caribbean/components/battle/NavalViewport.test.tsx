@@ -272,4 +272,15 @@ describe('NavalViewport', () => {
     render(<NavalViewport state={fixture()} events={[]} sceneFactory={null} onRestart={vi.fn()} />);
     expect(screen.getByTestId('naval-html-chart')).toBeVisible();
   });
+
+  it('uses the same fallback boundary when a live sensory update throws', async () => {
+    const scene = fakeScene();
+    scene.adapter.syncSensorySettings = () => { throw new Error('sensory failure'); };
+    const factory = vi.fn().mockResolvedValue(scene.adapter);
+    const { rerender } = render(<NavalViewport state={fixture()} events={[]} sceneFactory={factory} onRestart={vi.fn()} />);
+    await screen.findByTestId('naval-scene-slot');
+    rerender(<NavalViewport state={fixture()} events={[]} reducedMotion sceneFactory={factory} onRestart={vi.fn()} />);
+    expect(await screen.findByTestId('naval-html-chart')).toBeVisible();
+    expect(scene.disposed).toBe(1);
+  });
 });

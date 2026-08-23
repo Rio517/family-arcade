@@ -131,7 +131,11 @@ export function NavalViewport({
 
   useEffect(() => {
     sensoryRef.current = { reducedMotion, cameraShake, reducedFlashes, aimCue };
-    sceneRef.current?.syncSensorySettings?.(sensoryRef.current);
+    try {
+      sceneRef.current?.syncSensorySettings?.(sensoryRef.current);
+    } catch {
+      failRef.current?.();
+    }
   }, [aimCue, cameraShake, reducedFlashes, reducedMotion]);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { bearingSide, normalizeAngle } from './geometry';
+import { broadsideLegality, MAX_BROADSIDE_RANGE, normalizeAngle } from './geometry';
 import type { Ammunition, Broadside, NavalCommand, NavalState, Rudder } from './types';
 
 export type OpponentMode =
@@ -33,7 +33,6 @@ export interface OpponentControllerTick {
 }
 
 const DECISION_HOLD_TICKS = 30;
-const MAX_BROADSIDE_RANGE = 42;
 const REEF_RANGE = 24;
 const CHAIN_MINIMUM_RANGE = 16;
 const CHAIN_MAXIMUM_RANGE = 36;
@@ -80,9 +79,6 @@ function ammunitionFor(range: number, targetSails: number, targetCrew: number): 
   return 'round';
 }
 
-function hasUsableBattery(cannon: number): boolean {
-  return Number.isInteger(cannon) && cannon > 0;
-}
 
 function decision(
   state: NavalState,
@@ -125,7 +121,7 @@ export function opponentCommand(state: NavalState, _memory: OpponentMemory): Opp
   if (
     ship.hull <= DISENGAGE_HULL
     || ship.crew <= DISENGAGE_CREW
-    || !hasUsableBattery(ship.cannon)
+    || !broadsideLegality(ship, target.position, 'port').armed
   ) {
     const outwardHeading = headingTo(ship.position.x, ship.position.z);
     return decision(
@@ -161,8 +157,10 @@ export function opponentCommand(state: NavalState, _memory: OpponentMemory): Opp
     );
   }
 
-  const usefulSide = bearingSide(ship.position, ship.heading, target.position);
-  if (usefulSide && ship.reload[usefulSide].loaded) {
+  const port = broadsideLegality(ship, target.position, 'port');
+  const usefulSide = port.side;
+  const legality = usefulSide ? broadsideLegality(ship, target.position, usefulSide) : null;
+  if (legality?.legal) {
     const broadsideHeading = nearestBroadsideHeading(ship.heading, targetHeading);
     return decision(
       state,
@@ -219,7 +217,7 @@ export function advanceOpponentController(
 ): OpponentControllerTick {
   let memory = controller.memory;
   let heldCommand = controller.heldCommand;
-  const disarmedDuringHold = !hasUsableBattery(state.ships.opponent.cannon)
+  const disarmedDuringHold = !broadsideLegality(state.ships.opponent, state.ships.player.position, 'port').armed
     && memory.mode !== 'disengage'
     && memory.mode !== 'surrender';
 

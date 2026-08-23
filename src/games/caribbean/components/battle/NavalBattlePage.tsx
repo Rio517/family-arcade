@@ -42,7 +42,11 @@ function outcomeCopy(outcome: NavalOutcome, state: ReturnType<NavalSessionView['
     return { heading: 'Ready to board', detail: `Capture summary: ${target.name} sails ${Math.round(target.sails)}%, crew ${Math.round(target.crew)}, range ${range}. The prize is disabled and close enough to take.`, action: 'Rematch Battle Lab' };
   }
   if (outcome.kind === 'surrender') {
-    return { heading: 'Surrender', detail: `Capture summary: ${target.name} struck colours with hull ${Math.round(target.hull)}%, sails ${Math.round(target.sails)}%, crew ${Math.round(target.crew)}.`, action: 'Rematch Battle Lab' };
+    const surrendered = outcome.victorShipId === 'player' ? target : player;
+    const won = outcome.victorShipId === 'player';
+    return { heading: 'Surrender', detail: won
+      ? `Capture summary: ${surrendered.name} struck colours with hull ${Math.round(surrendered.hull)}%, sails ${Math.round(surrendered.sails)}%, crew ${Math.round(surrendered.crew)}.`
+      : `${surrendered.name} struck colours with hull ${Math.round(surrendered.hull)}% and crew ${Math.round(surrendered.crew)}. The prize escaped your command.`, action: won ? 'Rematch Battle Lab' : 'Restart Battle Lab' };
   }
   if (outcome.kind === 'sunk') {
     return outcome.victorShipId === 'player'
@@ -51,9 +55,11 @@ function outcomeCopy(outcome: NavalOutcome, state: ReturnType<NavalSessionView['
   }
   if (outcome.kind === 'escaped') {
     const ship = state.ships[outcome.shipId];
-    return { heading: 'Escaped', detail: `${ship.name} crossed the engagement boundary. No prize was taken.`, action: 'Restart Battle Lab' };
+    const distance = Math.hypot(ship.position.x, ship.position.z).toFixed(1);
+    const outward = ship.speed > 0 && ship.position.x * Math.sin(ship.heading) + ship.position.z * Math.cos(ship.heading) > 0;
+    return { heading: 'Escaped', detail: `${ship.name} crossed ${distance} beyond the ${state.input.arenaRadius} arena boundary while moving ${outward ? 'outward' : 'clear'}.`, action: 'Restart Battle Lab' };
   }
-  return { heading: 'Separated', detail: `Range reached ${range}; the engagement ended without a decisive capture.`, action: 'Restart Battle Lab' };
+  return { heading: 'Separated', detail: `The ${state.tick}/${state.input.timeLimitTicks} tick limit ended the engagement without a decisive capture.`, action: 'Restart Battle Lab' };
 }
 
 function useReducedMotionPreference(): boolean {
@@ -87,7 +93,7 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
   const portFireRef = useRef<HTMLButtonElement>(null);
   const terminalActionRef = useRef<HTMLButtonElement>(null);
   const underlayRef = useRef<HTMLDivElement>(null);
-  const [audio] = useState(() => new BattleAudio(audioFactory));
+  const audioRef = useRef<BattleAudio | null>(null);
   const [visible, setVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden');
   const [sensory, setSensory] = useState({ aim: true, steeringHint: true, shake: true, reducedFlashes: false, effects: 0.9, muted: false });
   const reducedMotion = useReducedMotionPreference();
@@ -98,7 +104,7 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
   const reloadAnnouncement = latestReload?.kind === 'reload-ready'
     ? `${latestReload.side === 'port' ? 'Port' : 'Starboard'} battery ready`
     : '';
-  const activateAudio = useCallback(() => { void audio.activate(); }, [audio]);
+  const activateAudio = useCallback(() => { void audioRef.current?.activate(); }, []);
   const clearHeldRudder = useCallback(() => {
     held.current = { port: false, starboard: false };
   }, []);
@@ -121,12 +127,21 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
+  // Effect ownership survives StrictMode's setup/cleanup rehearsal with a fresh adapter.
   useEffect(() => {
-    audio.syncSettings({ effects: sensory.effects, muted: sensory.muted, active: visible && !paused && !terminal });
-    audio.handle(state.events, battleGeneration);
-  }, [audio, battleGeneration, paused, sensory.effects, sensory.muted, state.events, terminal, visible]);
+    const audio = new BattleAudio(audioFactory);
+    audioRef.current = audio;
+    return () => {
+      if (audioRef.current === audio) audioRef.current = null;
+      audio.dispose();
+    };
+  }, [audioFactory]);
 
-  useEffect(() => () => audio.dispose(), [audio]);
+  useEffect(() => {
+    const audio = audioRef.current;
+    audio?.syncSettings({ effects: sensory.effects, muted: sensory.muted, active: visible && !paused && !diagnostic });
+    audio?.handle(state.events, battleGeneration);
+  }, [battleGeneration, diagnostic, paused, sensory.effects, sensory.muted, state.events, terminal, visible]);
 
   useEffect(() => {
     const underlay = underlayRef.current;

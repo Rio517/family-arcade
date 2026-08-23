@@ -168,7 +168,7 @@
 .naval-sensory-controls .naval-control { padding: 0 10px; }
 .naval-sensory-controls .naval-control[aria-pressed="true"] { border-color: var(--caribbean-trade-wind); color: var(--caribbean-trade-wind); }
 .naval-effects-volume { display: inline-flex; align-items: center; min-height: 44px; gap: 7px; padding-inline: 8px; color: color-mix(in srgb, var(--caribbean-sailcloth) 70%, transparent); font: 700 14px/1 ui-monospace, monospace; }
-.naval-effects-volume input { width: 90px; accent-color: var(--caribbean-trade-wind); }
+.naval-effects-volume input { width: 90px; min-block-size: 44px; accent-color: var(--caribbean-trade-wind); }
 .naval-aim-cue { margin: 0; color: var(--caribbean-brass); font: 700 14px/1.2 ui-monospace, monospace; letter-spacing: .04em; text-align: center; }
 
 .naval-pause-banner,

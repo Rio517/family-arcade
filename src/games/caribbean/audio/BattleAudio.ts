@@ -71,6 +71,7 @@ export class BattleAudio {
   #master: AudioNodeLike | null = null;
   #effects: AudioNodeLike | null = null;
   #activation: Promise<boolean> | null = null;
+  #pending: NavalEvent[] = [];
   #generation = -1;
   #lastEventId = 0;
   #settings: BattleAudioSettings = { ...DEFAULT_SETTINGS };
@@ -104,8 +105,12 @@ export class BattleAudio {
       this.#effects.connect(this.#master);
       this.#master.connect(context.destination);
       this.#syncGain();
+      const pending = this.#pending;
+      this.#pending = [];
+      for (const event of pending) this.#emit(event);
       return true;
     } catch {
+      this.#pending = [];
       await context?.close?.().catch(() => undefined);
       return false;
     } finally {
@@ -123,12 +128,19 @@ export class BattleAudio {
     if (this.#generation !== battleGeneration) {
       this.#generation = battleGeneration;
       this.#lastEventId = 0;
+      this.#pending = [];
     }
     const current = events.filter((event) => event.id > this.#lastEventId);
     for (const event of current) this.#lastEventId = Math.max(this.#lastEventId, event.id);
     // History before a real gesture is deliberately advanced and never replayed.
-    if (!this.#context || this.#settings.muted || !this.#settings.active) return;
-    for (const event of current) this.#emit(event);
+    if (!this.#context) {
+      if (this.#activation) this.#pending.push(...current);
+      return;
+    }
+    if (this.#settings.muted) return;
+    for (const event of current) {
+      if (this.#settings.active || (event.kind === 'outcome' && event.outcome.kind === 'surrender')) this.#emit(event);
+    }
   }
 
   #syncGain(): void {
@@ -156,14 +168,14 @@ export class BattleAudio {
       return;
     }
     if (event.kind === 'outcome' && event.outcome.kind === 'surrender') {
-      this.#play('surrender-bell', 390, 0.42, 'sine');
+      this.#play('surrender-bell', 390, 0.42, 'sine', true);
     }
   }
 
-  #play(cue: BattleCue, frequency: number, duration: number, type: OscillatorType): void {
+  #play(cue: BattleCue, frequency: number, duration: number, type: OscillatorType, decisive = false): void {
     const context = this.#context;
     const destination = this.#effects;
-    if (!context || !destination || this.#settings.muted || !this.#settings.active) return;
+    if (!context || !destination || this.#settings.muted || (!this.#settings.active && !decisive)) return;
     this.#factory.onCue?.(cue);
     try {
       const oscillator = context.createOscillator();
@@ -178,6 +190,13 @@ export class BattleAudio {
       this.#sources.add(gain);
       oscillator.start?.(context.currentTime);
       oscillator.stop?.(context.currentTime + duration);
+      const cleanup = () => {
+        this.#sources.delete(oscillator);
+        this.#sources.delete(gain);
+        try { oscillator.disconnect(); } catch { /* already disconnected */ }
+        try { gain.disconnect(); } catch { /* already disconnected */ }
+      };
+      (oscillator as AudioNodeLike & { onended?: (() => void) | null }).onended = cleanup;
     } catch {
       // A partially supported browser remains silently usable and retry-safe.
     }
@@ -198,6 +217,7 @@ export class BattleAudio {
     this.#effects = null;
     this.#master = null;
     this.#lastEventId = 0;
+    this.#pending = [];
     void owned?.close?.().catch(() => undefined);
   }
 }

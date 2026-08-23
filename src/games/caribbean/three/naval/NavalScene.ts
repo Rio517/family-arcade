@@ -256,6 +256,8 @@ export class NavalScene implements NavalSceneAdapter {
   #viewportWidth = 960;
   #viewportHeight = 540;
   #hasCameraFit = false;
+  #latestState: NavalState | null = null;
+  #cameraShake = 0;
   #sensory: NavalSensorySettings;
 
   private constructor(container: HTMLElement, options: NavalSceneOptions) {
@@ -381,6 +383,7 @@ export class NavalScene implements NavalSceneAdapter {
 
   sync(state: NavalState, events: readonly NavalEvent[]): void {
     if (this.#disposed) return;
+    this.#latestState = state;
     for (const shipId of SHIP_IDS) {
       const canonical = state.ships[shipId];
       const visual = this.#ships[shipId];
@@ -412,6 +415,8 @@ export class NavalScene implements NavalSceneAdapter {
     if (this.#disposed) return;
     const changedMotion = this.#sensory.reducedMotion !== settings.reducedMotion;
     this.#sensory = settings;
+    if (settings.reducedMotion || !settings.cameraShake) this.#cameraShake = 0;
+    if (this.#latestState) this.#updateAimArc(this.#latestState);
     if (changedMotion) {
       const capacity = qualitySettings(this.#quality.tier, this.#deviceDpr()).effectCapacity;
       this.#effects.dispose();
@@ -445,11 +450,12 @@ export class NavalScene implements NavalSceneAdapter {
       const originX = ship.position.x + side.x * 3.1;
       const originZ = ship.position.z + side.z * 3.1;
       const firingVisual = this.#ships[event.shipId];
-      if (firingVisual && !this.#sensory.reducedMotion && this.#sensory.cameraShake) {
+      if (firingVisual && !this.#sensory.reducedMotion) {
         firingVisual.recoil = 1;
         firingVisual.recoilX = -side.x;
         firingVisual.recoilZ = -side.z;
       }
+      if (!this.#sensory.reducedMotion && this.#sensory.cameraShake) this.#cameraShake = 1;
       if (!this.#sensory.reducedFlashes) this.#effects.spawn('flash', originX, 1.25, originZ);
       for (let index = 0; index < 3; index += 1) {
         this.#effects.spawn('smoke', originX + side.x * index * 0.28, 1.15, originZ + side.z * index * 0.28, {
@@ -537,8 +543,10 @@ export class NavalScene implements NavalSceneAdapter {
 
     const damping = this.#sensory.reducedMotion ? 1 : 1 - Math.exp(-elapsed * 2.8);
     this.#cameraPosition.lerp(this.#cameraDesired, damping);
-    this.#camera.position.copy(this.#cameraPosition);
-    this.#camera.lookAt(this.#cameraTarget);
+    this.#cameraShake = Math.max(0, this.#cameraShake - elapsed * 5);
+    const shake = this.#cameraShake * 0.32;
+    this.#camera.position.copy(this.#cameraPosition).add(new THREE.Vector3(Math.sin(this.#time * 71) * shake, Math.sin(this.#time * 53) * shake * .55, 0));
+    this.#camera.lookAt(this.#cameraTarget.x + Math.sin(this.#time * 47) * shake * .16, this.#cameraTarget.y, this.#cameraTarget.z);
     this.#renderer.render(this.#scene, this.#camera);
     assertDrawCallBudget(this.#renderer.info.render.calls);
 
