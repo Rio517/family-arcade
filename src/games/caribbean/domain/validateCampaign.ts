@@ -38,6 +38,7 @@ const LEAD_STATUSES = ['active', 'completed', 'expired'] as const;
 const STABLE_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
 const MISSING = Symbol('missing');
 const INVALID_JSON = Symbol('invalid-json');
+const SNAPSHOT_ARRAY_EXTRA_KEYS = Symbol('snapshot-array-extra-keys');
 
 type JsonProblems = Map<string, ValidationIssue>;
 type PlainRecord = Record<string, unknown>;
@@ -143,15 +144,26 @@ function snapshotJsonValue(
         snapshot[index] = snapshotJsonValue(descriptor.value, itemPath, ancestors, problems, nonEnumerable);
       }
     }
+    const retainedExtraKeys: string[] = [];
     for (const key of ownKeys.filter((candidate): candidate is string => typeof candidate === 'string').sort()) {
       if (key === 'length' || /^(0|[1-9]\d*)$/.test(key) && Number(key) < length) continue;
       const keyPath = childPath(path, key);
       const descriptor = dataDescriptor(value, key, keyPath, problems);
+      const snapshottedValue = descriptor
+        ? snapshotJsonValue(descriptor.value, keyPath, ancestors, problems, nonEnumerable)
+        : INVALID_JSON;
+      if (/^(0|[1-9]\d*)$/.test(key)) {
+        retainedExtraKeys.push(key);
+        continue;
+      }
       defineSnapshotValue(
         snapshot,
         key,
-        descriptor ? snapshotJsonValue(descriptor.value, keyPath, ancestors, problems, nonEnumerable) : INVALID_JSON,
+        snapshottedValue,
       );
+    }
+    if (retainedExtraKeys.length > 0) {
+      Object.defineProperty(snapshot, SNAPSHOT_ARRAY_EXTRA_KEYS, { value: retainedExtraKeys });
     }
     ancestors.delete(value);
     return snapshot;
@@ -283,6 +295,7 @@ function arrayValue(
   }
   const extraKeys = Reflect.ownKeys(value)
     .filter((key): key is string => typeof key === 'string' && key !== 'length' && !(/^(0|[1-9]\d*)$/.test(key) && Number(key) < value.length))
+    .concat(Object.getOwnPropertyDescriptor(value, SNAPSHOT_ARRAY_EXTRA_KEYS)?.value ?? [])
     .sort();
   for (const key of extraKeys) {
     const keyPath = childPath(path, key);

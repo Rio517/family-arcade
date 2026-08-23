@@ -132,6 +132,35 @@ describe('validateCampaign', () => {
     expect(target.seed).toBe(-1);
   });
 
+  it('preserves captured array length when a proxy reports an out-of-range numeric own key', () => {
+    const state = validCampaign();
+    const target: unknown[] = [];
+    const lead = {
+      id: 'red-jackdaw',
+      kind: 'rumour',
+      status: 'active',
+      acceptedDay: 0,
+      expiresDay: 18,
+    };
+    let reads = 0;
+    const proxy = new Proxy(target, {
+      ownKeys: () => ['length', '0'],
+      getOwnPropertyDescriptor: (_value, key) => key === 'length'
+        ? Reflect.getOwnPropertyDescriptor(target, 'length')
+        : { configurable: true, enumerable: true, value: lead, writable: true },
+      get: () => {
+        reads += 1;
+        throw new Error('unsafe proxy read');
+      },
+    });
+    state.leads = proxy as CampaignStateV1['leads'];
+
+    expectIssues(state, [{ path: 'leads.0', code: 'unknown-key' }]);
+    expect(reads).toBe(0);
+    expect(target).toHaveLength(0);
+    expect(Object.prototype.hasOwnProperty.call(target, '0')).toBe(false);
+  });
+
   it('rejects symbol keys attached to canonical arrays', () => {
     const state = validCampaign();
     const leads = state.leads as unknown as Record<PropertyKey, unknown>;
