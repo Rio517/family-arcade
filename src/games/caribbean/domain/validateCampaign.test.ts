@@ -98,6 +98,88 @@ describe('validateCampaign', () => {
     expectIssues(nonFinite, [{ path: 'seed', code: 'non-json' }]);
   });
 
+  it('rejects accessor-backed fields without invoking a stateful getter', () => {
+    const state = validCampaign();
+    let reads = 0;
+    Object.defineProperty(state, 'seed', {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        if (reads === 1) return 1702;
+        throw new Error('unsafe second read');
+      },
+    });
+
+    expectIssues(state, [{ path: 'seed', code: 'non-json' }]);
+    expect(reads).toBe(0);
+    expect(Object.getOwnPropertyDescriptor(state, 'seed')?.get).toBeTypeOf('function');
+  });
+
+  it('returns stable issues for a proxy without invoking its throwing get trap', () => {
+    const target = validCampaign();
+    target.seed = -1;
+    let reads = 0;
+    const proxy = new Proxy(target, {
+      get: () => {
+        reads += 1;
+        throw new Error('unsafe proxy read');
+      },
+    });
+
+    expectIssues(proxy, [{ path: 'seed', code: 'out-of-range' }]);
+    expect(reads).toBe(0);
+    expect(target.seed).toBe(-1);
+  });
+
+  it('rejects symbol keys attached to canonical arrays', () => {
+    const state = validCampaign();
+    const leads = state.leads as unknown as Record<PropertyKey, unknown>;
+    leads[Symbol('hidden')] = true;
+
+    expectIssues(state, [{ path: 'leads', code: 'non-json' }]);
+  });
+
+  it('rejects extra string and function-valued properties attached to canonical arrays', () => {
+    const state = validCampaign();
+    const ships = state.fleet.ships as unknown as Record<string, unknown>;
+    ships.note = 'hidden';
+    ships.run = () => undefined;
+
+    expectIssues(state, [
+      { path: 'fleet.ships.note', code: 'unknown-key' },
+      { path: 'fleet.ships.run', code: 'non-json' },
+    ]);
+  });
+
+  it('rejects non-enumerable unknown record keys and non-enumerable canonical fields', () => {
+    const unknown = validCampaign();
+    Object.defineProperty(unknown, 'surprise', { configurable: true, value: true });
+    expectIssues(unknown, [{ path: 'surprise', code: 'unknown-key' }]);
+
+    const canonical = validCampaign();
+    Object.defineProperty(canonical, 'seed', { configurable: true, enumerable: false, value: 1702 });
+    expectIssues(canonical, [{ path: 'seed', code: 'non-json' }]);
+  });
+
+  it('suppresses stale descendant JSON issues when a parent or unknown subtree is rejected', () => {
+    const state = validCampaign();
+    const malformedCaptain = [undefined];
+    state.captain = malformedCaptain as never;
+    state.wealth.gold = -1;
+    const input = state as unknown as Record<string, unknown>;
+    const unknownSubtree = { value: undefined };
+    input.surprise = unknownSubtree;
+
+    expectIssues(input, [
+      { path: 'surprise', code: 'unknown-key' },
+      { path: 'captain', code: 'wrong-type' },
+      { path: 'wealth.gold', code: 'out-of-range' },
+    ]);
+    expect(state.captain).toBe(malformedCaptain);
+    expect(input.surprise).toBe(unknownSubtree);
+  });
+
   it('rejects unknown and missing keys at records reducers index directly', () => {
     const extra = validCampaign() as unknown as { world: { ports: { bridgetown: Record<string, unknown> } } };
     extra.world.ports.bridgetown.market = {};

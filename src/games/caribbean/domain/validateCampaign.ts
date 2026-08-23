@@ -37,9 +37,16 @@ const MORALES = ['very-happy', 'happy', 'content', 'unhappy', 'mutinous'] as con
 const LEAD_STATUSES = ['active', 'completed', 'expired'] as const;
 const STABLE_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
 const MISSING = Symbol('missing');
+const INVALID_JSON = Symbol('invalid-json');
 
 type JsonProblems = Map<string, ValidationIssue>;
 type PlainRecord = Record<string, unknown>;
+
+interface JsonSnapshot {
+  value: unknown;
+  problems: JsonProblems;
+  nonEnumerable: Set<string>;
+}
 
 function issue(issues: ValidationIssue[], path: string, code: ValidationIssue['code']): void {
   issues.push({ path, code });
@@ -55,65 +62,151 @@ function childPath(parent: string, child: string | number): string {
   return parent === '$' ? String(child) : `${parent}.${child}`;
 }
 
-function scanJson(
+function setJsonProblem(problems: JsonProblems, path: string): void {
+  problems.set(path, { path, code: 'non-json' });
+}
+
+function dataDescriptor(
+  value: object,
+  key: PropertyKey,
+  path: string,
+  problems: JsonProblems,
+): PropertyDescriptor | null {
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  if (!descriptor || !('value' in descriptor)) {
+    setJsonProblem(problems, path);
+    return null;
+  }
+  return descriptor;
+}
+
+function defineSnapshotValue(target: object, key: string, value: unknown): void {
+  Object.defineProperty(target, key, {
+    configurable: true,
+    enumerable: true,
+    value,
+    writable: true,
+  });
+}
+
+function snapshotJsonValue(
   value: unknown,
   path: string,
   ancestors: Set<object>,
   problems: JsonProblems,
-): void {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+  nonEnumerable: Set<string>,
+): unknown {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) problems.set(path, { path, code: 'non-json' });
-    return;
+    if (!Number.isFinite(value)) {
+      setJsonProblem(problems, path);
+      return INVALID_JSON;
+    }
+    return value;
   }
   if (typeof value === 'undefined' || typeof value === 'bigint' || typeof value === 'function' || typeof value === 'symbol') {
-    problems.set(path, { path, code: 'non-json' });
-    return;
+    setJsonProblem(problems, path);
+    return INVALID_JSON;
   }
 
   if (ancestors.has(value)) {
-    problems.set(path, { path, code: 'non-json' });
-    return;
+    setJsonProblem(problems, path);
+    return INVALID_JSON;
   }
   if (!Array.isArray(value) && !isPlainRecord(value)) {
-    problems.set(path, { path, code: 'non-json' });
-    return;
+    setJsonProblem(problems, path);
+    return INVALID_JSON;
   }
-  if (!Array.isArray(value) && Object.getOwnPropertySymbols(value).length > 0) {
-    problems.set(path, { path, code: 'non-json' });
-    return;
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.some((key) => typeof key === 'symbol')) {
+    setJsonProblem(problems, path);
+    return INVALID_JSON;
   }
 
   ancestors.add(value);
   if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index += 1) {
+    const lengthDescriptor = dataDescriptor(value, 'length', path, problems);
+    if (!lengthDescriptor || typeof lengthDescriptor.value !== 'number' || !Number.isInteger(lengthDescriptor.value) || lengthDescriptor.value < 0) {
+      setJsonProblem(problems, path);
+      ancestors.delete(value);
+      return INVALID_JSON;
+    }
+    const length = lengthDescriptor.value;
+    const snapshot: unknown[] = new Array(length);
+    for (let index = 0; index < length; index += 1) {
       const itemPath = childPath(path, index);
-      if (!(index in value)) problems.set(itemPath, { path: itemPath, code: 'non-json' });
-      else scanJson(value[index], itemPath, ancestors, problems);
+      const descriptor = dataDescriptor(value, String(index), itemPath, problems);
+      if (!descriptor || descriptor.enumerable !== true) {
+        setJsonProblem(problems, itemPath);
+        snapshot[index] = INVALID_JSON;
+      } else {
+        snapshot[index] = snapshotJsonValue(descriptor.value, itemPath, ancestors, problems, nonEnumerable);
+      }
     }
+    for (const key of ownKeys.filter((candidate): candidate is string => typeof candidate === 'string').sort()) {
+      if (key === 'length' || /^(0|[1-9]\d*)$/.test(key) && Number(key) < length) continue;
+      const keyPath = childPath(path, key);
+      const descriptor = dataDescriptor(value, key, keyPath, problems);
+      defineSnapshotValue(
+        snapshot,
+        key,
+        descriptor ? snapshotJsonValue(descriptor.value, keyPath, ancestors, problems, nonEnumerable) : INVALID_JSON,
+      );
+    }
+    ancestors.delete(value);
+    return snapshot;
   } else {
-    for (const key of Object.keys(value).sort()) {
-      scanJson(value[key], childPath(path, key), ancestors, problems);
+    const snapshot: PlainRecord = Object.create(null);
+    for (const key of ownKeys.filter((candidate): candidate is string => typeof candidate === 'string').sort()) {
+      const keyPath = childPath(path, key);
+      const descriptor = dataDescriptor(value, key, keyPath, problems);
+      if (descriptor?.enumerable === false) nonEnumerable.add(keyPath);
+      defineSnapshotValue(
+        snapshot,
+        key,
+        descriptor ? snapshotJsonValue(descriptor.value, keyPath, ancestors, problems, nonEnumerable) : INVALID_JSON,
+      );
     }
+    ancestors.delete(value);
+    return snapshot;
   }
-  ancestors.delete(value);
 }
 
-function jsonProblems(input: unknown): JsonProblems {
+function snapshotJson(input: unknown): JsonSnapshot {
   const problems: JsonProblems = new Map();
+  const nonEnumerable = new Set<string>();
   try {
-    scanJson(input, '$', new Set(), problems);
+    return {
+      value: snapshotJsonValue(input, '$', new Set(), problems, nonEnumerable),
+      problems,
+      nonEnumerable,
+    };
   } catch {
-    problems.set('$', { path: '$', code: 'non-json' });
+    setJsonProblem(problems, '$');
+    return { value: INVALID_JSON, problems, nonEnumerable };
   }
-  return problems;
 }
 
-function emitJsonProblem(path: string, problems: JsonProblems, issues: ValidationIssue[]): boolean {
+function discardAtOrBelow(path: string, problems: JsonProblems, nonEnumerable: Set<string>): void {
+  const prefix = path === '$' ? '' : `${path}.`;
+  for (const problemPath of problems.keys()) {
+    if (problemPath === path || problemPath.startsWith(prefix)) problems.delete(problemPath);
+  }
+  for (const descriptorPath of nonEnumerable) {
+    if (descriptorPath === path || descriptorPath.startsWith(prefix)) nonEnumerable.delete(descriptorPath);
+  }
+}
+
+function emitJsonProblem(
+  path: string,
+  problems: JsonProblems,
+  nonEnumerable: Set<string>,
+  issues: ValidationIssue[],
+): boolean {
   const problem = problems.get(path);
   if (!problem) return false;
   issues.push(problem);
-  problems.delete(path);
+  discardAtOrBelow(path, problems, nonEnumerable);
   return true;
 }
 
@@ -122,6 +215,7 @@ function required(
   key: string,
   parentPath: string,
   problems: JsonProblems,
+  nonEnumerable: Set<string>,
   issues: ValidationIssue[],
 ): unknown | typeof MISSING {
   const path = childPath(parentPath, key);
@@ -129,7 +223,12 @@ function required(
     issue(issues, path, 'missing');
     return MISSING;
   }
-  if (emitJsonProblem(path, problems, issues)) return MISSING;
+  if (nonEnumerable.has(path)) {
+    issue(issues, path, 'non-json');
+    discardAtOrBelow(path, problems, nonEnumerable);
+    return MISSING;
+  }
+  if (emitJsonProblem(path, problems, nonEnumerable, issues)) return MISSING;
   return record[key];
 }
 
@@ -138,12 +237,16 @@ function validateKeys(
   allowed: readonly string[],
   path: string,
   problems: JsonProblems,
+  nonEnumerable: Set<string>,
   issues: ValidationIssue[],
 ): void {
   const allowedKeys = new Set(allowed);
-  for (const key of Object.keys(record).filter((candidate) => !allowedKeys.has(candidate)).sort()) {
+  for (const key of Reflect.ownKeys(record).filter((candidate): candidate is string => typeof candidate === 'string' && !allowedKeys.has(candidate)).sort()) {
     const keyPath = childPath(path, key);
-    if (!emitJsonProblem(keyPath, problems, issues)) issue(issues, keyPath, 'unknown-key');
+    if (!emitJsonProblem(keyPath, problems, nonEnumerable, issues)) {
+      issue(issues, keyPath, 'unknown-key');
+      discardAtOrBelow(keyPath, problems, nonEnumerable);
+    }
   }
 }
 
@@ -152,22 +255,41 @@ function recordValue(
   path: string,
   allowed: readonly string[],
   problems: JsonProblems,
+  nonEnumerable: Set<string>,
   issues: ValidationIssue[],
 ): PlainRecord | null {
   if (value === MISSING) return null;
   if (!isPlainRecord(value)) {
     issue(issues, path, 'wrong-type');
+    discardAtOrBelow(path, problems, nonEnumerable);
     return null;
   }
-  validateKeys(value, allowed, path, problems, issues);
+  validateKeys(value, allowed, path, problems, nonEnumerable, issues);
   return value;
 }
 
-function arrayValue(value: unknown, path: string, issues: ValidationIssue[]): unknown[] | null {
+function arrayValue(
+  value: unknown,
+  path: string,
+  problems: JsonProblems,
+  nonEnumerable: Set<string>,
+  issues: ValidationIssue[],
+): unknown[] | null {
   if (value === MISSING) return null;
   if (!Array.isArray(value)) {
     issue(issues, path, 'wrong-type');
+    discardAtOrBelow(path, problems, nonEnumerable);
     return null;
+  }
+  const extraKeys = Reflect.ownKeys(value)
+    .filter((key): key is string => typeof key === 'string' && key !== 'length' && !(/^(0|[1-9]\d*)$/.test(key) && Number(key) < value.length))
+    .sort();
+  for (const key of extraKeys) {
+    const keyPath = childPath(path, key);
+    if (!emitJsonProblem(keyPath, problems, nonEnumerable, issues)) {
+      issue(issues, keyPath, 'unknown-key');
+      discardAtOrBelow(keyPath, problems, nonEnumerable);
+    }
   }
   return value;
 }
@@ -259,79 +381,82 @@ function validateBoolean(value: unknown, path: string, issues: ValidationIssue[]
   return true;
 }
 
-function validateCareer(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateCareer(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'career';
-  const career = recordValue(required(root, 'career', '$', problems, issues), path, ['length'], problems, issues);
+  const career = recordValue(required(root, 'career', '$', problems, nonEnumerable, issues), path, ['length'], problems, nonEnumerable, issues);
   if (!career) return;
-  validateKnownString(required(career, 'length', path, problems, issues), `${path}.length`, CAMPAIGN_LENGTHS, issues);
+  validateKnownString(required(career, 'length', path, problems, nonEnumerable, issues), `${path}.length`, CAMPAIGN_LENGTHS, issues);
 }
 
-function validateCalendar(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateCalendar(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'calendar';
-  const calendar = recordValue(required(root, 'calendar', '$', problems, issues), path, ['startYear', 'elapsedDays'], problems, issues);
+  const calendar = recordValue(required(root, 'calendar', '$', problems, nonEnumerable, issues), path, ['startYear', 'elapsedDays'], problems, nonEnumerable, issues);
   if (!calendar) return;
-  validateLiteralNumber(required(calendar, 'startYear', path, problems, issues), `${path}.startYear`, 1675, issues);
-  validateInteger(required(calendar, 'elapsedDays', path, problems, issues), `${path}.elapsedDays`, 0, Number.MAX_SAFE_INTEGER, issues);
+  validateLiteralNumber(required(calendar, 'startYear', path, problems, nonEnumerable, issues), `${path}.startYear`, 1675, issues);
+  validateInteger(required(calendar, 'elapsedDays', path, problems, nonEnumerable, issues), `${path}.elapsedDays`, 0, Number.MAX_SAFE_INTEGER, issues);
 }
 
-function validateMode(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateMode(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'mode';
-  const rawMode = required(root, 'mode', '$', problems, issues);
+  const rawMode = required(root, 'mode', '$', problems, nonEnumerable, issues);
   if (rawMode === MISSING) return;
   if (!isPlainRecord(rawMode)) {
     issue(issues, path, 'wrong-type');
+    discardAtOrBelow(path, problems, nonEnumerable);
     return;
   }
-  const kind = required(rawMode, 'kind', path, problems, issues);
+  const kind = required(rawMode, 'kind', path, problems, nonEnumerable, issues);
   if (!validateString(kind, `${path}.kind`, issues)) return;
   if (kind !== 'port') {
     issue(issues, `${path}.kind`, 'unknown-id');
+    discardAtOrBelow(path, problems, nonEnumerable);
     return;
   }
-  validateKeys(rawMode, ['kind', 'portId'], path, problems, issues);
-  const portId = required(rawMode, 'portId', path, problems, issues);
+  validateKeys(rawMode, ['kind', 'portId'], path, problems, nonEnumerable, issues);
+  const portId = required(rawMode, 'portId', path, problems, nonEnumerable, issues);
   if (validateString(portId, `${path}.portId`, issues) && !isPortId(portId)) {
     issue(issues, `${path}.portId`, 'unknown-id');
   }
 }
 
-function validateCaptain(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateCaptain(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'captain';
-  const captain = recordValue(required(root, 'captain', '$', problems, issues), path, ['name', 'pronouns', 'talent'], problems, issues);
+  const captain = recordValue(required(root, 'captain', '$', problems, nonEnumerable, issues), path, ['name', 'pronouns', 'talent'], problems, nonEnumerable, issues);
   if (!captain) return;
-  validateText(required(captain, 'name', path, problems, issues), `${path}.name`, 40, issues);
-  validateText(required(captain, 'pronouns', path, problems, issues), `${path}.pronouns`, 24, issues);
-  validateKnownString(required(captain, 'talent', path, problems, issues), `${path}.talent`, TALENTS, issues);
+  validateText(required(captain, 'name', path, problems, nonEnumerable, issues), `${path}.name`, 40, issues);
+  validateText(required(captain, 'pronouns', path, problems, nonEnumerable, issues), `${path}.pronouns`, 24, issues);
+  validateKnownString(required(captain, 'talent', path, problems, nonEnumerable, issues), `${path}.talent`, TALENTS, issues);
 }
 
-function validateWealth(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateWealth(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'wealth';
-  const wealth = recordValue(required(root, 'wealth', '$', problems, issues), path, ['gold', 'earned'], problems, issues);
+  const wealth = recordValue(required(root, 'wealth', '$', problems, nonEnumerable, issues), path, ['gold', 'earned'], problems, nonEnumerable, issues);
   if (!wealth) return;
-  validateInteger(required(wealth, 'gold', path, problems, issues), `${path}.gold`, 0, Number.MAX_SAFE_INTEGER, issues);
-  validateInteger(required(wealth, 'earned', path, problems, issues), `${path}.earned`, 0, Number.MAX_SAFE_INTEGER, issues);
+  validateInteger(required(wealth, 'gold', path, problems, nonEnumerable, issues), `${path}.gold`, 0, Number.MAX_SAFE_INTEGER, issues);
+  validateInteger(required(wealth, 'earned', path, problems, nonEnumerable, issues), `${path}.earned`, 0, Number.MAX_SAFE_INTEGER, issues);
 }
 
-function validateCrew(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateCrew(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'crew';
-  const crew = recordValue(required(root, 'crew', '$', problems, issues), path, ['morale'], problems, issues);
+  const crew = recordValue(required(root, 'crew', '$', problems, nonEnumerable, issues), path, ['morale'], problems, nonEnumerable, issues);
   if (!crew) return;
-  validateKnownString(required(crew, 'morale', path, problems, issues), `${path}.morale`, MORALES, issues);
+  validateKnownString(required(crew, 'morale', path, problems, nonEnumerable, issues), `${path}.morale`, MORALES, issues);
 }
 
 function validateCargo(
   ship: PlainRecord,
   shipPath: string,
   problems: JsonProblems,
+  nonEnumerable: Set<string>,
   issues: ValidationIssue[],
 ): { valid: boolean; units: number } {
   const path = `${shipPath}.cargo`;
-  const cargo = recordValue(required(ship, 'cargo', shipPath, problems, issues), path, CARGO_IDS, problems, issues);
+  const cargo = recordValue(required(ship, 'cargo', shipPath, problems, nonEnumerable, issues), path, CARGO_IDS, problems, nonEnumerable, issues);
   if (!cargo) return { valid: false, units: 0 };
   let valid = true;
   let units = 0;
   for (const cargoId of CARGO_IDS) {
-    const value = required(cargo, cargoId, path, problems, issues);
+    const value = required(cargo, cargoId, path, problems, nonEnumerable, issues);
     if (validateInteger(value, `${path}.${cargoId}`, 0, Number.MAX_SAFE_INTEGER, issues)) units += value;
     else valid = false;
   }
@@ -342,10 +467,17 @@ function validateFittings(
   ship: PlainRecord,
   shipPath: string,
   problems: JsonProblems,
+  nonEnumerable: Set<string>,
   issues: ValidationIssue[],
 ): { valid: boolean; holdPenalty: number } {
   const path = `${shipPath}.fittings`;
-  const fittings = arrayValue(required(ship, 'fittings', shipPath, problems, issues), path, issues);
+  const fittings = arrayValue(
+    required(ship, 'fittings', shipPath, problems, nonEnumerable, issues),
+    path,
+    problems,
+    nonEnumerable,
+    issues,
+  );
   if (!fittings) return { valid: false, holdPenalty: 0 };
   let valid = true;
   let holdPenalty = 0;
@@ -356,7 +488,7 @@ function validateFittings(
   const seen = new Set<string>();
   fittings.forEach((value, index) => {
     const itemPath = `${path}.${index}`;
-    if (emitJsonProblem(itemPath, problems, issues)) {
+    if (emitJsonProblem(itemPath, problems, nonEnumerable, issues)) {
       valid = false;
       return;
     }
@@ -383,21 +515,23 @@ function validateShip(
   value: unknown,
   index: number,
   problems: JsonProblems,
+  nonEnumerable: Set<string>,
   issues: ValidationIssue[],
   seenIds: Set<string>,
 ): string | null {
   const path = `fleet.ships.${index}`;
-  if (emitJsonProblem(path, problems, issues)) return null;
+  if (emitJsonProblem(path, problems, nonEnumerable, issues)) return null;
   const ship = recordValue(
     value,
     path,
     ['id', 'classId', 'name', 'hull', 'sails', 'crew', 'cannon', 'cargo', 'fittings'],
     problems,
+    nonEnumerable,
     issues,
   );
   if (!ship) return null;
 
-  const id = required(ship, 'id', path, problems, issues);
+  const id = required(ship, 'id', path, problems, nonEnumerable, issues);
   let shipId: string | null = null;
   if (validateStableId(id, `${path}.id`, issues)) {
     shipId = id;
@@ -405,18 +539,18 @@ function validateShip(
     seenIds.add(id);
   }
 
-  const classId = required(ship, 'classId', path, problems, issues);
+  const classId = required(ship, 'classId', path, problems, nonEnumerable, issues);
   if (validateString(classId, `${path}.classId`, issues) && !isShipClassId(classId)) {
     issue(issues, `${path}.classId`, 'unknown-id');
   }
-  validateText(required(ship, 'name', path, problems, issues), `${path}.name`, 40, issues);
-  validateInteger(required(ship, 'hull', path, problems, issues), `${path}.hull`, 0, SLOOP_CLASS.hullMaximum, issues);
-  validateInteger(required(ship, 'sails', path, problems, issues), `${path}.sails`, 0, SLOOP_CLASS.sailsMaximum, issues);
-  validateInteger(required(ship, 'crew', path, problems, issues), `${path}.crew`, 0, SLOOP_CLASS.crew.maximum, issues);
-  const cannon = required(ship, 'cannon', path, problems, issues);
+  validateText(required(ship, 'name', path, problems, nonEnumerable, issues), `${path}.name`, 40, issues);
+  validateInteger(required(ship, 'hull', path, problems, nonEnumerable, issues), `${path}.hull`, 0, SLOOP_CLASS.hullMaximum, issues);
+  validateInteger(required(ship, 'sails', path, problems, nonEnumerable, issues), `${path}.sails`, 0, SLOOP_CLASS.sailsMaximum, issues);
+  validateInteger(required(ship, 'crew', path, problems, nonEnumerable, issues), `${path}.crew`, 0, SLOOP_CLASS.crew.maximum, issues);
+  const cannon = required(ship, 'cannon', path, problems, nonEnumerable, issues);
   const cannonValid = validateInteger(cannon, `${path}.cannon`, 0, SLOOP_CLASS.cannonMaximum, issues);
-  const cargo = validateCargo(ship, path, problems, issues);
-  const fittings = validateFittings(ship, path, problems, issues);
+  const cargo = validateCargo(ship, path, problems, nonEnumerable, issues);
+  const fittings = validateFittings(ship, path, problems, nonEnumerable, issues);
   if (cannonValid && cargo.valid && fittings.valid) {
     const holdUsed = cargo.units + cannon * 2 + fittings.holdPenalty;
     if (holdUsed > SLOOP_CLASS.hold) issue(issues, path, 'capacity-exceeded');
@@ -424,19 +558,25 @@ function validateShip(
   return shipId;
 }
 
-function validateFleet(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateFleet(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'fleet';
-  const fleet = recordValue(required(root, 'fleet', '$', problems, issues), path, ['flagshipId', 'ships'], problems, issues);
+  const fleet = recordValue(required(root, 'fleet', '$', problems, nonEnumerable, issues), path, ['flagshipId', 'ships'], problems, nonEnumerable, issues);
   if (!fleet) return;
-  const flagship = required(fleet, 'flagshipId', path, problems, issues);
+  const flagship = required(fleet, 'flagshipId', path, problems, nonEnumerable, issues);
   const flagshipValid = validateStableId(flagship, `${path}.flagshipId`, issues);
-  const ships = arrayValue(required(fleet, 'ships', path, problems, issues), `${path}.ships`, issues);
+  const ships = arrayValue(
+    required(fleet, 'ships', path, problems, nonEnumerable, issues),
+    `${path}.ships`,
+    problems,
+    nonEnumerable,
+    issues,
+  );
   if (!ships) return;
   if (ships.length < 1 || ships.length > 8) issue(issues, `${path}.ships`, 'out-of-range');
   const seenIds = new Set<string>();
   const ids: string[] = [];
   ships.forEach((ship, index) => {
-    const id = validateShip(ship, index, problems, issues, seenIds);
+    const id = validateShip(ship, index, problems, nonEnumerable, issues, seenIds);
     if (id !== null) ids.push(id);
   });
   if (flagshipValid && ids.filter((id) => id === flagship).length !== 1) {
@@ -444,120 +584,131 @@ function validateFleet(root: PlainRecord, problems: JsonProblems, issues: Valida
   }
 }
 
-function validateStandings(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateStandings(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'standings';
-  const standings = recordValue(required(root, 'standings', '$', problems, issues), path, FACTION_IDS, problems, issues);
+  const standings = recordValue(required(root, 'standings', '$', problems, nonEnumerable, issues), path, FACTION_IDS, problems, nonEnumerable, issues);
   if (!standings) return;
   for (const factionId of FACTION_IDS) {
-    validateInteger(required(standings, factionId, path, problems, issues), `${path}.${factionId}`, -100, 100, issues);
+    validateInteger(required(standings, factionId, path, problems, nonEnumerable, issues), `${path}.${factionId}`, -100, 100, issues);
   }
 }
 
-function validateWorld(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateWorld(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'world';
-  const world = recordValue(required(root, 'world', '$', problems, issues), path, ['ports', 'targetDefeated'], problems, issues);
+  const world = recordValue(required(root, 'world', '$', problems, nonEnumerable, issues), path, ['ports', 'targetDefeated'], problems, nonEnumerable, issues);
   if (!world) return;
   const portsPath = `${path}.ports`;
-  const ports = recordValue(required(world, 'ports', path, problems, issues), portsPath, PORT_IDS, problems, issues);
+  const ports = recordValue(required(world, 'ports', path, problems, nonEnumerable, issues), portsPath, PORT_IDS, problems, nonEnumerable, issues);
   if (ports) {
     for (const portId of PORT_IDS) {
       const portPath = `${portsPath}.${portId}`;
-      const port = recordValue(required(ports, portId, portsPath, problems, issues), portPath, ['prosperity', 'defense'], problems, issues);
+      const port = recordValue(required(ports, portId, portsPath, problems, nonEnumerable, issues), portPath, ['prosperity', 'defense'], problems, nonEnumerable, issues);
       if (!port) continue;
-      validateKnownString(required(port, 'prosperity', portPath, problems, issues), `${portPath}.prosperity`, ['modest'], issues);
-      validateKnownString(required(port, 'defense', portPath, problems, issues), `${portPath}.defense`, ['guarded'], issues);
+      validateKnownString(required(port, 'prosperity', portPath, problems, nonEnumerable, issues), `${portPath}.prosperity`, ['modest'], issues);
+      validateKnownString(required(port, 'defense', portPath, problems, nonEnumerable, issues), `${portPath}.defense`, ['guarded'], issues);
     }
   }
-  validateBoolean(required(world, 'targetDefeated', path, problems, issues), `${path}.targetDefeated`, issues);
+  validateBoolean(required(world, 'targetDefeated', path, problems, nonEnumerable, issues), `${path}.targetDefeated`, issues);
 }
 
-function validateLeads(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateLeads(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'leads';
-  const leads = arrayValue(required(root, 'leads', '$', problems, issues), path, issues);
+  const leads = arrayValue(
+    required(root, 'leads', '$', problems, nonEnumerable, issues),
+    path,
+    problems,
+    nonEnumerable,
+    issues,
+  );
   if (!leads) return;
   if (leads.length > 1) issue(issues, path, 'out-of-range');
   const seen = new Set<string>();
   leads.forEach((value, index) => {
     const leadPath = `${path}.${index}`;
-    if (emitJsonProblem(leadPath, problems, issues)) return;
-    const lead = recordValue(value, leadPath, ['id', 'kind', 'status', 'acceptedDay', 'expiresDay'], problems, issues);
+    if (emitJsonProblem(leadPath, problems, nonEnumerable, issues)) return;
+    const lead = recordValue(value, leadPath, ['id', 'kind', 'status', 'acceptedDay', 'expiresDay'], problems, nonEnumerable, issues);
     if (!lead) return;
-    const id = required(lead, 'id', leadPath, problems, issues);
+    const id = required(lead, 'id', leadPath, problems, nonEnumerable, issues);
     if (validateString(id, `${leadPath}.id`, issues)) {
       if (!isLeadId(id)) issue(issues, `${leadPath}.id`, 'unknown-id');
       if (seen.has(id)) issue(issues, `${leadPath}.id`, 'duplicate');
       seen.add(id);
     }
-    validateKnownString(required(lead, 'kind', leadPath, problems, issues), `${leadPath}.kind`, ['rumour'], issues);
-    validateKnownString(required(lead, 'status', leadPath, problems, issues), `${leadPath}.status`, LEAD_STATUSES, issues);
-    validateInteger(required(lead, 'acceptedDay', leadPath, problems, issues), `${leadPath}.acceptedDay`, 0, Number.MAX_SAFE_INTEGER, issues);
-    const expiresDay = required(lead, 'expiresDay', leadPath, problems, issues);
+    validateKnownString(required(lead, 'kind', leadPath, problems, nonEnumerable, issues), `${leadPath}.kind`, ['rumour'], issues);
+    validateKnownString(required(lead, 'status', leadPath, problems, nonEnumerable, issues), `${leadPath}.status`, LEAD_STATUSES, issues);
+    validateInteger(required(lead, 'acceptedDay', leadPath, problems, nonEnumerable, issues), `${leadPath}.acceptedDay`, 0, Number.MAX_SAFE_INTEGER, issues);
+    const expiresDay = required(lead, 'expiresDay', leadPath, problems, nonEnumerable, issues);
     if (expiresDay !== MISSING && expiresDay !== null) {
       validateInteger(expiresDay, `${leadPath}.expiresDay`, 0, Number.MAX_SAFE_INTEGER, issues);
     }
   });
 }
 
-function validateRelationships(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateRelationships(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'relationships';
-  const value = required(root, 'relationships', '$', problems, issues);
+  const value = required(root, 'relationships', '$', problems, nonEnumerable, issues);
   if (value === MISSING) return;
   if (!isPlainRecord(value)) {
     issue(issues, path, 'wrong-type');
+    discardAtOrBelow(path, problems, nonEnumerable);
     return;
   }
-  if (Object.keys(value).length > 0) issue(issues, path, 'invariant');
+  if (Reflect.ownKeys(value).length > 0) {
+    issue(issues, path, 'invariant');
+    discardAtOrBelow(path, problems, nonEnumerable);
+  }
 }
 
-function validateLegacy(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateLegacy(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'legacy';
-  const legacy = recordValue(required(root, 'legacy', '$', problems, issues), path, ['capturedShips', 'goldEarned'], problems, issues);
+  const legacy = recordValue(required(root, 'legacy', '$', problems, nonEnumerable, issues), path, ['capturedShips', 'goldEarned'], problems, nonEnumerable, issues);
   if (!legacy) return;
-  validateInteger(required(legacy, 'capturedShips', path, problems, issues), `${path}.capturedShips`, 0, Number.MAX_SAFE_INTEGER, issues);
-  validateInteger(required(legacy, 'goldEarned', path, problems, issues), `${path}.goldEarned`, 0, Number.MAX_SAFE_INTEGER, issues);
+  validateInteger(required(legacy, 'capturedShips', path, problems, nonEnumerable, issues), `${path}.capturedShips`, 0, Number.MAX_SAFE_INTEGER, issues);
+  validateInteger(required(legacy, 'goldEarned', path, problems, nonEnumerable, issues), `${path}.goldEarned`, 0, Number.MAX_SAFE_INTEGER, issues);
 }
 
-function validateRng(root: PlainRecord, problems: JsonProblems, issues: ValidationIssue[]): void {
+function validateRng(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'rng';
-  const rng = recordValue(required(root, 'rng', '$', problems, issues), path, ['world', 'navigation', 'naval'], problems, issues);
+  const rng = recordValue(required(root, 'rng', '$', problems, nonEnumerable, issues), path, ['world', 'navigation', 'naval'], problems, nonEnumerable, issues);
   if (!rng) return;
-  validateInteger(required(rng, 'world', path, problems, issues), `${path}.world`, 0, 0xffff_ffff, issues);
-  validateInteger(required(rng, 'navigation', path, problems, issues), `${path}.navigation`, 0, 0xffff_ffff, issues);
-  validateInteger(required(rng, 'naval', path, problems, issues), `${path}.naval`, 0, 0xffff_ffff, issues);
+  validateInteger(required(rng, 'world', path, problems, nonEnumerable, issues), `${path}.world`, 0, 0xffff_ffff, issues);
+  validateInteger(required(rng, 'navigation', path, problems, nonEnumerable, issues), `${path}.navigation`, 0, 0xffff_ffff, issues);
+  validateInteger(required(rng, 'naval', path, problems, nonEnumerable, issues), `${path}.naval`, 0, 0xffff_ffff, issues);
 }
 
 function collectCampaignIssues(input: unknown, issues: ValidationIssue[]): input is CampaignStateV1 {
-  const problems = jsonProblems(input);
-  if (emitJsonProblem('$', problems, issues)) return false;
-  if (!isPlainRecord(input)) {
+  const snapshot = snapshotJson(input);
+  const { problems, nonEnumerable } = snapshot;
+  if (emitJsonProblem('$', problems, nonEnumerable, issues)) return false;
+  if (!isPlainRecord(snapshot.value)) {
     issue(issues, '$', 'wrong-type');
     return false;
   }
+  const root = snapshot.value;
 
-  validateKeys(input, ROOT_KEYS, '$', problems, issues);
-  validateLiteralNumber(required(input, 'schemaVersion', '$', problems, issues), 'schemaVersion', 1, issues);
-  const contentVersion = required(input, 'contentVersion', '$', problems, issues);
+  validateKeys(root, ROOT_KEYS, '$', problems, nonEnumerable, issues);
+  validateLiteralNumber(required(root, 'schemaVersion', '$', problems, nonEnumerable, issues), 'schemaVersion', 1, issues);
+  const contentVersion = required(root, 'contentVersion', '$', problems, nonEnumerable, issues);
   if (validateString(contentVersion, 'contentVersion', issues) && contentVersion !== 'caribbean-slice-1') {
     issue(issues, 'contentVersion', 'unknown-id');
   }
-  validateStableId(required(input, 'campaignId', '$', problems, issues), 'campaignId', issues);
-  validateInteger(required(input, 'seed', '$', problems, issues), 'seed', 0, 0xffff_ffff, issues);
-  validateCareer(input, problems, issues);
-  validateCalendar(input, problems, issues);
-  validateMode(input, problems, issues);
-  validateCaptain(input, problems, issues);
-  validateWealth(input, problems, issues);
-  validateCrew(input, problems, issues);
-  validateFleet(input, problems, issues);
-  validateStandings(input, problems, issues);
-  validateWorld(input, problems, issues);
-  validateLeads(input, problems, issues);
-  validateRelationships(input, problems, issues);
-  validateLegacy(input, problems, issues);
-  validateRng(input, problems, issues);
-  validateInteger(required(input, 'lastEventId', '$', problems, issues), 'lastEventId', 0, 0xffff_ffff, issues);
+  validateStableId(required(root, 'campaignId', '$', problems, nonEnumerable, issues), 'campaignId', issues);
+  validateInteger(required(root, 'seed', '$', problems, nonEnumerable, issues), 'seed', 0, 0xffff_ffff, issues);
+  validateCareer(root, problems, nonEnumerable, issues);
+  validateCalendar(root, problems, nonEnumerable, issues);
+  validateMode(root, problems, nonEnumerable, issues);
+  validateCaptain(root, problems, nonEnumerable, issues);
+  validateWealth(root, problems, nonEnumerable, issues);
+  validateCrew(root, problems, nonEnumerable, issues);
+  validateFleet(root, problems, nonEnumerable, issues);
+  validateStandings(root, problems, nonEnumerable, issues);
+  validateWorld(root, problems, nonEnumerable, issues);
+  validateLeads(root, problems, nonEnumerable, issues);
+  validateRelationships(root, problems, nonEnumerable, issues);
+  validateLegacy(root, problems, nonEnumerable, issues);
+  validateRng(root, problems, nonEnumerable, issues);
+  validateInteger(required(root, 'lastEventId', '$', problems, nonEnumerable, issues), 'lastEventId', 0, 0xffff_ffff, issues);
 
-  for (const problem of problems.values()) issues.push(problem);
   return issues.length === 0;
 }
 
