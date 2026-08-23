@@ -1,5 +1,5 @@
 import { createNavalBattle } from './createBattle';
-import { initialOpponentMemory, opponentCommand, type OpponentDecision } from './opponent';
+import { advanceOpponentController, initialOpponentController } from './opponent';
 import { stepBattle } from './stepBattle';
 import type { NavalBattleInput, NavalCommand, NavalState } from './types';
 
@@ -32,8 +32,7 @@ export function replayBattle(input: NavalBattleInput, segments: readonly Command
   validateSegments(segments);
 
   let state = createNavalBattle(input);
-  let memory = initialOpponentMemory();
-  let opponentDecision: OpponentDecision | null = null;
+  let opponentController = initialOpponentController();
   let segmentIndex = 0;
 
   while (!state.outcome) {
@@ -43,15 +42,12 @@ export function replayBattle(input: NavalBattleInput, segments: readonly Command
       throw new Error(`Invalid command segments: tick ${state.tick} is not covered`);
     }
 
-    if (state.tick >= memory.untilTick) {
-      opponentDecision = opponentCommand(state, memory);
-      memory = opponentDecision.memory;
-    }
-    if (!opponentDecision) throw new Error('Opponent decision was not initialized');
+    const opponent = advanceOpponentController(state, opponentController);
+    opponentController = opponent.controller;
 
     state = stepBattle(state, {
       player: segment.player,
-      opponent: opponentDecision.command,
+      opponent: opponent.command,
     });
   }
 

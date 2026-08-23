@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
+import { NAVAL_RELOAD_REQUIRED_WORK } from './balance';
 import { normalizeAngle } from './geometry';
-import { initialOpponentMemory, opponentCommand } from './opponent';
+import {
+  advanceOpponentController,
+  initialOpponentController,
+  initialOpponentMemory,
+  opponentCommand,
+} from './opponent';
 import { stepBattle } from './stepBattle';
 import { fixture } from './testFixtures';
 
@@ -105,8 +111,12 @@ describe('legible naval opponent', () => {
         position: { x: 0, z: 0 },
         heading: 0,
         reload: {
-          port: { progress: 120_000, required: 360_000, loaded: false },
-          starboard: { progress: 360_000, required: 360_000, loaded: true },
+          port: { progress: 120_000, required: NAVAL_RELOAD_REQUIRED_WORK, loaded: false },
+          starboard: {
+            progress: NAVAL_RELOAD_REQUIRED_WORK,
+            required: NAVAL_RELOAD_REQUIRED_WORK,
+            loaded: true,
+          },
         },
       },
       player: { position: { x: 20, z: 0 } },
@@ -159,5 +169,22 @@ describe('legible naval opponent', () => {
     expect(first.memory.untilTick).toBe(72);
     expect(state).toEqual(stateBefore);
     expect(memory).toEqual(memoryBefore);
+  });
+
+  it('consumes a fire request once while preserving the thirty-tick steering hold', () => {
+    const state = fixture({
+      opponent: { position: { x: 0, z: 0 }, heading: 0 },
+      player: { position: { x: 20, z: 0 } },
+    });
+
+    const firing = advanceOpponentController(state, initialOpponentController());
+    const afterFire = stepBattle(state, { opponent: firing.command });
+    const held = advanceOpponentController(afterFire, firing.controller);
+
+    expect(firing.command.fire).toBe('port');
+    expect(held.command).toEqual({ ...firing.command, fire: null });
+    expect(held.controller.memory).toEqual(firing.controller.memory);
+    expect(held.controller.memory).toMatchObject({ mode: 'fire', untilTick: 30 });
+    expect(afterFire.ships.opponent.reload.port.loaded).toBe(false);
   });
 });

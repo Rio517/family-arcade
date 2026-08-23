@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { NAVAL_RELOAD_REQUIRED_WORK } from './balance';
 import { command, fixture } from './testFixtures';
 import { stepBattle } from './stepBattle';
 import type { NavalCommand, NavalEvent, NavalState } from './types';
@@ -109,11 +110,23 @@ describe('one canonical naval battle tick', () => {
 
   it('reloads physical sides independently and announces only the unloaded-to-loaded transition', () => {
     const state = fixture();
-    state.ships.player.reload.port = { progress: 359_500, required: 360_000, loaded: false };
-    state.ships.player.reload.starboard = { progress: 360_000, required: 360_000, loaded: true };
+    state.ships.player.reload.port = {
+      progress: NAVAL_RELOAD_REQUIRED_WORK - 500,
+      required: NAVAL_RELOAD_REQUIRED_WORK,
+      loaded: false,
+    };
+    state.ships.player.reload.starboard = {
+      progress: NAVAL_RELOAD_REQUIRED_WORK,
+      required: NAVAL_RELOAD_REQUIRED_WORK,
+      loaded: true,
+    };
 
     const ready = stepBattle(state, {});
-    expect(ready.ships.player.reload.port).toEqual({ progress: 360_000, required: 360_000, loaded: true });
+    expect(ready.ships.player.reload.port).toEqual({
+      progress: NAVAL_RELOAD_REQUIRED_WORK,
+      required: NAVAL_RELOAD_REQUIRED_WORK,
+      loaded: true,
+    });
     expect(events(ready, 'reload-ready')).toEqual([
       { id: 1, kind: 'reload-ready', atTick: 1, shipId: 'player', side: 'port' },
     ]);
@@ -151,7 +164,11 @@ describe('one canonical naval battle tick', () => {
       side: 'port',
     }));
     state.nextEventId = 121;
-    state.ships.player.reload.port = { progress: 359_500, required: 360_000, loaded: false };
+    state.ships.player.reload.port = {
+      progress: NAVAL_RELOAD_REQUIRED_WORK - 500,
+      required: NAVAL_RELOAD_REQUIRED_WORK,
+      loaded: false,
+    };
 
     const next = stepBattle(state, {});
     expect(next.events).toHaveLength(120);

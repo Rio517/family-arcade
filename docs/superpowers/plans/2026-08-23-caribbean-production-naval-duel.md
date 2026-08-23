@@ -502,7 +502,7 @@ Commit: `feat(caribbean): add naval gunnery and outcomes`
 
 **Interfaces:**
 - Consumes: complete integer-tick battle state from Task 3.
-- Produces: `OpponentMode`, `OpponentMemory`, `initialOpponentMemory()`, `opponentCommand(state, memory)`, `CommandSegment`, `replayBattle(input, segments)`, `FrameRunner`, deterministic two-tactic fixtures, and measured duel-duration assertions.
+- Produces: `OpponentMode`, `OpponentMemory`, `initialOpponentMemory()`, `opponentCommand(state, memory)`, `OpponentControllerState`, `initialOpponentController()`, `advanceOpponentController(state, controller)`, `CommandSegment`, `replayBattle(input, segments)`, `FrameRunner`, deterministic two-tactic fixtures, and measured duel-duration assertions.
 
 - [ ] **Step 1: Write failing opponent-state tests**
 
@@ -577,11 +577,11 @@ Expected: FAIL because opponent, replay, and scripted fixtures do not exist.
 
 `OpponentMode` is `'close' | 'gain-weather-position' | 'seek-broadside' | 'fire' | 'recover' | 'disengage' | 'surrender'`. `OpponentMemory` contains `{ mode, desiredHeading, untilTick }`, while `OpponentDecision` contains `{ memory, command }`. Use normalized heading error and the corrected negative rudder convention. Fire only when `bearingSide` is legal, range is at most 42, and that side is loaded. Use chain when target sails exceed 55 and range is 16–36; use grape when range is below 16 and target crew exceeds 18; use round otherwise. Reef while seeking/firing inside 24; use full sail when closing or disengaging.
 
-The opponent enters `recover` while its useful side reloads and maintains range rather than oscillating rudder every tick. Add a 30-tick decision hold to canonical opponent state so mode changes are legible and deterministic.
+The opponent enters `recover` while its useful side reloads and maintains range rather than oscillating rudder every tick. Add a 30-tick decision hold to transient `OpponentControllerState`, outside canonical battle state, so mode changes are legible and deterministic. `advanceOpponentController(state, controller)` is the shared pure per-tick boundary: steering, sail, and ammunition remain held, while a non-null `fire` request is returned for exactly one tick and cleared from the next controller state.
 
 - [ ] **Step 5: Implement replay and tune only documented constants**
 
-`CommandSegment` is `{ fromTick: number; untilTick: number; player: NavalCommand }`; segments are sorted, non-overlapping, and cover tick zero. `replayBattle` creates state from input, carries `OpponentMemory` locally, selects the segment for each tick, refreshes `opponentCommand` when `state.tick >= memory.untilTick`, and stops at outcome. Opponent memory is a deterministic controller concern rather than canonical battle/campaign state; replay recomputes it from input and ticks.
+`CommandSegment` is `{ fromTick: number; untilTick: number; player: NavalCommand }`; segments are sorted, non-overlapping, and cover tick zero. `replayBattle` creates state from input, carries `OpponentControllerState` locally, selects the segment for each tick, advances the shared controller helper, and stops at outcome. Opponent memory and its held command are deterministic controller concerns rather than canonical battle/campaign state; replay recomputes them from input and ticks.
 
 `FrameRunner` accepts integer microseconds only. It converts them to integer tick work using a rational numerator/remainder, caps execution to `maxTicksPerFrame`, retains backlog, and exposes `reset()` for pause/restart. Browser code performs the one rounding boundary from `performance.now()` milliseconds to microseconds before calling it.
 
@@ -626,7 +626,7 @@ Commit: `feat(caribbean): add naval opponent and replay`
 - Modify: `knip.json`
 
 **Interfaces:**
-- Consumes: `BATTLE_LAB_INPUT`, `stepBattle`, `opponentCommand`, `FrameRunner`, and semantic events from Tasks 1–4.
+- Consumes: `BATTLE_LAB_INPUT`, `stepBattle`, `initialOpponentController`, `advanceOpponentController`, `FrameRunner`, and semantic events from Tasks 1–4.
 - Produces: `NavalSession`, `NavalSessionView`, `useNavalSession`, production Battle Lab briefing/battle/result flow, physical keyboard/touch command mapping, pause/restart, debug snapshot hooks, and an HTML tactical chart that remains usable when WebGL is absent.
 
 - [ ] **Step 1: Write the failing transient-session tests**
@@ -704,7 +704,7 @@ Expected: FAIL because the frame runner and production Battle Lab do not exist.
 
 - [ ] **Step 4: Implement the transient session boundary**
 
-`NavalSession` owns mutable canonical `NavalState`, a `FrameRunner`, current player command, opponent decision hold, last-consumed event ID, subscribers, and a throttled immutable HUD snapshot. `useNavalSession(input)` creates/disposes one session and subscribes React through `useSyncExternalStore`. The session exposes:
+`NavalSession` owns mutable canonical `NavalState`, a `FrameRunner`, current player command, transient `OpponentControllerState`, last-consumed event ID, subscribers, and a throttled immutable HUD snapshot. `useNavalSession(input)` creates/disposes one session and subscribes React through `useSyncExternalStore`. The session exposes:
 
 ```ts
 export interface NavalSessionView {
@@ -724,7 +724,7 @@ export interface NavalSessionView {
 
 `testSession.ts` exports `manualNavalSession(options)` implementing this same interface with explicit frame delivery and command history controls for component tests; it is imported only by tests. `NavalBattlePage` receives `onResolved(outcome)` as a prop and guards it by outcome identity so rerenders dispatch exactly once.
 
-The RAF callback asks `FrameRunner` for integer ticks, calls `stepBattle` once per tick, clears one-shot `fire` after the first tick, and never stores RAF timestamps in domain state. Pause freezes both canonical ticks and frame backlog. In the Battle Lab/debug harness, validate after each delivered frame; on any issue, pause, expose the diagnostic, emit no resolution, and offer restart from the original serialized input. Restart recreates from that input and clears the diagnostic.
+The RAF callback asks `FrameRunner` for integer ticks, calls `advanceOpponentController` and then `stepBattle` once per tick, clears the player's one-shot `fire` after the first tick, and never stores RAF timestamps in domain state. The shared opponent helper consumes its own one-shot `fire` while preserving the 30-tick steering/mode hold. Pause freezes both canonical ticks and frame backlog. In the Battle Lab/debug harness, validate after each delivered frame; on any issue, pause, expose the diagnostic, emit no resolution, and offer restart from the original serialized input. Restart recreates from that input and clears the diagnostic.
 
 - [ ] **Step 5: Implement the HTML decision, briefing, battle, and result flow**
 

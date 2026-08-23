@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BATTLE_LAB_INPUT } from '../../content/naval';
+import { NAVAL_RELOAD_REQUIRED_WORK } from './balance';
 import { createNavalBattle, validateNavalInput } from './createBattle';
 import { command, fixture } from './testFixtures';
 
@@ -12,10 +13,11 @@ describe('createNavalBattle', () => {
     expect(state.ships.player.position).toEqual({ x: 0, z: -36 });
     expect(state.ships.opponent.position).toEqual({ x: 0, z: 36 });
     expect(state.ships.player.reload.port).toEqual({
-      progress: 1_500_000,
-      required: 1_500_000,
+      progress: NAVAL_RELOAD_REQUIRED_WORK,
+      required: NAVAL_RELOAD_REQUIRED_WORK,
       loaded: true,
     });
+    expect(NAVAL_RELOAD_REQUIRED_WORK).toBe(1_500_000);
     state.ships.player.hull = 1;
     expect(BATTLE_LAB_INPUT.player.hull).toBe(100);
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);

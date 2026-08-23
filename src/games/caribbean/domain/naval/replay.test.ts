@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BATTLE_LAB_INPUT } from '../../content/naval';
 import { FrameRunner } from '../../state/naval/FrameRunner';
 import { createNavalBattle } from './createBattle';
-import { initialOpponentMemory, opponentCommand } from './opponent';
+import { advanceOpponentController, initialOpponentController } from './opponent';
 import { replayBattle, type CommandSegment } from './replay';
 import { stepBattle } from './stepBattle';
 import { command } from './testFixtures';
@@ -39,60 +39,55 @@ function runDeliveredFrames(
   input: NavalBattleInput,
   segments: readonly CommandSegment[],
   frames: readonly number[],
-): NavalState {
+): { state: NavalState; retainedBacklog: boolean; finalBacklog: number } {
   const runner = new FrameRunner({ tickRate: 60, maxTicksPerFrame: 6 });
   let state = createNavalBattle(input);
-  let opponentMemory = initialOpponentMemory();
-  let opponentDecision = opponentCommand(state, opponentMemory);
-  opponentMemory = opponentDecision.memory;
+  let opponentController = initialOpponentController();
+  let retainedBacklog = false;
+
+  const deliverTicks = (ticks: number) => {
+    for (let index = 0; index < ticks && !state.outcome; index++) {
+      const opponent = advanceOpponentController(state, opponentController);
+      opponentController = opponent.controller;
+      state = stepBattle(state, {
+        player: segmentAt(segments, state.tick).player,
+        opponent: opponent.command,
+      });
+    }
+  };
 
   for (const frame of frames) {
     const ticks = runner.deliverMicros(frame);
-    for (let index = 0; index < ticks && !state.outcome; index++) {
-      if (state.tick >= opponentMemory.untilTick) {
-        opponentDecision = opponentCommand(state, opponentMemory);
-        opponentMemory = opponentDecision.memory;
-      }
-      state = stepBattle(state, {
-        player: segmentAt(segments, state.tick).player,
-        opponent: opponentDecision.command,
-      });
-    }
+    retainedBacklog ||= runner.backlogTicks > 0;
+    deliverTicks(ticks);
   }
+  while (runner.backlogTicks > 0) deliverTicks(runner.deliverMicros(0));
 
-  return state;
-}
-
-function combatInput(): NavalBattleInput {
-  const input = structuredClone(BATTLE_LAB_INPUT);
-  input.timeLimitTicks = 600;
-  input.player.position = { x: 0, z: 0 };
-  input.player.heading = 0;
-  input.opponent.position = { x: 12, z: 0 };
-  input.opponent.heading = Math.PI;
-  input.opponent.hull = 25;
-  input.opponent.cannon = 1;
-  return input;
+  return { state, retainedBacklog, finalBacklog: runner.backlogTicks };
 }
 
 describe('deterministic naval replay', () => {
   it('replays byte-equal canonical state under different delivered frame chunks', () => {
-    const input = combatInput();
+    const input = structuredClone(BATTLE_LAB_INPUT);
+    input.timeLimitTicks = 600;
     const log: CommandSegment[] = [
-      { fromTick: 0, untilTick: 600, player: command({ ammunition: 'round', fire: 'port' }) },
+      { fromTick: 0, untilTick: 137, player: command({ rudder: -1, sail: 'reefed', ammunition: 'chain' }) },
+      { fromTick: 137, untilTick: 311, player: command({ rudder: 1, ammunition: 'grape' }) },
+      { fromTick: 311, untilTick: 600, player: command({ rudder: 0, sail: 'reefed', ammunition: 'round' }) },
     ];
     const frames60 = evenFrames(10_000_000, 600);
-    const irregular = irregularFrames(10_000_000);
+    const irregular = [500_000, ...irregularFrames(9_500_000)];
 
     const sixty = runDeliveredFrames(input, log, frames60);
     const uneven = runDeliveredFrames(input, log, irregular);
+    const direct = replayBattle(input, log);
 
-    expect(uneven).toEqual(sixty);
-    expect(replayBattle(input, log)).toEqual(sixty);
-    expect(sixty.outcome).toEqual({ kind: 'surrender', victorShipId: 'player' });
-    expect(sixty.events.map((event) => event.kind)).toEqual([
-      'volley', 'volley', 'damage', 'damage', 'outcome',
-    ]);
+    expect(uneven.retainedBacklog).toBe(true);
+    expect(uneven.finalBacklog).toBe(0);
+    expect(JSON.stringify(uneven.state)).toBe(JSON.stringify(sixty.state));
+    expect(JSON.stringify(direct)).toBe(JSON.stringify(sixty.state));
+    expect(sixty.state.outcome).toEqual({ kind: 'separated', shipId: 'player' });
+    expect(sixty.state.events.at(-1)).toMatchObject({ kind: 'outcome' });
   });
 
   it('recomputes controller memory without adding it to canonical replay state', () => {

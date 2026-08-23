@@ -21,6 +21,17 @@ export interface OpponentDecision {
   command: NavalCommand;
 }
 
+/** Transient controller state. It is intentionally excluded from canonical battle state. */
+export interface OpponentControllerState {
+  memory: OpponentMemory;
+  heldCommand: NavalCommand | null;
+}
+
+export interface OpponentControllerTick {
+  controller: OpponentControllerState;
+  command: NavalCommand;
+}
+
 const DECISION_HOLD_TICKS = 30;
 const MAX_BROADSIDE_RANGE = 42;
 const REEF_RANGE = 24;
@@ -34,6 +45,10 @@ const RUDDER_DEAD_ZONE = 0.025;
 
 export function initialOpponentMemory(): OpponentMemory {
   return { mode: 'close', desiredHeading: 0, untilTick: 0 };
+}
+
+export function initialOpponentController(): OpponentControllerState {
+  return { memory: initialOpponentMemory(), heldCommand: null };
 }
 
 function headingTo(dx: number, dz: number): number {
@@ -183,4 +198,32 @@ export function opponentCommand(state: NavalState, _memory: OpponentMemory): Opp
     broadsideHeading,
     commandFor(rudderToward(ship.heading, broadsideHeading), range < REEF_RANGE ? 'reefed' : 'full', ammunition),
   );
+}
+
+/**
+ * Produces one opponent command for the current canonical tick. Steering, sail,
+ * and ammunition remain held for the decision window; fire is consumed after
+ * this returned tick because it is a one-shot request.
+ */
+export function advanceOpponentController(
+  state: NavalState,
+  controller: OpponentControllerState,
+): OpponentControllerTick {
+  let memory = controller.memory;
+  let heldCommand = controller.heldCommand;
+
+  if (!heldCommand || state.tick >= memory.untilTick) {
+    const decision = opponentCommand(state, memory);
+    memory = decision.memory;
+    heldCommand = decision.command;
+  }
+
+  const command = { ...heldCommand };
+  return {
+    command,
+    controller: {
+      memory,
+      heldCommand: { ...heldCommand, fire: null },
+    },
+  };
 }

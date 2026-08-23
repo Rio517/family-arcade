@@ -1,4 +1,5 @@
 import { SLOOP_CLASS } from '../../content/naval';
+import { NAVAL_RELOAD_REQUIRED_WORK } from './balance';
 import type {
   NavalBattleInput,
   NavalShipInput,
@@ -8,8 +9,6 @@ import type {
 } from './types';
 
 export type NavalInputValidation = { ok: true } | { ok: false; issues: string[] };
-
-const RELOAD_REQUIRED = 1_500_000;
 
 function finiteIssue(issues: string[], value: number, label: string): void {
   if (!Number.isFinite(value)) issues.push(`${label}:not-finite`);
@@ -62,7 +61,11 @@ export function validateNavalInput(input: NavalBattleInput): NavalInputValidatio
 }
 
 function loadedReload(): ReloadState {
-  return { progress: RELOAD_REQUIRED, required: RELOAD_REQUIRED, loaded: true };
+  return {
+    progress: NAVAL_RELOAD_REQUIRED_WORK,
+    required: NAVAL_RELOAD_REQUIRED_WORK,
+    loaded: true,
+  };
 }
 
 function createShipState(ship: NavalShipInput): NavalShipState {

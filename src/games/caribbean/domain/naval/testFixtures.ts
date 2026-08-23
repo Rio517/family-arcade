@@ -1,7 +1,7 @@
 import { BATTLE_LAB_INPUT } from '../../content/naval';
 import { createNavalBattle } from './createBattle';
 import { bearingSide, normalizeAngle } from './geometry';
-import { initialOpponentMemory, opponentCommand } from './opponent';
+import { advanceOpponentController, initialOpponentController } from './opponent';
 import { stepBattle } from './stepBattle';
 import type {
   Ammunition,
@@ -35,6 +35,7 @@ export function command(overrides: Partial<NavalCommand> = {}): NavalCommand {
 }
 
 export type TestCaptain = (state: NavalState) => NavalCommand;
+export type OpponentCommandObserver = (state: NavalState, command: NavalCommand) => void;
 
 function headingTo(dx: number, dz: number): number {
   return normalizeAngle(Math.atan2(dx, dz));
@@ -108,17 +109,18 @@ export function captureCaptain(state: NavalState): NavalCommand {
   return fightingCommand(state, target.sails > 30 ? 'chain' : 'grape');
 }
 
-export function simulateCaptain(input: NavalBattleInput, captain: TestCaptain): NavalState {
+export function simulateCaptain(
+  input: NavalBattleInput,
+  captain: TestCaptain,
+  observeOpponentCommand?: OpponentCommandObserver,
+): NavalState {
   let state = createNavalBattle(input);
-  let memory = initialOpponentMemory();
-  let opponent = opponentCommand(state, memory);
-  memory = opponent.memory;
+  let opponentController = initialOpponentController();
 
   while (!state.outcome) {
-    if (state.tick >= memory.untilTick) {
-      opponent = opponentCommand(state, memory);
-      memory = opponent.memory;
-    }
+    const opponent = advanceOpponentController(state, opponentController);
+    opponentController = opponent.controller;
+    observeOpponentCommand?.(state, opponent.command);
     state = stepBattle(state, { player: captain(state), opponent: opponent.command });
   }
 
