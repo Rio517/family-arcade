@@ -18,11 +18,15 @@ captures are in
 [`metrics.json`](../../screenshots/caribbean-naval/metrics.json).
 
 Ordinary evidence pages use the browser's `no-preference` motion setting. The
-real scene recorded 112 intermediate ship frames and 56 intermediate camera
+real scene recorded 118 intermediate ship frames and 59 intermediate camera
 frames in that path. A separate `reduce` page recorded 14 live ship snaps and
-7 camera snaps. The active plateau sustained a 77.333 FPS minimum three-sample
-average with 33 maximum draw calls, 8,374 maximum triangles, and zero texture,
+7 camera snaps. The active plateau sustained a 69 FPS minimum three-sample
+average with 33 maximum draw calls, 7,841 maximum triangles, and zero texture,
 geometry, material, buffer-attribute, or effect-capacity growth.
+
+The action-copy measurement includes the separate pause action as well as the
+bottom strip. Its visible `Space / Esc` shortcut and the other measured action
+text compute to at least 14 px at exact 960×600 and 1024×768.
 
 The recorded 2026-08-23 experienced-owner feedback drove this revision: remove
 the giant side fire controls, restore the POC's sea-first composition, simplify

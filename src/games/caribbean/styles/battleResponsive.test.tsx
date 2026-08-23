@@ -24,6 +24,15 @@ describe('full-bleed Battle Lab layout contracts', () => {
     expect(battleCss).toMatch(/\.naval-command-control span,[\s\S]*\.naval-rudder-control span\s*\{[^}]*white-space:\s*normal[^}]*text-align:\s*center/s);
   });
 
+  it.each([
+    ['exact 960x600 boundary', 960, 600],
+    ['1024x768 supported layout', 1024, 768],
+  ])('keeps the visible Space / Esc action at least 14px at the %s', (_label, _width, _height) => {
+    const pauseRule = battleCss.match(/\.naval-pause-control kbd\s*\{[^}]*font-size:\s*([\d.]+)px[^}]*\}/s);
+    expect(pauseRule, 'pause shortcut must keep an explicit visible font-size').not.toBeNull();
+    expect(Number(pauseRule?.[1])).toBeGreaterThanOrEqual(14);
+  });
+
   it('keeps semantic wind and the minimum-display notice visible rather than hiding live controls', () => {
     expect(battleCss).not.toMatch(/\.naval-mission-line[^}]*display:\s*none/s);
     expect(battleCss).toMatch(/\.caribbean-display-notice\s*\{/s);

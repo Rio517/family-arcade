@@ -61,7 +61,7 @@
 .naval-mission-line p span { color: color-mix(in srgb, var(--caribbean-sailcloth) 64%, transparent); font: 700 14px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
 .naval-mission-line p strong { font-weight: 700; }
 .naval-pause-control { justify-self: end; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 164px; padding: 0 12px; pointer-events: auto; }
-.naval-pause-control kbd { font-size: 12px; }
+.naval-pause-control kbd { font-size: 14px; }
 
 .naval-opponent-rail,
 .naval-player-rail { position: absolute; left: max(14px, env(safe-area-inset-left)); right: max(14px, env(safe-area-inset-right)); display: flex; pointer-events: none; }

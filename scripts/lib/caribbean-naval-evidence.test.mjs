@@ -73,10 +73,10 @@ function healthyEvidence(overrides = {}) {
     },
     display: {
       supported: {
-        desktop: { viewport: { width: 1440, height: 900 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true },
-        tablet: { viewport: { width: 1180, height: 820 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true },
-        minimum: { viewport: { width: 1024, height: 768 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true },
-        boundary: { viewport: { width: 960, height: 600 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true },
+        desktop: { viewport: { width: 1440, height: 900 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true, measuredActionControls: ['naval-fire-port', 'naval-sail-toggle', 'naval-pause'] },
+        tablet: { viewport: { width: 1180, height: 820 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true, measuredActionControls: ['naval-fire-port', 'naval-sail-toggle', 'naval-pause'] },
+        minimum: { viewport: { width: 1024, height: 768 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true, measuredActionControls: ['naval-fire-port', 'naval-sail-toggle', 'naval-pause'] },
+        boundary: { viewport: { width: 960, height: 600 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true, measuredActionControls: ['naval-fire-port', 'naval-sail-toggle', 'naval-pause'] },
       },
       unsupported: {
         portrait: { viewport: { width: 430, height: 932 }, notice: true, battle: false, liveFrame: false, focused: true },
@@ -313,7 +313,10 @@ describe('evaluateNavalEvidence', () => {
     for (const mutate of [
       (e) => { e.motion.normal.shipIntermediateFrames = 0; },
       (e) => { e.motion.reduced.cameraSnaps = 0; },
+      (e) => { e.display.supported.minimum.minimumActionFontSize = 12; },
       (e) => { e.display.supported.boundary.minimumActionFontSize = 13.99; },
+      (e) => { e.display.supported.minimum.measuredActionControls = e.display.supported.minimum.measuredActionControls.filter((id) => id !== 'naval-pause'); },
+      (e) => { e.display.supported.boundary.measuredActionControls = e.display.supported.boundary.measuredActionControls.filter((id) => id !== 'naval-pause'); },
       (e) => { e.display.supported.boundary.sailControl = false; },
       (e) => { e.display.prebattle.briefing.ctaVisible = false; },
       (e) => { e.display.prebattle.briefing.legendComplete = false; },

@@ -102,6 +102,11 @@ function validateDisplayEvidence(issues, display) {
     if (!Number.isFinite(sample.minimumActionFontSize) || sample.minimumActionFontSize < 14) {
       issues.push(`display supported ${name} action font must be at least 14px`);
     }
+    if (!Array.isArray(sample.measuredActionControls)
+      || sample.measuredActionControls.some((id) => typeof id !== 'string')
+      || !sample.measuredActionControls.includes('naval-pause')) {
+      issues.push(`display supported ${name} measured actions must include naval-pause`);
+    }
     if (sample.sailControl !== true) issues.push(`display supported ${name} sailControl must be true`);
     if (sample.notice !== false) issues.push(`display supported ${name} notice must be false`);
   }

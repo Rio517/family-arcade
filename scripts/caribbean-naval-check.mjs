@@ -367,6 +367,7 @@ async function readSupportedDisplay(page, viewport) {
       'naval-ammo-grape', 'naval-sail-toggle', 'naval-fire-starboard', 'naval-rudder-starboard', 'naval-options-toggle',
     ];
     const controls = controlIds.map((id) => document.querySelector(`[data-testid="${id}"]`));
+    const pauseControl = document.querySelector('[data-testid="naval-pause"]');
     const touchSized = controls.every((element) => {
       const bounds = element?.getBoundingClientRect();
       return visible(element) && bounds.width >= 44 && bounds.height >= 44;
@@ -380,7 +381,8 @@ async function readSupportedDisplay(page, viewport) {
           && labelBounds.top >= bounds.top - 1 && labelBounds.bottom <= bounds.bottom + 1;
       });
     });
-    const actionType = controls.flatMap((element) => element
+    const actionControls = [...controls, pauseControl];
+    const actionType = actionControls.flatMap((element) => element
       ? [element, ...element.querySelectorAll('*')].filter((candidate) => [...candidate.childNodes].some(
         (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
       ))
@@ -420,6 +422,7 @@ async function readSupportedDisplay(page, viewport) {
       labelsContained,
       shortcutKeys,
       minimumActionFontSize,
+      measuredActionControls: actionControls.map((element) => element?.getAttribute('data-testid') ?? null),
       sailControl: visible(sailControl) && controls.includes(sailControl),
       noOuterScroll: document.documentElement.scrollWidth <= innerWidth
         && document.documentElement.scrollHeight <= innerHeight,
