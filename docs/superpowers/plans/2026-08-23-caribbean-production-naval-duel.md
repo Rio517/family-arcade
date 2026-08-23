@@ -726,7 +726,7 @@ The RAF callback asks `FrameRunner` for integer ticks, calls `stepBattle` once p
 
 - [ ] **Step 5: Implement the HTML decision, briefing, battle, and result flow**
 
-`CaribbeanLab` starts on a parchment/brass decision page with one active `Enter Battle Lab` card and a labelled `Port Decisions — next slice` preview. The battle briefing states objective, trade wind, full/reefed sail, Q/E, A/D, and ammunition consequences in fewer than 90 words.
+`CaribbeanLab` starts on a modern, spacious decision page with restrained brass and turquoise nautical accents, one active `Enter Battle Lab` card, and a labelled `Port Decisions — next slice` preview. Avoid a parchment-heavy historical imitation. The battle briefing states objective, trade wind, full/reefed sail, Q/E, A/D, and ammunition consequences in fewer than 90 words.
 
 `BattleHud` shows only player/opponent hull/sails/crew/cannon, port/starboard reload, ammo, sail, wind, objective, and pause. `HtmlTacticalChart` renders both ships as labelled, rotated CSS/SVG silhouettes on an x/z chart and reports `3D sea unavailable—battle rules continue`; it is a functional fallback rather than an error dead-end.
 

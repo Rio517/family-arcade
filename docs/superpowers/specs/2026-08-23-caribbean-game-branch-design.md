@@ -282,6 +282,11 @@ warm horizon, compact ships, readable wakes—but improve feedback and hierarchy
 before adding expensive art. The current sloop remains the only hero model for
 the complete vertical slice.
 
+The interface stays modern, clean, and spacious. Use brass and nautical texture
+as restrained accents inside a contemporary information hierarchy; do not turn
+the shell into a parchment-heavy imitation of the 2004 game's menus. Historical
+character belongs primarily in ships, locations, weather, names, and systems.
+
 Priorities:
 
 1. readable ship orientation, range, and physical broadside side;
