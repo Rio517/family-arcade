@@ -1,0 +1,2 @@
+id,path,source_commit,author_tool,transformation,ownership,review_state
+caribbean-sloop,src/games/caribbean/assets/caribbean-sloop.glb,d82bb56,Blender 5.2 scripted original,"Meshopt optimization; production copy pending",project-owned,prototype-reviewed
