@@ -48,6 +48,8 @@ export function validateNavalInput(input: NavalBattleInput): NavalInputValidatio
   if (!Number.isFinite(input.arenaRadius) || input.arenaRadius <= 0) issues.push('arenaRadius:not-positive');
   if (!Number.isInteger(input.timeLimitTicks) || input.timeLimitTicks <= 0) issues.push('timeLimitTicks:not-positive');
 
+  if (input.player.id !== 'player') issues.push('player.id:mismatch');
+  if (input.opponent.id !== 'opponent') issues.push('opponent.id:mismatch');
   validateShip(input.player, 'player', issues);
   validateShip(input.opponent, 'opponent', issues);
 

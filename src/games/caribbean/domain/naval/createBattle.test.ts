@@ -39,6 +39,17 @@ describe('createNavalBattle', () => {
     expect(() => createNavalBattle(invalid)).toThrow(/^Invalid naval input: /);
   });
 
+  it.each([
+    ['player', 'opponent', 'player.id:mismatch'],
+    ['opponent', 'player', 'opponent.id:mismatch'],
+  ] as const)('rejects an external %s key with ship id %s', (key, id, issue) => {
+    const invalid = structuredClone(BATTLE_LAB_INPUT);
+    invalid[key].id = id;
+
+    expect(validateNavalInput(invalid)).toEqual({ ok: false, issues: [issue] });
+    expect(() => createNavalBattle(invalid)).toThrow(`Invalid naval input: ${issue}`);
+  });
+
   it('creates fresh test fixtures with named shallow overrides and default commands', () => {
     const state = fixture({ player: { hull: 43 }, input: { windStrength: 2 }, tick: 12 });
     expect(state.ships.player.hull).toBe(43);
