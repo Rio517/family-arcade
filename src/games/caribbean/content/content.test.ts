@@ -13,6 +13,7 @@ describe('Caribbean naval content', () => {
       topSpeed: 5.6,
       turnResponse: 0.52,
       bestWindAngle: 90,
+      fittingSlots: 2,
     });
   });
 

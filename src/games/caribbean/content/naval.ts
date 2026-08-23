@@ -11,6 +11,7 @@ export const SLOOP_CLASS: SloopClass = {
   topSpeed: 5.6,
   turnResponse: 0.52,
   bestWindAngle: 90,
+  fittingSlots: 2,
 };
 
 export const BATTLE_LAB_INPUT: NavalBattleInput = {
