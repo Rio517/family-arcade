@@ -24,6 +24,31 @@ describe('naval battle outcomes', () => {
     expect(evaluateOutcome(state)).toEqual({ kind: 'boarding-ready', victorShipId: 'player' });
   });
 
+  it.each([
+    ['same direction at equal high speed', 3, 0, 3, 0, true],
+    ['head-on at the relative-speed boundary', 0.75, 0, 0.75, Math.PI, true],
+    ['head-on beyond the relative-speed boundary', 0.751, 0, 0.751, Math.PI, false],
+    ['perpendicular within the relative-speed boundary', 1.06, 0, 1.06, Math.PI / 2, true],
+    ['perpendicular beyond the relative-speed boundary', 1.061, 0, 1.061, Math.PI / 2, false],
+  ] as const)(
+    'uses vector-relative velocity when ships move %s',
+    (_label, playerSpeed, playerHeading, opponentSpeed, opponentHeading, boardingReady) => {
+      const state = fixture({
+        player: { position: { x: 0, z: 0 }, speed: playerSpeed, heading: playerHeading, crew: 52 },
+        opponent: {
+          position: { x: 5.5, z: 0 },
+          speed: opponentSpeed,
+          heading: opponentHeading,
+          sails: 25,
+          crew: 14,
+        },
+      });
+      expect(evaluateOutcome(state)).toEqual(
+        boardingReady ? { kind: 'boarding-ready', victorShipId: 'player' } : null,
+      );
+    },
+  );
+
   it.each(BOARDING_FAILURES)('does not declare boarding-ready beyond the %s gate', (_label, change) => {
     const state = fixture({
       player: { position: { x: 0, z: 0 }, speed: 0, crew: 52, ...change.player },

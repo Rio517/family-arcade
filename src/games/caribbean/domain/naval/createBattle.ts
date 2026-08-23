@@ -34,6 +34,9 @@ function validateShip(ship: NavalShipInput, label: 'player' | 'opponent', issues
     if (!Number.isFinite(value) || value < 0 || value > maximum) {
       issues.push(`${label}.${field}:outside-sloop-maximum`);
     }
+    if ((field === 'crew' || field === 'cannon') && !Number.isInteger(value)) {
+      issues.push(`${label}.${field}:not-integer`);
+    }
   }
 }
 

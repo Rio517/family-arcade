@@ -26,6 +26,34 @@ function isShipId(value: unknown): value is NavalShipId {
   return value === 'player' || value === 'opponent';
 }
 
+function isBroadside(value: unknown): value is Broadside {
+  return value === 'port' || value === 'starboard';
+}
+
+function isRudder(value: unknown): boolean {
+  return value === -1 || value === 0 || value === 1;
+}
+
+function isSail(value: unknown): boolean {
+  return value === 'full' || value === 'reefed';
+}
+
+function isAmmunition(value: unknown): boolean {
+  return value === 'round' || value === 'chain' || value === 'grape';
+}
+
+function isEventKind(value: unknown): value is NavalEvent['kind'] {
+  return value === 'volley' || value === 'damage' || value === 'reload-ready' || value === 'outcome';
+}
+
+function isOutcomeKind(value: unknown): value is NavalOutcome['kind'] {
+  return value === 'surrender'
+    || value === 'sunk'
+    || value === 'boarding-ready'
+    || value === 'escaped'
+    || value === 'separated';
+}
+
 function finiteIssue(issues: string[], value: number, label: string): void {
   if (!Number.isFinite(value)) issues.push(`${label}:not-finite`);
 }
@@ -46,6 +74,10 @@ function validateReload(reload: ReloadState, label: string, issues: string[]): v
 
 function validateShip(ship: NavalShipState, expectedId: NavalShipId, issues: string[]): void {
   if (ship.id !== expectedId) issues.push(`${expectedId}.id:mismatch`);
+  if (ship.classId !== 'sloop') issues.push(`${expectedId}.classId:unsupported`);
+  if (!isRudder(ship.rudder)) issues.push(`${expectedId}.rudder:unknown`);
+  if (!isSail(ship.sail)) issues.push(`${expectedId}.sail:unknown`);
+  if (!isAmmunition(ship.ammunition)) issues.push(`${expectedId}.ammunition:unknown`);
   finiteIssue(issues, ship.position.x, `${expectedId}.position.x`);
   finiteIssue(issues, ship.position.z, `${expectedId}.position.z`);
   finiteIssue(issues, ship.heading, `${expectedId}.heading`);
@@ -55,16 +87,24 @@ function validateShip(ship: NavalShipState, expectedId: NavalShipId, issues: str
   boundIssue(issues, ship.sails, SLOOP_CLASS.sailsMaximum, `${expectedId}.sails`);
   boundIssue(issues, ship.crew, SLOOP_CLASS.crew.maximum, `${expectedId}.crew`);
   boundIssue(issues, ship.cannon, SLOOP_CLASS.cannonMaximum, `${expectedId}.cannon`);
+  if (!Number.isInteger(ship.crew)) issues.push(`${expectedId}.crew:not-integer`);
+  if (!Number.isInteger(ship.cannon)) issues.push(`${expectedId}.cannon:not-integer`);
   for (const side of BROADSIDES) validateReload(ship.reload[side], `${expectedId}.reload.${side}`, issues);
 }
 
 function validateEventShipIds(event: NavalEvent, index: number, issues: string[]): void {
   if ('shipId' in event && !isShipId(event.shipId)) issues.push(`events.${index}.shipId:unknown`);
-  if (event.kind === 'volley' && !isShipId(event.targetShipId)) issues.push(`events.${index}.targetShipId:unknown`);
+  if (event.kind === 'volley') {
+    if (!isShipId(event.targetShipId)) issues.push(`events.${index}.targetShipId:unknown`);
+    if (!isBroadside(event.result.side)) issues.push(`events.${index}.result.side:unknown`);
+    if (!isAmmunition(event.result.ammunition)) issues.push(`events.${index}.result.ammunition:unknown`);
+  }
+  if (event.kind === 'reload-ready' && !isBroadside(event.side)) issues.push(`events.${index}.side:unknown`);
   if (event.kind === 'outcome') validateOutcomeShipId(event.outcome, `events.${index}.outcome`, issues);
 }
 
 function validateOutcomeShipId(outcome: NavalOutcome, label: string, issues: string[]): void {
+  if (!isOutcomeKind(outcome.kind)) issues.push(`${label}.kind:unknown`);
   if ('victorShipId' in outcome && !isShipId(outcome.victorShipId)) issues.push(`${label}.victorShipId:unknown`);
   if ('shipId' in outcome && !isShipId(outcome.shipId)) issues.push(`${label}.shipId:unknown`);
 }
@@ -108,6 +148,7 @@ export function validateNavalState(state: NavalState): NavalStateValidation {
     if (!isPositiveInteger(event.id)) issues.push(`events.${index}.id:not-positive-integer`);
     if (index > 0 && event.id <= previousId) issues.push(`events.${index}.id:not-monotonic`);
     if (!isUint32(event.atTick)) issues.push(`events.${index}.atTick:not-uint32`);
+    if (!isEventKind(event.kind)) issues.push(`events.${index}.kind:unknown`);
     validateEventShipIds(event, index, issues);
     if (event.kind === 'outcome') outcomeEvents.push(event);
     previousId = event.id;

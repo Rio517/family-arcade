@@ -70,6 +70,43 @@ describe('one canonical naval battle tick', () => {
     expect(next.nextVolleyId).toBe(3);
   });
 
+  it('snapshots both requested volleys before either damage result is applied', () => {
+    const state = fixture({
+      player: { position: { x: 0, z: 0 }, heading: 0, cannon: 2 },
+      opponent: { position: { x: 5, z: 0 }, heading: Math.PI, cannon: 2, crew: 50, sails: 30 },
+    });
+    const next = stepBattle(state, {
+      player: command({ ammunition: 'round', fire: 'port' }),
+      opponent: command({ ammunition: 'round', fire: 'port' }),
+    });
+
+    expect(next.events.map((event) => event.kind)).toEqual(['volley', 'volley', 'damage', 'damage']);
+    expect(events(next, 'volley').map((event) => ({
+      shipId: event.shipId,
+      fired: event.result.fired,
+      hits: event.result.hits,
+    }))).toEqual([
+      { shipId: 'player', fired: 2, hits: 1 },
+      { shipId: 'opponent', fired: 2, hits: 2 },
+    ]);
+    expect(next.seed).toBe(2_876_432_698);
+    expect(next.ships.opponent).toMatchObject({ cannon: 0, crew: 49, sails: 29 });
+  });
+
+  it('does not emit or reset a zero-projectile fractional battery', () => {
+    const state = fixture({
+      player: { position: { x: 0, z: 0 }, heading: 0, cannon: 0.5 },
+      opponent: { position: { x: 5, z: 0 } },
+    });
+    const next = stepBattle(state, { player: command({ fire: 'port' }) });
+
+    expect(events(next, 'volley')).toHaveLength(0);
+    expect(events(next, 'damage')).toHaveLength(0);
+    expect(next.ships.player.reload.port).toEqual(state.ships.player.reload.port);
+    expect(next.seed).toBe(1702);
+    expect(next.nextVolleyId).toBe(1);
+  });
+
   it('reloads physical sides independently and announces only the unloaded-to-loaded transition', () => {
     const state = fixture();
     state.ships.player.reload.port = { progress: 359_500, required: 360_000, loaded: false };

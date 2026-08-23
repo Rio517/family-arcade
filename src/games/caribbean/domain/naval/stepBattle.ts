@@ -23,6 +23,12 @@ const EVENT_WINDOW = 120;
 type WithoutId<T> = T extends unknown ? Omit<T, 'id'> : never;
 type NewNavalEvent = WithoutId<NavalEvent>;
 
+interface PendingDamage {
+  targetShipId: NavalShipId;
+  damage: Damage;
+  atTick: number;
+}
+
 function opposingShip(shipId: NavalShipId): NavalShipId {
   return shipId === 'player' ? 'opponent' : 'player';
 }
@@ -86,24 +92,26 @@ function applyDamage(state: NavalState, targetShipId: NavalShipId, requested: Da
 
 function resolveRequestedBroadside(
   state: NavalState,
+  firingSnapshot: NavalState,
   shipId: NavalShipId,
   command: NavalCommand | undefined,
   firedSides: Set<string>,
-): void {
-  if (!command?.fire) return;
+): PendingDamage | null {
+  if (!command?.fire) return null;
 
-  const ship = state.ships[shipId];
+  const ship = firingSnapshot.ships[shipId];
   const targetShipId = opposingShip(shipId);
-  const target = state.ships[targetShipId];
+  const target = firingSnapshot.ships[targetShipId];
   const side = command.fire;
   const distance = Math.hypot(target.position.x - ship.position.x, target.position.z - ship.position.z);
   if (
     !ship.reload[side].loaded
+    || !Number.isInteger(ship.cannon)
     || ship.cannon <= 0
     || distance > MAX_BROADSIDE_RANGE
     || bearingSide(ship.position, ship.heading, target.position) !== side
   ) {
-    return;
+    return null;
   }
 
   const normalizedRange = distance / MAX_BROADSIDE_RANGE;
@@ -118,8 +126,8 @@ function resolveRequestedBroadside(
   });
   state.seed = result.seedAfter;
   state.nextVolleyId += 1;
-  ship.reload[side].progress = 0;
-  ship.reload[side].loaded = false;
+  state.ships[shipId].reload[side].progress = 0;
+  state.ships[shipId].reload[side].loaded = false;
   firedSides.add(`${shipId}:${side}`);
 
   appendEvent(state, {
@@ -129,8 +137,7 @@ function resolveRequestedBroadside(
     targetShipId,
     result,
   });
-  const appliedDamage = applyDamage(state, targetShipId, result.damage);
-  appendEvent(state, { kind: 'damage', atTick: state.tick, shipId: targetShipId, damage: appliedDamage });
+  return { targetShipId, damage: result.damage, atTick: state.tick };
 }
 
 function reloadSnapshot(state: NavalState): Record<NavalShipId, Record<Broadside, boolean>> {
@@ -170,8 +177,26 @@ export function stepBattle(state: NavalState, commands: NavalCommands): NavalSta
   for (const shipId of SHIP_IDS) applyCommand(next, shipId, validatedCommands[shipId]);
 
   const firedSides = new Set<string>();
+  const firingSnapshot = structuredClone(next);
+  const pendingDamage: PendingDamage[] = [];
   for (const shipId of SHIP_IDS) {
-    resolveRequestedBroadside(next, shipId, validatedCommands[shipId], firedSides);
+    const pending = resolveRequestedBroadside(
+      next,
+      firingSnapshot,
+      shipId,
+      validatedCommands[shipId],
+      firedSides,
+    );
+    if (pending) pendingDamage.push(pending);
+  }
+  for (const pending of pendingDamage) {
+    const appliedDamage = applyDamage(next, pending.targetShipId, pending.damage);
+    appendEvent(next, {
+      kind: 'damage',
+      atTick: pending.atTick,
+      shipId: pending.targetShipId,
+      damage: appliedDamage,
+    });
   }
 
   const reloadsBeforeMovement = reloadSnapshot(next);

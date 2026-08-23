@@ -50,6 +50,17 @@ describe('createNavalBattle', () => {
     expect(() => createNavalBattle(invalid)).toThrow(`Invalid naval input: ${issue}`);
   });
 
+  it.each([
+    ['crew', 51.5, 'player.crew:not-integer'],
+    ['cannon', 7.5, 'player.cannon:not-integer'],
+  ] as const)('rejects fractional external %s counts', (field, value, issue) => {
+    const invalid = structuredClone(BATTLE_LAB_INPUT);
+    invalid.player[field] = value;
+
+    expect(validateNavalInput(invalid)).toEqual({ ok: false, issues: [issue] });
+    expect(() => createNavalBattle(invalid)).toThrow(`Invalid naval input: ${issue}`);
+  });
+
   it('creates fresh test fixtures with named shallow overrides and default commands', () => {
     const state = fixture({ player: { hull: 43 }, input: { windStrength: 2 }, tick: 12 });
     expect(state.ships.player.hull).toBe(43);

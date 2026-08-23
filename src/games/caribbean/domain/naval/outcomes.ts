@@ -25,7 +25,18 @@ function boardingOutcome(state: NavalState): NavalOutcome | null {
   const player = state.ships.player;
   const target = state.ships.opponent;
   const distance = Math.hypot(target.position.x - player.position.x, target.position.z - player.position.z);
-  const relativeSpeed = Math.abs(player.speed - target.speed);
+  const playerVelocity = {
+    x: Math.sin(player.heading) * player.speed,
+    z: Math.cos(player.heading) * player.speed,
+  };
+  const targetVelocity = {
+    x: Math.sin(target.heading) * target.speed,
+    z: Math.cos(target.heading) * target.speed,
+  };
+  const relativeSpeed = Math.hypot(
+    playerVelocity.x - targetVelocity.x,
+    playerVelocity.z - targetVelocity.z,
+  );
 
   if (
     distance <= 7
