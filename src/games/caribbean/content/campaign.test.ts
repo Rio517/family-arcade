@@ -49,6 +49,7 @@ describe('Caribbean campaign content', () => {
 
     for (const ids of [PORT_IDS, CARGO_IDS, SHIP_CLASS_IDS, FACTION_IDS, FITTING_IDS, LEAD_IDS]) {
       expectUnique(ids);
+      expect(Object.isFrozen(ids)).toBe(true);
     }
   });
 
@@ -56,6 +57,12 @@ describe('Caribbean campaign content', () => {
     expect(Object.isFrozen(BRIDGETOWN)).toBe(true);
     expect(Object.isFrozen(FITTINGS)).toBe(true);
     expect(Object.isFrozen(LEADS)).toBe(true);
+    for (const [id, fitting] of Object.entries(FITTINGS)) {
+      expect(Object.isFrozen(fitting), `FITTINGS.${id} must be frozen`).toBe(true);
+    }
+    for (const [id, lead] of Object.entries(LEADS)) {
+      expect(Object.isFrozen(lead), `LEADS.${id} must be frozen`).toBe(true);
+    }
     expect(BRIDGETOWN).toEqual({
       id: 'bridgetown',
       name: 'Bridgetown',
@@ -87,7 +94,7 @@ describe('Caribbean campaign content', () => {
   });
 
   it('derives campaign sloop validation limits from the authoritative naval class', () => {
-    expect(SLOOP_VALIDATION_LIMITS).toEqual(SLOOP_CLASS);
+    expect(SLOOP_VALIDATION_LIMITS).toBe(SLOOP_CLASS);
   });
 
   it.each([
