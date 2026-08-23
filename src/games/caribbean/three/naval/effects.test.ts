@@ -79,4 +79,25 @@ describe('bounded naval effect pool', () => {
       'debris',
     ]);
   });
+
+  it('disposes all five instanced batches and their GPU instance attributes', () => {
+    const scene = new THREE.Scene();
+    const effects = new EffectPool(scene, 4, false);
+    const disposeEvents: string[] = [];
+    for (const child of scene.children) {
+      if (!(child instanceof THREE.InstancedMesh)) throw new Error('Expected only instanced effect batches');
+      child.addEventListener('dispose', () => disposeEvents.push(child.name));
+    }
+
+    effects.dispose();
+
+    expect(disposeEvents).toEqual([
+      'NavalEffectBatch_flash',
+      'NavalEffectBatch_smoke',
+      'NavalEffectBatch_splash',
+      'NavalEffectBatch_debris',
+      'NavalEffectBatch_rig',
+    ]);
+    expect(scene.children).toHaveLength(0);
+  });
 });

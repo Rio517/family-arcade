@@ -42,9 +42,9 @@ function fakeScene(): FakeScene {
       tier: 'low',
       drawCalls: 1,
       triangles: 2,
-      textures: 0,
-      geometries: 1,
-      materials: 1,
+      textures: 3,
+      geometries: 4,
+      materials: 5,
       activeEffects: 0,
       effectCapacity: 32,
     }),
@@ -216,6 +216,34 @@ describe('NavalViewport', () => {
     expect(scene.renders.at(-1)).toEqual({ animation: 0.1, wall: 0.5 });
   });
 
+  it('resets wall timing across hidden intervals while preserving visible low-FPS samples', async () => {
+    let visibilityState: DocumentVisibilityState = 'visible';
+    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibilityState);
+    const removeListener = vi.spyOn(document, 'removeEventListener');
+    const scene = fakeScene();
+    const { unmount } = render(
+      <NavalViewport state={fixture()} events={[]} sceneFactory={vi.fn().mockResolvedValue(scene.adapter)} onRestart={vi.fn()} />,
+    );
+    await screen.findByTestId('naval-scene-slot');
+
+    act(() => frames.shift()?.(1_000));
+    act(() => frames.shift()?.(1_500));
+    expect(scene.renders.at(-1)).toEqual({ animation: 0.1, wall: 0.5 });
+
+    visibilityState = 'hidden';
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    visibilityState = 'visible';
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    act(() => frames.shift()?.(9_000));
+    expect(scene.renders.at(-1)).toEqual({ animation: 0, wall: 0 });
+
+    act(() => frames.shift()?.(9_500));
+    expect(scene.renders.at(-1)).toEqual({ animation: 0.1, wall: 0.5 });
+
+    unmount();
+    expect(removeListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+  });
+
   it('publishes actual renderer metrics on the harness-visible scene frame', async () => {
     const scene = fakeScene();
     render(<NavalViewport state={fixture()} events={[]} sceneFactory={vi.fn().mockResolvedValue(scene.adapter)} onRestart={vi.fn()} />);
@@ -223,9 +251,21 @@ describe('NavalViewport', () => {
 
     act(() => frames.shift()?.(1_000));
 
-    expect(frame).toHaveAttribute('data-scene-draw-calls', '1');
-    expect(frame).toHaveAttribute('data-scene-triangles', '2');
-    expect(frame).toHaveAttribute('data-scene-effect-capacity', '32');
+    const publishedMetrics = Object.fromEntries(
+      Object.entries(frame.dataset).filter(([name]) => name.startsWith('scene')),
+    );
+    expect(publishedMetrics).toEqual({
+      sceneFps: '60',
+      sceneDpr: '1',
+      sceneTier: 'low',
+      sceneDrawCalls: '1',
+      sceneTriangles: '2',
+      sceneTextures: '3',
+      sceneGeometries: '4',
+      sceneMaterials: '5',
+      sceneActiveEffects: '0',
+      sceneEffectCapacity: '32',
+    });
   });
 
   it('uses the HTML chart immediately when 3D is explicitly disabled', () => {

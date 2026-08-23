@@ -58,9 +58,18 @@ export function fitEngagementCamera(
   const verticalTangent = Math.tan(verticalHalfFov) * safeFraction;
   const elevation = THREE.MathUtils.degToRad(58);
   const horizontal = Math.cos(elevation);
-  const viewX = Math.sin(input.playerHeading) * horizontal;
+  const engagementX = input.opponent.x - input.player.x;
+  const engagementZ = input.opponent.z - input.player.z;
+  const engagementLength = Math.hypot(engagementX, engagementZ);
+  const horizontalViewX = engagementLength > 0.001
+    ? engagementZ / engagementLength
+    : Math.sin(input.playerHeading);
+  const horizontalViewZ = engagementLength > 0.001
+    ? -engagementX / engagementLength
+    : Math.cos(input.playerHeading);
+  const viewX = horizontalViewX * horizontal;
   const viewY = -Math.sin(elevation);
-  const viewZ = Math.cos(input.playerHeading) * horizontal;
+  const viewZ = horizontalViewZ * horizontal;
   const rightLength = Math.hypot(viewZ, viewX);
   const rightX = -viewZ / rightLength;
   const rightZ = viewX / rightLength;

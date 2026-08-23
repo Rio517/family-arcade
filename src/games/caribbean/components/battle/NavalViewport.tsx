@@ -122,6 +122,17 @@ export function NavalViewport({
     let lastFrameMilliseconds: number | null = null;
     let renderedFrames = 0;
     let scene: NavalSceneAdapter | null = null;
+    let listeningForVisibility = true;
+
+    const resetFrameBaseline = () => {
+      lastFrameMilliseconds = null;
+    };
+    const stopListeningForVisibility = () => {
+      if (!listeningForVisibility) return;
+      listeningForVisibility = false;
+      document.removeEventListener('visibilitychange', resetFrameBaseline);
+    };
+    document.addEventListener('visibilitychange', resetFrameBaseline);
 
     const disposeScene = () => {
       const owned = scene;
@@ -135,6 +146,7 @@ export function NavalViewport({
       failed = true;
       if (frameHandle !== null) cancelAnimationFrame(frameHandle);
       frameHandle = null;
+      stopListeningForVisibility();
       disposeScene();
       setStatus('failed');
     };
@@ -142,6 +154,11 @@ export function NavalViewport({
 
     const frame = (timeMilliseconds: number) => {
       if (!active || failed || !scene) return;
+      if (document.visibilityState === 'hidden') {
+        lastFrameMilliseconds = null;
+        frameHandle = requestAnimationFrame(frame);
+        return;
+      }
       const wallSeconds = lastFrameMilliseconds === null
         ? 0
         : Math.max(0, (timeMilliseconds - lastFrameMilliseconds) / 1_000);
@@ -157,6 +174,9 @@ export function NavalViewport({
           dataset.sceneTier = metrics.tier;
           dataset.sceneDrawCalls = String(metrics.drawCalls);
           dataset.sceneTriangles = String(metrics.triangles);
+          dataset.sceneTextures = String(metrics.textures);
+          dataset.sceneGeometries = String(metrics.geometries);
+          dataset.sceneMaterials = String(metrics.materials);
           dataset.sceneActiveEffects = String(metrics.activeEffects);
           dataset.sceneEffectCapacity = String(metrics.effectCapacity);
         }
@@ -197,6 +217,7 @@ export function NavalViewport({
       if (failRef.current === fail) failRef.current = null;
       if (frameHandle !== null) cancelAnimationFrame(frameHandle);
       frameHandle = null;
+      stopListeningForVisibility();
       disposeScene();
     };
   }, [attempt, initialTier, reducedMotion, sceneFactory]);

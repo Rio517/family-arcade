@@ -190,7 +190,10 @@ export class EffectPool {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    Object.values(this.#batches).forEach((batch) => batch.removeFromParent());
+    Object.values(this.#batches).forEach((batch) => {
+      batch.removeFromParent();
+      batch.dispose();
+    });
     Object.values(this.#geometries).forEach((geometry) => geometry.dispose());
     Object.values(this.#materials).forEach((material) => material.dispose());
   }
