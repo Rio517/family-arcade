@@ -10,23 +10,23 @@ function broadsideSetup(playerX: number): BattleState {
 }
 
 describe('opponentCommand', () => {
-  it('fires the loaded starboard battery when the player crosses that side', () => {
+  it('fires the loaded port battery when the player crosses physical port', () => {
     expect(opponentCommand(broadsideSetup(-24))).toMatchObject({
-      ammo: 'round',
-      fire: 'starboard',
-    });
-  });
-
-  it('fires the loaded port battery when the player crosses that side', () => {
-    expect(opponentCommand(broadsideSetup(24))).toMatchObject({
       ammo: 'round',
       fire: 'port',
     });
   });
 
+  it('fires the loaded starboard battery when the player crosses physical starboard', () => {
+    expect(opponentCommand(broadsideSetup(24))).toMatchObject({
+      ammo: 'round',
+      fire: 'starboard',
+    });
+  });
+
   it('does not request a battery that is still reloading', () => {
     const state = broadsideSetup(24);
-    state.ships.enemy.reload.port = 2;
+    state.ships.enemy.reload.starboard = 2;
 
     expect(opponentCommand(state).fire).toBeUndefined();
   });

@@ -1,6 +1,7 @@
 import {
   applyDamage,
   bearingSide,
+  broadsideVector,
   createBattle,
   damageProfile,
   fireBroadside,
@@ -40,8 +41,8 @@ describe('ship handling', () => {
     const afterFull = stepBattle(full, {}, 1);
     const afterReefed = stepBattle(reefed, {}, 1);
 
-    expect(afterReefed.ships.player.heading - Math.PI / 2).toBeGreaterThan(
-      afterFull.ships.player.heading - Math.PI / 2,
+    expect(Math.abs(afterReefed.ships.player.heading - Math.PI / 2)).toBeGreaterThan(
+      Math.abs(afterFull.ships.player.heading - Math.PI / 2),
     );
     expect(afterReefed.ships.player.position.x).toBeLessThan(
       afterFull.ships.player.position.x,
@@ -58,10 +59,30 @@ describe('ship handling', () => {
 });
 
 describe('broadside fire', () => {
-  it('classifies targets on the correct side of a northbound ship', () => {
-    expect(bearingSide({ x: 0, z: 0 }, 0, { x: -20, z: 1 })).toBe('port');
-    expect(bearingSide({ x: 0, z: 0 }, 0, { x: 20, z: 1 })).toBe('starboard');
-    expect(bearingSide({ x: 0, z: 0 }, 0, { x: 0, z: 20 })).toBeNull();
+  it('maps physical sides for a ship whose bow points +Z', () => {
+    expect(broadsideVector(0, 'port')).toEqual({ x: 1, z: 0 });
+    expect(broadsideVector(0, 'starboard')).toEqual({ x: -1, z: 0 });
+    expect(bearingSide({ x: 0, z: 0 }, 0, { x: 20, z: 0 })).toBe('port');
+    expect(bearingSide({ x: 0, z: 0 }, 0, { x: -20, z: 0 })).toBe('starboard');
+  });
+
+  it('launches each broadside from its named physical side', () => {
+    const state = createBattle({ seed: 123 });
+    state.ships.player.position = { x: 0, z: 0 };
+    state.ships.player.heading = 0;
+
+    const port = fireBroadside(state, 'player', 'port');
+    const starboard = fireBroadside(state, 'player', 'starboard');
+
+    expect(port.projectiles.every((shot) => shot.position.x > 0 && shot.velocity.x > 0)).toBe(true);
+    expect(starboard.projectiles.every((shot) => shot.position.x < 0 && shot.velocity.x < 0)).toBe(true);
+  });
+
+  it('turns a starboard rudder toward physical starboard', () => {
+    const state = createBattle({ seed: 44 });
+    state.ships.player.heading = 0;
+    const next = stepBattle(state, { player: { rudder: 1 } }, 0.5);
+    expect(next.ships.player.heading).toBeLessThan(0);
   });
 
   it('fires only a loaded side and starts that side reloading', () => {

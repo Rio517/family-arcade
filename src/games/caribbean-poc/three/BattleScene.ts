@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { disposeDeep } from '@shared/three/disposeDeep';
-import type { BattleEvent, BattleState, Broadside, ShipId } from '../domain/battle';
+import { broadsideVector, type BattleEvent, type BattleState, type Broadside, type ShipId } from '../domain/battle';
 import { createSloop } from './loadSloop';
 
 interface ShipVisual {
@@ -239,7 +239,7 @@ export class BattleScene {
     const ship = state.ships[shipId];
     const smoke = event.kind === 'broadside';
     const side: Broadside = event.kind === 'broadside' ? event.side : 'port';
-    const lateral = side === 'starboard' ? 1 : -1;
+    const broadside = broadsideVector(ship.heading, side);
     for (let index = 0; index < (smoke ? 6 : 9); index++) {
       const material = new THREE.MeshStandardMaterial({
         color: smoke ? '#d7d2c6' : '#c8f8ef',
@@ -248,11 +248,10 @@ export class BattleScene {
         roughness: 1,
       });
       const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(smoke ? 0.45 : 0.25, 1), material);
-      const sideAngle = ship.heading + lateral * Math.PI / 2;
       puff.position.set(
-        ship.position.x + Math.sin(sideAngle) * (2.7 + index * 0.2),
+        ship.position.x + broadside.x * (2.7 + index * 0.2),
         smoke ? 1.2 : 0.15,
-        ship.position.z + Math.cos(sideAngle) * (2.7 + index * 0.2),
+        ship.position.z + broadside.z * (2.7 + index * 0.2),
       );
       this.scene.add(puff);
       this.effects.push({
@@ -260,9 +259,9 @@ export class BattleScene {
         age: 0,
         life: smoke ? 1.8 : 1.15,
         velocity: new THREE.Vector3(
-          Math.sin(sideAngle) * (0.7 + index * 0.08),
+          broadside.x * (0.7 + index * 0.08),
           smoke ? 0.85 + index * 0.05 : 1.7 + index * 0.1,
-          Math.cos(sideAngle) * (0.7 + index * 0.08),
+          broadside.z * (0.7 + index * 0.08),
         ),
       });
     }

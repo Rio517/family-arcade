@@ -160,6 +160,16 @@ export function createBattle(options: CreateBattleOptions): BattleState {
   };
 }
 
+export function broadsideVector(heading: number, side: Broadside): Point {
+  const lateral = side === 'port' ? 1 : -1;
+  const x = Math.cos(heading) * lateral;
+  const z = -Math.sin(heading) * lateral;
+  return {
+    x: Object.is(x, -0) ? 0 : x,
+    z: Object.is(z, -0) ? 0 : z,
+  };
+}
+
 export function bearingSide(origin: Point, heading: number, target: Point): Broadside | null {
   const dx = target.x - origin.x;
   const dz = target.z - origin.z;
@@ -171,9 +181,8 @@ export function bearingSide(origin: Point, heading: number, target: Point): Broa
   const forward = (dx * forwardX + dz * forwardZ) / length;
   if (Math.abs(forward) > 0.72) return null;
 
-  const starboardX = Math.cos(heading);
-  const starboardZ = -Math.sin(heading);
-  return dx * starboardX + dz * starboardZ >= 0 ? 'starboard' : 'port';
+  const port = broadsideVector(heading, 'port');
+  return dx * port.x + dz * port.z >= 0 ? 'port' : 'starboard';
 }
 
 function random01(state: BattleState): number {
@@ -198,9 +207,7 @@ export function fireBroadside(
 
   const next = cloneBattle(state);
   const ship = next.ships[shipId];
-  const broadsideAngle = ship.heading + (side === 'starboard' ? Math.PI / 2 : -Math.PI / 2);
-  const lateralX = Math.sin(broadsideAngle);
-  const lateralZ = Math.cos(broadsideAngle);
+  const lateral = broadsideVector(ship.heading, side);
   const forwardX = Math.sin(ship.heading);
   const forwardZ = Math.cos(ship.heading);
   const shotCount = Math.max(1, Math.min(4, Math.ceil(ship.cannon / 2)));
@@ -209,19 +216,20 @@ export function fireBroadside(
   for (let i = 0; i < shotCount; i++) {
     const alongDeck = (i - (shotCount - 1) / 2) * 0.75;
     const spread = (random01(next) - 0.5) * 0.07;
-    const direction = broadsideAngle + spread;
+    const spreadCos = Math.cos(spread);
+    const spreadSin = Math.sin(spread);
     next.projectiles.push({
       id: next.nextProjectileId++,
       volley,
       owner: shipId,
       ammo: ship.ammo,
       position: {
-        x: ship.position.x + lateralX * 2.2 + forwardX * alongDeck,
-        z: ship.position.z + lateralZ * 2.2 + forwardZ * alongDeck,
+        x: ship.position.x + lateral.x * 2.2 + forwardX * alongDeck,
+        z: ship.position.z + lateral.z * 2.2 + forwardZ * alongDeck,
       },
       velocity: {
-        x: Math.sin(direction) * PROJECTILE_SPEED,
-        z: Math.cos(direction) * PROJECTILE_SPEED,
+        x: (lateral.x * spreadCos + forwardX * spreadSin) * PROJECTILE_SPEED,
+        z: (lateral.z * spreadCos + forwardZ * spreadSin) * PROJECTILE_SPEED,
       },
       travelled: 0,
       ttl: PROJECTILE_RANGE / PROJECTILE_SPEED,
@@ -315,7 +323,7 @@ function moveShip(ship: ShipState, state: BattleState, dt: number): void {
   const crewFactor = clamp(ship.crew / 35, 0.45, 1);
   const reefed = ship.sail === 'reefed';
   const turnRate = (reefed ? 0.8 : 0.52) * (0.55 + 0.45 * sailHealth);
-  ship.heading += ship.rudder * turnRate * dt;
+  ship.heading -= ship.rudder * turnRate * dt;
 
   const polar = sailingEfficiency(ship.heading - state.windFrom);
   const maxSpeed = (reefed ? 3.9 : 5.6) * state.windStrength;
