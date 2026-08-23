@@ -1,4 +1,4 @@
-import { createBattle, type BattleState } from './battle';
+import { createBattle, normalizeAngle, stepBattle, type BattleState } from './battle';
 import { opponentCommand } from './opponent';
 
 function broadsideSetup(playerX: number): BattleState {
@@ -56,5 +56,18 @@ describe('opponentCommand', () => {
 
     expect(Math.abs(command.rudder ?? 0)).toBeGreaterThan(0.2);
     expect(command.sail).toBe('reefed');
+  });
+
+  it('steps closer to the intended broadside heading', () => {
+    const state = createBattle({ seed: 44 });
+    const intendedBroadsideHeading = Math.PI / 2;
+    const angularError = (heading: number) =>
+      Math.abs(normalizeAngle(heading - intendedBroadsideHeading));
+
+    const next = stepBattle(state, { enemy: opponentCommand(state) }, 0.5);
+
+    expect(angularError(next.ships.enemy.heading)).toBeLessThan(
+      angularError(state.ships.enemy.heading),
+    );
   });
 });

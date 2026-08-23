@@ -66,6 +66,23 @@ describe('broadside fire', () => {
     expect(bearingSide({ x: 0, z: 0 }, 0, { x: -20, z: 0 })).toBe('starboard');
   });
 
+  it.each([
+    [0, { x: 1, z: 0 }, { x: -1, z: 0 }, { x: 20, z: 0 }, { x: -20, z: 0 }],
+    [Math.PI / 2, { x: 0, z: -1 }, { x: 0, z: 1 }, { x: 0, z: -20 }, { x: 0, z: 20 }],
+    [Math.PI, { x: -1, z: 0 }, { x: 1, z: 0 }, { x: -20, z: 0 }, { x: 20, z: 0 }],
+    [-Math.PI / 2, { x: 0, z: 1 }, { x: 0, z: -1 }, { x: 0, z: 20 }, { x: 0, z: -20 }],
+  ])('maps port and starboard at heading %d', (heading, port, starboard, portTarget, starboardTarget) => {
+    const portVector = broadsideVector(heading, 'port');
+    const starboardVector = broadsideVector(heading, 'starboard');
+
+    expect(portVector.x).toBeCloseTo(port.x, 10);
+    expect(portVector.z).toBeCloseTo(port.z, 10);
+    expect(starboardVector.x).toBeCloseTo(starboard.x, 10);
+    expect(starboardVector.z).toBeCloseTo(starboard.z, 10);
+    expect(bearingSide({ x: 0, z: 0 }, heading, portTarget)).toBe('port');
+    expect(bearingSide({ x: 0, z: 0 }, heading, starboardTarget)).toBe('starboard');
+  });
+
   it('launches each broadside from its named physical side', () => {
     const state = createBattle({ seed: 123 });
     state.ships.player.position = { x: 0, z: 0 };
@@ -76,6 +93,16 @@ describe('broadside fire', () => {
 
     expect(port.projectiles.every((shot) => shot.position.x > 0 && shot.velocity.x > 0)).toBe(true);
     expect(starboard.projectiles.every((shot) => shot.position.x < 0 && shot.velocity.x < 0)).toBe(true);
+  });
+
+  it('launches port projectiles toward port at a non-zero heading', () => {
+    const state = createBattle({ seed: 123 });
+    state.ships.player.position = { x: 0, z: 0 };
+    state.ships.player.heading = Math.PI / 2;
+
+    const port = fireBroadside(state, 'player', 'port');
+
+    expect(port.projectiles.every((shot) => shot.position.z < 0 && shot.velocity.z < 0)).toBe(true);
   });
 
   it('turns a starboard rudder toward physical starboard', () => {

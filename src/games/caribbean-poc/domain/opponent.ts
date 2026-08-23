@@ -10,7 +10,7 @@ function clamp(value: number, low: number, high: number): number {
 }
 
 function turnToward(current: number, desired: number): number {
-  return clamp(normalizeAngle(desired - current) * 1.4, -1, 1);
+  return clamp(-normalizeAngle(desired - current) * 1.4, -1, 1);
 }
 
 function bestBroadsideHeading(current: number, targetBearing: number): number {
