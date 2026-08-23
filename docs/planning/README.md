@@ -9,7 +9,8 @@ finished specs, and not necessarily built yet.
   caveat about strict networks.)
 - [rainbow-racer-kart.md](./rainbow-racer-kart.md) — growing Rainbow Racer into
   the Mario-Kart-like the girls asked for, on the lead designer's spec: no
-  cars — you ride a creature or you *are* one, and stars grow your body
-  (bigger, faster; no tools, no magnets). Racers and stars first, then AI
-  rivals, then a Rainbow Road track, then two-girls-one-tablet — each phase a
-  playable release.
+  cars — you ride a creature or you *are* one, and stars move you up the
+  animal ladder, bunny → unicorn (a fairy gets bigger wings; no tools, no
+  magnets, no dragons). Racers and stars first, then AI rivals, then a
+  Rainbow Road track, then two-girls-one-tablet — each phase a playable
+  release.

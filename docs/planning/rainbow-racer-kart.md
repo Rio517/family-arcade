@@ -11,17 +11,23 @@ the lead designer got specific, and her design is better than our first draft:
 > get a **bigger animal**, or you can get **stronger** — you just get a
 > faster bonus. But not like a magnet, not with tools — **with your body**.
 
+Her second review (2026-08-23) settled the open questions in one breath:
+
+> Princess, fairies, mermaids — **no dragons**. Unicorns, bunny, horse, pig,
+> dog, cat. You **move to a bigger animal** — or if you are a fairy you get
+> **bigger wings**. You go faster and are stronger. Otherwise fine.
+
 Three pillars fall straight out of that:
 
 1. **No cars.** You ride a creature, or you *are* one.
 2. **Who you are decides how you race.** A princess needs a mount (she can't
    fly alone); a fairy flies by herself; an animal runs on its own legs.
 3. **Powers live in your body.** Stars are the only pickup that matters:
-   collect them and your creature grows bigger / you get faster. No tools,
-   no gadgets, and — by name — no magnets. This *replaces* the item-box
-   roster from the first draft (Bubble Trap and Rainbow Magnet are cut;
-   Sparkle Boost survives in spirit as the star speed bonus, because a burst
-   of speed is something your body does).
+   collect them and you move to a bigger animal (a fairy's wings grow) —
+   faster and stronger. No tools, no gadgets, and — by name — no magnets.
+   This *replaces* the item-box roster from the first draft (Bubble Trap and
+   Rainbow Magnet are cut; Sparkle Boost survives in spirit as the star
+   speed bonus, because a burst of speed is something your body does).
 
 **The plan in one line:** grow the existing game in place — racers and stars
 first (in the arena it already has), then AI rivals, then a Rainbow Road
@@ -58,22 +64,26 @@ Two structural observations shape everything below:
 
 ## The racers
 
-A small roster of characters, each an answer to "how do you move?":
+The roster is decreed — **no dragons** — and it splits cleanly in two:
 
-- **Riders** — a princess on a unicorn (or pony). Two beings, one racer:
-  the creature runs, the rider steers. The mount is what grows.
-- **Solo creatures** — an animal racing on its own legs. It *is* the body
-  that grows.
-- **Flyers** — a fairy who flies alone. Flying is a *look*, not a shortcut:
-  a hover-bob above the ground on the same racing line, same speed rules,
-  same rails. The moment flying skips part of the course, the race stops
-  being fair, and fairness between a six-year-old and a parent is the whole
-  game.
+- **Characters** — a **princess**, a **fairy**, a **mermaid**. The princess
+  and the mermaid ride (by her own logic: the princess can't fly alone, and
+  a mermaid has no legs — her mockup can offer side-saddle or a floating
+  water bubble); the fairy flies by herself.
+- **The animal ladder** — the six animals sort by size into the growth
+  ladder: **bunny → cat → dog → pig → horse → unicorn**. An animal can race
+  solo or carry a rider; either way it's the animal that changes when stars
+  are collected, and the unicorn is the crown of the ladder.
 
-Per house rules, the roster is **mockups first**: ~3 labelled character-style
-options as local HTML pages before we build, and the girls christen every
-racer. (Cloud Kingdom already gives us the palette: unicorns, rainbows,
-cloud sea.)
+Flying is a *look*, not a shortcut: the fairy hover-bobs above the same
+racing line, same speed rules, same rails. The moment flying skips part of
+the course, the race stops being fair, and fairness between a six-year-old
+and a parent is the whole game.
+
+Per house rules, each racer's look is **mockups first**: ~3 labelled
+character-style options as local HTML pages before we build, and the girls
+christen the individual racers. (Cloud Kingdom already gives us the palette:
+unicorns, rainbows, cloud sea.)
 
 ## Phase 1 — Stars and growing (in today's arena)
 
@@ -82,11 +92,18 @@ the host-owned world; `WorldDelta` grows `spawned`/`removed` arrays for stars
 and a growth-state field per racer). Stars are rarer than coins and they
 don't score — they feed your body:
 
-- Collecting stars fills a **star meter**. At each threshold your creature
-  **grows a size tier** — visibly bigger, a notch faster. Bigger is also
-  heavier: bumping into a smaller racer nudges them aside (the gentle bonk —
-  our chaos, done with bodies instead of shells).
-- The top tier is **temporary** — it glows, then fades back one tier after a
+- Collecting stars fills a **star meter**. At each threshold you **move to
+  a bigger animal** — your mount (or you, racing solo) steps up the ladder:
+  bunny → cat → dog → pig → horse → unicorn. A **fairy gets bigger wings**
+  instead. Every step up is faster *and* stronger: bumping into a smaller
+  racer nudges them aside (the gentle bonk — our chaos, done with bodies
+  instead of shells).
+- **Starting spot is a costume, not a head start**: you pick the animal you
+  begin on, but speed and strength come from *stars collected*, not from
+  which animal you're on — so a star-fed cat outruns a fresh horse, which is
+  exactly the kind of upset this game is for. Past the top of your ladder,
+  extra tiers make your unicorn (or wings) glow brighter.
+- The top tier is **temporary** — it glows, then fades back one step after a
   while, so the lead changes hands and races stay swingy instead of
   snowballing.
 - **The kindness rule** (Mario Kart's own secret, reworded for stars):
@@ -97,8 +114,8 @@ don't score — they feed your body:
 All growth logic lives in a new pure `domain/stars.ts` (no DOM, injected
 RNG, unit-tested like `kart.ts`). The host resolves pickups, thresholds, and
 decay timers for every racer; the guest renders what the deltas say. Growth
-visuals respect `prefers-reduced-motion` (a size change is a resize, not a
-mandatory sparkle storm).
+visuals respect `prefers-reduced-motion` (an animal swap is a quick change,
+not a mandatory sparkle storm).
 
 ## Phase 2 — AI rivals
 
@@ -161,18 +178,23 @@ the other) or WASD-vs-arrows on a keyboard.
 - **Shipping rhythm:** one phase = one or a few PRs, each leaving the game
   playable. No long-lived feature branch.
 
+## Decided (by the lead designer, 2026-08-23)
+
+- **Roster:** princess, fairy, mermaid + unicorn, bunny, horse, pig, dog,
+  cat. **No dragons.**
+- **Growth is a swap:** you move to a bigger animal (fairy: bigger wings).
+- **Bigger is faster *and* stronger** — the gentle bonk is in.
+- **Stars vs coins:** coins stay the score, stars feed growth ("otherwise
+  fine" ratified the starting bid).
+
 ## Open questions (for the family, mostly)
 
-1. **The roster.** Which racers at launch — princess-on-unicorn, a fairy, a
-   pony racing solo? The girls pick and name them.
-2. **How does "bigger" happen?** Does your animal grow — or do you hop onto
-   a bigger friend at each tier (pony → horse → something magnificent)?
-   Her words allow both readings; her call.
-3. **Bumping.** Should big racers nudge little ones aside (the gentle bonk),
-   or is bigger only about speed?
-4. **Stars vs coins.** Coins stay the score and stars feed growth (our
-   starting bid) — or should stars do both jobs?
-5. How many Rainbow Road layouts at launch — one great track, or a couple of
+1. **Names.** The girls christen the individual racers when the mockups
+   land.
+2. **Starting spot.** Everyone begins at bunny, or pick your animal (with
+   speed coming from stars collected, so starting big is a look, not a head
+   start — our starting bid above)?
+3. How many Rainbow Road layouts at launch — one great track, or a couple of
    seeded variants?
-6. AI difficulty: fixed and friendly, or a picker (pony / racer / rainbow
+4. AI difficulty: fixed and friendly, or a picker (pony / racer / rainbow
    legend)?
