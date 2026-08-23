@@ -19,10 +19,13 @@ const OUT = path.join(ROOT, 'docs', 'screenshots', 'caribbean-naval');
 const HARNESS_PATH = '/preview-caribbean-game.html';
 const GLB_PATTERN = /^caribbean-sloop-[A-Za-z0-9_-]+\.glb$/;
 const ANGLE_ARGS = ['--use-gl=angle', '--use-angle=default', '--enable-unsafe-swiftshader'];
-const VIEWPORTS = {
+export const VIEWPORTS = {
   tablet: { width: 1180, height: 820 },
   desktop: { width: 1440, height: 900 },
-  phone: { width: 430, height: 932 },
+  minimum: { width: 1024, height: 768 },
+  boundary: { width: 960, height: 600 },
+  phonePortrait: { width: 430, height: 932 },
+  phoneLandscape: { width: 844, height: 390 },
 };
 const TASK8_TREE_FILES = [
   'package.json',
@@ -33,6 +36,10 @@ const TASK8_TREE_FILES = [
   'scripts/lib/caribbean-naval-scenario.test.mjs',
   'src/games/caribbean/components/CaribbeanLab.test.tsx',
   'src/games/caribbean/components/CaribbeanLab.tsx',
+  'src/games/caribbean/components/battle/BattleHud.tsx',
+  'src/games/caribbean/components/battle/BattleShortcutLegend.tsx',
+  'src/games/caribbean/components/battle/NavalBattlePage.tsx',
+  'src/games/caribbean/components/battle/NavalViewport.tsx',
   'src/games/caribbean/domain/naval/geometry.test.ts',
   'src/games/caribbean/domain/naval/geometry.ts',
   'src/games/caribbean/preview.tsx',
@@ -41,6 +48,9 @@ const TASK8_TREE_FILES = [
   'src/games/caribbean/state/naval/harnessConfig.test.ts',
   'src/games/caribbean/state/naval/harnessConfig.ts',
   'src/games/caribbean/three/naval/NavalScene.ts',
+  'src/games/caribbean/three/naval/sceneMath.ts',
+  'src/games/caribbean/styles/battle.css',
+  'src/games/caribbean/styles/caribbean.css',
 ];
 
 const CANONICAL_INPUT = {
@@ -333,6 +343,87 @@ async function screenshot(page, filename) {
   saveIfChanged(filename, await page.screenshot({ animations: 'disabled' }));
 }
 
+async function readSupportedDisplay(page, viewport) {
+  return page.evaluate((expectedViewport) => {
+    const visible = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    };
+    const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
+    const stage = rect('.naval-battle-stage');
+    const commandStrip = document.querySelector('[aria-label="Battle commands"]');
+    const controlIds = [
+      'naval-rudder-port', 'naval-fire-port', 'naval-ammo-round', 'naval-ammo-chain',
+      'naval-ammo-grape', 'naval-fire-starboard', 'naval-rudder-starboard', 'naval-options-toggle',
+    ];
+    const controls = controlIds.map((id) => document.querySelector(`[data-testid="${id}"]`));
+    const touchSized = controls.every((element) => {
+      const bounds = element?.getBoundingClientRect();
+      return visible(element) && bounds.width >= 44 && bounds.height >= 44;
+    });
+    const labelsContained = controls.every((element) => {
+      const bounds = element?.getBoundingClientRect();
+      if (!bounds) return false;
+      return [...element.querySelectorAll('span, strong')].every((label) => {
+        const labelBounds = label.getBoundingClientRect();
+        return labelBounds.left >= bounds.left - 1 && labelBounds.right <= bounds.right + 1
+          && labelBounds.top >= bounds.top - 1 && labelBounds.bottom <= bounds.bottom + 1;
+      });
+    });
+    const commandText = commandStrip?.textContent ?? '';
+    const pauseText = document.querySelector('[data-testid="naval-pause"]')?.textContent ?? '';
+    const center = {
+      left: innerWidth * 0.35,
+      right: innerWidth * 0.65,
+      top: innerHeight * 0.3,
+      bottom: innerHeight * 0.66,
+    };
+    const blockers = [...document.querySelectorAll(
+      '.naval-mission-line, .naval-opponent-rail > *, .naval-player-rail > *, .naval-command-strip',
+    )].filter(visible);
+    const intersectsCenter = blockers.some((element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.left < center.right && bounds.right > center.left
+        && bounds.top < center.bottom && bounds.bottom > center.top;
+    });
+    return {
+      viewport: expectedViewport,
+      battle: visible(document.querySelector('[data-testid="naval-battle-page"]')),
+      notice: visible(document.querySelector('[data-testid="caribbean-display-notice"]')),
+      fullBleed: Boolean(stage)
+        && stage.left <= 1 && stage.top <= 1
+        && stage.width >= innerWidth - 2 && stage.height >= innerHeight - 2,
+      centerClear: !intersectsCenter,
+      controlsVisible: visible(commandStrip)
+        && touchSized && labelsContained
+        && ['A', 'Q', '1', '2', '3', 'R', 'E', 'D'].every((key) => commandText.includes(key))
+        && pauseText.includes('Space') && pauseText.includes('Esc'),
+      noOuterScroll: document.documentElement.scrollWidth <= innerWidth
+        && document.documentElement.scrollHeight <= innerHeight,
+    };
+  }, viewport);
+}
+
+async function readUnsupportedDisplay(page, viewport) {
+  return page.evaluate((expectedViewport) => {
+    const visible = (selector) => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) return false;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    };
+    return {
+      viewport: expectedViewport,
+      notice: visible('[data-testid="caribbean-display-notice"]'),
+      battle: visible('[data-testid="naval-battle-page"]'),
+      liveFrame: visible('[data-testid="naval-scene-frame"]'),
+    };
+  }, viewport);
+}
+
 async function newEvidencePage(browser, baseUrl, aggregate, viewport) {
   const page = await browser.newPage({
     viewport,
@@ -367,6 +458,7 @@ async function captureCanonicalJourney(browser, baseUrl, aggregate) {
     throw new Error(`Production Battle Lab default drifted: ${JSON.stringify(canonicalInput)}`);
   }
   const tabletMetrics = await readSceneMetrics(page);
+  const tabletDisplay = await readSupportedDisplay(page, VIEWPORTS.tablet);
   await screenshot(page, 'battle-tablet-landscape.png');
 
   const headingBeforePort = await page.evaluate(() => window.__CARIBBEAN_NAVAL_DEBUG__.getSnapshot().state.ships.player.heading);
@@ -386,13 +478,43 @@ async function captureCanonicalJourney(browser, baseUrl, aggregate) {
   await page.setViewportSize(VIEWPORTS.desktop);
   await page.waitForTimeout(1_100);
   const desktopMetrics = await readSceneMetrics(page);
+  const desktopDisplay = await readSupportedDisplay(page, VIEWPORTS.desktop);
   await screenshot(page, 'battle-desktop.png');
-  await page.setViewportSize(VIEWPORTS.phone);
+  await page.setViewportSize(VIEWPORTS.minimum);
   await page.waitForTimeout(1_100);
-  const phoneMetrics = await readSceneMetrics(page);
-  await screenshot(page, 'battle-phone.png');
+  const minimumMetrics = await readSceneMetrics(page);
+  const minimumDisplay = await readSupportedDisplay(page, VIEWPORTS.minimum);
+  await screenshot(page, 'battle-minimum-supported.png');
+
+  await page.setViewportSize(VIEWPORTS.boundary);
+  await page.waitForTimeout(1_100);
+  const boundaryMetrics = await readSceneMetrics(page);
+  const boundaryDisplay = await readSupportedDisplay(page, VIEWPORTS.boundary);
+  await screenshot(page, 'battle-boundary-supported.png');
+
+  await page.evaluate(() => { window.__NAVAL_PRIOR_DEBUG__ = window.__CARIBBEAN_NAVAL_DEBUG__; });
+  await page.setViewportSize(VIEWPORTS.phoneLandscape);
+  await page.getByTestId('caribbean-display-notice').waitFor();
+  const blockedTickStart = await page.evaluate(() => window.__NAVAL_PRIOR_DEBUG__.getSnapshot().state.tick);
+  await page.waitForTimeout(450);
+  const blockedTickEnd = await page.evaluate(() => window.__NAVAL_PRIOR_DEBUG__.getSnapshot().state.tick);
+  const landscapeDisplay = await readUnsupportedDisplay(page, VIEWPORTS.phoneLandscape);
+  await screenshot(page, 'minimum-screen-phone-landscape.png');
+
+  await page.setViewportSize(VIEWPORTS.phonePortrait);
+  await page.getByTestId('caribbean-display-notice').waitFor();
+  const portraitDisplay = await readUnsupportedDisplay(page, VIEWPORTS.phonePortrait);
+  await screenshot(page, 'minimum-screen-phone-portrait.png');
+
   await page.setViewportSize(VIEWPORTS.tablet);
-  await page.waitForTimeout(1_100);
+  await page.getByTestId('naval-battle-page').waitFor();
+  await page.waitForFunction(() => window.__CARIBBEAN_NAVAL_DEBUG__ !== window.__NAVAL_PRIOR_DEBUG__);
+  const restoredTick = await page.evaluate(() => window.__CARIBBEAN_NAVAL_DEBUG__.getSnapshot().state.tick);
+  await page.waitForFunction(
+    (tick) => window.__CARIBBEAN_NAVAL_DEBUG__.getSnapshot().state.tick > tick,
+    restoredTick,
+  );
+  const restoredWithNewSession = await page.evaluate(() => window.__CARIBBEAN_NAVAL_DEBUG__ !== window.__NAVAL_PRIOR_DEBUG__);
 
   await flushUnhandled(page, aggregate);
   await page.close();
@@ -402,7 +524,17 @@ async function captureCanonicalJourney(browser, baseUrl, aggregate) {
     steeringStarboardHeadingDelta: headingAfterStarboard - headingBeforeStarboard,
     staleRudder,
     canonicalInput,
-    viewportMetrics: { tablet: tabletMetrics, desktop: desktopMetrics, phone: phoneMetrics },
+    viewportMetrics: { tablet: tabletMetrics, desktop: desktopMetrics, minimum: minimumMetrics, boundary: boundaryMetrics },
+    display: {
+      supported: { desktop: desktopDisplay, tablet: tabletDisplay, minimum: minimumDisplay, boundary: boundaryDisplay },
+      unsupported: { portrait: portraitDisplay, landscape: landscapeDisplay },
+      resize: {
+        notice: landscapeDisplay.notice,
+        battleUnmounted: !landscapeDisplay.battle,
+        tickStopped: blockedTickEnd === blockedTickStart,
+        restoredWithNewSession,
+      },
+    },
   };
 }
 
@@ -533,7 +665,7 @@ async function captureBoardingReady(browser, baseUrl, aggregate) {
 }
 
 async function captureFallback(browser, baseUrl, aggregate) {
-  const page = await newEvidencePage(browser, baseUrl, aggregate, VIEWPORTS.phone);
+  const page = await newEvidencePage(browser, baseUrl, aggregate, VIEWPORTS.minimum);
   await page.goto(serializedHarnessUrl(baseUrl, CANONICAL_INPUT, { forceWebglFailure: '1' }), { waitUntil: 'networkidle' });
   await enterBattle(page);
   await page.getByTestId('naval-html-chart').waitFor();
@@ -549,15 +681,20 @@ async function captureFallback(browser, baseUrl, aggregate) {
     beforeRestart,
   );
   const afterRestart = await page.evaluate(() => window.__CARIBBEAN_NAVAL_DEBUG__.getSnapshot().battleGeneration);
-  await screenshot(page, 'fallback-phone.png');
+  await screenshot(page, 'fallback-tablet-landscape.png');
   const chart = await page.getByTestId('naval-html-chart').isVisible();
   const battleControls = await page.getByTestId('naval-fire-port').isEnabled();
   const retry = await page.getByTestId('naval-scene-retry').isEnabled();
   const restart = await page.getByTestId('naval-scene-restart').isEnabled();
-  const ok = chart && battleControls && retry && restart && afterRestart === beforeRestart + 1;
+  const labelsClear = await page.evaluate(() => {
+    const caption = document.querySelector('.naval-chart figcaption')?.getBoundingClientRect();
+    const actions = document.querySelector('.naval-viewport-fallback__actions')?.getBoundingClientRect();
+    return Boolean(caption && actions && actions.top >= caption.bottom + 8);
+  });
+  const ok = chart && battleControls && retry && restart && labelsClear && afterRestart === beforeRestart + 1;
   await flushUnhandled(page, aggregate);
   await page.close();
-  return { ok, chart, retry, restart, battleControls };
+  return { ok, chart, retry, restart, battleControls, labelsClear };
 }
 
 export function plateauEvidence(samples) {
@@ -611,7 +748,8 @@ export async function runNavalCheck() {
     const performanceSamples = [
       canonical.viewportMetrics.tablet,
       canonical.viewportMetrics.desktop,
-      canonical.viewportMetrics.phone,
+      canonical.viewportMetrics.minimum,
+      canonical.viewportMetrics.boundary,
       handednessEvents.portMetrics,
       handednessEvents.starboardMetrics,
       ...activePlateauSamples,
@@ -648,6 +786,7 @@ export async function runNavalCheck() {
       handedness,
       scenario,
       fallback,
+      display: canonical.display,
     };
     const verdict = evaluateNavalEvidence(evidence);
     const metrics = {
@@ -660,7 +799,8 @@ export async function runNavalCheck() {
       tiers: {
         tablet: canonical.viewportMetrics.tablet.tier,
         desktop: canonical.viewportMetrics.desktop.tier,
-        phone: canonical.viewportMetrics.phone.tier,
+        minimum: canonical.viewportMetrics.minimum.tier,
+        boundary: canonical.viewportMetrics.boundary.tier,
       },
       fps: {
         samples: fpsSamples,
@@ -693,6 +833,7 @@ export async function runNavalCheck() {
       outcome: scenario,
       handedness,
       fallback,
+      display: canonical.display,
       verdict,
     };
     saveIfChanged('metrics.json', `${JSON.stringify(metrics, null, 2)}\n`);

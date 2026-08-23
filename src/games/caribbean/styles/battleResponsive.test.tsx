@@ -21,11 +21,13 @@ describe('full-bleed Battle Lab layout contracts', () => {
     expect(battleCss).toMatch(/\.naval-fire-control\s*\{[^}]*min-height:\s*56px/s);
     expect(battleCss).not.toMatch(/\.naval-fire-control\s*\{[^}]*min-height:\s*(?:9[0-9]|1[0-9]{2,})px/s);
     expect(battleCss).not.toMatch(/\.naval-shortcut-key\s*\{[^}]*display:\s*none/s);
+    expect(battleCss).toMatch(/\.naval-command-control span,[\s\S]*\.naval-rudder-control span\s*\{[^}]*white-space:\s*normal[^}]*text-align:\s*center/s);
   });
 
   it('keeps semantic wind and the minimum-display notice visible rather than hiding live controls', () => {
     expect(battleCss).not.toMatch(/\.naval-mission-line[^}]*display:\s*none/s);
     expect(battleCss).toMatch(/\.caribbean-display-notice\s*\{/s);
+    expect(battleCss).toMatch(/\.naval-viewport-fallback__actions\s*\{[^}]*top:\s*calc\(50% \+ 88px\)/s);
   });
 
   it('requests the bundled SVG favicon instead of an implicit favicon.ico', () => {

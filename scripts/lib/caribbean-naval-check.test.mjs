@@ -19,6 +19,17 @@ function activeSamples() {
 }
 
 describe('naval browser evidence helpers', () => {
+  it('locks the playable and warning-only viewport matrix', () => {
+    expect(navalCheck.VIEWPORTS).toEqual({
+      tablet: { width: 1180, height: 820 },
+      desktop: { width: 1440, height: 900 },
+      minimum: { width: 1024, height: 768 },
+      boundary: { width: 960, height: 600 },
+      phonePortrait: { width: 430, height: 932 },
+      phoneLandscape: { width: 844, height: 390 },
+    });
+  });
+
   it('treats varying active effects as pooled activity and checks every sample capacity', () => {
     const valid = navalCheck.plateauEvidence(activeSamples());
     expect(valid.growthAfterWarmup).toEqual({

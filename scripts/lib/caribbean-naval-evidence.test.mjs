@@ -64,7 +64,20 @@ function healthyEvidence(overrides = {}) {
         opponent: { hull: 72, sails: 30, crew: 18, cannon: 6 },
       },
     },
-    fallback: { ok: true, chart: true, retry: true, restart: true, battleControls: true },
+    fallback: { ok: true, chart: true, retry: true, restart: true, battleControls: true, labelsClear: true },
+    display: {
+      supported: {
+        desktop: { viewport: { width: 1440, height: 900 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true },
+        tablet: { viewport: { width: 1180, height: 820 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true },
+        minimum: { viewport: { width: 1024, height: 768 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true },
+        boundary: { viewport: { width: 960, height: 600 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true },
+      },
+      unsupported: {
+        portrait: { viewport: { width: 430, height: 932 }, notice: true, battle: false, liveFrame: false },
+        landscape: { viewport: { width: 844, height: 390 }, notice: true, battle: false, liveFrame: false },
+      },
+      resize: { notice: true, battleUnmounted: true, tickStopped: true, restoredWithNewSession: true },
+    },
     ...overrides,
   };
 }
@@ -254,6 +267,7 @@ describe('evaluateNavalEvidence', () => {
     ['fallback shell', { fallback: { ok: true } }],
     ['missing fallback', { fallback: undefined }],
     ['false chart proof', { fallback: { ...healthyEvidence().fallback, chart: false } }],
+    ['overlapping fallback copy', { fallback: { ...healthyEvidence().fallback, labelsClear: false } }],
   ])('fails closed on malformed %s proof', (_label, override) => {
     expect(evaluateNavalEvidence(healthyEvidence(override)).ok).toBe(false);
   });
@@ -264,5 +278,25 @@ describe('evaluateNavalEvidence', () => {
     ['fallback controls fail', { fallback: { ok: false } }],
   ])('fails when %s', (_label, override) => {
     expect(evaluateNavalEvidence(healthyEvidence(override)).ok).toBe(false);
+  });
+
+  it('accepts only the exact supported and warning-state viewport matrix', () => {
+    expect(evaluateNavalEvidence(healthyEvidence()).ok).toBe(true);
+    const wrongBoundary = healthyEvidence();
+    wrongBoundary.display.supported.minimum.viewport.width = 959;
+    expect(evaluateNavalEvidence(wrongBoundary).issues).toContain('display supported minimum viewport is not 1024x768');
+    const livePhone = healthyEvidence();
+    livePhone.display.unsupported.portrait.liveFrame = true;
+    expect(evaluateNavalEvidence(livePhone).issues).toContain('display unsupported portrait liveFrame must be false');
+  });
+
+  it.each([
+    ['display record', without(healthyEvidence(), 'display'), 'display evidence is missing'],
+    ['desktop proof', without(healthyEvidence(), 'display', 'supported', 'desktop'), 'display supported desktop evidence is missing'],
+    ['boundary proof', without(healthyEvidence(), 'display', 'supported', 'boundary'), 'display supported boundary evidence is missing'],
+    ['phone notice', { ...healthyEvidence(), display: { ...healthyEvidence().display, unsupported: { ...healthyEvidence().display.unsupported, portrait: { ...healthyEvidence().display.unsupported.portrait, notice: false } } } }, 'display unsupported portrait notice must be true'],
+    ['resize disposal', { ...healthyEvidence(), display: { ...healthyEvidence().display, resize: { ...healthyEvidence().display.resize, tickStopped: false } } }, 'display resize tickStopped must be true'],
+  ])('fails closed on malformed %s', (_label, evidence, reason) => {
+    expect(evaluateNavalEvidence(evidence).issues).toContain(reason);
   });
 });

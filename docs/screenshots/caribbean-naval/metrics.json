@@ -1,8 +1,8 @@
 {
   "source": {
-    "headCommitAtCapture": "bd25419f7c47ed3e9a86bc9438862f78959226da",
+    "headCommitAtCapture": "3c5ed5a042d2d1dadc01fe849c9a2c6a90a6ff2b",
     "worktreeDirtyBeforeCapture": true,
-    "sourceTreeSha256": "3dbbcaf9559827803391bb6d27e1eaa5f0b7d20a853317228e342f7ee91b885d",
+    "sourceTreeSha256": "6e17acc94aaac25668df67925958a0adca4269e2e16d341e2bbc7d3ca48f9169",
     "sourceTreeFiles": [
       "package.json",
       "scripts/caribbean-naval-check.mjs",
@@ -12,6 +12,10 @@
       "scripts/lib/caribbean-naval-scenario.test.mjs",
       "src/games/caribbean/components/CaribbeanLab.test.tsx",
       "src/games/caribbean/components/CaribbeanLab.tsx",
+      "src/games/caribbean/components/battle/BattleHud.tsx",
+      "src/games/caribbean/components/battle/BattleShortcutLegend.tsx",
+      "src/games/caribbean/components/battle/NavalBattlePage.tsx",
+      "src/games/caribbean/components/battle/NavalViewport.tsx",
       "src/games/caribbean/domain/naval/geometry.test.ts",
       "src/games/caribbean/domain/naval/geometry.ts",
       "src/games/caribbean/preview.tsx",
@@ -19,7 +23,10 @@
       "src/games/caribbean/state/naval/debugBridge.ts",
       "src/games/caribbean/state/naval/harnessConfig.test.ts",
       "src/games/caribbean/state/naval/harnessConfig.ts",
-      "src/games/caribbean/three/naval/NavalScene.ts"
+      "src/games/caribbean/three/naval/NavalScene.ts",
+      "src/games/caribbean/three/naval/sceneMath.ts",
+      "src/games/caribbean/styles/battle.css",
+      "src/games/caribbean/styles/caribbean.css"
     ]
   },
   "canonicalInput": {
@@ -45,42 +52,55 @@
       "width": 1440,
       "height": 900
     },
-    "phone": {
+    "minimum": {
+      "width": 1024,
+      "height": 768
+    },
+    "boundary": {
+      "width": 960,
+      "height": 600
+    },
+    "phonePortrait": {
       "width": 430,
       "height": 932
+    },
+    "phoneLandscape": {
+      "width": 844,
+      "height": 390
     }
   },
   "deviceScaleFactor": 1,
   "tiers": {
     "tablet": "high",
     "desktop": "high",
-    "phone": "high"
+    "minimum": "high",
+    "boundary": "high"
   },
   "fps": {
     "samples": [
-      88,
-      85,
+      68,
+      66,
+      68,
+      68,
       72,
-      72,
-      79,
-      77,
-      77,
-      80,
-      71,
-      76,
-      79,
-      75,
-      74,
-      72,
-      78,
-      76,
-      71,
-      77,
+      64,
+      68,
+      66,
+      66,
+      65,
+      69,
+      66,
+      66,
+      68,
+      67,
       70,
+      68,
+      66,
+      65,
       71
     ],
     "sustainedFloorMethod": "minimum 3-sample moving average after warm-up during an unpaused advancing battle with live effects",
-    "sustained": 72.667
+    "sustained": 65.667
   },
   "maximums": {
     "drawCalls": 34,
@@ -96,7 +116,7 @@
     "observedSeconds": 20,
     "samples": [
       {
-        "fps": 88,
+        "fps": 68,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 34,
@@ -106,22 +126,52 @@
         "materials": 30,
         "activeEffects": 5,
         "effectCapacity": 96,
-        "tick": 184,
+        "tick": 186,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 85,
+        "fps": 66,
         "dpr": 1,
         "tier": "high",
-        "drawCalls": 32,
-        "triangles": 7554,
+        "drawCalls": 28,
+        "triangles": 7278,
         "textures": 3,
         "geometries": 30,
         "materials": 30,
-        "activeEffects": 3,
+        "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 239,
+        "tick": 247,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 68,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 28,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "tick": 303,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 68,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 28,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "tick": 364,
         "paused": false,
         "outcome": null
       },
@@ -136,12 +186,12 @@
         "materials": 30,
         "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 301,
+        "tick": 421,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 72,
+        "fps": 64,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 28,
@@ -151,12 +201,12 @@
         "materials": 30,
         "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 362,
+        "tick": 482,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 79,
+        "fps": 68,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 28,
@@ -166,12 +216,12 @@
         "materials": 30,
         "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 420,
+        "tick": 545,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 77,
+        "fps": 66,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 28,
@@ -181,42 +231,12 @@
         "materials": 30,
         "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 481,
+        "tick": 607,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 77,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 28,
-        "triangles": 7278,
-        "textures": 3,
-        "geometries": 30,
-        "materials": 30,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "tick": 542,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 80,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 28,
-        "triangles": 7278,
-        "textures": 3,
-        "geometries": 30,
-        "materials": 30,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "tick": 602,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 71,
+        "fps": 66,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 28,
@@ -231,7 +251,7 @@
         "outcome": null
       },
       {
-        "fps": 76,
+        "fps": 65,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 28,
@@ -241,12 +261,12 @@
         "materials": 30,
         "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 723,
+        "tick": 725,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 79,
+        "fps": 69,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 28,
@@ -261,7 +281,7 @@
         "outcome": null
       },
       {
-        "fps": 75,
+        "fps": 66,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 28,
@@ -271,12 +291,12 @@
         "materials": 30,
         "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 844,
+        "tick": 843,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 74,
+        "fps": 66,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 28,
@@ -286,12 +306,12 @@
         "materials": 30,
         "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 905,
+        "tick": 903,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 72,
+        "fps": 68,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 28,
@@ -301,67 +321,22 @@
         "materials": 30,
         "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 961,
+        "tick": 964,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 78,
+        "fps": 67,
         "dpr": 1,
         "tier": "high",
-        "drawCalls": 27,
+        "drawCalls": 28,
         "triangles": 7278,
         "textures": 3,
         "geometries": 30,
         "materials": 30,
         "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 1021,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 76,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 7278,
-        "textures": 3,
-        "geometries": 30,
-        "materials": 30,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "tick": 1081,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 71,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 7278,
-        "textures": 3,
-        "geometries": 30,
-        "materials": 30,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "tick": 1143,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 77,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 7278,
-        "textures": 3,
-        "geometries": 30,
-        "materials": 30,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "tick": 1204,
+        "tick": 1022,
         "paused": false,
         "outcome": null
       },
@@ -369,14 +344,59 @@
         "fps": 70,
         "dpr": 1,
         "tier": "high",
-        "drawCalls": 25,
-        "triangles": 6894,
+        "drawCalls": 28,
+        "triangles": 7278,
         "textures": 3,
         "geometries": 30,
         "materials": 30,
         "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 1265,
+        "tick": 1084,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 68,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 28,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "tick": 1144,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 66,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 28,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "tick": 1205,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 65,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 28,
+        "triangles": 7278,
+        "textures": 3,
+        "geometries": 30,
+        "materials": 30,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "tick": 1262,
         "paused": false,
         "outcome": null
       },
@@ -384,14 +404,14 @@
         "fps": 71,
         "dpr": 1,
         "tier": "high",
-        "drawCalls": 25,
-        "triangles": 6894,
+        "drawCalls": 28,
+        "triangles": 7278,
         "textures": 3,
         "geometries": 30,
         "materials": 30,
         "activeEffects": 0,
         "effectCapacity": 96,
-        "tick": 1320,
+        "tick": 1322,
         "paused": false,
         "outcome": null
       }
@@ -422,7 +442,7 @@
   "outcome": {
     "ok": true,
     "outcome": "boarding-ready",
-    "elapsedBrowserSeconds": 0.22,
+    "elapsedBrowserSeconds": 0.25,
     "initial": {
       "distance": 7.02,
       "outcomeInjected": false,
@@ -442,7 +462,7 @@
     "portMuzzleOriginX": 3.1,
     "starboardMuzzleOriginX": -3.1,
     "steeringPortHeadingDelta": 0.286,
-    "steeringStarboardHeadingDelta": -0.225333,
+    "steeringStarboardHeadingDelta": -0.234,
     "staleRudder": false,
     "port": {
       "eventId": 3,
@@ -453,7 +473,7 @@
       },
       "muzzleOrigin": {
         "x": 3.1,
-        "z": 0.18601528399999967
+        "z": 0.2325191049999996
       }
     },
     "starboard": {
@@ -465,7 +485,7 @@
       },
       "muzzleOrigin": {
         "x": -3.1,
-        "z": 0.19845955583999964
+        "z": 0.24807444479999954
       }
     }
   },
@@ -474,7 +494,86 @@
     "chart": true,
     "retry": true,
     "restart": true,
-    "battleControls": true
+    "battleControls": true,
+    "labelsClear": true
+  },
+  "display": {
+    "supported": {
+      "desktop": {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "battle": true,
+        "notice": false,
+        "fullBleed": true,
+        "centerClear": true,
+        "controlsVisible": true,
+        "noOuterScroll": true
+      },
+      "tablet": {
+        "viewport": {
+          "width": 1180,
+          "height": 820
+        },
+        "battle": true,
+        "notice": false,
+        "fullBleed": true,
+        "centerClear": true,
+        "controlsVisible": true,
+        "noOuterScroll": true
+      },
+      "minimum": {
+        "viewport": {
+          "width": 1024,
+          "height": 768
+        },
+        "battle": true,
+        "notice": false,
+        "fullBleed": true,
+        "centerClear": true,
+        "controlsVisible": true,
+        "noOuterScroll": true
+      },
+      "boundary": {
+        "viewport": {
+          "width": 960,
+          "height": 600
+        },
+        "battle": true,
+        "notice": false,
+        "fullBleed": true,
+        "centerClear": true,
+        "controlsVisible": true,
+        "noOuterScroll": true
+      }
+    },
+    "unsupported": {
+      "portrait": {
+        "viewport": {
+          "width": 430,
+          "height": 932
+        },
+        "notice": true,
+        "battle": false,
+        "liveFrame": false
+      },
+      "landscape": {
+        "viewport": {
+          "width": 844,
+          "height": 390
+        },
+        "notice": true,
+        "battle": false,
+        "liveFrame": false
+      }
+    },
+    "resize": {
+      "notice": true,
+      "battleUnmounted": true,
+      "tickStopped": true,
+      "restoredWithNewSession": true
+    }
   },
   "verdict": {
     "ok": true,

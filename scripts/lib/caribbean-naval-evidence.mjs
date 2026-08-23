@@ -3,6 +3,18 @@ const TRIANGLE_CAP = 100_000;
 const SUSTAINED_FPS_FLOOR = 50;
 const OBSERVATION_SECONDS = 20;
 const HASHED_GLB_PATTERN = /^\/assets\/caribbean-sloop-[A-Za-z0-9_-]+\.glb$/;
+const DISPLAY_VIEWPORTS = {
+  supported: {
+    desktop: { width: 1440, height: 900 },
+    tablet: { width: 1180, height: 820 },
+    minimum: { width: 1024, height: 768 },
+    boundary: { width: 960, height: 600 },
+  },
+  unsupported: {
+    portrait: { width: 430, height: 932 },
+    landscape: { width: 844, height: 390 },
+  },
+};
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -68,6 +80,45 @@ function validateResourceSamples(issues, samples) {
     }
   }
   if (!sawActiveEffects) issues.push('resource observation contained no active effects');
+}
+
+function validateDisplayEvidence(issues, display) {
+  if (!isRecord(display)) {
+    issues.push('display evidence is missing');
+    return;
+  }
+  for (const [name, expectedViewport] of Object.entries(DISPLAY_VIEWPORTS.supported)) {
+    const sample = isRecord(display.supported?.[name]) ? display.supported[name] : null;
+    if (!sample) {
+      issues.push(`display supported ${name} evidence is missing`);
+      continue;
+    }
+    if (sample.viewport?.width !== expectedViewport.width || sample.viewport?.height !== expectedViewport.height) {
+      issues.push(`display supported ${name} viewport is not ${expectedViewport.width}x${expectedViewport.height}`);
+    }
+    for (const field of ['battle', 'fullBleed', 'centerClear', 'controlsVisible', 'noOuterScroll']) {
+      if (sample[field] !== true) issues.push(`display supported ${name} ${field} must be true`);
+    }
+    if (sample.notice !== false) issues.push(`display supported ${name} notice must be false`);
+  }
+  for (const [name, expectedViewport] of Object.entries(DISPLAY_VIEWPORTS.unsupported)) {
+    const sample = isRecord(display.unsupported?.[name]) ? display.unsupported[name] : null;
+    if (!sample) {
+      issues.push(`display unsupported ${name} evidence is missing`);
+      continue;
+    }
+    if (sample.viewport?.width !== expectedViewport.width || sample.viewport?.height !== expectedViewport.height) {
+      issues.push(`display unsupported ${name} viewport is not ${expectedViewport.width}x${expectedViewport.height}`);
+    }
+    if (sample.notice !== true) issues.push(`display unsupported ${name} notice must be true`);
+    for (const field of ['battle', 'liveFrame']) {
+      if (sample[field] !== false) issues.push(`display unsupported ${name} ${field} must be false`);
+    }
+  }
+  const resize = isRecord(display.resize) ? display.resize : {};
+  for (const field of ['notice', 'battleUnmounted', 'tickStopped', 'restoredWithNewSession']) {
+    if (resize[field] !== true) issues.push(`display resize ${field} must be true`);
+  }
 }
 
 export function evaluateNavalEvidence(evidence) {
@@ -156,9 +207,11 @@ export function evaluateNavalEvidence(evidence) {
 
   const fallback = isRecord(input.fallback) ? input.fallback : {};
   if (fallback.ok !== true) issues.push('WebGL fallback controls failed');
-  for (const field of ['chart', 'retry', 'restart', 'battleControls']) {
+  for (const field of ['chart', 'retry', 'restart', 'battleControls', 'labelsClear']) {
     if (fallback[field] !== true) issues.push(`fallback ${field} was not observed`);
   }
+
+  validateDisplayEvidence(issues, input.display);
 
   return { ok: issues.length === 0, issues };
 }

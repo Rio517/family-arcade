@@ -61,9 +61,12 @@ and write changed evidence bytes only. The current evidence set includes the
 [`tablet briefing`](../../screenshots/caribbean-naval/briefing-tablet.png),
 [`tablet battle`](../../screenshots/caribbean-naval/battle-tablet-landscape.png),
 [`desktop battle`](../../screenshots/caribbean-naval/battle-desktop.png),
-[`phone battle`](../../screenshots/caribbean-naval/battle-phone.png),
+[`1024×768 battle`](../../screenshots/caribbean-naval/battle-minimum-supported.png),
+[`960×600 boundary battle`](../../screenshots/caribbean-naval/battle-boundary-supported.png),
+[`phone portrait notice`](../../screenshots/caribbean-naval/minimum-screen-phone-portrait.png),
+[`phone landscape notice`](../../screenshots/caribbean-naval/minimum-screen-phone-landscape.png),
 [`boarding-ready result`](../../screenshots/caribbean-naval/boarding-ready-result.png),
-[`phone HTML fallback`](../../screenshots/caribbean-naval/fallback-phone.png),
+[`supported-screen HTML fallback`](../../screenshots/caribbean-naval/fallback-tablet-landscape.png),
 and [`physical broadside evidence`](../../screenshots/caribbean-naval/broadside-handedness.png).
 
 The engineering gate currently passes, but the milestone remains
