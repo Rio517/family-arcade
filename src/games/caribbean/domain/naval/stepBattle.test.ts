@@ -49,8 +49,8 @@ describe('one canonical naval battle tick', () => {
 
     expect(first).toEqual(replay);
     expect(events(first, 'volley')[0].result.ammunition).toBe('chain');
-    expect(events(first, 'damage')[0].damage).toEqual({ hull: 1, sails: 3, crew: 18, cannon: 0 });
-    expect(first.ships.opponent).toMatchObject({ hull: 0, sails: 0, crew: 57, cannon: 1 });
+    expect(events(first, 'damage')[0].damage).toEqual({ hull: 1, sails: 3, crew: 9, cannon: 0 });
+    expect(first.ships.opponent).toMatchObject({ hull: 0, sails: 0, crew: 66, cannon: 1 });
   });
 
   it('resolves at most one legal requested broadside per ship in stable event order', () => {
@@ -90,7 +90,7 @@ describe('one canonical naval battle tick', () => {
       { shipId: 'opponent', fired: 2, hits: 2 },
     ]);
     expect(next.seed).toBe(2_876_432_698);
-    expect(next.ships.opponent).toMatchObject({ cannon: 0, crew: 49, sails: 29 });
+    expect(next.ships.opponent).toMatchObject({ cannon: 1, crew: 49, sails: 29 });
   });
 
   it('does not emit or reset a zero-projectile fractional battery', () => {

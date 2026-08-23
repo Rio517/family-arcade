@@ -11,6 +11,11 @@ describe('createNavalBattle', () => {
     expect(state.seed).toBe(1702);
     expect(state.ships.player.position).toEqual({ x: 0, z: -36 });
     expect(state.ships.opponent.position).toEqual({ x: 0, z: 36 });
+    expect(state.ships.player.reload.port).toEqual({
+      progress: 1_500_000,
+      required: 1_500_000,
+      loaded: true,
+    });
     state.ships.player.hull = 1;
     expect(BATTLE_LAB_INPUT.player.hull).toBe(100);
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);

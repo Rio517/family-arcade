@@ -339,7 +339,7 @@ Use the POC polar table from the tests. For each ship per tick:
 - position advances by `{sin(heading), cos(heading)} * speed / 60`; and
 - each side reloads by `round(crewFactor * 1000)` integer work units.
 
-Return a structured clone; never mutate the input state. Keep reload as integer work units: healthy reload requires `360_000` units (six seconds × 60 ticks × 1000), a loaded side has `progress === required`, and firing resets progress to zero. This lets low crew slow reloading without fractional countdown ambiguity.
+Return a structured clone; never mutate the input state. Keep reload as integer work units: healthy reload requires `1_500_000` units (25 seconds × 60 ticks × 1000), a loaded side has `progress === required`, and firing resets progress to zero. This lets low crew slow reloading without fractional countdown ambiguity.
 
 - [ ] **Step 6: Verify and commit**
 
@@ -410,12 +410,12 @@ it('requires a loaded physical side and lateral target arc', () => {
 });
 
 it.each([
-  ['round', 0, { hull: 12, sails: 1, crew: 1, cannon: 2 }],
-  ['chain', 0, { hull: 2, sails: 14, crew: 2, cannon: 0 }],
-  ['grape', 0, { hull: 1, sails: 0, crew: 12, cannon: 0 }],
-  ['round', 1, { hull: 9, sails: 1, crew: 1, cannon: 2 }],
-  ['chain', 1, { hull: 1, sails: 6, crew: 1, cannon: 0 }],
-  ['grape', 1, { hull: 0, sails: 0, crew: 2, cannon: 0 }],
+  ['round', 0, { hull: 3, sails: 1, crew: 1, cannon: 1 }],
+  ['chain', 0, { hull: 1, sails: 5, crew: 1, cannon: 0 }],
+  ['grape', 0, { hull: 0, sails: 0, crew: 4, cannon: 0 }],
+  ['round', 1, { hull: 2, sails: 0, crew: 0, cannon: 0 }],
+  ['chain', 1, { hull: 0, sails: 2, crew: 0, cannon: 0 }],
+  ['grape', 1, { hull: 0, sails: 0, crew: 1, cannon: 0 }],
 ])('%s has the intended profile at normalized range %d', (ammo, range, want) => {
   expect(damageFor(ammo, range)).toEqual(want);
 });
@@ -585,7 +585,9 @@ The opponent enters `recover` while its useful side reloads and maintains range 
 
 `FrameRunner` accepts integer microseconds only. It converts them to integer tick work using a rational numerator/remainder, caps execution to `maxTicksPerFrame`, retains backlog, and exposes `reset()` for pause/restart. Browser code performs the one rounding boundary from `performance.now()` milliseconds to microseconds before calling it.
 
-Build pressure and capture captains from position/heading/reload observations, not tick-specific damage injection. Tune initial distance, reload work, accuracy falloff, and surrender/boarding gates only within values already stated in Tasks 1–3. If two-to-four minutes cannot support both tactics, record the failed fixture and revise the design rather than adding hidden damage bonuses.
+Build pressure and capture captains from position/heading/reload observations, not tick-specific damage injection. Tune initial distance, reload work, accuracy falloff, and surrender/boarding gates through explicit, tested balance constants. If two-to-four minutes cannot support both tactics, record the failed fixture and revise the design rather than adding hidden damage bonuses.
+
+**Task 4 balance revision (2026-08-23):** The first real-rule simulation exposed a structural mismatch: the former six-second reload plus former round/chain/grape profiles resolved normal duels in 11–18 seconds (one round volley removed 50 hull and all eight cannon; one grape volley removed 36 crew). The explicit profiles above replace the former close→far endpoints (`round` hull `12→9`, chain sails `14→6`, grape crew `12→2`) with `round` hull `3→2`, chain sails `5→2`, and grape crew `4→1`; healthy reload changes from `360_000`/6 seconds to `1_500_000`/25 seconds. Outcome thresholds remain unchanged. The ordinary opponent tacks inward at 78% of arena radius unless intentionally disengaging, and hull disengagement begins at 21 rather than 32 so it remains a legible last-chance escape without pre-empting the surrender gate at 20. With unchanged `7_200..14_400` acceptance bounds and no damage/outcome injection, pressure-and-surrender resolves at tick `12_183` (203.05 seconds) and disable-and-board at tick `13_125` (218.75 seconds).
 
 Extend `testFixtures.ts` with test-only `pressureCaptain(state)`, `captureCaptain(state)`, and `simulateCaptain(input, captain)`. Both captains use only public canonical state and geometry: they steer toward the nearest legal broadside heading, reef inside 24, and fire a loaded legal side. Pressure always selects round. Capture selects chain while opponent sails exceed 30, grape while opponent crew exceeds 18, then reefs and closes below range 7 while reducing relative speed. `simulateCaptain` runs both that player command and the real opponent controller until outcome/time limit; it never edits damage, seed, tick, or outcome directly.
 

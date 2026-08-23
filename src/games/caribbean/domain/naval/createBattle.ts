@@ -9,7 +9,7 @@ import type {
 
 export type NavalInputValidation = { ok: true } | { ok: false; issues: string[] };
 
-const RELOAD_REQUIRED = 360_000;
+const RELOAD_REQUIRED = 1_500_000;
 
 function finiteIssue(issues: string[], value: number, label: string): void {
   if (!Number.isFinite(value)) issues.push(`${label}:not-finite`);

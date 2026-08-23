@@ -20,20 +20,25 @@ export function damageFor(ammunition: Ammunition, normalizedRange: number): Dama
   const range = clamp(normalizedRange, 0, 1);
 
   if (ammunition === 'round') {
-    return { hull: Math.round(12 - 3 * range), sails: 1, crew: 1, cannon: 2 };
+    return {
+      hull: Math.round(3 - range),
+      sails: Math.round(1 - range),
+      crew: Math.round(1 - range),
+      cannon: Math.round(1 - range),
+    };
   }
   if (ammunition === 'chain') {
     return {
-      hull: Math.round(2 - range),
-      sails: Math.round(14 - 8 * range),
-      crew: Math.round(2 - range),
+      hull: Math.round(1 - range),
+      sails: Math.round(5 - 3 * range),
+      crew: Math.round(1 - range),
       cannon: 0,
     };
   }
   return {
-    hull: Math.round(1 - range),
+    hull: 0,
     sails: 0,
-    crew: Math.round(12 - 10 * range),
+    crew: Math.round(4 - 3 * range),
     cannon: 0,
   };
 }

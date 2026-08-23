@@ -37,19 +37,19 @@ describe('deterministic naval volleys', () => {
   });
 
   it.each([
-    ['round', 0, { hull: 12, sails: 1, crew: 1, cannon: 2 }],
-    ['chain', 0, { hull: 2, sails: 14, crew: 2, cannon: 0 }],
-    ['grape', 0, { hull: 1, sails: 0, crew: 12, cannon: 0 }],
-    ['round', 1, { hull: 9, sails: 1, crew: 1, cannon: 2 }],
-    ['chain', 1, { hull: 1, sails: 6, crew: 1, cannon: 0 }],
-    ['grape', 1, { hull: 0, sails: 0, crew: 2, cannon: 0 }],
+    ['round', 0, { hull: 3, sails: 1, crew: 1, cannon: 1 }],
+    ['chain', 0, { hull: 1, sails: 5, crew: 1, cannon: 0 }],
+    ['grape', 0, { hull: 0, sails: 0, crew: 4, cannon: 0 }],
+    ['round', 1, { hull: 2, sails: 0, crew: 0, cannon: 0 }],
+    ['chain', 1, { hull: 0, sails: 2, crew: 0, cannon: 0 }],
+    ['grape', 1, { hull: 0, sails: 0, crew: 1, cannon: 0 }],
   ] as const)('%s has the intended profile at normalized range %d', (ammo, range, want) => {
     expect(damageFor(ammo, range)).toEqual(want);
   });
 
   it('clamps range and damage-aware accuracy at their documented bounds', () => {
-    expect(damageFor('round', -1)).toEqual({ hull: 12, sails: 1, crew: 1, cannon: 2 });
-    expect(damageFor('grape', 2)).toEqual({ hull: 0, sails: 0, crew: 2, cannon: 0 });
+    expect(damageFor('round', -1)).toEqual({ hull: 3, sails: 1, crew: 1, cannon: 1 });
+    expect(damageFor('grape', 2)).toEqual({ hull: 0, sails: 0, crew: 1, cannon: 0 });
     expect(accuracyFor(0, 50, 100)).toBeCloseTo(0.78, 10);
     expect(accuracyFor(1, 50, 100)).toBeCloseTo(0.42, 10);
     expect(accuracyFor(1, 0, 0)).toBe(0.12);
