@@ -39,27 +39,34 @@ function outcomeCopy(outcome: NavalOutcome, state: ReturnType<NavalSessionView['
   const target = state.ships.opponent;
   const range = Math.hypot(target.position.x - player.position.x, target.position.z - player.position.z).toFixed(1);
   if (outcome.kind === 'boarding-ready') {
-    return { heading: 'Ready to board', detail: `Capture summary: ${target.name} sails ${Math.round(target.sails)}%, crew ${Math.round(target.crew)}, range ${range}. The prize is disabled and close enough to take.`, action: 'Rematch Battle Lab' };
+    if (outcome.victorShipId === 'player') {
+      return { heading: 'Ready to board', detail: `Capture summary: ${target.name} sails ${Math.round(target.sails)}%, crew ${Math.round(target.crew)}, range ${range}. The prize is disabled and close enough to take.`, action: 'Rematch Battle Lab' };
+    }
+    return { heading: `Boarding lost — ${player.name}`, detail: `${player.name}'s crew ${Math.round(player.crew)} cannot prevent ${target.name} from boarding at range ${range}.`, action: 'Restart Battle Lab' };
   }
   if (outcome.kind === 'surrender') {
     const surrendered = outcome.victorShipId === 'player' ? target : player;
     const won = outcome.victorShipId === 'player';
     return { heading: 'Surrender', detail: won
-      ? `Capture summary: ${surrendered.name} struck colours with hull ${Math.round(surrendered.hull)}%, sails ${Math.round(surrendered.sails)}%, crew ${Math.round(surrendered.crew)}.`
-      : `${surrendered.name} struck colours with hull ${Math.round(surrendered.hull)}% and crew ${Math.round(surrendered.crew)}. The prize escaped your command.`, action: won ? 'Rematch Battle Lab' : 'Restart Battle Lab' };
+      ? `${surrendered.name} and crew surrendered with hull ${Math.round(surrendered.hull)}%, sails ${Math.round(surrendered.sails)}%, crew ${Math.round(surrendered.crew)}. Capture summary recorded.`
+      : `${surrendered.name} and crew surrendered with hull ${Math.round(surrendered.hull)}% and crew ${Math.round(surrendered.crew)}. Return to the Battle Lab and restart the duel.`, action: won ? 'Rematch Battle Lab' : 'Restart Battle Lab' };
   }
   if (outcome.kind === 'sunk') {
+    const sunk = outcome.victorShipId === 'player' ? target : player;
     return outcome.victorShipId === 'player'
-      ? { heading: 'Sunk — Red Jackdaw', detail: `${target.name} reached hull 0. The prize is lost beneath the trade wind.`, action: 'Rematch Battle Lab' }
-      : { heading: 'Sunk — Mistral', detail: `${player.name} reached hull 0. Your hull can no longer carry the fight.`, action: 'Restart Battle Lab' };
+      ? { heading: `Sunk — ${sunk.name}`, detail: `${sunk.name} reached hull 0. The prize is lost beneath the trade wind.`, action: 'Rematch Battle Lab' }
+      : { heading: `Sunk — ${sunk.name}`, detail: `${sunk.name} reached hull 0. Your hull can no longer carry the fight.`, action: 'Restart Battle Lab' };
   }
   if (outcome.kind === 'escaped') {
     const ship = state.ships[outcome.shipId];
     const distance = Math.hypot(ship.position.x, ship.position.z).toFixed(1);
-    const outward = ship.speed > 0 && ship.position.x * Math.sin(ship.heading) + ship.position.z * Math.cos(ship.heading) > 0;
-    return { heading: 'Escaped', detail: `${ship.name} crossed ${distance} beyond the ${state.input.arenaRadius} arena boundary while moving ${outward ? 'outward' : 'clear'}.`, action: 'Restart Battle Lab' };
+    return { heading: 'Escaped', detail: `${ship.name} crossed the ${state.input.arenaRadius}-unit boundary at radial range ${distance} while moving outward.`, action: 'Restart Battle Lab' };
   }
-  return { heading: 'Separated', detail: `The ${state.tick}/${state.input.timeLimitTicks} tick limit ended the engagement without a decisive capture.`, action: 'Restart Battle Lab' };
+  if (outcome.kind === 'separated') {
+    const separated = state.ships[outcome.shipId];
+    return { heading: 'Separated', detail: `${separated.name} remained in an undecided engagement when tick ${state.tick} reached the ${state.input.timeLimitTicks}-tick limit.`, action: 'Restart Battle Lab' };
+  }
+  return { heading: 'Battle complete', detail: 'The engagement reached a decisive result.', action: 'Restart Battle Lab' };
 }
 
 function useReducedMotionPreference(): boolean {

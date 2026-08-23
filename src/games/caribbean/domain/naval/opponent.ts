@@ -113,6 +113,11 @@ export function opponentCommand(state: NavalState, _memory: OpponentMemory): Opp
   const range = Math.hypot(dx, dz);
   const targetHeading = headingTo(dx, dz);
   const ammunition = ammunitionFor(range, target.sails, target.crew);
+  const port = broadsideLegality(state, 'opponent', 'port');
+
+  if (port.terminal) {
+    return decision(state, 'surrender', ship.heading, commandFor(0, 'reefed', ammunition));
+  }
 
   if (ship.hull <= 20 || ship.crew <= 8) {
     return decision(state, 'surrender', ship.heading, commandFor(0, 'reefed', ammunition));
@@ -121,7 +126,7 @@ export function opponentCommand(state: NavalState, _memory: OpponentMemory): Opp
   if (
     ship.hull <= DISENGAGE_HULL
     || ship.crew <= DISENGAGE_CREW
-    || !broadsideLegality(ship, target.position, 'port').armed
+    || !port.armed
   ) {
     const outwardHeading = headingTo(ship.position.x, ship.position.z);
     return decision(
@@ -157,9 +162,8 @@ export function opponentCommand(state: NavalState, _memory: OpponentMemory): Opp
     );
   }
 
-  const port = broadsideLegality(ship, target.position, 'port');
   const usefulSide = port.side;
-  const legality = usefulSide ? broadsideLegality(ship, target.position, usefulSide) : null;
+  const legality = usefulSide ? broadsideLegality(state, 'opponent', usefulSide) : null;
   if (legality?.legal) {
     const broadsideHeading = nearestBroadsideHeading(ship.heading, targetHeading);
     return decision(
@@ -217,7 +221,8 @@ export function advanceOpponentController(
 ): OpponentControllerTick {
   let memory = controller.memory;
   let heldCommand = controller.heldCommand;
-  const disarmedDuringHold = !broadsideLegality(state.ships.opponent, state.ships.player.position, 'port').armed
+  const firingGate = broadsideLegality(state, 'opponent', 'port');
+  const disarmedDuringHold = (!firingGate.armed || firingGate.terminal)
     && memory.mode !== 'disengage'
     && memory.mode !== 'surrender';
 

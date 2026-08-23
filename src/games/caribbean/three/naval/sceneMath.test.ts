@@ -1,7 +1,14 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
-import { assertDrawCallBudget, composeWakeMatrix, fitEngagementCamera } from './sceneMath';
+import {
+  assertDrawCallBudget,
+  composeWakeMatrix,
+  decayCameraShake,
+  fitEngagementCamera,
+  writeCameraShake,
+  writeShipRecoil,
+} from './sceneMath';
 
 const canonicalEngagement = {
   player: { x: 0, z: -36 },
@@ -94,5 +101,45 @@ describe('naval scene visual transforms', () => {
   it('accepts the hard renderer cap and rejects the first over-budget frame', () => {
     expect(() => assertDrawCallBudget(120)).not.toThrow();
     expect(() => assertDrawCallBudget(121)).toThrow(/121.*120/);
+  });
+
+  it('writes deterministic camera shake into reusable scratch vectors and decays to exact fitted restore', () => {
+    const fittedPosition = new THREE.Vector3(3, 31, 42);
+    const fittedTarget = new THREE.Vector3(2, 1.5, 4);
+    const positionScratch = new THREE.Vector3();
+    const targetScratch = new THREE.Vector3();
+
+    expect(writeCameraShake(fittedPosition, fittedTarget, 0.125, 1, positionScratch, targetScratch)).toBe(positionScratch);
+    expect(positionScratch.equals(fittedPosition)).toBe(false);
+    const expectedPosition = positionScratch.clone();
+    const expectedTarget = targetScratch.clone();
+    writeCameraShake(fittedPosition, fittedTarget, 0.125, 1, positionScratch, targetScratch);
+    expect(positionScratch).toEqual(expectedPosition);
+    expect(targetScratch).toEqual(expectedTarget);
+
+    let intensity = 1;
+    for (let frame = 0; frame < 12; frame += 1) intensity = decayCameraShake(intensity, 1 / 60, true);
+    expect(intensity).toBe(0);
+    writeCameraShake(fittedPosition, fittedTarget, 1, intensity, positionScratch, targetScratch);
+    expect(positionScratch).toEqual(fittedPosition);
+    expect(targetScratch).toEqual(fittedTarget);
+  });
+
+  it('restores the exact fitted camera under reduced motion while ship recoil remains independent', () => {
+    const fittedPosition = new THREE.Vector3(3, 31, 42);
+    const fittedTarget = new THREE.Vector3(2, 1.5, 4);
+    const cameraScratch = new THREE.Vector3();
+    const targetScratch = new THREE.Vector3();
+    const recoilScratch = new THREE.Vector3();
+    const modelRest = new THREE.Vector3(1, 2, 3);
+
+    expect(decayCameraShake(1, 0, false)).toBe(0);
+    writeCameraShake(fittedPosition, fittedTarget, 0.125, 0, cameraScratch, targetScratch);
+    expect(cameraScratch).toEqual(fittedPosition);
+    expect(targetScratch).toEqual(fittedTarget);
+    expect(writeShipRecoil(modelRest, -1, 0, 1, recoilScratch)).toBe(recoilScratch);
+    expect(recoilScratch.x).toBeCloseTo(0.68, 12);
+    expect(recoilScratch.y).toBe(2);
+    expect(recoilScratch.z).toBe(3);
   });
 });

@@ -25,7 +25,10 @@ import {
 import {
   assertDrawCallBudget,
   composeWakeMatrix,
+  decayCameraShake,
   fitEngagementCamera,
+  writeCameraShake,
+  writeShipRecoil,
   type EngagementCameraFit,
   type EngagementCameraInput,
 } from './sceneMath';
@@ -177,6 +180,8 @@ export class NavalScene implements NavalSceneAdapter {
   readonly #cameraPosition = new THREE.Vector3(0, 31, 42);
   readonly #cameraTarget = new THREE.Vector3();
   readonly #cameraDesired = new THREE.Vector3(0, 31, 42);
+  readonly #cameraRenderPosition = new THREE.Vector3(0, 31, 42);
+  readonly #cameraRenderTarget = new THREE.Vector3();
   readonly #damageTint = new THREE.Color('#382d2a');
   readonly #renderDummy = new THREE.Object3D();
   readonly #wakeMatrix = new THREE.Matrix4();
@@ -523,9 +528,7 @@ export class NavalScene implements NavalSceneAdapter {
         ? 0
         : -state.rudder * Math.min(0.09, state.speed * 0.018) + Math.sin(this.#time * 0.9 + phase) * 0.012;
       visual.recoil = Math.max(0, visual.recoil - elapsed * 4.8);
-      visual.model.position.x = visual.modelRest.x + visual.recoilX * visual.recoil * 0.32;
-      visual.model.position.y = visual.modelRest.y;
-      visual.model.position.z = visual.modelRest.z + visual.recoilZ * visual.recoil * 0.32;
+      writeShipRecoil(visual.modelRest, visual.recoilX, visual.recoilZ, visual.recoil, visual.model.position);
 
       this.#wakeMatrices.setMatrixAt(
         index,
@@ -543,10 +546,21 @@ export class NavalScene implements NavalSceneAdapter {
 
     const damping = this.#sensory.reducedMotion ? 1 : 1 - Math.exp(-elapsed * 2.8);
     this.#cameraPosition.lerp(this.#cameraDesired, damping);
-    this.#cameraShake = Math.max(0, this.#cameraShake - elapsed * 5);
-    const shake = this.#cameraShake * 0.32;
-    this.#camera.position.copy(this.#cameraPosition).add(new THREE.Vector3(Math.sin(this.#time * 71) * shake, Math.sin(this.#time * 53) * shake * .55, 0));
-    this.#camera.lookAt(this.#cameraTarget.x + Math.sin(this.#time * 47) * shake * .16, this.#cameraTarget.y, this.#cameraTarget.z);
+    this.#cameraShake = decayCameraShake(
+      this.#cameraShake,
+      elapsed,
+      this.#sensory.cameraShake && !this.#sensory.reducedMotion,
+    );
+    writeCameraShake(
+      this.#cameraPosition,
+      this.#cameraTarget,
+      this.#time,
+      this.#cameraShake,
+      this.#cameraRenderPosition,
+      this.#cameraRenderTarget,
+    );
+    this.#camera.position.copy(this.#cameraRenderPosition);
+    this.#camera.lookAt(this.#cameraRenderTarget);
     this.#renderer.render(this.#scene, this.#camera);
     assertDrawCallBudget(this.#renderer.info.render.calls);
 

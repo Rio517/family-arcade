@@ -16,6 +16,8 @@ interface FakeScene {
   syncs: Array<{ tick: number; eventIds: number[] }>;
   throwOnRender: boolean;
   throwOnSync: boolean;
+  throwOnSensory: boolean;
+  sensorySyncs: number;
 }
 
 function fakeScene(): FakeScene {
@@ -25,12 +27,18 @@ function fakeScene(): FakeScene {
     syncs: [],
     throwOnRender: false,
     throwOnSync: false,
+    throwOnSensory: false,
+    sensorySyncs: 0,
     adapter: undefined as unknown as NavalSceneAdapter,
   };
   fake.adapter = {
     sync(state, events) {
       if (fake.throwOnSync) throw new Error('snapshot sync failed');
       fake.syncs.push({ tick: state.tick, eventIds: events.map(({ id }) => id) });
+    },
+    syncSensorySettings() {
+      if (fake.throwOnSensory) throw new Error('sensory failure');
+      fake.sensorySyncs += 1;
     },
     render(frameSeconds, wallSeconds) {
       if (fake.throwOnRender) throw new Error('context render failed');
@@ -273,12 +281,22 @@ describe('NavalViewport', () => {
     expect(screen.getByTestId('naval-html-chart')).toBeVisible();
   });
 
-  it('uses the same fallback boundary when a live sensory update throws', async () => {
+  it('routes initial sensory sync failure through the same one-shot boundary', async () => {
     const scene = fakeScene();
-    scene.adapter.syncSensorySettings = () => { throw new Error('sensory failure'); };
+    scene.throwOnSensory = true;
+    const factory = vi.fn().mockResolvedValue(scene.adapter);
+    render(<NavalViewport state={fixture()} events={[]} sceneFactory={factory} onRestart={vi.fn()} />);
+    expect(await screen.findByTestId('naval-html-chart')).toBeVisible();
+    expect(scene.disposed).toBe(1);
+    expect(scene.sensorySyncs).toBe(0);
+  });
+
+  it('routes a post-ready live sensory sync failure through the same one-shot boundary', async () => {
+    const scene = fakeScene();
     const factory = vi.fn().mockResolvedValue(scene.adapter);
     const { rerender } = render(<NavalViewport state={fixture()} events={[]} sceneFactory={factory} onRestart={vi.fn()} />);
-    await screen.findByTestId('naval-scene-slot');
+    await waitFor(() => expect(scene.sensorySyncs).toBe(1));
+    scene.throwOnSensory = true;
     rerender(<NavalViewport state={fixture()} events={[]} reducedMotion sceneFactory={factory} onRestart={vi.fn()} />);
     expect(await screen.findByTestId('naval-html-chart')).toBeVisible();
     expect(scene.disposed).toBe(1);

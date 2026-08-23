@@ -18,17 +18,18 @@ function qualityFor(ammunition: 'round' | 'chain' | 'grape', distance: number): 
 }
 
 export function selectAimCue(state: NavalState, shipId: NavalShipId): AimCue {
-  if (state.outcome) return { side: null, quality: 'blocked', message: 'Battle ended — no further broadside' };
   const ship = state.ships[shipId];
   const target = state.ships[shipId === 'player' ? 'opponent' : 'player'];
-  const side = broadsideLegality(ship, target.position, 'port').side;
+  const port = broadsideLegality(state, shipId, 'port');
+  if (port.terminal) return { side: null, quality: 'blocked', message: 'Battle ended — no further broadside' };
+  const side = port.side;
   if (!side) {
     const forwardX = Math.sin(ship.heading);
     const forwardZ = Math.cos(ship.heading);
     const dot = (target.position.x - ship.position.x) * forwardX + (target.position.z - ship.position.z) * forwardZ;
     return { side: null, quality: 'blocked', message: dot >= 0 ? 'Target off the bow — turn for a broadside' : 'Target astern — turn for a broadside' };
   }
-  const legality = broadsideLegality(ship, target.position, side);
+  const legality = broadsideLegality(state, shipId, side);
   if (!legality.inRange) return { side, quality: 'blocked', message: `${title(side)} broadside — out of range` };
   if (!legality.armed) return { side, quality: 'blocked', message: `${title(side)} battery disarmed` };
   if (!legality.loaded) return { side, quality: 'blocked', message: `${title(side)} battery reloading` };

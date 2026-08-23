@@ -1,14 +1,79 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { AudioFactory, BattleAudioContext } from '../../audio/BattleAudio';
 import { manualNavalSession } from '../../state/naval/testSession';
-import type { NavalOutcome } from '../../domain/naval/types';
+import type { NavalEvent, NavalOutcome } from '../../domain/naval/types';
 import { NavalBattlePage } from './NavalBattlePage';
 import type { NavalSceneAdapter, NavalSceneFactory } from './NavalViewport';
 
 const BOARDING_READY: NavalOutcome = { kind: 'boarding-ready', victorShipId: 'player' };
 
+function pageAudioFactory() {
+  const cues: string[] = [];
+  const contexts: Array<{ closed: number }> = [];
+  const parameter = () => ({
+    value: 0,
+    setValueAtTime: () => undefined,
+    linearRampToValueAtTime: () => undefined,
+    exponentialRampToValueAtTime: () => undefined,
+  });
+  const node = () => ({
+    connect: () => undefined,
+    disconnect: () => undefined,
+    start: () => undefined,
+    stop: () => undefined,
+    onended: null as (() => void) | null,
+    gain: parameter(),
+    frequency: parameter(),
+    Q: parameter(),
+    type: 'sine' as OscillatorType | BiquadFilterType,
+    buffer: null as unknown,
+  });
+  const factory: AudioFactory = {
+    createContext: () => {
+      const owned = { closed: 0 };
+      contexts.push(owned);
+      return {
+        currentTime: 0,
+        destination: {},
+        resume: () => Promise.resolve(),
+        close: () => { owned.closed += 1; return Promise.resolve(); },
+        createGain: node,
+        createOscillator: node,
+        createBuffer: (_channels: number, length: number) => {
+          const data = new Float32Array(length);
+          return { getChannelData: () => data };
+        },
+        createBufferSource: node,
+        createBiquadFilter: node,
+      } as unknown as BattleAudioContext;
+    },
+    onCue: (cue) => cues.push(cue),
+  };
+  return { factory, cues, contexts };
+}
+
+function surrenderEvent(id = 1): NavalEvent {
+  return { id, kind: 'outcome', atTick: 1, outcome: { kind: 'surrender', victorShipId: 'player' } };
+}
+
 describe('accessible naval command deck', () => {
+  it('recreates effect-owned audio after production StrictMode rehearsal and closes only final ownership', async () => {
+    const audio = pageAudioFactory();
+    const session = manualNavalSession();
+    const { unmount } = render(
+      <StrictMode><NavalBattlePage session={session} sceneFactory={null} audioFactory={audio.factory} /></StrictMode>,
+    );
+
+    fireEvent.click(screen.getByTestId('naval-ammo-chain'));
+    await waitFor(() => expect(audio.contexts).toHaveLength(1));
+    expect(audio.contexts[0].closed).toBe(0);
+    unmount();
+    await waitFor(() => expect(audio.contexts[0].closed).toBe(1));
+  });
+
   it('uses the manual component session to deliver real canonical ticks explicitly', () => {
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} />);
@@ -321,7 +386,7 @@ describe('accessible naval command deck', () => {
     expect(within(hud).getByLabelText('Trade wind 60° / fresh')).toHaveTextContent('60° / fresh');
   });
 
-  it('updates independent sensory settings on the same scene and hides the optional aim cue', async () => {
+  it('updates the live aim directive off and onto the current physical side while paused without recreating the scene', async () => {
     const session = manualNavalSession();
     const syncSensorySettings = vi.fn();
     const adapter: NavalSceneAdapter = {
@@ -332,11 +397,20 @@ describe('accessible naval command deck', () => {
     render(<NavalBattlePage session={session} sceneFactory={factory} />);
     await screen.findByTestId('naval-scene-slot');
     expect(screen.getByTestId('naval-aim-cue')).toBeVisible();
+    fireEvent.click(screen.getByTestId('naval-pause'));
+    fireEvent.click(screen.getByTestId('naval-setting-aim'));
+    expect(syncSensorySettings).toHaveBeenLastCalledWith(expect.objectContaining({ aimCue: null }));
+    act(() => {
+      session.state.ships.player.position = { x: 0, z: 0 };
+      session.state.ships.player.heading = 0;
+      session.state.ships.opponent.position = { x: -24, z: 0 };
+      session.setSail('full');
+    });
     fireEvent.click(screen.getByTestId('naval-setting-aim'));
     fireEvent.click(screen.getByTestId('naval-setting-flashes'));
-    expect(screen.queryByTestId('naval-aim-cue')).toBeNull();
+    expect(screen.getByTestId('naval-aim-cue')).toHaveTextContent(/starboard/i);
     expect(factory).toHaveBeenCalledTimes(1);
-    expect(syncSensorySettings).toHaveBeenLastCalledWith(expect.objectContaining({ aimCue: null, reducedFlashes: true }));
+    expect(syncSensorySettings).toHaveBeenLastCalledWith(expect.objectContaining({ aimCue: expect.objectContaining({ side: 'starboard' }), reducedFlashes: true }));
   });
 
   it('announces each player reload-ready event once without making aim feedback live', () => {
@@ -351,5 +425,106 @@ describe('accessible naval command deck', () => {
     act(() => session.setSail('full'));
     expect(screen.getByTestId('naval-reload-announcement')).toHaveTextContent('Port battery ready');
     expect(screen.getByTestId('naval-aim-cue')).not.toHaveAttribute('aria-live');
+  });
+
+  it('plays one newly reached visible terminal surrender cue after activation', async () => {
+    const audio = pageAudioFactory();
+    const session = manualNavalSession();
+    render(<NavalBattlePage session={session} sceneFactory={null} audioFactory={audio.factory} />);
+    fireEvent.click(screen.getByTestId('naval-ammo-chain'));
+    await waitFor(() => expect(audio.contexts).toHaveLength(1));
+
+    act(() => {
+      session.state.outcome = { kind: 'surrender', victorShipId: 'player' };
+      session.state.events.push(surrenderEvent());
+      session.setSail('full');
+    });
+    await waitFor(() => expect(audio.cues).toEqual(['surrender-bell']));
+  });
+
+  it.each(['paused', 'muted'] as const)('does not schedule or report surrender while %s', async (suppression) => {
+    const audio = pageAudioFactory();
+    const session = manualNavalSession();
+    render(<NavalBattlePage session={session} sceneFactory={null} audioFactory={audio.factory} />);
+    fireEvent.click(screen.getByTestId('naval-ammo-chain'));
+    await waitFor(() => expect(audio.contexts).toHaveLength(1));
+    if (suppression === 'paused') fireEvent.click(screen.getByTestId('naval-pause'));
+    else fireEvent.click(screen.getByTestId('naval-setting-mute'));
+
+    act(() => {
+      session.state.outcome = { kind: 'surrender', victorShipId: 'player' };
+      session.state.events.push(surrenderEvent());
+      session.setSail('full');
+    });
+    expect(audio.cues).toEqual([]);
+  });
+
+  it('does not schedule or report surrender while the page is hidden', async () => {
+    let visibility: DocumentVisibilityState = 'visible';
+    const visibilitySpy = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    const audio = pageAudioFactory();
+    const session = manualNavalSession();
+    render(<NavalBattlePage session={session} sceneFactory={null} audioFactory={audio.factory} />);
+    fireEvent.click(screen.getByTestId('naval-ammo-chain'));
+    await waitFor(() => expect(audio.contexts).toHaveLength(1));
+    visibility = 'hidden';
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+
+    act(() => {
+      session.state.outcome = { kind: 'surrender', victorShipId: 'player' };
+      session.state.events.push(surrenderEvent());
+      session.setSail('full');
+    });
+    expect(audio.cues).toEqual([]);
+    visibilitySpy.mockRestore();
+  });
+
+  it('keeps genuine already-terminal preactivation history silent', async () => {
+    const audio = pageAudioFactory();
+    const session = manualNavalSession({ outcome: { kind: 'surrender', victorShipId: 'player' } });
+    session.state.events.push(surrenderEvent());
+    render(<NavalBattlePage session={session} sceneFactory={null} audioFactory={audio.factory} />);
+
+    fireEvent.click(screen.getByTestId('naval-result-restart'));
+    await waitFor(() => expect(audio.contexts).toHaveLength(1));
+    expect(audio.cues).toEqual([]);
+  });
+
+  it.each([
+    [{ kind: 'boarding-ready', victorShipId: 'player' } as NavalOutcome, /Red Jackdaw sails 25%, crew 14, range 5\.5/i, 'Rematch Battle Lab'],
+    [{ kind: 'boarding-ready', victorShipId: 'opponent' } as NavalOutcome, /Mistral.*crew.*boarding/i, 'Restart Battle Lab'],
+    [{ kind: 'surrender', victorShipId: 'player' } as NavalOutcome, /Red Jackdaw.*surrendered.*hull 20%.*crew 8/i, 'Rematch Battle Lab'],
+    [{ kind: 'surrender', victorShipId: 'opponent' } as NavalOutcome, /Mistral.*crew surrendered.*hull 20%.*crew 8/i, 'Restart Battle Lab'],
+    [{ kind: 'sunk', victorShipId: 'player' } as NavalOutcome, /Red Jackdaw reached hull 0/i, 'Rematch Battle Lab'],
+    [{ kind: 'sunk', victorShipId: 'opponent' } as NavalOutcome, /Mistral reached hull 0/i, 'Restart Battle Lab'],
+    [{ kind: 'escaped', shipId: 'player' } as NavalOutcome, /Mistral crossed the 92-unit boundary at radial range 93\.0 while moving outward/i, 'Restart Battle Lab'],
+    [{ kind: 'escaped', shipId: 'opponent' } as NavalOutcome, /Red Jackdaw crossed the 92-unit boundary at radial range 93\.0 while moving outward/i, 'Restart Battle Lab'],
+    [{ kind: 'separated', shipId: 'player' } as NavalOutcome, /tick 7200 reached the 7200-tick limit/i, 'Restart Battle Lab'],
+    [{ kind: 'separated', shipId: 'opponent' } as NavalOutcome, /tick 7200 reached the 7200-tick limit/i, 'Restart Battle Lab'],
+  ])('explains every outcome identity with decisive values and the correct next action', (outcome, detail, action) => {
+    const session = manualNavalSession({ outcome });
+    session.state.tick = 7_200;
+    session.state.input.timeLimitTicks = 7_200;
+    session.state.input.arenaRadius = 92;
+    session.state.ships.player.position = { x: 93, z: 0 };
+    session.state.ships.player.heading = Math.PI / 2;
+    session.state.ships.player.speed = 1;
+    session.state.ships.player.hull = outcome.kind === 'sunk' && outcome.victorShipId === 'opponent' ? 0 : 20;
+    session.state.ships.player.crew = 8;
+    session.state.ships.opponent.position = outcome.kind === 'boarding-ready' ? { x: 98.5, z: 0 } : { x: 93, z: 0 };
+    session.state.ships.opponent.heading = Math.PI / 2;
+    session.state.ships.opponent.speed = 1;
+    session.state.ships.opponent.hull = outcome.kind === 'sunk' && outcome.victorShipId === 'player' ? 0 : 20;
+    session.state.ships.opponent.sails = 25;
+    session.state.ships.opponent.crew = outcome.kind === 'surrender' && outcome.victorShipId === 'player' ? 8 : 14;
+    session.setSail('full');
+
+    render(<NavalBattlePage session={session} sceneFactory={null} />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent(detail);
+    expect(within(dialog).getByTestId('naval-result-restart')).toHaveTextContent(action);
+    if (outcome.kind === 'surrender' && outcome.victorShipId === 'opponent') {
+      expect(dialog).not.toHaveTextContent(/escaped|prize/i);
+    }
   });
 });

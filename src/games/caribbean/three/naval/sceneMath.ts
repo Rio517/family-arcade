@@ -43,6 +43,44 @@ export function assertDrawCallBudget(drawCalls: number): void {
   }
 }
 
+export function decayCameraShake(intensity: number, elapsed: number, enabled: boolean): number {
+  if (!enabled) return 0;
+  const next = Math.max(0, intensity - Math.max(0, elapsed) * 5);
+  return next <= 1e-9 ? 0 : next;
+}
+
+export function writeCameraShake(
+  fittedPosition: THREE.Vector3,
+  fittedTarget: THREE.Vector3,
+  time: number,
+  intensity: number,
+  positionOut: THREE.Vector3,
+  targetOut: THREE.Vector3,
+): THREE.Vector3 {
+  positionOut.copy(fittedPosition);
+  targetOut.copy(fittedTarget);
+  const shake = Math.max(0, intensity) * 0.32;
+  if (shake === 0) return positionOut;
+  positionOut.x += Math.sin(time * 71) * shake;
+  positionOut.y += Math.sin(time * 53) * shake * 0.55;
+  targetOut.x += Math.sin(time * 47) * shake * 0.16;
+  return positionOut;
+}
+
+export function writeShipRecoil(
+  rest: THREE.Vector3,
+  directionX: number,
+  directionZ: number,
+  intensity: number,
+  output: THREE.Vector3,
+): THREE.Vector3 {
+  return output.set(
+    rest.x + directionX * Math.max(0, intensity) * 0.32,
+    rest.y,
+    rest.z + directionZ * Math.max(0, intensity) * 0.32,
+  );
+}
+
 export function fitEngagementCamera(
   input: EngagementCameraInput,
   output?: EngagementCameraFit,

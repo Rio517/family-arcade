@@ -100,9 +100,8 @@ function resolveRequestedBroadside(
 
   const ship = firingSnapshot.ships[shipId];
   const targetShipId = opposingShip(shipId);
-  const target = firingSnapshot.ships[targetShipId];
   const side = command.fire;
-  const legality = broadsideLegality(ship, target.position, side);
+  const legality = broadsideLegality(firingSnapshot, shipId, side);
   if (!legality.legal) {
     return null;
   }

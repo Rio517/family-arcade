@@ -1,4 +1,4 @@
-import type { Broadside, NavalShipState, Point } from './types';
+import type { Broadside, NavalShipId, NavalShipState, NavalState, Point } from './types';
 
 const TAU = Math.PI * 2;
 const LATERAL_ARC_FORWARD_DOT = 0.72;
@@ -50,15 +50,15 @@ export interface BroadsideLegality {
   inRange: boolean;
   loaded: boolean;
   armed: boolean;
+  terminal: boolean;
   legal: boolean;
 }
 
-/** One shared firing gate for the reducer, opponent assistance, and presentation. */
-export function broadsideLegality(
+function physicalBroadsideLegality(
   ship: NavalShipState,
   target: Point,
   requestedSide: Broadside,
-): BroadsideLegality {
+): Omit<BroadsideLegality, 'terminal' | 'legal'> & { physicallyLegal: boolean } {
   const distance = Math.hypot(target.x - ship.position.x, target.z - ship.position.z);
   const side = bearingSide(ship.position, ship.heading, target);
   const inRange = distance <= MAX_BROADSIDE_RANGE;
@@ -70,7 +70,28 @@ export function broadsideLegality(
     inRange,
     loaded,
     armed,
-    legal: side === requestedSide && inRange && loaded && armed,
+    physicallyLegal: side === requestedSide && inRange && loaded && armed,
+  };
+}
+
+/** The sole state-aware firing gate for reducer, opponent assistance, and presentation. */
+export function broadsideLegality(
+  state: NavalState,
+  shipId: NavalShipId,
+  requestedSide: Broadside,
+): BroadsideLegality {
+  const ship = state.ships[shipId];
+  const target = state.ships[shipId === 'player' ? 'opponent' : 'player'];
+  const physical = physicalBroadsideLegality(ship, target.position, requestedSide);
+  const terminal = state.outcome !== null;
+  return {
+    side: physical.side,
+    distance: physical.distance,
+    inRange: physical.inRange,
+    loaded: physical.loaded,
+    armed: physical.armed,
+    terminal,
+    legal: !terminal && physical.physicallyLegal,
   };
 }
 
