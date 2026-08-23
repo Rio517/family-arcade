@@ -48,6 +48,8 @@ const TASK8_TREE_FILES = [
   'src/games/caribbean/state/naval/harnessConfig.test.ts',
   'src/games/caribbean/state/naval/harnessConfig.ts',
   'src/games/caribbean/three/naval/NavalScene.ts',
+  'src/games/caribbean/three/naval/bearingLine.test.ts',
+  'src/games/caribbean/three/naval/bearingLine.ts',
   'src/games/caribbean/three/naval/sceneMath.ts',
   'src/games/caribbean/styles/battle.css',
   'src/games/caribbean/styles/caribbean.css',
@@ -255,8 +257,14 @@ function sceneMetricsFrom(element) {
     textures: Number(data.sceneTextures),
     geometries: Number(data.sceneGeometries),
     materials: Number(data.sceneMaterials),
+    bufferAttributes: Number(data.sceneBufferAttributes),
     activeEffects: Number(data.sceneActiveEffects),
     effectCapacity: Number(data.sceneEffectCapacity),
+    reducedMotion: data.sceneReducedMotion === 'true',
+    shipIntermediateFrames: Number(data.sceneShipIntermediateFrames),
+    cameraIntermediateFrames: Number(data.sceneCameraIntermediateFrames),
+    reducedMotionShipSnaps: Number(data.sceneReducedMotionShipSnaps),
+    reducedMotionCameraSnaps: Number(data.sceneReducedMotionCameraSnaps),
   };
 }
 
@@ -356,7 +364,7 @@ async function readSupportedDisplay(page, viewport) {
     const commandStrip = document.querySelector('[aria-label="Battle commands"]');
     const controlIds = [
       'naval-rudder-port', 'naval-fire-port', 'naval-ammo-round', 'naval-ammo-chain',
-      'naval-ammo-grape', 'naval-fire-starboard', 'naval-rudder-starboard', 'naval-options-toggle',
+      'naval-ammo-grape', 'naval-sail-toggle', 'naval-fire-starboard', 'naval-rudder-starboard', 'naval-options-toggle',
     ];
     const controls = controlIds.map((id) => document.querySelector(`[data-testid="${id}"]`));
     const touchSized = controls.every((element) => {
@@ -372,8 +380,17 @@ async function readSupportedDisplay(page, viewport) {
           && labelBounds.top >= bounds.top - 1 && labelBounds.bottom <= bounds.bottom + 1;
       });
     });
+    const actionType = controls.flatMap((element) => element
+      ? [element, ...element.querySelectorAll('*')].filter((candidate) => [...candidate.childNodes].some(
+        (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+      ))
+      : []);
+    const minimumActionFontSize = Math.min(...actionType.map((element) => Number.parseFloat(getComputedStyle(element).fontSize)));
+    const sailControl = document.querySelector('[data-testid="naval-sail-toggle"]');
     const commandText = commandStrip?.textContent ?? '';
     const pauseText = document.querySelector('[data-testid="naval-pause"]')?.textContent ?? '';
+    const shortcutKeys = ['A', 'Q', '1', '2', '3', 'R', 'E', 'D'].every((key) => commandText.includes(key))
+      && pauseText.includes('Space') && pauseText.includes('Esc');
     const center = {
       left: innerWidth * 0.35,
       right: innerWidth * 0.65,
@@ -398,8 +415,12 @@ async function readSupportedDisplay(page, viewport) {
       centerClear: !intersectsCenter,
       controlsVisible: visible(commandStrip)
         && touchSized && labelsContained
-        && ['A', 'Q', '1', '2', '3', 'R', 'E', 'D'].every((key) => commandText.includes(key))
-        && pauseText.includes('Space') && pauseText.includes('Esc'),
+        && shortcutKeys,
+      touchSized,
+      labelsContained,
+      shortcutKeys,
+      minimumActionFontSize,
+      sailControl: visible(sailControl) && controls.includes(sailControl),
       noOuterScroll: document.documentElement.scrollWidth <= innerWidth
         && document.documentElement.scrollHeight <= innerHeight,
     };
@@ -420,15 +441,40 @@ async function readUnsupportedDisplay(page, viewport) {
       notice: visible('[data-testid="caribbean-display-notice"]'),
       battle: visible('[data-testid="naval-battle-page"]'),
       liveFrame: visible('[data-testid="naval-scene-frame"]'),
+      focused: document.activeElement?.getAttribute('data-testid') === 'caribbean-display-notice',
     };
   }, viewport);
 }
 
-async function newEvidencePage(browser, baseUrl, aggregate, viewport) {
+async function readPrebattleDisplay(page, phase) {
+  return page.evaluate((currentPhase) => {
+    const viewportContains = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      const bounds = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden'
+        && bounds.left >= 0 && bounds.right <= innerWidth && bounds.top >= 0 && bounds.bottom <= innerHeight;
+    };
+    const legend = document.querySelector('[aria-label="Battle controls"]');
+    const keys = [...(legend?.querySelectorAll('kbd') ?? [])].map((element) => element.textContent?.trim());
+    const expected = ['A', 'Q', '1', '2', '3', 'R', 'E', 'D', 'Space / Esc'];
+    const cta = document.querySelector(`[data-testid="${currentPhase === 'decision' ? 'lab-start-naval' : 'naval-enter-battle'}"]`);
+    return {
+      legendComplete: expected.every((key) => keys.includes(key))
+        && viewportContains(legend)
+        && [...(legend?.querySelectorAll('li') ?? [])].every(viewportContains),
+      ctaVisible: viewportContains(cta),
+      noOuterScroll: document.documentElement.scrollWidth <= innerWidth
+        && document.documentElement.scrollHeight <= innerHeight,
+    };
+  }, phase);
+}
+
+async function newEvidencePage(browser, baseUrl, aggregate, viewport, reducedMotion = 'no-preference') {
   const page = await browser.newPage({
     viewport,
     deviceScaleFactor: 1,
-    reducedMotion: 'reduce',
+    reducedMotion,
   });
   await page.addInitScript(() => {
     window.__NAVAL_UNHANDLED__ = [];
@@ -444,12 +490,21 @@ async function newEvidencePage(browser, baseUrl, aggregate, viewport) {
 async function captureCanonicalJourney(browser, baseUrl, aggregate) {
   const page = await newEvidencePage(browser, baseUrl, aggregate, VIEWPORTS.tablet);
   await page.goto(`${baseUrl}${HARNESS_PATH}`, { waitUntil: 'networkidle' });
+  const decisionDisplay = await readPrebattleDisplay(page, 'decision');
+  await screenshot(page, 'decision-tablet.png');
   await page.getByTestId('lab-start-naval').click();
   await page.getByTestId('naval-briefing').waitFor();
+  const briefingDisplay = await readPrebattleDisplay(page, 'briefing');
   await screenshot(page, 'briefing-tablet.png');
   await page.getByTestId('naval-enter-battle').click();
   await page.getByTestId('naval-battle-page').waitFor();
   await page.waitForFunction(() => Boolean(window.__CARIBBEAN_NAVAL_DEBUG__));
+  await page.waitForFunction(() => {
+    const frame = document.querySelector('[data-testid="naval-scene-frame"]');
+    return frame?.getAttribute('data-scene-reduced-motion') === 'false'
+      && Number(frame.getAttribute('data-scene-ship-intermediate-frames')) > 0
+      && Number(frame.getAttribute('data-scene-camera-intermediate-frames')) > 0;
+  }, undefined, { timeout: 20_000 });
   const canonicalInput = await page.evaluate(() => {
     const input = window.__CARIBBEAN_NAVAL_DEBUG__.getSnapshot().state.input;
     return { battleId: input.battleId, seed: input.seed };
@@ -530,11 +585,34 @@ async function captureCanonicalJourney(browser, baseUrl, aggregate) {
       unsupported: { portrait: portraitDisplay, landscape: landscapeDisplay },
       resize: {
         notice: landscapeDisplay.notice,
+        noticeFocused: landscapeDisplay.focused,
         battleUnmounted: !landscapeDisplay.battle,
         tickStopped: blockedTickEnd === blockedTickStart,
         restoredWithNewSession,
       },
+      prebattle: { decision: decisionDisplay, briefing: briefingDisplay },
     },
+  };
+}
+
+async function captureReducedMotion(browser, baseUrl, aggregate) {
+  const page = await newEvidencePage(browser, baseUrl, aggregate, VIEWPORTS.tablet, 'reduce');
+  await page.goto(`${baseUrl}${HARNESS_PATH}`, { waitUntil: 'networkidle' });
+  await enterBattle(page);
+  await page.waitForFunction(() => {
+    const frame = document.querySelector('[data-testid="naval-scene-frame"]');
+    return frame?.getAttribute('data-scene-reduced-motion') === 'true'
+      && Number(frame.getAttribute('data-scene-reduced-motion-ship-snaps')) > 0
+      && Number(frame.getAttribute('data-scene-reduced-motion-camera-snaps')) > 0;
+  }, undefined, { timeout: 20_000 });
+  const metrics = await readSceneMetrics(page);
+  await flushUnhandled(page, aggregate);
+  await page.close();
+  return {
+    preference: 'reduce',
+    reducedMotion: metrics.reducedMotion,
+    shipSnaps: metrics.reducedMotionShipSnaps,
+    cameraSnaps: metrics.reducedMotionCameraSnaps,
   };
 }
 
@@ -702,7 +780,7 @@ export function plateauEvidence(samples) {
   const capacityErrors = [];
   const poolErrors = [];
   for (const [index, sample] of samples.entries()) {
-    for (const field of ['textures', 'geometries', 'materials', 'activeEffects', 'effectCapacity']) {
+    for (const field of ['textures', 'geometries', 'materials', 'bufferAttributes', 'activeEffects', 'effectCapacity']) {
       if (!Number.isFinite(sample[field]) || sample[field] < 0) allocationErrors.push(`sample ${index} ${field}=${sample[field]}`);
     }
     if (!Number.isInteger(sample.effectCapacity) || sample.effectCapacity <= 0) capacityErrors.push(`sample ${index} capacity=${sample.effectCapacity}`);
@@ -715,6 +793,7 @@ export function plateauEvidence(samples) {
       textures: resourceGrowth(samples, 'textures'),
       geometries: resourceGrowth(samples, 'geometries'),
       materials: resourceGrowth(samples, 'materials'),
+      bufferAttributes: resourceGrowth(samples, 'bufferAttributes'),
       activeEffects: resourceGrowth(samples, 'activeEffects'),
       effectCapacity: resourceGrowth(samples, 'effectCapacity'),
     },
@@ -741,6 +820,7 @@ export async function runNavalCheck() {
       requestedPaths: [], remoteDependencies: [],
     };
     const canonical = await captureCanonicalJourney(browser, baseUrl, aggregate);
+    const reducedMotion = await captureReducedMotion(browser, baseUrl, aggregate);
     const activePlateauSamples = await captureActivePlateau(browser, baseUrl, aggregate);
     const handednessEvents = await captureHandedness(browser, baseUrl, aggregate);
     const scenario = await captureBoardingReady(browser, baseUrl, aggregate);
@@ -786,6 +866,15 @@ export async function runNavalCheck() {
       handedness,
       scenario,
       fallback,
+      motion: {
+        normal: {
+          preference: 'no-preference',
+          reducedMotion: canonical.viewportMetrics.tablet.reducedMotion,
+          shipIntermediateFrames: canonical.viewportMetrics.tablet.shipIntermediateFrames,
+          cameraIntermediateFrames: canonical.viewportMetrics.tablet.cameraIntermediateFrames,
+        },
+        reduced: reducedMotion,
+      },
       display: canonical.display,
     };
     const verdict = evaluateNavalEvidence(evidence);
@@ -813,6 +902,7 @@ export async function runNavalCheck() {
         textures: Math.max(...performanceSamples.map((sample) => sample.textures)),
         geometries: Math.max(...performanceSamples.map((sample) => sample.geometries)),
         materials: Math.max(...performanceSamples.map((sample) => sample.materials)),
+        bufferAttributes: Math.max(...performanceSamples.map((sample) => sample.bufferAttributes)),
         effectActive: Math.max(...performanceSamples.map((sample) => sample.activeEffects)),
         effectCapacity: Math.max(...performanceSamples.map((sample) => sample.effectCapacity)),
       },
@@ -833,6 +923,7 @@ export async function runNavalCheck() {
       outcome: scenario,
       handedness,
       fallback,
+      motion: evidence.motion,
       display: canonical.display,
       verdict,
     };

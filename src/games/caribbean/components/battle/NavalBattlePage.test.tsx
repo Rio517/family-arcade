@@ -156,7 +156,7 @@ describe('accessible naval command deck', () => {
       ['naval-ammo-round', '1', 'Round'],
       ['naval-ammo-chain', '2', 'Chain'],
       ['naval-ammo-grape', '3', 'Grape'],
-      ['naval-sail-reefed', 'R', 'Reef sail'],
+      ['naval-sail-toggle', 'R', 'Sail: Full'],
       ['naval-fire-starboard', 'E', 'Fire starboard'],
       ['naval-rudder-starboard', 'D', 'Turn starboard'],
     ]) {
@@ -173,7 +173,15 @@ describe('accessible naval command deck', () => {
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} />);
 
-    fireEvent.click(screen.getByTestId('naval-sail-reefed'));
+    const sail = screen.getByTestId('naval-sail-toggle');
+    expect(sail).toHaveAttribute('aria-pressed', 'false');
+    expect(sail).toHaveAccessibleName(/sail setting: full.*reef/i);
+    expect(sail).toHaveTextContent('Sail: Full');
+    fireEvent.click(sail);
+    expect(screen.getByTestId('naval-sail-toggle')).toBe(sail);
+    expect(sail).toHaveAttribute('aria-pressed', 'true');
+    expect(sail).toHaveAccessibleName(/sail setting: reefed.*full/i);
+    expect(sail).toHaveTextContent('Sail: Reefed');
     fireEvent.click(screen.getByTestId('naval-ammo-chain'));
     fireEvent.click(screen.getByTestId('naval-pause'));
 
@@ -366,8 +374,14 @@ describe('accessible naval command deck', () => {
         textures: 0,
         geometries: 1,
         materials: 1,
+        bufferAttributes: 3,
         activeEffects: 0,
         effectCapacity: 32,
+        reducedMotion: false,
+        shipIntermediateFrames: 1,
+        cameraIntermediateFrames: 1,
+        reducedMotionShipSnaps: 0,
+        reducedMotionCameraSnaps: 0,
       }),
       dispose,
     };
@@ -441,7 +455,7 @@ describe('accessible naval command deck', () => {
     const syncSensorySettings = vi.fn();
     const adapter: NavalSceneAdapter = {
       sync: vi.fn(), syncSensorySettings, render: vi.fn(), dispose: vi.fn(),
-      metrics: () => ({ fps: 60, dpr: 1, tier: 'low', drawCalls: 1, triangles: 1, textures: 0, geometries: 1, materials: 1, activeEffects: 0, effectCapacity: 8 }),
+      metrics: () => ({ fps: 60, dpr: 1, tier: 'low', drawCalls: 1, triangles: 1, textures: 0, geometries: 1, materials: 1, bufferAttributes: 3, activeEffects: 0, effectCapacity: 8, reducedMotion: false, shipIntermediateFrames: 1, cameraIntermediateFrames: 1, reducedMotionShipSnaps: 0, reducedMotionCameraSnaps: 0 }),
     };
     const factory: NavalSceneFactory = vi.fn().mockResolvedValue(adapter);
     render(<NavalBattlePage session={session} sceneFactory={factory} />);

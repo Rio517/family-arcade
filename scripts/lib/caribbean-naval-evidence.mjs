@@ -63,7 +63,7 @@ function validateResourceSamples(issues, samples) {
     }
     if (sample.paused !== false) issues.push(`resource sample ${index} is paused`);
     if (sample.outcome !== null) issues.push(`resource sample ${index} is not an unresolved battle`);
-    for (const field of ['textures', 'geometries', 'materials']) {
+    for (const field of ['textures', 'geometries', 'materials', 'bufferAttributes']) {
       if (!Number.isInteger(sample[field]) || sample[field] < 0) {
         issues.push(`resource sample ${index} ${field} is invalid`);
       }
@@ -99,6 +99,10 @@ function validateDisplayEvidence(issues, display) {
     for (const field of ['battle', 'fullBleed', 'centerClear', 'controlsVisible', 'noOuterScroll']) {
       if (sample[field] !== true) issues.push(`display supported ${name} ${field} must be true`);
     }
+    if (!Number.isFinite(sample.minimumActionFontSize) || sample.minimumActionFontSize < 14) {
+      issues.push(`display supported ${name} action font must be at least 14px`);
+    }
+    if (sample.sailControl !== true) issues.push(`display supported ${name} sailControl must be true`);
     if (sample.notice !== false) issues.push(`display supported ${name} notice must be false`);
   }
   for (const [name, expectedViewport] of Object.entries(DISPLAY_VIEWPORTS.unsupported)) {
@@ -111,13 +115,42 @@ function validateDisplayEvidence(issues, display) {
       issues.push(`display unsupported ${name} viewport is not ${expectedViewport.width}x${expectedViewport.height}`);
     }
     if (sample.notice !== true) issues.push(`display unsupported ${name} notice must be true`);
+    if (sample.focused !== true) issues.push(`display unsupported ${name} focused must be true`);
     for (const field of ['battle', 'liveFrame']) {
       if (sample[field] !== false) issues.push(`display unsupported ${name} ${field} must be false`);
     }
   }
   const resize = isRecord(display.resize) ? display.resize : {};
-  for (const field of ['notice', 'battleUnmounted', 'tickStopped', 'restoredWithNewSession']) {
+  for (const field of ['notice', 'noticeFocused', 'battleUnmounted', 'tickStopped', 'restoredWithNewSession']) {
     if (resize[field] !== true) issues.push(`display resize ${field} must be true`);
+  }
+  const prebattle = isRecord(display.prebattle) ? display.prebattle : {};
+  for (const phase of ['decision', 'briefing']) {
+    const sample = isRecord(prebattle[phase]) ? prebattle[phase] : {};
+    for (const field of ['legendComplete', 'ctaVisible', 'noOuterScroll']) {
+      if (sample[field] !== true) issues.push(`display prebattle ${phase} ${field} must be true`);
+    }
+  }
+}
+
+function validateMotionEvidence(issues, motion) {
+  const normal = isRecord(motion?.normal) ? motion.normal : {};
+  if (normal.preference !== 'no-preference') issues.push('normal motion preference must be no-preference');
+  if (normal.reducedMotion !== false) issues.push('normal scene must report reducedMotion false');
+  if (!Number.isInteger(normal.shipIntermediateFrames) || normal.shipIntermediateFrames <= 0) {
+    issues.push('normal scene did not observe intermediate ship frames');
+  }
+  if (!Number.isInteger(normal.cameraIntermediateFrames) || normal.cameraIntermediateFrames <= 0) {
+    issues.push('normal scene did not observe intermediate camera frames');
+  }
+  const reduced = isRecord(motion?.reduced) ? motion.reduced : {};
+  if (reduced.preference !== 'reduce') issues.push('reduced motion preference must be reduce');
+  if (reduced.reducedMotion !== true) issues.push('reduced scene must report reducedMotion true');
+  if (!Number.isInteger(reduced.shipSnaps) || reduced.shipSnaps <= 0) {
+    issues.push('reduced scene did not observe ship snaps');
+  }
+  if (!Number.isInteger(reduced.cameraSnaps) || reduced.cameraSnaps <= 0) {
+    issues.push('reduced scene did not observe camera snaps');
   }
 }
 
@@ -170,7 +203,7 @@ export function evaluateNavalEvidence(evidence) {
   }
   validateResourceSamples(issues, resources?.samples);
   const growth = isRecord(resources?.growthAfterWarmup) ? resources.growthAfterWarmup : {};
-  for (const name of ['textures', 'geometries', 'materials', 'effectCapacity']) {
+  for (const name of ['textures', 'geometries', 'materials', 'bufferAttributes', 'effectCapacity']) {
     if (!Number.isFinite(growth[name]) || growth[name] !== 0) {
       issues.push(`${name} grew after warm-up`);
     }
@@ -211,6 +244,7 @@ export function evaluateNavalEvidence(evidence) {
     if (fallback[field] !== true) issues.push(`fallback ${field} was not observed`);
   }
 
+  validateMotionEvidence(issues, input.motion);
   validateDisplayEvidence(issues, input.display);
 
   return { ok: issues.length === 0, issues };

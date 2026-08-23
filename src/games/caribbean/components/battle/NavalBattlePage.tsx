@@ -310,10 +310,11 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
               <button
                 type="button"
                 className="naval-control naval-hit-target naval-command-control naval-sail-control"
-                data-testid={`naval-sail-${currentCommand.sail === 'full' ? 'reefed' : 'full'}`}
+                data-testid="naval-sail-toggle"
                 aria-pressed={currentCommand.sail === 'reefed'}
+                aria-label={`Sail setting: ${currentCommand.sail}. Press to ${currentCommand.sail === 'full' ? 'reef' : 'set full sail'}`}
                 onClick={() => { activateAudio(); session.setSail(currentCommand.sail === 'full' ? 'reefed' : 'full'); }}
-              ><kbd>R</kbd><span>{currentCommand.sail === 'full' ? 'Reef sail' : 'Full sail'}</span></button>
+              ><kbd>R</kbd><span>Sail: {currentCommand.sail === 'full' ? 'Full' : 'Reefed'}</span></button>
               <FireControl side="starboard" onFire={() => { activateAudio(); session.requestFire('starboard'); }} disabled={Boolean(outcome || diagnostic)} />
               <RudderControl side="starboard" shortcut="D" onHold={holdRudder} onActivate={activateAudio} />
               <details className="naval-options" data-testid="naval-options">

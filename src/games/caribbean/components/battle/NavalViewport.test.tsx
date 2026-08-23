@@ -58,8 +58,14 @@ function fakeScene(): FakeScene {
       textures: 3,
       geometries: 4,
       materials: 5,
+      bufferAttributes: 17,
       activeEffects: 0,
       effectCapacity: 32,
+      reducedMotion: false,
+      shipIntermediateFrames: 12,
+      cameraIntermediateFrames: 9,
+      reducedMotionShipSnaps: 0,
+      reducedMotionCameraSnaps: 0,
     }),
     dispose() {
       fake.disposed += 1;
@@ -299,8 +305,14 @@ describe('NavalViewport', () => {
       sceneTextures: '3',
       sceneGeometries: '4',
       sceneMaterials: '5',
+      sceneBufferAttributes: '17',
       sceneActiveEffects: '0',
       sceneEffectCapacity: '32',
+      sceneReducedMotion: 'false',
+      sceneShipIntermediateFrames: '12',
+      sceneCameraIntermediateFrames: '9',
+      sceneReducedMotionShipSnaps: '0',
+      sceneReducedMotionCameraSnaps: '0',
     });
   });
 

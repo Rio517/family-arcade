@@ -75,15 +75,20 @@ function BattleSession({ sceneFactory, battleInput = BATTLE_LAB_INPUT, onSession
 export function CaribbeanLab({ sceneFactory, battleInput, onSessionReady }: CaribbeanLabProps) {
   const [phase, setPhase] = useState<LabPhase>('decision');
   const briefingHeading = useRef<HTMLHeadingElement>(null);
+  const displayNotice = useRef<HTMLElement>(null);
   const supportsPlayfield = useBattlePlayfieldSupport();
 
   useEffect(() => {
     if (phase === 'briefing') briefingHeading.current?.focus();
   }, [phase]);
 
+  useEffect(() => {
+    if (!supportsPlayfield) displayNotice.current?.focus();
+  }, [supportsPlayfield]);
+
   if (!supportsPlayfield) {
     return (
-      <section className="caribbean-display-notice" data-testid="caribbean-display-notice" role="alert">
+      <section ref={displayNotice} className="caribbean-display-notice" data-testid="caribbean-display-notice" role="alert" tabIndex={-1}>
         <ShipIcon size={34} />
         <p>Caribbean Career</p>
         <h1>Designed for tablet and larger</h1>

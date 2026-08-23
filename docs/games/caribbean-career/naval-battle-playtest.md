@@ -22,9 +22,12 @@ Observed feedback on the pre-revision build:
 The 2026-08-23 revision incorporates that direction with render-only pose and
 camera interpolation, an edge-to-edge tactical sea, a compact bottom command
 strip, preserved health/reload rails, and visible physical key labels. The
-automated captures verify the resulting implementation, but Mario has not yet
-recorded a post-revision human play session, so no subjective acceptance claim
-is made here.
+normal-motion automation now exercises the real 3D scene and records
+intermediate ship/camera presentation frames; a separate reduced-motion run
+records exact ship/camera snaps. Browser captures also verify the full command
+strip, 14 px action-copy floor, and unclipped decision/briefing shortcuts and
+actions. Mario has not yet recorded a post-revision human play session, so no
+subjective acceptance claim is made here.
 
 ## Evidence boundary
 

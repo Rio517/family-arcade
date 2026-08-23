@@ -13,6 +13,7 @@ function activeSamples() {
     textures: 3,
     geometries: 30,
     materials: 30,
+    bufferAttributes: 88,
     activeEffects: index % 4 === 0 ? 5 : 0,
     effectCapacity: 96,
   }));
@@ -36,6 +37,7 @@ describe('naval browser evidence helpers', () => {
       textures: 0,
       geometries: 0,
       materials: 0,
+      bufferAttributes: 0,
       activeEffects: 5,
       effectCapacity: 0,
     });
@@ -46,6 +48,16 @@ describe('naval browser evidence helpers', () => {
     expect(navalCheck.plateauEvidence(invalid).poolErrors).toEqual([
       'sample 13 active=97 capacity=96',
     ]);
+  });
+
+  it('fails closed when the GPU buffer-attribute resource class is missing or grows', () => {
+    const missing = activeSamples();
+    delete missing[4].bufferAttributes;
+    expect(navalCheck.plateauEvidence(missing).allocationErrors).toContain('sample 4 bufferAttributes=undefined');
+
+    const growing = activeSamples();
+    growing[19].bufferAttributes += 1;
+    expect(navalCheck.plateauEvidence(growing).growthAfterWarmup.bufferAttributes).toBe(1);
   });
 
   it('records neutral runtime HEAD provenance instead of a historical pre-Task-8 role', () => {

@@ -18,6 +18,7 @@ import type {
 } from '../../domain/naval/types';
 import { createSloop } from '../shared/loadSloop';
 import { damageEffectKinds, EffectPool } from './effects';
+import { createBearingLineGeometry, updateBearingLineGeometry } from './bearingLine';
 import {
   QualityController,
   qualitySettings,
@@ -239,10 +240,7 @@ export class NavalScene implements NavalSceneAdapter {
     42,
   );
   readonly #bearingLine = new THREE.Line(
-    new THREE.BufferGeometry().setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute([0, 0.08, 0, 0, 0.08, 0], 3),
-    ),
+    createBearingLineGeometry(),
     new THREE.LineDashedMaterial({
       color: '#c79a45',
       dashSize: 1.2,
@@ -269,6 +267,10 @@ export class NavalScene implements NavalSceneAdapter {
   #viewportHeight = 540;
   #hasCameraFit = false;
   #cameraShake = 0;
+  #shipIntermediateFrames = 0;
+  #cameraIntermediateFrames = 0;
+  #reducedMotionShipSnaps = 0;
+  #reducedMotionCameraSnaps = 0;
   #sensory: NavalSensorySettings;
 
   private constructor(container: HTMLElement, options: NavalSceneOptions) {
@@ -354,7 +356,6 @@ export class NavalScene implements NavalSceneAdapter {
 
     this.#updateWindLines(0);
     this.#bearingLine.name = 'Live_Bearing_Line';
-    this.#bearingLine.computeLineDistances();
     this.#aimArc.frustumCulled = false;
     this.#scene.add(this.#windLines, this.#wakeMatrices, this.#selectionRings, this.#bearingLine, this.#aimArc);
     return sun;
@@ -405,11 +406,17 @@ export class NavalScene implements NavalSceneAdapter {
       const canonical = state.ships[shipId];
       const visual = this.#ships[shipId];
       if (!visual) continue;
+      const hadState = visual.state !== null;
       visual.state = canonical;
       visual.targetPose.x = canonical.position.x;
       visual.targetPose.z = canonical.position.z;
       visual.targetPose.heading = canonical.heading;
       if (snap) {
+        if (hadState && this.#sensory.reducedMotion && (
+          Math.abs(visual.renderPose.x - visual.targetPose.x) > 1e-6
+          || Math.abs(visual.renderPose.z - visual.targetPose.z) > 1e-6
+          || Math.abs(visual.renderPose.heading - visual.targetPose.heading) > 1e-6
+        )) this.#reducedMotionShipSnaps += 1;
         visual.renderPose.x = visual.targetPose.x;
         visual.renderPose.z = visual.targetPose.z;
         visual.renderPose.heading = visual.targetPose.heading;
@@ -555,6 +562,9 @@ export class NavalScene implements NavalSceneAdapter {
       const visual = this.#ships[shipId];
       const state = visual?.state;
       if (!visual || !state) continue;
+      const poseDistanceBefore = Math.abs(visual.renderPose.x - visual.targetPose.x)
+        + Math.abs(visual.renderPose.z - visual.targetPose.z)
+        + Math.abs(visual.renderPose.heading - visual.targetPose.heading);
       writeDampedPose(
         visual.renderPose,
         visual.targetPose,
@@ -562,6 +572,13 @@ export class NavalScene implements NavalSceneAdapter {
         this.#sensory.reducedMotion,
         visual.renderPose,
       );
+      const poseDistanceAfter = Math.abs(visual.renderPose.x - visual.targetPose.x)
+        + Math.abs(visual.renderPose.z - visual.targetPose.z)
+        + Math.abs(visual.renderPose.heading - visual.targetPose.heading);
+      if (!this.#sensory.reducedMotion && poseDistanceBefore > 1e-6
+        && poseDistanceAfter > 1e-6 && poseDistanceAfter < poseDistanceBefore) {
+        this.#shipIntermediateFrames += 1;
+      }
       visual.root.position.x = visual.renderPose.x;
       visual.root.position.z = visual.renderPose.z;
       visual.root.rotation.y = visual.renderPose.heading;
@@ -587,18 +604,22 @@ export class NavalScene implements NavalSceneAdapter {
     }
     this.#wakeMatrices.instanceMatrix.needsUpdate = true;
     this.#selectionRings.instanceMatrix.needsUpdate = true;
-    const bearingPositions = this.#bearingLine.geometry.getAttribute('position') as THREE.BufferAttribute;
     const playerPose = this.#ships.player.renderPose;
     const opponentPose = this.#ships.opponent.renderPose;
-    bearingPositions.setXYZ(0, playerPose.x, 0.08, playerPose.z);
-    bearingPositions.setXYZ(1, opponentPose.x, 0.08, opponentPose.z);
-    bearingPositions.needsUpdate = true;
-    this.#bearingLine.computeLineDistances();
+    updateBearingLineGeometry(this.#bearingLine.geometry, playerPose, opponentPose);
     this.#updateAimArc();
 
     const damping = this.#sensory.reducedMotion ? 1 : presentationDampingFactor(elapsed);
+    const cameraDistanceBefore = this.#cameraPosition.distanceTo(this.#cameraDesired)
+      + this.#cameraTarget.distanceTo(this.#cameraDesiredTarget);
     this.#cameraPosition.lerp(this.#cameraDesired, damping);
     this.#cameraTarget.lerp(this.#cameraDesiredTarget, damping);
+    const cameraDistanceAfter = this.#cameraPosition.distanceTo(this.#cameraDesired)
+      + this.#cameraTarget.distanceTo(this.#cameraDesiredTarget);
+    if (!this.#sensory.reducedMotion && cameraDistanceBefore > 1e-6
+      && cameraDistanceAfter > 1e-6 && cameraDistanceAfter < cameraDistanceBefore) {
+      this.#cameraIntermediateFrames += 1;
+    }
     this.#cameraShake = decayCameraShake(
       this.#cameraShake,
       elapsed,
@@ -631,8 +652,18 @@ export class NavalScene implements NavalSceneAdapter {
   metrics(): NavalSceneMetrics {
     const materials = new Set<THREE.Material>();
     const geometries = new Set<THREE.BufferGeometry>();
+    const bufferAttributes = new Set<THREE.BufferAttribute | THREE.InterleavedBufferAttribute>();
     this.#scene.traverse((object) => {
       const mesh = object as THREE.Mesh;
+      if (mesh.geometry) {
+        for (const attribute of Object.values(mesh.geometry.attributes)) bufferAttributes.add(attribute);
+        if (mesh.geometry.index) bufferAttributes.add(mesh.geometry.index);
+      }
+      if ((mesh as THREE.InstancedMesh).isInstancedMesh) {
+        const instanced = mesh as THREE.InstancedMesh;
+        bufferAttributes.add(instanced.instanceMatrix);
+        if (instanced.instanceColor) bufferAttributes.add(instanced.instanceColor);
+      }
       if (mesh.name.startsWith('NavalEffectBatch_')) return;
       if (mesh.geometry) geometries.add(mesh.geometry);
       if (!mesh.material) return;
@@ -649,8 +680,14 @@ export class NavalScene implements NavalSceneAdapter {
       textures: this.#renderer.info.memory.textures,
       geometries: geometries.size + effects.resources.geometries,
       materials: materials.size + effects.resources.materials,
+      bufferAttributes: bufferAttributes.size,
       activeEffects: effects.active,
       effectCapacity: effects.capacity,
+      reducedMotion: this.#sensory.reducedMotion,
+      shipIntermediateFrames: this.#shipIntermediateFrames,
+      cameraIntermediateFrames: this.#cameraIntermediateFrames,
+      reducedMotionShipSnaps: this.#reducedMotionShipSnaps,
+      reducedMotionCameraSnaps: this.#reducedMotionCameraSnaps,
     };
   }
 
@@ -680,11 +717,16 @@ export class NavalScene implements NavalSceneAdapter {
     this.#cameraInput.width = this.#viewportWidth;
     this.#cameraInput.height = this.#viewportHeight;
     const fitted = fitEngagementCamera(this.#cameraInput, this.#cameraFit);
+    const hadCameraFit = this.#hasCameraFit;
     this.#cameraDesired.set(fitted.position.x, fitted.position.y, fitted.position.z);
     this.#cameraDesiredTarget.set(fitted.target.x, fitted.target.y, fitted.target.z);
     this.#camera.fov = fitted.fov;
     this.#camera.updateProjectionMatrix();
     if (!this.#hasCameraFit || this.#sensory.reducedMotion || snap) {
+      if (hadCameraFit && this.#sensory.reducedMotion && (
+        this.#cameraPosition.distanceToSquared(this.#cameraDesired) > 1e-12
+        || this.#cameraTarget.distanceToSquared(this.#cameraDesiredTarget) > 1e-12
+      )) this.#reducedMotionCameraSnaps += 1;
       this.#cameraPosition.copy(this.#cameraDesired);
       this.#cameraTarget.copy(this.#cameraDesiredTarget);
       this.#hasCameraFit = true;

@@ -41,7 +41,7 @@ describe('Caribbean Battle Lab flow', () => {
     [1180, 599],
     [430, 932],
     [844, 390],
-  ])('blocks the live game below the 960 by 600 playfield at %sx%s', (width, height) => {
+  ])('blocks and focuses the live game notice below the 960 by 600 playfield at %sx%s', async (width, height) => {
     vi.stubGlobal('innerWidth', width);
     vi.stubGlobal('innerHeight', height);
 
@@ -50,6 +50,8 @@ describe('Caribbean Battle Lab flow', () => {
     const notice = screen.getByTestId('caribbean-display-notice');
     expect(notice).toHaveTextContent(/designed for tablet and larger/i);
     expect(notice).toHaveTextContent(/rotate.*larger display/i);
+    expect(notice).toHaveAttribute('tabindex', '-1');
+    await waitFor(() => expect(notice).toHaveFocus());
     expect(screen.queryByTestId('lab-start-naval')).not.toBeInTheDocument();
     expect(screen.queryByTestId('naval-battle-page')).not.toBeInTheDocument();
   });
@@ -71,7 +73,7 @@ describe('Caribbean Battle Lab flow', () => {
     const adapter: NavalSceneAdapter = {
       sync: vi.fn(),
       render: vi.fn(),
-      metrics: () => ({ fps: 60, dpr: 1, tier: 'low', drawCalls: 1, triangles: 1, textures: 0, geometries: 1, materials: 1, activeEffects: 0, effectCapacity: 8 }),
+      metrics: () => ({ fps: 60, dpr: 1, tier: 'low', drawCalls: 1, triangles: 1, textures: 0, geometries: 1, materials: 1, bufferAttributes: 3, activeEffects: 0, effectCapacity: 8, reducedMotion: false, shipIntermediateFrames: 1, cameraIntermediateFrames: 1, reducedMotionShipSnaps: 0, reducedMotionCameraSnaps: 0 }),
       dispose,
     };
     const onSessionReady = vi.fn();
@@ -85,7 +87,9 @@ describe('Caribbean Battle Lab flow', () => {
     vi.stubGlobal('innerHeight', 390);
     fireEvent(window, new Event('resize'));
 
-    expect(await screen.findByTestId('caribbean-display-notice')).toHaveTextContent(/duel restarts/i);
+    const notice = await screen.findByTestId('caribbean-display-notice');
+    expect(notice).toHaveTextContent(/duel restarts/i);
+    await waitFor(() => expect(notice).toHaveFocus());
     expect(screen.queryByTestId('naval-battle-page')).not.toBeInTheDocument();
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(onSessionReady).toHaveBeenCalledTimes(1);

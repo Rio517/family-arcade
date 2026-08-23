@@ -14,8 +14,14 @@ export interface NavalSceneMetrics {
   textures: number;
   geometries: number;
   materials: number;
+  bufferAttributes: number;
   activeEffects: number;
   effectCapacity: number;
+  reducedMotion: boolean;
+  shipIntermediateFrames: number;
+  cameraIntermediateFrames: number;
+  reducedMotionShipSnaps: number;
+  reducedMotionCameraSnaps: number;
 }
 
 export interface NavalSceneAdapter {
@@ -211,8 +217,14 @@ export function NavalViewport({
           dataset.sceneTextures = String(metrics.textures);
           dataset.sceneGeometries = String(metrics.geometries);
           dataset.sceneMaterials = String(metrics.materials);
+          dataset.sceneBufferAttributes = String(metrics.bufferAttributes);
           dataset.sceneActiveEffects = String(metrics.activeEffects);
           dataset.sceneEffectCapacity = String(metrics.effectCapacity);
+          dataset.sceneReducedMotion = String(metrics.reducedMotion);
+          dataset.sceneShipIntermediateFrames = String(metrics.shipIntermediateFrames);
+          dataset.sceneCameraIntermediateFrames = String(metrics.cameraIntermediateFrames);
+          dataset.sceneReducedMotionShipSnaps = String(metrics.reducedMotionShipSnaps);
+          dataset.sceneReducedMotionCameraSnaps = String(metrics.reducedMotionCameraSnaps);
         }
         renderedFrames += 1;
         frameHandle = requestAnimationFrame(frame);

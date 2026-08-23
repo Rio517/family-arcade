@@ -10,6 +10,7 @@ function healthyEvidence(overrides = {}) {
     textures: 3,
     geometries: 30,
     materials: 30,
+    bufferAttributes: 88,
     activeEffects: index % 4 === 0 ? 5 : 0,
     effectCapacity: 96,
   }));
@@ -34,6 +35,7 @@ function healthyEvidence(overrides = {}) {
         textures: 0,
         geometries: 0,
         materials: 0,
+        bufferAttributes: 0,
         activeEffects: 5,
         effectCapacity: 0,
       },
@@ -65,18 +67,26 @@ function healthyEvidence(overrides = {}) {
       },
     },
     fallback: { ok: true, chart: true, retry: true, restart: true, battleControls: true, labelsClear: true },
+    motion: {
+      normal: { preference: 'no-preference', reducedMotion: false, shipIntermediateFrames: 12, cameraIntermediateFrames: 9 },
+      reduced: { preference: 'reduce', reducedMotion: true, shipSnaps: 4, cameraSnaps: 2 },
+    },
     display: {
       supported: {
-        desktop: { viewport: { width: 1440, height: 900 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true },
-        tablet: { viewport: { width: 1180, height: 820 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true },
-        minimum: { viewport: { width: 1024, height: 768 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true },
-        boundary: { viewport: { width: 960, height: 600 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true },
+        desktop: { viewport: { width: 1440, height: 900 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true },
+        tablet: { viewport: { width: 1180, height: 820 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true },
+        minimum: { viewport: { width: 1024, height: 768 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true },
+        boundary: { viewport: { width: 960, height: 600 }, battle: true, notice: false, fullBleed: true, centerClear: true, controlsVisible: true, noOuterScroll: true, minimumActionFontSize: 14, sailControl: true },
       },
       unsupported: {
-        portrait: { viewport: { width: 430, height: 932 }, notice: true, battle: false, liveFrame: false },
-        landscape: { viewport: { width: 844, height: 390 }, notice: true, battle: false, liveFrame: false },
+        portrait: { viewport: { width: 430, height: 932 }, notice: true, battle: false, liveFrame: false, focused: true },
+        landscape: { viewport: { width: 844, height: 390 }, notice: true, battle: false, liveFrame: false, focused: true },
       },
-      resize: { notice: true, battleUnmounted: true, tickStopped: true, restoredWithNewSession: true },
+      resize: { notice: true, noticeFocused: true, battleUnmounted: true, tickStopped: true, restoredWithNewSession: true },
+      prebattle: {
+        decision: { legendComplete: true, ctaVisible: true, noOuterScroll: true },
+        briefing: { legendComplete: true, ctaVisible: true, noOuterScroll: true },
+      },
     },
     ...overrides,
   };
@@ -173,6 +183,15 @@ describe('evaluateNavalEvidence', () => {
 
   it('accepts active-effect counts rising and falling inside a fixed pool', () => {
     expect(evaluateNavalEvidence(healthyEvidence()).ok).toBe(true);
+  });
+
+  it('requires the buffer-attribute class to be present, integral, and stable', () => {
+    const missing = healthyEvidence();
+    delete missing.resources.samples[4].bufferAttributes;
+    expect(evaluateNavalEvidence(missing).issues).toContain('resource sample 4 bufferAttributes is invalid');
+    const growth = healthyEvidence();
+    growth.resources.growthAfterWarmup.bufferAttributes = 1;
+    expect(evaluateNavalEvidence(growth).issues).toContain('bufferAttributes grew after warm-up');
   });
 
   it.each([
@@ -288,6 +307,23 @@ describe('evaluateNavalEvidence', () => {
     const livePhone = healthyEvidence();
     livePhone.display.unsupported.portrait.liveFrame = true;
     expect(evaluateNavalEvidence(livePhone).issues).toContain('display unsupported portrait liveFrame must be false');
+  });
+
+  it('fails closed on absent motion, undersized action type, missing sail, clipped briefing, or unfocused notice', () => {
+    for (const mutate of [
+      (e) => { e.motion.normal.shipIntermediateFrames = 0; },
+      (e) => { e.motion.reduced.cameraSnaps = 0; },
+      (e) => { e.display.supported.boundary.minimumActionFontSize = 13.99; },
+      (e) => { e.display.supported.boundary.sailControl = false; },
+      (e) => { e.display.prebattle.briefing.ctaVisible = false; },
+      (e) => { e.display.prebattle.briefing.legendComplete = false; },
+      (e) => { e.display.unsupported.portrait.focused = false; },
+      (e) => { e.display.resize.noticeFocused = false; },
+    ]) {
+      const evidence = healthyEvidence();
+      mutate(evidence);
+      expect(evaluateNavalEvidence(evidence).ok).toBe(false);
+    }
   });
 
   it.each([

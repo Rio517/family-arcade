@@ -58,6 +58,7 @@ Run `npm run caribbean:naval-check` to build the harness-only production entry,
 serve `dist` on an OS-assigned local port, drive the Battle Lab in Chromium,
 and write changed evidence bytes only. The current evidence set includes the
 [`technical metrics`](../../screenshots/caribbean-naval/metrics.json),
+[`tablet decision`](../../screenshots/caribbean-naval/decision-tablet.png),
 [`tablet briefing`](../../screenshots/caribbean-naval/briefing-tablet.png),
 [`tablet battle`](../../screenshots/caribbean-naval/battle-tablet-landscape.png),
 [`desktop battle`](../../screenshots/caribbean-naval/battle-desktop.png),
