@@ -17,6 +17,6 @@ function exposeDebugSession(session: NavalSessionView): void {
 
 createRoot(document.getElementById('root')!).render(
   <div className="app caribbean-app">
-    <CaribbeanLab sceneFactory={null} onSessionReady={exposeDebugSession} />
+    <CaribbeanLab onSessionReady={exposeDebugSession} />
   </div>,
 );

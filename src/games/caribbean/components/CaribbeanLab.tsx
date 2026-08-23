@@ -51,7 +51,7 @@ function BattleSession({ sceneFactory, onSessionReady }: CaribbeanLabProps) {
   return <NavalBattlePage session={session} sceneFactory={sceneFactory} />;
 }
 
-export function CaribbeanLab({ sceneFactory = null, onSessionReady }: CaribbeanLabProps) {
+export function CaribbeanLab({ sceneFactory, onSessionReady }: CaribbeanLabProps) {
   const [phase, setPhase] = useState<LabPhase>('decision');
   const briefingHeading = useRef<HTMLHeadingElement>(null);
 

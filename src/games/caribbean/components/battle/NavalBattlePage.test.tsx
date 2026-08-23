@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { manualNavalSession } from '../../state/naval/testSession';
 import type { NavalOutcome } from '../../domain/naval/types';
 import { NavalBattlePage } from './NavalBattlePage';
+import type { NavalSceneAdapter, NavalSceneFactory } from './NavalViewport';
 
 const BOARDING_READY: NavalOutcome = { kind: 'boarding-ready', victorShipId: 'player' };
 
@@ -227,6 +228,48 @@ describe('accessible naval command deck', () => {
 
     await waitFor(() => expect(screen.getByTestId('naval-html-chart')).toBeVisible());
     expect(screen.getByTestId('naval-html-chart')).toHaveTextContent(/battle rules continue/i);
+  });
+
+  it('wires canonical snapshots and semantic events into one disposable live scene', async () => {
+    const session = manualNavalSession();
+    session.state.events = [{
+      id: 4,
+      kind: 'reload-ready',
+      atTick: 0,
+      shipId: 'player',
+      side: 'port',
+    }];
+    session.setSail('full');
+    const sync = vi.fn();
+    const dispose = vi.fn();
+    const adapter: NavalSceneAdapter = {
+      sync,
+      render: vi.fn(),
+      metrics: () => ({
+        fps: 60,
+        dpr: 1,
+        tier: 'low',
+        drawCalls: 1,
+        triangles: 2,
+        textures: 0,
+        geometries: 1,
+        materials: 1,
+        activeEffects: 0,
+        effectCapacity: 32,
+      }),
+      dispose,
+    };
+    const sceneFactory: NavalSceneFactory = vi.fn().mockResolvedValue(adapter);
+
+    const { unmount } = render(<NavalBattlePage session={session} sceneFactory={sceneFactory} />);
+    await screen.findByTestId('naval-scene-slot');
+
+    expect(sync).toHaveBeenCalledWith(
+      expect.objectContaining({ tick: 0 }),
+      [expect.objectContaining({ id: 4, kind: 'reload-ready' })],
+    );
+    unmount();
+    expect(dispose).toHaveBeenCalledTimes(1);
   });
 
   it('shows only the approved battle systems in the HUD', () => {

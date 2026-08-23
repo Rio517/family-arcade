@@ -120,8 +120,13 @@
 .naval-chart-ship span { display: block; margin-top: 4px; padding: 3px 5px; background: color-mix(in srgb, var(--caribbean-deep-keel) 84%, transparent); color: currentColor; font: 700 14px/1 ui-monospace, monospace; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }
 .naval-chart-ship--opponent { color: color-mix(in srgb, var(--caribbean-signal-red) 78%, var(--caribbean-sailcloth)); }
 .naval-chart figcaption { padding: 5px 10px 0; color: color-mix(in srgb, var(--caribbean-sailcloth) 52%, transparent); font-size: 14px; text-align: center; }
-.naval-chart--loading { place-items: center; border: 1px solid var(--naval-line); color: var(--caribbean-trade-wind); font: 700 14px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
-.naval-scene-slot { min-height: 260px; border: 1px solid var(--naval-line); }
+.naval-scene-frame { position: relative; min-height: 260px; overflow: hidden; border: 1px solid var(--naval-line); background: var(--caribbean-deep-keel); }
+.naval-scene-slot { position: absolute; inset: 0; min-height: 260px; }
+.naval-scene-canvas { display: block; width: 100%; height: 100%; }
+.naval-scene-loading { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--caribbean-deep-keel) 72%, transparent); color: var(--caribbean-trade-wind); font: 700 14px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.naval-viewport-fallback { min-height: 0; display: grid; grid-template-rows: minmax(220px, 1fr) auto; }
+.naval-viewport-fallback__actions { display: flex; justify-content: center; gap: 8px; padding-top: 7px; }
+.naval-viewport-fallback__actions .naval-control { padding: 0 14px; }
 
 .naval-fire-control {
   position: relative;
@@ -211,6 +216,8 @@
   .naval-command-deck { display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "chart chart" "port starboard"; gap: 8px; }
   .naval-tactical-center { grid-area: chart; grid-template-rows: minmax(280px, 43vh) auto; }
   .naval-chart__plot { min-height: 280px; }
+  .naval-scene-frame,
+  .naval-scene-slot { min-height: 280px; }
   .naval-steering { grid-template-columns: 1fr 62px 1fr; }
   .naval-fire-control { width: 100%; height: 94px; min-height: 94px; clip-path: polygon(7% 0, 93% 0, 100% 50%, 93% 100%, 7% 100%, 0 50%); background: color-mix(in srgb, var(--caribbean-deep-keel) 92%, var(--caribbean-brass)); }
   .naval-fire-control--port { grid-area: port; }

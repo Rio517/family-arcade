@@ -1,0 +1,159 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { fixture } from '../../domain/naval/testFixtures';
+import type { NavalEvent } from '../../domain/naval/types';
+import {
+  NavalViewport,
+  type NavalSceneAdapter,
+  type NavalSceneFactory,
+} from './NavalViewport';
+
+interface FakeScene {
+  adapter: NavalSceneAdapter;
+  disposed: number;
+  renders: number[];
+  syncs: Array<{ tick: number; eventIds: number[] }>;
+  throwOnRender: boolean;
+}
+
+function fakeScene(): FakeScene {
+  const fake: FakeScene = {
+    disposed: 0,
+    renders: [],
+    syncs: [],
+    throwOnRender: false,
+    adapter: undefined as unknown as NavalSceneAdapter,
+  };
+  fake.adapter = {
+    sync(state, events) {
+      fake.syncs.push({ tick: state.tick, eventIds: events.map(({ id }) => id) });
+    },
+    render(frameSeconds) {
+      if (fake.throwOnRender) throw new Error('context render failed');
+      fake.renders.push(frameSeconds);
+    },
+    metrics: () => ({
+      fps: 60,
+      dpr: 1,
+      tier: 'low',
+      drawCalls: 1,
+      triangles: 2,
+      textures: 0,
+      geometries: 1,
+      materials: 1,
+      activeEffects: 0,
+      effectCapacity: 32,
+    }),
+    dispose() {
+      fake.disposed += 1;
+    },
+  };
+  return fake;
+}
+
+describe('NavalViewport', () => {
+  let frames: FrameRequestCallback[];
+  let nextFrameHandle: number;
+
+  beforeEach(() => {
+    frames = [];
+    nextFrameHandle = 0;
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      frames.push(callback);
+      nextFrameHandle += 1;
+      return nextFrameHandle;
+    }));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows loading, syncs canonical snapshots/events, renders, and disposes exactly once', async () => {
+    const scene = fakeScene();
+    let resolveFactory!: (value: NavalSceneAdapter) => void;
+    const sceneFactory: NavalSceneFactory = vi.fn(() => new Promise<NavalSceneAdapter>((resolve) => {
+      resolveFactory = resolve;
+    }));
+    const state = fixture();
+    const events: NavalEvent[] = [{
+      id: 7,
+      kind: 'reload-ready',
+      atTick: 0,
+      shipId: 'player',
+      side: 'port',
+    }];
+
+    const { rerender, unmount } = render(
+      <NavalViewport state={state} events={events} sceneFactory={sceneFactory} onRestart={vi.fn()} />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Preparing tactical sea');
+
+    await act(async () => resolveFactory(scene.adapter));
+    expect(await screen.findByTestId('naval-scene-slot')).toBeVisible();
+    expect(scene.syncs).toEqual([{ tick: 0, eventIds: [7] }]);
+
+    const nextState = fixture({ tick: 12 });
+    rerender(<NavalViewport state={nextState} events={[]} sceneFactory={sceneFactory} onRestart={vi.fn()} />);
+    expect(scene.syncs.at(-1)).toEqual({ tick: 12, eventIds: [] });
+
+    act(() => frames.shift()?.(1_000));
+    act(() => frames.shift()?.(1_016.667));
+    expect(scene.renders.at(-1)).toBeCloseTo(1 / 60, 3);
+
+    unmount();
+    expect(scene.disposed).toBe(1);
+    expect(cancelAnimationFrame).toHaveBeenCalled();
+  });
+
+  it('renders the usable HTML chart after construction failure without logging a Three stack', async () => {
+    const state = fixture();
+    const onRestart = vi.fn();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const sceneFactory: NavalSceneFactory = vi.fn().mockRejectedValue(new Error('no WebGL'));
+
+    render(<NavalViewport state={state} events={[]} sceneFactory={sceneFactory} onRestart={onRestart} />);
+
+    const chart = await screen.findByTestId('naval-html-chart');
+    expect(chart).toHaveTextContent('3D sea unavailable—battle rules continue');
+    expect(screen.getByTestId('naval-scene-retry')).toBeEnabled();
+    fireEvent.click(screen.getByTestId('naval-scene-restart'));
+    expect(onRestart).toHaveBeenCalledTimes(1);
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('retries scene construction and replaces the fallback when WebGL recovers', async () => {
+    const scene = fakeScene();
+    const sceneFactory: NavalSceneFactory = vi.fn()
+      .mockRejectedValueOnce(new Error('temporary context loss'))
+      .mockResolvedValueOnce(scene.adapter);
+
+    render(<NavalViewport state={fixture()} events={[]} sceneFactory={sceneFactory} onRestart={vi.fn()} />);
+    await screen.findByTestId('naval-html-chart');
+    fireEvent.click(screen.getByTestId('naval-scene-retry'));
+
+    expect(await screen.findByTestId('naval-scene-slot')).toBeVisible();
+    expect(sceneFactory).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back and disposes when rendering fails', async () => {
+    const scene = fakeScene();
+    scene.throwOnRender = true;
+    const sceneFactory: NavalSceneFactory = vi.fn().mockResolvedValue(scene.adapter);
+
+    render(<NavalViewport state={fixture()} events={[]} sceneFactory={sceneFactory} onRestart={vi.fn()} />);
+    await screen.findByTestId('naval-scene-slot');
+    act(() => frames.shift()?.(1_000));
+
+    await waitFor(() => expect(screen.getByTestId('naval-html-chart')).toBeVisible());
+    expect(scene.disposed).toBe(1);
+  });
+
+  it('uses the HTML chart immediately when 3D is explicitly disabled', () => {
+    render(<NavalViewport state={fixture()} events={[]} sceneFactory={null} onRestart={vi.fn()} />);
+    expect(screen.getByTestId('naval-html-chart')).toBeVisible();
+  });
+});

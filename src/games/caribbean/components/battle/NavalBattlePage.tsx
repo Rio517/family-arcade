@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { RotateIcon, WarningIcon } from '@shared/ui/icons';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 
@@ -9,9 +9,9 @@ import type {
 } from '../../domain/naval/types';
 import type { NavalSessionView } from '../../state/naval/NavalSession';
 import { BattleHud } from './BattleHud';
-import { HtmlTacticalChart } from './HtmlTacticalChart';
+import { NavalViewport, type NavalSceneFactory } from './NavalViewport';
 
-export type NavalSceneFactory = () => Promise<unknown>;
+export type { NavalSceneFactory } from './NavalViewport';
 
 export interface NavalBattlePageProps {
   session: NavalSessionView;
@@ -59,26 +59,7 @@ function CannonIcon() {
   );
 }
 
-function TacticalViewport({ state, sceneFactory }: Pick<NavalBattlePageProps, 'sceneFactory'> & { state: NavalSessionView['state'] }) {
-  const [failed, setFailed] = useState(sceneFactory === null || sceneFactory === undefined);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (!sceneFactory) return;
-    let active = true;
-    void sceneFactory().then(
-      () => { if (active) setReady(true); },
-      () => { if (active) setFailed(true); },
-    );
-    return () => { active = false; };
-  }, [sceneFactory]);
-
-  if (failed) return <HtmlTacticalChart state={state} unavailable />;
-  if (ready) return <div className="naval-scene-slot" data-testid="naval-scene-slot" />;
-  return <div className="naval-chart naval-chart--loading" role="status">Preparing tactical sea…</div>;
-}
-
-export function NavalBattlePage({ session, sceneFactory = null, onResolved }: NavalBattlePageProps) {
+export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBattlePageProps) {
   const snapshot = useSessionSnapshot(session);
   const { state, currentCommand, paused, diagnostic } = snapshot;
   const resolvedRef = useRef<string | null>(null);
@@ -202,7 +183,12 @@ export function NavalBattlePage({ session, sceneFactory = null, onResolved }: Na
         <div className="naval-command-deck">
           <FireControl buttonRef={portFireRef} side="port" onFire={() => session.requestFire('port')} disabled={Boolean(outcome || diagnostic)} />
           <div className="naval-tactical-center">
-            <TacticalViewport state={state} sceneFactory={sceneFactory} />
+            <NavalViewport
+              state={state}
+              events={state.events}
+              sceneFactory={sceneFactory}
+              onRestart={() => session.restart()}
+            />
             <div className="naval-steering" aria-label="Rudder controls">
               <RudderControl side="port" onHold={holdRudder} />
               <div className="naval-steering__keel"><span>Rudder</span><strong>A / D</strong></div>

@@ -1,2 +1,2 @@
-id,path,source_commit,author_tool,transformation,ownership,review_state
-caribbean-sloop,src/games/caribbean/assets/caribbean-sloop.glb,d82bb56,Blender 5.2 scripted original,"Meshopt optimization; production copy pending",project-owned,prototype-reviewed
+id,path,source_commit,source_sha256,byte_size,compression,author_tool,transformation,ownership,review_state
+caribbean-sloop,src/games/caribbean/assets/caribbean-sloop.glb,d82bb5618ee84b7abccbb570262830299c661aec,36c9b53aeebe28706932af7d66d67e3a9a545ac1a4ea00ad5ffd944876270320,56864,EXT_meshopt_compression,Blender 5.2 scripted original,"Exact-byte promotion of reviewed optimized POC asset; no rebuild",project-owned,production-promoted
