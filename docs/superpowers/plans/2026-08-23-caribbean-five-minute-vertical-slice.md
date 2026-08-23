@@ -14,7 +14,9 @@
 
 - The working title and route are `Caribbean Career` and `/caribbean`; both remain changeable before public marketing, but save/content IDs never derive from display copy.
 - The production module is `src/games/caribbean/`; do not rename or import runtime code from `src/games/caribbean-poc/`.
-- Primary target is an iPad-class tablet in landscape; desktop and phone remain supported.
+- Primary target is an iPad-class tablet in landscape; desktop is supported.
+  Phones and tablet portrait are intentionally unsupported and receive a
+  blocking 960×600 minimum-screen notice without a hidden simulation.
 - Three career lengths are available at game start: Adventure, Voyage, and Legend. Adventure is the default.
 - The slice uses the documented/composite 1675 consolidation start and shows that date in setup; historical start selection and chapter transitions remain in Phase K after the loop passes.
 - The seven port activities stay in this order: Governor's House, Tavern, Market, Shipyard, Divide Shares, Captain's Log, Set Sail.
@@ -1191,7 +1193,12 @@ HUD shows destination bearing, wind, speed, months remaining, and target lead. A
 
 - [ ] **Step 5: Verify browser behavior and commit**
 
-Run component/domain tests, then browser-check desktop, tablet landscape, tablet portrait, phone, WebGL failure, reduced motion, background/resume, and keyboard/touch. Confirm no failed requests or console errors and production route lazy-loads Three.js only after sailing begins.
+Run component/domain tests, then browser-check desktop and tablet landscape,
+plus the blocking minimum-screen notice on tablet portrait and phone. On
+supported screens verify WebGL failure, reduced motion, background/resume, and
+keyboard/touch. Confirm no failed requests or console errors and production
+route lazy-loads Three.js only after sailing begins; unsupported screens must
+not mount the simulation.
 
 ```bash
 git add src/games/caribbean
@@ -1356,7 +1363,7 @@ Quality tiers:
 
 | Tier | DPR | Shadows | Effect pool | Target |
 | --- | --- | --- | --- | --- |
-| low | 1.0 | off | 32 | phone/fallback iPad |
+| low | 1.0 | off | 32 | fallback/low-power supported tablet |
 | medium | up to 1.4 | one 512 map | 64 | default tablet |
 | high | up to 1.75 | one 1024 map | 96 | desktop |
 
@@ -1372,7 +1379,13 @@ Extend `CampaignEvent` with `naval-resolved` carrying `{ battleId, outcome, priz
 
 - [ ] **Step 5: Browser/performance review and commit**
 
-Capture one broadside-handedness screenshot plus desktop, tablet landscape, tablet portrait, and phone battle screens. Confirm Q smoke/projectiles originate on physical port and E on physical starboard. Record draw calls, triangles, FPS, DPR, allocations after warm-up, console errors, failed requests, renderer, and seed. Run at least one real target-iPad session; if the device is unavailable, label the gate incomplete rather than substituting desktop results.
+Capture one broadside-handedness screenshot plus desktop and tablet-landscape
+battle screens, and separate tablet-portrait/phone minimum-screen notices.
+Confirm Q smoke/projectiles originate on physical port and E on physical
+starboard. Record draw calls, triangles, FPS, DPR, allocations after warm-up,
+console errors, failed requests, renderer, and seed on supported screens. Run at
+least one real target-iPad landscape session; if unavailable, label the gate
+incomplete rather than substituting desktop results.
 
 ```bash
 git add src/games/caribbean docs/screenshots/caribbean-slice
@@ -1509,9 +1522,9 @@ Add `npm run caribbean:check` invoking `scripts/caribbean-slice-check.mjs`. It s
 - `port-desktop.png` at 1440×900;
 - `battle-tablet-landscape.png` at 1180×820;
 - `capture-tablet-landscape.png` at 1180×820;
-- `shipyard-tablet-portrait.png` at 820×1180;
-- `overworld-phone.png` at 390×844;
-- `fallback-map-phone.png` with WebGL creation forced to fail; and
+- `minimum-screen-tablet-portrait.png` at 820×1180;
+- `minimum-screen-phone.png` at 390×844;
+- `fallback-map-tablet-landscape.png` with WebGL creation forced to fail; and
 - `broadside-handedness.png` with labelled debug vectors and visible muzzle origins.
 
 Write `metrics.json` beside the images with build hash, seed, browser, viewport, DPR, load time, draw calls, triangles, FPS samples, JS heap where available, event count, and final save checksum.

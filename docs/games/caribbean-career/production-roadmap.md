@@ -12,7 +12,8 @@ observably true.
 ### Product target
 
 - Installable offline web game inside the family arcade.
-- Primary device: iPad-class tablet in landscape; supported: desktop and phone.
+- Primary device: iPad-class tablet in landscape; desktop is supported. Phones
+  and tablet portrait show a blocking 960×600 minimum-screen notice.
 - Three career lengths: Adventure, Voyage, Legend.
 - First public-quality milestone: a complete Adventure career.
 - Original identity, assets, prose, rules values, and interface.
@@ -569,7 +570,8 @@ until the six silhouettes and roles are proven.
 ### M4. Release gates
 
 - Fresh `npm run check`, full tests, clean build, PWA offline audit.
-- Real-browser screenshots at desktop/tablet landscape/tablet portrait/phone.
+- Real-browser screenshots at desktop/tablet landscape plus phone/portrait
+  warning-state evidence for the 960×600 minimum-screen gate.
 - 30-minute thermal profile and memory plateau on target iPad.
 - Save migration from every public version.
 - Historical, representation, license, and legal reviews closed.

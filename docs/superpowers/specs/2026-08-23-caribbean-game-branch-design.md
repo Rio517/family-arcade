@@ -291,12 +291,14 @@ Priorities:
 
 1. readable ship orientation, range, and physical broadside side;
 2. damage and reload feedback;
-3. camera composition across tablet/desktop/phone;
+3. camera composition across tablet landscape and desktop;
 4. pooled smoke, spray, impact, and rig effects;
 5. original procedural battle audio; and
 6. measured shader/model polish only after the duel is tactically satisfying.
 
-Primary device is iPad-class tablet landscape. Desktop and phone remain usable.
+Primary device is iPad-class tablet landscape; desktop is supported. Phones and
+tablet portrait are intentionally unsupported. Below 960×600 CSS pixels, show a
+clear rotate/use-a-larger-screen notice and do not run a hidden simulation.
 Use adaptive DPR and quality tiers; do not hide performance problems by cutting
 the sloop silhouette.
 
