@@ -9,7 +9,7 @@ import {
   opponentCommand,
 } from './opponent';
 import { stepBattle } from './stepBattle';
-import { fixture } from './testFixtures';
+import { command, fixture } from './testFixtures';
 
 function angleError(actual: number, desired: number): number {
   return Math.abs(normalizeAngle(desired - actual));
@@ -186,5 +186,36 @@ describe('legible naval opponent', () => {
     expect(held.controller.memory).toEqual(firing.controller.memory);
     expect(held.controller.memory).toMatchObject({ mode: 'fire', untilTick: 30 });
     expect(afterFire.ships.opponent.reload.port.loaded).toBe(false);
+  });
+
+  it('immediately disengages after real volley damage disarms its held firing decision', () => {
+    const state = fixture({
+      player: { position: { x: 0, z: 0 }, heading: 0 },
+      opponent: { position: { x: 5, z: 0 }, heading: Math.PI, cannon: 1 },
+    });
+    const firing = advanceOpponentController(state, initialOpponentController());
+    let afterDamage = stepBattle(state, {
+      player: command({ ammunition: 'round', fire: 'port' }),
+      opponent: firing.command,
+    });
+
+    expect(firing.controller.memory.mode).toBe('fire');
+    expect(afterDamage.ships.opponent.cannon).toBe(0);
+    expect(afterDamage.ships.opponent.hull).toBeGreaterThan(20);
+    expect(afterDamage.outcome).toBeNull();
+
+    let controller = firing.controller;
+    for (let tick = 0; tick < 60; tick += 1) {
+      const next = advanceOpponentController(afterDamage, controller);
+      const { position } = afterDamage.ships.opponent;
+      const desired = next.controller.memory.desiredHeading;
+
+      expect(next.controller.memory.mode).toBe('disengage');
+      expect(next.command).toMatchObject({ sail: 'full', fire: null });
+      expect(Math.sin(desired) * position.x + Math.cos(desired) * position.z).toBeGreaterThan(0);
+
+      controller = next.controller;
+      afterDamage = stepBattle(afterDamage, { opponent: next.command });
+    }
   });
 });

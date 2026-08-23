@@ -25,6 +25,8 @@ describe('normal naval duel pacing', () => {
       fireRequests += 1;
       const ship = state.ships.opponent;
       const target = state.ships.player;
+      expect(Number.isInteger(ship.cannon)).toBe(true);
+      expect(ship.cannon).toBeGreaterThan(0);
       expect(ship.reload[side].loaded).toBe(true);
       expect(Math.hypot(target.position.x - ship.position.x, target.position.z - ship.position.z)).toBeLessThanOrEqual(42);
       expect(bearingSide(ship.position, ship.heading, target.position)).toBe(side);

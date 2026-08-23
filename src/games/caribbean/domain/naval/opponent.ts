@@ -80,6 +80,10 @@ function ammunitionFor(range: number, targetSails: number, targetCrew: number): 
   return 'round';
 }
 
+function hasUsableBattery(cannon: number): boolean {
+  return Number.isInteger(cannon) && cannon > 0;
+}
+
 function decision(
   state: NavalState,
   mode: OpponentMode,
@@ -118,7 +122,11 @@ export function opponentCommand(state: NavalState, _memory: OpponentMemory): Opp
     return decision(state, 'surrender', ship.heading, commandFor(0, 'reefed', ammunition));
   }
 
-  if (ship.hull <= DISENGAGE_HULL || ship.crew <= DISENGAGE_CREW) {
+  if (
+    ship.hull <= DISENGAGE_HULL
+    || ship.crew <= DISENGAGE_CREW
+    || !hasUsableBattery(ship.cannon)
+  ) {
     const outwardHeading = headingTo(ship.position.x, ship.position.z);
     return decision(
       state,
@@ -211,8 +219,11 @@ export function advanceOpponentController(
 ): OpponentControllerTick {
   let memory = controller.memory;
   let heldCommand = controller.heldCommand;
+  const disarmedDuringHold = !hasUsableBattery(state.ships.opponent.cannon)
+    && memory.mode !== 'disengage'
+    && memory.mode !== 'surrender';
 
-  if (!heldCommand || state.tick >= memory.untilTick) {
+  if (!heldCommand || state.tick >= memory.untilTick || disarmedDuringHold) {
     const decision = opponentCommand(state, memory);
     memory = decision.memory;
     heldCommand = decision.command;
