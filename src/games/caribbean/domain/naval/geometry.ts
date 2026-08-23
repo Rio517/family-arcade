@@ -1,7 +1,8 @@
-import type { Broadside, Point } from './types';
+import type { Broadside, NavalShipState, Point } from './types';
 
 const TAU = Math.PI * 2;
 const LATERAL_ARC_FORWARD_DOT = 0.72;
+export const MAX_BROADSIDE_RANGE = 42;
 const SAIL_POLAR: ReadonlyArray<readonly [degrees: number, efficiency: number]> = [
   [0, 0.08],
   [30, 0.18],
@@ -41,6 +42,36 @@ export function bearingSide(origin: Point, heading: number, target: Point): Broa
 
   const port = broadsideVector(heading, 'port');
   return x * port.x + z * port.z >= 0 ? 'port' : 'starboard';
+}
+
+export interface BroadsideLegality {
+  side: Broadside | null;
+  distance: number;
+  inRange: boolean;
+  loaded: boolean;
+  armed: boolean;
+  legal: boolean;
+}
+
+/** One shared firing gate for the reducer, opponent assistance, and presentation. */
+export function broadsideLegality(
+  ship: NavalShipState,
+  target: Point,
+  requestedSide: Broadside,
+): BroadsideLegality {
+  const distance = Math.hypot(target.x - ship.position.x, target.z - ship.position.z);
+  const side = bearingSide(ship.position, ship.heading, target);
+  const inRange = distance <= MAX_BROADSIDE_RANGE;
+  const loaded = ship.reload[requestedSide].loaded;
+  const armed = Number.isInteger(ship.cannon) && ship.cannon > 0;
+  return {
+    side,
+    distance,
+    inRange,
+    loaded,
+    armed,
+    legal: side === requestedSide && inRange && loaded && armed,
+  };
 }
 
 /** Relative angle is zero when the bow points into the wind. */

@@ -320,4 +320,36 @@ describe('accessible naval command deck', () => {
     expect(hud).toHaveTextContent(/Capture Red Jackdaw/);
     expect(within(hud).getByLabelText('Trade wind 60° / fresh')).toHaveTextContent('60° / fresh');
   });
+
+  it('updates independent sensory settings on the same scene and hides the optional aim cue', async () => {
+    const session = manualNavalSession();
+    const syncSensorySettings = vi.fn();
+    const adapter: NavalSceneAdapter = {
+      sync: vi.fn(), syncSensorySettings, render: vi.fn(), dispose: vi.fn(),
+      metrics: () => ({ fps: 60, dpr: 1, tier: 'low', drawCalls: 1, triangles: 1, textures: 0, geometries: 1, materials: 1, activeEffects: 0, effectCapacity: 8 }),
+    };
+    const factory: NavalSceneFactory = vi.fn().mockResolvedValue(adapter);
+    render(<NavalBattlePage session={session} sceneFactory={factory} />);
+    await screen.findByTestId('naval-scene-slot');
+    expect(screen.getByTestId('naval-aim-cue')).toBeVisible();
+    fireEvent.click(screen.getByTestId('naval-setting-aim'));
+    fireEvent.click(screen.getByTestId('naval-setting-flashes'));
+    expect(screen.queryByTestId('naval-aim-cue')).toBeNull();
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(syncSensorySettings).toHaveBeenLastCalledWith(expect.objectContaining({ aimCue: null, reducedFlashes: true }));
+  });
+
+  it('announces each player reload-ready event once without making aim feedback live', () => {
+    const session = manualNavalSession();
+    render(<NavalBattlePage session={session} sceneFactory={null} />);
+    expect(screen.getByTestId('naval-reload-announcement')).toHaveAttribute('aria-live', 'polite');
+    act(() => {
+      session.state.events.push({ id: 1, kind: 'reload-ready', atTick: 1, shipId: 'player', side: 'port' });
+      session.setSail('full');
+    });
+    expect(screen.getByTestId('naval-reload-announcement')).toHaveTextContent('Port battery ready');
+    act(() => session.setSail('full'));
+    expect(screen.getByTestId('naval-reload-announcement')).toHaveTextContent('Port battery ready');
+    expect(screen.getByTestId('naval-aim-cue')).not.toHaveAttribute('aria-live');
+  });
 });

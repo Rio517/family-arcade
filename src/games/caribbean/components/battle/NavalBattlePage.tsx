@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RotateIcon, WarningIcon } from '@shared/ui/icons';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 
@@ -8,14 +8,17 @@ import type {
   Rudder,
 } from '../../domain/naval/types';
 import type { NavalSessionView } from '../../state/naval/NavalSession';
+import { BattleAudio, type AudioFactory } from '../../audio/BattleAudio';
 import { BattleHud } from './BattleHud';
 import { NavalViewport, type NavalSceneFactory } from './NavalViewport';
+import { selectAimCue } from './aimCue';
 
 export type { NavalSceneFactory } from './NavalViewport';
 
 export interface NavalBattlePageProps {
   session: NavalSessionView;
   sceneFactory?: NavalSceneFactory | null;
+  audioFactory?: AudioFactory;
   onResolved?(outcome: NavalOutcome): void;
 }
 
@@ -31,22 +34,39 @@ function outcomeKey(outcome: NavalOutcome): string {
   return JSON.stringify(outcome);
 }
 
-function outcomeCopy(outcome: NavalOutcome): { heading: string; detail: string } {
+function outcomeCopy(outcome: NavalOutcome, state: ReturnType<NavalSessionView['getSnapshot']>['state']): { heading: string; detail: string; action: string } {
+  const player = state.ships.player;
+  const target = state.ships.opponent;
+  const range = Math.hypot(target.position.x - player.position.x, target.position.z - player.position.z).toFixed(1);
   if (outcome.kind === 'boarding-ready') {
-    return { heading: 'Ready to board', detail: 'The prize is disabled and close enough to take.' };
+    return { heading: 'Ready to board', detail: `Capture summary: ${target.name} sails ${Math.round(target.sails)}%, crew ${Math.round(target.crew)}, range ${range}. The prize is disabled and close enough to take.`, action: 'Rematch Battle Lab' };
   }
   if (outcome.kind === 'surrender') {
-    return { heading: 'Colours struck', detail: 'The opposing crew has surrendered the Red Jackdaw.' };
+    return { heading: 'Surrender', detail: `Capture summary: ${target.name} struck colours with hull ${Math.round(target.hull)}%, sails ${Math.round(target.sails)}%, crew ${Math.round(target.crew)}.`, action: 'Rematch Battle Lab' };
   }
   if (outcome.kind === 'sunk') {
     return outcome.victorShipId === 'player'
-      ? { heading: 'Red Jackdaw sunk', detail: 'The prize is lost beneath the trade wind.' }
-      : { heading: 'Mistral lost', detail: 'Your hull can no longer carry the fight.' };
+      ? { heading: 'Sunk — Red Jackdaw', detail: `${target.name} reached hull 0. The prize is lost beneath the trade wind.`, action: 'Rematch Battle Lab' }
+      : { heading: 'Sunk — Mistral', detail: `${player.name} reached hull 0. Your hull can no longer carry the fight.`, action: 'Restart Battle Lab' };
   }
   if (outcome.kind === 'escaped') {
-    return { heading: 'Ship escaped', detail: 'The duel crossed the Battle Lab boundary.' };
+    const ship = state.ships[outcome.shipId];
+    return { heading: 'Escaped', detail: `${ship.name} crossed the engagement boundary. No prize was taken.`, action: 'Restart Battle Lab' };
   }
-  return { heading: 'Ships separated', detail: 'The engagement ended without a decisive capture.' };
+  return { heading: 'Separated', detail: `Range reached ${range}; the engagement ended without a decisive capture.`, action: 'Restart Battle Lab' };
+}
+
+function useReducedMotionPreference(): boolean {
+  const [reduced, setReduced] = useState(() => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const query = matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener?.('change', update);
+    return () => query.removeEventListener?.('change', update);
+  }, []);
+  return reduced;
 }
 
 function CannonIcon() {
@@ -59,7 +79,7 @@ function CannonIcon() {
   );
 }
 
-export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBattlePageProps) {
+export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolved }: NavalBattlePageProps) {
   const snapshot = useSessionSnapshot(session);
   const { state, battleGeneration, currentCommand, paused, diagnostic } = snapshot;
   const resolvedRef = useRef<string | null>(null);
@@ -67,7 +87,18 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
   const portFireRef = useRef<HTMLButtonElement>(null);
   const terminalActionRef = useRef<HTMLButtonElement>(null);
   const underlayRef = useRef<HTMLDivElement>(null);
+  const [audio] = useState(() => new BattleAudio(audioFactory));
+  const [visible, setVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden');
+  const [sensory, setSensory] = useState({ aim: true, steeringHint: true, shake: true, reducedFlashes: false, effects: 0.9, muted: false });
+  const reducedMotion = useReducedMotionPreference();
   const terminal = Boolean(state.outcome || diagnostic);
+  const effectiveShake = sensory.shake && !reducedMotion;
+  const aimCue = sensory.aim ? selectAimCue(state, 'player') : null;
+  const latestReload = [...state.events].reverse().find((event) => event.kind === 'reload-ready' && event.shipId === 'player');
+  const reloadAnnouncement = latestReload?.kind === 'reload-ready'
+    ? `${latestReload.side === 'port' ? 'Port' : 'Starboard'} battery ready`
+    : '';
+  const activateAudio = useCallback(() => { void audio.activate(); }, [audio]);
   const clearHeldRudder = useCallback(() => {
     held.current = { port: false, starboard: false };
   }, []);
@@ -83,6 +114,19 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
     resolvedRef.current = key;
     onResolved(state.outcome);
   }, [diagnostic, onResolved, state.outcome]);
+
+  useEffect(() => {
+    const onVisibility = () => setVisible(document.visibilityState !== 'hidden');
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
+  useEffect(() => {
+    audio.syncSettings({ effects: sensory.effects, muted: sensory.muted, active: visible && !paused && !terminal });
+    audio.handle(state.events, battleGeneration);
+  }, [audio, battleGeneration, paused, sensory.effects, sensory.muted, state.events, terminal, visible]);
+
+  useEffect(() => () => audio.dispose(), [audio]);
 
   useEffect(() => {
     const underlay = underlayRef.current;
@@ -120,6 +164,7 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (terminal) return;
+      activateAudio();
       if (event.code === 'Escape' && event.repeat) {
         event.stopImmediatePropagation();
         return;
@@ -156,7 +201,7 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
       window.removeEventListener('keydown', onKeyDown, { capture: true });
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [currentCommand.sail, diagnostic, paused, session, state.outcome, terminal]);
+  }, [activateAudio, currentCommand.sail, diagnostic, paused, session, state.outcome, terminal]);
 
   const holdRudder = (side: 'port' | 'starboard', active: boolean) => {
     if (terminal) {
@@ -168,7 +213,7 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
     session.setRudder(rudder);
   };
 
-  const outcome = state.outcome ? outcomeCopy(state.outcome) : null;
+  const outcome = state.outcome ? outcomeCopy(state.outcome, state) : null;
 
   return (
     <section className="naval-battle-page" data-testid="naval-battle-page" aria-label="Caribbean naval battle">
@@ -178,25 +223,29 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
         data-testid="naval-battle-underlay"
         aria-hidden={terminal ? true : undefined}
       >
-        <BattleHud state={state} paused={paused} onTogglePause={() => session.togglePause()} />
+        <BattleHud state={state} paused={paused} onTogglePause={() => { activateAudio(); session.togglePause(); }} />
 
         <div className="naval-command-deck">
-          <FireControl buttonRef={portFireRef} side="port" onFire={() => session.requestFire('port')} disabled={Boolean(outcome || diagnostic)} />
+          <FireControl buttonRef={portFireRef} side="port" onFire={() => { activateAudio(); session.requestFire('port'); }} disabled={Boolean(outcome || diagnostic)} />
           <div className="naval-tactical-center">
             <NavalViewport
               state={state}
               events={state.events}
               battleGeneration={battleGeneration}
               sceneFactory={sceneFactory}
+              reducedMotion={reducedMotion}
+              cameraShake={effectiveShake}
+              reducedFlashes={sensory.reducedFlashes}
+              aimCue={aimCue}
               onRestart={() => session.restart()}
             />
             <div className="naval-steering" aria-label="Rudder controls">
-              <RudderControl side="port" onHold={holdRudder} />
-              <div className="naval-steering__keel"><span>Rudder</span><strong>A / D</strong></div>
-              <RudderControl side="starboard" onHold={holdRudder} />
+              <RudderControl side="port" onHold={holdRudder} onActivate={activateAudio} />
+              <div className="naval-steering__keel"><span>Rudder</span>{sensory.steeringHint && <strong>A / D</strong>}</div>
+              <RudderControl side="starboard" onHold={holdRudder} onActivate={activateAudio} />
             </div>
           </div>
-          <FireControl side="starboard" onFire={() => session.requestFire('starboard')} disabled={Boolean(outcome || diagnostic)} />
+          <FireControl side="starboard" onFire={() => { activateAudio(); session.requestFire('starboard'); }} disabled={Boolean(outcome || diagnostic)} />
         </div>
 
         <div className="naval-order-controls">
@@ -208,7 +257,7 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
                 className="naval-control naval-hit-target"
                 data-testid={`naval-sail-${sail}`}
                 aria-pressed={currentCommand.sail === sail}
-                onClick={() => session.setSail(sail)}
+                onClick={() => { activateAudio(); session.setSail(sail); }}
               >{sail === 'full' ? 'Full sail' : 'Reefed'}</button>
             ))}
           </OrderGroup>
@@ -220,7 +269,7 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
                 className="naval-control naval-hit-target"
                 data-testid={`naval-ammo-${ammunition}`}
                 aria-pressed={currentCommand.ammunition === ammunition}
-                onClick={() => session.setAmmunition(ammunition)}
+                onClick={() => { activateAudio(); session.setAmmunition(ammunition); }}
               >{ammunition.charAt(0).toUpperCase() + ammunition.slice(1)}</button>
             ))}
           </OrderGroup>
@@ -228,9 +277,22 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
             type="button"
             className="naval-control naval-hit-target naval-restart"
             data-testid="naval-restart"
-            onClick={() => session.restart()}
+            onClick={() => { activateAudio(); session.restart(); }}
           ><RotateIcon size={18} /> Restart duel</button>
         </div>
+
+        <fieldset className="naval-sensory-controls" aria-label="Battle feedback settings">
+          <legend>Battle feedback</legend>
+          <SensoryToggle testId="naval-setting-aim" label="Aim assist" pressed={sensory.aim} onToggle={() => setSensory((value) => ({ ...value, aim: !value.aim }))} />
+          <SensoryToggle testId="naval-setting-steering" label="Steering hint" pressed={sensory.steeringHint} onToggle={() => setSensory((value) => ({ ...value, steeringHint: !value.steeringHint }))} />
+          <SensoryToggle testId="naval-setting-shake" label="Camera shake" pressed={sensory.shake} onToggle={() => setSensory((value) => ({ ...value, shake: !value.shake }))} />
+          <SensoryToggle testId="naval-setting-flashes" label="Reduced flashes" pressed={sensory.reducedFlashes} onToggle={() => setSensory((value) => ({ ...value, reducedFlashes: !value.reducedFlashes }))} />
+          <label className="naval-effects-volume">Effects <input data-testid="naval-setting-effects" type="range" min="0" max="1" step="0.1" value={sensory.effects} onChange={(event) => setSensory((value) => ({ ...value, effects: Number(event.target.value) }))} /></label>
+          <SensoryToggle testId="naval-setting-mute" label="Mute" pressed={sensory.muted} onToggle={() => setSensory((value) => ({ ...value, muted: !value.muted }))} />
+          <span data-testid="naval-effective-shake" className="naval-visually-hidden">Camera shake {effectiveShake ? 'enabled' : 'disabled'}</span>
+        </fieldset>
+        <p className="naval-visually-hidden" aria-live="polite" aria-atomic="true" data-testid="naval-reload-announcement" key={`${battleGeneration}-${latestReload?.id ?? 'none'}`}>{reloadAnnouncement}</p>
+        {aimCue && <p className="naval-aim-cue" data-testid="naval-aim-cue">{aimCue.message}</p>}
 
         {paused && !diagnostic && !outcome && (
           <div className="naval-pause-banner" role="status">Battle paused <span>Escape or Resume continues</span></div>
@@ -246,7 +308,7 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
             type="button"
             className="naval-control naval-hit-target"
             data-testid="naval-restart-input"
-            onClick={() => session.restart()}
+            onClick={() => { activateAudio(); session.restart(); }}
           >Restart from Battle Lab input</button>
         </div>
       )}
@@ -261,12 +323,16 @@ export function NavalBattlePage({ session, sceneFactory, onResolved }: NavalBatt
             type="button"
             className="naval-control naval-hit-target"
             data-testid="naval-result-restart"
-            onClick={() => session.restart()}
-          ><RotateIcon size={18} /> Restart duel</button>
+            onClick={() => { activateAudio(); session.restart(); }}
+          ><RotateIcon size={18} /> {outcome.action}</button>
         </div>
       )}
     </section>
   );
+}
+
+function SensoryToggle({ testId, label, pressed, onToggle }: { testId: string; label: string; pressed: boolean; onToggle(): void }) {
+  return <button type="button" className="naval-control naval-hit-target" data-testid={testId} aria-pressed={pressed} onClick={onToggle}>{label}</button>;
 }
 
 function FireControl({
@@ -298,7 +364,7 @@ function FireControl({
   );
 }
 
-function RudderControl({ side, onHold }: { side: 'port' | 'starboard'; onHold(side: 'port' | 'starboard', active: boolean): void }) {
+function RudderControl({ side, onHold, onActivate }: { side: 'port' | 'starboard'; onHold(side: 'port' | 'starboard', active: boolean): void; onActivate(): void }) {
   const value: Rudder = side === 'port' ? -1 : 1;
   const pulse = () => {
     onHold(side, true);
@@ -310,6 +376,7 @@ function RudderControl({ side, onHold }: { side: 'port' | 'starboard'; onHold(si
       className="naval-control naval-hit-target naval-rudder-control"
       data-testid={`naval-rudder-${side}`}
       onPointerDown={(event) => {
+        onActivate();
         event.currentTarget.setPointerCapture?.(event.pointerId);
         onHold(side, true);
       }}
@@ -317,6 +384,7 @@ function RudderControl({ side, onHold }: { side: 'port' | 'starboard'; onHold(si
       onPointerCancel={() => onHold(side, false)}
       onLostPointerCapture={() => onHold(side, false)}
       onClick={(event) => {
+        onActivate();
         if (event.detail === 0) pulse();
       }}
       aria-label={`Turn ${side}`}

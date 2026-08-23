@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { NavalEvent, NavalState } from '../../domain/naval/types';
 import type { QualityTier } from '../../three/naval/quality';
+import type { AimCue } from './aimCue';
 import { HtmlTacticalChart } from './HtmlTacticalChart';
 
 export interface NavalSceneMetrics {
@@ -19,6 +20,7 @@ export interface NavalSceneMetrics {
 
 export interface NavalSceneAdapter {
   sync(state: NavalState, eventDeltas: readonly NavalEvent[]): void;
+  syncSensorySettings?(settings: NavalSensorySettings): void;
   render(animationSeconds: number, wallSeconds?: number): void;
   metrics(): NavalSceneMetrics;
   dispose(): void;
@@ -27,6 +29,13 @@ export interface NavalSceneAdapter {
 export interface NavalSceneOptions {
   reducedMotion: boolean;
   initialTier: QualityTier;
+}
+
+export interface NavalSensorySettings {
+  reducedMotion: boolean;
+  cameraShake: boolean;
+  reducedFlashes: boolean;
+  aimCue: AimCue | null;
 }
 
 export type NavalSceneFactory = (
@@ -40,6 +49,9 @@ export interface NavalViewportProps {
   battleGeneration?: number;
   sceneFactory?: NavalSceneFactory | null;
   reducedMotion?: boolean;
+  cameraShake?: boolean;
+  reducedFlashes?: boolean;
+  aimCue?: AimCue | null;
   initialTier?: QualityTier;
   onRestart(): void;
 }
@@ -88,6 +100,9 @@ export function NavalViewport({
   battleGeneration = 0,
   sceneFactory = createProductionScene,
   reducedMotion = prefersReducedMotion(),
+  cameraShake = true,
+  reducedFlashes = false,
+  aimCue = null,
   initialTier = 'high',
   onRestart,
 }: NavalViewportProps) {
@@ -98,6 +113,7 @@ export function NavalViewport({
   const failRef = useRef<(() => void) | null>(null);
   const deliveryRef = useRef<EventCursor>({ generation: battleGeneration, lastEventId: 0 });
   const latestRef = useRef({ state, events, battleGeneration });
+  const sensoryRef = useRef<NavalSensorySettings>({ reducedMotion, cameraShake, reducedFlashes, aimCue });
   const recoveringRef = useRef(false);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>(sceneFactory ? 'loading' : 'failed');
@@ -112,6 +128,11 @@ export function NavalViewport({
       failRef.current?.();
     }
   }, [battleGeneration, events, state]);
+
+  useEffect(() => {
+    sensoryRef.current = { reducedMotion, cameraShake, reducedFlashes, aimCue };
+    sceneRef.current?.syncSensorySettings?.(sensoryRef.current);
+  }, [aimCue, cameraShake, reducedFlashes, reducedMotion]);
 
   useEffect(() => {
     if (!sceneFactory || !containerRef.current) return;
@@ -187,7 +208,7 @@ export function NavalViewport({
       }
     };
 
-    void sceneFactory(containerRef.current, { reducedMotion, initialTier }).then(
+    void sceneFactory(containerRef.current, { reducedMotion: sensoryRef.current.reducedMotion, initialTier }).then(
       (created) => {
         if (!active) {
           created.dispose();
@@ -201,6 +222,7 @@ export function NavalViewport({
           lastEventId: newestEventId(latest.events),
         };
         try {
+          created.syncSensorySettings?.(sensoryRef.current);
           created.sync(latest.state, []);
         } catch {
           fail();
@@ -220,7 +242,7 @@ export function NavalViewport({
       stopListeningForVisibility();
       disposeScene();
     };
-  }, [attempt, initialTier, reducedMotion, sceneFactory]);
+  }, [attempt, initialTier, sceneFactory]);
 
   useEffect(() => {
     if (status === 'failed' && sceneFactory) retryRef.current?.focus();

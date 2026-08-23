@@ -6,6 +6,7 @@ import type {
   NavalSceneAdapter,
   NavalSceneMetrics,
   NavalSceneOptions,
+  NavalSensorySettings,
 } from '../../components/battle/NavalViewport';
 import { broadsideVector } from '../../domain/naval/geometry';
 import type {
@@ -166,7 +167,6 @@ function hasDamage(damage: Damage): boolean {
 
 export class NavalScene implements NavalSceneAdapter {
   readonly #container: HTMLElement;
-  readonly #options: NavalSceneOptions;
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene = new THREE.Scene();
   readonly #camera: THREE.PerspectiveCamera;
@@ -240,6 +240,10 @@ export class NavalScene implements NavalSceneAdapter {
       depthWrite: false,
     }),
   );
+  readonly #aimArc = new THREE.Line(
+    new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(new Array(39).fill(0), 3)),
+    new THREE.LineBasicMaterial({ color: '#d7b565', transparent: true, opacity: 0.82, depthWrite: false }),
+  );
   #effects: EffectPool;
   #resizeObserver: ResizeObserver | null = null;
   #time = 0;
@@ -252,10 +256,11 @@ export class NavalScene implements NavalSceneAdapter {
   #viewportWidth = 960;
   #viewportHeight = 540;
   #hasCameraFit = false;
+  #sensory: NavalSensorySettings;
 
   private constructor(container: HTMLElement, options: NavalSceneOptions) {
     this.#container = container;
-    this.#options = options;
+    this.#sensory = { reducedMotion: options.reducedMotion, cameraShake: true, reducedFlashes: false, aimCue: null };
     this.#quality = new QualityController(options.initialTier);
     this.#renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -337,7 +342,8 @@ export class NavalScene implements NavalSceneAdapter {
     this.#updateWindLines(0);
     this.#bearingLine.name = 'Live_Bearing_Line';
     this.#bearingLine.computeLineDistances();
-    this.#scene.add(this.#windLines, this.#wakeMatrices, this.#selectionRings, this.#bearingLine);
+    this.#aimArc.frustumCulled = false;
+    this.#scene.add(this.#windLines, this.#wakeMatrices, this.#selectionRings, this.#bearingLine, this.#aimArc);
     return sun;
   }
 
@@ -396,9 +402,39 @@ export class NavalScene implements NavalSceneAdapter {
     bearingPositions.setXYZ(1, state.ships.opponent.position.x, 0.08, state.ships.opponent.position.z);
     bearingPositions.needsUpdate = true;
     this.#bearingLine.computeLineDistances();
+    this.#updateAimArc(state);
 
     for (const event of events) this.#emitEvent(event, state);
     this.#fitCamera(state.ships.player, state.ships.opponent);
+  }
+
+  syncSensorySettings(settings: NavalSensorySettings): void {
+    if (this.#disposed) return;
+    const changedMotion = this.#sensory.reducedMotion !== settings.reducedMotion;
+    this.#sensory = settings;
+    if (changedMotion) {
+      const capacity = qualitySettings(this.#quality.tier, this.#deviceDpr()).effectCapacity;
+      this.#effects.dispose();
+      this.#effects = new EffectPool(this.#scene, capacity, settings.reducedMotion);
+    }
+  }
+
+  #updateAimArc(state: NavalState): void {
+    const cue = this.#sensory.aimCue;
+    this.#aimArc.visible = Boolean(cue?.side);
+    if (!cue?.side) return;
+    const ship = state.ships.player;
+    const lateral = broadsideVector(ship.heading, cue.side);
+    const forwardX = Math.sin(ship.heading);
+    const forwardZ = Math.cos(ship.heading);
+    const position = this.#aimArc.geometry.getAttribute('position') as THREE.BufferAttribute;
+    for (let index = 0; index < 13; index += 1) {
+      const bend = (index / 12 - 0.5) * 1.15;
+      const x = ship.position.x + (lateral.x * Math.cos(bend) + forwardX * Math.sin(bend)) * 9;
+      const z = ship.position.z + (lateral.z * Math.cos(bend) + forwardZ * Math.sin(bend)) * 9;
+      position.setXYZ(index, x, 0.24, z);
+    }
+    position.needsUpdate = true;
   }
 
   #emitEvent(event: NavalEvent, state: NavalState): void {
@@ -409,12 +445,12 @@ export class NavalScene implements NavalSceneAdapter {
       const originX = ship.position.x + side.x * 3.1;
       const originZ = ship.position.z + side.z * 3.1;
       const firingVisual = this.#ships[event.shipId];
-      if (firingVisual && !this.#options.reducedMotion) {
+      if (firingVisual && !this.#sensory.reducedMotion && this.#sensory.cameraShake) {
         firingVisual.recoil = 1;
         firingVisual.recoilX = -side.x;
         firingVisual.recoilZ = -side.z;
       }
-      this.#effects.spawn('flash', originX, 1.25, originZ);
+      if (!this.#sensory.reducedFlashes) this.#effects.spawn('flash', originX, 1.25, originZ);
       for (let index = 0; index < 3; index += 1) {
         this.#effects.spawn('smoke', originX + side.x * index * 0.28, 1.15, originZ + side.z * index * 0.28, {
           velocityX: side.x * (0.45 + index * 0.1),
@@ -475,9 +511,9 @@ export class NavalScene implements NavalSceneAdapter {
       const state = visual?.state;
       if (!visual || !state) continue;
       const phase = shipId === 'opponent' ? 1.7 : 0;
-      visual.root.position.y = this.#options.reducedMotion ? 0 : Math.sin(this.#time * 1.15 + phase) * 0.14;
-      visual.root.rotation.x = this.#options.reducedMotion ? 0 : Math.sin(this.#time * 0.72 + 0.8 + phase) * 0.022;
-      visual.root.rotation.z = this.#options.reducedMotion
+      visual.root.position.y = this.#sensory.reducedMotion ? 0 : Math.sin(this.#time * 1.15 + phase) * 0.14;
+      visual.root.rotation.x = this.#sensory.reducedMotion ? 0 : Math.sin(this.#time * 0.72 + 0.8 + phase) * 0.022;
+      visual.root.rotation.z = this.#sensory.reducedMotion
         ? 0
         : -state.rudder * Math.min(0.09, state.speed * 0.018) + Math.sin(this.#time * 0.9 + phase) * 0.012;
       visual.recoil = Math.max(0, visual.recoil - elapsed * 4.8);
@@ -499,7 +535,7 @@ export class NavalScene implements NavalSceneAdapter {
     this.#wakeMatrices.instanceMatrix.needsUpdate = true;
     this.#selectionRings.instanceMatrix.needsUpdate = true;
 
-    const damping = this.#options.reducedMotion ? 1 : 1 - Math.exp(-elapsed * 2.8);
+    const damping = this.#sensory.reducedMotion ? 1 : 1 - Math.exp(-elapsed * 2.8);
     this.#cameraPosition.lerp(this.#cameraDesired, damping);
     this.#camera.position.copy(this.#cameraPosition);
     this.#camera.lookAt(this.#cameraTarget);
@@ -555,7 +591,7 @@ export class NavalScene implements NavalSceneAdapter {
     if (settings.shadows) this.#sun.shadow.mapSize.set(settings.shadowMapSize, settings.shadowMapSize);
     if (this.#effects && this.#effects.metrics().capacity !== settings.effectCapacity) {
       this.#effects.dispose();
-      this.#effects = new EffectPool(this.#scene, settings.effectCapacity, this.#options.reducedMotion);
+      this.#effects = new EffectPool(this.#scene, settings.effectCapacity, this.#sensory.reducedMotion);
     }
     this.#resize();
   }
@@ -573,7 +609,7 @@ export class NavalScene implements NavalSceneAdapter {
     this.#cameraTarget.set(fitted.target.x, fitted.target.y, fitted.target.z);
     this.#camera.fov = fitted.fov;
     this.#camera.updateProjectionMatrix();
-    if (!this.#hasCameraFit || this.#options.reducedMotion) {
+    if (!this.#hasCameraFit || this.#sensory.reducedMotion) {
       this.#cameraPosition.copy(this.#cameraDesired);
       this.#hasCameraFit = true;
     }

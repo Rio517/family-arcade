@@ -1,4 +1,4 @@
-import { bearingSide } from './geometry';
+import { broadsideLegality, MAX_BROADSIDE_RANGE } from './geometry';
 import { moveShipsOneTick } from './movement';
 import { evaluateOutcome } from './outcomes';
 import type {
@@ -17,7 +17,6 @@ import { accuracyFor, damageFor, resolveVolley } from './volley';
 
 const SHIP_IDS: readonly NavalShipId[] = ['player', 'opponent'];
 const BROADSIDES: readonly Broadside[] = ['port', 'starboard'];
-const MAX_BROADSIDE_RANGE = 42;
 const EVENT_WINDOW = 120;
 
 type WithoutId<T> = T extends unknown ? Omit<T, 'id'> : never;
@@ -103,18 +102,12 @@ function resolveRequestedBroadside(
   const targetShipId = opposingShip(shipId);
   const target = firingSnapshot.ships[targetShipId];
   const side = command.fire;
-  const distance = Math.hypot(target.position.x - ship.position.x, target.position.z - ship.position.z);
-  if (
-    !ship.reload[side].loaded
-    || !Number.isInteger(ship.cannon)
-    || ship.cannon <= 0
-    || distance > MAX_BROADSIDE_RANGE
-    || bearingSide(ship.position, ship.heading, target.position) !== side
-  ) {
+  const legality = broadsideLegality(ship, target.position, side);
+  if (!legality.legal) {
     return null;
   }
 
-  const normalizedRange = distance / MAX_BROADSIDE_RANGE;
+  const normalizedRange = legality.distance / MAX_BROADSIDE_RANGE;
   const result = resolveVolley({
     seed: state.seed,
     volleyId: state.nextVolleyId,

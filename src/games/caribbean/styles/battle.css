@@ -163,6 +163,13 @@
 .naval-order-group .naval-control { padding: 0 12px; }
 .naval-order-group .naval-control[aria-pressed="true"] { border-color: var(--caribbean-trade-wind); background: color-mix(in srgb, var(--caribbean-trade-wind) 18%, var(--caribbean-deep-keel)); color: var(--caribbean-trade-wind); }
 .naval-restart { min-width: 148px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; }
+.naval-sensory-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 8px 0 0; border: 0; border-top: 1px solid var(--naval-line); }
+.naval-sensory-controls legend { padding: 0 10px 0 0; color: color-mix(in srgb, var(--caribbean-sailcloth) 54%, transparent); font: 700 14px/1 ui-monospace, monospace; letter-spacing: .07em; text-transform: uppercase; }
+.naval-sensory-controls .naval-control { padding: 0 10px; }
+.naval-sensory-controls .naval-control[aria-pressed="true"] { border-color: var(--caribbean-trade-wind); color: var(--caribbean-trade-wind); }
+.naval-effects-volume { display: inline-flex; align-items: center; min-height: 44px; gap: 7px; padding-inline: 8px; color: color-mix(in srgb, var(--caribbean-sailcloth) 70%, transparent); font: 700 14px/1 ui-monospace, monospace; }
+.naval-effects-volume input { width: 90px; accent-color: var(--caribbean-trade-wind); }
+.naval-aim-cue { margin: 0; color: var(--caribbean-brass); font: 700 14px/1.2 ui-monospace, monospace; letter-spacing: .04em; text-align: center; }
 
 .naval-pause-banner,
 .naval-result,
@@ -226,6 +233,8 @@
   .naval-fire-control__key { top: 12px; }
   .naval-fire-control svg { width: 26px; height: 26px; }
   .naval-order-controls { grid-template-columns: 1fr; gap: 7px; margin-top: 4px; }
+  .naval-sensory-controls { gap: 4px; }
+  .naval-sensory-controls .naval-control { flex: 1 1 126px; }
   .naval-order-group legend { margin-bottom: 4px; }
   .naval-restart { width: 100%; }
   .naval-result,
