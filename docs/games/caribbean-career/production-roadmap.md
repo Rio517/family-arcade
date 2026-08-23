@@ -592,6 +592,10 @@ until the six silhouettes and roles are proven.
 
 ## 16. Immediate next sprint
 
+The execution-level TDD steps, interfaces, commands, evidence, and stop/go
+criteria for this sprint live in the
+[five-minute vertical-slice implementation plan](../../superpowers/plans/2026-08-23-caribbean-five-minute-vertical-slice.md).
+
 The next sprint should contain only these deliverables:
 
 1. **CAR-001:** production `CampaignStateV1`, constructor, validator, save round

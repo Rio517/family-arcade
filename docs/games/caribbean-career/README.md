@@ -48,6 +48,7 @@ offline-capable—not a browser novelty.
 | [poc-implementation-plan.md](./poc-implementation-plan.md) | Exact, testable plan for the first naval and model proof-of-concepts |
 | [poc-review.md](./poc-review.md) | Evidence, measurements, self-review findings, and POC recommendation |
 | [production-roadmap.md](./production-roadmap.md) | Extremely structured, phase-by-phase implementation plan based on measured POC results |
+| [five-minute vertical-slice plan](../../superpowers/plans/2026-08-23-caribbean-five-minute-vertical-slice.md) | Execution-ready TDD plan for the first production loop and its stop/go gate |
 
 ## Decision rule
 
