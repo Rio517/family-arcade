@@ -13,7 +13,7 @@ interface FakeScene {
   adapter: NavalSceneAdapter;
   disposed: number;
   renders: Array<{ animation: number; wall: number | undefined }>;
-  syncs: Array<{ tick: number; eventIds: number[] }>;
+  syncs: Array<{ tick: number; eventIds: number[]; battleGeneration: number; snap: boolean }>;
   throwOnRender: boolean;
   throwOnSync: boolean;
   throwOnSensory: boolean;
@@ -32,9 +32,14 @@ function fakeScene(): FakeScene {
     adapter: undefined as unknown as NavalSceneAdapter,
   };
   fake.adapter = {
-    sync(state, events) {
+    sync(state, events, presentation) {
       if (fake.throwOnSync) throw new Error('snapshot sync failed');
-      fake.syncs.push({ tick: state.tick, eventIds: events.map(({ id }) => id) });
+      fake.syncs.push({
+        tick: state.tick,
+        eventIds: events.map(({ id }) => id),
+        battleGeneration: presentation.battleGeneration,
+        snap: presentation.snap,
+      });
     },
     syncSensorySettings() {
       if (fake.throwOnSensory) throw new Error('sensory failure');
@@ -104,11 +109,11 @@ describe('NavalViewport', () => {
 
     await act(async () => resolveFactory(scene.adapter));
     expect(await screen.findByTestId('naval-scene-slot')).toBeVisible();
-    expect(scene.syncs).toEqual([{ tick: 0, eventIds: [] }]);
+    expect(scene.syncs).toEqual([{ tick: 0, eventIds: [], battleGeneration: 0, snap: true }]);
 
     const nextState = fixture({ tick: 12 });
     rerender(<NavalViewport state={nextState} events={[]} sceneFactory={sceneFactory} onRestart={vi.fn()} />);
-    expect(scene.syncs.at(-1)).toEqual({ tick: 12, eventIds: [] });
+    expect(scene.syncs.at(-1)).toEqual({ tick: 12, eventIds: [], battleGeneration: 0, snap: false });
 
     act(() => frames.shift()?.(1_000));
     act(() => frames.shift()?.(1_016.667));
@@ -152,7 +157,7 @@ describe('NavalViewport', () => {
 
     expect(await screen.findByTestId('naval-scene-slot')).toBeVisible();
     expect(sceneFactory).toHaveBeenCalledTimes(2);
-    expect(scene.syncs).toEqual([{ tick: 0, eventIds: [] }]);
+    expect(scene.syncs).toEqual([{ tick: 0, eventIds: [], battleGeneration: 0, snap: true }]);
     expect(screen.getByTestId('naval-scene-frame')).toHaveFocus();
   });
 
@@ -201,8 +206,10 @@ describe('NavalViewport', () => {
     const scene = fakeScene();
     const factory = vi.fn().mockResolvedValue(scene.adapter);
     const event: NavalEvent = { id: 1, kind: 'reload-ready', atTick: 1, shipId: 'player', side: 'port' };
+    const initial = fixture();
+    const initialBytes = JSON.stringify(initial);
     const { rerender } = render(
-      <NavalViewport state={fixture()} events={[]} battleGeneration={0} sceneFactory={factory} onRestart={vi.fn()} />,
+      <NavalViewport state={initial} events={[]} battleGeneration={0} sceneFactory={factory} onRestart={vi.fn()} />,
     );
     await screen.findByTestId('naval-scene-slot');
 
@@ -211,6 +218,27 @@ describe('NavalViewport', () => {
     rerender(<NavalViewport state={fixture({ tick: 1 })} events={[event]} battleGeneration={1} sceneFactory={factory} onRestart={vi.fn()} />);
 
     expect(scene.syncs.map(({ eventIds }) => eventIds)).toEqual([[], [1], [], [1]]);
+    expect(scene.syncs.map(({ battleGeneration }) => battleGeneration)).toEqual([0, 0, 0, 1]);
+    expect(scene.syncs.map(({ snap }) => snap)).toEqual([true, false, false, true]);
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(initial)).toBe(initialBytes);
+  });
+
+  it('delivers live reduced-motion changes without recreating the scene', async () => {
+    const scene = fakeScene();
+    const factory = vi.fn().mockResolvedValue(scene.adapter);
+    const state = fixture();
+    const stateBytes = JSON.stringify(state);
+    const { rerender } = render(
+      <NavalViewport state={state} events={[]} reducedMotion={false} sceneFactory={factory} onRestart={vi.fn()} />,
+    );
+    await screen.findByTestId('naval-scene-slot');
+
+    rerender(<NavalViewport state={state} events={[]} reducedMotion sceneFactory={factory} onRestart={vi.fn()} />);
+
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(scene.sensorySyncs).toBe(2);
+    expect(JSON.stringify(state)).toBe(stateBytes);
   });
 
   it('keeps wall time unclamped while clamping animation after a stalled frame', async () => {

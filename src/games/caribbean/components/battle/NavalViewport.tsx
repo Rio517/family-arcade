@@ -19,7 +19,11 @@ export interface NavalSceneMetrics {
 }
 
 export interface NavalSceneAdapter {
-  sync(state: NavalState, eventDeltas: readonly NavalEvent[]): void;
+  sync(
+    state: NavalState,
+    eventDeltas: readonly NavalEvent[],
+    presentation: { battleGeneration: number; snap: boolean },
+  ): void;
   syncSensorySettings?(settings: NavalSensorySettings): void;
   render(animationSeconds: number, wallSeconds?: number): void;
   metrics(): NavalSceneMetrics;
@@ -123,7 +127,12 @@ export function NavalViewport({
     const scene = sceneRef.current;
     if (!scene) return;
     try {
-      scene.sync(state, consumeEventDeltas(deliveryRef.current, battleGeneration, events));
+      const snap = deliveryRef.current.generation !== battleGeneration;
+      scene.sync(
+        state,
+        consumeEventDeltas(deliveryRef.current, battleGeneration, events),
+        { battleGeneration, snap },
+      );
     } catch {
       failRef.current?.();
     }
@@ -227,7 +236,7 @@ export function NavalViewport({
         };
         try {
           created.syncSensorySettings?.(sensoryRef.current);
-          created.sync(latest.state, []);
+          created.sync(latest.state, [], { battleGeneration: latest.battleGeneration, snap: true });
         } catch {
           fail();
           return;

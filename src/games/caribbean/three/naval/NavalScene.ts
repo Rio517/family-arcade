@@ -28,10 +28,13 @@ import {
   decayCameraShake,
   fitEngagementCamera,
   settleShipRecoilForReducedMotion,
+  presentationDampingFactor,
+  writeDampedPose,
   writeCameraShake,
   writeShipRecoil,
   type EngagementCameraFit,
   type EngagementCameraInput,
+  type NavalRenderPose,
 } from './sceneMath';
 
 interface ShipVisual {
@@ -44,6 +47,8 @@ interface ShipVisual {
     role: 'sail' | 'other';
   }>;
   state: NavalShipState | null;
+  targetPose: NavalRenderPose;
+  renderPose: NavalRenderPose;
   recoil: number;
   recoilX: number;
   recoilZ: number;
@@ -181,6 +186,7 @@ export class NavalScene implements NavalSceneAdapter {
   readonly #cameraPosition = new THREE.Vector3(0, 31, 42);
   readonly #cameraTarget = new THREE.Vector3();
   readonly #cameraDesired = new THREE.Vector3(0, 31, 42);
+  readonly #cameraDesiredTarget = new THREE.Vector3();
   readonly #cameraRenderPosition = new THREE.Vector3(0, 31, 42);
   readonly #cameraRenderTarget = new THREE.Vector3();
   readonly #damageTint = new THREE.Color('#382d2a');
@@ -262,7 +268,6 @@ export class NavalScene implements NavalSceneAdapter {
   #viewportWidth = 960;
   #viewportHeight = 540;
   #hasCameraFit = false;
-  #latestState: NavalState | null = null;
   #cameraShake = 0;
   #sensory: NavalSensorySettings;
 
@@ -381,23 +386,35 @@ export class NavalScene implements NavalSceneAdapter {
       modelRest: model.position.clone(),
       materials: collectMaterials(model),
       state: null,
+      targetPose: { x: 0, z: 0, heading: 0 },
+      renderPose: { x: 0, z: 0, heading: 0 },
       recoil: 0,
       recoilX: 0,
       recoilZ: 0,
     };
   }
 
-  sync(state: NavalState, events: readonly NavalEvent[]): void {
+  sync(
+    state: NavalState,
+    events: readonly NavalEvent[],
+    presentation: { battleGeneration: number; snap: boolean },
+  ): void {
     if (this.#disposed) return;
-    this.#latestState = state;
+    const snap = presentation.snap || this.#sensory.reducedMotion;
     for (const shipId of SHIP_IDS) {
       const canonical = state.ships[shipId];
       const visual = this.#ships[shipId];
       if (!visual) continue;
       visual.state = canonical;
-      visual.root.position.x = canonical.position.x;
-      visual.root.position.z = canonical.position.z;
-      visual.root.rotation.y = canonical.heading;
+      visual.targetPose.x = canonical.position.x;
+      visual.targetPose.z = canonical.position.z;
+      visual.targetPose.heading = canonical.heading;
+      if (snap) {
+        visual.renderPose.x = visual.targetPose.x;
+        visual.renderPose.z = visual.targetPose.z;
+        visual.renderPose.heading = visual.targetPose.heading;
+        visual.recoil = 0;
+      }
       for (const entry of visual.materials) {
         const severity = damageSeverity(canonical, entry.role);
         entry.material.color.copy(entry.baseColor).lerp(this.#damageTint, severity * 0.52);
@@ -406,15 +423,8 @@ export class NavalScene implements NavalSceneAdapter {
       }
     }
     this.#updateWindLines(state.input.windFrom);
-    const bearingPositions = this.#bearingLine.geometry.getAttribute('position') as THREE.BufferAttribute;
-    bearingPositions.setXYZ(0, state.ships.player.position.x, 0.08, state.ships.player.position.z);
-    bearingPositions.setXYZ(1, state.ships.opponent.position.x, 0.08, state.ships.opponent.position.z);
-    bearingPositions.needsUpdate = true;
-    this.#bearingLine.computeLineDistances();
-    this.#updateAimArc(state);
-
+    this.#fitCamera(state.ships.player, state.ships.opponent, snap);
     for (const event of events) this.#emitEvent(event, state);
-    this.#fitCamera(state.ships.player, state.ships.opponent);
   }
 
   syncSensorySettings(settings: NavalSensorySettings): void {
@@ -432,9 +442,13 @@ export class NavalScene implements NavalSceneAdapter {
           visual.modelRest,
           visual.model.position,
         );
+        visual.renderPose.x = visual.targetPose.x;
+        visual.renderPose.z = visual.targetPose.z;
+        visual.renderPose.heading = visual.targetPose.heading;
       }
+      this.#cameraPosition.copy(this.#cameraDesired);
+      this.#cameraTarget.copy(this.#cameraDesiredTarget);
     }
-    if (this.#latestState) this.#updateAimArc(this.#latestState);
     if (changedMotion) {
       const capacity = qualitySettings(this.#quality.tier, this.#deviceDpr()).effectCapacity;
       this.#effects.dispose();
@@ -442,19 +456,19 @@ export class NavalScene implements NavalSceneAdapter {
     }
   }
 
-  #updateAimArc(state: NavalState): void {
+  #updateAimArc(): void {
     const cue = this.#sensory.aimCue;
     this.#aimArc.visible = Boolean(cue?.side);
     if (!cue?.side) return;
-    const ship = state.ships.player;
+    const ship = this.#ships.player.renderPose;
     const lateral = broadsideVector(ship.heading, cue.side);
     const forwardX = Math.sin(ship.heading);
     const forwardZ = Math.cos(ship.heading);
     const position = this.#aimArc.geometry.getAttribute('position') as THREE.BufferAttribute;
     for (let index = 0; index < 13; index += 1) {
       const bend = (index / 12 - 0.5) * 1.15;
-      const x = ship.position.x + (lateral.x * Math.cos(bend) + forwardX * Math.sin(bend)) * 9;
-      const z = ship.position.z + (lateral.z * Math.cos(bend) + forwardZ * Math.sin(bend)) * 9;
+      const x = ship.x + (lateral.x * Math.cos(bend) + forwardX * Math.sin(bend)) * 9;
+      const z = ship.z + (lateral.z * Math.cos(bend) + forwardZ * Math.sin(bend)) * 9;
       position.setXYZ(index, x, 0.24, z);
     }
     position.needsUpdate = true;
@@ -464,11 +478,14 @@ export class NavalScene implements NavalSceneAdapter {
     if (event.kind === 'volley') {
       const ship = state.ships[event.shipId];
       const target = state.ships[event.targetShipId];
-      const side = broadsideVector(ship.heading, event.result.side);
-      const muzzleOrigin = broadsideMuzzleOrigin(ship.position, ship.heading, event.result.side);
+      const firingVisual = this.#ships[event.shipId];
+      const targetVisual = this.#ships[event.targetShipId];
+      const firingPose = firingVisual?.renderPose ?? { x: ship.position.x, z: ship.position.z, heading: ship.heading };
+      const targetPose = targetVisual?.renderPose ?? { x: target.position.x, z: target.position.z, heading: target.heading };
+      const side = broadsideVector(firingPose.heading, event.result.side);
+      const muzzleOrigin = broadsideMuzzleOrigin(firingPose, firingPose.heading, event.result.side);
       const originX = muzzleOrigin.x;
       const originZ = muzzleOrigin.z;
-      const firingVisual = this.#ships[event.shipId];
       if (firingVisual && !this.#sensory.reducedMotion) {
         firingVisual.recoil = 1;
         firingVisual.recoilX = -side.x;
@@ -483,8 +500,8 @@ export class NavalScene implements NavalSceneAdapter {
           velocityZ: side.z * (0.45 + index * 0.1),
         });
       }
-      const targetX = target.position.x - ship.position.x;
-      const targetZ = target.position.z - ship.position.z;
+      const targetX = targetPose.x - firingPose.x;
+      const targetZ = targetPose.z - firingPose.z;
       const distance = Math.max(1, Math.hypot(targetX, targetZ));
       const lateralX = targetZ / distance;
       const lateralZ = -targetX / distance;
@@ -493,9 +510,9 @@ export class NavalScene implements NavalSceneAdapter {
         const spread = sample.normalizedSpread * Math.min(8, distance * 0.16);
         this.#effects.spawn(
           'splash',
-          target.position.x + lateralX * spread,
+          targetPose.x + lateralX * spread,
           0.12,
-          target.position.z + lateralZ * spread,
+          targetPose.z + lateralZ * spread,
         );
       }
       return;
@@ -503,15 +520,18 @@ export class NavalScene implements NavalSceneAdapter {
 
     if (event.kind === 'damage' && hasDamage(event.damage)) {
       const ship = state.ships[event.shipId];
+      const pose = this.#ships[event.shipId]?.renderPose;
+      const x = pose?.x ?? ship.position.x;
+      const z = pose?.z ?? ship.position.z;
       let debrisIndex = 0;
       for (const kind of damageEffectKinds(event.damage)) {
         if (kind === 'smoke') {
-          this.#effects.spawn(kind, ship.position.x, 1.4, ship.position.z, { life: 2.2 });
+          this.#effects.spawn(kind, x, 1.4, z, { life: 2.2 });
         } else if (kind === 'rig') {
-          this.#effects.spawn(kind, ship.position.x, 3.5, ship.position.z, { life: 1.3 });
+          this.#effects.spawn(kind, x, 3.5, z, { life: 1.3 });
         } else {
           const direction = debrisIndex % 2 === 0 ? 1 : -1;
-          this.#effects.spawn(kind, ship.position.x, 1.5 + debrisIndex * 0.18, ship.position.z, {
+          this.#effects.spawn(kind, x, 1.5 + debrisIndex * 0.18, z, {
             velocityX: direction * (0.7 + debrisIndex * 0.13),
             velocityY: 1.1 + debrisIndex * 0.12,
             velocityZ: (debrisIndex - 1.5) * 0.28,
@@ -535,6 +555,16 @@ export class NavalScene implements NavalSceneAdapter {
       const visual = this.#ships[shipId];
       const state = visual?.state;
       if (!visual || !state) continue;
+      writeDampedPose(
+        visual.renderPose,
+        visual.targetPose,
+        elapsed,
+        this.#sensory.reducedMotion,
+        visual.renderPose,
+      );
+      visual.root.position.x = visual.renderPose.x;
+      visual.root.position.z = visual.renderPose.z;
+      visual.root.rotation.y = visual.renderPose.heading;
       const phase = shipId === 'opponent' ? 1.7 : 0;
       visual.root.position.y = this.#sensory.reducedMotion ? 0 : Math.sin(this.#time * 1.15 + phase) * 0.14;
       visual.root.rotation.x = this.#sensory.reducedMotion ? 0 : Math.sin(this.#time * 0.72 + 0.8 + phase) * 0.022;
@@ -546,10 +576,10 @@ export class NavalScene implements NavalSceneAdapter {
 
       this.#wakeMatrices.setMatrixAt(
         index,
-        composeWakeMatrix(state.position, state.heading, state.speed, this.#wakeMatrix),
+        composeWakeMatrix(visual.renderPose, visual.renderPose.heading, state.speed, this.#wakeMatrix),
       );
 
-      this.#renderDummy.position.set(state.position.x, 0.14, state.position.z);
+      this.#renderDummy.position.set(visual.renderPose.x, 0.14, visual.renderPose.z);
       this.#renderDummy.rotation.set(-Math.PI / 2, 0, 0);
       this.#renderDummy.scale.setScalar(shipId === 'player' ? 1.05 : 0.92);
       this.#renderDummy.updateMatrix();
@@ -557,9 +587,18 @@ export class NavalScene implements NavalSceneAdapter {
     }
     this.#wakeMatrices.instanceMatrix.needsUpdate = true;
     this.#selectionRings.instanceMatrix.needsUpdate = true;
+    const bearingPositions = this.#bearingLine.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const playerPose = this.#ships.player.renderPose;
+    const opponentPose = this.#ships.opponent.renderPose;
+    bearingPositions.setXYZ(0, playerPose.x, 0.08, playerPose.z);
+    bearingPositions.setXYZ(1, opponentPose.x, 0.08, opponentPose.z);
+    bearingPositions.needsUpdate = true;
+    this.#bearingLine.computeLineDistances();
+    this.#updateAimArc();
 
-    const damping = this.#sensory.reducedMotion ? 1 : 1 - Math.exp(-elapsed * 2.8);
+    const damping = this.#sensory.reducedMotion ? 1 : presentationDampingFactor(elapsed);
     this.#cameraPosition.lerp(this.#cameraDesired, damping);
+    this.#cameraTarget.lerp(this.#cameraDesiredTarget, damping);
     this.#cameraShake = decayCameraShake(
       this.#cameraShake,
       elapsed,
@@ -632,7 +671,7 @@ export class NavalScene implements NavalSceneAdapter {
     this.#resize();
   }
 
-  #fitCamera(player: NavalShipState, opponent: NavalShipState): void {
+  #fitCamera(player: NavalShipState, opponent: NavalShipState, snap = false): void {
     this.#cameraInput.player.x = player.position.x;
     this.#cameraInput.player.z = player.position.z;
     this.#cameraInput.opponent.x = opponent.position.x;
@@ -642,11 +681,12 @@ export class NavalScene implements NavalSceneAdapter {
     this.#cameraInput.height = this.#viewportHeight;
     const fitted = fitEngagementCamera(this.#cameraInput, this.#cameraFit);
     this.#cameraDesired.set(fitted.position.x, fitted.position.y, fitted.position.z);
-    this.#cameraTarget.set(fitted.target.x, fitted.target.y, fitted.target.z);
+    this.#cameraDesiredTarget.set(fitted.target.x, fitted.target.y, fitted.target.z);
     this.#camera.fov = fitted.fov;
     this.#camera.updateProjectionMatrix();
-    if (!this.#hasCameraFit || this.#sensory.reducedMotion) {
+    if (!this.#hasCameraFit || this.#sensory.reducedMotion || snap) {
       this.#cameraPosition.copy(this.#cameraDesired);
+      this.#cameraTarget.copy(this.#cameraDesiredTarget);
       this.#hasCameraFit = true;
     }
   }

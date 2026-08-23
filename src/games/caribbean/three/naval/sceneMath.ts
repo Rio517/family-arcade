@@ -1,11 +1,58 @@
 import * as THREE from 'three';
 
+import { normalizeAngle } from '../../domain/naval/geometry';
 import type { Point } from '../../domain/naval/types';
 
 const position = new THREE.Vector3();
 const rotation = new THREE.Quaternion();
 const scale = new THREE.Vector3();
 const up = new THREE.Vector3(0, 1, 0);
+
+/** Settles a 20 Hz snapshot step to under 2% presentation error in 250 ms. */
+export const NAVAL_PRESENTATION_RESPONSE = 18;
+const MAX_PRESENTATION_DELTA = 0.1;
+
+export interface NavalRenderPose {
+  x: number;
+  z: number;
+  heading: number;
+}
+
+function presentationDelta(delta: number): number {
+  if (!Number.isFinite(delta) || delta <= 0) return 0;
+  return Math.min(MAX_PRESENTATION_DELTA, delta);
+}
+
+export function presentationDampingFactor(delta: number): number {
+  return 1 - Math.exp(-NAVAL_PRESENTATION_RESPONSE * presentationDelta(delta));
+}
+
+export function dampScalar(current: number, target: number, delta: number): number {
+  return current + (target - current) * presentationDampingFactor(delta);
+}
+
+export function dampAngle(current: number, target: number, delta: number): number {
+  return normalizeAngle(current + normalizeAngle(target - current) * presentationDampingFactor(delta));
+}
+
+export function writeDampedPose(
+  current: NavalRenderPose,
+  target: NavalRenderPose,
+  delta: number,
+  snap: boolean,
+  output: NavalRenderPose,
+): NavalRenderPose {
+  if (snap) {
+    output.x = target.x;
+    output.z = target.z;
+    output.heading = target.heading;
+    return output;
+  }
+  output.x = dampScalar(current.x, target.x, delta);
+  output.z = dampScalar(current.z, target.z, delta);
+  output.heading = dampAngle(current.heading, target.heading, delta);
+  return output;
+}
 
 export function composeWakeMatrix(
   point: Point,

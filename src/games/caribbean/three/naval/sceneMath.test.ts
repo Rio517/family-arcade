@@ -1,12 +1,17 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { normalizeAngle } from '../../domain/naval/geometry';
 
 import {
   assertDrawCallBudget,
   composeWakeMatrix,
+  dampAngle,
+  dampScalar,
   decayCameraShake,
   fitEngagementCamera,
+  NAVAL_PRESENTATION_RESPONSE,
   settleShipRecoilForReducedMotion,
+  writeDampedPose,
   writeCameraShake,
   writeShipRecoil,
 } from './sceneMath';
@@ -29,6 +34,71 @@ function cameraFor(width: number, height: number) {
 }
 
 describe('naval scene visual transforms', () => {
+  it('moves a render pose part-way toward a new snapshot in one 60 Hz frame', () => {
+    const output = { x: 0, z: 0, heading: 0 };
+
+    expect(writeDampedPose(output, { x: 12, z: -6, heading: 1 }, 1 / 60, false, output)).toBe(output);
+    expect(output.x).toBeGreaterThan(0);
+    expect(output.x).toBeLessThan(12);
+    expect(output.z).toBeLessThan(0);
+    expect(output.z).toBeGreaterThan(-6);
+    expect(output.heading).toBeGreaterThan(0);
+    expect(output.heading).toBeLessThan(1);
+  });
+
+  it('is exponentially partition-invariant for scalar presentation motion', () => {
+    const oneFrame = dampScalar(0, 10, 1 / 30);
+    const twoFrames = dampScalar(dampScalar(0, 10, 1 / 60), 10, 1 / 60);
+
+    expect(twoFrames).toBeCloseTo(oneFrame, 12);
+  });
+
+  it.each([
+    [Math.PI - 0.04, -Math.PI + 0.04, 1],
+    [-Math.PI + 0.04, Math.PI - 0.04, -1],
+  ])('takes the shortest heading path across the wrap boundary', (current, target, direction) => {
+    const next = dampAngle(current, target, 1 / 60);
+    const travelled = normalizeAngle(next - current);
+
+    expect(Math.sign(travelled)).toBe(direction);
+    expect(Math.abs(travelled)).toBeLessThan(0.08);
+  });
+
+  it('stays finite for zero, negative, non-finite, and clamped-large frame deltas', () => {
+    const values = [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 5].map((delta) => (
+      dampScalar(2, 9, delta)
+    ));
+
+    expect(values.every(Number.isFinite)).toBe(true);
+    expect(values[0]).toBe(2);
+    expect(values[1]).toBe(2);
+    expect(values[2]).toBe(2);
+    expect(values[3]).toBe(2);
+    expect(values[4]).toBeCloseTo(dampScalar(2, 9, 0.1), 12);
+  });
+
+  it('snaps exactly under reduced motion and reuses the caller-owned output', () => {
+    const current = { x: -4, z: 3, heading: Math.PI - 0.2 };
+    const target = { x: 8, z: -7, heading: -Math.PI + 0.2 };
+    const output = { x: 0, z: 0, heading: 0 };
+
+    expect(writeDampedPose(current, target, 1 / 60, true, output)).toBe(output);
+    expect(output).toEqual(target);
+  });
+
+  it('converges inside the locked 250 ms presentation-lag bound', () => {
+    let x = 0;
+    let heading = 0;
+    for (let frame = 0; frame < 15; frame += 1) {
+      x = dampScalar(x, 1, 1 / 60);
+      heading = dampAngle(heading, 0.1, 1 / 60);
+    }
+
+    expect(NAVAL_PRESENTATION_RESPONSE).toBeGreaterThan(0);
+    expect(Math.abs(1 - x)).toBeLessThanOrEqual(0.02);
+    expect(Math.abs(0.1 - heading)).toBeLessThanOrEqual(0.002);
+  });
+
   it('keeps a heading-zero wake flat on the water and behind world +Z travel', () => {
     const matrix = composeWakeMatrix({ x: 4, z: 7 }, 0, 5);
     const wakeTail = new THREE.Vector3(0, 0, -15).applyMatrix4(matrix);
