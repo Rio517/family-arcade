@@ -168,6 +168,16 @@ body:has(.caribbean-app) {
 .caribbean-bearing-thesis > small { top: 55%; color: color-mix(in srgb, var(--caribbean-sailcloth) 52%, transparent); font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; }
 
 .caribbean-decision__choices { display: grid; gap: 34px; }
+.battle-shortcut-legend {
+  min-width: 0;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--caribbean-brass) 36%, transparent);
+}
+.battle-shortcut-legend__label { display: block; margin-bottom: 10px; color: color-mix(in srgb, var(--caribbean-sailcloth) 58%, var(--caribbean-trade-wind)); font: 700 14px/1 ui-monospace, monospace; letter-spacing: .11em; text-transform: uppercase; }
+.battle-shortcut-legend ul { display: flex; flex-wrap: wrap; gap: 7px 12px; margin: 0; padding: 0; list-style: none; }
+.battle-shortcut-legend li { display: inline-flex; align-items: center; gap: 6px; color: color-mix(in srgb, var(--caribbean-sailcloth) 68%, transparent); font-size: 14px; }
+.battle-shortcut-legend kbd { min-width: 24px; padding: 4px 6px; border: 1px solid color-mix(in srgb, var(--caribbean-brass) 52%, transparent); color: var(--caribbean-brass); font: 800 14px/1 ui-monospace, monospace; text-align: center; }
+.caribbean-briefing .battle-shortcut-legend { margin: 20px 0; }
 .caribbean-lab-action,
 .caribbean-next-slice {
   position: relative;

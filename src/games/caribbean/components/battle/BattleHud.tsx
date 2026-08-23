@@ -75,16 +75,19 @@ export function BattleHud({ state, paused, onTogglePause }: BattleHudProps) {
           onClick={onTogglePause}
         >
           <PauseIcon paused={paused} />
-          {paused ? 'Resume' : 'Pause'}
+          <span>{paused ? 'Resume' : 'Pause'}</span>
+          <kbd>Space / Esc</kbd>
         </button>
       </div>
-      <div className="naval-system-rail">
+      <div className="naval-opponent-rail">
+        <ShipSystems ship={state.ships.opponent} enemy />
+      </div>
+      <div className="naval-player-rail">
         <ShipSystems ship={player} />
         <div className="naval-current-order" aria-label="Current sailing order">
           <span>Ammunition</span><strong>{title(player.ammunition)}</strong>
           <span>Sail</span><strong>{title(player.sail)} sail</strong>
         </div>
-        <ShipSystems ship={state.ships.opponent} enemy />
       </div>
     </div>
   );

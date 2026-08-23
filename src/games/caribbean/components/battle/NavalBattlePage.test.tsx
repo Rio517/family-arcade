@@ -145,6 +145,30 @@ describe('accessible naval command deck', () => {
     expect(session.currentCommand.rudder).toBe(0);
   });
 
+  it('shows the complete compact command strip without side-paddle duplication', () => {
+    const session = manualNavalSession();
+    render(<NavalBattlePage session={session} sceneFactory={null} />);
+
+    const strip = screen.getByRole('group', { name: 'Battle commands' });
+    for (const [testId, key, action] of [
+      ['naval-rudder-port', 'A', 'Turn port'],
+      ['naval-fire-port', 'Q', 'Fire port'],
+      ['naval-ammo-round', '1', 'Round'],
+      ['naval-ammo-chain', '2', 'Chain'],
+      ['naval-ammo-grape', '3', 'Grape'],
+      ['naval-sail-reefed', 'R', 'Reef sail'],
+      ['naval-fire-starboard', 'E', 'Fire starboard'],
+      ['naval-rudder-starboard', 'D', 'Turn starboard'],
+    ]) {
+      const control = within(strip).getByTestId(testId);
+      expect(control).toHaveTextContent(key);
+      expect(control).toHaveTextContent(action);
+      expect(control).toHaveClass('naval-hit-target');
+    }
+    expect(within(strip).getAllByTestId(/naval-fire-(port|starboard)/)).toHaveLength(2);
+    expect(screen.getByTestId('naval-pause')).toHaveTextContent('Space / Esc');
+  });
+
   it('maps sail, ammunition, pause, and restart actions through stable test ids', () => {
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} />);
@@ -159,6 +183,29 @@ describe('accessible naval command deck', () => {
 
     fireEvent.click(screen.getByTestId('naval-restart'));
     expect(session.restartCount).toBe(1);
+  });
+
+  it('keeps restart and all feedback settings in a compact Options disclosure without changing battle state', () => {
+    const session = manualNavalSession();
+    render(<NavalBattlePage session={session} sceneFactory={null} />);
+    const before = session.getSnapshot();
+    const options = screen.getByTestId('naval-options');
+
+    expect(options).not.toHaveAttribute('open');
+    fireEvent.click(screen.getByTestId('naval-options-toggle'));
+    expect(options).toHaveAttribute('open');
+    for (const testId of [
+      'naval-restart',
+      'naval-setting-aim',
+      'naval-setting-steering',
+      'naval-setting-shake',
+      'naval-setting-flashes',
+      'naval-setting-effects',
+      'naval-setting-mute',
+    ]) expect(screen.getByTestId(testId)).toBeVisible();
+    expect(session.getSnapshot().state.tick).toBe(before.state.tick);
+    expect(session.paused).toBe(before.paused);
+    expect(session.commandHistory()).toHaveLength(0);
   });
 
   it('uses Escape to pause and resume without letting repeated pause commands through', () => {
@@ -332,6 +379,7 @@ describe('accessible naval command deck', () => {
     expect(sync).toHaveBeenLastCalledWith(
       expect.objectContaining({ tick: 0 }),
       [],
+      { battleGeneration: 0, snap: true },
     );
 
     act(() => {
@@ -347,6 +395,7 @@ describe('accessible naval command deck', () => {
     expect(sync).toHaveBeenLastCalledWith(
       expect.anything(),
       [expect.objectContaining({ id: 5 })],
+      { battleGeneration: 0, snap: false },
     );
 
     act(() => session.restart());
@@ -363,6 +412,7 @@ describe('accessible naval command deck', () => {
     expect(sync).toHaveBeenLastCalledWith(
       expect.anything(),
       [expect.objectContaining({ id: 1 })],
+      { battleGeneration: 1, snap: false },
     );
     unmount();
     expect(dispose).toHaveBeenCalledTimes(1);

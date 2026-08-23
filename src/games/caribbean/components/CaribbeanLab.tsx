@@ -6,6 +6,7 @@ import type { NavalBattleInput } from '../domain/naval/types';
 import type { NavalSessionView } from '../state/naval/NavalSession';
 import { useNavalSession } from '../state/naval/useNavalSession';
 import { NavalBattlePage, type NavalSceneFactory } from './battle/NavalBattlePage';
+import { BattleShortcutLegend } from './battle/BattleShortcutLegend';
 import '../styles/caribbean.css';
 import '../styles/battle.css';
 
@@ -16,6 +17,24 @@ export interface CaribbeanLabProps {
 }
 
 type LabPhase = 'decision' | 'briefing' | 'battle';
+
+const MIN_PLAYFIELD_WIDTH = 960;
+const MIN_PLAYFIELD_HEIGHT = 600;
+
+function supportsBattlePlayfield(): boolean {
+  if (typeof window === 'undefined') return true;
+  return window.innerWidth >= MIN_PLAYFIELD_WIDTH && window.innerHeight >= MIN_PLAYFIELD_HEIGHT;
+}
+
+function useBattlePlayfieldSupport(): boolean {
+  const [supported, setSupported] = useState(supportsBattlePlayfield);
+  useEffect(() => {
+    const update = () => setSupported(supportsBattlePlayfield());
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return supported;
+}
 
 function ArrowIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6" /></svg>;
@@ -56,10 +75,22 @@ function BattleSession({ sceneFactory, battleInput = BATTLE_LAB_INPUT, onSession
 export function CaribbeanLab({ sceneFactory, battleInput, onSessionReady }: CaribbeanLabProps) {
   const [phase, setPhase] = useState<LabPhase>('decision');
   const briefingHeading = useRef<HTMLHeadingElement>(null);
+  const supportsPlayfield = useBattlePlayfieldSupport();
 
   useEffect(() => {
     if (phase === 'briefing') briefingHeading.current?.focus();
   }, [phase]);
+
+  if (!supportsPlayfield) {
+    return (
+      <section className="caribbean-display-notice" data-testid="caribbean-display-notice" role="alert">
+        <ShipIcon size={34} />
+        <p>Caribbean Career</p>
+        <h1>Designed for tablet and larger</h1>
+        <span>This sea needs a 960 × 600 playfield. Rotate your device or use a larger display to take command. Any duel restarts when the playfield returns.</span>
+      </section>
+    );
+  }
 
   if (phase === 'battle') {
     return <BattleSession sceneFactory={sceneFactory} battleInput={battleInput} onSessionReady={onSessionReady} />;
@@ -98,6 +129,7 @@ export function CaribbeanLab({ sceneFactory, battleInput, onSessionReady }: Cari
               <strong>Bridgetown, markets, and crew</strong>
               <small>The harbour opens after the naval proving ground.</small>
             </div>
+            <BattleShortcutLegend />
           </div>
         </div>
       ) : (
@@ -111,6 +143,7 @@ export function CaribbeanLab({ sceneFactory, battleInput, onSessionReady }: Cari
               <div><dt>Your sloop</dt><dd>Mistral / 8 cannon / 52 crew</dd></div>
               <div><dt>Prize target</dt><dd>Red Jackdaw / capture intact</dd></div>
             </dl>
+            <BattleShortcutLegend />
             <button
               type="button"
               className="caribbean-enter-battle naval-hit-target"

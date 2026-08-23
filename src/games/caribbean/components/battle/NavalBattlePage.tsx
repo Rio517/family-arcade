@@ -87,16 +87,6 @@ function useReducedMotionPreference(): boolean {
   return reduced;
 }
 
-function CannonIcon() {
-  return (
-    <svg viewBox="0 0 28 28" aria-hidden="true">
-      <path d="m5 11 13-5 2 5-13 5-2-5ZM9 16l3 4M18 12l3 4M6 22h17" />
-      <circle cx="11" cy="21" r="2" />
-      <circle cx="20" cy="19" r="2" />
-    </svg>
-  );
-}
-
 export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolved }: NavalBattlePageProps) {
   const snapshot = useSessionSnapshot(session);
   const { state, battleGeneration, currentCommand, paused, diagnostic } = snapshot;
@@ -283,76 +273,74 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
         data-testid="naval-battle-underlay"
         aria-hidden={terminal ? true : undefined}
       >
-        <BattleHud state={state} paused={paused} onTogglePause={() => { activateAudio(); session.togglePause(); }} />
+        <div className="naval-battle-stage">
+          <NavalViewport
+            state={state}
+            events={state.events}
+            battleGeneration={battleGeneration}
+            sceneFactory={sceneFactory}
+            reducedMotion={reducedMotion}
+            cameraShake={effectiveShake}
+            reducedFlashes={sensory.reducedFlashes}
+            aimCue={aimCue}
+            onRestart={() => session.restart()}
+          />
+        </div>
 
-        <div className="naval-command-deck">
-          <FireControl buttonRef={portFireRef} side="port" onFire={() => { activateAudio(); session.requestFire('port'); }} disabled={Boolean(outcome || diagnostic)} />
-          <div className="naval-tactical-center">
-            <NavalViewport
-              state={state}
-              events={state.events}
-              battleGeneration={battleGeneration}
-              sceneFactory={sceneFactory}
-              reducedMotion={reducedMotion}
-              cameraShake={effectiveShake}
-              reducedFlashes={sensory.reducedFlashes}
-              aimCue={aimCue}
-              onRestart={() => session.restart()}
-            />
-            <div className="naval-steering" aria-label="Rudder controls">
-              <RudderControl side="port" onHold={holdRudder} onActivate={activateAudio} />
-              <div className="naval-steering__keel"><span>Rudder</span>{sensory.steeringHint && <strong>A / D</strong>}</div>
-              <RudderControl side="starboard" onHold={holdRudder} onActivate={activateAudio} />
+        <div className="naval-battle-overlay">
+          <BattleHud state={state} paused={paused} onTogglePause={() => { activateAudio(); session.togglePause(); }} />
+          {aimCue && <p className="naval-aim-cue" data-testid="naval-aim-cue">{aimCue.message}</p>}
+
+          <div className="naval-command-dock">
+            <div className="naval-command-strip" role="group" aria-label="Battle commands">
+              <RudderControl side="port" shortcut="A" onHold={holdRudder} onActivate={activateAudio} />
+              <FireControl buttonRef={portFireRef} side="port" onFire={() => { activateAudio(); session.requestFire('port'); }} disabled={Boolean(outcome || diagnostic)} />
+              <div className="naval-ammunition-controls" role="group" aria-label="Ammunition">
+                {(['round', 'chain', 'grape'] as const).map((ammunition, index) => (
+                  <button
+                    key={ammunition}
+                    type="button"
+                    className="naval-control naval-hit-target naval-command-control"
+                    data-testid={`naval-ammo-${ammunition}`}
+                    aria-pressed={currentCommand.ammunition === ammunition}
+                    onClick={() => { activateAudio(); session.setAmmunition(ammunition); }}
+                  ><kbd>{index + 1}</kbd><span>{ammunition.charAt(0).toUpperCase() + ammunition.slice(1)}</span></button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="naval-control naval-hit-target naval-command-control naval-sail-control"
+                data-testid={`naval-sail-${currentCommand.sail === 'full' ? 'reefed' : 'full'}`}
+                aria-pressed={currentCommand.sail === 'reefed'}
+                onClick={() => { activateAudio(); session.setSail(currentCommand.sail === 'full' ? 'reefed' : 'full'); }}
+              ><kbd>R</kbd><span>{currentCommand.sail === 'full' ? 'Reef sail' : 'Full sail'}</span></button>
+              <FireControl side="starboard" onFire={() => { activateAudio(); session.requestFire('starboard'); }} disabled={Boolean(outcome || diagnostic)} />
+              <RudderControl side="starboard" shortcut="D" onHold={holdRudder} onActivate={activateAudio} />
+              <details className="naval-options" data-testid="naval-options">
+                <summary className="naval-control naval-hit-target" data-testid="naval-options-toggle">Options</summary>
+                <div className="naval-options__panel">
+                  <button
+                    type="button"
+                    className="naval-control naval-hit-target naval-restart"
+                    data-testid="naval-restart"
+                    onClick={() => { activateAudio(); session.restart(); }}
+                  ><RotateIcon size={18} /> Restart duel</button>
+                  <fieldset className="naval-sensory-controls" aria-label="Battle feedback settings">
+                    <legend>Battle feedback</legend>
+                    <SensoryToggle testId="naval-setting-aim" label="Aim assist" pressed={sensory.aim} onToggle={() => setSensory((value) => ({ ...value, aim: !value.aim }))} />
+                    <SensoryToggle testId="naval-setting-steering" label="Steering hint" pressed={sensory.steeringHint} onToggle={() => setSensory((value) => ({ ...value, steeringHint: !value.steeringHint }))} />
+                    <SensoryToggle testId="naval-setting-shake" label="Camera shake" pressed={sensory.shake} onToggle={() => setSensory((value) => ({ ...value, shake: !value.shake }))} />
+                    <SensoryToggle testId="naval-setting-flashes" label="Reduced flashes" pressed={sensory.reducedFlashes} onToggle={() => setSensory((value) => ({ ...value, reducedFlashes: !value.reducedFlashes }))} />
+                    <label className="naval-effects-volume">Effects <input data-testid="naval-setting-effects" type="range" min="0" max="1" step="0.1" value={sensory.effects} onChange={(event) => setSensory((value) => ({ ...value, effects: Number(event.target.value) }))} /></label>
+                    <SensoryToggle testId="naval-setting-mute" label="Mute" pressed={sensory.muted} onToggle={() => setSensory((value) => ({ ...value, muted: !value.muted }))} />
+                  </fieldset>
+                </div>
+              </details>
             </div>
           </div>
-          <FireControl side="starboard" onFire={() => { activateAudio(); session.requestFire('starboard'); }} disabled={Boolean(outcome || diagnostic)} />
         </div>
-
-        <div className="naval-order-controls">
-          <OrderGroup label="Sail setting">
-            {(['full', 'reefed'] as const).map((sail) => (
-              <button
-                key={sail}
-                type="button"
-                className="naval-control naval-hit-target"
-                data-testid={`naval-sail-${sail}`}
-                aria-pressed={currentCommand.sail === sail}
-                onClick={() => { activateAudio(); session.setSail(sail); }}
-              >{sail === 'full' ? 'Full sail' : 'Reefed'}</button>
-            ))}
-          </OrderGroup>
-          <OrderGroup label="Ammunition">
-            {(['round', 'chain', 'grape'] as const).map((ammunition) => (
-              <button
-                key={ammunition}
-                type="button"
-                className="naval-control naval-hit-target"
-                data-testid={`naval-ammo-${ammunition}`}
-                aria-pressed={currentCommand.ammunition === ammunition}
-                onClick={() => { activateAudio(); session.setAmmunition(ammunition); }}
-              >{ammunition.charAt(0).toUpperCase() + ammunition.slice(1)}</button>
-            ))}
-          </OrderGroup>
-          <button
-            type="button"
-            className="naval-control naval-hit-target naval-restart"
-            data-testid="naval-restart"
-            onClick={() => { activateAudio(); session.restart(); }}
-          ><RotateIcon size={18} /> Restart duel</button>
-        </div>
-
-        <fieldset className="naval-sensory-controls" aria-label="Battle feedback settings">
-          <legend>Battle feedback</legend>
-          <SensoryToggle testId="naval-setting-aim" label="Aim assist" pressed={sensory.aim} onToggle={() => setSensory((value) => ({ ...value, aim: !value.aim }))} />
-          <SensoryToggle testId="naval-setting-steering" label="Steering hint" pressed={sensory.steeringHint} onToggle={() => setSensory((value) => ({ ...value, steeringHint: !value.steeringHint }))} />
-          <SensoryToggle testId="naval-setting-shake" label="Camera shake" pressed={sensory.shake} onToggle={() => setSensory((value) => ({ ...value, shake: !value.shake }))} />
-          <SensoryToggle testId="naval-setting-flashes" label="Reduced flashes" pressed={sensory.reducedFlashes} onToggle={() => setSensory((value) => ({ ...value, reducedFlashes: !value.reducedFlashes }))} />
-          <label className="naval-effects-volume">Effects <input data-testid="naval-setting-effects" type="range" min="0" max="1" step="0.1" value={sensory.effects} onChange={(event) => setSensory((value) => ({ ...value, effects: Number(event.target.value) }))} /></label>
-          <SensoryToggle testId="naval-setting-mute" label="Mute" pressed={sensory.muted} onToggle={() => setSensory((value) => ({ ...value, muted: !value.muted }))} />
-          <span data-testid="naval-effective-shake" className="naval-visually-hidden">Camera shake {effectiveShake ? 'enabled' : 'disabled'}</span>
-        </fieldset>
+        <span data-testid="naval-effective-shake" className="naval-visually-hidden">Camera shake {effectiveShake ? 'enabled' : 'disabled'}</span>
         <p ref={reloadAnnouncementRef} className="naval-visually-hidden" aria-live="polite" aria-atomic="true" data-testid="naval-reload-announcement" />
-        {aimCue && <p className="naval-aim-cue" data-testid="naval-aim-cue">{aimCue.message}</p>}
 
         {paused && !diagnostic && !outcome && (
           <div className="naval-pause-banner" role="status">Battle paused <span>Escape or Resume continues</span></div>
@@ -417,15 +405,12 @@ function FireControl({
       disabled={disabled}
     >
       <span className="naval-fire-control__key">{isPort ? 'Q' : 'E'}</span>
-      <CannonIcon />
       <strong>Fire {side}</strong>
-      <span>{isPort ? 'Port battery' : 'Starboard battery'}</span>
     </button>
   );
 }
 
-function RudderControl({ side, onHold, onActivate }: { side: 'port' | 'starboard'; onHold(side: 'port' | 'starboard', active: boolean): void; onActivate(): void }) {
-  const value: Rudder = side === 'port' ? -1 : 1;
+function RudderControl({ side, shortcut, onHold, onActivate }: { side: 'port' | 'starboard'; shortcut: 'A' | 'D'; onHold(side: 'port' | 'starboard', active: boolean): void; onActivate(): void }) {
   const pulse = () => {
     onHold(side, true);
     window.setTimeout(() => onHold(side, false), 140);
@@ -449,12 +434,8 @@ function RudderControl({ side, onHold, onActivate }: { side: 'port' | 'starboard
       }}
       aria-label={`Turn ${side}`}
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d={value < 0 ? 'M19 5 7 12l12 7M7 12h14' : 'm5 5 12 7-12 7M17 12H3'} /></svg>
+      <kbd>{shortcut}</kbd>
       <span>Turn {side}</span>
     </button>
   );
-}
-
-function OrderGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return <fieldset className="naval-order-group"><legend>{label}</legend><div>{children}</div></fieldset>;
 }
