@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -80,10 +80,15 @@ function openingState(): CampaignStateV1 {
   return createCampaign({ seed: 1702, name: 'Morgan' });
 }
 
+async function appliedTrade() {
+  return { kind: 'applied' as const, eventId: 1 };
+}
+
 function StatefulMarket() {
   const [journal, setJournal] = useState(() => createJournal(openingState()));
   const trade = async (draft: CampaignEventDraftFor<'market-traded'>) => {
     setJournal((current) => appendJournal(current, draft));
+    return { kind: 'applied' as const, eventId: 1 };
   };
   return <Market state={journal.state} busy={false} onTrade={trade} />;
 }
@@ -117,7 +122,7 @@ afterEach(() => {
 
 describe('<Market>', () => {
   it('renders the six authored goods in order as a compact fixed-price cargo ledger', () => {
-    render(<Market state={openingState()} busy={false} onTrade={vi.fn(async () => undefined)} />);
+    render(<Market state={openingState()} busy={false} onTrade={appliedTrade} />);
 
     const summary = screen.getByRole('region', { name: 'Cargo summary' });
     expect(summary).toHaveTextContent('500 gold');
@@ -150,7 +155,7 @@ describe('<Market>', () => {
   });
 
   it('gives all six one-tap actions per good a unique name, test id, and 44px target contract', () => {
-    render(<Market state={openingState()} busy={false} onTrade={vi.fn(async () => undefined)} />);
+    render(<Market state={openingState()} busy={false} onTrade={appliedTrade} />);
 
     expect(screen.getByRole('button', { name: 'Sell all Provisions' })).toHaveAttribute('data-testid', 'market-provisions-sell-all');
     expect(screen.getByRole('button', { name: 'Sell 5 Provisions' })).toHaveAttribute('data-testid', 'market-provisions-sell-5');
@@ -173,7 +178,7 @@ describe('<Market>', () => {
 
   it('disables impossible actions and places the exact reason beside their row', () => {
     const { rerender } = render(
-      <Market state={openingState()} busy={false} onTrade={vi.fn(async () => undefined)} />,
+      <Market state={openingState()} busy={false} onTrade={appliedTrade} />,
     );
 
     const toolsSellFive = screen.getByRole('button', { name: 'Sell 5 Tools & common goods' });
@@ -187,24 +192,25 @@ describe('<Market>', () => {
 
     const full = openingState();
     full.fleet.ships[0].cargo['sugar-molasses'] = 46;
-    rerender(<Market state={full} busy={false} onTrade={vi.fn(async () => undefined)} />);
+    rerender(<Market state={full} busy={false} onTrade={appliedTrade} />);
     const noSpace = screen.getByRole('button', { name: 'Buy 1 Provisions' });
     expect(noSpace).toBeDisabled();
     expect(noSpace).toHaveAccessibleDescription('Not enough hold space.');
 
     const poor = openingState();
     poor.wealth.gold = 3;
-    rerender(<Market state={poor} busy={false} onTrade={vi.fn(async () => undefined)} />);
+    rerender(<Market state={poor} busy={false} onTrade={appliedTrade} />);
     const noGold = screen.getByRole('button', { name: 'Buy 1 Provisions' });
     expect(noGold).toBeDisabled();
     expect(noGold).toHaveAccessibleDescription('Not enough gold.');
   });
 
-  it('dispatches exactly one resolved semantic event for one click', () => {
-    const onTrade = vi.fn(async () => undefined);
+  it('dispatches exactly one resolved semantic event for one click', async () => {
+    const onTrade = vi.fn(appliedTrade);
     render(<Market state={openingState()} busy={false} onTrade={onTrade} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Buy 5 Provisions' }));
+    await act(async () => { await Promise.resolve(); });
 
     expect(onTrade).toHaveBeenCalledTimes(1);
     expect(onTrade).toHaveBeenCalledWith({
@@ -219,14 +225,15 @@ describe('<Market>', () => {
     });
   });
 
-  it('quotes every click from current props instead of retaining a stale quote', () => {
-    const onTrade = vi.fn(async () => undefined);
+  it('quotes every click from current props instead of retaining a stale quote', async () => {
+    const onTrade = vi.fn(appliedTrade);
     const { rerender } = render(<Market state={openingState()} busy={false} onTrade={onTrade} />);
     const changed = openingState();
     changed.fleet.ships[0].cargo.provisions = 2;
     rerender(<Market state={changed} busy={false} onTrade={onTrade} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Sell all Provisions' }));
+    await act(async () => { await Promise.resolve(); });
 
     expect(onTrade).toHaveBeenCalledTimes(1);
     expect(onTrade).toHaveBeenCalledWith(expect.objectContaining({
@@ -235,33 +242,115 @@ describe('<Market>', () => {
     }));
   });
 
-  it('bounds Max by both the sloop hold and current gold', () => {
-    const onTrade = vi.fn(async () => undefined);
+  it('bounds Max by both the sloop hold and current gold', async () => {
+    const onTrade = vi.fn(appliedTrade);
     const { rerender } = render(<Market state={openingState()} busy={false} onTrade={onTrade} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Buy maximum Provisions' }));
     expect(onTrade).toHaveBeenLastCalledWith(expect.objectContaining({
       payload: expect.objectContaining({ cargoId: 'provisions', delta: 46 }),
     }));
+    await act(async () => { await Promise.resolve(); });
 
     const goldLimited = openingState();
     goldLimited.wealth.gold = 100;
     rerender(<Market state={goldLimited} busy={false} onTrade={onTrade} />);
     fireEvent.click(screen.getByRole('button', { name: 'Buy maximum Luxuries' }));
+    await act(async () => { await Promise.resolve(); });
     expect(onTrade).toHaveBeenLastCalledWith(expect.objectContaining({
       payload: expect.objectContaining({ cargoId: 'luxuries', delta: 3 }),
     }));
   });
 
   it('disables every trade while busy with a visible adjacent reason', () => {
-    render(<Market state={openingState()} busy onTrade={vi.fn(async () => undefined)} />);
+    render(<Market state={openingState()} busy onTrade={appliedTrade} />);
 
-    expect(screen.getAllByRole('button')).toHaveLength(36);
-    for (const control of screen.getAllByRole('button')) {
+    const controls = screen.getAllByRole('button');
+    expect(controls).toHaveLength(36);
+    for (const control of controls) {
       expect(control).toBeDisabled();
-      expect(control).toHaveAccessibleDescription('Trade is being saved.');
     }
-    expect(screen.getAllByText('Trade is being saved.')).toHaveLength(6);
+    expect(controls[0]).not.toHaveAccessibleDescription('Trade is being saved.');
+    expect(screen.queryByText('Trade is being saved.')).not.toBeInTheDocument();
+  });
+
+  it('keeps reason slots and one polite status node stable through saving and resolution', async () => {
+    let resolveTrade!: (value: { kind: 'applied'; eventId: number }) => void;
+    const onTrade = vi.fn(() => new Promise<{ kind: 'applied'; eventId: number }>((resolve) => {
+      resolveTrade = resolve;
+    }));
+    const { container } = render(<Market state={openingState()} busy={false} onTrade={onTrade} />);
+
+    const status = screen.getByTestId('caribbean-market-status');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveTextContent('');
+    expect(container.querySelectorAll('.caribbean-market-reasons')).toHaveLength(6);
+    expect(screen.getByTestId('caribbean-market')).toHaveAttribute('aria-busy', 'false');
+
+    const action = screen.getByTestId('market-provisions-buy-5');
+    action.focus();
+    fireEvent.click(action);
+    expect(onTrade).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('caribbean-market-status')).toBe(status);
+    expect(status).toHaveTextContent('Saving trade.');
+    expect(screen.getByTestId('caribbean-market')).toHaveAttribute('aria-busy', 'true');
+    expect(document.activeElement).toBe(action);
+
+    await act(async () => { resolveTrade({ kind: 'applied', eventId: 1 }); });
+    expect(screen.getByTestId('caribbean-market-status')).toBe(status);
+    expect(status).toHaveTextContent('Cargo ledger updated.');
+    expect(screen.getByTestId('caribbean-market')).toHaveAttribute('aria-busy', 'false');
+    expect(document.activeElement).toBe(action);
+  });
+
+  it.each([
+    ['not applied', async () => ({ kind: 'not-applied' as const }), 'Trade was not saved.'],
+    ['rejected', async () => { throw new Error('writer rejected'); }, 'Trade was not saved.'],
+  ])('releases local trade ownership and announces failure when dispatch is %s', async (_label, onTrade, copy) => {
+    const trade = vi.fn(onTrade);
+    render(<Market state={openingState()} busy={false} onTrade={trade} />);
+
+    const action = screen.getByTestId('market-provisions-buy-5');
+    await act(async () => {
+      fireEvent.click(action);
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('caribbean-market-status')).toHaveTextContent(copy);
+    await act(async () => {
+      fireEvent.click(action);
+      await Promise.resolve();
+    });
+    expect(trade).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps an activated action focusable and guarded after its resolved trade makes it illegal', async () => {
+    function ExhaustingMarket() {
+      const [state, setState] = useState(() => {
+        const next = openingState();
+        next.fleet.ships[0].cargo.provisions = 1;
+        return next;
+      });
+      return <Market
+        state={state}
+        busy={false}
+        onTrade={async (draft) => {
+          setState((current) => appendJournal(createJournal(current), draft).state);
+          return { kind: 'applied', eventId: 1 };
+        }}
+      />;
+    }
+
+    render(<ExhaustingMarket />);
+    const action = screen.getByTestId('market-provisions-sell-all');
+    action.focus();
+    fireEvent.click(action);
+    await waitFor(() => expect(screen.getByTestId('caribbean-market-status')).toHaveTextContent('Cargo ledger updated.'));
+    expect(action).toHaveAttribute('aria-disabled', 'true');
+    expect(action).toBeEnabled();
+    expect(document.activeElement).toBe(action);
+    fireEvent.keyDown(action, { key: 'Enter' });
+    fireEvent.keyDown(action, { key: ' ' });
+    expect(screen.getByTestId('caribbean-market-status')).toHaveTextContent('Cargo ledger updated.');
   });
 
   it.each([
@@ -272,7 +361,7 @@ describe('<Market>', () => {
   ] as const)('shows text-and-shape provision severity for %i provisions', (quantity, months, severity) => {
     const state = openingState();
     state.fleet.ships[0].cargo.provisions = quantity;
-    render(<Market state={state} busy={false} onTrade={vi.fn(async () => undefined)} />);
+    render(<Market state={state} busy={false} onTrade={appliedTrade} />);
 
     const summary = screen.getByRole('region', { name: 'Cargo summary' });
     expect(summary).toHaveTextContent(months);
@@ -289,7 +378,7 @@ describe('<Market>', () => {
   it('renders only the six cargo resources without consuming or mutating campaign state', () => {
     const state = openingState();
     const before = structuredClone(state);
-    render(<Market state={state} busy={false} onTrade={vi.fn(async () => undefined)} />);
+    render(<Market state={state} busy={false} onTrade={appliedTrade} />);
 
     expect(state).toEqual(before);
     expect(screen.getAllByRole('listitem')).toHaveLength(CARGO_IDS.length);

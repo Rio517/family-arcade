@@ -1,3 +1,5 @@
+import { useRef, useState } from 'react';
+
 import { CARGO_IDS } from '../../content/campaign';
 import { BRIDGETOWN_MARKET, GOODS } from '../../content/market';
 import { SLOOP_CLASS } from '../../content/naval';
@@ -13,12 +15,15 @@ import {
 import type { CampaignEventDraftFor } from '../../domain/events';
 import { provisionsMonths } from '../../domain/selectors';
 import type { CampaignStateV1, ShipState } from '../../domain/types';
+import type { CampaignDispatchOutcome } from '../../state/useCaribbean';
 
 export interface MarketProps {
   state: CampaignStateV1;
   busy: boolean;
-  onTrade(draft: CampaignEventDraftFor<'market-traded'>): Promise<void>;
+  onTrade(draft: CampaignEventDraftFor<'market-traded'>): Promise<CampaignDispatchOutcome>;
 }
+
+type MarketPhase = 'idle' | 'saving' | 'success' | 'failure';
 
 type MarketActionId = 'sell-all' | 'sell-5' | 'sell-1' | 'buy-1' | 'buy-5' | 'buy-max';
 
@@ -115,9 +120,7 @@ function actionView(
   ship: ShipState,
   cargoId: CargoId,
   action: MarketActionDefinition,
-  busy: boolean,
 ): MarketActionView {
-  if (busy) return { ...action, disabled: true, reason: 'Trade is being saved.' };
   const owned = ship.cargo[cargoId];
   const delta = actionDelta(state, ship, cargoId, action.id);
   if (delta === 0) {
@@ -181,16 +184,22 @@ function CargoRow({
   ship,
   cargoId,
   busy,
+  phase,
+  retainedActionId,
   onTrade,
+  onSettleFocus,
 }: {
   state: CampaignStateV1;
   ship: ShipState;
   cargoId: CargoId;
   busy: boolean;
-  onTrade: MarketProps['onTrade'];
+  phase: MarketPhase;
+  retainedActionId: string | null;
+  onTrade(draft: CampaignEventDraftFor<'market-traded'>, actionTestId: string): Promise<void>;
+  onSettleFocus(testId: string): void;
 }) {
   const good = GOODS[cargoId];
-  const actions = MARKET_ACTIONS.map((action) => actionView(state, ship, cargoId, action, busy));
+  const actions = MARKET_ACTIONS.map((action) => actionView(state, ship, cargoId, action));
   const reasonIds = new Map<string, string>();
   for (const action of actions) {
     if (action.reason !== null && !reasonIds.has(action.reason)) {
@@ -198,15 +207,15 @@ function CargoRow({
     }
   }
 
-  const trade = (actionId: MarketActionId): void => {
-    if (busy) return;
+  const trade = (actionId: MarketActionId, testId: string, disabled: boolean): void => {
+    if (busy || phase === 'saving' || disabled) return;
     const currentShip = flagship(state);
     if (currentShip === null) return;
     const delta = actionDelta(state, currentShip, cargoId, actionId);
     if (delta === 0) return;
     const freshQuote = requestQuote(state, currentShip, cargoId, delta);
     if (!freshQuote.ok) return;
-    void onTrade(marketTradeDraft(freshQuote));
+    void onTrade(marketTradeDraft(freshQuote), testId);
   };
 
   return (
@@ -220,40 +229,83 @@ function CargoRow({
         <PriceCue cargoId={cargoId} />
       </div>
       <div className="caribbean-market-command">
-        <div className="caribbean-market-actions">
+        <div className="caribbean-market-actions" data-testid={`market-${cargoId}-actions`}>
           {actions.map((action) => (
-            <button
-              key={action.id}
-              className="caribbean-market-action"
-              data-testid={`market-${cargoId}-${action.id}`}
-              type="button"
-              disabled={action.disabled}
-              aria-label={`${action.accessibleVerb} ${good.name}`}
-              aria-describedby={action.reason === null ? undefined : reasonIds.get(action.reason)}
-              onClick={() => trade(action.id)}
-            >
-              {action.label}
-            </button>
+            (() => {
+              const testId = `market-${cargoId}-${action.id}`;
+              const retained = retainedActionId === testId;
+              const guarded = phase === 'saving' || retained && phase !== 'idle' && action.disabled;
+              const disabled = !retained && (busy || phase === 'saving' || action.disabled);
+              return (
+                <button
+                  key={action.id}
+                  className="caribbean-market-action"
+                  data-testid={testId}
+                  type="button"
+                  disabled={disabled}
+                  aria-disabled={guarded || undefined}
+                  aria-label={`${action.accessibleVerb} ${good.name}`}
+                  aria-describedby={action.reason === null ? undefined : reasonIds.get(action.reason)}
+                  onFocus={() => onSettleFocus(testId)}
+                  onKeyDown={(event) => {
+                    if (guarded && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
+                  }}
+                  onClick={() => trade(action.id, testId, action.disabled || guarded)}
+                >
+                  {action.label}
+                </button>
+              );
+            })()
           ))}
         </div>
-        {reasonIds.size > 0 && (
-          <div className="caribbean-market-reasons" aria-live="polite">
-            {[...reasonIds].map(([reason, id]) => <span id={id} key={id}>{reason}</span>)}
-          </div>
-        )}
+        <div className="caribbean-market-reasons">
+          {[...reasonIds].map(([reason, id]) => <span id={id} key={id}>{reason}</span>)}
+        </div>
       </div>
     </li>
   );
 }
 
 export function Market({ state, busy, onTrade }: MarketProps) {
+  const [phase, setPhase] = useState<MarketPhase>('idle');
+  const [retainedActionId, setRetainedActionId] = useState<string | null>(null);
+  const savingRef = useRef(false);
   const ship = flagship(state);
   if (ship === null) return <p className="caribbean-alert" role="alert">The flagship record is unavailable.</p>;
   const months = provisionsMonths(state);
   const holdUsed = shipHoldUsed(ship);
 
+  const startTrade = async (
+    draft: CampaignEventDraftFor<'market-traded'>,
+    actionTestId: string,
+  ): Promise<void> => {
+    if (savingRef.current || busy) return;
+    savingRef.current = true;
+    setRetainedActionId(actionTestId);
+    setPhase('saving');
+    try {
+      const outcome = await onTrade(draft);
+      setPhase(outcome.kind === 'applied' ? 'success' : 'failure');
+    } catch {
+      setPhase('failure');
+    } finally {
+      savingRef.current = false;
+    }
+  };
+
+  const settleFocus = (testId: string): void => {
+    if (phase !== 'saving' && phase !== 'idle' && retainedActionId !== testId) {
+      setRetainedActionId(null);
+      setPhase('idle');
+    }
+  };
+
   return (
-    <div className="caribbean-market">
+    <section className="caribbean-market" data-testid="caribbean-market" aria-busy={phase === 'saving'}>
+      <p className="caribbean-market-status" data-testid="caribbean-market-status" aria-live="polite">
+        {phase === 'idle' ? '' : phase === 'saving' ? 'Saving trade.'
+          : phase === 'success' ? 'Cargo ledger updated.' : 'Trade was not saved.'}
+      </p>
       <dl className="caribbean-market-summary" role="region" aria-label="Cargo summary">
         <div><dt>Gold</dt><dd>{state.wealth.gold} gold</dd></div>
         <div><dt>Flagship hold</dt><dd>{holdUsed} / {SLOOP_CLASS.hold} hold</dd></div>
@@ -273,10 +325,13 @@ export function Market({ state, busy, onTrade }: MarketProps) {
             ship={ship}
             cargoId={cargoId}
             busy={busy}
-            onTrade={onTrade}
+            phase={phase}
+            retainedActionId={retainedActionId}
+            onTrade={startTrade}
+            onSettleFocus={settleFocus}
           />
         ))}
       </ul>
-    </div>
+    </section>
   );
 }

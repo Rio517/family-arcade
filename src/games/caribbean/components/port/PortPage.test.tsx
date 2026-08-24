@@ -215,7 +215,7 @@ function makeRuntime(storage: StorageLike): CaribbeanRuntime {
 }
 
 function StatefulPort({
-  dispatch = vi.fn(async () => undefined),
+  dispatch = vi.fn(async () => ({ kind: 'not-applied' as const })),
   onSelection = vi.fn(),
 }: {
   dispatch?: CaribbeanController['dispatch'];
@@ -290,7 +290,7 @@ describe('<PortPage>', () => {
   });
 
   it('opens six useful nonempty activities without dispatching a canonical event', () => {
-    const dispatch = vi.fn(async () => undefined);
+    const dispatch = vi.fn(async () => ({ kind: 'not-applied' as const }));
     const onSelection = vi.fn();
     render(<StatefulPort dispatch={dispatch} onSelection={onSelection} />);
 
@@ -473,7 +473,7 @@ describe('<PortPage>', () => {
     expect(navigation.parentElement).toBe(shell);
     expect(activity).toContainElement(back);
     expect(rows).toHaveLength(6);
-    expect(reasonRows).toHaveLength(5);
+    expect(reasonRows).toHaveLength(6);
 
     const viewportWidth = 1440;
     const viewportHeight = 900;
@@ -510,6 +510,7 @@ describe('<PortPage>', () => {
 
     expect(declaration(stageRule, 'min-height')).toBe('0');
     expect(declaration(marketStageRule, 'overflow-y')).toBe('auto');
+    expect(declaration(marketStageRule, 'scrollbar-gutter')).toBe('stable');
 
     const captainLine = lineBoxPixels(
       desktopCss,
@@ -592,12 +593,9 @@ describe('<PortPage>', () => {
       ['.caribbean-market-action'],
     ), viewportWidth);
     const rowRule = ruleBodyContaining(desktopCss, '.caribbean-market-row');
-    const rowChrome = shorthandBlockPixels(declaration(rowRule, 'padding') ?? '', viewportWidth) + 1;
-    const reasonsRule = ruleBodyWithDeclaration(desktopCss, '.caribbean-market-reasons', 'min-height');
-    const reasonHeight = lengthPixels(declaration(reasonsRule, 'min-height') ?? '', viewportWidth)
-      + lengthPixels(declaration(reasonsRule, 'margin-top') ?? '', viewportWidth);
-    const rowsHeight = marketActionHeight + rowChrome
-      + reasonRows.length * (marketActionHeight + reasonHeight + rowChrome);
+    const rowMinimum = lengthPixels(declaration(rowRule, 'min-block-size') ?? '', viewportWidth);
+    const rowHeight = rowMinimum;
+    const rowsHeight = rowHeight * rows.length;
 
     const closeRule = ruleBodyContaining(desktopCss, '.caribbean-port-close');
     const closeStyleRule = ruleBodyContaining(desktopCss, '.caribbean-port .caribbean-port-close');

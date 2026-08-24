@@ -22,7 +22,7 @@ function controller(overrides: Partial<CaribbeanController> = {}): CaribbeanCont
     start: vi.fn().mockResolvedValue(undefined),
     resume: vi.fn().mockResolvedValue(undefined),
     continueWithoutSaving: vi.fn(),
-    dispatch: vi.fn().mockResolvedValue(undefined),
+    dispatch: vi.fn().mockResolvedValue({ kind: 'not-applied' }),
     retrySaving: vi.fn().mockResolvedValue(undefined),
     reloadExternalSave: vi.fn().mockResolvedValue(undefined),
     exportInMemoryJournal: vi.fn(() => '{"journal":"exact"}'),

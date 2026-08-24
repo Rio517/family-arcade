@@ -116,6 +116,10 @@ export type CaribbeanPersistencePhase =
       }>;
     };
 
+export type CampaignDispatchOutcome =
+  | { kind: 'applied'; eventId: number }
+  | { kind: 'not-applied' };
+
 export interface CaribbeanController {
   load: LoadResult;
   journal: CampaignJournal | null;
@@ -127,7 +131,7 @@ export interface CaribbeanController {
   start(options: Omit<CreateCampaignOptions, 'seed'>): Promise<void>;
   resume(): Promise<void>;
   continueWithoutSaving(): void;
-  dispatch(draft: CampaignEventDraft): Promise<void>;
+  dispatch(draft: CampaignEventDraft): Promise<CampaignDispatchOutcome>;
   retrySaving(): Promise<void>;
   reloadExternalSave(): Promise<void>;
   exportInMemoryJournal(): string | null;
@@ -635,21 +639,21 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     setPersistence(next);
   }, [runtime]);
 
-  const dispatch = useCallback(async (draft: CampaignEventDraft): Promise<void> => {
+  const dispatch = useCallback(async (draft: CampaignEventDraft): Promise<CampaignDispatchOutcome> => {
     const activeJournal = journalRef.current;
     const phase = persistenceRef.current;
-    if (activeJournal === null || busyRef.current) return;
+    if (activeJournal === null || busyRef.current) return { kind: 'not-applied' };
     if (phase.kind === 'memory-only') {
       const candidate = appendJournal(activeJournal, draft);
       journalRef.current = candidate;
       setJournal(candidate);
       const pending = pendingRef.current;
       if (pending?.kind === 'memory-save') pendingRef.current = { ...pending, candidate };
-      return;
+      return { kind: 'applied', eventId: candidate.state.lastEventId };
     }
-    if (phase.kind !== 'persisted') return;
+    if (phase.kind !== 'persisted') return { kind: 'not-applied' };
     const expectedRevision = revisionOf(loadRef.current);
-    if (expectedRevision === null) return;
+    if (expectedRevision === null) return { kind: 'not-applied' };
     const candidate = appendJournal(activeJournal, draft);
     const intent: Extract<PendingIntent, { kind: 'event' }> = {
       kind: 'event',
@@ -658,7 +662,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
       expectedRevision: cloneRevision(expectedRevision),
     };
     const generation = begin();
-    if (generation === null) return;
+    if (generation === null) return { kind: 'not-applied' };
     try {
       const runResult = await runtime.writer.run(() => reconcileSaveInsideLock(
         runtime,
@@ -667,11 +671,15 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
         expectedRevision,
         runtime.now(),
       ));
-      if (!current(generation)) return;
+      if (!current(generation)) return { kind: 'not-applied' };
       if (runResult.kind === 'operation-result') {
         applyLockedSave(generation, intent, runResult.result);
+        return runResult.result.kind === 'saved'
+          ? { kind: 'applied', eventId: runResult.result.journal.state.lastEventId }
+          : { kind: 'not-applied' };
       } else {
         holdForConsent(generation, intent, writerFailure(runResult)!);
+        return { kind: 'not-applied' };
       }
     } finally {
       finish(generation);

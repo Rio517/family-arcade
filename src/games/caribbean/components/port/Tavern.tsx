@@ -3,11 +3,12 @@ import { useRef, useState } from 'react';
 import type { CampaignEventDraftFor } from '../../domain/events';
 import { redJackdawView } from '../../domain/leadSelectors';
 import type { CampaignStateV1 } from '../../domain/types';
+import type { CampaignDispatchOutcome } from '../../state/useCaribbean';
 
 export interface TavernProps {
   state: CampaignStateV1;
   busy: boolean;
-  onAccept(draft: CampaignEventDraftFor<'lead-accepted'>): Promise<void>;
+  onAccept(draft: CampaignEventDraftFor<'lead-accepted'>): Promise<CampaignDispatchOutcome>;
 }
 
 export function Tavern({ state, busy, onAccept }: TavernProps) {

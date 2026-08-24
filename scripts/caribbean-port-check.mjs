@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from 'playwright';
-import { evaluatePortIdentityEvidence } from './lib/caribbean-port-identity-evidence.mjs';
+import { evaluatePortIdentityEvidence, marketStabilityFailure, validateMarketStability } from './lib/caribbean-port-identity-evidence.mjs';
 
 const MODULE_URL = new URL(import.meta.url);
 const ROOT = fileURLToPath(new URL('..', MODULE_URL));
@@ -52,7 +52,8 @@ const VIEWPORTS = {
   minimumHeight: { width: 960, height: 599, supported: false },
   largePortrait: { width: 1024, height: 1366, supported: false },
 };
-const NOW_FIXTURES = Array.from({ length: 32 }, (_, index) => 1_700_000_000_000 + index * 1_000);
+export const MARKET_PROBE_MINIMUM_NOW_FIXTURES = 42;
+export const NOW_FIXTURES = Array.from({ length: 96 }, (_, index) => 1_700_000_000_000 + index * 1_000);
 const SEED_FIXTURES = [1702, 2702, 3702, 4702, 5702, 6702, 7702, 8702];
 const UUID_FIXTURES = Array.from(
   { length: 12 },
@@ -281,6 +282,18 @@ async function installBrowserBoundary(context) {
         },
       });
 
+      let releaseHeldWriter = null;
+      const control = {
+        traceKey,
+        writerLock,
+        holdNextWriter: false,
+        writerHeld: false,
+        releaseWriter() {
+          releaseHeldWriter?.();
+          releaseHeldWriter = null;
+          control.writerHeld = false;
+        },
+      };
       if (typeof LockManager !== 'undefined') {
         const nativeRequest = LockManager.prototype.request;
         Object.defineProperty(LockManager.prototype, 'request', {
@@ -288,12 +301,18 @@ async function installBrowserBoundary(context) {
           value(name, options, callback) {
             trace.locks.push({ name, mode: options?.mode ?? 'exclusive' });
             persist();
-            return nativeRequest.call(this, name, options, callback);
+            if (name !== writerLock || !control.holdNextWriter) return nativeRequest.call(this, name, options, callback);
+            control.holdNextWriter = false;
+            return nativeRequest.call(this, name, options, async (lock) => {
+              control.writerHeld = true;
+              await new Promise((resolve) => { releaseHeldWriter = resolve; });
+              return callback(lock);
+            });
           },
         });
       }
       persist();
-      window.__CARIBBEAN_PORT_CHECK__ = { traceKey, writerLock };
+      window.__CARIBBEAN_PORT_CHECK__ = control;
     },
     {
       nowFixtures: NOW_FIXTURES,
@@ -534,6 +553,108 @@ async function capture(page, screenshots, directory, filename) {
   fs.writeFileSync(path.join(directory, filename), bytes);
 }
 
+async function readMarketGeometry(page, phase, actionTestId) {
+  return page.evaluate(({ samplePhase, actionId }) => {
+    const rect = (element) => {
+      const value = element.getBoundingClientRect();
+      return { x: value.x, y: value.y, width: value.width, height: value.height };
+    };
+    const stage = document.querySelector('.caribbean-port-stage--market');
+    const rows = [...document.querySelectorAll('.caribbean-market-row')];
+    const strips = [...document.querySelectorAll('.caribbean-market-actions')];
+    const status = document.querySelector('[data-testid="caribbean-market-status"]');
+    if (!(stage instanceof HTMLElement) || !(status instanceof HTMLElement)) {
+      throw new Error('Market geometry probe could not find stable containers');
+    }
+    return {
+      phase: samplePhase,
+      actionTestId: actionId,
+      stage: rect(stage),
+      rows: rows.map(rect),
+      actionStrips: strips.map(rect),
+      stageClientWidth: stage.clientWidth,
+      stageScrollWidth: stage.scrollWidth,
+      rowsClientWidth: document.querySelector('.caribbean-market-goods').clientWidth,
+      rowsScrollWidth: document.querySelector('.caribbean-market-goods').scrollWidth,
+      actionStripWidths: strips.map((strip) => ({
+        testId: strip.dataset.testid,
+        clientWidth: strip.clientWidth,
+        scrollWidth: strip.scrollWidth,
+      })),
+      scrollLeft: stage.scrollLeft,
+      scrollTop: stage.scrollTop,
+      focusedTestId: document.activeElement?.dataset?.testid ?? null,
+      status: status.textContent?.trim() ?? '',
+      ariaBusy: document.querySelector('[data-testid="caribbean-market"]')?.getAttribute('aria-busy') === 'true',
+    };
+  }, { samplePhase: phase, actionId: actionTestId });
+}
+
+async function openProbeMarket(page, baseUrl) {
+  await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
+  await page.evaluate(({ currentKey, previousKey, quarantinePrefix }) => {
+    for (const key of Object.keys(localStorage)) {
+      if (key === currentKey || key === previousKey || key.startsWith(quarantinePrefix)) localStorage.removeItem(key);
+    }
+  }, { currentKey: CURRENT_SAVE_KEY, previousKey: PREVIOUS_SAVE_KEY, quarantinePrefix: QUARANTINE_PREFIX });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Start career' }).click();
+  await page.getByTestId('caribbean-career-ready').waitFor();
+  await page.getByRole('button', { name: 'Market' }).click();
+  await page.getByRole('heading', { name: 'Market', level: 2 }).waitFor();
+}
+
+async function runMarketProbe(browser, baseUrl) {
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'en-US', timezoneId: 'UTC', reducedMotion: 'reduce',
+  });
+  await installBrowserBoundary(context);
+  const page = await context.newPage();
+  const samples = [];
+  const actions = ['buy-1', 'sell-1', 'buy-5', 'sell-5', 'buy-max', 'sell-all'];
+  const goods = ['provisions', 'tools', 'luxuries', 'sugar-molasses', 'tobacco-dyewood', 'powder-arms'];
+  try {
+    for (const cargoId of goods) {
+      await openProbeMarket(page, baseUrl);
+      for (const action of actions) {
+        const actionTestId = `market-${cargoId}-${action}`;
+        const control = page.getByTestId(actionTestId);
+        await control.focus();
+        await page.waitForFunction(() => document.querySelector('[data-testid="caribbean-market-status"]')?.textContent === '');
+        samples.push(await readMarketGeometry(page, 'before', actionTestId));
+        await page.evaluate(() => { window.__CARIBBEAN_PORT_CHECK__.holdNextWriter = true; });
+        await control.click();
+        await page.getByTestId('caribbean-market-status').getByText('Saving trade.').waitFor();
+        await page.waitForFunction(() => window.__CARIBBEAN_PORT_CHECK__.writerHeld === true);
+        samples.push(await readMarketGeometry(page, 'pending', actionTestId));
+        await page.evaluate(() => window.__CARIBBEAN_PORT_CHECK__.releaseWriter());
+        try {
+          await page.getByTestId('caribbean-market-status').getByText('Cargo ledger updated.').waitFor({ timeout: 5_000 });
+        } catch (error) {
+          const diagnostic = await page.evaluate(() => ({
+            status: document.querySelector('[data-testid="caribbean-market-status"]')?.textContent?.trim(),
+            busy: document.querySelector('[data-testid="caribbean-market"]')?.getAttribute('aria-busy'),
+            focusedTestId: document.activeElement?.dataset?.testid ?? null,
+            control: {
+              holdNextWriter: window.__CARIBBEAN_PORT_CHECK__.holdNextWriter,
+              writerHeld: window.__CARIBBEAN_PORT_CHECK__.writerHeld,
+            },
+            currentSave: localStorage.getItem('caribbean:campaign:current'),
+          }));
+          throw new Error(`Market probe did not resolve ${actionTestId}: ${JSON.stringify(diagnostic)}; ${error.message}`);
+        }
+        samples.push(await readMarketGeometry(page, 'resolved', actionTestId));
+      }
+    }
+    const verdict = validateMarketStability(samples);
+    const failure = marketStabilityFailure(verdict);
+    invariant(failure === null, `Market stability evidence failed: ${failure}`);
+    return samples;
+  } finally {
+    await context.close();
+  }
+}
+
 async function readActiveEnvelope(page, key = CURRENT_SAVE_KEY) {
   return page.evaluate((storageKey) => localStorage.getItem(storageKey), key);
 }
@@ -739,6 +860,7 @@ async function runJourney(browser, baseUrl, runDirectory) {
     invariant(!failures.requestedPaths.some((requestPath) => requestPath.endsWith('.glb')), 'Production route requested a GLB');
     invariant(!failures.requestedPaths.some((requestPath) => requestPath.includes('preview-caribbean')), 'Production route requested preview-caribbean');
 
+    const marketSamples = await runMarketProbe(browser, baseUrl);
     const supportedLayouts = [
       layouts.setupDesktop, layouts.portDesktop, marketLayout, tavernLayout, logLayout,
       layouts.minimumSupported, recoveryLayout,
@@ -797,7 +919,7 @@ async function runJourney(browser, baseUrl, runDirectory) {
       screenshots: SCREENSHOTS,
       determinism: { cleanRuns: 2, metricsByteIdentical: true, screenshotsByteIdentical: true },
       schemaVersion: 2,
-      packagePhase: 'setup',
+      packagePhase: 'market',
       profile: {
         status: 'setup-verified',
         defaultPronouns: 'he/him',
@@ -805,7 +927,7 @@ async function runJourney(browser, baseUrl, runDirectory) {
         setup: setupIdentity,
       },
       art: { status: 'not-yet-observed' },
-      market: { status: 'not-yet-observed' },
+      market: { status: 'verified', samples: marketSamples },
     };
     const verdict = evaluatePortIdentityEvidence(metrics);
     invariant(verdict.ok, `Caribbean port identity evidence failed: ${verdict.issues.join(' | ')}`);

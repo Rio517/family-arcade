@@ -61,6 +61,10 @@ function runtime(storage: StorageLike): CaribbeanRuntime {
   };
 }
 
+async function appliedDispatch() {
+  return { kind: 'applied' as const, eventId: 1 };
+}
+
 afterEach(() => {
   if (originalWidth) Object.defineProperty(window, 'innerWidth', originalWidth);
   if (originalHeight) Object.defineProperty(window, 'innerHeight', originalHeight);
@@ -69,7 +73,7 @@ afterEach(() => {
 describe('<Tavern>', () => {
   it('shows exactly one direct speaker card and one accessible action', () => {
     const { container } = render(
-      <Tavern state={availableState()} busy={false} onAccept={vi.fn(async () => undefined)} />,
+      <Tavern state={availableState()} busy={false} onAccept={appliedDispatch} />,
     );
 
     expect(screen.getAllByTestId('tavern-rumour-card')).toHaveLength(1);
@@ -82,7 +86,7 @@ describe('<Tavern>', () => {
 
   it('dispatches the one accepted lead draft exactly once even on a duplicate click', () => {
     const onAccept = vi.fn((_draft: CampaignEventDraftFor<'lead-accepted'>) => (
-      new Promise<void>(() => undefined)
+      new Promise<{ kind: 'applied'; eventId: number }>(() => undefined)
     ));
     render(<Tavern state={availableState()} busy={false} onAccept={onAccept} />);
 
@@ -98,8 +102,8 @@ describe('<Tavern>', () => {
   });
 
   it('releases its local guard when dispatch resolves without publishing acceptance', async () => {
-    let resolveDispatch!: () => void;
-    const onAccept = vi.fn(() => new Promise<void>((resolve) => {
+    let resolveDispatch!: (outcome: { kind: 'applied'; eventId: number }) => void;
+    const onAccept = vi.fn(() => new Promise<{ kind: 'applied'; eventId: number }>((resolve) => {
       resolveDispatch = resolve;
     }));
     render(<Tavern state={availableState()} busy={false} onAccept={onAccept} />);
@@ -109,7 +113,7 @@ describe('<Tavern>', () => {
     expect(action).toBeDisabled();
 
     await act(async () => {
-      resolveDispatch();
+      resolveDispatch({ kind: 'applied', eventId: 1 });
       await Promise.resolve();
     });
 
@@ -120,7 +124,7 @@ describe('<Tavern>', () => {
 
   it('removes the duplicate action and announces acceptance once', () => {
     const { container } = render(
-      <Tavern state={acceptedState()} busy={false} onAccept={vi.fn(async () => undefined)} />,
+      <Tavern state={acceptedState()} busy={false} onAccept={appliedDispatch} />,
     );
 
     expect(screen.queryByRole('button', { name: 'Mark on chart' })).not.toBeInTheDocument();
@@ -132,7 +136,7 @@ describe('<Tavern>', () => {
   it('keeps terminal rumours free of a duplicate acceptance control or stale action', () => {
     const state = acceptedState();
     state.leads[0].status = 'expired';
-    render(<Tavern state={state} busy={false} onAccept={vi.fn(async () => undefined)} />);
+    render(<Tavern state={state} busy={false} onAccept={appliedDispatch} />);
 
     expect(screen.getByText('This rumour has gone cold.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mark on chart' })).not.toBeInTheDocument();

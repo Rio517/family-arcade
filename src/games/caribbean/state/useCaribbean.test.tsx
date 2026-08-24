@@ -366,12 +366,33 @@ describe('useCaribbean', () => {
     act(() => result.current.closeActivity());
     expect(result.current.activity).toBe('menu');
 
-    await act(() => result.current.dispatch({
-      type: 'lead-accepted',
-      payload: { leadId: 'red-jackdaw' },
-    }));
+    let outcome!: Awaited<ReturnType<CaribbeanController['dispatch']>>;
+    await act(async () => {
+      outcome = await result.current.dispatch({
+        type: 'lead-accepted',
+        payload: { leadId: 'red-jackdaw' },
+      });
+    });
+    expect(outcome).toEqual({ kind: 'applied', eventId: 1 });
     expect(result.current.journal?.state.lastEventId).toBe(1);
     expect(writerRun).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns not-applied when an event cannot become the published journal', async () => {
+    const storage = memoryStorage();
+    persist(storage, createJournal(createCampaign({ seed: 11 })));
+    const injected = runtime({ storage, locks: denyAfterFirstLock() });
+    const { result } = renderHook(() => useCaribbean(injected));
+    await act(() => result.current.resume());
+
+    let outcome!: Awaited<ReturnType<CaribbeanController['dispatch']>>;
+    await act(async () => {
+      outcome = await result.current.dispatch({ type: 'lead-accepted', payload: { leadId: 'red-jackdaw' } });
+    });
+
+    expect(outcome).toEqual({ kind: 'not-applied' });
+    expect(result.current.journal?.state.lastEventId).toBe(0);
+    expect(result.current.persistence).toMatchObject({ kind: 'consent-required', intent: 'event' });
   });
 
   it('rejects a synchronous second dispatch before React can rerender', async () => {
@@ -383,7 +404,7 @@ describe('useCaribbean', () => {
     const deferred = deferredLocks();
     injected.writer = createCampaignWriter(deferred.locks);
 
-    let dispatching!: Promise<void>;
+    let dispatching!: ReturnType<CaribbeanController['dispatch']>;
     act(() => {
       dispatching = result.current.dispatch({
         type: 'lead-accepted',
@@ -513,10 +534,14 @@ describe('useCaribbean', () => {
         write(key, value);
       });
 
-      await act(() => result.current.dispatch({
-        type: 'lead-accepted', payload: { leadId: 'red-jackdaw' },
-      }));
+      let outcome!: Awaited<ReturnType<CaribbeanController['dispatch']>>;
+      await act(async () => {
+        outcome = await result.current.dispatch({
+          type: 'lead-accepted', payload: { leadId: 'red-jackdaw' },
+        });
+      });
 
+      expect(outcome).toEqual({ kind: 'not-applied' });
       expect(result.current.persistence.kind).toBe('save-conflict');
       expect(result.current.journal?.state.captain.name).toBe('Active');
       const candidate = result.current.exportInMemoryJournal();
@@ -940,7 +965,7 @@ describe('useCaribbean', () => {
     await act(() => first.result.current.resume());
     const deferred = deferredLocks();
     injected.writer = createCampaignWriter(deferred.locks);
-    let dispatching!: Promise<void>;
+    let dispatching!: ReturnType<CaribbeanController['dispatch']>;
     act(() => {
       dispatching = first.result.current.dispatch({ type: 'lead-accepted', payload: { leadId: 'red-jackdaw' } });
     });
