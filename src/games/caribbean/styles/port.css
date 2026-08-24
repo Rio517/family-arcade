@@ -32,7 +32,7 @@
   z-index: 4;
   min-width: 0;
   display: grid;
-  grid-template-columns: clamp(190px, 18vw, 248px) minmax(0, 1fr);
+  grid-template-columns: clamp(244px, 20vw, 288px) minmax(0, 1fr);
   align-items: stretch;
   border-bottom: 1px solid color-mix(in srgb, var(--caribbean-brass) 58%, transparent);
   background: color-mix(in srgb, var(--caribbean-deep-keel) 88%, transparent);
@@ -40,13 +40,21 @@
 }
 
 .caribbean-port-position {
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   display: flex;
+  flex-wrap: nowrap;
   align-items: baseline;
-  gap: 12px;
-  padding: 14px clamp(18px, 3vw, 44px);
+  gap: 10px;
+  padding: 14px 12px;
   border-right: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 22%, transparent);
   text-transform: uppercase;
+}
+
+.caribbean-port-position span,
+.caribbean-port-position strong {
+  white-space: nowrap;
 }
 
 .caribbean-port-position span {
