@@ -24,6 +24,11 @@ describe('full-bleed Battle Lab layout contracts', () => {
     expect(battleCss).toMatch(/\.naval-command-control span,[\s\S]*\.naval-rudder-control span\s*\{[^}]*white-space:\s*normal[^}]*text-align:\s*center/s);
   });
 
+  it('docks the app-wide Party control clear of campaign battle controls without hiding it', () => {
+    expect(battleCss).toMatch(/body:has\(\.caribbean-production--campaign \.naval-battle-page\) \.party-root\s*\{[^}]*left:\s*max\(14px,[^}]*top:\s*max\(64px,[^}]*bottom:\s*auto[^}]*transform:\s*none[^}]*flex-direction:\s*column-reverse/s);
+    expect(battleCss).not.toMatch(/body:has\(\.caribbean-production--campaign \.naval-battle-page\) \.party-root\s*\{[^}]*display:\s*none/s);
+  });
+
   it.each([
     ['exact 960x600 boundary', 960, 600],
     ['1024x768 supported layout', 1024, 768],

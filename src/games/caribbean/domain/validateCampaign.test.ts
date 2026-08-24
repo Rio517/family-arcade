@@ -355,6 +355,33 @@ describe('validateCampaign', () => {
     expect(validateCampaign(state)).toMatchObject({ ok: false });
   });
 
+  it('binds a return day exactly in port and allows only a prior day while en route', () => {
+    const state = strategicBase();
+    state.calendar.elapsedDays = 3;
+    state.world.lastVoyage = {
+      voyageId: 'voyage-2', battleId: null, result: 'avoided', outcome: null, returnedDay: 2,
+    };
+
+    expect(validateCampaign(state)).toMatchObject({
+      ok: false,
+      issues: expect.arrayContaining([{ path: 'world.lastVoyage', code: 'invariant' }]),
+    });
+
+    state.lastEventId = 6;
+    state.fleet.ships[0].cargo.provisions = 31;
+    state.mode = {
+      kind: 'encounter', voyageId: 'voyage-5', encounterId: 'voyage-5-contact',
+      returnCheckpoint: structuredClone(RED_JACKDAW_VOYAGE.contact),
+    };
+    expect(validateCampaign(state)).toEqual({ ok: true, value: state });
+
+    state.world.lastVoyage.returnedDay = 4;
+    expect(validateCampaign(state)).toMatchObject({
+      ok: false,
+      issues: expect.arrayContaining([{ path: 'world.lastVoyage', code: 'invariant' }]),
+    });
+  });
+
   it('accepts the legacy V1 world with no lastVoyage own property', () => {
     // Kills accidentally making the post-Task-2 summary required on legacy saves.
     const state = validCampaign();

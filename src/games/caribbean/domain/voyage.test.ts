@@ -217,6 +217,29 @@ describe('voyage transition sequence', () => {
     expect(withdrawn.state.fleet.ships[0].cargo.provisions).toBe(32);
   });
 
+  it('preserves the latest return summary through literal second-voyage events 5 and 6', () => {
+    // Regression: en-route validation must not reinterpret the prior return day as the current travel day.
+    const active = createJournal(activeLeadCampaign());
+    const firstDeparture = appendJournal(active, voyageStartedDraft(active.state));
+    const firstContact = appendJournal(firstDeparture, seaLegCompletedDraft(firstDeparture.state));
+    const returned = appendJournal(firstContact, encounterAvoidedDraft(firstContact.state));
+    const priorSummary = structuredClone(returned.state.world.lastVoyage);
+
+    const secondDeparture = appendJournal(returned, voyageStartedDraft(returned.state));
+    expect(secondDeparture.events.at(-1)).toMatchObject({
+      id: 5, type: 'voyage-started', payload: { voyageId: 'voyage-5' },
+    });
+    expect(secondDeparture.state.world.lastVoyage).toEqual(priorSummary);
+
+    const secondContact = appendJournal(secondDeparture, seaLegCompletedDraft(secondDeparture.state));
+    expect(secondContact.events.at(-1)).toMatchObject({
+      id: 6, type: 'sea-leg-completed',
+      payload: { voyageId: 'voyage-5', encounterId: 'voyage-5-contact' },
+    });
+    expect(secondContact.state.calendar.elapsedDays).toBe(3);
+    expect(secondContact.state.world.lastVoyage).toEqual(priorSummary);
+  });
+
   it('advances only the exact authored RNG stream at contact and engagement', () => {
     // Kills navigation/naval assignment swaps, stale assignment, and cross-stream mutation.
     const { active, departed, contact, engaged } = voyageJournals();

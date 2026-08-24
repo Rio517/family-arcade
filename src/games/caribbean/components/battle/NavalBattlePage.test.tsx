@@ -270,6 +270,143 @@ describe('accessible naval command deck', () => {
     expect(screen.getByTestId('naval-fire-port')).toHaveFocus();
   });
 
+  it('uses one guarded campaign Return action with a cloned terminal state while preserving Battle Lab defaults', () => {
+    const session = manualNavalSession({ outcome: BOARDING_READY });
+    const activate = vi.fn((state) => {
+      state.ships.player.hull = 0;
+    });
+    render(
+      <NavalBattlePage
+        session={session}
+        sceneFactory={null}
+        resultAction={{ label: 'Return to Bridgetown', busy: false, activate }}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: /ready to board/i });
+    expect(dialog).toHaveTextContent('Campaign result');
+    expect(dialog).not.toHaveTextContent('Battle Lab result');
+    expect(screen.queryByTestId('naval-result-restart')).not.toBeInTheDocument();
+    expect(screen.queryByText(/withdraw/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('naval-result-action'));
+    fireEvent.click(screen.getByTestId('naval-result-action'));
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(activate).toHaveBeenCalledWith(expect.objectContaining({ outcome: BOARDING_READY }));
+    expect(activate.mock.calls[0]?.[0]).not.toBe(session.getSnapshot().state);
+    expect(session.getSnapshot().state.ships.player.hull).toBe(100);
+    expect(session.state.ships.player.hull).toBe(100);
+    expect(session.restartCount).toBe(0);
+  });
+
+  it('keeps campaign result copy free of Battle Lab instructions for a player surrender', () => {
+    const session = manualNavalSession({ outcome: { kind: 'surrender', victorShipId: 'opponent' } });
+    render(
+      <NavalBattlePage
+        session={session}
+        sceneFactory={null}
+        resultAction={{ label: 'Return to Bridgetown', busy: false, activate: vi.fn() }}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: /surrender/i });
+    expect(dialog).toHaveTextContent('Mistral and crew surrendered');
+    expect(dialog).toHaveTextContent('Return to Bridgetown when ready.');
+    expect(dialog).not.toHaveTextContent('Battle Lab');
+  });
+
+  it('adds guarded campaign withdrawal only to nonterminal Options', () => {
+    const session = manualNavalSession();
+    const activate = vi.fn();
+    const { rerender } = render(
+      <NavalBattlePage
+        session={session}
+        sceneFactory={null}
+        exitAction={{ label: 'Withdraw to Bridgetown', busy: false, activate }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('naval-options-toggle'));
+    const withdraw = screen.getByTestId('naval-exit-action');
+    expect(withdraw).toHaveTextContent('Withdraw to Bridgetown');
+    fireEvent.click(withdraw);
+    fireEvent.click(withdraw);
+    expect(activate).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      session.state.outcome = structuredClone(BOARDING_READY);
+      session.setSail('full');
+    });
+    rerender(
+      <NavalBattlePage
+        session={session}
+        sceneFactory={null}
+        resultAction={{ label: 'Return to Bridgetown', busy: false, activate: vi.fn() }}
+        exitAction={{ label: 'Withdraw to Bridgetown', busy: false, activate }}
+      />,
+    );
+    expect(screen.queryByTestId('naval-exit-action')).not.toBeInTheDocument();
+  });
+
+  it('renders a campaign-only resolution error with trapped Restart and Withdraw actions', () => {
+    const session = manualNavalSession({ outcome: BOARDING_READY });
+    const restart = vi.fn();
+    const withdraw = vi.fn();
+    render(
+      <NavalBattlePage
+        session={session}
+        sceneFactory={null}
+        resolutionErrorAction={{
+          message: 'Battle result could not be verified.',
+          busy: false,
+          restartLabel: 'Restart engagement',
+          withdrawLabel: 'Withdraw to Bridgetown',
+          restart,
+          withdraw,
+        }}
+      />,
+    );
+
+    const dialog = screen.getByTestId('naval-resolution-error');
+    expect(dialog).toHaveAttribute('role', 'dialog');
+    expect(dialog).toHaveTextContent('Battle result could not be verified.');
+    expect(dialog).not.toHaveTextContent('Battle Lab');
+    const restartButton = screen.getByTestId('naval-resolution-restart');
+    const withdrawButton = screen.getByTestId('naval-resolution-withdraw');
+    expect(restartButton).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+    expect(withdrawButton).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(restartButton).toHaveFocus();
+
+    fireEvent.click(restartButton);
+    fireEvent.click(restartButton);
+    fireEvent.click(withdrawButton);
+    fireEvent.click(withdrawButton);
+    expect(restart).toHaveBeenCalledTimes(1);
+    expect(withdraw).toHaveBeenCalledTimes(1);
+    expect(session.restartCount).toBe(0);
+  });
+
+  it('pauses on hidden visibility and leaves visible return paused', () => {
+    let visibility: DocumentVisibilityState = 'visible';
+    const visibilitySpy = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    try {
+      const session = manualNavalSession();
+      render(<NavalBattlePage session={session} sceneFactory={null} />);
+
+      visibility = 'hidden';
+      act(() => document.dispatchEvent(new Event('visibilitychange')));
+      expect(session.paused).toBe(true);
+
+      visibility = 'visible';
+      act(() => document.dispatchEvent(new Event('visibilitychange')));
+      expect(session.paused).toBe(true);
+    } finally {
+      visibilitySpy.mockRestore();
+    }
+  });
+
   it('clears a held rudder across terminal suppression before rematch steering', () => {
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} />);

@@ -732,10 +732,18 @@ function validateWorld(root: PlainRecord, problems: JsonProblems, nonEnumerable:
       ? root.leads.find((entry) => isPlainRecord(entry) && entry.id === 'red-jackdaw')
       : undefined;
     const leadStatus = isPlainRecord(lead) ? lead.status : undefined;
+    const modeKind = isPlainRecord(root.mode) ? root.mode.kind : undefined;
+    const elapsedDays = isPlainRecord(root.calendar) ? root.calendar.elapsedDays : undefined;
+    const returnDayMatches = typeof summary.returnedDay === 'number'
+      && typeof elapsedDays === 'number'
+      && (modeKind === 'port'
+        ? summary.returnedDay === elapsedDays
+        : (modeKind === 'sailing' || modeKind === 'encounter' || modeKind === 'naval')
+          && summary.returnedDay <= elapsedDays);
     voyageInvariant(
       summaryPath,
       matches
-        && summary.returnedDay === (isPlainRecord(root.calendar) ? root.calendar.elapsedDays : undefined)
+        && returnDayMatches
         && (result === 'victory'
           ? world.targetDefeated === true && leadStatus === 'completed'
           : world.targetDefeated === false && leadStatus !== 'completed'),

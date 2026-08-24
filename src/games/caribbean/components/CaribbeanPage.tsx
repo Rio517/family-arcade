@@ -56,7 +56,7 @@ export function ActiveCampaign({ controller }: { controller: ReturnType<typeof u
   );
 }
 
-function ControllerPage({ runtime }: { runtime: CaribbeanRuntime }) {
+function ControllerPage({ runtime, autoResume }: { runtime: CaribbeanRuntime; autoResume: boolean }) {
   const controller = useCaribbean(runtime);
   const { profile, setPronouns } = useProfile();
   const identity = useMemo(() => ({
@@ -71,7 +71,7 @@ function ControllerPage({ runtime }: { runtime: CaribbeanRuntime }) {
 
   useEffect(() => {
     if (
-      !requestedResume()
+      !autoResume
       || journal !== null
       || busy
       || persistence.kind !== 'persisted'
@@ -84,7 +84,7 @@ function ControllerPage({ runtime }: { runtime: CaribbeanRuntime }) {
       if (active) void resume();
     });
     return () => { active = false; };
-  }, [busy, journal, persistence.kind, resume, load]);
+  }, [autoResume, busy, journal, persistence.kind, resume, load]);
 
   const savingAvailable = runtime.storageCapability.kind === 'available'
     && runtime.writer.capability === 'available'
@@ -143,7 +143,13 @@ export function CaribbeanPage({ runtime: suppliedRuntime }: { runtime?: Caribbea
   const [runtime] = useState(() => suppliedRuntime ?? getBrowserCaribbeanRuntime());
   return (
     <MinimumScreenGate>
-      <ControllerPage runtime={runtime} />
+      {(supportGeneration) => (
+        <ControllerPage
+          key={`support-${supportGeneration}`}
+          runtime={runtime}
+          autoResume={requestedResume() || supportGeneration > 0}
+        />
+      )}
     </MinimumScreenGate>
   );
 }

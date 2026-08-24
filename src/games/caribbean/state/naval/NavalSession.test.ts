@@ -60,6 +60,44 @@ describe('transient naval session', () => {
     expect(session.diagnostic).toBeNull();
   });
 
+  it('sets pause explicitly, clears queued frame work, and treats repeated requests as idempotent', () => {
+    const session = new NavalSession(BATTLE_LAB_INPUT);
+    const listener = vi.fn();
+    session.subscribe(listener);
+
+    session.deliverFrameMicros(500_000);
+    expect(session.state.tick).toBe(6);
+
+    session.setPaused(true);
+    session.setPaused(true);
+    expect(session.paused).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    session.deliverFrameMicros(500_000);
+    expect(session.state.tick).toBe(6);
+    session.setPaused(false);
+    session.deliverFrameMicros(0);
+    expect(session.state.tick).toBe(6);
+    session.deliverFrameMicros(16_667);
+    expect(session.state.tick).toBe(7);
+  });
+
+  it('does not explicitly resume a diagnostic or terminal session', () => {
+    const diagnostic = new NavalSession(BATTLE_LAB_INPUT, {
+      validator: () => ({ ok: false, issues: ['fixture:drift'] }),
+    });
+    diagnostic.deliverFrameMicros(16_667);
+    expect(diagnostic.paused).toBe(true);
+    diagnostic.setPaused(false);
+    expect(diagnostic.paused).toBe(true);
+
+    const terminal = new NavalSession(BATTLE_LAB_INPUT);
+    terminal.setPaused(true);
+    terminal.state.outcome = { kind: 'boarding-ready', victorShipId: 'player' };
+    terminal.setPaused(false);
+    expect(terminal.paused).toBe(true);
+  });
+
   it('retains capped frame backlog until later delivery instead of skipping canonical work', () => {
     const input = structuredClone(BATTLE_LAB_INPUT);
     input.timeLimitTicks = 10_000;

@@ -8,6 +8,7 @@ import { stepBattle } from '../../domain/naval/stepBattle';
 import type {
   Ammunition,
   Broadside,
+  NavalBattleInput,
   NavalCommand,
   NavalEvent,
   NavalOutcome,
@@ -24,6 +25,7 @@ import type {
 import { FrameRunner } from './FrameRunner';
 
 export interface ManualNavalSessionOptions {
+  input?: NavalBattleInput;
   outcome?: NavalOutcome;
   validator?: (state: NavalState) => NavalStateValidation;
 }
@@ -40,7 +42,8 @@ function command(): NavalCommand {
 }
 
 export function manualNavalSession(options: ManualNavalSessionOptions = {}): ManualNavalSession {
-  let state = createNavalBattle(BATTLE_LAB_INPUT);
+  const input = structuredClone(options.input ?? BATTLE_LAB_INPUT);
+  let state = createNavalBattle(input);
   if (options.outcome) {
     state.outcome = structuredClone(options.outcome);
     state.events = [{ id: 1, kind: 'outcome', atTick: 0, outcome: structuredClone(options.outcome) }];
@@ -89,14 +92,17 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
     setSail(value: SailSetting) { record({ ...currentCommand, sail: value }); },
     setAmmunition(value: Ammunition) { record({ ...currentCommand, ammunition: value }); },
     requestFire(side: Broadside) { record({ ...currentCommand, fire: side }); },
-    togglePause() {
-      if (diagnostic) return;
-      paused = !paused;
+    setPaused(value: boolean) {
+      if (diagnostic || state.outcome || paused === value) return;
+      paused = value;
       runner.reset();
       publish();
     },
+    togglePause() {
+      this.setPaused(!paused);
+    },
     restart() {
-      state = createNavalBattle(BATTLE_LAB_INPUT);
+      state = createNavalBattle(input);
       currentCommand = command();
       paused = false;
       diagnostic = null;

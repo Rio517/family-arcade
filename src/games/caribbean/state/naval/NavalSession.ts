@@ -41,6 +41,7 @@ export interface NavalSessionView extends NavalSessionSnapshot {
   setSail(value: SailSetting): void;
   setAmmunition(value: Ammunition): void;
   requestFire(side: Broadside): void;
+  setPaused(value: boolean): void;
   togglePause(): void;
   restart(): void;
   subscribe(listener: () => void): () => void;
@@ -134,11 +135,15 @@ export class NavalSession implements NavalSessionView {
     this.#publish(true);
   }
 
-  togglePause(): void {
-    if (this.#diagnostic) return;
-    this.#paused = !this.#paused;
+  setPaused(value: boolean): void {
+    if (this.#diagnostic || this.#state.outcome || this.#paused === value) return;
+    this.#paused = value;
     this.#runner.reset();
     this.#publish(true);
+  }
+
+  togglePause(): void {
+    this.setPaused(!this.#paused);
   }
 
   restart(): void {

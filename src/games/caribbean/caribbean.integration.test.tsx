@@ -1,12 +1,17 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import campaignVictory from '../../../scripts/fixtures/caribbean-campaign-victory.json';
 import { CaribbeanPage } from './components/CaribbeanPage';
 import { createCampaign } from './domain/createCampaign';
 import { marketTradeDraft, quoteTrade } from './domain/economy';
 import { appendJournal, createJournal } from './domain/replay';
 import type { CampaignJournal } from './domain/events';
+import { replayBattle, type CommandSegment } from './domain/naval/replay';
+import type { NavalBattleInput, NavalCommand } from './domain/naval/types';
+import { navalEngagedDraft } from './domain/voyage';
 import type { CaribbeanRuntime } from './state/runtime';
+import { manualNavalSession, type ManualNavalSession } from './state/naval/testSession';
 import {
   CURRENT_SAVE_KEY,
   PREVIOUS_SAVE_KEY,
@@ -20,6 +25,18 @@ import { createCampaignWriter, type LockManagerLike } from './storage/writer';
 import { defaultProfile } from '@shared/profile/profile';
 import { emptyUsersState } from '@shared/profile/users';
 import { getUsersSnapshot, setUsersState } from '@shared/profile/usersStore';
+
+const navalSessionFactory = vi.hoisted(() => vi.fn());
+vi.mock('./state/naval/useNavalSession', async () => {
+  const React = await vi.importActual<typeof import('react')>('react');
+  const support = await vi.importActual<typeof import('./state/naval/testSession')>('./state/naval/testSession');
+  return {
+    useNavalSession(input: NavalBattleInput) {
+      const [session] = React.useState(() => navalSessionFactory(input) ?? support.manualNavalSession({ input }));
+      return session;
+    },
+  };
+});
 
 const originalWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
 const originalHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
@@ -119,6 +136,35 @@ function loadedJournal(store: StorageLike): CampaignJournal {
   return loaded.journal;
 }
 
+function campaignVictorySegments(): CommandSegment[] {
+  const fixture = campaignVictory as unknown as {
+    expected: { atTick: number };
+    segments: Array<{ atTick: number } & NavalCommand>;
+  };
+  return fixture.segments.flatMap((row, index) => {
+    const untilTick = fixture.segments[index + 1]?.atTick ?? fixture.expected.atTick;
+    const player: NavalCommand = {
+      rudder: row.rudder,
+      sail: row.sail,
+      ammunition: row.ammunition,
+      fire: row.fire,
+    };
+    if (row.fire === null) return [{ fromTick: row.atTick, untilTick, player }];
+    return [
+      { fromTick: row.atTick, untilTick: row.atTick + 1, player },
+      { fromTick: row.atTick + 1, untilTick, player: { ...player, fire: null } },
+    ];
+  });
+}
+
+function terminalCampaignSession(input: NavalBattleInput): ManualNavalSession {
+  const terminal = replayBattle(input, campaignVictorySegments());
+  const session = manualNavalSession({ input });
+  Object.assign(session.state, structuredClone(terminal));
+  session.setSail(terminal.ships.player.sail);
+  return session;
+}
+
 describe('Caribbean integrated production journey', () => {
   let capturedBlobParts: unknown[] | null;
 
@@ -127,6 +173,7 @@ describe('Caribbean integrated production journey', () => {
     window.location.hash = '#/caribbean';
     window.localStorage.clear();
     capturedBlobParts = null;
+    navalSessionFactory.mockReset();
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     vi.stubGlobal('Blob', class {
       constructor(parts: unknown[]) {
@@ -210,6 +257,96 @@ describe('Caribbean integrated production journey', () => {
     expect(screen.getByRole('region', { name: 'Voyage status' })).toHaveTextContent('3.9 months');
     expect(loadedJournal(store).state.lastEventId).toBe(2);
   });
+
+  it('completes the literal two-voyage campaign through a real-domain terminal Return and reloads its safe log', async () => {
+    const store = window.localStorage;
+    const first = render(<CaribbeanPage runtime={runtime({
+      storage: store,
+      seed: 1702,
+      now: [100, 200, 300, 400, 500, 600, 700, 800, 900],
+    })} />);
+
+    await beginRecommendedCareer();
+    await openPortActivity('Tavern');
+    fireEvent.click(screen.getByRole('button', { name: 'Mark on chart' }));
+    await screen.findByText("Marked in the Captain's Log");
+    await closeActivity();
+    fireEvent.click(screen.getByTestId('port-action-set-sail'));
+    await screen.findByTestId('voyage-continue-east');
+
+    first.unmount();
+    window.location.hash = '#/caribbean?resume=1';
+    const resumed = render(<CaribbeanPage runtime={runtime({ storage: store, now: [1_000, 1_100, 1_200, 1_300, 1_400, 1_500] })} />);
+    await screen.findByTestId('voyage-continue-east');
+    fireEvent.click(screen.getByTestId('voyage-continue-east'));
+    await screen.findByTestId('encounter-avoid');
+    fireEvent.click(screen.getByTestId('encounter-avoid'));
+    await screen.findByTestId('caribbean-career-ready');
+
+    fireEvent.click(screen.getByTestId('port-action-set-sail'));
+    await screen.findByTestId('voyage-continue-east');
+    fireEvent.click(screen.getByTestId('voyage-continue-east'));
+    await screen.findByTestId('encounter-pursue');
+    const encounter = loadedJournal(store);
+    const terminalSession = terminalCampaignSession(navalEngagedDraft(encounter.state).payload.input);
+    navalSessionFactory.mockReturnValue(terminalSession);
+    fireEvent.click(screen.getByTestId('encounter-pursue'));
+    expect(await screen.findByTestId('naval-result-action')).toHaveTextContent('Return to Bridgetown');
+
+    const beforeReturn = loadedJournal(store);
+    expect(beforeReturn.events).toHaveLength(7);
+    expect(beforeReturn.state.mode).toMatchObject({
+      kind: 'naval', voyageId: 'voyage-5', battleId: 'voyage-5-battle',
+      input: { seed: 1_971_161_494 },
+    });
+    fireEvent.click(screen.getByTestId('naval-result-action'));
+    expect(await screen.findByTestId('caribbean-career-ready')).toBeInTheDocument();
+    expect(screen.getByTestId('port-action-log')).toHaveFocus();
+    expect(screen.getByText('Mistral lies secure beneath the trade wind. Choose the next call from the harbour line.')).toBeVisible();
+    expect(screen.getByTestId('port-action-set-sail')).toBeDisabled();
+    expect(screen.getByText('The Red Jackdaw lead is complete.')).toBeVisible();
+
+    const completed = loadedJournal(store);
+    expect(completed.events.map(({ id, type, atDay }) => ({ id, type, atDay }))).toEqual([
+      { id: 1, type: 'lead-accepted', atDay: 0 },
+      { id: 2, type: 'voyage-started', atDay: 0 },
+      { id: 3, type: 'sea-leg-completed', atDay: 0 },
+      { id: 4, type: 'encounter-avoided', atDay: 1 },
+      { id: 5, type: 'voyage-started', atDay: 2 },
+      { id: 6, type: 'sea-leg-completed', atDay: 2 },
+      { id: 7, type: 'naval-engaged', atDay: 3 },
+      { id: 8, type: 'naval-resolved', atDay: 3 },
+    ]);
+    expect(completed.state).toMatchObject({
+      calendar: { elapsedDays: 4 },
+      rng: { navigation: 2_953_755_055, naval: 1_971_161_494 },
+      mode: { kind: 'port', portId: 'bridgetown' },
+      world: {
+        targetDefeated: true,
+        lastVoyage: {
+          voyageId: 'voyage-5', battleId: 'voyage-5-battle', result: 'victory',
+          outcome: { kind: 'boarding-ready', victorShipId: 'player' }, returnedDay: 4,
+        },
+      },
+      fleet: {
+        flagshipId: 'mistral',
+        ships: [{ id: 'mistral', hull: 100, sails: 100, crew: 50, cannon: 8, cargo: { provisions: 30 } }],
+      },
+      leads: [{ id: 'red-jackdaw', status: 'completed' }],
+    });
+    expect(completed.events.filter(({ type }) => type === 'naval-resolved')).toHaveLength(1);
+
+    resumed.unmount();
+    const canonicalBeforeReload = JSON.stringify(completed);
+    render(<CaribbeanPage runtime={runtime({ storage: store })} />);
+    expect(await screen.findByTestId('caribbean-career-ready')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('port-action-log'));
+    expect(await screen.findByTestId('captains-log-last-voyage')).toHaveTextContent('Victory — Red Jackdaw ready to board · Returned on day 4.');
+    expect(screen.getByTestId('captains-log-last-voyage')).toHaveTextContent(
+      'Bridgetown’s harbour crew made Mistral ready for the next departure; the battle outcome remains in this log, but its damage is not carried onto the ready flagship.',
+    );
+    expect(JSON.stringify(loadedJournal(store))).toBe(canonicalBeforeReload);
+  }, 15_000);
 
   it('exports corrupt bytes, quarantines them under writer ownership, republishes the canonical previous save, and resumes after reload', async () => {
     const store = window.localStorage;

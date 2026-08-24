@@ -12,9 +12,9 @@ function setViewport(width: number, height: number): void {
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });
 }
 
-function MountProbe({ onMount }: { onMount(): void }) {
+function MountProbe({ onMount, generation }: { onMount(): void; generation: number }) {
   useEffect(onMount, [onMount]);
-  return <div data-testid="campaign-controller">Campaign controller</div>;
+  return <div data-testid="campaign-controller" data-support-generation={generation}>Campaign controller</div>;
 }
 
 afterEach(() => {
@@ -35,7 +35,7 @@ describe('<MinimumScreenGate>', () => {
 
     render(
       <MinimumScreenGate>
-        <MountProbe onMount={onMount} />
+        {(generation) => <MountProbe onMount={onMount} generation={generation} />}
       </MinimumScreenGate>,
     );
 
@@ -57,12 +57,13 @@ describe('<MinimumScreenGate>', () => {
 
     render(
       <MinimumScreenGate>
-        <MountProbe onMount={onMount} />
+        {(generation) => <MountProbe onMount={onMount} generation={generation} />}
       </MinimumScreenGate>,
     );
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByTestId('campaign-controller')).toBeInTheDocument();
+    expect(screen.getByTestId('campaign-controller')).toHaveAttribute('data-support-generation', '0');
     expect(onMount).toHaveBeenCalledTimes(1);
   });
 
@@ -72,7 +73,7 @@ describe('<MinimumScreenGate>', () => {
 
     render(
       <MinimumScreenGate>
-        <MountProbe onMount={onMount} />
+        {(generation) => <MountProbe onMount={onMount} generation={generation} />}
       </MinimumScreenGate>,
     );
 
@@ -84,6 +85,7 @@ describe('<MinimumScreenGate>', () => {
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByTestId('campaign-controller')).toBeInTheDocument();
+    expect(screen.getByTestId('campaign-controller')).toHaveAttribute('data-support-generation', '1');
     expect(onMount).toHaveBeenCalledTimes(1);
 
     setViewport(960, 599);
@@ -92,5 +94,11 @@ describe('<MinimumScreenGate>', () => {
     const notice = screen.getByRole('alert');
     expect(notice).toHaveFocus();
     expect(screen.queryByTestId('campaign-controller')).not.toBeInTheDocument();
+
+    setViewport(1440, 900);
+    fireEvent(window, new Event('resize'));
+
+    expect(screen.getByTestId('campaign-controller')).toHaveAttribute('data-support-generation', '2');
+    expect(onMount).toHaveBeenCalledTimes(2);
   });
 });

@@ -49,7 +49,7 @@
   right: max(14px, env(safe-area-inset-right));
   min-height: 46px;
   display: grid;
-  grid-template-columns: minmax(270px, 1fr) auto minmax(175px, 1fr);
+  grid-template-columns: minmax(270px, 1fr) auto auto minmax(175px, 1fr);
   align-items: center;
   gap: 16px;
   padding: 0 8px 6px;
@@ -58,6 +58,7 @@
 }
 .naval-mission-line p { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; text-shadow: 0 2px 7px rgba(0,0,0,.8); }
 .naval-mission-line p:nth-child(2) { justify-self: center; }
+.naval-mission-line .naval-elapsed { width: 17ch; justify-content: center; color: var(--caribbean-brass); font: 700 14px/1 ui-monospace, "SFMono-Regular", monospace; font-variant-numeric: tabular-nums; letter-spacing: .04em; white-space: nowrap; }
 .naval-mission-line p span { color: color-mix(in srgb, var(--caribbean-sailcloth) 64%, transparent); font: 700 14px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
 .naval-mission-line p strong { font-weight: 700; }
 .naval-pause-control { justify-self: end; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 164px; padding: 0 12px; pointer-events: auto; }
@@ -129,6 +130,7 @@
 .naval-options[open] > summary { border-color: var(--caribbean-trade-wind); color: var(--caribbean-trade-wind); }
 .naval-options__panel { position: absolute; right: 0; bottom: calc(100% + 8px); width: 390px; max-height: calc(100dvh - 160px); overflow: auto; padding: 10px; border: 1px solid color-mix(in srgb, var(--caribbean-brass) 55%, transparent); background: color-mix(in srgb, var(--caribbean-deep-keel) 96%, transparent); box-shadow: 0 18px 60px rgba(0,0,0,.55); }
 .naval-restart { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; }
+.naval-exit-action { width: 100%; margin-top: 8px; padding: 0 12px; border-color: color-mix(in srgb, var(--caribbean-signal-red) 70%, transparent); }
 .naval-sensory-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 9px 0 0; padding: 9px 0 0; border: 0; border-top: 1px solid var(--naval-line); }
 .naval-sensory-controls legend { padding: 0 8px 0 0; color: color-mix(in srgb, var(--caribbean-sailcloth) 60%, transparent); font: 700 14px/1 ui-monospace, monospace; letter-spacing: .07em; text-transform: uppercase; }
 .naval-sensory-controls .naval-control { padding: 0 8px; }
@@ -176,6 +178,22 @@
 .naval-result h2 { margin: 12px 0; color: var(--caribbean-sailcloth); font: 600 clamp(38px, 6vw, 70px)/.95 "Avenir Next Condensed", sans-serif; text-transform: uppercase; }
 .naval-result p { margin: 0 0 24px; color: color-mix(in srgb, var(--caribbean-sailcloth) 66%, transparent); }
 .naval-result button { min-width: 180px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; }
+.naval-result-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+.naval-resolution-error { border-color: var(--caribbean-signal-red); }
+.campaign-naval-battle,
+.campaign-naval-battle__engagement { min-height: 100%; }
+body:has(.caribbean-production--campaign .naval-battle-page) .party-root {
+  left: max(14px, env(safe-area-inset-left));
+  top: max(64px, env(safe-area-inset-top));
+  bottom: auto;
+  transform: none;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+}
+.campaign-naval-battle__restart-note,
+.campaign-naval-battle__status { position: fixed; z-index: 19; right: clamp(14px, 2.2vw, 32px); bottom: clamp(76px, 10vh, 108px); max-width: min(36ch, calc(100vw - 28px)); margin: 0; padding: 7px 10px; border: 1px solid rgba(230, 214, 177, .28); border-radius: 3px; background: rgba(12, 28, 38, .84); color: var(--caribbean-sailcloth); font-size: .72rem; letter-spacing: .03em; }
+.campaign-naval-battle__status { bottom: clamp(114px, 15vh, 154px); border-color: rgba(204, 161, 66, .58); }
+.naval-withdrawal-error { border-color: var(--caribbean-signal-red); }
 .naval-diagnostic { display: grid; grid-template-columns: auto 1fr; gap: 16px; padding: 28px; color: var(--caribbean-signal-red); }
 .naval-diagnostic div { display: grid; gap: 7px; }
 .naval-diagnostic strong { font-size: 20px; }

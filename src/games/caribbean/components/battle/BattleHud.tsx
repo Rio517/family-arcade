@@ -17,6 +17,13 @@ function title(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function elapsedEngagement(tick: number): string {
+  const elapsedSeconds = Math.floor(tick / 60);
+  const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+  const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+  return `Engagement ${minutes}:${seconds}`;
+}
+
 function SystemValue({ label, value, maximum = 100 }: { label: string; value: number; maximum?: number }) {
   const amount = percent(value, maximum);
   return (
@@ -68,6 +75,11 @@ export function BattleHud({ state, paused, onTogglePause }: BattleHudProps) {
       <div className="naval-mission-line">
         <p><TargetIcon size={18} /> <span>Objective</span> <strong>Capture Red Jackdaw</strong></p>
         <p aria-label={`Trade wind ${windBearing}° / fresh`}><span>Trade wind</span> <strong>{windBearing}° / fresh</strong></p>
+        <p
+          className="naval-elapsed"
+          data-testid="naval-elapsed"
+          data-battle-tick={state.tick}
+        >{elapsedEngagement(state.tick)}</p>
         <button
           type="button"
           className="naval-control naval-hit-target naval-pause-control"

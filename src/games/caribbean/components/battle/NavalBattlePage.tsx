@@ -6,6 +6,7 @@ import type {
   Broadside,
   NavalEvent,
   NavalOutcome,
+  NavalState,
   Rudder,
 } from '../../domain/naval/types';
 import type { NavalSessionView } from '../../state/naval/NavalSession';
@@ -16,11 +17,35 @@ import { selectAimCue } from './aimCue';
 
 export type { NavalSceneFactory } from './NavalViewport';
 
+export interface NavalResultAction {
+  label: string;
+  busy: boolean;
+  activate(state: NavalState): void;
+}
+
+export interface NavalExitAction {
+  label: string;
+  busy: boolean;
+  activate(): void;
+}
+
+export interface NavalResolutionErrorAction {
+  message: 'Battle result could not be verified.';
+  busy: boolean;
+  restartLabel: 'Restart engagement';
+  withdrawLabel: 'Withdraw to Bridgetown';
+  restart(): void;
+  withdraw(): void;
+}
+
 export interface NavalBattlePageProps {
   session: NavalSessionView;
   sceneFactory?: NavalSceneFactory | null;
   audioFactory?: AudioFactory;
   onResolved?(outcome: NavalOutcome): void;
+  resultAction?: NavalResultAction;
+  exitAction?: NavalExitAction;
+  resolutionErrorAction?: NavalResolutionErrorAction;
 }
 
 function useSessionSnapshot(session: NavalSessionView) {
@@ -39,7 +64,11 @@ function isPlayerReloadReady(event: NavalEvent): event is Extract<NavalEvent, { 
   return event.kind === 'reload-ready' && event.shipId === 'player';
 }
 
-function outcomeCopy(outcome: NavalOutcome, state: ReturnType<NavalSessionView['getSnapshot']>['state']): { heading: string; detail: string; action: string } {
+function outcomeCopy(
+  outcome: NavalOutcome,
+  state: ReturnType<NavalSessionView['getSnapshot']>['state'],
+  campaign: boolean,
+): { heading: string; detail: string; action: string } {
   const player = state.ships.player;
   const target = state.ships.opponent;
   const range = Math.hypot(target.position.x - player.position.x, target.position.z - player.position.z).toFixed(1);
@@ -54,7 +83,7 @@ function outcomeCopy(outcome: NavalOutcome, state: ReturnType<NavalSessionView['
     const won = outcome.victorShipId === 'player';
     return { heading: 'Surrender', detail: won
       ? `${surrendered.name} and crew surrendered with hull ${Math.round(surrendered.hull)}%, sails ${Math.round(surrendered.sails)}%, crew ${Math.round(surrendered.crew)}. Capture summary recorded.`
-      : `${surrendered.name} and crew surrendered with hull ${Math.round(surrendered.hull)}% and crew ${Math.round(surrendered.crew)}. Return to the Battle Lab and restart the duel.`, action: won ? 'Rematch Battle Lab' : 'Restart Battle Lab' };
+      : `${surrendered.name} and crew surrendered with hull ${Math.round(surrendered.hull)}% and crew ${Math.round(surrendered.crew)}. ${campaign ? 'Return to Bridgetown when ready.' : 'Return to the Battle Lab and restart the duel.'}`, action: won ? 'Rematch Battle Lab' : 'Restart Battle Lab' };
   }
   if (outcome.kind === 'sunk') {
     const sunk = outcome.victorShipId === 'player' ? target : player;
@@ -87,22 +116,35 @@ function useReducedMotionPreference(): boolean {
   return reduced;
 }
 
-export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolved }: NavalBattlePageProps) {
+export function NavalBattlePage({
+  session,
+  sceneFactory,
+  audioFactory,
+  onResolved,
+  resultAction,
+  exitAction,
+  resolutionErrorAction,
+}: NavalBattlePageProps) {
   const snapshot = useSessionSnapshot(session);
   const { state, battleGeneration, currentCommand, paused, diagnostic } = snapshot;
   const resolvedRef = useRef<string | null>(null);
   const held = useRef({ port: false, starboard: false });
   const portFireRef = useRef<HTMLButtonElement>(null);
   const terminalActionRef = useRef<HTMLButtonElement>(null);
+  const terminalDialogRef = useRef<HTMLDivElement>(null);
   const underlayRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<BattleAudio | null>(null);
   const reloadAnnouncementRef = useRef<HTMLParagraphElement>(null);
   const reloadAnnouncementFrameRef = useRef<number | null>(null);
   const reloadAnnouncementKeyRef = useRef('');
+  const resultActionGuardRef = useRef(false);
+  const exitActionGuardRef = useRef(false);
+  const resolutionRestartGuardRef = useRef(false);
+  const resolutionWithdrawGuardRef = useRef(false);
   const [visible, setVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden');
   const [sensory, setSensory] = useState({ aim: true, steeringHint: true, shake: true, reducedFlashes: false, effects: 0.9, muted: false });
   const reducedMotion = useReducedMotionPreference();
-  const terminal = Boolean(state.outcome || diagnostic);
+  const terminal = Boolean(state.outcome || diagnostic || resolutionErrorAction);
   const effectiveShake = sensory.shake && !reducedMotion;
   const aimCue = sensory.aim ? selectAimCue(state, 'player') : null;
   const latestReload = [...state.events].reverse().find(isPlayerReloadReady);
@@ -128,10 +170,30 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
   }, [diagnostic, onResolved, state.outcome]);
 
   useEffect(() => {
-    const onVisibility = () => setVisible(document.visibilityState !== 'hidden');
+    const onVisibility = () => {
+      const nextVisible = document.visibilityState !== 'hidden';
+      setVisible(nextVisible);
+      if (!nextVisible) session.setPaused(true);
+    };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, []);
+  }, [session]);
+
+  useEffect(() => {
+    if (resultAction?.busy) return;
+    resultActionGuardRef.current = false;
+  }, [resultAction?.busy]);
+
+  useEffect(() => {
+    if (exitAction?.busy) return;
+    exitActionGuardRef.current = false;
+  }, [exitAction?.busy]);
+
+  useEffect(() => {
+    if (resolutionErrorAction?.busy) return;
+    resolutionRestartGuardRef.current = false;
+    resolutionWithdrawGuardRef.current = false;
+  }, [resolutionErrorAction?.busy]);
 
   // Effect ownership survives StrictMode's setup/cleanup rehearsal with a fresh adapter.
   useEffect(() => {
@@ -186,7 +248,32 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
 
     if (terminal) terminalActionRef.current?.focus();
     else portFireRef.current?.focus();
-  }, [terminal]);
+  }, [resolutionErrorAction, terminal]);
+
+  useEffect(() => {
+    if (!state.outcome || diagnostic) return;
+    const dialog = terminalDialogRef.current;
+    if (!dialog) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusable = [...dialog.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [diagnostic, resolutionErrorAction, state.outcome]);
 
   useEffect(() => {
     if (terminal) clearHeldRudder();
@@ -263,7 +350,7 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
     session.setRudder(rudder);
   };
 
-  const outcome = state.outcome ? outcomeCopy(state.outcome, state) : null;
+  const outcome = state.outcome ? outcomeCopy(state.outcome, state, Boolean(resultAction)) : null;
 
   return (
     <section className="naval-battle-page" data-testid="naval-battle-page" aria-label="Caribbean naval battle">
@@ -326,6 +413,19 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
                     data-testid="naval-restart"
                     onClick={() => { activateAudio(); session.restart(); }}
                   ><RotateIcon size={18} /> Restart duel</button>
+                  {exitAction && !outcome && !diagnostic && (
+                    <button
+                      type="button"
+                      className="naval-control naval-hit-target naval-exit-action"
+                      data-testid="naval-exit-action"
+                      disabled={exitAction.busy}
+                      onClick={() => {
+                        if (exitAction.busy || exitActionGuardRef.current) return;
+                        exitActionGuardRef.current = true;
+                        exitAction.activate();
+                      }}
+                    >{exitAction.label}</button>
+                  )}
                   <fieldset className="naval-sensory-controls" aria-label="Battle feedback settings">
                     <legend>Battle feedback</legend>
                     <SensoryToggle testId="naval-setting-aim" label="Aim assist" pressed={sensory.aim} onToggle={() => setSensory((value) => ({ ...value, aim: !value.aim }))} />
@@ -362,18 +462,68 @@ export function NavalBattlePage({ session, sceneFactory, audioFactory, onResolve
         </div>
       )}
 
-      {outcome && !diagnostic && (
-        <div className="naval-result" role="dialog" aria-modal="true" aria-labelledby="naval-result-title">
-          <span>Battle Lab result</span>
+      {outcome && !diagnostic && resolutionErrorAction && (
+        <div
+          ref={terminalDialogRef}
+          className="naval-result naval-resolution-error"
+          data-testid="naval-resolution-error"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="naval-resolution-error-title"
+        >
+          <span>Campaign result</span>
+          <h2 id="naval-resolution-error-title">Result unverified</h2>
+          <p>{resolutionErrorAction.message}</p>
+          <div className="naval-result-actions">
+            <button
+              ref={terminalActionRef}
+              type="button"
+              className="naval-control naval-hit-target"
+              data-testid="naval-resolution-restart"
+              disabled={resolutionErrorAction.busy}
+              onClick={() => {
+                if (resolutionErrorAction.busy || resolutionRestartGuardRef.current) return;
+                resolutionRestartGuardRef.current = true;
+                resolutionErrorAction.restart();
+              }}
+            >{resolutionErrorAction.restartLabel}</button>
+            <button
+              type="button"
+              className="naval-control naval-hit-target"
+              data-testid="naval-resolution-withdraw"
+              disabled={resolutionErrorAction.busy}
+              onClick={() => {
+                if (resolutionErrorAction.busy || resolutionWithdrawGuardRef.current) return;
+                resolutionWithdrawGuardRef.current = true;
+                resolutionErrorAction.withdraw();
+              }}
+            >{resolutionErrorAction.withdrawLabel}</button>
+          </div>
+        </div>
+      )}
+
+      {outcome && !diagnostic && !resolutionErrorAction && (
+        <div ref={terminalDialogRef} className="naval-result" role="dialog" aria-modal="true" aria-labelledby="naval-result-title">
+          <span>{resultAction ? 'Campaign result' : 'Battle Lab result'}</span>
           <h2 id="naval-result-title">{outcome.heading}</h2>
           <p>{outcome.detail}</p>
           <button
             ref={terminalActionRef}
             type="button"
             className="naval-control naval-hit-target"
-            data-testid="naval-result-restart"
-            onClick={() => { activateAudio(); session.restart(); }}
-          ><RotateIcon size={18} /> {outcome.action}</button>
+            data-testid={resultAction ? 'naval-result-action' : 'naval-result-restart'}
+            disabled={resultAction?.busy}
+            onClick={() => {
+              activateAudio();
+              if (!resultAction) {
+                session.restart();
+                return;
+              }
+              if (resultAction.busy || resultActionGuardRef.current) return;
+              resultActionGuardRef.current = true;
+              resultAction.activate(structuredClone(state));
+            }}
+          >{resultAction ? resultAction.label : <><RotateIcon size={18} /> {outcome.action}</>}</button>
         </div>
       )}
     </section>

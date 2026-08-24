@@ -8,6 +8,7 @@ import { navalEngagedDraft, seaLegCompletedDraft, voyageStartedDraft } from '../
 import { loadCampaign, saveCampaign, type StorageLike } from '../storage/persistence';
 import { createCampaignWriter, type LockManagerLike } from '../storage/writer';
 import type { CaribbeanRuntime } from '../state/runtime';
+import { NavalSession } from '../state/naval/NavalSession';
 import { defaultProfile } from '@shared/profile/profile';
 import { emptyUsersState } from '@shared/profile/users';
 import { getUsersSnapshot, setUsersState } from '@shared/profile/usersStore';
@@ -108,6 +109,13 @@ function seedSave(store: StorageLike): void {
   if (!result.ok) throw new Error('fixture save failed');
 }
 
+function seedJournalSave(store: StorageLike, journal: ReturnType<typeof journalForMode>): void {
+  const result = saveCampaign(store, journal, {
+    build: 'fixture', savedAt: 100, expectedRevision: { currentRaw: null, previousRaw: null },
+  });
+  if (!result.ok) throw new Error('journal fixture save failed');
+}
+
 function journalForMode(mode: 'port' | 'sailing' | 'encounter' | 'naval') {
   const port = appendJournal(createJournal(createCampaign({ seed: 1702, name: 'Morgan' })), {
     type: 'lead-accepted' as const, payload: { leadId: 'red-jackdaw' as const },
@@ -141,6 +149,7 @@ afterEach(() => {
   if (originalHeight) Object.defineProperty(window, 'innerHeight', originalHeight);
   window.location.hash = '';
   setUsersState(emptyUsersState());
+  vi.restoreAllMocks();
 });
 
 describe('<CaribbeanPage>', () => {
@@ -215,6 +224,48 @@ describe('<CaribbeanPage>', () => {
     expect(observed.request).toHaveBeenCalledTimes(1);
     expect(store.setItem).toHaveBeenCalledTimes(writesBefore);
     expect(loadCampaign(store)).toMatchObject({ kind: 'loaded', recovered: false });
+  });
+
+  it('unmounts an unsupported naval route and automatically resumes a fresh tick-zero session when support returns', async () => {
+    setViewport(1440, 900);
+    window.location.hash = '#/caribbean';
+    const store = storage();
+    const saved = journalForMode('naval');
+    seedJournalSave(store, saved);
+    const started = new Set<NavalSession>();
+    const disposed = new Set<NavalSession>();
+    const originalStart = NavalSession.prototype.start;
+    const originalDispose = NavalSession.prototype.dispose;
+    vi.spyOn(NavalSession.prototype, 'start').mockImplementation(function start(this: NavalSession) {
+      started.add(this);
+      originalStart.call(this);
+    });
+    vi.spyOn(NavalSession.prototype, 'dispose').mockImplementation(function dispose(this: NavalSession) {
+      disposed.add(this);
+      originalDispose.call(this);
+    });
+
+    render(<CaribbeanPage runtime={runtime(store)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Resume career' }));
+    expect(await screen.findByTestId('naval-elapsed')).toHaveAttribute('data-battle-tick', '0');
+    expect(screen.getByText('Reloading restarts this engagement from first contact.')).toBeVisible();
+    expect(started.size).toBe(1);
+    expect(JSON.stringify([...started][0]?.state.input)).toBe(JSON.stringify(saved.state.mode.kind === 'naval' ? saved.state.mode.input : null));
+
+    setViewport(1024, 1366);
+    fireEvent(window, new Event('resize'));
+    expect(screen.getByTestId('caribbean-minimum-screen')).toHaveFocus();
+    expect(screen.queryByTestId('naval-battle-page')).not.toBeInTheDocument();
+    expect(disposed.size).toBe(1);
+
+    setViewport(1440, 900);
+    fireEvent(window, new Event('resize'));
+    expect(await screen.findByTestId('naval-elapsed')).toHaveAttribute('data-battle-tick', '0');
+    expect(screen.getByText('Reloading restarts this engagement from first contact.')).toBeVisible();
+    expect(started.size).toBe(2);
+    expect(disposed.size).toBe(1);
+    expect([...started][1]).not.toBe([...started][0]);
+    expect(JSON.stringify([...started][1]?.state.input)).toBe(JSON.stringify(saved.state.mode.kind === 'naval' ? saved.state.mode.input : null));
   });
 
   it('survives StrictMode rehearsal and settles one deferred query resume without a duplicate or stale summary', async () => {

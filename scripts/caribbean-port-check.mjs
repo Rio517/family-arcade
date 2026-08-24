@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from 'playwright';
 import sharp from 'sharp';
+import { driveCampaignVictory } from './lib/caribbean-campaign-victory-driver.mjs';
 import { normalBuildIsolationFailure } from './lib/caribbean-normal-build-isolation.mjs';
 import {
   ART_ACTIVITY_CONTRAST_SPECS,
@@ -56,6 +57,17 @@ const VOYAGE_SCREENSHOTS = [
   'sailing-minimum-supported.png',
   'sailing-large-portrait-notice.png',
 ];
+const BATTLE_SCREENSHOTS = [
+  'campaign-battle-desktop.png',
+  'campaign-result-desktop.png',
+  'returned-log-desktop.png',
+  'campaign-battle-fallback.png',
+  'campaign-battle-resize-notice.png',
+];
+const CAMPAIGN_VICTORY_TRACE = JSON.parse(fs.readFileSync(
+  path.join(ROOT, 'scripts', 'fixtures', 'caribbean-campaign-victory.json'),
+  'utf8',
+));
 const PORT_ORDER = [
   "Governor's House",
   'Tavern',
@@ -812,6 +824,63 @@ async function capture(page, screenshots, directory, filename) {
   fs.writeFileSync(path.join(directory, filename), bytes);
 }
 
+async function captureBattle(page, screenshots, directory, filename) {
+  await page.evaluate(() => document.fonts.ready);
+  const bytes = await page.screenshot({ animations: 'disabled' });
+  screenshots.set(filename, bytes);
+  fs.writeFileSync(path.join(directory, filename), bytes);
+}
+
+async function assertBattleControlHitTargets(page) {
+  const geometry = await page.evaluate(() => {
+    const rect = (element) => {
+      const value = element.getBoundingClientRect();
+      return {
+        left: value.left, top: value.top, right: value.right, bottom: value.bottom,
+        width: value.width, height: value.height,
+      };
+    };
+    const controls = [...document.querySelectorAll('.naval-battle-page .naval-control, .naval-battle-page .naval-effects-volume input')]
+      .filter((element) => {
+        if (!(element instanceof HTMLElement)) return false;
+        const style = getComputedStyle(element);
+        const bounds = element.getBoundingClientRect();
+        const disabled = element instanceof HTMLButtonElement || element instanceof HTMLInputElement
+          ? element.disabled
+          : element.getAttribute('aria-disabled') === 'true';
+        const closedDetails = element.closest('details:not([open])');
+        return !disabled && style.display !== 'none' && style.visibility !== 'hidden'
+          && style.pointerEvents !== 'none' && bounds.width > 0 && bounds.height > 0
+          && (closedDetails === null || element.matches('summary'));
+      })
+      .map((element) => {
+        const bounds = element.getBoundingClientRect();
+        const x = bounds.left + bounds.width / 2;
+        const y = bounds.top + bounds.height / 2;
+        const hit = document.elementFromPoint(x, y);
+        return {
+          testId: element.getAttribute('data-testid'),
+          rect: rect(element),
+          hitTestId: hit instanceof HTMLElement ? hit.closest('[data-testid]')?.getAttribute('data-testid') ?? null : null,
+          hitClass: hit instanceof HTMLElement ? hit.className : null,
+          clear: hit === element || (hit !== null && element.contains(hit)),
+        };
+      });
+    const partyPill = document.querySelector('[data-testid="party-pill"]');
+    return {
+      viewport: { width: innerWidth, height: innerHeight },
+      partyPill: partyPill instanceof HTMLElement ? rect(partyPill) : null,
+      controls,
+    };
+  });
+  const blocked = geometry.controls.filter(({ clear }) => !clear);
+  invariant(
+    blocked.length === 0,
+    `battle-control-hit-test-${canonicalJson({ viewport: geometry.viewport, partyPill: geometry.partyPill, blocked })}`,
+  );
+  return geometry;
+}
+
 async function readArtViewport(page, spec, subjectRoi) {
   return page.evaluate(({ viewportSpec, roi, contrastSelectors, marketActionIds }) => {
     const visible = (element) => {
@@ -1375,6 +1444,144 @@ async function runVoyageUiCheck() {
       invariant(VOYAGE_SCREENSHOTS.every((filename) => screenshots.has(filename)), 'incomplete-voyage-screenshot-set');
       for (const filename of VOYAGE_SCREENSHOTS) saveIfChanged(filename, screenshots.get(filename));
       console.log(`CARIBBEAN_VOYAGE_UI_OK screenshots=${VOYAGE_SCREENSHOTS.length}`);
+    } finally {
+      await context.close();
+    }
+  } finally {
+    await browser?.close();
+    await stopStaticServer(server);
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+async function runBattleUiCheck() {
+  buildNormalProduction();
+  const { server, baseUrl } = await startStaticServer();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-battle-ui-'));
+  let browser;
+  try {
+    browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+    const context = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: 1,
+      locale: 'en-US',
+      timezoneId: 'UTC',
+      reducedMotion: 'reduce',
+    });
+    await installBrowserBoundary(context);
+    const page = await context.newPage();
+    const failures = { console: [], page: [], requests: [], external: [], requestedPaths: [] };
+    recordFailures(page, baseUrl, failures);
+    const screenshots = new Map();
+    try {
+      await page.clock.install({ time: new Date('2023-11-14T22:13:20.000Z') });
+      await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Start career' }).click();
+      await page.getByTestId('caribbean-career-ready').waitFor();
+      await page.getByRole('button', { name: 'Tavern' }).click();
+      await page.getByRole('button', { name: 'Mark on chart' }).click();
+      await page.getByText("Marked in the Captain's Log").waitFor();
+
+      await page.getByTestId('port-action-set-sail').click();
+      await page.getByTestId('voyage-continue-east').waitFor();
+      await page.getByTestId('voyage-continue-east').click();
+      await page.getByTestId('encounter-avoid').waitFor();
+      await page.getByTestId('encounter-avoid').click();
+      await page.getByTestId('caribbean-career-ready').waitFor();
+
+      await page.getByTestId('port-action-set-sail').click();
+      await page.getByTestId('voyage-continue-east').waitFor();
+      await page.getByTestId('voyage-continue-east').click();
+      await page.getByTestId('encounter-pursue').waitFor();
+      await page.clock.pauseAt(new Date('2023-11-14T22:13:30.000Z'));
+      await page.getByTestId('encounter-pursue').click();
+      await page.getByTestId('naval-elapsed').waitFor();
+      invariant(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick') === '0', 'campaign-battle-did-not-start-at-tick-zero');
+      const navalRaw = await readActiveEnvelope(page);
+      const navalEnvelope = await readVoyageEnvelope(page, 'naval');
+      const navalTraceInput = {
+        battleId: navalEnvelope.payload.state.mode.input.battleId,
+        seed: navalEnvelope.payload.state.mode.input.seed,
+      };
+      invariant(navalEnvelope.payload.events.at(-1)?.type === 'naval-engaged', 'missing-naval-engaged-event');
+      invariant(
+        canonicalJson(navalTraceInput) === canonicalJson(CAMPAIGN_VICTORY_TRACE.input),
+        `campaign-battle-input-does-not-match-golden-trace-${canonicalJson(navalTraceInput)}`,
+      );
+      await page.getByText('3D tactical sea restored.').waitFor();
+      await page.clock.runFor(16);
+      invariant(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick') === '0', 'visual-prime-advanced-campaign-battle');
+      await captureBattle(page, screenshots, directory, 'campaign-battle-desktop.png');
+      await assertBattleControlHitTargets(page);
+
+      const terminal = await driveCampaignVictory({
+        page,
+        trace: CAMPAIGN_VICTORY_TRACE,
+        clockPrimed: true,
+        timeoutMs: 600_000,
+      });
+      invariant(canonicalJson(terminal) === canonicalJson(CAMPAIGN_VICTORY_TRACE.expected), 'campaign-battle-terminal-result-drifted');
+      await captureBattle(page, screenshots, directory, 'campaign-result-desktop.png');
+      await page.getByTestId('naval-result-action').click();
+      await page.getByTestId('caribbean-career-ready').waitFor();
+      invariant(await page.getByTestId('port-action-log').evaluate((element) => element === document.activeElement), 'battle-return-did-not-focus-captains-log');
+
+      const returnedEnvelope = await readVoyageEnvelope(page, 'port');
+      invariant(returnedEnvelope.payload.events.length === 8, `battle-return-event-count-${returnedEnvelope.payload.events.length}`);
+      invariant(returnedEnvelope.payload.events.at(-1)?.type === 'naval-resolved', 'missing-naval-resolved-event');
+      invariant(returnedEnvelope.payload.state.calendar.elapsedDays === 4, 'battle-return-day-drifted');
+      invariant(returnedEnvelope.payload.state.world.lastVoyage?.outcome?.kind === 'boarding-ready', 'battle-return-summary-drifted');
+      invariant(returnedEnvelope.payload.state.fleet.ships[0]?.hull === 100, 'battle-damage-leaked-into-campaign');
+      await page.getByTestId('port-action-log').click();
+      await page.getByTestId('captains-log-last-voyage').waitFor();
+      invariant(await page.getByTestId('captains-log-last-voyage').getByText('Victory — Red Jackdaw ready to board · Returned on day 4.').isVisible(), 'returned-log-missing-safe-victory-summary');
+      await captureBattle(page, screenshots, directory, 'returned-log-desktop.png');
+
+      await page.addInitScript(() => {
+        const nativeGetContext = HTMLCanvasElement.prototype.getContext;
+        Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+          configurable: true,
+          value(type, ...args) {
+            return String(type).startsWith('webgl') ? null : nativeGetContext.call(this, type, ...args);
+          },
+        });
+      });
+      await page.evaluate(({ currentKey, raw }) => {
+        localStorage.setItem(currentKey, raw);
+        window.location.hash = '#/caribbean?resume=1';
+      }, { currentKey: CURRENT_SAVE_KEY, raw: navalRaw });
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.getByTestId('naval-html-chart').waitFor();
+      invariant(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick') === '0', 'fallback-battle-did-not-resume-at-tick-zero');
+      await captureBattle(page, screenshots, directory, 'campaign-battle-fallback.png');
+
+      await page.setViewportSize({ width: 1024, height: 1366 });
+      await page.getByTestId('caribbean-minimum-screen').waitFor();
+      await page.evaluate(() => { window.location.hash = '#/caribbean'; });
+      await captureBattle(page, screenshots, directory, 'campaign-battle-resize-notice.png');
+      await page.setViewportSize({ width: 1440, height: 900 });
+      try {
+        await page.getByTestId('naval-elapsed').waitFor({ timeout: 3_000 });
+      } catch {
+        throw new Error('support-restored-resume');
+      }
+      invariant(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick') === '0', 'support-restored-battle-did-not-restart-at-tick-zero');
+      const restoredInput = (await readVoyageEnvelope(page, 'naval')).payload.state.mode.input;
+      invariant(canonicalJson({ battleId: restoredInput.battleId, seed: restoredInput.seed }) === canonicalJson(CAMPAIGN_VICTORY_TRACE.input), 'support-restored-battle-input-drifted');
+
+      failures.console = [...new Set(failures.console)].filter((message) => (
+        !message.includes('THREE.WebGLRenderer: Error creating WebGL context')
+      ));
+      failures.page = [...new Set(failures.page)];
+      failures.requests = [...new Set(failures.requests)];
+      failures.external = [...new Set(failures.external)];
+      invariant(failures.console.length === 0, `battle-console-errors-${failures.console.join('|')}`);
+      invariant(failures.page.length === 0, `battle-page-errors-${failures.page.join('|')}`);
+      invariant(failures.requests.length === 0, `battle-request-errors-${failures.requests.join('|')}`);
+      invariant(failures.external.length === 0, `battle-external-requests-${failures.external.join('|')}`);
+      invariant(BATTLE_SCREENSHOTS.every((filename) => screenshots.has(filename)), 'incomplete-battle-screenshot-set');
+      for (const filename of BATTLE_SCREENSHOTS) saveIfChanged(filename, screenshots.get(filename));
+      console.log(`CARIBBEAN_BATTLE_UI_OK screenshots=${BATTLE_SCREENSHOTS.length}`);
     } finally {
       await context.close();
     }
@@ -1982,10 +2189,16 @@ export async function runPortCheck() {
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
 if (import.meta.url === invokedPath) {
   const uiSlice = readUiSlice(process.argv.slice(2));
-  const command = uiSlice === 'voyage' ? runVoyageUiCheck : runPortCheck;
+  const command = uiSlice === 'voyage'
+    ? runVoyageUiCheck
+    : uiSlice === 'battle'
+      ? runBattleUiCheck
+      : runPortCheck;
   command().catch((error) => {
     if (uiSlice === 'voyage') {
       console.error(`CARIBBEAN_VOYAGE_UI_FAILED ${error instanceof Error ? error.message : String(error)}`);
+    } else if (uiSlice === 'battle') {
+      console.error(`CARIBBEAN_BATTLE_UI_FAILED ${error instanceof Error ? error.message : String(error)}`);
     } else {
       console.error(error instanceof Error ? error.stack ?? error.message : error);
     }
