@@ -1,5 +1,7 @@
 import type { CampaignJournal } from '../domain/events';
+import { compactJournal } from '../domain/compactJournal';
 import { validateJournal } from '../domain/replay';
+import { shouldCompactJournal } from './compactionPolicy';
 import type { ValidationIssue } from '../domain/types';
 import { canonicalJson, checksumPayload } from './checksum';
 import {
@@ -165,12 +167,15 @@ export function saveCampaign(
     expectedRevision: ActiveSaveRevision;
   },
 ): SaveResult {
-  const journal = validateJournal(inputJournal);
-  if (!journal.ok) {
-    return { ok: false, reason: 'invalid-journal', issues: journal.issues };
+  const validation = validateJournal(inputJournal);
+  if (!validation.ok) {
+    return { ok: false, reason: 'invalid-journal', issues: validation.issues };
   }
+  const journal = shouldCompactJournal(validation.value)
+    ? compactJournal(validation.value)
+    : validation.value;
 
-  const checksum = checksumPayload(journal.value);
+  const checksum = checksumPayload(journal);
   let proposedRaw: string;
   try {
     proposedRaw = canonicalJson({
@@ -178,7 +183,7 @@ export function saveCampaign(
       build: options.build,
       savedAt: options.savedAt,
       checksum,
-      payload: journal.value,
+      payload: journal,
     } satisfies SaveEnvelopeV1);
   } catch {
     throw new Error('Invalid proposed save envelope: invalid-envelope');

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createCampaign } from './createCampaign';
+import { marketTradeDraft, quoteTrade } from './economy';
 import type { CampaignEvent, CampaignJournal } from './events';
 import {
   appendJournal,
@@ -29,6 +30,17 @@ function acceptedJournal(): CampaignJournal {
 }
 
 describe('replayCampaign', () => {
+  it('replays a market trade to the canonical stored state', () => {
+    const journal = createJournal(initialCampaign());
+    const quote = quoteTrade(journal.state, {
+      portId: 'bridgetown', shipId: 'mistral', cargoId: 'provisions', delta: 5,
+    });
+    if (!quote.ok) throw new Error('fixture must quote');
+    const traded = appendJournal(journal, marketTradeDraft(quote));
+
+    expect(replayCampaign(traded.initial, traded.events)).toEqual(traded.state);
+  });
+
   it('reproduces the stored state with canonical byte equality', () => {
     const journal = acceptedJournal();
 
@@ -125,7 +137,9 @@ describe('validateJournal', () => {
   it('aggregates invalid initial, event payload, and stored state boundaries', () => {
     const journal = acceptedJournal();
     journal.initial.fleet.flagshipId = 'missing';
-    journal.events[0].payload.leadId = 'blue-albatross' as never;
+    const [event] = journal.events;
+    if (event.type !== 'lead-accepted') throw new Error('fixture must accept the Red Jackdaw');
+    event.payload.leadId = 'blue-albatross' as never;
     journal.state.wealth.gold = -1;
 
     expect(validateJournal(journal)).toEqual({

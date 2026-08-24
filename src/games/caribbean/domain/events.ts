@@ -1,18 +1,34 @@
-import type { LeadId } from '../content/types';
+import { isCargoId, isPortId } from '../content/campaign';
+import type { CargoId, LeadId, PortId } from '../content/types';
 import type {
   CampaignStateV1,
   ValidationIssue,
   ValidationResult,
 } from './types';
 
-export type CampaignEvent = {
-  id: number;
-  type: 'lead-accepted';
-  atDay: number;
-  payload: { leadId: 'red-jackdaw' };
-};
+export type CampaignEvent =
+  | {
+      id: number;
+      type: 'lead-accepted';
+      atDay: number;
+      payload: { leadId: 'red-jackdaw' };
+    }
+  | {
+      id: number;
+      type: 'market-traded';
+      atDay: number;
+      payload: {
+        portId: PortId;
+        shipId: string;
+        cargoId: CargoId;
+        delta: number;
+        unitPrice: number;
+      };
+    };
 
-export type CampaignEventDraft = Omit<CampaignEvent, 'id' | 'atDay'>;
+type DraftOf<Event> = Event extends CampaignEvent ? Omit<Event, 'id' | 'atDay'> : never;
+export type CampaignEventDraft = DraftOf<CampaignEvent>;
+export type CampaignEventDraftFor<Type extends CampaignEvent['type']> = Extract<CampaignEventDraft, { type: Type }>;
 
 export interface CampaignJournal {
   initial: CampaignStateV1;
@@ -57,7 +73,7 @@ function snapshotRecord(
     for (const key of keys.filter((candidate): candidate is string => typeof candidate === 'string')) {
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
-        issue(issues, path === '$' ? key : `${path}.${key}`, 'non-json');
+        snapshot[key] = undefined;
         continue;
       }
       snapshot[key] = descriptor.value;
@@ -160,9 +176,11 @@ export function validateCampaignEvent(input: unknown): ValidationResult<Campaign
   validateUint32(required(event, 'id', '$', issues), 'id', issues);
 
   const type = required(event, 'type', '$', issues);
+  let validType: CampaignEvent['type'] | null = null;
   if (type !== undefined) {
     if (typeof type !== 'string') issue(issues, 'type', 'wrong-type');
-    else if (type !== 'lead-accepted') issue(issues, 'type', 'unknown-id');
+    else if (type === 'lead-accepted' || type === 'market-traded') validType = type;
+    else issue(issues, 'type', 'unknown-id');
   }
 
   validateDay(required(event, 'atDay', '$', issues), 'atDay', issues);
@@ -171,7 +189,7 @@ export function validateCampaignEvent(input: unknown): ValidationResult<Campaign
   const payload = payloadValue === undefined
     ? null
     : snapshotRecord(payloadValue, 'payload', issues);
-  if (payload) {
+  if (payload && validType === 'lead-accepted') {
     validateKeys(payload, ['leadId'], 'payload', issues);
     const leadId = required(payload, 'leadId', 'payload', issues);
     if (leadId !== undefined) {
@@ -179,15 +197,53 @@ export function validateCampaignEvent(input: unknown): ValidationResult<Campaign
       else if (leadId !== ('red-jackdaw' satisfies LeadId)) issue(issues, 'payload.leadId', 'unknown-id');
     }
   }
+  if (payload && validType === 'market-traded') {
+    validateKeys(payload, ['portId', 'shipId', 'cargoId', 'delta', 'unitPrice'], 'payload', issues);
+    const portId = required(payload, 'portId', 'payload', issues);
+    if (portId !== undefined) {
+      if (typeof portId !== 'string') issue(issues, 'payload.portId', 'wrong-type');
+      else if (!isPortId(portId)) issue(issues, 'payload.portId', 'unknown-id');
+    }
+    const shipId = required(payload, 'shipId', 'payload', issues);
+    if (shipId !== undefined && typeof shipId !== 'string') issue(issues, 'payload.shipId', 'wrong-type');
+    const cargoId = required(payload, 'cargoId', 'payload', issues);
+    if (cargoId !== undefined) {
+      if (typeof cargoId !== 'string') issue(issues, 'payload.cargoId', 'wrong-type');
+      else if (!isCargoId(cargoId)) issue(issues, 'payload.cargoId', 'unknown-id');
+    }
+    const delta = required(payload, 'delta', 'payload', issues);
+    if (delta !== undefined) {
+      if (typeof delta !== 'number') issue(issues, 'payload.delta', 'wrong-type');
+      else if (!Number.isInteger(delta)) issue(issues, 'payload.delta', 'not-integer');
+      else if (!Number.isSafeInteger(delta) || delta === 0) issue(issues, 'payload.delta', 'out-of-range');
+    }
+    const unitPrice = required(payload, 'unitPrice', 'payload', issues);
+    if (unitPrice !== undefined) {
+      if (typeof unitPrice !== 'number') issue(issues, 'payload.unitPrice', 'wrong-type');
+      else if (!Number.isInteger(unitPrice)) issue(issues, 'payload.unitPrice', 'not-integer');
+      else if (!Number.isSafeInteger(unitPrice) || unitPrice < 0) issue(issues, 'payload.unitPrice', 'out-of-range');
+    }
+  }
 
   if (issues.length > 0) return { ok: false, issues };
-  return {
+  if (validType === 'lead-accepted') return {
+    ok: true,
+    value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: { leadId: 'red-jackdaw' } },
+  };
+  if (validType === 'market-traded') return {
     ok: true,
     value: {
       id: event.id as number,
-      type: 'lead-accepted',
+      type: validType,
       atDay: event.atDay as number,
-      payload: { leadId: 'red-jackdaw' },
+      payload: {
+        portId: payload?.portId as PortId,
+        shipId: payload?.shipId as string,
+        cargoId: payload?.cargoId as CargoId,
+        delta: payload?.delta as number,
+        unitPrice: payload?.unitPrice as number,
+      },
     },
   };
+  return { ok: false, issues: [{ path: '$', code: 'invariant' }] };
 }

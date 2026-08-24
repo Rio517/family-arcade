@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createCampaign } from '../domain/createCampaign';
+import { marketTradeDraft, quoteTrade } from '../domain/economy';
 import type { CampaignJournal } from '../domain/events';
 import { appendJournal, createJournal } from '../domain/replay';
 import { canonicalJson, checksumPayload } from './checksum';
@@ -35,6 +36,21 @@ function acceptedJournal(): CampaignJournal {
     type: 'lead-accepted',
     payload: { leadId: 'red-jackdaw' },
   });
+}
+
+function journalWithLegalTrades(count: number): CampaignJournal {
+  let journal = initialJournal();
+  for (let index = 0; index < count; index += 1) {
+    const quote = quoteTrade(journal.state, {
+      portId: 'bridgetown',
+      shipId: 'mistral',
+      cargoId: 'provisions',
+      delta: index % 2 === 0 ? 1 : -1,
+    });
+    if (!quote.ok) throw new Error('fixture must quote');
+    journal = appendJournal(journal, marketTradeDraft(quote));
+  }
+  return journal;
 }
 
 function envelopeRaw(
@@ -287,6 +303,18 @@ describe('loadCampaign', () => {
 });
 
 describe('saveCampaign', () => {
+  it('compacts a validated oversized journal before checksumming and saving it', () => {
+    const storage = new MemoryStorage();
+    const journal = journalWithLegalTrades(257);
+
+    const result = saveSuccessfully(storage, journal, EMPTY_REVISION, 100);
+
+    expect(result.journal.events).toEqual([]);
+    expect(result.journal.initial).toEqual(journal.state);
+    expect(result.journal.state).toEqual(journal.state);
+    expect(loadCampaign(storage)).toMatchObject({ kind: 'loaded', journal: result.journal });
+  });
+
   it('publishes a verified first save to the exact current key', () => {
     const storage = new MemoryStorage();
     const journal = initialJournal();

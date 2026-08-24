@@ -58,6 +58,7 @@ export const LEADS = Object.freeze({
     id: 'red-jackdaw',
     expiresAfterDays: 18,
     nextAction: 'Sail east of Bridgetown and identify the Red Jackdaw.',
+    sentence: 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.',
   } satisfies LeadDefinition),
 } satisfies Record<LeadId, Readonly<LeadDefinition>>);
 

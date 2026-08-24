@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { createCampaign } from './createCampaign';
+import { marketTradeDraft, quoteTrade } from './economy';
 import type { CampaignEvent, CampaignEventDraft } from './events';
+import { validateCampaignEvent } from './events';
 import { reduceCampaign } from './reduceCampaign';
 import { appendJournal, createJournal } from './replay';
 
@@ -30,6 +32,132 @@ function acceptEvent(id = 1, atDay = 0): CampaignEvent {
 }
 
 describe('campaign journal append', () => {
+  it('applies a quoted market event atomically and replays it canonically', () => {
+    const journal = createJournal(initialCampaign());
+    const quote = quoteTrade(journal.state, {
+      portId: 'bridgetown', shipId: 'mistral', cargoId: 'provisions', delta: 5,
+    });
+    if (!quote.ok) throw new Error('fixture must quote');
+
+    const traded = appendJournal(journal, marketTradeDraft(quote));
+
+    expect(traded.state.wealth.gold).toBe(480);
+    expect(traded.state.wealth.earned).toBe(0);
+    expect(traded.state.legacy.goldEarned).toBe(0);
+    expect(traded.state.fleet.ships[0].cargo.provisions).toBe(39);
+    expect(traded.state.lastEventId).toBe(1);
+    expect(traded.initial).toEqual(journal.initial);
+  });
+
+  it('parses the exact market-traded payload shape', () => {
+    expect(validateCampaignEvent({
+      id: 1,
+      type: 'market-traded',
+      atDay: 0,
+      payload: {
+        portId: 'bridgetown', shipId: 'mistral', cargoId: 'provisions', delta: 5, unitPrice: 4,
+      },
+    })).toEqual({
+      ok: true,
+      value: {
+        id: 1,
+        type: 'market-traded',
+        atDay: 0,
+        payload: {
+          portId: 'bridgetown', shipId: 'mistral', cargoId: 'provisions', delta: 5, unitPrice: 4,
+        },
+      },
+    });
+  });
+
+  it.each([
+    ['zero delta', { delta: 0 }, 'payload.delta:out-of-range'],
+    ['fractional delta', { delta: 1.5 }, 'payload.delta:not-integer'],
+    ['unknown ship ID is left to canonical quote validation', { shipId: 'missing' }, null],
+    ['unknown cargo ID', { cargoId: 'people' }, 'payload.cargoId:unknown-id'],
+    ['unknown port ID', { portId: 'nassau' }, 'payload.portId:unknown-id'],
+    ['wrong unit-price type', { unitPrice: '4' }, 'payload.unitPrice:wrong-type'],
+  ] as const)('validates market payload %s', (_label, changes, expectedIssue) => {
+    const event = {
+      id: 1,
+      type: 'market-traded',
+      atDay: 0,
+      payload: {
+        portId: 'bridgetown', shipId: 'mistral', cargoId: 'provisions', delta: 1, unitPrice: 4,
+        ...changes,
+      },
+    };
+    const validation = validateCampaignEvent(event);
+
+    if (expectedIssue) expect(validation).toEqual({
+      ok: false,
+      issues: [{ path: expectedIssue.split(':')[0], code: expectedIssue.split(':')[1] }],
+    });
+    else expect(validation).toMatchObject({ ok: true });
+  });
+
+  it('rejects payload accessors and reads a descriptor-safe proxy without live gets', () => {
+    const accessor = {
+      id: 1,
+      type: 'market-traded',
+      atDay: 0,
+      payload: {
+        portId: 'bridgetown', shipId: 'mistral', cargoId: 'provisions', delta: 1, unitPrice: 4,
+      },
+    } as Record<string, unknown>;
+    let reads = 0;
+    Object.defineProperty(accessor.payload as object, 'delta', {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return 1;
+      },
+    });
+    expect(validateCampaignEvent(accessor)).toEqual({
+      ok: false,
+      issues: [{ path: 'payload.delta', code: 'non-json' }],
+    });
+    expect(reads).toBe(0);
+
+    const target = {
+      id: 1,
+      type: 'market-traded',
+      atDay: 0,
+      payload: {
+        portId: 'bridgetown', shipId: 'mistral', cargoId: 'provisions', delta: 1, unitPrice: 4,
+      },
+    };
+    const proxy = new Proxy(target, {
+      get: () => {
+        reads += 1;
+        throw new Error('unsafe live read');
+      },
+    });
+    expect(validateCampaignEvent(proxy)).toMatchObject({ ok: true });
+    expect(reads).toBe(0);
+  });
+
+  it('rejects a forged unit price and stale full-hold quote without mutating state', () => {
+    const journal = createJournal(initialCampaign());
+    const quote = quoteTrade(journal.state, {
+      portId: 'bridgetown', shipId: 'mistral', cargoId: 'provisions', delta: 46,
+    });
+    if (!quote.ok) throw new Error('fixture must quote');
+    const forged = marketTradeDraft(quote);
+    forged.payload.unitPrice = 5;
+
+    expect(() => appendJournal(journal, forged)).toThrowError(
+      'Invalid market trade: expected unit price 4, received 5',
+    );
+    expect(journal.state.fleet.ships[0].cargo.provisions).toBe(34);
+
+    const first = appendJournal(journal, marketTradeDraft(quote));
+    expect(() => appendJournal(first, marketTradeDraft(quote))).toThrowError(
+      'Invalid market trade: insufficient-space',
+    );
+  });
+
   it('derives the next event ID and current campaign day', () => {
     const initial = initialCampaign();
     initial.lastEventId = 41;

@@ -51,4 +51,16 @@ export interface LeadDefinition {
   id: LeadId;
   expiresAfterDays: number;
   nextAction: string;
+  sentence: string;
+}
+
+export interface CargoDefinition {
+  id: CargoId;
+  name: string;
+  baselinePrice: number;
+}
+
+export interface PortMarketDefinition {
+  portId: PortId;
+  unitPrices: Readonly<Record<CargoId, number>>;
 }

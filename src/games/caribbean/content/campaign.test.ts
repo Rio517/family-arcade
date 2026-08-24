@@ -89,8 +89,12 @@ describe('Caribbean campaign content', () => {
         id: 'red-jackdaw',
         expiresAfterDays: 18,
         nextAction: 'Sail east of Bridgetown and identify the Red Jackdaw.',
+        sentence: 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.',
       },
     });
+    expect(LEADS['red-jackdaw'].sentence).toBe(
+      'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.',
+    );
   });
 
   it('derives campaign sloop validation limits from the authoritative naval class', () => {

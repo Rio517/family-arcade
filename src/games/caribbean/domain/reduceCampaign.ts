@@ -1,4 +1,5 @@
 import { LEADS } from '../content/campaign';
+import { quoteTrade } from './economy';
 import {
   type CampaignEvent,
   validateCampaignEvent,
@@ -57,8 +58,28 @@ export function reduceCampaign(
       next.lastEventId = event.id;
       break;
     }
+    case 'market-traded': {
+      const quote = quoteTrade(state, {
+        portId: event.payload.portId,
+        shipId: event.payload.shipId,
+        cargoId: event.payload.cargoId,
+        delta: event.payload.delta,
+      });
+      if (!quote.ok) {
+        throw new Error(`Invalid market trade: ${quote.reason}`);
+      }
+      if (quote.unitPrice !== event.payload.unitPrice) {
+        throw new Error(`Invalid market trade: expected unit price ${quote.unitPrice}, received ${event.payload.unitPrice}`);
+      }
+      const ship = next.fleet.ships.find(({ id }) => id === event.payload.shipId);
+      if (!ship) throw new Error(`Invalid market trade: unknown ship ${event.payload.shipId}`);
+      next.wealth.gold = quote.goldAfter;
+      ship.cargo[event.payload.cargoId] = quote.quantityAfter;
+      next.lastEventId = event.id;
+      break;
+    }
     default:
-      return assertNever(event.type);
+      return assertNever(event);
   }
 
   const result = validateCampaign(next);
