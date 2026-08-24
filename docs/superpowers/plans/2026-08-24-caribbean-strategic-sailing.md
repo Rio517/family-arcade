@@ -37,7 +37,7 @@
 - Every UI task runs a real production browser gate before package completion. Stable evidence is deterministic, honest performance/pixel observations are range-validated, every gate fails closed, and all existing version-2 port evidence channels remain present.
 - Before every Task 1–6 source commit, run the task's focused suite, `mise exec node@20 -- npm run check`, full `mise exec node@20 -- npx vitest run`, clean `mise exec node@20 -- npx tsc -b --force`, and real `mise exec node@20 -- npm run build`, then `git diff --check`. The forced solution build is the clean typecheck; the following package build is the required production Vite build. Do not delete caches.
 - Tasks 4 and 5 must run their owned normal-production browser mode, inspect and stage its deterministic screenshots in the same UI commit. Task 7 may recapture them cumulatively but cannot supply missing per-commit browser evidence retroactively.
-- Naval source provenance uses the Task 6 `git ls-files -z --` pathspec contract, not a hand-maintained historical file list; path membership/order and raw-byte hashes are exact, while live performance and PNG pixels remain observational.
+- Naval source provenance uses Task 6's deterministic `git ls-files` seed plus transitive tracked-local import/HTML/CSS/build-entry closure, not a hand-maintained final file list; unresolved/omitted local dependencies fail closed, path membership/order and raw-byte hashes are exact, and live performance/PNG pixels remain observational.
 
 ---
 
@@ -187,12 +187,25 @@ export interface MinimumScreenGateProps {
 // unsupported -> supported transition. Children are not invoked while blocked.
 
 // scripts/lib/caribbean-naval-verification.mjs — Task 6
-export const CARIBBEAN_NAVAL_SOURCE_PATHS: readonly string[];
+export const CARIBBEAN_NAVAL_SOURCE_SEEDS: readonly string[];
 export interface CaribbeanNavalSourceRow { path: string; sha256: string }
+export interface CaribbeanNavalSourceEdge {
+  importer: string;
+  specifier: string;
+  target: string;
+}
+export interface CaribbeanNavalSourceAudit {
+  seeds: string[];
+  paths: string[];
+  edges: CaribbeanNavalSourceEdge[];
+}
 export interface CaribbeanNavalSourceManifest {
   files: CaribbeanNavalSourceRow[];
   sourceHash: string;
 }
+export function auditCaribbeanNavalSourceClosure(
+  root: string,
+): CaribbeanNavalSourceAudit;
 export function collectCaribbeanNavalSourceManifest(
   root: string,
 ): CaribbeanNavalSourceManifest;
@@ -1347,7 +1360,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 - Modify: `scripts/caribbean-naval-check.mjs`
 - Modify: `scripts/lib/caribbean-naval-check.test.mjs`
 
-**Interfaces:** Consumes Task 5's literal `CampaignVictoryTrace`, `driveCampaignVictory`, public tick, browser modes/screenshots, and all production interfaces. Produces port evidence schema version 3, `CARIBBEAN_NAVAL_SOURCE_PATHS`/`collectCaribbeanNavalSourceManifest`, real clock integration, revised isolation, exact screenshot/stable-manifest contract, observational range validation, and naval `--semantic-probe`/`--verify`/`--capture` modes. Does not commit generated metrics/PNG bytes.
+**Interfaces:** Consumes Task 5's literal `CampaignVictoryTrace`, `driveCampaignVictory`, public tick, browser modes/screenshots, and all production interfaces. Produces port evidence schema version 3, `CARIBBEAN_NAVAL_SOURCE_SEEDS`/`auditCaribbeanNavalSourceClosure`/`collectCaribbeanNavalSourceManifest`, real clock integration, revised isolation, exact screenshot/stable-manifest contract, observational range validation, and naval `--semantic-probe`/`--verify`/`--capture` modes. Does not commit generated metrics/PNG bytes.
 
 - [ ] **Step 1: Define exact schema-v3 evaluator tests**
 
@@ -1448,7 +1461,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
   Test exported verification helpers and the CLI with injected temp/docs roots.
   Replace `TASK8_TREE_FILES`; do not extend that historical fixed list. The
-  exact `CARIBBEAN_NAVAL_SOURCE_PATHS` passed as separate arguments after
+  exact `CARIBBEAN_NAVAL_SOURCE_SEEDS` passed as separate arguments after
   `git ls-files -z --` is:
 
   ```text
@@ -1464,20 +1477,44 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   scripts/caribbean-port-check.mjs
   scripts/caribbean-naval-check.mjs
   scripts/fixtures/caribbean-campaign-victory.json
-  :(glob)scripts/lib/caribbean-*.mjs
+  :(glob)scripts/lib/caribbean-naval-*.mjs
+  :(glob)scripts/lib/caribbean-port-identity-*.mjs
+  :(glob)scripts/lib/caribbean-campaign-*.mjs
   :(glob)src/games/caribbean/**
-  :(glob)src/shared/profile/**
-  src/shared/game.ts
-  src/shared/three/disposeDeep.ts
-  src/shared/ui/icons.tsx
-  src/shared/ui/useDismissOnEscape.ts
+  :(glob)public/**
   ```
 
-  Parse the NUL-delimited output, normalize repository-relative separators to
-  `/`, reject duplicates/non-files, and sort bytewise ascending. Hash each
-  file's raw bytes as SHA-256 into `{ path, sha256 }`; compute `sourceHash` as
-  SHA-256 of canonical JSON for the complete sorted row array. No observation,
-  generated PNG, `dist`, or docs evidence path enters this list.
+  Independently call `git ls-files -z` once for the complete tracked universe.
+  Parse NUL-delimited paths, normalize separators to `/`, reject duplicates and
+  non-files, and sort bytewise ascending. Starting from the seeds, calculate a
+  fixed-point local dependency closure with the exact spec algorithm:
+
+  - use the installed TypeScript compiler API for static import/export,
+    side-effect import, import-type nodes, literal dynamic import/require,
+    triple-slash path, and literal local-file
+    `new URL('./asset', import.meta.url)` edges in JS/TS variants;
+  - extract local module-script sources and stylesheet/icon/manifest links from
+    HTML, plus local `@import`/`url(...)` from CSS;
+  - strip query/hash; load aliases from `tsconfig.app.json`, require the
+    `vite.config.ts` alias object to agree, and literal-test
+    `@shared`/`@games`/`@app`/`@test`; resolve relative and root/public paths
+    through the literal extension/index list in the spec;
+  - ignore `node:` and a bare package specifier only when its package root is
+    declared in `package.json`; permit a type-only bare import through its
+    declared `@types` name using the spec's scoped/unscoped mapping, and reject
+    any other unknown bare/alias-like specifier;
+    validate Vite's directory-valued
+    `fileURLToPath(new URL(...))` alias roots as directories without adding file
+    rows; and
+  - enqueue every uniquely resolved tracked target. Reject unresolved or
+    ambiguous local edges, nonliteral dynamic imports/requires, unsupported
+    `import.meta.glob`, duplicates, or any resolved edge target absent from the
+    final closure with `source-files`.
+
+  Sort the final closure paths bytewise. Hash each file's raw bytes as SHA-256
+  into `{ path, sha256 }`; compute `sourceHash` as SHA-256 of canonical JSON for
+  that complete row array. No observation, generated PNG, `dist`, or docs
+  evidence path enters the closure.
 
   Required matrix:
 
@@ -1490,8 +1527,9 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   | semantic/stale/dirty/hash/source/stable-manifest/observation-range/artifact-manifest/destination/cleanup failure | no accepted output | exit 1, mode-specific `NAVAL_SEMANTIC_PROBE_FAILED <code>`, `NAVAL_CAPTURE_FAILED <code>`, or `NAVAL_VERIFY_FAILED <code>` |
 
   The verify fixture requires capture HEAD ancestor, exact source-file manifest
-  and source hash, and a clean tracked worktree. It compares candidate and
-  current source rows for exact length, order, path, and per-file hash: missing,
+  and source hash, a zero-finding closure audit, and a clean tracked worktree.
+  It compares candidate and current source rows for exact length, order, path,
+  and per-file hash: missing,
   extra, or reordered rows fail `source-files`; equal paths with changed hashes
   or aggregate hash fail `source-hash`. Compare canonical bytes only
   for `stableManifest`: version 1; sorted source paths/hash; canonical input;
@@ -1514,8 +1552,12 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   FPS/duration/resource/frame values and different valid PNG pixels, and
   requires acceptance; then mutates one stable field, each observation range,
   and artifact name/dimension/signature to require rejection. A named
-  `collects the dependency-complete Caribbean naval source manifest` test
-  asserts literal membership of
+  `audits the real tracked dependency closure` test runs against the repository
+  rather than an injected expected list. It asserts every recorded local edge's
+  importer/target is in `audit.paths`, every target is tracked, no unresolved
+  edge exists, and literal membership includes
+  `src/shared/storage/kv.ts`, `src/shared/styles/tokens.css`,
+  `src/app/main.tsx`, `src/app/App.tsx`, `src/app/registry.ts`,
   `src/games/caribbean/content/naval.ts`,
   `src/games/caribbean/domain/naval/resolution.ts`,
   `src/games/caribbean/state/naval/NavalSession.ts`,
@@ -1524,10 +1566,29 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   `src/games/caribbean/styles/battle.css`,
   `src/games/caribbean/assets/caribbean-sloop.glb`,
   `scripts/lib/caribbean-campaign-victory-driver.mjs`,
+  `scripts/lib/caribbean-campaign-victory-browser.node-test.mjs`,
+  `scripts/lib/caribbean-naval-verification.mjs`,
+  `scripts/lib/caribbean-naval-verification.node-test.mjs`,
   `scripts/fixtures/caribbean-campaign-victory.json`,
   `scripts/caribbean-port-check.mjs`, `scripts/caribbean-naval-check.mjs`, and
-  every literal shared/build/package input above. Delete one captured
-  critical row and inject one out-of-selection `README.md` row; both must fail
+  every literal seed/build/package input above. Assert the exact real edges
+  `index.html` `/src/app/main.tsx` -> `src/app/main.tsx`, both
+  `src/app/main.tsx` and `src/games/caribbean/preview.tsx`
+  `@shared/styles/tokens.css` -> `src/shared/styles/tokens.css`, and
+  `src/shared/profile/usersStore.ts` `@shared/storage/kv` ->
+  `src/shared/storage/kv.ts`. In independent temporary graph
+  fixtures created with `mkdtemp`, `git init`, and explicit `git add` (no
+  commit/network/global config), cover relative+extensionless+directory-index,
+  alias-config agreement and all four aliases;
+  HTML `/src/app/main.tsx`; TypeScript side-effect CSS import; CSS `@import` and
+  asset `url(...)`; literal dynamic import/require/new-URL; accepted declared
+  package/`@types`/`node:` imports; and rejected unknown bare specifiers. Add a
+  new tracked transitive local import and require the
+  closure/manifest to grow by exactly its dependency edge; then remove that
+  target from the tracked universe and require `source-files`. A nonliteral
+  dynamic import, unresolved path, and ambiguous extension candidates also
+  fail `source-files`. Delete one captured
+  critical row and inject one out-of-closure `README.md` row; both must fail
   `source-files`. Change one retained file hash; it must fail `source-hash`.
   Also inject stale capture, dirty source, wrong destination, and cleanup
   failure. Both success and every failure remove the exact temp directory in
@@ -1547,7 +1608,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   mise exec node@20 -- npx vitest run scripts/lib/caribbean-naval-check.test.mjs
   ```
 
-  Expected RED: Node collects named source-membership,
+  Expected RED: Node collects named real-closure, resolver, omitted-import,
   missing/extra/hash-drift, stable/observation, and cleanup tests and they fail
   on missing `caribbean-naval-verification.mjs`; Vitest independently collects
   the existing CLI suite and fails on the historical `TASK8_TREE_FILES`/
@@ -1556,7 +1617,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
 - [ ] **Step 7: Implement semantic-probe, capture, and final verify modes**
 
-  Implement the exact pathspec collector and remove `TASK8_TREE_FILES`.
+  Implement the exact seed/closure collector and remove `TASK8_TREE_FILES`.
   `--semantic-probe` generates in temp, runs harness/evaluator, skips tracked
   provenance/artifact equality, reports tracked current when source plus stable
   manifest match (regardless of observation bytes), reports stale otherwise,
@@ -1566,10 +1627,17 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   nobody captures accidentally. Do not freeze, normalize, or byte-compare
   honest performance/PNG observations.
 
-  Rerun the two Step 6 commands. Expected: every named native source-membership,
-  missing/extra/hash-drift, two-generation, stable-drift, range, artifact,
-  destination, and cleanup test passes; the existing Vitest CLI suite passes
-  under Vitest.
+  Before the real-repository GREEN audit, stage exactly the Task 6 source list
+  from Step 9. `git ls-files` must see the three newly created native/module
+  files as members of the prospective commit; an untracked-file union is not
+  permitted in the production collector. Do not commit yet. Require the audit
+  to include the browser native test and both verification module/test paths
+  literally.
+
+  Rerun the two Step 6 commands. Expected: every named native real-closure,
+  resolver, omitted-import, missing/extra/hash-drift, two-generation,
+  stable-drift, range, artifact, destination, and cleanup test passes; the
+  existing Vitest CLI suite passes under Vitest.
 
   Run the new source command after GREEN:
 
@@ -1606,7 +1674,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
 - [ ] **Step 9: Mutation proof, focused verification, review, and commit**
 
-  Mutate raw fixtures for duplicated resolution, changed literal event ID, changed mode order, terminal tick `11856`, wrong seed, `tickAfterReload: 1`, a naval request on avoid, missing prior v2 field, unknown nested key, and false recovery preservation. Each returns a failed verdict without throwing. Mutate first-RAF behavior, clock/Date installation order, omit a literal critical source, add an out-of-selection source, change a retained source hash, stable manifest, observation ranges, artifact manifest, and each CLI destination; browser/naval-verification tests must fail with the owning literal code. Different valid FPS/duration/resource/PNG observations must continue to pass.
+  Mutate raw fixtures for duplicated resolution, changed literal event ID, changed mode order, terminal tick `11856`, wrong seed, `tickAfterReload: 1`, a naval request on avoid, missing prior v2 field, unknown nested key, and false recovery preservation. Each returns a failed verdict without throwing. Mutate first-RAF behavior and clock/Date installation order. In a temporary tracked graph, add a new local import and require automatic closure growth; remove its target, make it ambiguous, and make a dynamic import nonliteral, each requiring `source-files`. Omit each literal `kv.ts`/token-CSS/app-main critical row, add an out-of-closure source, reorder rows, and change a retained source hash; the verification suite must fail with `source-files` or `source-hash` exactly. Mutate stable manifest, observation ranges, artifact manifest, and each CLI destination; the owning browser/naval-verification test must fail. Different valid FPS/duration/resource/PNG observations must continue to pass.
 
   Run:
 
@@ -1622,6 +1690,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   mise exec node@20 -- npx tsc -b --force
   mise exec node@20 -- npm run build
   mise exec node@20 -- npm run caribbean:naval-check -- --semantic-probe
+  git diff --cached --check
   git diff --check
   ```
 
@@ -1787,7 +1856,7 @@ The package is complete only when every statement is evidenced:
 16. Normal setup/port/sailing/avoid does not request naval assets; pursuit loads only local production assets; no harness/debug module ships; Battle Lab remains independently green.
 17. The real-session literal public-control trace mounts at tick zero, primes first RAF without a tick, advances through actual 16 ms RAF quanta to exact six-tick publications/final tick `11855`, preserves ordered clock/Date fixtures and `nowConsumed`, and fails closed on drift, timeout, or non-victory.
 18. Schema-v3 normal-route port metrics and its nine exact-clock/public-tick screenshots are byte-identical across two clean runs and fail closed on malformed/unknown evidence; this does not impose byte identity on the separate live naval-harness observations in criterion 19.
-19. Naval semantic probe is non-writing and tolerates stale tracked provenance; Task 7's clean-Task-6-HEAD capture owns honest observations; final clean `--verify` proves the exact sorted dependency-complete `git ls-files` source row/hash manifest and canonical stable-manifest equality while accepting varied in-range FPS/duration/resource/PNG observations and rejecting missing, extra, reordered, hash, stable, range, and artifact drift.
+19. Naval semantic probe is non-writing and tolerates stale tracked provenance; Task 7's clean-Task-6-HEAD capture owns honest observations; final clean `--verify` proves the exact sorted seed-to-fixed-point tracked-local import/HTML/CSS/build-entry closure and raw-byte row/hash manifest—including `kv.ts`, token CSS, and app main—while accepting varied in-range FPS/duration/resource/PNG observations and rejecting unresolved/omitted/new dependencies, missing/extra/reordered rows, hash, stable, range, and artifact drift.
 20. Every Task 1–6 source commit has fresh focused tests, check, full Vitest, forced clean solution build, real package build, and diff check; Tasks 4–5 also commit inspected normal-production screenshots with their UI source; cumulative gates/review are fresh and zero-finding.
 21. Human first-time and target-iPad Safari/touch/offline/thermal observations remain honestly unobserved unless actually performed.
 22. Worktree is clean; no merge, push, rebase, fetch, or main change occurred.

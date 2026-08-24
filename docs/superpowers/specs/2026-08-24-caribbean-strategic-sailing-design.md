@@ -843,9 +843,10 @@ truncated-trace RED, before either implementation turns green.
   cleans the exact temporary directory in `finally` and exits 0 only with
   `NAVAL_VERIFY_OK capture=<sha> source=<sha> artifacts=<n>`.
 
-The source provenance set is deterministic and dependency-complete for this
-package. Replace the historical hand-maintained naval list with the sorted,
-NUL-delimited result of `git ls-files -z --` over these exact pathspecs:
+The source provenance set is the deterministic transitive tracked-local
+dependency closure of the package's selected source/build entries. It is not a
+curated final file list. Start with the sorted, NUL-delimited result of
+`git ls-files -z --` over these exact seed pathspecs:
 
 ```text
 package.json
@@ -860,23 +861,58 @@ preview-caribbean-game.html
 scripts/caribbean-port-check.mjs
 scripts/caribbean-naval-check.mjs
 scripts/fixtures/caribbean-campaign-victory.json
-:(glob)scripts/lib/caribbean-*.mjs
+:(glob)scripts/lib/caribbean-naval-*.mjs
+:(glob)scripts/lib/caribbean-port-identity-*.mjs
+:(glob)scripts/lib/caribbean-campaign-*.mjs
 :(glob)src/games/caribbean/**
-:(glob)src/shared/profile/**
-src/shared/game.ts
-src/shared/three/disposeDeep.ts
-src/shared/ui/icons.tsx
-src/shared/ui/useDismissOnEscape.ts
+:(glob)public/**
 ```
 
-Paths are repository-relative POSIX strings, must be unique, and are sorted in
-bytewise ascending order. Each row is `{ path, sha256 }`, where `sha256` hashes
-the tracked file's raw bytes. `sourceHash` is SHA-256 of the canonical JSON of
-the complete sorted row array. Capture and current verification require exact
-array equality: a missing, extra, duplicate, or reordered path fails
-`source-files`; an equal path array with any changed row hash or aggregate hash
-fails `source-hash`. Literal membership tests
-must include `src/games/caribbean/content/naval.ts`,
+Build one universe from `git ls-files -z` and resolve recursively from those
+seeds until a fixed point. TypeScript's compiler API extracts static
+`import`/`export ... from`, side-effect imports, import-type nodes, literal
+dynamic imports, literal `require`, triple-slash path references, and literal
+local-file `new URL('./asset', import.meta.url)` edges from tracked
+`.ts/.tsx/.js/.jsx/.mjs/.cjs` files. HTML extraction covers local module-script
+`src` plus local stylesheet/icon/manifest `href`; CSS extraction covers local
+`@import` and `url(...)`. Resolution strips query/hash, supports the repository
+aliases `@shared`, `@games`, `@app`, and `@test`, checks exact files plus
+`.ts/.tsx/.js/.jsx/.mjs/.cjs/.json/.css/.glb/.webp/.svg/.png/.woff2` and
+`index.*`, maps root `/src/...` to the repository and root/public HTML/CSS
+assets to `public/...`. Load alias keys/targets from `tsconfig.app.json` and
+require the `vite.config.ts` alias object to match them; literal tests lock the
+current `@shared`, `@games`, `@app`, and `@test` mappings. Ignore `node:` and a
+bare package specifier only when its package root exists in `package.json`
+dependencies/devDependencies/peerDependencies/optionalDependencies; an unknown
+bare type-only specifier may instead match its declared `@types` package
+(`pkg` -> `@types/pkg`, `@scope/pkg` -> `@types/scope__pkg`). Any other unknown
+bare/alias-like specifier fails `source-files`. Package versions remain covered
+by the seeded `package.json`/lockfile.
+Directory-valued `fileURLToPath(new URL(...))` alias roots in `vite.config.ts`
+must resolve to tracked-source directories and are audited as resolver roots,
+not added as file rows; any other local file reference must resolve to a file.
+
+Every extracted local edge must resolve to exactly one tracked path, and every
+resolved target is enqueued and included. An unresolved/ambiguous local edge,
+nonliteral dynamic import/require, any unsupported `import.meta.glob`, duplicate
+path, or local edge whose target is absent from the final set fails
+`source-files`; no audit warning is allowed.
+Tests inject a new tracked transitive import and require the closure to grow,
+then delete its target and require fail-closed rejection. They separately
+exercise HTML -> `/src/app/main.tsx`, TypeScript -> CSS, CSS -> asset, alias,
+extension, directory-index, alias-config agreement, and declared-package
+resolution.
+
+Final paths are repository-relative POSIX strings sorted bytewise ascending.
+Each row is `{ path, sha256 }`, where `sha256` hashes the tracked file's raw
+bytes. `sourceHash` is SHA-256 of canonical JSON for the complete sorted row
+array. Capture and current verification require exact array equality: a
+missing, extra, duplicate, or reordered path fails `source-files`; an equal
+path array with any changed row or aggregate hash fails `source-hash`. A real
+repository closure audit and literal membership tests must include
+`src/shared/storage/kv.ts`, `src/shared/styles/tokens.css`,
+`src/app/main.tsx`, `src/app/App.tsx`, `src/app/registry.ts`,
+`src/games/caribbean/content/naval.ts`,
 `src/games/caribbean/domain/naval/resolution.ts`,
 `src/games/caribbean/state/naval/NavalSession.ts`,
 `src/games/caribbean/state/naval/FrameRunner.ts`,
@@ -884,10 +920,22 @@ must include `src/games/caribbean/content/naval.ts`,
 `src/games/caribbean/styles/battle.css`,
 `src/games/caribbean/assets/caribbean-sloop.glb`,
 `scripts/lib/caribbean-campaign-victory-driver.mjs`,
+`scripts/lib/caribbean-campaign-victory-browser.node-test.mjs`,
+`scripts/lib/caribbean-naval-verification.mjs`,
+`scripts/lib/caribbean-naval-verification.node-test.mjs`,
 `scripts/fixtures/caribbean-campaign-victory.json`,
 `scripts/caribbean-port-check.mjs`, `scripts/caribbean-naval-check.mjs`, and
-every literal shared/build/package input above. Variable observations and
-generated PNGs are never members.
+every seed/build/package input above. Variable observations and generated PNGs
+are never members.
+
+The real-repository test locks these current edges, not only the target rows:
+`index.html` `/src/app/main.tsx` -> `src/app/main.tsx`;
+`src/app/main.tsx` `@shared/styles/tokens.css` and
+`src/games/caribbean/preview.tsx` `@shared/styles/tokens.css` ->
+`src/shared/styles/tokens.css`; and
+`src/shared/profile/usersStore.ts` `@shared/storage/kv` ->
+`src/shared/storage/kv.ts`. Removing an importer, edge, or target fails the
+closure audit.
 
 The stable/observational boundary is exact. `stableManifest.version === 1` and
 contains that complete sorted source row array/hash; canonical input/seed; exact viewport
