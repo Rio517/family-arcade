@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { getBrowserCaribbeanRuntime, type CaribbeanRuntime } from '../state/runtime';
 import { useCaribbean } from '../state/useCaribbean';
+import { useProfile } from '@shared/profile/useProfile';
 import '../styles/production.css';
 import { MinimumScreenGate } from './MinimumScreenGate';
 import { PortPage } from './port/PortPage';
@@ -16,6 +17,12 @@ function requestedResume(): boolean {
 
 function ControllerPage({ runtime }: { runtime: CaribbeanRuntime }) {
   const controller = useCaribbean(runtime);
+  const { profile, setPronouns } = useProfile();
+  const identity = useMemo(() => ({
+    playerName: profile.name,
+    pronouns: profile.pronouns,
+    savePronouns: setPronouns,
+  }), [profile.name, profile.pronouns, setPronouns]);
   const load = controller.load;
   const { busy, journal, persistence, resume } = controller;
   const needsRecovery = load.kind === 'unreadable'
@@ -71,7 +78,7 @@ function ControllerPage({ runtime }: { runtime: CaribbeanRuntime }) {
             {needsRecovery || recoveryPhase ? (
               <RecoveryPanel controller={controller} />
             ) : (
-              <CampaignSetup controller={controller} savingAvailable={savingAvailable} />
+              <CampaignSetup controller={controller} identity={identity} savingAvailable={savingAvailable} />
             )}
           </div>
         </>

@@ -22,9 +22,9 @@ offline-capable—not a browser novelty.
 ## Current decisions
 
 - Single-player first; Caribbean setting, roughly 1655–1720.
-- A campaign-length choice at the start: **Adventure** (30–60 minutes),
-  **Voyage** (2–3 hours), or **Legend** (8–12 hours). This changes pacing and
-  content density, not the rules.
+- **Adventure** is the only campaign length currently offered. **Voyage** and
+  **Legend** remain compatibility values for existing saves until their
+  duration mechanics ship.
 - Three historical chapters let ports, wars, and piracy change over time.
 - The 2004 game's simplicity is the reference constraint. Player-facing
   gauges stay few: ship condition, crew and morale, provisions in **months

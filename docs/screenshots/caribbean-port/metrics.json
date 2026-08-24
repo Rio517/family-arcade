@@ -220,7 +220,7 @@
       "market-traded",
       "lead-accepted"
     ],
-    "saveChecksum": "c9715934",
+    "saveChecksum": "ba05d9f4",
     "replayVerified": true
   },
   "accessibility": {
@@ -522,8 +522,8 @@
     "failedCount": 0,
     "requestedPaths": [
       "/",
-      "/assets/index-Di5xpT4P.css",
-      "/assets/index-moigaiGV.js",
+      "/assets/index-C6UvL_Qw.js",
+      "/assets/index-hJ8_jPoj.css",
       "/registerSW.js"
     ]
   },
@@ -545,7 +545,7 @@
     "quarantineKey": "caribbean:campaign:quarantine:00000000-0000-4000-8000-000000000001",
     "quarantineVerified": true,
     "exportedCorruptRawVerified": true,
-    "recoveredChecksum": "ae0c5e71",
+    "recoveredChecksum": "9d36f629",
     "recoveryReloaded": true
   },
   "screenshots": [
@@ -567,12 +567,27 @@
     "screenshotsByteIdentical": true
   },
   "schemaVersion": 2,
-  "packagePhase": "profile",
+  "packagePhase": "setup",
   "profile": {
-    "status": "profile-only",
+    "status": "setup-verified",
     "defaultPronouns": "he/him",
     "boothProfilePersisted": true,
-    "setup": "not-yet-observed"
+    "setup": {
+      "prefill": {
+        "captainName": "Mario",
+        "pronouns": "he/him"
+      },
+      "careerLengthControlPresent": false,
+      "accessibility": {
+        "minimumFontPx": 14,
+        "minimumTargetHeightPx": 44,
+        "horizontalOverflowPx": 0
+      },
+      "sharedPronounSnapshot": {
+        "profile": "they/them",
+        "campaign": "they/them"
+      }
+    }
   },
   "art": {
     "status": "not-yet-observed"

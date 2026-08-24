@@ -17,6 +17,9 @@ import {
 import { QUARANTINE_KEY_PREFIX, serializeRecoveryExport } from './storage/recovery';
 import { parseSaveEnvelope } from './storage/schema';
 import { createCampaignWriter, type LockManagerLike } from './storage/writer';
+import { defaultProfile } from '@shared/profile/profile';
+import { emptyUsersState } from '@shared/profile/users';
+import { getUsersSnapshot, setUsersState } from '@shared/profile/usersStore';
 
 const originalWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
 const originalHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
@@ -139,11 +142,47 @@ describe('Caribbean integrated production journey', () => {
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
+    setUsersState(emptyUsersState());
     window.location.hash = '';
     if (originalWidth) Object.defineProperty(window, 'innerWidth', originalWidth);
     if (originalHeight) Object.defineProperty(window, 'innerHeight', originalHeight);
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it('snapshots active profile identity at setup while later shared-profile pronoun changes leave the journal unchanged', async () => {
+    const store = window.localStorage;
+    setUsersState({
+      users: [{
+        id: 'mario',
+        createdAt: 0,
+        profile: { ...defaultProfile(), name: 'Mario', pronouns: 'he/him' },
+      }],
+      activeId: 'mario',
+    });
+    const first = render(<CaribbeanPage runtime={runtime({ storage: store })} />);
+
+    expect(screen.getByLabelText('Captain name')).toHaveValue('Mario');
+    expect(screen.getByLabelText('Player pronouns')).toHaveValue('he/him');
+    fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
+    await screen.findByTestId('caribbean-career-ready');
+    expect(loadedJournal(store).state.captain).toMatchObject({ name: 'Mario', pronouns: 'he/him' });
+    first.unmount();
+
+    const users = getUsersSnapshot();
+    setUsersState({
+      ...users,
+      users: users.users.map((user) => user.id === 'mario'
+        ? { ...user, profile: { ...user.profile, pronouns: 'they/them' } }
+        : user),
+    });
+
+    render(<CaribbeanPage runtime={runtime({ storage: store })} />);
+    expect(screen.getByRole('heading', { name: 'Mario’s commission' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Resume career' }));
+    await screen.findByTestId('caribbean-career-ready');
+    expect(loadedJournal(store).state.captain).toMatchObject({ name: 'Mario', pronouns: 'he/him' });
+    expect(getUsersSnapshot().users[0]?.profile.pronouns).toBe('they/them');
   });
 
   it('persists setup -> trade -> rumour -> log while port navigation stays transient', async () => {

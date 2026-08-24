@@ -5,7 +5,8 @@ import { createCampaign } from '../../domain/createCampaign';
 import { createJournal } from '../../domain/replay';
 import type { CaribbeanController, CaribbeanPersistencePhase } from '../../state/useCaribbean';
 import type { LoadResult } from '../../storage/persistence';
-import { CampaignSetup } from './CampaignSetup';
+import { normalizePronouns } from '@shared/profile/profile';
+import { CampaignSetup, type CampaignSetupIdentity } from './CampaignSetup';
 
 const EMPTY_REVISION = { currentRaw: null, previousRaw: null };
 
@@ -34,7 +35,7 @@ function controller(overrides: Partial<CaribbeanController> = {}): CaribbeanCont
   };
 }
 
-function cleanLoad(): Extract<LoadResult, { kind: 'loaded' }> {
+function cleanLoad(length: 'voyage' | 'legend' = 'voyage'): Extract<LoadResult, { kind: 'loaded' }> {
   return {
     kind: 'loaded',
     journal: createJournal(createCampaign({
@@ -42,7 +43,7 @@ function cleanLoad(): Extract<LoadResult, { kind: 'loaded' }> {
       name: 'Morgan',
       pronouns: 'they/them',
       talent: 'navigation',
-      length: 'voyage',
+      length,
     })),
     savedAt: Date.UTC(2026, 7, 24, 12, 30),
     build: 'fixture',
@@ -50,6 +51,23 @@ function cleanLoad(): Extract<LoadResult, { kind: 'loaded' }> {
     unreadableSlots: [],
     revision: { currentRaw: 'current', previousRaw: null },
   };
+}
+
+function setupIdentity(overrides: Partial<CampaignSetupIdentity> = {}): CampaignSetupIdentity {
+  return {
+    playerName: 'Mario',
+    pronouns: 'he/him',
+    savePronouns: vi.fn(),
+    ...overrides,
+  };
+}
+
+function renderSetup(
+  view = controller(),
+  identity = setupIdentity(),
+  savingAvailable = true,
+) {
+  return { view, identity, ...render(<CampaignSetup controller={view} identity={identity} savingAvailable={savingAvailable} />) };
 }
 
 function expectControlIds(container: HTMLElement, expected: string[]): void {
@@ -69,39 +87,79 @@ describe('<CampaignSetup>', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it('offers recommended optional fields, all talents, all lengths, and Bridgetown in 1675', () => {
+  it('prefills the captain from the active player and submits the shared pronouns with Adventure', () => {
     const view = controller();
-    render(<CampaignSetup controller={view} savingAvailable />);
+    const savePronouns = vi.fn();
+    const profileSetName = vi.fn();
+    renderSetup(view, { playerName: 'Mario', pronouns: 'he/him', savePronouns, ...{ setName: profileSetName } });
 
     expect(screen.getByRole('heading', { name: 'Sign a captain’s commission' })).toBeInTheDocument();
     expect(screen.getByText('Bridgetown · 1675')).toBeInTheDocument();
-    expect(screen.getByLabelText('Captain name')).toHaveValue('Captain');
-    expect(screen.getByLabelText('Pronouns')).toHaveValue('they/them');
+    expect(screen.getByLabelText('Captain name')).toHaveValue('Mario');
+    expect(screen.getByLabelText('Player pronouns')).toHaveValue('he/him');
     expect(screen.getByLabelText('Starting talent')).toHaveValue('navigation');
-    expect(screen.getByLabelText('Career length')).toHaveValue('adventure');
+    expect(screen.queryByLabelText('Career length')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Starting talent').querySelectorAll('option')).toHaveLength(5);
-    expect(screen.getByLabelText('Career length').querySelectorAll('option')).toHaveLength(3);
+    expect(screen.getByText('Shared across every arcade game')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Captain name'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
-    const name = screen.getByLabelText('Captain name');
-    expect(name).toHaveAttribute('aria-invalid', 'true');
-    expect(name).toHaveAttribute('aria-describedby', 'captain-name-error');
-    expect(screen.getByText('Enter a captain name.')).toHaveAttribute('id', 'captain-name-error');
-
-    fireEvent.change(name, { target: { value: 'Morgan' } });
-    fireEvent.change(screen.getByLabelText('Starting talent'), { target: { value: 'medicine' } });
-    fireEvent.change(screen.getByLabelText('Career length'), { target: { value: 'legend' } });
+    fireEvent.change(screen.getByLabelText('Captain name'), { target: { value: 'Red Morgan' } });
+    fireEvent.change(screen.getByLabelText('Player pronouns'), { target: { value: 'they/them' } });
     fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
     expect(view.start).toHaveBeenCalledWith({
-      name: 'Morgan', pronouns: 'they/them', talent: 'medicine', length: 'legend',
+      name: 'Red Morgan', pronouns: 'they/them', talent: 'navigation', length: 'adventure',
     });
+    expect(savePronouns).toHaveBeenCalledWith('they/them');
+    expect(profileSetName).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['blank', ''],
+    ['whitespace', '   '],
+    ['malformed programmatic value', null],
+    ['24 astral code points', '😀'.repeat(24)],
+    ['25 astral code points', '😀'.repeat(25)],
+  ])('normalizes %s pronouns identically for profile persistence and campaign creation', (_label, raw) => {
+    const view = controller();
+    const savePronouns = vi.fn();
+    renderSetup(view, setupIdentity({ pronouns: raw as unknown as string, savePronouns }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
+
+    const normalized = normalizePronouns(raw);
+    expect(savePronouns).toHaveBeenCalledWith(normalized);
+    const campaignPronouns = vi.mocked(view.start).mock.calls[0]?.[0].pronouns;
+    expect(campaignPronouns).toBe(normalized);
+    if (normalized === 'he/him') expect(campaignPronouns).not.toBe('they/them');
+  });
+
+  it('keeps the normalized pronouns in campaign creation when profile persistence throws', () => {
+    const view = controller();
+    const savePronouns = vi.fn(() => { throw new Error('profile unavailable'); });
+    renderSetup(view, setupIdentity({ pronouns: 'they/them', savePronouns }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
+
+    expect(savePronouns).toHaveBeenCalledWith('they/them');
+    expect(view.start).toHaveBeenCalledWith({
+      name: 'Mario', pronouns: 'they/them', talent: 'navigation', length: 'adventure',
+    });
+  });
+
+  it('keeps the previous pronouns and exposes an accessible error beyond 24 Unicode code points', () => {
+    renderSetup();
+    const input = screen.getByLabelText('Player pronouns');
+
+    fireEvent.change(input, { target: { value: '😀'.repeat(25) } });
+
+    expect(input).toHaveValue('he/him');
+    expect(input).toHaveAttribute('aria-describedby', 'caribbean-pronouns-error');
+    expect(screen.getByRole('alert')).toHaveTextContent('Use 24 characters or fewer');
   });
 
   it('summarizes a clean save and opens an accessible abandon confirmation', () => {
     const load = cleanLoad();
     const view = controller({ load });
-    render(<CampaignSetup controller={view} savingAvailable />);
+    renderSetup(view);
 
     expect(screen.getByRole('heading', { name: 'Morgan’s commission' })).toBeInTheDocument();
     expect(screen.getByText('Voyage · Bridgetown')).toBeInTheDocument();
@@ -124,17 +182,26 @@ describe('<CampaignSetup>', () => {
     expect(document.querySelector('.caribbean-commission-content')).not.toHaveAttribute('inert');
   });
 
+  it.each([
+    ['voyage', 'Voyage'],
+    ['legend', 'Legend'],
+  ] as const)('keeps the original %s compatibility save label in its summary', (length, label) => {
+    renderSetup(controller({ load: cleanLoad(length) }));
+
+    expect(screen.getByText(`${label} · Bridgetown`)).toBeInTheDocument();
+  });
+
   it('states that saving is disabled without claiming a saved campaign', () => {
-    render(<CampaignSetup controller={controller()} savingAvailable={false} />);
+    renderSetup(controller(), setupIdentity(), false);
     expect(screen.getByRole('status')).toHaveTextContent(/Saving disabled/i);
     expect(screen.queryByText(/saved safely/i)).not.toBeInTheDocument();
   });
 
   it('describes a loaded campaign truthfully when safe resume ownership is unavailable', () => {
-    render(<CampaignSetup controller={controller({
+    renderSetup(controller({
       load: cleanLoad(),
       recoveryWriterCapability: 'unavailable',
-    })} savingAvailable={false} />);
+    }), setupIdentity(), false);
     expect(screen.getByRole('status')).toHaveTextContent(
       'Saving disabled. Resume requires explicit memory-only consent.',
     );
@@ -146,7 +213,7 @@ describe('<CampaignSetup>', () => {
 
   it('suppresses stale resume claims after abandonment succeeds but its same-lock reread fails', () => {
     const load = cleanLoad();
-    render(<CampaignSetup controller={controller({
+    renderSetup(controller({
       load,
       recoveryFailure: {
         kind: 'post-result-load',
@@ -159,7 +226,7 @@ describe('<CampaignSetup>', () => {
         },
         loadFailure: { kind: 'storage-unavailable', operation: 'read-current' },
       },
-    })} savingAvailable />);
+    }));
 
     expect(screen.getByRole('heading', { name: 'Campaign storage must be reread' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Morgan’s commission' })).not.toBeInTheDocument();
@@ -169,14 +236,19 @@ describe('<CampaignSetup>', () => {
     expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeDisabled();
   });
 
-  it('omits a cleared optional pronoun field so the domain default remains available', () => {
+  it('falls back to Captain and he/him when the setup drafts are blank', () => {
     const view = controller();
-    render(<CampaignSetup controller={view} savingAvailable />);
-    fireEvent.change(screen.getByLabelText('Pronouns'), { target: { value: '   ' } });
+    const savePronouns = vi.fn();
+    renderSetup(view, setupIdentity({ playerName: '   ', pronouns: '   ', savePronouns }));
+    expect(screen.getByLabelText('Captain name')).toHaveValue('Captain');
+    expect(screen.getByLabelText('Player pronouns')).toHaveValue('he/him');
+    fireEvent.change(screen.getByLabelText('Captain name'), { target: { value: '   ' } });
+    fireEvent.change(screen.getByLabelText('Player pronouns'), { target: { value: '   ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
     expect(view.start).toHaveBeenCalledWith({
-      name: 'Captain', talent: 'navigation', length: 'adventure',
+      name: 'Captain', pronouns: 'he/him', talent: 'navigation', length: 'adventure',
     });
+    expect(savePronouns).toHaveBeenCalledWith('he/him');
   });
 
   it('presents explicit consent after a failed start and invokes it from the keyboard', () => {
@@ -186,7 +258,7 @@ describe('<CampaignSetup>', () => {
       failure: { kind: 'writer-denied', error: new Error('denied') },
     };
     const view = controller({ persistence });
-    render(<CampaignSetup controller={view} savingAvailable={false} />);
+    renderSetup(view, setupIdentity(), false);
 
     expect(screen.getByRole('alert')).toHaveTextContent(/could not acquire safe save ownership/i);
     const action = screen.getByRole('button', { name: 'Continue without saving' });
@@ -204,7 +276,7 @@ describe('<CampaignSetup>', () => {
         actual: { currentRaw: 'new', previousRaw: 'old' },
       },
     });
-    render(<CampaignSetup controller={view} savingAvailable />);
+    renderSetup(view);
 
     expect(screen.getByRole('alert')).toHaveTextContent(/newer save exists/i);
     fireEvent.click(screen.getByRole('button', { name: 'Reload newer save' }));
@@ -219,39 +291,37 @@ describe('<CampaignSetup>', () => {
   });
 
   it('gives every setup, resume, conflict, and modal control a stable semantic test id', () => {
-    let rendered = render(<CampaignSetup controller={controller()} savingAvailable />);
+    let rendered = renderSetup();
     expectControlIds(rendered.container, [
       'caribbean-captain-name-input',
       'caribbean-pronouns-input',
       'caribbean-starting-talent-select',
-      'caribbean-career-length-select',
       'caribbean-start-career-button',
     ]);
     cleanup();
 
-    rendered = render(<CampaignSetup controller={controller({
+    rendered = renderSetup(controller({
       persistence: {
         kind: 'consent-required', intent: 'start', failure: { kind: 'writer-denied' },
       },
-    })} savingAvailable={false} />);
+    }), setupIdentity(), false);
     expectControlIds(rendered.container, [
       'caribbean-captain-name-input',
       'caribbean-pronouns-input',
       'caribbean-starting-talent-select',
-      'caribbean-career-length-select',
       'caribbean-start-career-button',
       'caribbean-continue-without-saving-button',
     ]);
     cleanup();
 
-    rendered = render(<CampaignSetup controller={controller({
+    rendered = renderSetup(controller({
       journal: cleanLoad().journal,
       persistence: {
         kind: 'save-conflict',
         expected: { currentRaw: 'old', previousRaw: null },
         actual: { currentRaw: 'new', previousRaw: 'old' },
       },
-    })} savingAvailable />);
+    }));
     expectControlIds(rendered.container, [
       'caribbean-reload-newer-save-button',
       'caribbean-export-in-memory-journal-button',
@@ -259,7 +329,7 @@ describe('<CampaignSetup>', () => {
     ]);
     cleanup();
 
-    rendered = render(<CampaignSetup controller={controller({ load: cleanLoad() })} savingAvailable />);
+    rendered = renderSetup(controller({ load: cleanLoad() }));
     fireEvent.click(screen.getByRole('button', { name: 'Abandon campaign' }));
     expectControlIds(rendered.container, [
       'caribbean-resume-career-button',

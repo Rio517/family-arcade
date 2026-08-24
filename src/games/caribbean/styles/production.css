@@ -128,6 +128,7 @@
 }
 .caribbean-form-grid input[aria-invalid="true"] { border-color: var(--caribbean-signal-red); }
 .caribbean-field-error { color: color-mix(in srgb, var(--caribbean-signal-red) 80%, white); font-size: 14px; }
+.caribbean-field-help { color: color-mix(in srgb, var(--caribbean-sailcloth) 58%, transparent); font-size: 14px; line-height: 1.35; }
 
 .caribbean-production button {
   min-height: 46px;

@@ -15,7 +15,7 @@ const ROOT = fileURLToPath(new URL('..', MODULE_URL));
 const DIST = path.join(ROOT, 'dist');
 const OUT = path.join(ROOT, 'docs', 'screenshots', 'caribbean-port');
 const HOST = '127.0.0.1';
-const PORT = 4178;
+const PORT = 0;
 const ROUTE = '/#/caribbean';
 const CURRENT_SAVE_KEY = 'caribbean:campaign:current';
 const PREVIOUS_SAVE_KEY = 'caribbean:campaign:previous';
@@ -191,7 +191,9 @@ async function startStaticServer() {
     server.once('error', reject);
     server.listen(PORT, HOST, resolve);
   });
-  const baseUrl = `http://${HOST}:${PORT}`;
+  const address = server.address();
+  invariant(address !== null && typeof address !== 'string', 'Production server did not expose a local port');
+  const baseUrl = `http://${HOST}:${address.port}`;
   try {
     const response = await fetch(`${baseUrl}/`, { cache: 'no-store' });
     invariant(response.status === 200, `Production health check returned ${response.status}`);
@@ -304,7 +306,7 @@ async function installBrowserBoundary(context) {
           id: 'port-check-player',
           createdAt: 1_700_000_000_000,
           profile: {
-            name: 'Port Check', points: 0, wins: 0, losses: 0,
+            name: 'Mario', pronouns: 'he/him', points: 0, wins: 0, losses: 0,
             unlocked: [], lastSkinId: '', history: [],
           },
         }],
@@ -426,6 +428,26 @@ async function readLayout(page, name, expected) {
   return result;
 }
 
+async function readSetupIdentityEvidence(page, layout) {
+  const result = await page.evaluate(() => ({
+    captainName: document.querySelector('#caribbean-captain-name')?.value ?? null,
+    pronouns: document.querySelector('#caribbean-pronouns')?.value ?? null,
+    careerLengthControlPresent: document.querySelector('#caribbean-length') !== null,
+  }));
+  invariant(result.captainName === 'Mario', `Setup captain prefill is wrong: ${result.captainName}`);
+  invariant(result.pronouns === 'he/him', `Setup pronoun prefill is wrong: ${result.pronouns}`);
+  invariant(!result.careerLengthControlPresent, 'Setup still renders a Career length control');
+  return {
+    prefill: { captainName: result.captainName, pronouns: result.pronouns },
+    careerLengthControlPresent: result.careerLengthControlPresent,
+    accessibility: {
+      minimumFontPx: layout.minimumFontPx,
+      minimumTargetHeightPx: layout.minimumTargetHeightPx,
+      horizontalOverflowPx: layout.horizontalOverflowPx,
+    },
+  };
+}
+
 const BOOTH_CONTROL_IDS = [
   'booth-switch',
   'booth-edit-profile',
@@ -533,13 +555,32 @@ async function runJourney(browser, baseUrl, runDirectory) {
   const layouts = {};
   let metrics;
   try {
+    console.log('Checking setup identity and Bridgetown journey…');
     await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
     invariant(await page.getByRole('heading', { name: 'Sign a captain’s commission' }).isVisible(), 'Production route did not reach setup');
     layouts.setupDesktop = await readLayout(page, 'setupDesktop', VIEWPORTS.setupDesktop);
     await capture(page, screenshots, runDirectory, 'setup-desktop.png');
+    const setupIdentity = await readSetupIdentityEvidence(page, layouts.setupDesktop);
 
+    await page.getByLabel('Player pronouns').fill('they/them');
     await page.getByRole('button', { name: 'Start career' }).click();
     await page.getByTestId('caribbean-career-ready').waitFor();
+    const setupProfile = await page.evaluate(() => {
+      const raw = localStorage.getItem('arcade.users.v1');
+      return raw === null ? null : JSON.parse(raw).users.find((user) => user.id === 'port-check-player')?.profile;
+    });
+    const setupEnvelope = verifyEnvelope(await readActiveEnvelope(page), 'setup identity snapshot');
+    invariant(setupProfile?.pronouns === 'they/them', 'Setup did not persist normalized pronouns to the active profile');
+    invariant(
+      setupEnvelope.payload.state.captain.name === 'Mario'
+      && setupEnvelope.payload.state.captain.pronouns === 'they/them',
+      'Campaign did not capture the exact normalized active-profile pronouns',
+    );
+    setupIdentity.sharedPronounSnapshot = {
+      profile: setupProfile.pronouns,
+      campaign: setupEnvelope.payload.state.captain.pronouns,
+    };
+    console.log('Checking port activities and journal…');
     const menuLabels = await page.locator('[aria-label="Bridgetown activities"] button').allTextContents();
     invariant(canonicalJson(menuLabels.map((label) => label.trim())) === canonicalJson(PORT_ORDER), `Wrong port order: ${JSON.stringify(menuLabels)}`);
     invariant(await page.getByRole('button', { name: 'Set Sail' }).isDisabled(), 'Set Sail is not visibly unavailable');
@@ -597,6 +638,8 @@ async function runJourney(browser, baseUrl, runDirectory) {
     layouts.largePortrait = await readLayout(page, 'largePortrait', VIEWPORTS.largePortrait);
     await capture(page, screenshots, runDirectory, 'minimum-screen-large-portrait.png');
 
+    console.log('Checking recovery and shared profile evidence…');
+
     await page.setViewportSize({ width: 1440, height: 900 });
     const knownPreviousRaw = await readActiveEnvelope(page, PREVIOUS_SAVE_KEY);
     const knownPrevious = verifyEnvelope(knownPreviousRaw, 'canonical previous');
@@ -629,7 +672,7 @@ async function runJourney(browser, baseUrl, runDirectory) {
     invariant(exportedRaw === expectedExport, 'Recovery export did not preserve the exact corrupt bytes/revision');
 
     await page.getByRole('button', { name: 'Recover known-good campaign' }).click();
-    await page.getByRole('heading', { name: 'Captain’s commission' }).waitFor();
+    await page.getByRole('heading', { name: 'Mario’s commission' }).waitFor();
     const recoveredStorage = await page.evaluate(({ prefix, currentKey, previousKey, corrupt }) => {
       const quarantineKeys = Object.keys(localStorage).filter((key) => key.startsWith(prefix));
       return {
@@ -754,12 +797,12 @@ async function runJourney(browser, baseUrl, runDirectory) {
       screenshots: SCREENSHOTS,
       determinism: { cleanRuns: 2, metricsByteIdentical: true, screenshotsByteIdentical: true },
       schemaVersion: 2,
-      packagePhase: 'profile',
+      packagePhase: 'setup',
       profile: {
-        status: 'profile-only',
+        status: 'setup-verified',
         defaultPronouns: 'he/him',
         boothProfilePersisted: true,
-        setup: 'not-yet-observed',
+        setup: setupIdentity,
       },
       art: { status: 'not-yet-observed' },
       market: { status: 'not-yet-observed' },
@@ -808,8 +851,10 @@ export async function runPortCheck() {
   const secondDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-run-b-'));
   try {
     browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+    console.log('Running deterministic browser journey A…');
     const first = await runJourney(browser, baseUrl, firstDirectory);
     assertRequestedGraphIsolation(first.metrics);
+    console.log('Running deterministic browser journey B…');
     const second = await runJourney(browser, baseUrl, secondDirectory);
     assertRequestedGraphIsolation(second.metrics);
     const metricsBytes = compareRuns(first, second);

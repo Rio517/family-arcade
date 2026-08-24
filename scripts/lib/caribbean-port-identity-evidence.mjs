@@ -96,19 +96,40 @@ export function evaluatePortIdentityEvidence(evidence) {
     if (!(section in evidence)) issues.push(`retained v1 section ${section} is missing`);
   }
   if (evidence.schemaVersion !== 2) issues.push('schemaVersion must be 2');
-  if (evidence.packagePhase !== 'profile') issues.push('packagePhase must be profile');
+  if (evidence.packagePhase !== 'setup') issues.push('packagePhase must be setup');
 
   const profile = evidence.profile;
   if (!isRecord(profile)) {
     issues.push('profile evidence is missing');
   } else if (
-    profile.status !== 'profile-only'
+    profile.status !== 'setup-verified'
     || profile.defaultPronouns !== 'he/him'
     || profile.boothProfilePersisted !== true
-    || profile.setup !== 'not-yet-observed'
     || Object.keys(profile).length !== 4
   ) {
-    issues.push('profile evidence must be exact profile-only evidence');
+    issues.push('profile evidence must be exact setup-verified evidence');
+  } else {
+    const setup = profile.setup;
+    if (
+      !isRecord(setup)
+      || Object.keys(setup).length !== 4
+      || !isRecord(setup.prefill)
+      || Object.keys(setup.prefill).length !== 2
+      || setup.prefill.captainName !== 'Mario'
+      || setup.prefill.pronouns !== 'he/him'
+      || !isRecord(setup.sharedPronounSnapshot)
+      || Object.keys(setup.sharedPronounSnapshot).length !== 2
+      || setup.sharedPronounSnapshot.profile !== 'they/them'
+      || setup.sharedPronounSnapshot.campaign !== 'they/them'
+      || setup.careerLengthControlPresent !== false
+      || !isRecord(setup.accessibility)
+      || Object.keys(setup.accessibility).length !== 3
+      || setup.accessibility.minimumFontPx < 14
+      || setup.accessibility.minimumTargetHeightPx < 44
+      || setup.accessibility.horizontalOverflowPx !== 0
+    ) {
+      issues.push('profile evidence must be exact setup-verified evidence');
+    }
   }
 
   const boothProfile = evidence.accessibility?.boothProfile;
@@ -123,7 +144,7 @@ export function evaluatePortIdentityEvidence(evidence) {
   for (const [section, label] of [['market', 'market'], ['art', 'art']]) {
     const value = evidence[section];
     if (!isRecord(value) || Object.keys(value).length !== 1 || value.status !== 'not-yet-observed') {
-      issues.push(`${label} must remain not-yet-observed during profile phase`);
+      issues.push(`${label} must remain not-yet-observed during setup phase`);
     }
   }
 

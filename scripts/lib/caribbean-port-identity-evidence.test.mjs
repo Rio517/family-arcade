@@ -49,16 +49,21 @@ function retainedV1Evidence() {
   };
 }
 
-function profileEvidence(overrides = {}) {
+function setupEvidence(overrides = {}) {
   return {
     ...retainedV1Evidence(),
     schemaVersion: 2,
-    packagePhase: 'profile',
+    packagePhase: 'setup',
     profile: {
-      status: 'profile-only',
+      status: 'setup-verified',
       defaultPronouns: 'he/him',
       boothProfilePersisted: true,
-      setup: 'not-yet-observed',
+      setup: {
+        prefill: { captainName: 'Mario', pronouns: 'he/him' },
+        sharedPronounSnapshot: { profile: 'they/them', campaign: 'they/them' },
+        careerLengthControlPresent: false,
+        accessibility: { minimumFontPx: 14, minimumTargetHeightPx: 44, horizontalOverflowPx: 0 },
+      },
     },
     art: { status: 'not-yet-observed' },
     market: { status: 'not-yet-observed' },
@@ -67,29 +72,37 @@ function profileEvidence(overrides = {}) {
 }
 
 describe('evaluatePortIdentityEvidence', () => {
-  it('accepts the exact profile-only v2 evidence while later branches remain pending', () => {
-    expect(evaluatePortIdentityEvidence(profileEvidence())).toEqual({ ok: true, issues: [] });
+  it('accepts exact setup identity evidence while Market and art remain pending', () => {
+    expect(evaluatePortIdentityEvidence(setupEvidence())).toEqual({ ok: true, issues: [] });
   });
 
   it.each([
     ['a missing retained v1 section', (() => {
-      const evidence = profileEvidence();
+      const evidence = setupEvidence();
       delete evidence.journey;
       return evidence;
     })(), 'retained v1 section journey is missing'],
-    ['an unknown field', profileEvidence({ unexpected: true }), 'unknown evidence field unexpected'],
-    ['the wrong package phase', profileEvidence({ packagePhase: 'setup' }), 'packagePhase must be profile'],
-    ['premature Market success', profileEvidence({ market: { status: 'verified' } }), 'market must remain not-yet-observed during profile phase'],
-    ['premature art success', profileEvidence({ art: { status: 'verified' } }), 'art must remain not-yet-observed during profile phase'],
-    ['missing narrow Booth measurement', profileEvidence({
+    ['an unknown field', setupEvidence({ unexpected: true }), 'unknown evidence field unexpected'],
+    ['the wrong package phase', setupEvidence({ packagePhase: 'profile' }), 'packagePhase must be setup'],
+    ['premature Market success', setupEvidence({ market: { status: 'verified' } }), 'market must remain not-yet-observed during setup phase'],
+    ['premature art success', setupEvidence({ art: { status: 'verified' } }), 'art must remain not-yet-observed during setup phase'],
+    ['missing narrow Booth measurement', setupEvidence({
       accessibility: { boothProfile: { desktop: boothViewport(1440, 900) } },
     }), 'profile evidence must include Booth narrow viewport evidence'],
-    ['a missing keyboard focus check', profileEvidence({
+    ['a missing keyboard focus check', setupEvidence({
       accessibility: { boothProfile: {
         desktop: boothViewport(1440, 900),
         narrow: { ...boothViewport(960, 600), focusChecks: [] },
       } },
     }), 'Booth narrow focus checks must cover every control'],
+    ['a missing setup identity snapshot', setupEvidence({
+      profile: {
+        status: 'setup-verified',
+        defaultPronouns: 'he/him',
+        boothProfilePersisted: true,
+        setup: { prefill: { captainName: 'Mario', pronouns: 'he/him' } },
+      },
+    }), 'profile evidence must be exact setup-verified evidence'],
   ])('fails closed on %s', (_label, evidence, issue) => {
     expect(evaluatePortIdentityEvidence(evidence)).toEqual({ ok: false, issues: [issue] });
   });

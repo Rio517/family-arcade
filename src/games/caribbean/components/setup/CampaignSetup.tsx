@@ -1,8 +1,9 @@
 import { useRef, useState, type FormEvent, type RefObject } from 'react';
 
-import type { CampaignLength, Talent } from '../../domain/types';
+import type { Talent } from '../../domain/types';
 import { provisionsMonths } from '../../domain/selectors';
 import { CAMPAIGN_LENGTH_LABELS } from '../../state/selectors';
+import { normalizePronouns, pronounCodePointLength } from '@shared/profile/profile';
 import type {
   CaribbeanController,
   RecoveryActionFailure,
@@ -18,7 +19,11 @@ const TALENTS = [
   ['medicine', 'Medicine'],
 ] as const satisfies readonly (readonly [Talent, string])[];
 
-const LENGTHS = (Object.entries(CAMPAIGN_LENGTH_LABELS)) as [CampaignLength, string][];
+export interface CampaignSetupIdentity {
+  playerName: string;
+  pronouns: string;
+  savePronouns(pronouns: string): void;
+}
 
 function downloadText(raw: string, filename: string): void {
   const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
@@ -132,35 +137,45 @@ function AbandonDialog({
 
 export function CampaignSetup({
   controller,
+  identity,
   savingAvailable,
 }: {
   controller: CaribbeanController;
+  identity: CampaignSetupIdentity;
   savingAvailable: boolean;
 }) {
-  const [name, setName] = useState('Captain');
-  const [pronouns, setPronouns] = useState('they/them');
+  const [name, setName] = useState(() => identity.playerName.trim() || 'Captain');
+  const [pronouns, setPronouns] = useState(() => normalizePronouns(identity.pronouns));
   const [talent, setTalent] = useState<Talent>('navigation');
-  const [length, setLength] = useState<CampaignLength>('adventure');
-  const [nameError, setNameError] = useState(false);
+  const [pronounsError, setPronounsError] = useState(false);
   const [abandonOpen, setAbandonOpen] = useState(false);
   const abandonRef = useRef<HTMLButtonElement>(null);
   const backgroundRef = useRef<HTMLDivElement>(null);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const normalizedName = name.trim();
-    if (normalizedName.length === 0) {
-      setNameError(true);
+    const normalizedPronouns = normalizePronouns(pronouns);
+    const captainName = name.trim() || 'Captain';
+    try {
+      identity.savePronouns(normalizedPronouns);
+    } catch {
+      // A Caribbean career captures its own pronoun snapshot even if the shared profile is unavailable.
+    }
+    void controller.start({
+      name: captainName,
+      pronouns: normalizedPronouns,
+      talent,
+      length: 'adventure',
+    });
+  };
+
+  const changePronouns = (value: string) => {
+    if (pronounCodePointLength(value) <= 24) {
+      setPronouns(value);
+      setPronounsError(false);
       return;
     }
-    setNameError(false);
-    const normalizedPronouns = pronouns.trim();
-    void controller.start({
-      name: normalizedName,
-      ...(normalizedPronouns.length > 0 ? { pronouns: normalizedPronouns } : {}),
-      talent,
-      length,
-    });
+    setPronounsError(true);
   };
 
   const cleanLoad = controller.load.kind === 'loaded'
@@ -243,7 +258,7 @@ export function CampaignSetup({
         ) : state === null ? (
           <form onSubmit={submit} noValidate>
             <h1>Sign a captain’s commission</h1>
-            <p className="caribbean-intro">Set a name and course. Every field already carries the recommended starting choice.</p>
+            <p className="caribbean-intro">Choose your captain and their starting talent. Adventure begins from Bridgetown.</p>
             <div className="caribbean-form-grid">
               <div className="caribbean-field">
                 <label htmlFor="caribbean-captain-name">Captain name</label>
@@ -253,26 +268,26 @@ export function CampaignSetup({
                   name="captain-name"
                   value={name}
                   maxLength={40}
-                  aria-invalid={nameError ? 'true' : undefined}
-                  aria-describedby={nameError ? 'captain-name-error' : undefined}
-                  onChange={(event) => { setName(event.target.value); if (nameError) setNameError(false); }}
+                  onChange={(event) => setName(event.target.value)}
                 />
-                {nameError && <span id="captain-name-error" className="caribbean-field-error">Enter a captain name.</span>}
               </div>
               <div className="caribbean-field">
-                <label htmlFor="caribbean-pronouns">Pronouns</label>
-                <input data-testid="caribbean-pronouns-input" id="caribbean-pronouns" name="pronouns" value={pronouns} maxLength={24} onChange={(event) => setPronouns(event.target.value)} />
+                <label htmlFor="caribbean-pronouns">Player pronouns</label>
+                <input
+                  data-testid="caribbean-pronouns-input"
+                  id="caribbean-pronouns"
+                  name="pronouns"
+                  value={pronouns}
+                  aria-describedby={pronounsError ? 'caribbean-pronouns-error' : undefined}
+                  onChange={(event) => changePronouns(event.target.value)}
+                />
+                <span className="caribbean-field-help">Shared across every arcade game</span>
+                {pronounsError && <p id="caribbean-pronouns-error" className="caribbean-field-error" role="alert">Use 24 characters or fewer</p>}
               </div>
               <div className="caribbean-field">
                 <label htmlFor="caribbean-talent">Starting talent</label>
                 <select data-testid="caribbean-starting-talent-select" id="caribbean-talent" value={talent} onChange={(event) => setTalent(event.target.value as Talent)}>
                   {TALENTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-              </div>
-              <div className="caribbean-field">
-                <label htmlFor="caribbean-length">Career length</label>
-                <select data-testid="caribbean-career-length-select" id="caribbean-length" value={length} onChange={(event) => setLength(event.target.value as CampaignLength)}>
-                  {LENGTHS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </div>
             </div>

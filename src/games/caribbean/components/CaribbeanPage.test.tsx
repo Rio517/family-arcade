@@ -7,6 +7,9 @@ import { createJournal } from '../domain/replay';
 import { loadCampaign, saveCampaign, type StorageLike } from '../storage/persistence';
 import { createCampaignWriter, type LockManagerLike } from '../storage/writer';
 import type { CaribbeanRuntime } from '../state/runtime';
+import { defaultProfile } from '@shared/profile/profile';
+import { emptyUsersState } from '@shared/profile/users';
+import { getUsersSnapshot, setUsersState } from '@shared/profile/usersStore';
 import { CaribbeanPage } from './CaribbeanPage';
 
 const originalWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
@@ -107,9 +110,39 @@ afterEach(() => {
   if (originalWidth) Object.defineProperty(window, 'innerWidth', originalWidth);
   if (originalHeight) Object.defineProperty(window, 'innerHeight', originalHeight);
   window.location.hash = '';
+  setUsersState(emptyUsersState());
 });
 
 describe('<CaribbeanPage>', () => {
+  it('prefills setup from the active profile, snapshots the captain, and preserves the site-wide name', async () => {
+    setViewport(1440, 900);
+    const store = storage();
+    setUsersState({
+      users: [{
+        id: 'mario',
+        createdAt: 0,
+        profile: { ...defaultProfile(), name: 'Mario', pronouns: 'he/him' },
+      }],
+      activeId: 'mario',
+    });
+    render(<CaribbeanPage runtime={runtime(store)} />);
+
+    expect(screen.getByLabelText('Captain name')).toHaveValue('Mario');
+    expect(screen.getByLabelText('Player pronouns')).toHaveValue('he/him');
+    expect(screen.queryByLabelText('Career length')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Captain name'), { target: { value: 'Red Morgan' } });
+    fireEvent.change(screen.getByLabelText('Player pronouns'), { target: { value: 'they/them' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
+    await screen.findByTestId('caribbean-career-ready');
+
+    expect(loadCampaign(store)).toMatchObject({
+      kind: 'loaded',
+      journal: { state: { captain: { name: 'Red Morgan', pronouns: 'they/them' } } },
+    });
+    expect(getUsersSnapshot().users[0]?.profile).toMatchObject({ name: 'Mario', pronouns: 'they/them' });
+  });
+
   it('keeps the controller-owning child outside the tree on unsupported screens', () => {
     setViewport(1024, 1366);
     const store = storage();
