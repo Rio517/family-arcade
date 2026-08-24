@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createCampaign } from './createCampaign';
+import { RED_JACKDAW_VOYAGE } from '../content/voyage';
 import { marketTradeDraft, quoteTrade } from './economy';
 import type { CampaignEvent, CampaignEventDraft } from './events';
 import { validateCampaignEvent } from './events';
@@ -53,6 +54,38 @@ describe('campaign journal append', () => {
     expect(validateCampaignEvent({
       id: 2, type: 'voyage-started', atDay: 0, payload: { voyageId: 'voyage-2' },
     })).toMatchObject({ ok: true });
+  });
+
+  it('rejects shallow strategic payloads and returns a detached nested snapshot', () => {
+    // Catches the old outer-record-only parser and journal aliasing.
+    const malformed = {
+      id: 4, type: 'naval-engaged', atDay: 1,
+      payload: {
+        voyageId: 'voyage-2', encounterId: 'voyage-2-contact', battleId: 'voyage-2-battle',
+        navalRng: { before: 1, after: 1 }, input: {},
+      },
+    };
+    expect(validateCampaignEvent(malformed)).toMatchObject({ ok: false });
+  });
+
+  it('accepts zero-valued RNG syntax and detaches nested strategic payloads', () => {
+    // Catches treating RNG lineage like a positive event ID and nested event aliasing.
+    const raw = {
+      id: 3, type: 'sea-leg-completed', atDay: 0,
+      payload: {
+        voyageId: 'voyage-2', encounterId: 'voyage-2-contact',
+        checkpoint: structuredClone(RED_JACKDAW_VOYAGE.contact),
+        navigationRng: { before: 0, after: 0 },
+      },
+    };
+    const parsed = validateCampaignEvent(raw);
+    expect(parsed).toMatchObject({ ok: true });
+    if (!parsed.ok || parsed.value.type !== 'sea-leg-completed') throw new Error('fixture must parse');
+    raw.payload.checkpoint.position.x = 99;
+    raw.payload.navigationRng.before = 7;
+    expect(parsed.value.payload).toMatchObject({
+      checkpoint: { position: { x: 24 } }, navigationRng: { before: 0, after: 0 },
+    });
   });
   it('applies a quoted market event atomically and replays it canonically', () => {
     const journal = createJournal(initialCampaign());

@@ -37,8 +37,17 @@ function spendVoyageCost(state: CampaignStateV1, elapsedDays: number, provisions
 }
 
 function classifyResolution(outcome: NavalOutcome): 'victory' | 'defeat' | 'unresolved' {
-  if (outcome.kind === 'escaped' || outcome.kind === 'separated') return 'unresolved';
-  return (outcome as Extract<NavalOutcome, { victorShipId: 'player' | 'opponent' }>).victorShipId === 'player' ? 'victory' : 'defeat';
+  switch (outcome.kind) {
+    case 'escaped':
+    case 'separated':
+      return 'unresolved';
+    case 'surrender':
+    case 'sunk':
+    case 'boarding-ready':
+      return outcome.victorShipId === 'player' ? 'victory' : 'defeat';
+    default:
+      return assertNever(outcome);
+  }
 }
 
 function returnToBridgetown(

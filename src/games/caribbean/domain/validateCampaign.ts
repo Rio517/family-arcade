@@ -413,7 +413,11 @@ function validateCalendar(root: PlainRecord, problems: JsonProblems, nonEnumerab
 }
 
 function sameJson(left: unknown, right: unknown): boolean {
-  return canonicalJson(left) === canonicalJson(right);
+  try {
+    return canonicalJson(left) === canonicalJson(right);
+  } catch {
+    return false;
+  }
 }
 
 function activeRedJackdaw(root: PlainRecord): boolean {
@@ -724,11 +728,17 @@ function validateWorld(root: PlainRecord, problems: JsonProblems, nonEnumerable:
           : result === 'victory' ? isPlainRecord(outcome) && outcome.victorShipId === 'player'
             : isPlainRecord(outcome) && outcome.victorShipId === 'opponent'
       );
+    const lead = Array.isArray(root.leads)
+      ? root.leads.find((entry) => isPlainRecord(entry) && entry.id === 'red-jackdaw')
+      : undefined;
+    const leadStatus = isPlainRecord(lead) ? lead.status : undefined;
     voyageInvariant(
       summaryPath,
       matches
         && summary.returnedDay === (isPlainRecord(root.calendar) ? root.calendar.elapsedDays : undefined)
-        && (result === 'victory' ? world.targetDefeated === true : world.targetDefeated === false),
+        && (result === 'victory'
+          ? world.targetDefeated === true && leadStatus === 'completed'
+          : world.targetDefeated === false && leadStatus !== 'completed'),
       issues,
     );
   }

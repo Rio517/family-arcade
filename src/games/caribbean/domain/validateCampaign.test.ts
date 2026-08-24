@@ -22,6 +22,38 @@ function secondSloop(id = 'second-sloop'): ShipState {
 }
 
 describe('validateCampaign', () => {
+  it('binds durable victory summaries to the target and Red Jackdaw lead terminal state', () => {
+    // Catches compacted victory states that claim success without completing the strategic lead.
+    const state = validCampaign();
+    state.leads = [{ id: 'red-jackdaw', kind: 'rumour', status: 'active', acceptedDay: 0, expiresDay: 18 }];
+    state.world.targetDefeated = true;
+    state.world.lastVoyage = {
+      voyageId: 'voyage-2', battleId: 'voyage-2-battle', result: 'victory',
+      outcome: { kind: 'sunk', victorShipId: 'player' }, returnedDay: 0,
+    };
+    expect(validateCampaign(state).ok).toBe(false);
+
+    state.leads[0].status = 'completed';
+    expect(validateCampaign(state).ok).toBe(true);
+
+    state.world.targetDefeated = false;
+    state.world.lastVoyage = {
+      voyageId: 'voyage-2', battleId: 'voyage-2-battle', result: 'unresolved',
+      outcome: { kind: 'escaped', shipId: 'player' }, returnedDay: 0,
+    };
+    expect(validateCampaign(state).ok).toBe(false);
+  });
+  it.each([
+    ['missing checkpoint', (state: CampaignStateV1) => { state.lastEventId = 2; state.leads = [{ id: 'red-jackdaw', kind: 'rumour', status: 'active', acceptedDay: 0, expiresDay: 18 }]; state.fleet.ships[0].cargo.provisions = 2; state.mode = { kind: 'sailing', voyageId: 'voyage-2' } as never; }],
+    ['missing encounter checkpoint', (state: CampaignStateV1) => { state.lastEventId = 3; state.leads = [{ id: 'red-jackdaw', kind: 'rumour', status: 'active', acceptedDay: 0, expiresDay: 18 }]; state.fleet.ships[0].cargo.provisions = 1; state.mode = { kind: 'encounter', voyageId: 'voyage-2', encounterId: 'voyage-2-contact' } as never; }],
+    ['missing naval input', (state: CampaignStateV1) => { state.lastEventId = 4; state.leads = [{ id: 'red-jackdaw', kind: 'rumour', status: 'active', acceptedDay: 0, expiresDay: 18 }]; state.fleet.ships[0].cargo.provisions = 1; state.mode = { kind: 'naval', voyageId: 'voyage-2', battleId: 'voyage-2-battle' } as never; }],
+  ] as const)('is total for malformed strategic mode: %s', (_label, mutate) => {
+    // Catches canonicalJson receiving the validator's MISSING sentinel.
+    const state = validCampaign();
+    mutate(state);
+    expect(() => validateCampaign(state)).not.toThrow();
+    expect(validateCampaign(state).ok).toBe(false);
+  });
   it('accepts the authored compactable sailing, encounter, and naval checkpoints', () => {
     // Catches acceptance of resumable modes without relaxing their cross-field facts.
     const sailing = validCampaign();

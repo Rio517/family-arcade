@@ -169,12 +169,12 @@ export function validateJournal(input: unknown): ValidationResult<CampaignJourna
   if (initial?.ok && events && eventShapesValid) {
     let semanticsValid = true;
     let current = initial.value;
-    events.forEach((event, index) => {
+    for (const [index, event] of events.entries()) {
       const expectedId = current.lastEventId + 1;
       if (expectedId > 0xffff_ffff || event.id !== expectedId) {
         issues.push({ path: `events.${index}.id`, code: 'invariant' });
         semanticsValid = false;
-        return;
+        break;
       }
       try {
         current = reduceCampaign(current, event);
@@ -185,8 +185,9 @@ export function validateJournal(input: unknown): ValidationResult<CampaignJourna
           code: 'invariant',
         });
         semanticsValid = false;
+        break;
       }
-    });
+    }
 
     if (semanticsValid) {
       if (state?.ok && canonicalJson(current) !== canonicalJson(state.value)) {

@@ -7,6 +7,7 @@ import type {
   ValidationResult,
 } from './types';
 import type { NavalBattleInput, NavalResolution } from './naval/types';
+import { validateNavalInput as validateBattleInput } from './naval/createBattle';
 
 export type CampaignEvent =
   | {
@@ -51,6 +52,7 @@ export interface CampaignJournal {
 }
 
 type PlainRecord = Record<string, unknown>;
+const INVALID = Symbol('invalid');
 
 function isPlainRecord(value: unknown): value is PlainRecord {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -97,6 +99,67 @@ function snapshotRecord(
     issue(issues, path, 'non-json');
     return null;
   }
+}
+
+function snapshotJson(value: unknown, path: string, issues: ValidationIssue[]): unknown {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (Number.isFinite(value)) return value;
+    issue(issues, path, 'non-json');
+    return INVALID;
+  }
+  if (typeof value !== 'object' || value === null) {
+    issue(issues, path, 'non-json');
+    return INVALID;
+  }
+  try {
+    if (!Array.isArray(value) && !isPlainRecord(value)) {
+      issue(issues, path, 'non-json');
+      return INVALID;
+    }
+    const keys = Reflect.ownKeys(value);
+    if (keys.some((key) => typeof key === 'symbol')) {
+      issue(issues, path, 'non-json');
+      return INVALID;
+    }
+    if (Array.isArray(value)) {
+      const result: unknown[] = [];
+      for (let index = 0; index < value.length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        const itemPath = `${path}.${index}`;
+        if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
+          issue(issues, itemPath, 'non-json');
+          result[index] = INVALID;
+        } else result[index] = snapshotJson(descriptor.value, itemPath, issues);
+      }
+      for (const key of keys.filter((candidate): candidate is string => typeof candidate === 'string' && !/^(0|[1-9]\d*)$/.test(candidate) && candidate !== 'length')) {
+        issue(issues, `${path}.${key}`, 'unknown-key');
+      }
+      return result;
+    }
+    const result: PlainRecord = Object.create(null);
+    for (const key of keys.filter((candidate): candidate is string => typeof candidate === 'string')) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      const child = `${path}.${key}`;
+      if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
+        issue(issues, child, 'non-json');
+        result[key] = INVALID;
+      } else result[key] = snapshotJson(descriptor.value, child, issues);
+    }
+    return result;
+  } catch {
+    issue(issues, path, 'non-json');
+    return INVALID;
+  }
+}
+
+function snapshotNestedRecord(value: unknown, path: string, issues: ValidationIssue[]): PlainRecord | null {
+  const snapshot = snapshotJson(value, path, issues);
+  if (!isPlainRecord(snapshot)) {
+    if (snapshot !== INVALID) issue(issues, path, 'wrong-type');
+    return null;
+  }
+  return snapshot;
 }
 
 function validateKeys(
@@ -164,6 +227,23 @@ function validateUint32(value: unknown, path: string, issues: ValidationIssue[])
   return true;
 }
 
+function validateRngUint32(value: unknown, path: string, issues: ValidationIssue[]): value is number {
+  if (value === undefined) return false;
+  if (typeof value !== 'number') {
+    issue(issues, path, 'wrong-type');
+    return false;
+  }
+  if (!Number.isInteger(value)) {
+    issue(issues, path, 'not-integer');
+    return false;
+  }
+  if (!Number.isSafeInteger(value) || value < 0 || value > 0xffff_ffff) {
+    issue(issues, path, 'out-of-range');
+    return false;
+  }
+  return true;
+}
+
 function validateDay(value: unknown, path: string, issues: ValidationIssue[]): value is number {
   if (value === undefined) return false;
   if (typeof value !== 'number') {
@@ -193,32 +273,185 @@ function validateStableId(value: unknown, path: string, issues: ValidationIssue[
   return true;
 }
 
-function validateCheckpoint(value: unknown, path: string, issues: ValidationIssue[]): void {
-  const checkpoint = snapshotRecord(value, path, issues);
-  if (!checkpoint) return;
+function validateCheckpoint(value: unknown, path: string, issues: ValidationIssue[]): SailingCheckpoint | null {
+  const before = issues.length;
+  const checkpoint = snapshotNestedRecord(value, path, issues);
+  if (!checkpoint) return null;
   validateKeys(checkpoint, ['tick', 'position', 'heading', 'elapsedDays', 'provisionsUsed'], path, issues);
   for (const key of ['tick', 'heading', 'elapsedDays', 'provisionsUsed'] as const) {
     const field = required(checkpoint, key, path, issues);
+    if (field === undefined) continue;
     if (typeof field !== 'number') issue(issues, `${path}.${key}`, 'wrong-type');
     else if (!Number.isFinite(field)) issue(issues, `${path}.${key}`, 'not-finite');
     else if (!Number.isSafeInteger(field) && key !== 'heading') issue(issues, `${path}.${key}`, 'out-of-range');
   }
-  const position = snapshotRecord(required(checkpoint, 'position', path, issues), `${path}.position`, issues);
-  if (!position) return;
+  const positionValue = required(checkpoint, 'position', path, issues);
+  if (positionValue === undefined) return null;
+  const position = snapshotNestedRecord(positionValue, `${path}.position`, issues);
+  if (!position) return null;
   validateKeys(position, ['x', 'z'], `${path}.position`, issues);
   for (const key of ['x', 'z'] as const) {
     const field = required(position, key, `${path}.position`, issues);
+    if (field === undefined) continue;
     if (typeof field !== 'number') issue(issues, `${path}.position.${key}`, 'wrong-type');
     else if (!Number.isFinite(field)) issue(issues, `${path}.position.${key}`, 'not-finite');
   }
+  if (issues.length !== before) return null;
+  return checkpoint as unknown as SailingCheckpoint;
 }
 
-function validateRngPair(value: unknown, path: string, issues: ValidationIssue[]): void {
-  const pair = snapshotRecord(value, path, issues);
-  if (!pair) return;
+function validateRngPair(value: unknown, path: string, issues: ValidationIssue[]): { before: number; after: number } | null {
+  const beforeIssues = issues.length;
+  const pair = snapshotNestedRecord(value, path, issues);
+  if (!pair) return null;
   validateKeys(pair, ['before', 'after'], path, issues);
-  validateUint32(required(pair, 'before', path, issues), `${path}.before`, issues);
-  validateUint32(required(pair, 'after', path, issues), `${path}.after`, issues);
+  validateRngUint32(required(pair, 'before', path, issues), `${path}.before`, issues);
+  validateRngUint32(required(pair, 'after', path, issues), `${path}.after`, issues);
+  if (issues.length !== beforeIssues) return null;
+  return pair as unknown as { before: number; after: number };
+}
+
+function validateFiniteNumber(value: unknown, path: string, issues: ValidationIssue[]): void {
+  if (value === undefined) return;
+  if (typeof value !== 'number') issue(issues, path, 'wrong-type');
+  else if (!Number.isFinite(value)) issue(issues, path, 'not-finite');
+}
+
+function validateNavalShipInput(value: unknown, path: string, issues: ValidationIssue[]): PlainRecord | null {
+  const before = issues.length;
+  const ship = snapshotNestedRecord(value, path, issues);
+  if (!ship) return null;
+  validateKeys(ship, ['id', 'stableShipId', 'name', 'classId', 'position', 'heading', 'hull', 'sails', 'crew', 'cannon'], path, issues);
+  for (const key of ['id', 'stableShipId', 'name', 'classId'] as const) {
+    const field = required(ship, key, path, issues);
+    if (field !== undefined && typeof field !== 'string') issue(issues, `${path}.${key}`, 'wrong-type');
+  }
+  const positionValue = required(ship, 'position', path, issues);
+  const position = positionValue === undefined ? null : snapshotNestedRecord(positionValue, `${path}.position`, issues);
+  if (position) {
+    validateKeys(position, ['x', 'z'], `${path}.position`, issues);
+    validateFiniteNumber(required(position, 'x', `${path}.position`, issues), `${path}.position.x`, issues);
+    validateFiniteNumber(required(position, 'z', `${path}.position`, issues), `${path}.position.z`, issues);
+  }
+  for (const key of ['heading', 'hull', 'sails', 'crew', 'cannon'] as const) {
+    validateFiniteNumber(required(ship, key, path, issues), `${path}.${key}`, issues);
+  }
+  return issues.length === before ? ship : null;
+}
+
+function validateNavalInput(value: unknown, path: string, issues: ValidationIssue[]): NavalBattleInput | null {
+  const before = issues.length;
+  const input = snapshotNestedRecord(value, path, issues);
+  if (!input) return null;
+  validateKeys(input, ['battleId', 'seed', 'windFrom', 'windStrength', 'arenaRadius', 'timeLimitTicks', 'objective', 'player', 'opponent'], path, issues);
+  for (const key of ['battleId', 'objective'] as const) {
+    const field = required(input, key, path, issues);
+    if (field !== undefined && typeof field !== 'string') issue(issues, `${path}.${key}`, 'wrong-type');
+  }
+  validateRngUint32(required(input, 'seed', path, issues), `${path}.seed`, issues);
+  for (const key of ['windFrom', 'windStrength', 'arenaRadius', 'timeLimitTicks'] as const) {
+    validateFiniteNumber(required(input, key, path, issues), `${path}.${key}`, issues);
+  }
+  const player = required(input, 'player', path, issues);
+  if (player !== undefined) validateNavalShipInput(player, `${path}.player`, issues);
+  const opponent = required(input, 'opponent', path, issues);
+  if (opponent !== undefined) validateNavalShipInput(opponent, `${path}.opponent`, issues);
+  if (issues.length !== before) return null;
+  const parsed = input as unknown as NavalBattleInput;
+  if (!validateBattleInput(parsed).ok) {
+    issue(issues, path, 'invariant');
+    return null;
+  }
+  return parsed;
+}
+
+function validateSystems(value: unknown, path: string, issues: ValidationIssue[]): PlainRecord | null {
+  const before = issues.length;
+  const systems = snapshotNestedRecord(value, path, issues);
+  if (!systems) return null;
+  validateKeys(systems, ['hull', 'sails', 'crew', 'cannon'], path, issues);
+  for (const key of ['hull', 'sails', 'crew', 'cannon'] as const) {
+    validateFiniteNumber(required(systems, key, path, issues), `${path}.${key}`, issues);
+  }
+  return issues.length === before ? systems : null;
+}
+
+function validateOutcome(value: unknown, path: string, issues: ValidationIssue[]): PlainRecord | null {
+  const before = issues.length;
+  const outcome = snapshotNestedRecord(value, path, issues);
+  if (!outcome) return null;
+  const kind = required(outcome, 'kind', path, issues);
+  if (typeof kind !== 'string') issue(issues, `${path}.kind`, 'wrong-type');
+  else if (kind === 'surrender' || kind === 'sunk' || kind === 'boarding-ready') {
+    validateKeys(outcome, ['kind', 'victorShipId'], path, issues);
+    const victor = required(outcome, 'victorShipId', path, issues);
+    if (victor !== undefined && victor !== 'player' && victor !== 'opponent') issue(issues, `${path}.victorShipId`, 'unknown-id');
+  } else if (kind === 'escaped' || kind === 'separated') {
+    validateKeys(outcome, ['kind', 'shipId'], path, issues);
+    const shipId = required(outcome, 'shipId', path, issues);
+    if (shipId !== undefined && shipId !== 'player' && shipId !== 'opponent') issue(issues, `${path}.shipId`, 'unknown-id');
+  } else issue(issues, `${path}.kind`, 'unknown-id');
+  return issues.length === before ? outcome : null;
+}
+
+function validateResolution(value: unknown, path: string, issues: ValidationIssue[]): NavalResolution | null {
+  const before = issues.length;
+  const resolution = snapshotNestedRecord(value, path, issues);
+  if (!resolution) return null;
+  validateKeys(resolution, ['battleId', 'outcome', 'atTick', 'seedAfter', 'player', 'opponent', 'decisive'], path, issues);
+  const battleId = required(resolution, 'battleId', path, issues);
+  if (battleId !== undefined && typeof battleId !== 'string') issue(issues, `${path}.battleId`, 'wrong-type');
+  const outcome = required(resolution, 'outcome', path, issues);
+  if (outcome !== undefined) validateOutcome(outcome, `${path}.outcome`, issues);
+  validateFiniteNumber(required(resolution, 'atTick', path, issues), `${path}.atTick`, issues);
+  validateRngUint32(required(resolution, 'seedAfter', path, issues), `${path}.seedAfter`, issues);
+  const playerSystems = required(resolution, 'player', path, issues);
+  if (playerSystems !== undefined) validateSystems(playerSystems, `${path}.player`, issues);
+  const opponentSystems = required(resolution, 'opponent', path, issues);
+  if (opponentSystems !== undefined) validateSystems(opponentSystems, `${path}.opponent`, issues);
+  const decisiveValue = required(resolution, 'decisive', path, issues);
+  const decisive = decisiveValue === undefined ? null : snapshotNestedRecord(decisiveValue, `${path}.decisive`, issues);
+  if (decisive) {
+    const kind = required(decisive, 'kind', `${path}.decisive`, issues);
+    const decisivePath = `${path}.decisive`;
+    if (typeof kind !== 'string') issue(issues, `${decisivePath}.kind`, 'wrong-type');
+    else if (kind === 'surrender') {
+      validateKeys(decisive, ['kind', 'victorShipId', 'surrenderedShipId', 'threshold', 'value', 'thresholdValue'], decisivePath, issues);
+      for (const key of ['victorShipId', 'surrenderedShipId', 'threshold'] as const) {
+        const field = required(decisive, key, decisivePath, issues);
+        if (field !== undefined && typeof field !== 'string') issue(issues, `${decisivePath}.${key}`, 'wrong-type');
+      }
+      validateFiniteNumber(required(decisive, 'value', decisivePath, issues), `${decisivePath}.value`, issues);
+      validateFiniteNumber(required(decisive, 'thresholdValue', decisivePath, issues), `${decisivePath}.thresholdValue`, issues);
+    } else if (kind === 'sunk') {
+      validateKeys(decisive, ['kind', 'victorShipId', 'sunkShipId', 'hull'], decisivePath, issues);
+      for (const key of ['victorShipId', 'sunkShipId'] as const) {
+        const field = required(decisive, key, decisivePath, issues);
+        if (field !== undefined && typeof field !== 'string') issue(issues, `${decisivePath}.${key}`, 'wrong-type');
+      }
+      validateFiniteNumber(required(decisive, 'hull', decisivePath, issues), `${decisivePath}.hull`, issues);
+    } else if (kind === 'boarding-ready') {
+      validateKeys(decisive, ['kind', 'victorShipId', 'range', 'relativeSpeed', 'targetSails', 'targetCrew', 'playerCrew'], decisivePath, issues);
+      const victor = required(decisive, 'victorShipId', decisivePath, issues);
+      if (victor !== undefined && typeof victor !== 'string') issue(issues, `${decisivePath}.victorShipId`, 'wrong-type');
+      for (const key of ['range', 'relativeSpeed', 'targetSails', 'targetCrew', 'playerCrew'] as const) {
+        validateFiniteNumber(required(decisive, key, decisivePath, issues), `${decisivePath}.${key}`, issues);
+      }
+    } else if (kind === 'escaped') {
+      validateKeys(decisive, ['kind', 'shipId', 'distance', 'arenaRadius', 'outwardSpeed'], decisivePath, issues);
+      const shipId = required(decisive, 'shipId', decisivePath, issues);
+      if (shipId !== undefined && typeof shipId !== 'string') issue(issues, `${decisivePath}.shipId`, 'wrong-type');
+      for (const key of ['distance', 'arenaRadius', 'outwardSpeed'] as const) {
+        validateFiniteNumber(required(decisive, key, decisivePath, issues), `${decisivePath}.${key}`, issues);
+      }
+    } else if (kind === 'separated') {
+      validateKeys(decisive, ['kind', 'shipId', 'timeLimitTicks'], decisivePath, issues);
+      const shipId = required(decisive, 'shipId', decisivePath, issues);
+      if (shipId !== undefined && typeof shipId !== 'string') issue(issues, `${decisivePath}.shipId`, 'wrong-type');
+      validateFiniteNumber(required(decisive, 'timeLimitTicks', decisivePath, issues), `${decisivePath}.timeLimitTicks`, issues);
+    } else issue(issues, `${decisivePath}.kind`, 'unknown-id');
+  }
+  return issues.length === before ? resolution as unknown as NavalResolution : null;
 }
 
 export function validateCampaignEvent(input: unknown): ValidationResult<CampaignEvent> {
@@ -300,7 +533,7 @@ export function validateCampaignEvent(input: unknown): ValidationResult<Campaign
     validateStableId(required(payload, 'encounterId', 'payload', issues), 'payload.encounterId', issues);
     validateStableId(required(payload, 'battleId', 'payload', issues), 'payload.battleId', issues);
     validateRngPair(required(payload, 'navalRng', 'payload', issues), 'payload.navalRng', issues);
-    if (!snapshotRecord(required(payload, 'input', 'payload', issues), 'payload.input', issues)) return { ok: false, issues };
+    validateNavalInput(required(payload, 'input', 'payload', issues), 'payload.input', issues);
   }
   if (payload && validType === 'battle-withdrawn') {
     validateKeys(payload, ['voyageId', 'battleId'], 'payload', issues);
@@ -311,7 +544,7 @@ export function validateCampaignEvent(input: unknown): ValidationResult<Campaign
     validateKeys(payload, ['voyageId', 'battleId', 'resolution'], 'payload', issues);
     validateStableId(required(payload, 'voyageId', 'payload', issues), 'payload.voyageId', issues);
     validateStableId(required(payload, 'battleId', 'payload', issues), 'payload.battleId', issues);
-    if (!snapshotRecord(required(payload, 'resolution', 'payload', issues), 'payload.resolution', issues)) return { ok: false, issues };
+    validateResolution(required(payload, 'resolution', 'payload', issues), 'payload.resolution', issues);
   }
 
   if (issues.length > 0) return { ok: false, issues };
@@ -335,10 +568,26 @@ export function validateCampaignEvent(input: unknown): ValidationResult<Campaign
     },
   };
   if (validType === 'voyage-started') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: { voyageId: payload?.voyageId as string } } };
-  if (validType === 'sea-leg-completed') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: payload as unknown as Extract<CampaignEvent, { type: 'sea-leg-completed' }>['payload'] } };
+  if (validType === 'sea-leg-completed') {
+    const cloneIssues: ValidationIssue[] = [];
+    const checkpoint = validateCheckpoint(payload?.checkpoint, 'payload.checkpoint', cloneIssues);
+    const navigationRng = validateRngPair(payload?.navigationRng, 'payload.navigationRng', cloneIssues);
+    if (!checkpoint || !navigationRng) return { ok: false, issues: [{ path: '$', code: 'invariant' }] };
+    return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: { voyageId: payload?.voyageId as string, encounterId: payload?.encounterId as string, checkpoint, navigationRng } } };
+  }
   if (validType === 'encounter-avoided') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: payload as unknown as Extract<CampaignEvent, { type: 'encounter-avoided' }>['payload'] } };
-  if (validType === 'naval-engaged') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: payload as unknown as Extract<CampaignEvent, { type: 'naval-engaged' }>['payload'] } };
+  if (validType === 'naval-engaged') {
+    const cloneIssues: ValidationIssue[] = [];
+    const navalRng = validateRngPair(payload?.navalRng, 'payload.navalRng', cloneIssues);
+    const navalInput = validateNavalInput(payload?.input, 'payload.input', cloneIssues);
+    if (!navalRng || !navalInput) return { ok: false, issues: [{ path: '$', code: 'invariant' }] };
+    return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: { voyageId: payload?.voyageId as string, encounterId: payload?.encounterId as string, battleId: payload?.battleId as string, navalRng, input: navalInput } } };
+  }
   if (validType === 'battle-withdrawn') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: payload as unknown as Extract<CampaignEvent, { type: 'battle-withdrawn' }>['payload'] } };
-  if (validType === 'naval-resolved') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: payload as unknown as Extract<CampaignEvent, { type: 'naval-resolved' }>['payload'] } };
+  if (validType === 'naval-resolved') {
+    const resolution = validateResolution(payload?.resolution, 'payload.resolution', []);
+    if (!resolution) return { ok: false, issues: [{ path: '$', code: 'invariant' }] };
+    return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: { voyageId: payload?.voyageId as string, battleId: payload?.battleId as string, resolution } } };
+  }
   return { ok: false, issues: [{ path: '$', code: 'invariant' }] };
 }
