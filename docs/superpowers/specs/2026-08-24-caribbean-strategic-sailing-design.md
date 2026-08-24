@@ -384,9 +384,13 @@ The event records final tactical hull, sails, crew, and cannon, but this package
 does not copy that damage into `fleet`. Persistent damage without repair,
 replacement crew, tow, capture, or ship-loss decisions can strand a campaign
 after one loss and contradict the requested safe repeatable return. On return,
-the pre-battle flagship remains serviceable and the UI states that Bridgetown's
-harbour crew made Mistral ready for the next departure. The real costs in this
-slice are time, provisions, lead expiry, and target completion.
+the pre-battle flagship remains serviceable. Every naval result shown in the
+Captain's Log includes this exact player-facing sentence:
+“Bridgetown’s harbour crew made Mistral ready for the next departure; the
+battle outcome remains in this log, but its damage is not carried onto the
+ready flagship.”
+The real costs in this slice are time, provisions, lead expiry, and target
+completion.
 
 This is a deliberate bounded rule, not an accidental omission. The future
 fleet/shipyard package must replace it in one migration-aware design rather
@@ -460,22 +464,29 @@ battle, the transient session and result modal remain mounted beneath it:
 No UI infers return until `controller.journal.state.mode.kind === 'port'`.
 
 All transient consequences of an event live at one campaign-candidate
-publication boundary, not on the initiating named-action promise. The boundary
-receives predecessor plus candidate, publishes the journal, and applies an
-event token `{ campaignId, eventId, type }` at most once per controller
-generation:
+publication boundary, not on the initiating named-action promise. Its input is
+exactly `{ predecessor, publishedJournal, appendedEvent }`. `appendedEvent` is
+captured from the original single-event candidate before persistence;
+`publishedJournal` is the journal actually adopted by memory or returned by
+the writer. The boundary adopts `publishedJournal` and applies the event token
+`{ campaignId, id: appendedEvent.id, type: appendedEvent.type }` at most once
+per controller generation:
 
 - `voyage-started` resets port activity to `menu`;
 - `encounter-avoided`, `battle-withdrawn`, and `naval-resolved` set one-shot
   `portFocusTarget: 'last-voyage'`; and
 - every other event has no transient effect.
 
-Immediate persisted save, direct memory-only dispatch, and delayed
-**Continue without saving** all use this same boundary. A later retry that
-persists an already-published memory candidate, a repeated consent action, or a
-conflict refresh does not apply the token again. Pending, denied, failed, and
-conflicted candidates have no transient effect before publication; external
-reload discards the candidate without applying it.
+An immediate persisted save adopts `outcome.journal`, including an event-free
+threshold-compacted result, while still consuming the original appended event.
+Direct memory-only dispatch and delayed **Continue without saving** use the
+same input shape with their memory candidate as `publishedJournal`. A later
+retry may replace that live memory journal with the writer's compacted journal,
+but the retained appended-event token is already consumed and cannot apply its
+activity/focus effect again. Repeated consent and conflict refresh behave the
+same. Pending, denied, failed, and conflicted candidates have no transient
+effect before publication; external reload discards the candidate and event
+without applying it.
 
 Set Sail is governed only by `voyageReadiness`, even while any Governor,
 Tavern, Market, Shipyard, Shares, or Log activity is open. Before candidate
@@ -515,8 +526,15 @@ inert background behavior, and diagnostics remain modal-safe.
 - Reload in `naval` mode constructs a fresh `NavalSession` from the exact saved
   input. It starts again at tick zero with explicit copy: “Reloading restarts
   this engagement from first contact.” Exact-tick battle resume is not claimed.
-- Resize into an unsupported viewport unmounts and disposes the session. Resize
-  back constructs the same fresh duel from saved input.
+- Resize into an unsupported viewport unmounts the entire controller and
+  disposes the session; only the focused notice remains. The outer minimum-
+  screen gate retains no controller but increments a support generation when
+  an unsupported viewport becomes supported again. That generation tells the
+  newly mounted controller to auto-resume the already loaded persisted journal
+  even when the URL lacks `?resume=1`. A saved naval route therefore returns
+  automatically as a new session at tick zero from byte-identical input with
+  the first-contact restart disclosure. Empty/unreadable storage still follows
+  setup/recovery and never fabricates a resume.
 - **Withdraw to Bridgetown** is available from the battle Options disclosure.
   For a nonterminal battle, the wrapper calls `session.setPaused(true)`
   synchronously before invoking `withdrawBattle`, so no RAF tick overlaps the
@@ -695,10 +713,17 @@ invalid, and the same rule starts from a nonzero compacted checkpoint/day.
   publication for immediate saved, direct memory, and delayed consent paths;
   denial, write failure, conflict, retry, repeated consent, and reload-discard
   prove zero early or duplicate transient effects;
+- at `JOURNAL_EVENT_LIMIT + 1`, immediate saved publication adopts the
+  event-free writer journal while consuming the original appended event once;
+  delayed memory publication consumes it once, and a later compacting retry
+  adopts the event-free writer journal without consuming it again;
 - consent/conflict uses an active-route modal and preserves a terminal battle
   result until the pending candidate is published or discarded;
 - Set Sail reason/enablement, focus, encounter choices, status, Captain's Log,
   and exact mode routing;
+- every naval `lastVoyage` keeps its terminal outcome in the log while the
+  flagship remains byte-unchanged and the exact harbour-readiness sentence is
+  visible;
 - successful departure from every open port activity clears it only after
   publication; all return paths and reload have the exact focus rules above;
 - campaign battle uses the same `NavalBattlePage`, full-bleed scene, controls,
@@ -708,6 +733,9 @@ invalid, and the same rule starts from a nonzero compacted checkpoint/day.
   result exposes Return only;
 - hidden document pauses, visible return stays paused, reload restarts from
   byte-identical input, and unsupported resize disposes the session; and
+- an unsupported-to-supported transition on a fresh route has no controller
+  under the notice, then automatically resumes the persisted naval journal as
+  a new tick-zero session with byte-identical input and restart disclosure; and
 - nonterminal withdrawal pauses synchronously before a deferred writer can
   observe even one more RAF tick, and every applied/pending/conflict/rejection/
   reload branch keeps the pause/unmount contract above; and
@@ -733,7 +761,13 @@ from clean localStorage with fixed seed/clock/UUID boundaries. The gate drives:
 11. corrupt/recover an active intermediate snapshot without losing raw bytes.
 
 Record normal screenshots for sea leg, encounter, campaign battle, result,
-returned log, exact `960x600`, HTML battle fallback, and unsupported portrait.
+returned log, exact `960x600`, HTML battle fallback, unsupported portrait, and
+the unsupported naval-resize notice.
+The voyage UI commit owns and stages the four sea/encounter/minimum/portrait
+screenshots after its normal-production browser pass. The battle UI commit owns
+and stages the five battle/result/log/fallback/resize screenshots after its
+normal-production browser pass. The final evidence task may recapture the same
+nine files cumulatively; it does not defer either UI commit's browser proof.
 The gate measures 14 px text, 44 px targets, contrast, focus, clipping,
 horizontal overflow, request/page/console failures, event counts, mode sequence,
 RNG lineage, input checksum, exactly-once resolution, reload restart, recovery,
@@ -781,27 +815,52 @@ truncated-trace RED, before either implementation turns green.
   runs the real harness and semantic evaluator, never compares provenance or
   tracked bytes, cleans the directory in `finally`, and exits 0 with exactly
   `NAVAL_SEMANTIC_PROBE_OK tracked=stale` or
-  `NAVAL_SEMANTIC_PROBE_OK tracked=current` when semantics pass;
+  `NAVAL_SEMANTIC_PROBE_OK tracked=current` when semantics pass. Current/stale
+  is determined only from source plus stable manifest, never variable
+  observations;
 - `--capture` requires a clean tracked Task 6 HEAD, writes through
   `saveIfChanged` only to `docs/screenshots/caribbean-naval`, and exits 0 with
   `NAVAL_CAPTURE_OK head=<sha> changed=<n>`; and
 - `--verify` is the post-capture/post-commit gate. It generates into a unique
   temporary directory, validates semantics, requires the tracked capture HEAD
   to be an ancestor, requires the current source-file manifest and source hash
-  to match the capture, requires a clean tracked worktree, normalizes only the
-  candidate/current `headCommitAtCapture` and `worktreeDirtyBeforeCapture`
-  fields to their tracked values, then byte-compares normalized metrics and
-  every PNG. It cleans the exact temporary directory in `finally` and exits 0
-  only with `NAVAL_VERIFY_OK capture=<sha> source=<sha> artifacts=<n>`.
+  to match the capture, and requires a clean tracked worktree. It then compares
+  canonical bytes for a deterministic `stableManifest`, while separately
+  range-validating the fresh observational metrics and artifact manifest. It
+  cleans the exact temporary directory in `finally` and exits 0 only with
+  `NAVAL_VERIFY_OK capture=<sha> source=<sha> artifacts=<n>`.
+
+The stable/observational boundary is exact. `stableManifest.version === 1` and
+contains the sorted source paths/hash; canonical input/seed; exact viewport
+names and dimensions; sorted screenshot names with width, height, and semantic
+state label; local GLB path/hash; port/starboard direction facts; deterministic
+boarding outcome/facts excluding elapsed duration; fallback facts; motion
+preference labels; and supported/unsupported display booleans. Its canonical
+JSON must equal the tracked capture byte-for-byte. Fresh PNG pixels are honest
+observational artifacts and are not byte-compared: each must have the exact
+manifest name/dimensions, valid PNG signature, nonzero bytes, and matching DOM
+semantic state at capture.
+
+Fresh performance remains observational, never frozen or normalized. It must
+have 20 advancing, unpaused one-second resource samples; finite FPS samples and
+sustained FPS at least 50; no more than 120 draw calls or 100,000 triangles;
+boarding duration `>= 0` and `< 15` seconds; no texture, geometry, material,
+buffer-attribute, or effect-capacity growth after warm-up; at least one active
+effect without exceeding capacity; and zero console/page/request/unhandled-
+rejection/allocation/capacity/pool failures. Live ticks, FPS, durations, frame counters, active
+effect counts, resource samples, observational metric bytes, and PNG pixels may
+differ between valid generations.
 
 Missing/unknown modes exit 1 with `NAVAL_CLI_FAILED mode`. Semantic-probe,
 capture, and verify failures exit 1 with, respectively,
 `NAVAL_SEMANTIC_PROBE_FAILED <code>`, `NAVAL_CAPTURE_FAILED <code>`, or
 `NAVAL_VERIFY_FAILED <code>`, where `<code>` is exactly one of `semantic`,
 `stale-capture`, `dirty-worktree`, `source-hash`, `source-files`,
-`metrics-byte`, `screenshot-byte`, `destination`, or `cleanup` as applicable.
-Tests inject each failure, including
-byte drift and cleanup on both success and failure. Task 7 captures once from
+`stable-manifest`, `observation-range`, `artifact-manifest`, `destination`, or
+`cleanup` as applicable. A real two-generation test accepts different valid
+FPS/duration/resource/frame/PNG observations under an identical stable
+manifest, then rejects one stable-field drift and every out-of-range class.
+Tests also cover cleanup on success and failure. Task 7 captures once from
 a clean Task 6 HEAD before any other evidence bytes change, stages only the
 metrics and genuinely changed screenshots, uses `--semantic-probe` for the
 pre-commit live-harness check, and runs final `--verify` only after the evidence
