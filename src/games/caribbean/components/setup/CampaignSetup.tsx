@@ -5,6 +5,7 @@ import { provisionsMonths } from '../../domain/selectors';
 import { CAMPAIGN_LENGTH_LABELS } from '../../state/selectors';
 import type {
   CaribbeanController,
+  RecoveryActionFailure,
   SaveCapabilityFailure,
 } from '../../state/useCaribbean';
 import { useModalFocus } from '../recovery/useModalFocus';
@@ -39,6 +40,38 @@ function saveFailureCopy(failure: SaveCapabilityFailure): string {
     return 'The last save operation has an uncertain outcome. Export or continue without saving before proceeding.';
   }
   return 'Campaign storage is unavailable. Continue only if you accept a memory-only career.';
+}
+
+function recoveryActionCopy(
+  capability: CaribbeanController['recoveryWriterCapability'],
+  failure: RecoveryActionFailure | null,
+): string | null {
+  if (failure?.kind === 'post-result-load') {
+    return `Campaign abandonment completed, but campaign storage could not be reread during ${failure.loadFailure.operation}. Reload before continuing.`;
+  }
+  if (failure?.kind === 'writer') {
+    if (failure.failure.kind === 'writer-denied') {
+      return 'Safe save ownership was denied. The campaign was not abandoned; you can try again.';
+    }
+    if (failure.failure.kind === 'writer-unavailable') {
+      return 'Safe save ownership is unavailable. Campaign abandonment is disabled in this browser.';
+    }
+    if (failure.failure.writer.kind === 'operation-threw') {
+      return 'The campaign abandonment operation threw before its outcome could be confirmed. Reload before continuing.';
+    }
+    return 'Safe save ownership returned an invalid protocol result during abandonment. Reload before continuing.';
+  }
+  return capability === 'unavailable'
+    ? 'Safe save ownership is unavailable. Campaign abandonment is disabled in this browser.'
+    : null;
+}
+
+function recoveryMutationBlocked(controller: CaribbeanController): boolean {
+  const { recoveryFailure } = controller;
+  if (controller.recoveryWriterCapability === 'unavailable') return true;
+  if (recoveryFailure === null) return false;
+  return recoveryFailure.kind === 'post-result-load'
+    || recoveryFailure.failure.kind !== 'writer-denied';
 }
 
 function AbandonDialog({
@@ -81,8 +114,9 @@ function AbandonDialog({
             The save will be copied to quarantine before its active slots are removed.
           </p>
           <div className="caribbean-dialog-actions">
-            <button ref={cancelRef} type="button" onClick={onClose}>Cancel</button>
+            <button data-testid="caribbean-abandon-cancel-button" ref={cancelRef} type="button" onClick={onClose}>Cancel</button>
             <button
+              data-testid="caribbean-abandon-confirm-button"
               className="caribbean-button-danger"
               type="button"
               onClick={() => { onClose(); onConfirm(); }}
@@ -137,6 +171,13 @@ export function CampaignSetup({
   const state = cleanLoad?.journal.state ?? controller.journal?.state ?? null;
   const showResume = cleanLoad !== null && controller.journal === null;
   const persistence = controller.persistence;
+  const recoveryNotice = recoveryActionCopy(
+    controller.recoveryWriterCapability,
+    controller.recoveryFailure,
+  );
+  const recoveryBlocked = recoveryMutationBlocked(controller);
+  const postResultLoadFailure = controller.recoveryFailure?.kind === 'post-result-load';
+  const resumeBlocked = recoveryBlocked && controller.recoveryFailure !== null;
 
   return (
     <section className="caribbean-commission-panel" aria-label="Caribbean career setup">
@@ -145,32 +186,59 @@ export function CampaignSetup({
 
         {state !== null && showResume ? (
           <div className="caribbean-save-summary">
-            <h1>{state.captain.name}’s commission</h1>
-            <p className="caribbean-summary-course">
-              {CAMPAIGN_LENGTH_LABELS[state.career.length]} · Bridgetown
-            </p>
-            <p className="caribbean-save-time">
-              Last saved {new Date(cleanLoad.savedAt).toLocaleString()}
-            </p>
-            <dl>
-              <div>
-                <dt>Flagship</dt>
-                <dd>{state.fleet.ships[0]?.name ?? 'No flagship'} · Hull {state.fleet.ships[0]?.hull ?? 0} · Sails {state.fleet.ships[0]?.sails ?? 0}</dd>
-              </div>
-              <div><dt>Cash</dt><dd>{state.wealth.gold} gold</dd></div>
-              <div>
-                <dt>Stores</dt>
-                <dd>{provisionsMonths(state)?.toFixed(1) ?? '—'} months provisions</dd>
-              </div>
-            </dl>
+            <h1>{postResultLoadFailure ? 'Campaign storage must be reread' : `${state.captain.name}’s commission`}</h1>
+            {postResultLoadFailure ? (
+              <p>
+                The storage change completed, but this page will not infer the active campaign until storage can be read again.
+              </p>
+            ) : (
+              <>
+                <p className="caribbean-summary-course">
+                  {CAMPAIGN_LENGTH_LABELS[state.career.length]} · Bridgetown
+                </p>
+                <p className="caribbean-save-time">
+                  Last saved {new Date(cleanLoad.savedAt).toLocaleString()}
+                </p>
+                <dl>
+                  <div>
+                    <dt>Flagship</dt>
+                    <dd>{state.fleet.ships[0]?.name ?? 'No flagship'} · Hull {state.fleet.ships[0]?.hull ?? 0} · Sails {state.fleet.ships[0]?.sails ?? 0}</dd>
+                  </div>
+                  <div><dt>Cash</dt><dd>{state.wealth.gold} gold</dd></div>
+                  <div>
+                    <dt>Stores</dt>
+                    <dd>{provisionsMonths(state)?.toFixed(1) ?? '—'} months provisions</dd>
+                  </div>
+                </dl>
+              </>
+            )}
             <div className="caribbean-action-row">
-              <button className="caribbean-button-primary" type="button" disabled={controller.busy} onClick={() => void controller.resume()}>
+              <button
+                data-testid="caribbean-resume-career-button"
+                className="caribbean-button-primary"
+                type="button"
+                disabled={controller.busy || resumeBlocked}
+                aria-describedby={resumeBlocked ? 'campaign-recovery-action-status' : undefined}
+                onClick={() => void controller.resume()}
+              >
                 Resume career
               </button>
-              <button ref={abandonRef} type="button" disabled={controller.busy} onClick={() => setAbandonOpen(true)}>
+              <button
+                data-testid="caribbean-abandon-campaign-button"
+                ref={abandonRef}
+                type="button"
+                disabled={controller.busy || recoveryBlocked}
+                aria-describedby={recoveryBlocked ? 'campaign-recovery-action-status' : undefined}
+                onClick={() => setAbandonOpen(true)}
+              >
                 Abandon campaign
               </button>
             </div>
+            {recoveryNotice !== null && (
+              <p id="campaign-recovery-action-status" className="caribbean-alert" role="alert">
+                {recoveryNotice}
+              </p>
+            )}
           </div>
         ) : state === null ? (
           <form onSubmit={submit} noValidate>
@@ -180,6 +248,7 @@ export function CampaignSetup({
               <div className="caribbean-field">
                 <label htmlFor="caribbean-captain-name">Captain name</label>
                 <input
+                  data-testid="caribbean-captain-name-input"
                   id="caribbean-captain-name"
                   name="captain-name"
                   value={name}
@@ -192,22 +261,22 @@ export function CampaignSetup({
               </div>
               <div className="caribbean-field">
                 <label htmlFor="caribbean-pronouns">Pronouns</label>
-                <input id="caribbean-pronouns" name="pronouns" value={pronouns} maxLength={24} onChange={(event) => setPronouns(event.target.value)} />
+                <input data-testid="caribbean-pronouns-input" id="caribbean-pronouns" name="pronouns" value={pronouns} maxLength={24} onChange={(event) => setPronouns(event.target.value)} />
               </div>
               <div className="caribbean-field">
                 <label htmlFor="caribbean-talent">Starting talent</label>
-                <select id="caribbean-talent" value={talent} onChange={(event) => setTalent(event.target.value as Talent)}>
+                <select data-testid="caribbean-starting-talent-select" id="caribbean-talent" value={talent} onChange={(event) => setTalent(event.target.value as Talent)}>
                   {TALENTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </div>
               <div className="caribbean-field">
                 <label htmlFor="caribbean-length">Career length</label>
-                <select id="caribbean-length" value={length} onChange={(event) => setLength(event.target.value as CampaignLength)}>
+                <select data-testid="caribbean-career-length-select" id="caribbean-length" value={length} onChange={(event) => setLength(event.target.value as CampaignLength)}>
                   {LENGTHS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </div>
             </div>
-            <button className="caribbean-button-primary" type="submit" disabled={controller.busy}>Start career</button>
+            <button data-testid="caribbean-start-career-button" className="caribbean-button-primary" type="submit" disabled={controller.busy}>Start career</button>
           </form>
         ) : null}
 
@@ -221,15 +290,16 @@ export function CampaignSetup({
         {persistence.kind === 'consent-required' && (
           <div className="caribbean-alert" role="alert">
             <p>{saveFailureCopy(persistence.failure)}</p>
-            <button type="button" onClick={controller.continueWithoutSaving}>Continue without saving</button>
+            <button data-testid="caribbean-continue-without-saving-button" type="button" onClick={controller.continueWithoutSaving}>Continue without saving</button>
           </div>
         )}
         {persistence.kind === 'save-conflict' && (
           <div className="caribbean-alert" role="alert">
             <p>A newer save exists. This tab will not overwrite or adopt it without your choice.</p>
             <div className="caribbean-action-row">
-              <button type="button" onClick={() => void controller.reloadExternalSave()}>Reload newer save</button>
+              <button data-testid="caribbean-reload-newer-save-button" type="button" onClick={() => void controller.reloadExternalSave()}>Reload newer save</button>
               <button
+                data-testid="caribbean-export-in-memory-journal-button"
                 type="button"
                 onClick={() => {
                   const raw = controller.exportInMemoryJournal();
@@ -238,7 +308,7 @@ export function CampaignSetup({
               >
                 Export in-memory journal
               </button>
-              <button type="button" onClick={controller.continueWithoutSaving}>Continue without saving</button>
+              <button data-testid="caribbean-continue-without-saving-button" type="button" onClick={controller.continueWithoutSaving}>Continue without saving</button>
             </div>
           </div>
         )}

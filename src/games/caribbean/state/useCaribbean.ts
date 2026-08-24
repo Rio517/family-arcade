@@ -21,6 +21,13 @@ import {
 import type { WriterRunResult } from '../storage/writer';
 import type { CaribbeanRuntime } from './runtime';
 
+type WriterOperationUncertainFailure = {
+  kind: 'operation-uncertain';
+  writer: Extract<WriterRunResult<unknown>, {
+    kind: 'operation-threw' | 'writer-protocol-failure';
+  }>;
+};
+
 export type SaveCapabilityFailure =
   | { kind: 'writer-unavailable' }
   | { kind: 'writer-denied'; error?: unknown }
@@ -35,12 +42,19 @@ export type SaveCapabilityFailure =
               | Extract<LoadResult, { kind: 'storage-unavailable' }>;
           };
     }
+  | WriterOperationUncertainFailure
   | {
       kind: 'operation-uncertain';
-      writer: Extract<WriterRunResult<unknown>, {
-        kind: 'operation-threw' | 'writer-protocol-failure';
-      }>;
+      writeFailure: Extract<SaveResult, { ok: false; reason: 'storage-unavailable' }> & {
+        operation: 'write-current' | 'write-previous';
+      };
+      outcomeReadFailure: Extract<LoadResult, { kind: 'storage-unavailable' }>;
     };
+
+type WriteStorageFailure = Extract<SaveResult, {
+  ok: false;
+  reason: 'storage-unavailable';
+}> & { operation: 'write-current' | 'write-previous' };
 
 export type MemoryOnlyReason = SaveCapabilityFailure['kind'] | 'save-conflict';
 
@@ -48,6 +62,29 @@ export type ContinuationRequiredRecoveryResult = Extract<RecoveryResult, {
   ok: false;
   reason: 'continuation-required';
 }>;
+
+export type RecoveryAction =
+  | 'recover'
+  | 'continue-recovery'
+  | 'abandon-from-quarantine'
+  | 'abandon';
+
+export type RecoveryWriterFailure =
+  | Extract<SaveCapabilityFailure, { kind: 'writer-unavailable' | 'writer-denied' }>
+  | WriterOperationUncertainFailure;
+
+export type RecoveryActionFailure =
+  | {
+      kind: 'writer';
+      action: RecoveryAction;
+      failure: RecoveryWriterFailure;
+    }
+  | {
+      kind: 'post-result-load';
+      action: RecoveryAction;
+      result: Extract<RecoveryResult, { ok: true }>;
+      loadFailure: Extract<LoadResult, { kind: 'storage-unavailable' }>;
+    };
 
 export type CaribbeanPersistencePhase =
   | { kind: 'persisted' }
@@ -85,6 +122,8 @@ export interface CaribbeanController {
   activity: PortActivity;
   busy: boolean;
   persistence: CaribbeanPersistencePhase;
+  recoveryWriterCapability: CaribbeanRuntime['writer']['capability'];
+  recoveryFailure: RecoveryActionFailure | null;
   start(options: Omit<CreateCampaignOptions, 'seed'>): Promise<void>;
   resume(): Promise<void>;
   continueWithoutSaving(): void;
@@ -147,6 +186,17 @@ type LockedSaveOutcome =
     }
   | { kind: 'recovery'; load: Exclude<LoadResult, { kind: 'storage-unavailable' }> };
 
+type RecoveryOperationOutcome =
+  | {
+      kind: 'failed';
+      result: Extract<RecoveryResult, { ok: false }>;
+    }
+  | {
+      kind: 'completed';
+      result: Extract<RecoveryResult, { ok: true }>;
+      postResultLoad: LoadResult;
+    };
+
 function cloneRevision(revision: ActiveSaveRevision): ActiveSaveRevision {
   return { currentRaw: revision.currentRaw, previousRaw: revision.previousRaw };
 }
@@ -174,6 +224,14 @@ function storageFailure(
     | Extract<LoadResult, { kind: 'storage-unavailable' }>,
 ): SaveCapabilityFailure {
   return { kind: 'storage-unavailable', detail: { kind: 'operation', result } };
+}
+
+function writeStorageFailure(
+  result: Extract<SaveResult, { ok: false; reason: 'storage-unavailable' }>,
+): WriteStorageFailure | null {
+  return result.operation === 'write-current' || result.operation === 'write-previous'
+    ? { ...result, operation: result.operation }
+    : null;
 }
 
 function syntheticLoaded(
@@ -226,13 +284,22 @@ function reconcileSaveInsideLock(
       : { kind: 'recovery', load: loaded };
   }
 
-  if (result.operation !== 'write-current' && result.operation !== 'write-previous') {
+  const writeFailure = writeStorageFailure(result);
+  if (writeFailure === null) {
     return { kind: 'pending', failure: storageFailure(result), expectedRevision };
   }
 
   const loaded = loadCampaign(runtime.storage);
   if (loaded.kind === 'storage-unavailable') {
-    return { kind: 'pending', failure: storageFailure(loaded), expectedRevision };
+    return {
+      kind: 'pending',
+      failure: {
+        kind: 'operation-uncertain',
+        writeFailure,
+        outcomeReadFailure: loaded,
+      },
+      expectedRevision,
+    };
   }
   if (cleanLoaded(loaded) && journalsEqual(loaded.journal, candidate)) {
     return {
@@ -252,7 +319,6 @@ function reconcileSaveInsideLock(
       expectedRevision: cloneRevision(loaded.revision),
     };
   }
-  if (needsRecovery(loaded)) return { kind: 'recovery', load: loaded };
   return {
     kind: 'conflict',
     expected: cloneRevision(expectedRevision),
@@ -260,7 +326,7 @@ function reconcileSaveInsideLock(
   };
 }
 
-function writerFailure(result: WriterRunResult<unknown>): SaveCapabilityFailure | null {
+function writerFailure(result: WriterRunResult<unknown>): RecoveryWriterFailure | null {
   if (result.kind === 'acquisition-failed') {
     return result.reason === 'unavailable'
       ? { kind: 'writer-unavailable' }
@@ -275,6 +341,21 @@ function writerFailure(result: WriterRunResult<unknown>): SaveCapabilityFailure 
 function canRetryFailure(failure: SaveCapabilityFailure): boolean {
   return failure.kind !== 'writer-unavailable'
     && !(failure.kind === 'storage-unavailable' && failure.detail.kind === 'runtime-access');
+}
+
+function blocksRecoveryMutation(failure: RecoveryActionFailure | null): boolean {
+  if (failure === null) return false;
+  if (failure.kind === 'post-result-load') return true;
+  return failure.failure.kind !== 'writer-denied';
+}
+
+function recoveryOperationOutcome(
+  runtime: CaribbeanRuntime,
+  result: RecoveryResult,
+): RecoveryOperationOutcome {
+  return result.ok
+    ? { kind: 'completed', result, postResultLoad: loadCampaign(runtime.storage) }
+    : { kind: 'failed', result };
 }
 
 function initialSnapshot(runtime: CaribbeanRuntime): {
@@ -295,10 +376,12 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
   const [activity, setActivity] = useState<PortActivity>('menu');
   const [busy, setBusy] = useState(false);
   const [persistence, setPersistence] = useState<CaribbeanPersistencePhase>(initial.persistence);
+  const [recoveryFailure, setRecoveryFailure] = useState<RecoveryActionFailure | null>(null);
 
   const loadRef = useRef(load);
   const journalRef = useRef(journal);
   const persistenceRef = useRef(persistence);
+  const recoveryFailureRef = useRef(recoveryFailure);
   const pendingRef = useRef<PendingIntent | null>(null);
   const busyRef = useRef(false);
   const generationRef = useRef(0);
@@ -310,6 +393,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     loadRef.current = next.load;
     journalRef.current = null;
     persistenceRef.current = next.persistence;
+    recoveryFailureRef.current = null;
     pendingRef.current = null;
     busyRef.current = false;
     // A supplied runtime replacement is an explicit controller-generation
@@ -320,6 +404,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     setActivity('menu');
     setBusy(false);
     setPersistence(next.persistence);
+    setRecoveryFailure(null);
     return () => {
       if (generationRef.current === generation) generationRef.current += 1;
     };
@@ -358,6 +443,15 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     if (!current(generation)) return;
     persistenceRef.current = next;
     setPersistence(next);
+  }, [current]);
+
+  const updateRecoveryFailure = useCallback((
+    generation: number,
+    next: RecoveryActionFailure | null,
+  ): void => {
+    if (!current(generation)) return;
+    recoveryFailureRef.current = next;
+    setRecoveryFailure(next);
   }, [current]);
 
   const holdForConsent = useCallback((
@@ -431,6 +525,10 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
           kind: 'storage-unavailable',
           detail: { kind: 'runtime-access', error: runtime.storageCapability.error },
         });
+        return;
+      }
+      if (loadRef.current.kind === 'storage-unavailable') {
+        holdForConsent(generation, intent, storageFailure(loadRef.current));
         return;
       }
       if (loadRef.current.kind !== 'empty') return;
@@ -628,6 +726,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
       const refreshed = runResult.result;
       if (refreshed.kind === 'storage-unavailable') return;
       pendingRef.current = null;
+      updateRecoveryFailure(generation, null);
       updateLoad(generation, refreshed);
       if (cleanLoaded(refreshed)) {
         updateJournal(generation, journalRef.current === null ? null : refreshed.journal);
@@ -641,7 +740,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     } finally {
       finish(generation);
     }
-  }, [begin, current, finish, runtime, updateJournal, updateLoad, updatePersistence]);
+  }, [begin, current, finish, runtime, updateJournal, updateLoad, updatePersistence, updateRecoveryFailure]);
 
   const exportInMemoryJournal = useCallback((): string | null => {
     const pending = pendingRef.current;
@@ -649,12 +748,26 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     return candidate === null ? null : canonicalJson(candidate);
   }, []);
 
-  const applyRecoveryResult = useCallback((generation: number, result: RecoveryResult): void => {
+  const applyRecoveryResult = useCallback((
+    generation: number,
+    action: RecoveryAction,
+    outcome: RecoveryOperationOutcome,
+  ): void => {
     if (!current(generation)) return;
-    if (result.ok) {
-      const refreshed = loadCampaign(runtime.storage);
-      if (refreshed.kind === 'storage-unavailable') return;
+    if (outcome.kind === 'completed') {
+      const { result } = outcome;
+      const refreshed = outcome.postResultLoad;
+      if (refreshed.kind === 'storage-unavailable') {
+        updateRecoveryFailure(generation, {
+          kind: 'post-result-load',
+          action,
+          result,
+          loadFailure: refreshed,
+        });
+        return;
+      }
       pendingRef.current = null;
+      updateRecoveryFailure(generation, null);
       updateLoad(generation, refreshed);
       updateJournal(generation, null);
       updatePersistence(generation, needsRecovery(refreshed)
@@ -662,19 +775,34 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
         : { kind: 'persisted' });
       return;
     }
+    const { result } = outcome;
+    updateRecoveryFailure(generation, null);
     if (result.reason === 'continuation-required') {
       updatePersistence(generation, { kind: 'recovery-continuation', result });
     } else {
       updatePersistence(generation, { kind: 'recovery-blocked', result });
     }
-  }, [current, runtime.storage, updateJournal, updateLoad, updatePersistence]);
+  }, [current, updateJournal, updateLoad, updatePersistence, updateRecoveryFailure]);
 
   const recover = useCallback(async (): Promise<void> => {
     const observed = loadRef.current;
-    if (observed.kind !== 'loaded' || !needsRecovery(observed) || busyRef.current) return;
+    if (
+      observed.kind !== 'loaded'
+      || !needsRecovery(observed)
+      || busyRef.current
+      || blocksRecoveryMutation(recoveryFailureRef.current)
+    ) return;
     const generation = begin();
     if (generation === null) return;
     try {
+      if (runtime.writer.capability === 'unavailable') {
+        updateRecoveryFailure(generation, {
+          kind: 'writer',
+          action: 'recover',
+          failure: { kind: 'writer-unavailable' },
+        });
+        return;
+      }
       const runResult = await runtime.writer.run(() => {
         const savedAt = runtime.now();
         const quarantinedAt = runtime.now();
@@ -692,39 +820,82 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
             quarantineId: runtime.makeQuarantineId(),
           });
         }
-        return result;
+        return recoveryOperationOutcome(runtime, result);
       });
-      if (!current(generation) || runResult.kind !== 'operation-result') return;
-      applyRecoveryResult(generation, runResult.result);
+      if (!current(generation)) return;
+      if (runResult.kind !== 'operation-result') {
+        updateRecoveryFailure(generation, {
+          kind: 'writer',
+          action: 'recover',
+          failure: writerFailure(runResult)!,
+        });
+        return;
+      }
+      applyRecoveryResult(generation, 'recover', runResult.result);
     } finally {
       finish(generation);
     }
-  }, [applyRecoveryResult, begin, current, finish, runtime]);
+  }, [applyRecoveryResult, begin, current, finish, runtime, updateRecoveryFailure]);
 
   const continueRecovery = useCallback(async (decision: 'continue' | 'abandon'): Promise<void> => {
     const phase = persistenceRef.current;
-    if (phase.kind !== 'recovery-continuation' || busyRef.current) return;
+    if (
+      phase.kind !== 'recovery-continuation'
+      || busyRef.current
+      || blocksRecoveryMutation(recoveryFailureRef.current)
+    ) return;
     const generation = begin();
     if (generation === null) return;
+    const action: RecoveryAction = decision === 'continue'
+      ? 'continue-recovery'
+      : 'abandon-from-quarantine';
     try {
-      const runResult = await runtime.writer.run(() => continueStoredRecovery(
-        runtime.storage,
-        phase.result.continuation,
-        decision,
+      if (runtime.writer.capability === 'unavailable') {
+        updateRecoveryFailure(generation, {
+          kind: 'writer',
+          action,
+          failure: { kind: 'writer-unavailable' },
+        });
+        return;
+      }
+      const runResult = await runtime.writer.run(() => recoveryOperationOutcome(
+        runtime,
+        continueStoredRecovery(runtime.storage, phase.result.continuation, decision),
       ));
-      if (!current(generation) || runResult.kind !== 'operation-result') return;
-      applyRecoveryResult(generation, runResult.result);
+      if (!current(generation)) return;
+      if (runResult.kind !== 'operation-result') {
+        updateRecoveryFailure(generation, {
+          kind: 'writer',
+          action,
+          failure: writerFailure(runResult)!,
+        });
+        return;
+      }
+      applyRecoveryResult(generation, action, runResult.result);
     } finally {
       finish(generation);
     }
-  }, [applyRecoveryResult, begin, current, finish, runtime]);
+  }, [applyRecoveryResult, begin, current, finish, runtime, updateRecoveryFailure]);
 
   const abandon = useCallback(async (): Promise<void> => {
     const observed = loadRef.current;
-    if (observed.kind === 'empty' || observed.kind === 'storage-unavailable' || busyRef.current) return;
+    if (
+      observed.kind === 'empty'
+      || observed.kind === 'storage-unavailable'
+      || busyRef.current
+      || blocksRecoveryMutation(recoveryFailureRef.current)
+    ) return;
     const generation = begin();
     if (generation === null) return;
     try {
+      if (runtime.writer.capability === 'unavailable') {
+        updateRecoveryFailure(generation, {
+          kind: 'writer',
+          action: 'abandon',
+          failure: { kind: 'writer-unavailable' },
+        });
+        return;
+      }
       const runResult = await runtime.writer.run(() => {
         const quarantinedAt = runtime.now();
         let result = abandonCampaign(runtime.storage, observed, {
@@ -737,14 +908,22 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
             quarantineId: runtime.makeQuarantineId(),
           });
         }
-        return result;
+        return recoveryOperationOutcome(runtime, result);
       });
-      if (!current(generation) || runResult.kind !== 'operation-result') return;
-      applyRecoveryResult(generation, runResult.result);
+      if (!current(generation)) return;
+      if (runResult.kind !== 'operation-result') {
+        updateRecoveryFailure(generation, {
+          kind: 'writer',
+          action: 'abandon',
+          failure: writerFailure(runResult)!,
+        });
+        return;
+      }
+      applyRecoveryResult(generation, 'abandon', runResult.result);
     } finally {
       finish(generation);
     }
-  }, [applyRecoveryResult, begin, current, finish, runtime]);
+  }, [applyRecoveryResult, begin, current, finish, runtime, updateRecoveryFailure]);
 
   const selectActivity = useCallback((next: PortActivity): void => {
     setActivity(next);
@@ -758,6 +937,8 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     activity,
     busy,
     persistence,
+    recoveryWriterCapability: runtime.writer.capability,
+    recoveryFailure,
     start,
     resume,
     continueWithoutSaving,

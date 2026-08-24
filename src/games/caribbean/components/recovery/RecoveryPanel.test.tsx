@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createCampaign } from '../../domain/createCampaign';
@@ -34,6 +34,8 @@ function controller(overrides: Partial<CaribbeanController> = {}): CaribbeanCont
     activity: 'menu',
     busy: false,
     persistence: { kind: 'recovery-required' },
+    recoveryWriterCapability: 'available',
+    recoveryFailure: null,
     start: vi.fn().mockResolvedValue(undefined),
     resume: vi.fn().mockResolvedValue(undefined),
     continueWithoutSaving: vi.fn(),
@@ -48,6 +50,19 @@ function controller(overrides: Partial<CaribbeanController> = {}): CaribbeanCont
     closeActivity: vi.fn(),
     ...overrides,
   };
+}
+
+function withRecoveryState(
+  view: CaribbeanController,
+  state: Pick<CaribbeanController, 'recoveryWriterCapability' | 'recoveryFailure'>,
+): CaribbeanController {
+  return Object.assign(view, state);
+}
+
+function expectControlIds(container: HTMLElement, expected: string[]): void {
+  const controls = [...container.querySelectorAll<HTMLElement>('input, select, button')];
+  expect(controls.map((control) => control.dataset.testid)).toEqual(expected);
+  expect(new Set(expected).size).toBe(expected.length);
 }
 
 const continuation: RecoveryContinuation = {
@@ -217,5 +232,100 @@ describe('<RecoveryPanel>', () => {
     expect(view.reloadExternalSave).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /abandon/i })).not.toBeInTheDocument();
+  });
+
+  it('disables recovery mutations with an adjacent reason when safe writer ownership is unavailable', () => {
+    const view = withRecoveryState(controller(), {
+      recoveryWriterCapability: 'unavailable',
+      recoveryFailure: null,
+    });
+    render(<RecoveryPanel controller={view} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/safe save ownership is unavailable/i);
+    expect(screen.getByRole('button', { name: 'Download recovery file' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Recover known-good campaign' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeDisabled();
+  });
+
+  it('renders denied ownership truthfully while leaving a safe retry available', () => {
+    const view = withRecoveryState(controller(), {
+      recoveryWriterCapability: 'available',
+      recoveryFailure: {
+        kind: 'writer', action: 'recover', failure: { kind: 'writer-denied', error: new Error('denied') },
+      },
+    });
+    render(<RecoveryPanel controller={view} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/ownership was denied/i);
+    expect(screen.getByRole('button', { name: 'Recover known-good campaign' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeEnabled();
+  });
+
+  it('retains a completed recovery plus typed post-result read failure and disables stale actions', () => {
+    const view = withRecoveryState(controller(), {
+      recoveryWriterCapability: 'available',
+      recoveryFailure: {
+        kind: 'post-result-load',
+        action: 'recover',
+        result: {
+          ok: true,
+          kind: 'recovered',
+          quarantineKey: continuation.quarantineKey,
+          revision: REVISION,
+          journal: degradedLoad().journal,
+        },
+        loadFailure: { kind: 'storage-unavailable', operation: 'read-current' },
+      },
+    });
+    render(<RecoveryPanel controller={view} />);
+
+    expect(screen.getByRole('heading', { name: 'Campaign storage must be reread' })).toBeInTheDocument();
+    expect(screen.queryByText(/active save could not be used as-is/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/recovery completed/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/read-current/i);
+    expect(screen.getByRole('button', { name: 'Recover known-good campaign' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeDisabled();
+  });
+
+  it('gives every recovery, continuation, conflict, and modal control a stable semantic test id', () => {
+    let rendered = render(<RecoveryPanel controller={controller()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abandon campaign' }));
+    expectControlIds(rendered.container, [
+      'caribbean-download-recovery-button',
+      'caribbean-recover-known-good-button',
+      'caribbean-abandon-campaign-button',
+      'caribbean-abandon-cancel-button',
+      'caribbean-abandon-confirm-button',
+    ]);
+    cleanup();
+
+    rendered = render(<RecoveryPanel controller={controller({
+      persistence: continuationPhase('partial-cleanup'),
+    })} />);
+    expectControlIds(rendered.container, [
+      'caribbean-retry-recovery-button',
+      'caribbean-abandon-from-quarantine-button',
+    ]);
+    cleanup();
+
+    const persistence: CaribbeanPersistencePhase = {
+      kind: 'recovery-blocked',
+      result: {
+        ok: false,
+        reason: 'external-revision-conflict',
+        cause: 'active-revision-conflict',
+        quarantineKey: continuation.quarantineKey,
+        quarantineRaw: continuation.quarantineRaw,
+        stage: 'cleanup',
+        sourceRevision: REVISION,
+        actualRevision: { currentRaw: '{external}', previousRaw: null },
+      },
+    };
+    rendered = render(<RecoveryPanel controller={controller({ persistence })} />);
+    expectControlIds(rendered.container, [
+      'caribbean-download-verified-quarantine-button',
+      'caribbean-reload-newer-save-button',
+      'caribbean-recovery-cancel-button',
+    ]);
   });
 });

@@ -33,7 +33,8 @@ function ControllerPage({ runtime }: { runtime: CaribbeanRuntime }) {
   }, [controller, load]);
 
   const savingAvailable = runtime.storageCapability.kind === 'available'
-    && runtime.writer.capability === 'available';
+    && runtime.writer.capability === 'available'
+    && load.kind !== 'storage-unavailable';
   const recoveryPhase = controller.persistence.kind === 'recovery-required'
     || controller.persistence.kind === 'recovery-continuation'
     || controller.persistence.kind === 'recovery-blocked';
@@ -67,7 +68,7 @@ function ControllerPage({ runtime }: { runtime: CaribbeanRuntime }) {
           <aside className="caribbean-status caribbean-memory-warning" role="status">
             <p>This career is not being saved. Keep this tab open.</p>
             {controller.persistence.canRetrySaving && (
-              <button type="button" disabled={controller.busy} onClick={() => void controller.retrySaving()}>
+              <button data-testid="caribbean-retry-saving-button" type="button" disabled={controller.busy} onClick={() => void controller.retrySaving()}>
                 Retry saving
               </button>
             )}

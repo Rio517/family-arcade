@@ -1,7 +1,11 @@
 import { useRef, useState } from 'react';
 
 import { serializeRecoveryExport } from '../../storage/recovery';
-import type { CaribbeanController, CaribbeanPersistencePhase } from '../../state/useCaribbean';
+import type {
+  CaribbeanController,
+  CaribbeanPersistencePhase,
+  RecoveryActionFailure,
+} from '../../state/useCaribbean';
 import { useModalFocus } from './useModalFocus';
 
 function downloadText(raw: string, filename: string): void {
@@ -48,6 +52,41 @@ function blockedMessage(
   }
 }
 
+function recoveryActionCopy(
+  capability: CaribbeanController['recoveryWriterCapability'],
+  failure: RecoveryActionFailure | null,
+): string | null {
+  if (failure?.kind === 'post-result-load') {
+    const action = failure.action === 'recover' || failure.action === 'continue-recovery'
+      ? 'Recovery'
+      : 'Campaign abandonment';
+    return `${action} completed, but campaign storage could not be reread during ${failure.loadFailure.operation}. Reload before taking another recovery action.`;
+  }
+  if (failure?.kind === 'writer') {
+    if (failure.failure.kind === 'writer-denied') {
+      return 'Safe save ownership was denied. No recovery action ran; you can try again.';
+    }
+    if (failure.failure.kind === 'writer-unavailable') {
+      return 'Safe save ownership is unavailable. Recovery and abandonment are disabled in this browser.';
+    }
+    if (failure.failure.writer.kind === 'operation-threw') {
+      return 'The recovery operation threw before its outcome could be confirmed. Reload before taking another recovery action.';
+    }
+    return 'Safe save ownership returned an invalid protocol result. Reload before taking another recovery action.';
+  }
+  return capability === 'unavailable'
+    ? 'Safe save ownership is unavailable. Recovery and abandonment are disabled in this browser.'
+    : null;
+}
+
+function recoveryMutationBlocked(controller: CaribbeanController): boolean {
+  const { recoveryFailure } = controller;
+  if (controller.recoveryWriterCapability === 'unavailable') return true;
+  if (recoveryFailure === null) return false;
+  return recoveryFailure.kind === 'post-result-load'
+    || recoveryFailure.failure.kind !== 'writer-denied';
+}
+
 export function RecoveryPanel({ controller }: { controller: CaribbeanController }) {
   const [abandonOpen, setAbandonOpen] = useState(false);
   const [externalCancelled, setExternalCancelled] = useState(false);
@@ -66,6 +105,13 @@ export function RecoveryPanel({ controller }: { controller: CaribbeanController 
 
   const load = controller.load;
   const phase = controller.persistence;
+  const recoveryNotice = recoveryActionCopy(
+    controller.recoveryWriterCapability,
+    controller.recoveryFailure,
+  );
+  const postResultLoadFailure = controller.recoveryFailure?.kind === 'post-result-load';
+  const mutationDisabled = controller.busy || recoveryMutationBlocked(controller);
+  const mutationReasonId = recoveryNotice === null ? undefined : 'caribbean-recovery-action-status';
   const externalConflict = phase.kind === 'recovery-blocked'
     && phase.result.reason === 'external-revision-conflict'
       ? phase.result
@@ -83,32 +129,56 @@ export function RecoveryPanel({ controller }: { controller: CaribbeanController 
     <section className="caribbean-recovery-panel" aria-label="Campaign recovery">
       <div ref={backgroundRef} className="caribbean-recovery-content">
         <p className="caribbean-place-line">Bridgetown · save station</p>
-        <h1>Campaign recovery required</h1>
+        <h1>{postResultLoadFailure ? 'Campaign storage must be reread' : 'Campaign recovery required'}</h1>
 
-        {phase.kind === 'recovery-continuation' ? (
-          <div className="caribbean-alert" role="alert">
+        {recoveryNotice !== null && (
+          <p id="caribbean-recovery-action-status" className="caribbean-alert" role="alert">
+            {recoveryNotice}
+          </p>
+        )}
+
+        {postResultLoadFailure ? (
+          <>
+            <p>
+              The storage change completed, but this page will not infer or repeat the result until the active slots can be read again.
+            </p>
+            <div className="caribbean-action-row">
+              <button data-testid="caribbean-download-recovery-button" type="button" onClick={exportRecovery}>Download recovery file</button>
+              {load.kind === 'loaded' && (
+                <button data-testid="caribbean-recover-known-good-button" className="caribbean-button-primary" type="button" disabled aria-describedby={mutationReasonId}>
+                  Recover known-good campaign
+                </button>
+              )}
+              <button data-testid="caribbean-abandon-campaign-button" ref={abandonRef} type="button" disabled aria-describedby={mutationReasonId}>
+                Abandon campaign
+              </button>
+            </div>
+          </>
+        ) : phase.kind === 'recovery-continuation' ? (
+          <div className="caribbean-alert" role={recoveryNotice === null ? 'alert' : undefined}>
             <p>{continuationMessage(phase)}</p>
             <p className="caribbean-diagnostic">
               {phase.result.quarantineKey} · {phase.result.continuation.stage}
             </p>
             <div className="caribbean-action-row">
-              <button type="button" disabled={controller.busy} onClick={() => void controller.continueRecovery('continue')}>Retry recovery</button>
-              <button className="caribbean-button-danger" type="button" disabled={controller.busy} onClick={() => void controller.continueRecovery('abandon')}>Abandon from quarantine</button>
+              <button data-testid="caribbean-retry-recovery-button" type="button" disabled={mutationDisabled} aria-describedby={mutationReasonId} onClick={() => void controller.continueRecovery('continue')}>Retry recovery</button>
+              <button data-testid="caribbean-abandon-from-quarantine-button" className="caribbean-button-danger" type="button" disabled={mutationDisabled} aria-describedby={mutationReasonId} onClick={() => void controller.continueRecovery('abandon')}>Abandon from quarantine</button>
             </div>
           </div>
         ) : phase.kind === 'recovery-blocked' ? (
-          <div className="caribbean-alert" role="alert">
+          <div className="caribbean-alert" role={recoveryNotice === null ? 'alert' : undefined}>
             <p>{blockedMessage(phase)}</p>
             {externalConflict !== null && !externalCancelled && (
               <div className="caribbean-action-row">
                 <button
+                  data-testid="caribbean-download-verified-quarantine-button"
                   type="button"
                   onClick={() => downloadText(externalConflict.quarantineRaw, 'caribbean-verified-quarantine.json')}
                 >
                   Download verified quarantine
                 </button>
-                <button type="button" onClick={() => void controller.reloadExternalSave()}>Reload newer save</button>
-                <button type="button" onClick={() => setExternalCancelled(true)}>Cancel</button>
+                <button data-testid="caribbean-reload-newer-save-button" type="button" onClick={() => void controller.reloadExternalSave()}>Reload newer save</button>
+                <button data-testid="caribbean-recovery-cancel-button" type="button" onClick={() => setExternalCancelled(true)}>Cancel</button>
               </div>
             )}
           </div>
@@ -118,13 +188,13 @@ export function RecoveryPanel({ controller }: { controller: CaribbeanController 
               The active save could not be used as-is. Download its exact bytes before choosing recovery or abandonment.
             </p>
             <div className="caribbean-action-row">
-              <button type="button" onClick={exportRecovery}>Download recovery file</button>
+              <button data-testid="caribbean-download-recovery-button" type="button" onClick={exportRecovery}>Download recovery file</button>
               {load.kind === 'loaded' && (
-                <button className="caribbean-button-primary" type="button" disabled={controller.busy} onClick={() => void controller.recover()}>
+                <button data-testid="caribbean-recover-known-good-button" className="caribbean-button-primary" type="button" disabled={mutationDisabled} aria-describedby={mutationReasonId} onClick={() => void controller.recover()}>
                   Recover known-good campaign
                 </button>
               )}
-              <button ref={abandonRef} type="button" disabled={controller.busy} onClick={() => setAbandonOpen(true)}>
+              <button data-testid="caribbean-abandon-campaign-button" ref={abandonRef} type="button" disabled={mutationDisabled} aria-describedby={mutationReasonId} onClick={() => setAbandonOpen(true)}>
                 Abandon campaign
               </button>
             </div>
@@ -146,8 +216,9 @@ export function RecoveryPanel({ controller }: { controller: CaribbeanController 
             The save will be copied to quarantine before its active slots are removed.
           </p>
           <div className="caribbean-dialog-actions">
-            <button ref={cancelRef} type="button" onClick={() => setAbandonOpen(false)}>Cancel</button>
+            <button data-testid="caribbean-abandon-cancel-button" ref={cancelRef} type="button" onClick={() => setAbandonOpen(false)}>Cancel</button>
             <button
+              data-testid="caribbean-abandon-confirm-button"
               className="caribbean-button-danger"
               type="button"
               onClick={() => { setAbandonOpen(false); void controller.abandon(); }}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createCampaign } from '../../domain/createCampaign';
@@ -16,6 +16,8 @@ function controller(overrides: Partial<CaribbeanController> = {}): CaribbeanCont
     activity: 'menu',
     busy: false,
     persistence: { kind: 'persisted' },
+    recoveryWriterCapability: 'available',
+    recoveryFailure: null,
     start: vi.fn().mockResolvedValue(undefined),
     resume: vi.fn().mockResolvedValue(undefined),
     continueWithoutSaving: vi.fn(),
@@ -48,6 +50,12 @@ function cleanLoad(): Extract<LoadResult, { kind: 'loaded' }> {
     unreadableSlots: [],
     revision: { currentRaw: 'current', previousRaw: null },
   };
+}
+
+function expectControlIds(container: HTMLElement, expected: string[]): void {
+  const controls = [...container.querySelectorAll<HTMLElement>('input, select, button')];
+  expect(controls.map((control) => control.dataset.testid)).toEqual(expected);
+  expect(new Set(expected).size).toBe(expected.length);
 }
 
 describe('<CampaignSetup>', () => {
@@ -123,11 +131,42 @@ describe('<CampaignSetup>', () => {
   });
 
   it('describes a loaded campaign truthfully when safe resume ownership is unavailable', () => {
-    render(<CampaignSetup controller={controller({ load: cleanLoad() })} savingAvailable={false} />);
+    render(<CampaignSetup controller={controller({
+      load: cleanLoad(),
+      recoveryWriterCapability: 'unavailable',
+    })} savingAvailable={false} />);
     expect(screen.getByRole('status')).toHaveTextContent(
       'Saving disabled. Resume requires explicit memory-only consent.',
     );
     expect(screen.getByRole('heading', { name: 'Morgan’s commission' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/campaign abandonment is disabled/i);
+    expect(screen.getByRole('button', { name: 'Resume career' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeDisabled();
+  });
+
+  it('suppresses stale resume claims after abandonment succeeds but its same-lock reread fails', () => {
+    const load = cleanLoad();
+    render(<CampaignSetup controller={controller({
+      load,
+      recoveryFailure: {
+        kind: 'post-result-load',
+        action: 'abandon',
+        result: {
+          ok: true,
+          kind: 'abandoned',
+          quarantineKey: 'caribbean:campaign:quarantine:one',
+          revision: { currentRaw: null, previousRaw: null },
+        },
+        loadFailure: { kind: 'storage-unavailable', operation: 'read-current' },
+      },
+    })} savingAvailable />);
+
+    expect(screen.getByRole('heading', { name: 'Campaign storage must be reread' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Morgan’s commission' })).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/abandonment completed/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/read-current/i);
+    expect(screen.getByRole('button', { name: 'Resume career' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeDisabled();
   });
 
   it('omits a cleared optional pronoun field so the domain default remains available', () => {
@@ -177,5 +216,56 @@ describe('<CampaignSetup>', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:journal');
     expect(view.continueWithoutSaving).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Retry saving' })).not.toBeInTheDocument();
+  });
+
+  it('gives every setup, resume, conflict, and modal control a stable semantic test id', () => {
+    let rendered = render(<CampaignSetup controller={controller()} savingAvailable />);
+    expectControlIds(rendered.container, [
+      'caribbean-captain-name-input',
+      'caribbean-pronouns-input',
+      'caribbean-starting-talent-select',
+      'caribbean-career-length-select',
+      'caribbean-start-career-button',
+    ]);
+    cleanup();
+
+    rendered = render(<CampaignSetup controller={controller({
+      persistence: {
+        kind: 'consent-required', intent: 'start', failure: { kind: 'writer-denied' },
+      },
+    })} savingAvailable={false} />);
+    expectControlIds(rendered.container, [
+      'caribbean-captain-name-input',
+      'caribbean-pronouns-input',
+      'caribbean-starting-talent-select',
+      'caribbean-career-length-select',
+      'caribbean-start-career-button',
+      'caribbean-continue-without-saving-button',
+    ]);
+    cleanup();
+
+    rendered = render(<CampaignSetup controller={controller({
+      journal: cleanLoad().journal,
+      persistence: {
+        kind: 'save-conflict',
+        expected: { currentRaw: 'old', previousRaw: null },
+        actual: { currentRaw: 'new', previousRaw: 'old' },
+      },
+    })} savingAvailable />);
+    expectControlIds(rendered.container, [
+      'caribbean-reload-newer-save-button',
+      'caribbean-export-in-memory-journal-button',
+      'caribbean-continue-without-saving-button',
+    ]);
+    cleanup();
+
+    rendered = render(<CampaignSetup controller={controller({ load: cleanLoad() })} savingAvailable />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abandon campaign' }));
+    expectControlIds(rendered.container, [
+      'caribbean-resume-career-button',
+      'caribbean-abandon-campaign-button',
+      'caribbean-abandon-cancel-button',
+      'caribbean-abandon-confirm-button',
+    ]);
   });
 });

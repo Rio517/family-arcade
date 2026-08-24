@@ -14,6 +14,9 @@ const originalHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
 const immediateLocks: LockManagerLike = {
   async request(_name, _options, callback) { return await callback({}); },
 };
+const deniedLocks: LockManagerLike = {
+  async request() { throw new Error('ownership denied'); },
+};
 
 function setViewport(width: number, height: number): void {
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
@@ -26,6 +29,20 @@ function storage(): StorageLike & { getItem: ReturnType<typeof vi.fn> } {
     getItem: vi.fn((key: string) => data.get(key) ?? null),
     setItem: vi.fn((key: string, value: string) => { data.set(key, value); }),
     removeItem: vi.fn((key: string) => { data.delete(key); }),
+  };
+}
+
+function operationFailingStorage(operation: 'read-current' | 'read-previous'): StorageLike {
+  return {
+    getItem(key) {
+      if (
+        operation === 'read-current' && key === 'caribbean:campaign:current'
+        || operation === 'read-previous' && key === 'caribbean:campaign:previous'
+      ) throw new DOMException(operation, 'SecurityError');
+      return null;
+    },
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
   };
 }
 
@@ -132,5 +149,46 @@ describe('<CaribbeanPage>', () => {
     expect(makeSeed).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('caribbean-career-ready')).toHaveTextContent('Captain');
     expect(screen.getByRole('status')).toHaveTextContent(/not being saved/i);
+  });
+
+  it.each(['read-current', 'read-previous'] as const)(
+    'renders operation-level saving-disabled consent after an initial %s failure',
+    async (operation) => {
+      setViewport(1440, 900);
+      const makeSeed = vi.fn(() => 1702);
+      const injected: CaribbeanRuntime = {
+        storage: operationFailingStorage(operation),
+        storageCapability: { kind: 'available' },
+        writer: createCampaignWriter(immediateLocks),
+        build: 'fixture', now: () => 100, makeSeed,
+        makeQuarantineId: () => '00000000-0000-4000-8000-000000000001',
+      };
+      render(<CaribbeanPage runtime={injected} />);
+
+      expect(screen.getByRole('status')).toHaveTextContent(/Saving disabled/i);
+      fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(/storage is unavailable/i);
+      expect(makeSeed).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('caribbean-career-ready')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Continue without saving' }));
+      expect(makeSeed).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('caribbean-career-ready')).toHaveTextContent('Captain');
+    },
+  );
+
+  it('gives the memory-only Retry saving control a stable semantic test id', async () => {
+    setViewport(1440, 900);
+    const injected = runtime();
+    injected.writer = createCampaignWriter(deniedLocks);
+    render(<CaribbeanPage runtime={injected} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue without saving' }));
+
+    expect(screen.getByRole('button', { name: 'Retry saving' })).toHaveAttribute(
+      'data-testid',
+      'caribbean-retry-saving-button',
+    );
   });
 });

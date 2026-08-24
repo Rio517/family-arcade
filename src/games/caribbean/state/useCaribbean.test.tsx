@@ -14,9 +14,14 @@ import {
   type StorageLike,
 } from '../storage/persistence';
 import { QUARANTINE_KEY_PREFIX } from '../storage/recovery';
-import { createCampaignWriter, type LockManagerLike } from '../storage/writer';
+import {
+  createCampaignWriter,
+  type CampaignWriter,
+  type LockManagerLike,
+  type WriterRunResult,
+} from '../storage/writer';
 import type { CaribbeanRuntime } from './runtime';
-import { useCaribbean } from './useCaribbean';
+import { useCaribbean, type CaribbeanController } from './useCaribbean';
 
 type MemoryStorage = StorageLike & {
   getItem: ReturnType<typeof vi.fn<(key: string) => string | null>>;
@@ -31,6 +36,19 @@ function memoryStorage(initial: Record<string, string> = {}): MemoryStorage {
     setItem: vi.fn((key: string, value: string) => { data.set(key, value); }),
     removeItem: vi.fn((key: string) => { data.delete(key); }),
   };
+}
+
+function readFailureStorage(operation: 'read-current' | 'read-previous'): MemoryStorage {
+  const storage = memoryStorage();
+  const read = storage.getItem.getMockImplementation()!;
+  storage.getItem.mockImplementation((key) => {
+    if (
+      operation === 'read-current' && key === CURRENT_SAVE_KEY
+      || operation === 'read-previous' && key === PREVIOUS_SAVE_KEY
+    ) throw new DOMException(operation, 'SecurityError');
+    return read(key);
+  });
+  return storage;
 }
 
 const immediateLocks: LockManagerLike = {
@@ -105,6 +123,23 @@ function runtime(options: {
     makeSeed: vi.fn(() => options.seed ?? 1702),
     makeQuarantineId: vi.fn(() => ids.shift() ?? '00000000-0000-4000-8000-000000000099'),
   };
+}
+
+type WriterFailureTag = 'unavailable' | 'denied' | 'operation-threw' | 'writer-protocol-failure';
+
+function failedWriter(tag: WriterFailureTag, error: Error): CampaignWriter {
+  return {
+    capability: tag === 'unavailable' ? 'unavailable' : 'available',
+    async run<T>(): Promise<WriterRunResult<T>> {
+      if (tag === 'unavailable') return { kind: 'acquisition-failed', reason: 'unavailable' };
+      if (tag === 'denied') return { kind: 'acquisition-failed', reason: 'denied', error };
+      return { kind: tag, error };
+    },
+  };
+}
+
+function recoveryFailureOf(controller: CaribbeanController): unknown {
+  return controller.recoveryFailure;
 }
 
 function persist(storage: MemoryStorage, journal: CampaignJournal, savedAt = 10): CampaignJournal {
@@ -194,6 +229,40 @@ describe('useCaribbean', () => {
     });
     expect(storage.setItem).not.toHaveBeenCalled();
   });
+
+  it.each(['read-current', 'read-previous'] as const)(
+    'retains an initial %s operation failure until explicit memory-only consent',
+    async (operation) => {
+      const storage = readFailureStorage(operation);
+      const injected = runtime({ storage });
+      const writerRun = vi.spyOn(injected.writer, 'run');
+      const { result } = renderHook(() => useCaribbean(injected));
+
+      expect(result.current.load).toEqual({ kind: 'storage-unavailable', operation });
+      await act(() => result.current.start(MORGAN));
+
+      expect(result.current.journal).toBeNull();
+      expect(result.current.persistence).toMatchObject({
+        kind: 'consent-required',
+        intent: 'start',
+        failure: {
+          kind: 'storage-unavailable',
+          detail: { kind: 'operation', result: { kind: 'storage-unavailable', operation } },
+        },
+      });
+      expect(injected.makeSeed).not.toHaveBeenCalled();
+      expect(writerRun).not.toHaveBeenCalled();
+      expect(storage.setItem).not.toHaveBeenCalled();
+
+      act(() => result.current.continueWithoutSaving());
+      expect(injected.makeSeed).toHaveBeenCalledTimes(1);
+      expect(result.current.journal?.state.captain.name).toBe('Morgan');
+      expect(result.current.persistence).toEqual({
+        kind: 'memory-only', reason: 'storage-unavailable', canRetrySaving: true,
+      });
+      expect(storage.setItem).not.toHaveBeenCalled();
+    },
+  );
 
   it('does not construct a campaign before explicit consent when safe writer ownership is unavailable', async () => {
     const storage = memoryStorage();
@@ -378,6 +447,124 @@ describe('useCaribbean', () => {
       kind: 'loaded', journal: { state: { lastEventId: 1 } },
     });
   });
+
+  it.each([
+    ['write-previous', PREVIOUS_SAVE_KEY],
+    ['write-current', CURRENT_SAVE_KEY],
+  ] as const)(
+    'retains typed %s uncertainty when the outcome reread fails',
+    async (operation, failedKey) => {
+      const storage = memoryStorage();
+      persist(storage, createJournal(createCampaign({ seed: 11 })));
+      const injected = runtime({ storage });
+      const { result } = renderHook(() => useCaribbean(injected));
+      await act(() => result.current.resume());
+      const read = storage.getItem.getMockImplementation()!;
+      const write = storage.setItem.getMockImplementation()!;
+      let outcomeReadFails = false;
+      storage.getItem.mockImplementation((key) => {
+        if (outcomeReadFails) throw new DOMException('reread denied', 'SecurityError');
+        return read(key);
+      });
+      storage.setItem.mockImplementation((key, value) => {
+        if (key === failedKey) {
+          outcomeReadFails = true;
+          throw new Error(`${operation} reported failure`);
+        }
+        write(key, value);
+      });
+
+      await act(() => result.current.dispatch({
+        type: 'lead-accepted', payload: { leadId: 'red-jackdaw' },
+      }));
+
+      expect(result.current.journal?.state.lastEventId).toBe(0);
+      expect(result.current.persistence).toMatchObject({
+        kind: 'consent-required',
+        intent: 'event',
+        failure: {
+          kind: 'operation-uncertain',
+          writeFailure: { ok: false, reason: 'storage-unavailable', operation },
+          outcomeReadFailure: { kind: 'storage-unavailable', operation: 'read-current' },
+        },
+      });
+      expect(result.current.exportInMemoryJournal()).toContain('lead-accepted');
+    },
+  );
+
+  it.each([
+    ['write-previous', PREVIOUS_SAVE_KEY],
+    ['write-current', CURRENT_SAVE_KEY],
+  ] as const)(
+    'freezes a degraded active reread after %s as conflict and retains the local fork',
+    async (operation, failedKey) => {
+      const storage = memoryStorage();
+      persist(storage, createJournal(createCampaign({ seed: 10, name: 'Previous' })));
+      persist(storage, createJournal(createCampaign({ seed: 11, name: 'Active' })));
+      const injected = runtime({ storage });
+      const { result } = renderHook(() => useCaribbean(injected));
+      await act(() => result.current.resume());
+      const write = storage.setItem.getMockImplementation()!;
+      storage.setItem.mockImplementation((key, value) => {
+        if (key === failedKey) {
+          write(CURRENT_SAVE_KEY, '{corrupt');
+          throw new Error(`${operation} reported failure`);
+        }
+        write(key, value);
+      });
+
+      await act(() => result.current.dispatch({
+        type: 'lead-accepted', payload: { leadId: 'red-jackdaw' },
+      }));
+
+      expect(result.current.persistence.kind).toBe('save-conflict');
+      expect(result.current.journal?.state.captain.name).toBe('Active');
+      const candidate = result.current.exportInMemoryJournal();
+      expect(candidate).toContain('lead-accepted');
+      await act(() => result.current.recover());
+      expect(result.current.persistence.kind).toBe('save-conflict');
+      expect(result.current.exportInMemoryJournal()).toBe(candidate);
+    },
+  );
+
+  it.each([
+    ['write-previous', PREVIOUS_SAVE_KEY],
+    ['write-current', CURRENT_SAVE_KEY],
+  ] as const)(
+    'freezes a different readable active after %s as conflict without adopting it',
+    async (operation, failedKey) => {
+      const storage = memoryStorage();
+      persist(storage, createJournal(createCampaign({ seed: 11, name: 'Original' })));
+      const externalStorage = memoryStorage();
+      persist(externalStorage, createJournal(createCampaign({ seed: 99, name: 'External' })));
+      const external = loadCampaign(externalStorage);
+      if (external.kind !== 'loaded' || external.revision.currentRaw === null) {
+        throw new Error('external fixture save failed');
+      }
+      const injected = runtime({ storage });
+      const { result } = renderHook(() => useCaribbean(injected));
+      await act(() => result.current.resume());
+      const write = storage.setItem.getMockImplementation()!;
+      storage.setItem.mockImplementation((key, value) => {
+        if (key === failedKey) {
+          write(CURRENT_SAVE_KEY, external.revision.currentRaw!);
+          throw new Error(`${operation} reported failure`);
+        }
+        write(key, value);
+      });
+
+      await act(() => result.current.dispatch({
+        type: 'lead-accepted', payload: { leadId: 'red-jackdaw' },
+      }));
+
+      expect(result.current.persistence.kind).toBe('save-conflict');
+      expect(result.current.journal?.state.captain.name).toBe('Original');
+      expect(result.current.exportInMemoryJournal()).toContain('lead-accepted');
+      expect(loadCampaign(storage)).toMatchObject({
+        kind: 'loaded', journal: { state: { captain: { name: 'External' } } },
+      });
+    },
+  );
 
   it('retries from the newly observed exact revision when the predecessor remains active', async () => {
     const storage = memoryStorage();
@@ -570,6 +757,144 @@ describe('useCaribbean', () => {
     expect(result.current.persistence).toEqual({ kind: 'persisted' });
     expect(result.current.load).toMatchObject({ kind: 'loaded', recovered: false, unreadableSlots: [] });
   });
+
+  it.each([
+    ['unavailable', { kind: 'writer-unavailable' }],
+    ['denied', { kind: 'writer-denied' }],
+    ['operation-threw', { kind: 'operation-uncertain', writer: { kind: 'operation-threw' } }],
+    ['writer-protocol-failure', { kind: 'operation-uncertain', writer: { kind: 'writer-protocol-failure' } }],
+  ] as const)('retains the %s writer tag when Recover cannot establish a result', async (tag, failure) => {
+    const storage = memoryStorage();
+    persist(storage, createJournal(createCampaign({ seed: 11 })));
+    persist(storage, createJournal(createCampaign({ seed: 12 })));
+    storage.setItem(CURRENT_SAVE_KEY, '{corrupt');
+    const injected = runtime({ storage });
+    const { result } = renderHook(() => useCaribbean(injected));
+    const phaseBefore = result.current.persistence;
+    injected.writer = failedWriter(tag, new Error(tag));
+
+    await act(() => result.current.recover());
+
+    expect(result.current.persistence).toEqual(phaseBefore);
+    expect(recoveryFailureOf(result.current)).toMatchObject({
+      kind: 'writer', action: 'recover', failure,
+    });
+  });
+
+  it.each([
+    ['recover', 'continue'] as const,
+    ['continue-recovery', 'continue'] as const,
+    ['abandon-from-quarantine', 'abandon'] as const,
+    ['abandon', 'abandon'] as const,
+  ])('retains denied ownership for the %s action family', async (action, decision) => {
+    const storage = memoryStorage();
+    if (action === 'abandon') {
+      persist(storage, createJournal(createCampaign({ seed: 11 })));
+    } else {
+      persist(storage, createJournal(createCampaign({ seed: 11 })));
+      persist(storage, createJournal(createCampaign({ seed: 12 })));
+      storage.setItem(CURRENT_SAVE_KEY, '{corrupt');
+    }
+    const injected = runtime({ storage });
+    const { result } = renderHook(() => useCaribbean(injected));
+
+    if (action === 'continue-recovery' || action === 'abandon-from-quarantine') {
+      const remove = storage.removeItem.getMockImplementation()!;
+      let reportFailure = true;
+      storage.removeItem.mockImplementation((key) => {
+        remove(key);
+        if (reportFailure) {
+          reportFailure = false;
+          throw new Error('remove reported failure');
+        }
+      });
+      await act(() => result.current.recover());
+      storage.removeItem.mockImplementation(remove);
+      expect(result.current.persistence.kind).toBe('recovery-continuation');
+    }
+
+    const phaseBefore = result.current.persistence;
+    injected.writer = failedWriter('denied', new Error(`${action} denied`));
+    if (action === 'recover') await act(() => result.current.recover());
+    else if (action === 'abandon') await act(() => result.current.abandon());
+    else await act(() => result.current.continueRecovery(decision));
+
+    expect(result.current.persistence).toEqual(phaseBefore);
+    expect(recoveryFailureOf(result.current)).toMatchObject({
+      kind: 'writer', action, failure: { kind: 'writer-denied' },
+    });
+  });
+
+  it.each([
+    ['recover', 'continue', 'write-current', 'recovered'] as const,
+    ['continue-recovery', 'continue', 'write-current', 'recovered'] as const,
+    ['abandon-from-quarantine', 'abandon', 'remove-current', 'abandoned'] as const,
+    ['abandon', 'abandon', 'remove-current', 'abandoned'] as const,
+  ])(
+    'retains the successful %s result when its same-lock post-result read fails',
+    async (action, decision, failAfter, resultKind) => {
+      const storage = memoryStorage();
+      if (action === 'abandon') {
+        persist(storage, createJournal(createCampaign({ seed: 11 })));
+      } else if (action === 'abandon-from-quarantine') {
+        persist(storage, createJournal(createCampaign({ seed: 11 })));
+        storage.setItem(PREVIOUS_SAVE_KEY, '{corrupt');
+      } else {
+        persist(storage, createJournal(createCampaign({ seed: 11 })));
+        persist(storage, createJournal(createCampaign({ seed: 12 })));
+        storage.setItem(CURRENT_SAVE_KEY, '{corrupt');
+      }
+      const injected = runtime({ storage });
+      const { result } = renderHook(() => useCaribbean(injected));
+
+      if (action === 'continue-recovery' || action === 'abandon-from-quarantine') {
+        const remove = storage.removeItem.getMockImplementation()!;
+        let reportFailure = true;
+        storage.removeItem.mockImplementation((key) => {
+          remove(key);
+          if (reportFailure) {
+            reportFailure = false;
+            throw new Error('remove reported failure');
+          }
+        });
+        await act(() => result.current.recover());
+        storage.removeItem.mockImplementation(remove);
+        expect(result.current.persistence.kind).toBe('recovery-continuation');
+      }
+
+      const read = storage.getItem.getMockImplementation()!;
+      const write = storage.setItem.getMockImplementation()!;
+      const remove = storage.removeItem.getMockImplementation()!;
+      let postResultReadFails = false;
+      storage.getItem.mockImplementation((key) => {
+        if (postResultReadFails) throw new DOMException('post-result read denied', 'SecurityError');
+        return read(key);
+      });
+      storage.setItem.mockImplementation((key, value) => {
+        write(key, value);
+        if (failAfter === 'write-current' && key === CURRENT_SAVE_KEY) postResultReadFails = true;
+      });
+      storage.removeItem.mockImplementation((key) => {
+        remove(key);
+        if (
+          failAfter === 'remove-current' && key === CURRENT_SAVE_KEY
+        ) postResultReadFails = true;
+      });
+      const phaseBefore = result.current.persistence;
+
+      if (action === 'recover') await act(() => result.current.recover());
+      else if (action === 'abandon') await act(() => result.current.abandon());
+      else await act(() => result.current.continueRecovery(decision));
+
+      expect(result.current.persistence).toEqual(phaseBefore);
+      expect(recoveryFailureOf(result.current)).toMatchObject({
+        kind: 'post-result-load',
+        action,
+        result: { ok: true, kind: resultKind },
+        loadFailure: { kind: 'storage-unavailable', operation: 'read-current' },
+      });
+    },
+  );
 
   it('retries one quarantine collision with one fresh injected id', async () => {
     const storage = memoryStorage();
