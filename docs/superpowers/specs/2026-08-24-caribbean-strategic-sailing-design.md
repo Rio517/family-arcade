@@ -488,6 +488,18 @@ same. Pending, denied, failed, and conflicted candidates have no transient
 effect before publication; external reload discards the candidate and event
 without applying it.
 
+The threshold proof uses only reducer-legal histories. The departure history
+is event 1 `lead-accepted`, events 2–256 as 255 alternating valid Bridgetown
+provision trades, and event 257 `voyage-started`. The resolution history is
+event 1 `lead-accepted`, events 2–253 as 252 alternating valid Bridgetown
+provision trades, event 254 `voyage-started`, event 255
+`sea-leg-completed`, event 256 `naval-engaged`, and the matching event 257
+`naval-resolved`. For each history, both immediate save and denied save ->
+memory publication -> retry must end with `events: []`, canonical/deep equality
+between `initial` and `state`, and distinct `initial !== state` object
+references. Live/saved canonical equality and the triggering activity/focus
+effect exactly once remain mandatory.
+
 Set Sail is governed only by `voyageReadiness`, even while any Governor,
 Tavern, Market, Shipyard, Shares, or Log activity is open. Before candidate
 publication, activity/focus remain exactly as they were. The publication
@@ -713,10 +725,11 @@ invalid, and the same rule starts from a nonzero compacted checkpoint/day.
   publication for immediate saved, direct memory, and delayed consent paths;
   denial, write failure, conflict, retry, repeated consent, and reload-discard
   prove zero early or duplicate transient effects;
-- at `JOURNAL_EVENT_LIMIT + 1`, immediate saved publication adopts the
-  event-free writer journal while consuming the original appended event once;
-  delayed memory publication consumes it once, and a later compacting retry
-  adopts the event-free writer journal without consuming it again;
+- for both exact legal departure and naval-resolution histories at
+  `JOURNAL_EVENT_LIMIT + 1`, immediate saved publication adopts an event-free,
+  deep-equal/reference-distinct checkpoint while consuming the original event
+  once; denied-save memory publication consumes it once, and a later compacting
+  retry adopts that checkpoint without consuming it again;
 - consent/conflict uses an active-route modal and preserves a terminal battle
   result until the pending candidate is published or discarded;
 - Set Sail reason/enablement, focus, encounter choices, status, Captain's Log,
@@ -830,8 +843,54 @@ truncated-trace RED, before either implementation turns green.
   cleans the exact temporary directory in `finally` and exits 0 only with
   `NAVAL_VERIFY_OK capture=<sha> source=<sha> artifacts=<n>`.
 
+The source provenance set is deterministic and dependency-complete for this
+package. Replace the historical hand-maintained naval list with the sorted,
+NUL-delimited result of `git ls-files -z --` over these exact pathspecs:
+
+```text
+package.json
+package-lock.json
+vite.config.ts
+tsconfig.json
+tsconfig.app.json
+tsconfig.node.json
+knip.json
+index.html
+preview-caribbean-game.html
+scripts/caribbean-port-check.mjs
+scripts/caribbean-naval-check.mjs
+scripts/fixtures/caribbean-campaign-victory.json
+:(glob)scripts/lib/caribbean-*.mjs
+:(glob)src/games/caribbean/**
+:(glob)src/shared/profile/**
+src/shared/game.ts
+src/shared/three/disposeDeep.ts
+src/shared/ui/icons.tsx
+src/shared/ui/useDismissOnEscape.ts
+```
+
+Paths are repository-relative POSIX strings, must be unique, and are sorted in
+bytewise ascending order. Each row is `{ path, sha256 }`, where `sha256` hashes
+the tracked file's raw bytes. `sourceHash` is SHA-256 of the canonical JSON of
+the complete sorted row array. Capture and current verification require exact
+array equality: a missing, extra, duplicate, or reordered path fails
+`source-files`; an equal path array with any changed row hash or aggregate hash
+fails `source-hash`. Literal membership tests
+must include `src/games/caribbean/content/naval.ts`,
+`src/games/caribbean/domain/naval/resolution.ts`,
+`src/games/caribbean/state/naval/NavalSession.ts`,
+`src/games/caribbean/state/naval/FrameRunner.ts`,
+`src/games/caribbean/components/voyage/CampaignNavalBattle.tsx`,
+`src/games/caribbean/styles/battle.css`,
+`src/games/caribbean/assets/caribbean-sloop.glb`,
+`scripts/lib/caribbean-campaign-victory-driver.mjs`,
+`scripts/fixtures/caribbean-campaign-victory.json`,
+`scripts/caribbean-port-check.mjs`, `scripts/caribbean-naval-check.mjs`, and
+every literal shared/build/package input above. Variable observations and
+generated PNGs are never members.
+
 The stable/observational boundary is exact. `stableManifest.version === 1` and
-contains the sorted source paths/hash; canonical input/seed; exact viewport
+contains that complete sorted source row array/hash; canonical input/seed; exact viewport
 names and dimensions; sorted screenshot names with width, height, and semantic
 state label; local GLB path/hash; port/starboard direction facts; deterministic
 boarding outcome/facts excluding elapsed duration; fallback facts; motion

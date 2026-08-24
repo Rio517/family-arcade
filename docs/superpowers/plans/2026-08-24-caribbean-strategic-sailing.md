@@ -37,6 +37,7 @@
 - Every UI task runs a real production browser gate before package completion. Stable evidence is deterministic, honest performance/pixel observations are range-validated, every gate fails closed, and all existing version-2 port evidence channels remain present.
 - Before every Task 1–6 source commit, run the task's focused suite, `mise exec node@20 -- npm run check`, full `mise exec node@20 -- npx vitest run`, clean `mise exec node@20 -- npx tsc -b --force`, and real `mise exec node@20 -- npm run build`, then `git diff --check`. The forced solution build is the clean typecheck; the following package build is the required production Vite build. Do not delete caches.
 - Tasks 4 and 5 must run their owned normal-production browser mode, inspect and stage its deterministic screenshots in the same UI commit. Task 7 may recapture them cumulatively but cannot supply missing per-commit browser evidence retroactively.
+- Naval source provenance uses the Task 6 `git ls-files -z --` pathspec contract, not a hand-maintained historical file list; path membership/order and raw-byte hashes are exact, while live performance and PNG pixels remain observational.
 
 ---
 
@@ -184,6 +185,17 @@ export interface MinimumScreenGateProps {
 }
 // supportGeneration is 0 on initial support and increments only on each
 // unsupported -> supported transition. Children are not invoked while blocked.
+
+// scripts/lib/caribbean-naval-verification.mjs — Task 6
+export const CARIBBEAN_NAVAL_SOURCE_PATHS: readonly string[];
+export interface CaribbeanNavalSourceRow { path: string; sha256: string }
+export interface CaribbeanNavalSourceManifest {
+  files: CaribbeanNavalSourceRow[];
+  sourceHash: string;
+}
+export function collectCaribbeanNavalSourceManifest(
+  root: string,
+): CaribbeanNavalSourceManifest;
 ```
 
 ## Shared-File and Interface Conflict Table
@@ -201,7 +213,7 @@ export interface MinimumScreenGateProps {
 | 4 <-> 5 | `CampaignNavalBattle.tsx` | Task 4 creates lazy saved-input/rematch routing; Task 5 owns terminal Return, explicit resolution-error state, tick surface, and disposal. |
 | 4 -> 7 | sailing/encounter test IDs and four owned screenshots | Task 4 captures/stages its normal-route screenshots with the UI commit; Task 7 may only cumulatively recapture through the same gate. |
 | 5 -> 7 | result/withdraw/reload/resize test IDs, driver, lazy assets, and five owned screenshots | Task 5 captures/stages battle evidence with its UI commit; Task 7 may only cumulatively recapture. |
-| 5 -> 6 | golden victory trace, driver, exact HUD tick, and port browser command | Task 5 produces the public-control driver needed for its browser proof; Task 6 extends/tests its clock and cumulative evidence contracts without a session/debug hook. |
+| 5 -> 6 | golden victory trace, driver, exact HUD tick, port browser command, and all Task 1/5 source paths | Task 5 produces the public-control driver needed for its browser proof; Task 6 derives the exact dependency-complete tracked source manifest and extends/tests its clock/evidence contracts without a session/debug hook. |
 | 6 -> 7 | evidence schema v3/evaluator/screenshot list and naval `--semantic-probe`/`--verify`/`--capture` modes | Task 6 owns fail-closed/non-writing tooling; Task 7 alone captures generated port/naval bytes, uses semantic probe while dirty, and uses final verify only after its commit. |
 | 1,2,3 | `domain/events.ts`, reducer, validator | Sequential only. Task 1 does not edit campaign events; Task 2 owns the complete union; Task 3 does not edit it. |
 | 4,5 | `CaribbeanPage.tsx`, `scripts/caribbean-port-check.mjs`, port screenshots | Task 4 creates four-mode routing/voyage capture; Task 5 adds terminal consent/conflict, support-generation resume, and battle capture. Review Task 5 diff against Task 4 HEAD. |
@@ -634,31 +646,42 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   only a published `voyage-started` clears to `menu`; only a published avoid,
   withdraw, or resolve sets one-shot log focus.
 
-  Add two threshold fixtures made through real `appendJournal`: valid
-  alternating market trades fill exactly `JOURNAL_EVENT_LIMIT`, then (a) a
-  `voyage-started` and (b) a `naval-resolved` become event 257. Immediate save
-  must adopt the writer's canonical event-free journal (`events: []`,
-  `initial === state`) while applying the original event's activity/focus once.
-  The denial -> memory publication -> Retry saving path first adopts the
-  257-event memory journal and applies once, then adopts the writer's event-free
-  compacted journal without applying again. Assert live journal canonical JSON
-  equals loaded saved journal after immediate save/retry, and the retained
-  terminal outcome remains in `lastVoyage`.
+  Add two threshold fixtures made entirely through real `appendJournal` and
+  legal drafts. The exact departure stream is event 1 `lead-accepted`, events
+  2–256 as 255 alternating valid Bridgetown provision trades, then event 257
+  `voyage-started`. The exact resolution stream is event 1 `lead-accepted`,
+  events 2–253 as 252 alternating valid Bridgetown provision trades, event 254
+  `voyage-started`, event 255 `sea-leg-completed`, event 256 `naval-engaged`,
+  then the matching event 257 `naval-resolved`. Assert every quoted trade is
+  `ok: true`, the event IDs/types above are literal, and the resolution uses
+  the naval input produced at event 256.
+
+  Run both histories through (a) immediate save and (b) writer denial ->
+  memory publication -> Retry saving. Immediate save adopts the writer's
+  compacted journal while applying the original event's activity/focus once.
+  Denial first adopts the 257-event memory journal and applies once; Retry then
+  adopts the compacted writer journal without applying again. Every compacted
+  result has `events: []`, `initial` deeply and canonically equal to `state`,
+  and `initial !== state` by reference. Assert live journal canonical JSON
+  equals loaded saved journal after immediate save/retry; departure clears the
+  original activity exactly once, resolution focuses Log exactly once, and the
+  retained terminal outcome remains in `lastVoyage`.
 
 - [ ] **Step 2: Capture controller RED**
 
   Run:
 
   ```bash
-  mise exec node@20 -- npx vitest run src/games/caribbean/state/namedActionGate.test.ts src/games/caribbean/state/useCaribbean.test.tsx src/games/caribbean/state/selectors.test.ts
+  mise exec node@20 -- npx vitest run src/games/caribbean/state/namedActionGate.test.ts src/games/caribbean/state/useCaribbean.test.tsx src/games/caribbean/state/selectors.test.ts src/games/caribbean/state/runtime.test.ts
   ```
 
-  Expected: Vitest collects all three suites. The named gate suite fails because
+  Expected: Vitest collects all four suites. The named gate suite fails because
   `state/namedActionGate` is missing; controller tests separately report the
   missing six actions, absent A/B/C ownership, absent saved/direct/delayed
-  publication effects, and compacted outcome/live-journal mismatch. The
-  runtime literal differs. A runner-initialization error is not an accepted
-  RED.
+  publication effects, and compacted outcome/live-journal mismatch.
+  `runtime.test.ts` names the exact failing assertion: expected new
+  `caribbean-sailing-1`, received old `caribbean-port-1`. A runner-
+  initialization error is not an accepted RED.
 
 - [ ] **Step 3: Implement token/generation ownership and the single publication boundary**
 
@@ -749,14 +772,15 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
 - [ ] **Step 4: Run the complete focused GREEN**
 
-  Rerun the exact Step 2 command. Expected: every gate, six-action,
-  publication, compaction-threshold, failure, retry, and selector case passes;
-  no save occurs from controller construction/resume alone for a saved naval
-  snapshot.
+  Rerun the exact Step 2 command, including `runtime.test.ts`. Expected: every
+  gate, six-action, publication, both legal event-257 immediate/denial-retry
+  histories, failure, retry, selector, and exact `caribbean-sailing-1` runtime
+  case passes; no save occurs from controller construction/resume alone for a
+  saved naval snapshot.
 
 - [ ] **Step 5: Mutation proof, verification, review, and commit**
 
-  Temporarily let `release` compare generation only; the A/runtime-swap/B/A-settles/C matrix must fail because stale A admits C. Restore it. Temporarily adopt the original candidate instead of `outcome.journal`; the event-257 immediate-save case must fail canonical equality. Drop `appendedEvent` on compaction; the activity/focus cases must fail. Clear the consumed-token set on retry; the retry cases must fail duplicate effects. Restore them. Temporarily call `appendJournal` directly in `resolveBattle`; the storage-failure case must fail. Restore it.
+  Temporarily let `release` compare generation only; the A/runtime-swap/B/A-settles/C matrix must fail because stale A admits C. Restore it. Temporarily adopt the original candidate instead of `outcome.journal`; both event-257 immediate-save cases must fail canonical equality. Alias compacted `initial` and `state`; both histories must fail reference isolation. Drop `appendedEvent` on compaction; the activity/focus cases must fail. Clear the consumed-token set on retry; both denial-memory-retry cases must fail duplicate effects. Restore them. Temporarily call `appendJournal` directly in `resolveBattle`; the storage-failure case must fail. Restore it. Restore `runtime.ts` to `caribbean-port-1`; the focused runtime assertion must fail with the literal old/new mismatch.
 
   Run:
 
@@ -813,7 +837,29 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
 **Interfaces:** Consumes controller Task 3, readiness/copy/state Task 2, and existing `MinimumScreenGate`. Produces stable test IDs `port-action-set-sail`, `voyage-continue-east`, `encounter-avoid`, `encounter-pursue`, `voyage-status`, `voyage-instrument`, `captains-log-last-voyage`, and `campaign-persistence-dialog`, plus an active-route consent/conflict overlay reused by Task 5.
 
-- [ ] **Step 1: Write Port Set Sail RED tests**
+- [ ] **Step 1: Write and observe the production-browser RED before component test imports exist**
+
+  Before production UI or component-test edits, add required
+  `--ui-slice=voyage` parsing and the fixed seed/UUID/Date/Web-Lock normal-route
+  journey to `scripts/caribbean-port-check.mjs`. It builds/serves normal
+  `dist`, starts from clean localStorage, commissions the campaign, marks the
+  lead, and drives only rendered setup/port/Set Sail/Continue controls. It
+  writes only the four Task 4 screenshots after every assertion succeeds.
+
+  Run against the still-buildable pre-feature source:
+
+  ```bash
+  mise exec node@20 -- npx tsc -b --force
+  mise exec node@20 -- npm run build
+  mise exec node@20 -- node scripts/caribbean-port-check.mjs --ui-slice=voyage
+  ```
+
+  Expected: the browser reaches the normal production port then exits 1 with
+  exactly `CARIBBEAN_VOYAGE_UI_FAILED missing-port-action-set-sail`; it writes
+  no screenshot. Build/runner failure is not an accepted RED. This harness edit
+  is test infrastructure, not production behavior.
+
+- [ ] **Step 2: Write Port, voyage, and encounter RED tests**
 
   Change `PortMenu` props to receive readiness, busy, and `onSetSail`. Assert disabled reason for every selector code in Task 2 precedence; active lead/two-provision boundary enables; click and Enter call once; busy prevents duplicates; active port activities still use exact order/focus. A completed-lead/defeated-target component fixture must display `The Red Jackdaw lead is complete.`, never Tavern instructions.
 
@@ -830,41 +876,64 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   expect(onSetSail).toHaveBeenCalledTimes(1);
   ```
 
-- [ ] **Step 2: Write voyage and encounter RED tests**
-
   `SailingPage` must show Bridgetown, exact bearing/wind, 1-day/1-provision outbound consequence, current total provisions, and one Continue east action. `EncounterPage` must focus its heading and state exact consequences: Avoid spends the guaranteed return cost and keeps the lead; Pursue enters the two-to-four-minute duel. Buttons synchronously guard pending calls and announce applied/not-applied.
+
+  Because the new voyage modules do not exist at RED, dynamically import each
+  one inside its named Vitest case rather than through a top-level import. The
+  suite must register before that named missing-module failure occurs; remove
+  no assertion when the module is added for GREEN.
 
   The route SVG must be `aria-hidden`; semantic text must contain the same facts. Depart through Set Sail while Governor's House, Tavern, Market, Shipyard, Divide Shares, and Captain's Log are each open; an applied controller response routes to sailing with activity `menu`, while a not-applied response leaves the exact activity open.
 
-- [ ] **Step 3: Write active-route persistence and return-focus RED tests**
+- [ ] **Step 3: Write overlay, setup, Log, focus, and CSS/accessibility RED tests**
 
   Extract the existing consent/conflict choices from `CampaignSetup` into `PersistenceDecisionOverlay` without changing their controller methods or exact test IDs. With a non-null port, sailing, encounter, or naval journal, render `consent-required` and `save-conflict` phases and assert the mode screen stays mounted beneath `role="dialog"`, the route branch is inert, initial focus enters the first decision, Tab is trapped, export changes no route, and Escape cannot silently dismiss a required choice. A null journal still uses `CampaignSetup`; recovery phases still use `RecoveryPanel`.
 
   Add port focus cases: same-session avoid/withdraw/resolve with `portFocusTarget: 'last-voyage'` focuses `port-action-log` and acknowledges once; reload/resume into ready port focuses `port-action-set-sail`; reload of a victorious port focuses `port-action-log`; a new port campaign with neither readiness nor summary focuses the harbour heading.
 
-- [ ] **Step 4: Write and capture component plus production-browser RED**
+  Before editing `CaptainsLog.tsx`, create a damaged terminal `lastVoyage`
+  fixture in `CaptainsLog.test.tsx`. Require the exact terminal outcome remains
+  present, the pre-battle hull/sails/crew/cannon values remain unchanged, and
+  “Bridgetown’s harbour crew made Mistral ready for the next departure; the
+  battle outcome remains in this log, but its damage is not carried onto the
+  ready flagship.” is visible.
+  Avoid-only results must not render battle-damage copy. Task 4 owns this
+  component proof only; `caribbean.integration.test.tsx` remains wholly in Task
+  5's file list, RED, implementation, and staging boundary.
 
-  Before production UI edits, add required `--ui-slice=voyage` parsing and the
-  fixed seed/UUID/Date/Web-Lock normal-route journey to
-  `scripts/caribbean-port-check.mjs`. It builds/serves normal `dist`, starts
-  from clean localStorage, commissions the campaign, marks the lead, and drives
-  only rendered setup/port/Set Sail/Continue controls. It writes only the four
-  Task 4 screenshots after every assertion succeeds.
+  Before editing either CSS file, write `voyageResponsive.test.tsx` and static
+  CSS assertions for fixed full-screen stage, minimum 44 px controls, 14 px
+  copy, opaque decision backplates, safe-area padding, zero outer horizontal
+  overflow, reduced-motion override, no dominant production-grid background,
+  and no portrait/phone rule that bypasses `MinimumScreenGate`. Component tests
+  also require heading focus after mode change, a stable status node,
+  `:focus-visible`, no emoji, and no inaccessible SVG name duplication.
+  One named static test reads existing `production.css` first and requires the
+  checked-in `8.333% 100%` grid layer to be absent, producing a concrete RED on
+  existing bytes before any CSS edit. A separate named test reads the absent
+  voyage CSS and fails there. Dynamically import the absent overlay inside its
+  named test, so every suite collects before its missing-contract failure.
+
+- [ ] **Step 4: Observe every Task 4 component and CSS RED before production edits**
 
   Run:
 
   ```bash
-  mise exec node@20 -- npx vitest run src/games/caribbean/components/port/PortMenu.test.tsx src/games/caribbean/components/port/PortPage.test.tsx src/games/caribbean/components/voyage src/games/caribbean/components/CaribbeanPage.test.tsx
-  mise exec node@20 -- npx tsc -b --force
-  mise exec node@20 -- npm run build
-  mise exec node@20 -- node scripts/caribbean-port-check.mjs --ui-slice=voyage
+  mise exec node@20 -- npx vitest run src/games/caribbean/components/port/PortMenu.test.tsx src/games/caribbean/components/port/PortPage.test.tsx src/games/caribbean/components/voyage src/games/caribbean/components/setup/PersistenceDecisionOverlay.test.tsx src/games/caribbean/components/setup/CampaignSetup.test.tsx src/games/caribbean/components/log/CaptainsLog.test.tsx src/games/caribbean/components/CaribbeanPage.test.tsx src/games/caribbean/styles/voyageResponsive.test.tsx
   ```
 
-  Expected: Vitest collects and fails for missing voyage/overlay components,
-  disabled Set Sail, and route replacement. The real browser command reaches
-  the normal production port then exits 1 with
-  `CARIBBEAN_VOYAGE_UI_FAILED missing-port-action-set-sail`; it does not write
-  screenshots. Runner/build errors are not accepted REDs.
+  Expected: Vitest collects every named suite. Record failures named
+  `enables Set Sail only when voyage readiness is ready`, `focuses the
+  published last voyage action once`, `renders the authored sea leg and
+  encounter actions`, `traps focus in the required persistence overlay`,
+  `keeps setup-only persistence decisions when the journal is null`, `keeps
+  the active route beneath the persistence decision dialog`, `shows the
+  safe-return explanation without mutating the flagship`, `removes the
+  production grid before voyage composition`, and `enforces voyage responsive
+  floors`.
+  A collection/runner failure is not an accepted RED. Do not edit a Task 4
+  production component or CSS file until this command has produced those
+  failures.
 
 - [ ] **Step 5: Implement mode routing, overlay ownership, and compact historical composition**
 
@@ -876,7 +945,11 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
   Create `CampaignNavalBattle` as a narrow saved-input adapter: assert naval mode, call `useNavalSession(mode.input)`, render the unchanged `NavalBattlePage`, and import `../../styles/battle.css` from this lazy module. At this task boundary the existing terminal rematch remains available; Task 5 replaces that terminal action additively with campaign return. Assert the campaign journal receives no event while this session ticks and unmount disposes it. Wrap only the naval branch in `Suspense` with a labelled `Loading the engagement…` status.
 
-  Build the voyage page from the spec's six existing tokens/type roles. The full-screen sea/sky uses broad local CSS colour and one inline SVG one-mast silhouette/brass wake. Opaque Deep Keel/Harbour Glass backplates carry text. Under reduced motion the wake renders complete with no animation.
+  Build the voyage page structure from the spec's six existing tokens/type
+  roles, with semantic classes but without editing `voyage.css` or
+  `production.css` yet. The full-screen sea/sky contains one inline SVG
+  one-mast silhouette/brass wake; the route SVG is hidden from assistive
+  technology while equivalent text remains present.
 
 - [ ] **Step 6: Add compacted outcome log and exact port focus**
 
@@ -894,24 +967,33 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   Bridgetown’s harbour crew made Mistral ready for the next departure; the battle outcome remains in this log, but its damage is not carried onto the ready flagship.
   ```
 
-  `CaptainsLog.test.tsx` and the integration fixture start from a damaged
-  terminal resolution, then assert `lastVoyage.outcome` remains exact, the
-  flagship's pre-battle hull/sails/crew/cannon object is unchanged, and the
-  sentence is visible. Avoid-only results do not show battle-damage copy.
+  The already-red `CaptainsLog.test.tsx` starts from a damaged terminal
+  resolution and proves `lastVoyage.outcome` remains exact, the flagship's
+  pre-battle hull/sails/crew/cannon object is unchanged, and the sentence is
+  visible. Avoid-only results do not show battle-damage copy.
   Outcome text is derived from codes and `NavalOutcome`; no event prose,
   repair action, or battle threshold is recreated.
 
   `PortPage` first consumes Task 3's `last-voyage` focus intent. Without an intent on mount/resume, focus Set Sail when readiness is ready, else Captain's Log when `lastVoyage` exists, else the harbour heading. Do not auto-open the log or alter canonical state.
 
-- [ ] **Step 7: CSS/accessibility RED and GREEN**
+- [ ] **Step 7: Implement CSS/accessibility GREEN and rerun the complete focused set**
 
-  Static CSS tests require fixed full-screen stage, minimum 44 px controls, 14 px copy, opaque decision backplates, safe-area padding, no outer horizontal overflow, reduced-motion override, no dominant production-grid background, and no portrait/phone override that bypasses `MinimumScreenGate`.
+  Now edit `voyage.css` and `production.css` to satisfy the already-observed
+  Step 4 CSS failures. Use broad local sea/sky colour, opaque Deep Keel/Harbour
+  Glass text backplates, 44 px controls, 14 px copy, safe-area padding, stable
+  geometry, and a complete non-animated wake under reduced motion. Do not add a
+  portrait/phone override around `MinimumScreenGate`.
 
-  At exact component view, verify heading focus after mode change, stable status node, focus-visible selector, no emoji, and no inaccessible SVG name duplication.
+  Rerun the exact Step 4 command. Expected: all Task 4 port, voyage, overlay,
+  setup, Log, page, responsive, focus, and accessibility cases pass. This is
+  the focused GREEN; no Task 4 test is first introduced after production.
 
 - [ ] **Step 8: Capture owned browser evidence and run the per-source-commit gate**
 
-  Kill/restore post-victory readiness copy, active-route rendering during `save-conflict`, overlay inert/focus, publication-only activity reset expectation, reload Set Sail focus, semantic wind text, and reduced-motion suppression. Each named test must fail.
+  Kill/restore post-victory Set Sail copy, the exact harbour-readiness Log
+  sentence, active-route rendering during `save-conflict`, overlay inert/focus,
+  publication-only activity reset expectation, reload Set Sail focus, semantic
+  wind text, and reduced-motion suppression. Each owning named test must fail.
 
   First rerun the voyage browser mode after GREEN:
 
@@ -1265,7 +1347,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 - Modify: `scripts/caribbean-naval-check.mjs`
 - Modify: `scripts/lib/caribbean-naval-check.test.mjs`
 
-**Interfaces:** Consumes Task 5's literal `CampaignVictoryTrace`, `driveCampaignVictory`, public tick, browser modes/screenshots, and all production interfaces. Produces port evidence schema version 3, real clock integration, revised isolation, exact screenshot/stable-manifest contract, observational range validation, and naval `--semantic-probe`/`--verify`/`--capture` modes. Does not commit generated metrics/PNG bytes.
+**Interfaces:** Consumes Task 5's literal `CampaignVictoryTrace`, `driveCampaignVictory`, public tick, browser modes/screenshots, and all production interfaces. Produces port evidence schema version 3, `CARIBBEAN_NAVAL_SOURCE_PATHS`/`collectCaribbeanNavalSourceManifest`, real clock integration, revised isolation, exact screenshot/stable-manifest contract, observational range validation, and naval `--semantic-probe`/`--verify`/`--capture` modes. Does not commit generated metrics/PNG bytes.
 
 - [ ] **Step 1: Define exact schema-v3 evaluator tests**
 
@@ -1365,6 +1447,38 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 - [ ] **Step 6: Write and observe CLI destination/cleanup/provenance RED**
 
   Test exported verification helpers and the CLI with injected temp/docs roots.
+  Replace `TASK8_TREE_FILES`; do not extend that historical fixed list. The
+  exact `CARIBBEAN_NAVAL_SOURCE_PATHS` passed as separate arguments after
+  `git ls-files -z --` is:
+
+  ```text
+  package.json
+  package-lock.json
+  vite.config.ts
+  tsconfig.json
+  tsconfig.app.json
+  tsconfig.node.json
+  knip.json
+  index.html
+  preview-caribbean-game.html
+  scripts/caribbean-port-check.mjs
+  scripts/caribbean-naval-check.mjs
+  scripts/fixtures/caribbean-campaign-victory.json
+  :(glob)scripts/lib/caribbean-*.mjs
+  :(glob)src/games/caribbean/**
+  :(glob)src/shared/profile/**
+  src/shared/game.ts
+  src/shared/three/disposeDeep.ts
+  src/shared/ui/icons.tsx
+  src/shared/ui/useDismissOnEscape.ts
+  ```
+
+  Parse the NUL-delimited output, normalize repository-relative separators to
+  `/`, reject duplicates/non-files, and sort bytewise ascending. Hash each
+  file's raw bytes as SHA-256 into `{ path, sha256 }`; compute `sourceHash` as
+  SHA-256 of canonical JSON for the complete sorted row array. No observation,
+  generated PNG, `dist`, or docs evidence path enters this list.
+
   Required matrix:
 
   | Mode/case | Destination and comparison | Exact result |
@@ -1376,7 +1490,10 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   | semantic/stale/dirty/hash/source/stable-manifest/observation-range/artifact-manifest/destination/cleanup failure | no accepted output | exit 1, mode-specific `NAVAL_SEMANTIC_PROBE_FAILED <code>`, `NAVAL_CAPTURE_FAILED <code>`, or `NAVAL_VERIFY_FAILED <code>` |
 
   The verify fixture requires capture HEAD ancestor, exact source-file manifest
-  and source hash, and a clean tracked worktree. Compare canonical bytes only
+  and source hash, and a clean tracked worktree. It compares candidate and
+  current source rows for exact length, order, path, and per-file hash: missing,
+  extra, or reordered rows fail `source-files`; equal paths with changed hashes
+  or aggregate hash fail `source-hash`. Compare canonical bytes only
   for `stableManifest`: version 1; sorted source paths/hash; canonical input;
   viewport names/dimensions; screenshot name/dimension/semantic-state rows;
   local GLB path/hash; handedness; deterministic outcome facts without elapsed
@@ -1396,8 +1513,23 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   also clones complete generation A, deliberately substitutes different valid
   FPS/duration/resource/frame values and different valid PNG pixels, and
   requires acceptance; then mutates one stable field, each observation range,
-  and artifact name/dimension/signature to require rejection. Inject stale
-  capture, dirty source, hash/source-list drift, wrong destination, and cleanup
+  and artifact name/dimension/signature to require rejection. A named
+  `collects the dependency-complete Caribbean naval source manifest` test
+  asserts literal membership of
+  `src/games/caribbean/content/naval.ts`,
+  `src/games/caribbean/domain/naval/resolution.ts`,
+  `src/games/caribbean/state/naval/NavalSession.ts`,
+  `src/games/caribbean/state/naval/FrameRunner.ts`,
+  `src/games/caribbean/components/voyage/CampaignNavalBattle.tsx`,
+  `src/games/caribbean/styles/battle.css`,
+  `src/games/caribbean/assets/caribbean-sloop.glb`,
+  `scripts/lib/caribbean-campaign-victory-driver.mjs`,
+  `scripts/fixtures/caribbean-campaign-victory.json`,
+  `scripts/caribbean-port-check.mjs`, `scripts/caribbean-naval-check.mjs`, and
+  every literal shared/build/package input above. Delete one captured
+  critical row and inject one out-of-selection `README.md` row; both must fail
+  `source-files`. Change one retained file hash; it must fail `source-hash`.
+  Also inject stale capture, dirty source, wrong destination, and cleanup
   failure. Both success and every failure remove the exact temp directory in
   `finally`; tracked docs remain untouched.
   Failure `<code>` is the literal union `semantic | stale-capture |
@@ -1415,13 +1547,16 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   mise exec node@20 -- npx vitest run scripts/lib/caribbean-naval-check.test.mjs
   ```
 
-  Expected RED: Node collects named stable/observation/cleanup tests and they
-  fail on missing `caribbean-naval-verification.mjs`; Vitest independently
-  collects the existing CLI suite and fails on missing required modes/result
-  codes. Runner-initialization failure is not accepted.
+  Expected RED: Node collects named source-membership,
+  missing/extra/hash-drift, stable/observation, and cleanup tests and they fail
+  on missing `caribbean-naval-verification.mjs`; Vitest independently collects
+  the existing CLI suite and fails on the historical `TASK8_TREE_FILES`/
+  missing required modes and result codes. Runner-initialization failure is not
+  accepted.
 
 - [ ] **Step 7: Implement semantic-probe, capture, and final verify modes**
 
+  Implement the exact pathspec collector and remove `TASK8_TREE_FILES`.
   `--semantic-probe` generates in temp, runs harness/evaluator, skips tracked
   provenance/artifact equality, reports tracked current when source plus stable
   manifest match (regardless of observation bytes), reports stale otherwise,
@@ -1431,9 +1566,10 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   nobody captures accidentally. Do not freeze, normalize, or byte-compare
   honest performance/PNG observations.
 
-  Rerun the two Step 6 commands. Expected: every named native two-generation,
-  stable-drift, range, artifact, destination, and cleanup test passes; the
-  existing Vitest CLI suite passes under Vitest.
+  Rerun the two Step 6 commands. Expected: every named native source-membership,
+  missing/extra/hash-drift, two-generation, stable-drift, range, artifact,
+  destination, and cleanup test passes; the existing Vitest CLI suite passes
+  under Vitest.
 
   Run the new source command after GREEN:
 
@@ -1470,7 +1606,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
 - [ ] **Step 9: Mutation proof, focused verification, review, and commit**
 
-  Mutate raw fixtures for duplicated resolution, changed literal event ID, changed mode order, terminal tick `11856`, wrong seed, `tickAfterReload: 1`, a naval request on avoid, missing prior v2 field, unknown nested key, and false recovery preservation. Each returns a failed verdict without throwing. Mutate first-RAF behavior, clock/Date installation order, stable manifest, observation ranges, artifact manifest, and each CLI destination; browser/naval-verification tests must fail. Different valid FPS/duration/resource/PNG observations must continue to pass.
+  Mutate raw fixtures for duplicated resolution, changed literal event ID, changed mode order, terminal tick `11856`, wrong seed, `tickAfterReload: 1`, a naval request on avoid, missing prior v2 field, unknown nested key, and false recovery preservation. Each returns a failed verdict without throwing. Mutate first-RAF behavior, clock/Date installation order, omit a literal critical source, add an out-of-selection source, change a retained source hash, stable manifest, observation ranges, artifact manifest, and each CLI destination; browser/naval-verification tests must fail with the owning literal code. Different valid FPS/duration/resource/PNG observations must continue to pass.
 
   Run:
 
@@ -1645,13 +1781,13 @@ The package is complete only when every statement is evidenced:
 10. Sailing/encounter/naval satisfy exact checkpoint/ID/lead/target/provision and naval RNG/full-builder invariants after direct load, compaction, and recovery without predecessor events.
 11. Replay from event zero and a nonzero compacted checkpoint yields canonical equality; `lastVoyage`, time, provisions, RNG, lead, target, and event ID survive compaction.
 12. Existing V1 saves load byte-valid with no required migration; the first new save rotates old raw bytes normally; intermediate-mode recovery preserves unreadable data.
-13. Every simultaneous named-action pair in persisted/memory-only modes fulfills with at most one applied event; the A/runtime-swap/B/A-settles/C matrix preserves B ownership; departure clearing and return focus consume the original appended-event token exactly once while adopting the actual saved/memory journal, including immediate and retry compaction at event 257.
+13. Every simultaneous named-action pair in persisted/memory-only modes fulfills with at most one applied event; the A/runtime-swap/B/A-settles/C matrix preserves B ownership; the two exact legal event-257 departure/resolution histories prove immediate and denial-memory-retry publication consumes the original event token once while adopting an event-free, canonical/deep-equal but reference-distinct checkpoint.
 14. Consent/conflict keeps the predecessor route and terminal modal mounted; invalid resolution has campaign-specific restart/withdraw while a valid result has Return only.
 15. Landscape `>=960x600` works with 14 px/44 px/focus/contrast/overflow/reduced-motion guarantees; phones and portrait mount only the notice.
 16. Normal setup/port/sailing/avoid does not request naval assets; pursuit loads only local production assets; no harness/debug module ships; Battle Lab remains independently green.
 17. The real-session literal public-control trace mounts at tick zero, primes first RAF without a tick, advances through actual 16 ms RAF quanta to exact six-tick publications/final tick `11855`, preserves ordered clock/Date fixtures and `nowConsumed`, and fails closed on drift, timeout, or non-victory.
 18. Schema-v3 normal-route port metrics and its nine exact-clock/public-tick screenshots are byte-identical across two clean runs and fail closed on malformed/unknown evidence; this does not impose byte identity on the separate live naval-harness observations in criterion 19.
-19. Naval semantic probe is non-writing and tolerates stale tracked provenance; Task 7's clean-Task-6-HEAD capture owns honest observations; final clean `--verify` proves source/provenance and canonical stable-manifest equality while accepting varied in-range FPS/duration/resource/PNG observations and rejecting stable/range/artifact drift.
+19. Naval semantic probe is non-writing and tolerates stale tracked provenance; Task 7's clean-Task-6-HEAD capture owns honest observations; final clean `--verify` proves the exact sorted dependency-complete `git ls-files` source row/hash manifest and canonical stable-manifest equality while accepting varied in-range FPS/duration/resource/PNG observations and rejecting missing, extra, reordered, hash, stable, range, and artifact drift.
 20. Every Task 1–6 source commit has fresh focused tests, check, full Vitest, forced clean solution build, real package build, and diff check; Tasks 4–5 also commit inspected normal-production screenshots with their UI source; cumulative gates/review are fresh and zero-finding.
 21. Human first-time and target-iPad Safari/touch/offline/thermal observations remain honestly unobserved unless actually performed.
 22. Worktree is clean; no merge, push, rebase, fetch, or main change occurred.
