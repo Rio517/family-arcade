@@ -8,6 +8,7 @@ import type { CaribbeanController } from '../../state/useCaribbean';
 import '../../styles/port.css';
 import { DivideShares } from './DivideShares';
 import { GovernorHouse } from './GovernorHouse';
+import { Market } from './Market';
 import { PortMenu } from './PortMenu';
 import { ShipyardSummary } from './ShipyardSummary';
 
@@ -26,7 +27,15 @@ function titleCase(value: string): string {
   return value.split('-').map((part) => `${part[0]?.toUpperCase()}${part.slice(1)}`).join(' ');
 }
 
-function ActivityContent({ activity, state }: { activity: OpenActivity; state: CampaignStateV1 }) {
+function ActivityContent({
+  activity,
+  state,
+  controller,
+}: {
+  activity: OpenActivity;
+  state: CampaignStateV1;
+  controller: CaribbeanController;
+}) {
   const flagship = state.fleet.ships.find((ship) => ship.id === state.fleet.flagshipId);
   switch (activity) {
     case 'governor':
@@ -39,12 +48,7 @@ function ActivityContent({ activity, state }: { activity: OpenActivity; state: C
         </div>
       );
     case 'market':
-      return (
-        <div className="caribbean-port-stub">
-          <p className="caribbean-port-lede">Compare six cargo prices and their hold impact.</p>
-          <p>Bridgetown’s fixed-price market opens for trading in the next package.</p>
-        </div>
-      );
+      return <Market state={state} busy={controller.busy} onTrade={controller.dispatch} />;
     case 'shipyard':
       return flagship === undefined
         ? <p>The flagship record is unavailable.</p>
@@ -114,7 +118,7 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
 
       <div className="caribbean-port-horizon" aria-hidden="true"><span /></div>
 
-      <div className="caribbean-port-stage">
+      <div className={`caribbean-port-stage${activeActivity === 'market' ? ' caribbean-port-stage--market' : ''}`}>
         <p className="caribbean-port-captain">Captain {state.captain.name}</p>
         <h1 id="caribbean-port-title">Bridgetown</h1>
         <section className="caribbean-port-activity" aria-label="Port activity">
@@ -128,7 +132,7 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
             </p>
           ) : (
             <>
-              <ActivityContent activity={activeActivity} state={state} />
+              <ActivityContent activity={activeActivity} state={state} controller={controller} />
               <button
                 className="caribbean-port-close"
                 data-testid="port-close-activity"

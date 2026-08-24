@@ -356,9 +356,203 @@
 }
 
 .caribbean-port-action:focus-visible,
-.caribbean-port-close:focus-visible {
+.caribbean-port-close:focus-visible,
+.caribbean-market-action:focus-visible {
   outline: 3px solid var(--caribbean-trade-wind);
   outline-offset: 3px;
+}
+
+.caribbean-port-stage--market {
+  align-self: stretch;
+  margin-block: 12px;
+  overflow-y: auto;
+  scrollbar-color: color-mix(in srgb, var(--caribbean-brass) 65%, transparent) transparent;
+}
+
+.caribbean-port-stage--market .caribbean-port-activity {
+  max-width: 1060px;
+}
+
+.caribbean-market {
+  display: grid;
+  gap: 9px;
+}
+
+.caribbean-market-summary {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-block: 1px solid color-mix(in srgb, var(--caribbean-brass) 46%, transparent);
+  background: color-mix(in srgb, var(--caribbean-deep-keel) 54%, transparent);
+}
+
+.caribbean-market-summary > div {
+  min-width: 0;
+  padding: 7px 12px;
+  border-right: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 18%, transparent);
+}
+
+.caribbean-market-summary > div:last-child {
+  border-right: 0;
+}
+
+.caribbean-market-summary dt,
+.caribbean-market-good > span,
+.caribbean-market-price-cue,
+.caribbean-market-reasons {
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 58%, var(--caribbean-trade-wind));
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.caribbean-market-summary dt {
+  text-transform: uppercase;
+}
+
+.caribbean-market-summary dd {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.caribbean-market-severity {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.caribbean-market-severity svg {
+  flex: 0 0 auto;
+}
+
+.caribbean-market-severity--low {
+  color: var(--caribbean-brass);
+}
+
+.caribbean-market-severity--critical {
+  color: color-mix(in srgb, var(--caribbean-signal-red) 72%, white);
+}
+
+.caribbean-market-goods {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 22%, transparent);
+}
+
+.caribbean-market-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(174px, 1.15fr) minmax(142px, .8fr) minmax(330px, 1.8fr);
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 17%, transparent);
+}
+
+.caribbean-market-good,
+.caribbean-market-quote,
+.caribbean-market-command {
+  min-width: 0;
+}
+
+.caribbean-market-good h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caribbean-market-good > span {
+  display: block;
+  margin-top: 3px;
+}
+
+.caribbean-market-quote strong {
+  display: block;
+  color: var(--caribbean-sailcloth);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.caribbean-market-price-cue {
+  margin-top: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.caribbean-market-price-cue svg {
+  flex: 0 0 auto;
+}
+
+.caribbean-market-price-cue--cheap {
+  color: var(--caribbean-trade-wind);
+}
+
+.caribbean-market-price-cue--fair {
+  color: var(--caribbean-sailcloth);
+}
+
+.caribbean-market-price-cue--expensive {
+  color: color-mix(in srgb, var(--caribbean-signal-red) 72%, white);
+}
+
+.caribbean-market-actions {
+  display: grid;
+  grid-template-columns: 1.35fr repeat(4, minmax(44px, .72fr)) 1fr;
+  gap: 4px;
+}
+
+.caribbean-market-action {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.caribbean-port .caribbean-market-action {
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 38%, transparent);
+  background: color-mix(in srgb, var(--caribbean-deep-keel) 66%, transparent);
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.caribbean-port .caribbean-market-action:hover:not(:disabled) {
+  border-color: var(--caribbean-trade-wind);
+  background: color-mix(in srgb, var(--caribbean-trade-wind) 16%, var(--caribbean-deep-keel));
+}
+
+.caribbean-port .caribbean-market-action:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+
+.caribbean-market-reasons {
+  min-height: 16px;
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 70%, var(--caribbean-deep-keel));
+  line-height: 1.15;
 }
 
 .caribbean-production--port .caribbean-memory-warning {
@@ -410,6 +604,28 @@
 
   .caribbean-port-facts div {
     padding-block: 5px;
+  }
+
+  .caribbean-port-stage--market {
+    margin-block: 7px;
+    padding-block: 10px 12px;
+  }
+
+  .caribbean-port-stage--market .caribbean-port-activity {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .caribbean-market {
+    gap: 6px;
+  }
+
+  .caribbean-market-summary > div {
+    padding-block: 5px;
+  }
+
+  .caribbean-market-row {
+    padding-block: 3px;
   }
 }
 

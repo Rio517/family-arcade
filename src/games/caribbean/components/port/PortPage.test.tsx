@@ -220,7 +220,7 @@ describe('<PortPage>', () => {
     const cases = [
       ["Governor's House", 'English control', 'Standing: Neutral (0)', 'Peace holds in Bridgetown.', 'No commission offered today.'],
       ['Tavern', 'Hear concise leads from Bridgetown’s waterfront.'],
-      ['Market', 'Compare six cargo prices and their hold impact.'],
+      ['Market', '34 owned', '4 gold / unit', 'Cheap'],
       ['Shipyard', 'Sloop', 'Hold 54 / 100', 'Repairs and refits open after a profitable voyage.'],
       ['Divide Shares', 'Available after a profitable voyage'],
       ["Captain's Log", 'Review one clear next action for every active lead.'],
