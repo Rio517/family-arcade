@@ -1,0 +1,136 @@
+import { StrictMode } from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { createCampaign } from '../domain/createCampaign';
+import { createJournal } from '../domain/replay';
+import { loadCampaign, saveCampaign, type StorageLike } from '../storage/persistence';
+import { createCampaignWriter, type LockManagerLike } from '../storage/writer';
+import type { CaribbeanRuntime } from '../state/runtime';
+import { CaribbeanPage } from './CaribbeanPage';
+
+const originalWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+const originalHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+const immediateLocks: LockManagerLike = {
+  async request(_name, _options, callback) { return await callback({}); },
+};
+
+function setViewport(width: number, height: number): void {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });
+}
+
+function storage(): StorageLike & { getItem: ReturnType<typeof vi.fn> } {
+  const data = new Map<string, string>();
+  return {
+    getItem: vi.fn((key: string) => data.get(key) ?? null),
+    setItem: vi.fn((key: string, value: string) => { data.set(key, value); }),
+    removeItem: vi.fn((key: string) => { data.delete(key); }),
+  };
+}
+
+function runtime(store = storage()): CaribbeanRuntime {
+  return {
+    storage: store,
+    storageCapability: { kind: 'available' },
+    writer: createCampaignWriter(immediateLocks),
+    build: 'fixture',
+    now: () => 100,
+    makeSeed: () => 1702,
+    makeQuarantineId: () => '00000000-0000-4000-8000-000000000001',
+  };
+}
+
+function seedSave(store: StorageLike): void {
+  const result = saveCampaign(store, createJournal(createCampaign({ seed: 1702, name: 'Morgan' })), {
+    build: 'fixture', savedAt: 100, expectedRevision: { currentRaw: null, previousRaw: null },
+  });
+  if (!result.ok) throw new Error('fixture save failed');
+}
+
+afterEach(() => {
+  if (originalWidth) Object.defineProperty(window, 'innerWidth', originalWidth);
+  if (originalHeight) Object.defineProperty(window, 'innerHeight', originalHeight);
+  window.location.hash = '';
+});
+
+describe('<CaribbeanPage>', () => {
+  it('keeps the controller-owning child outside the tree on unsupported screens', () => {
+    setViewport(1024, 1366);
+    const store = storage();
+    render(<CaribbeanPage runtime={runtime(store)} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('960 × 600 playfield');
+    expect(store.getItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps the first supplied runtime across rerenders and StrictMode probe remounts', () => {
+    setViewport(1440, 900);
+    const firstStore = storage();
+    const secondStore = storage();
+    const first = runtime(firstStore);
+    const second = runtime(secondStore);
+    const { rerender } = render(
+      <StrictMode><CaribbeanPage runtime={first} /></StrictMode>,
+    );
+    expect(screen.getByRole('heading', { name: 'Sign a captain’s commission' })).toBeInTheDocument();
+
+    rerender(<StrictMode><CaribbeanPage runtime={second} /></StrictMode>);
+    expect(firstStore.getItem).toHaveBeenCalled();
+    expect(secondStore.getItem).not.toHaveBeenCalled();
+  });
+
+  it('auto-resumes only a clean save when the Save Station query is present', async () => {
+    setViewport(1440, 900);
+    const store = storage();
+    seedSave(store);
+    window.location.hash = '#/caribbean?resume=1';
+
+    render(<CaribbeanPage runtime={runtime(store)} />);
+
+    expect(await screen.findByTestId('caribbean-career-ready')).toHaveTextContent('Morgan');
+    expect(loadCampaign(store)).toMatchObject({ kind: 'loaded', recovered: false });
+  });
+
+  it('does not bypass recovery for a degraded save even with the resume query', () => {
+    setViewport(1440, 900);
+    const store = storage();
+    seedSave(store);
+    store.setItem('caribbean:campaign:previous', '{corrupt');
+    window.location.hash = '#/caribbean?resume=1';
+
+    render(<CaribbeanPage runtime={runtime(store)} />);
+
+    expect(screen.getByRole('heading', { name: 'Campaign recovery required' })).toBeInTheDocument();
+    expect(screen.queryByTestId('caribbean-career-ready')).not.toBeInTheDocument();
+  });
+
+  it('renders saving-disabled setup and constructs memory state only after the explicit second action', () => {
+    setViewport(1440, 900);
+    const denied = new DOMException('Storage denied', 'SecurityError');
+    const guarded: StorageLike = {
+      getItem: () => { throw denied; },
+      setItem: () => { throw denied; },
+      removeItem: () => { throw denied; },
+    };
+    const makeSeed = vi.fn(() => 1702);
+    const injected: CaribbeanRuntime = {
+      storage: guarded,
+      storageCapability: { kind: 'unavailable', error: denied },
+      writer: createCampaignWriter(immediateLocks),
+      build: 'fixture', now: () => 100, makeSeed,
+      makeQuarantineId: () => '00000000-0000-4000-8000-000000000001',
+    };
+    render(<CaribbeanPage runtime={injected} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent(/Saving disabled/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
+    expect(makeSeed).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('caribbean-career-ready')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue without saving' }));
+    expect(makeSeed).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('caribbean-career-ready')).toHaveTextContent('Captain');
+    expect(screen.getByRole('status')).toHaveTextContent(/not being saved/i);
+  });
+});
