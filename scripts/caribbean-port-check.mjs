@@ -503,14 +503,38 @@ async function readLayout(page, name, expected) {
     );
     const partyObscured = partyPill !== null && partyRect !== null
       && partyHitElement !== partyPill && !partyPill.contains(partyHitElement);
-    const occludedTargets = partyRect === null ? [] : routeTargets.flatMap((element) => {
+    const routeTargetDiagnostics = routeTargets.map((element) => {
       const rect = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      const scrollableAncestor = (() => {
+        let ancestor = element.parentElement;
+        while (ancestor !== null && ancestor !== document.body) {
+          const style = getComputedStyle(ancestor);
+          if (/(?:auto|scroll)/.test(`${style.overflow} ${style.overflowX} ${style.overflowY}`)
+            && (ancestor.scrollHeight > ancestor.clientHeight || ancestor.scrollWidth > ancestor.clientWidth)) return true;
+          ancestor = ancestor.parentElement;
+        }
+        return false;
+      })();
+      return {
+        element,
+        rect,
+        testId: element.getAttribute('data-testid'),
+        label: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? null,
+        hitBlocked: hit !== element && !element.contains(hit),
+        hitTag: hit instanceof HTMLElement ? `${hit.tagName.toLowerCase()}.${[...hit.classList].join('.')}` : null,
+        contained: rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight,
+        scrollableAncestor,
+      };
+    });
+    const occludedTargets = partyRect === null ? [] : routeTargetDiagnostics.flatMap((target) => {
+      const { rect } = target;
       const inlineIntersects = Math.min(rect.right, partyRect.right) > Math.max(rect.left, partyRect.left);
       const blockClearance = Math.max(rect.top - partyRect.bottom, partyRect.top - rect.bottom);
       if (!inlineIntersects || blockClearance >= 8) return [];
       return [{
-        testId: element.getAttribute('data-testid'),
-        label: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? null,
+        testId: target.testId,
+        label: target.label,
         blockClearance,
         targetRect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
         partyRect: { left: partyRect.left, top: partyRect.top, right: partyRect.right, bottom: partyRect.bottom },
@@ -535,6 +559,17 @@ async function readLayout(page, name, expected) {
       minimumTargetHeightPx: targetSizes.length === 0 ? null : Math.min(...targetSizes.map((target) => target.height)),
       undersizedTargets: targetSizes.filter((target) => target.width < 44 || target.height < 44),
       occludedTargets,
+      ...(expectedViewport.requireRouteHitTest ? {
+        hitBlockedTargets: routeTargetDiagnostics.filter((target) => target.hitBlocked && (target.contained || !target.scrollableAncestor)).map(({ testId, label, hitTag, rect, contained, scrollableAncestor }) => ({
+          testId, label, hitTag, contained, scrollableAncestor,
+          rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+        })),
+      } : {}),
+      ...(expectedViewport.requireRouteContainment ? {
+        offscreenTargets: routeTargetDiagnostics.filter((target) => !target.contained && !target.scrollableAncestor).map(({ testId, label, rect }) => ({
+          testId, label, rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+        })),
+      } : {}),
       partyObscured,
       horizontalOverflowPx: Math.max(
         0,
@@ -555,6 +590,8 @@ async function readLayout(page, name, expected) {
     invariant(result.minimumFontPx !== null && result.minimumFontPx >= 14, `${name} has ${result.minimumFontPx}px text`);
     invariant(result.undersizedTargets.length === 0, `${name} has undersized active targets: ${JSON.stringify(result.undersizedTargets)}`);
     invariant(result.occludedTargets.length === 0, `${name} has Party control occlusion: ${JSON.stringify(result.occludedTargets)}`);
+    if (expected.requireRouteContainment) invariant(result.offscreenTargets.length === 0, `${name} has offscreen route targets without a scroll path: ${JSON.stringify(result.offscreenTargets)}`);
+    if (expected.requireRouteHitTest) invariant(result.hitBlockedTargets.length === 0, `${name} has blocked route targets: ${JSON.stringify(result.hitBlockedTargets)}`);
     invariant(!result.partyObscured, `${name} renders the Party control beneath another surface`);
   } else if (expectedNotice) {
     invariant(!result.controllerMounted && result.noticeVisible && result.noticeFocused, `${name} mounted a controller or failed to focus its notice`);
@@ -1363,8 +1400,12 @@ async function runPortMemoryWarningProbe(browser, baseUrl, viewport) {
   try {
     await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
     await page.evaluate(() => { window.__CARIBBEAN_PORT_CHECK__.failNextStorageWrite = true; });
-    await page.getByTestId('caribbean-start-career-button').evaluate((button) => button.click());
-    await page.getByTestId('caribbean-continue-without-saving-button').evaluate((button) => button.click());
+    const controlViewport = { ...viewport, supported: true, requireRouteHitTest: true, requireRouteContainment: true };
+    await readLayout(page, `memorySetup${viewport.width}x${viewport.height}`, controlViewport);
+    await page.getByRole('button', { name: 'Start career' }).click();
+    await page.getByRole('button', { name: 'Continue without saving' }).waitFor();
+    await readLayout(page, `memoryConsent${viewport.width}x${viewport.height}`, controlViewport);
+    await page.getByRole('button', { name: 'Continue without saving' }).click();
     await page.getByTestId('caribbean-career-ready').waitFor();
     await page.getByText('This career is not being saved. Keep this tab open.').waitFor();
     await settle(page);
@@ -1525,6 +1566,13 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
     await page.getByRole('heading', { name: 'Campaign recovery required' }).waitFor();
     const recoveryLayout = await readLayout(page, 'recoveryDesktop', VIEWPORTS.setupDesktop);
     await capture(page, screenshots, runDirectory, 'recovery-desktop.png');
+    await page.setViewportSize({ width: 960, height: 600 });
+    await readLayout(page, 'recoveryMinimumControls', {
+      ...VIEWPORTS.minimumSupported,
+      requireRouteHitTest: true,
+      requireRouteContainment: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
 
     const degradedRevision = await page.evaluate(({ currentKey, previousKey }) => ({
       currentRaw: localStorage.getItem(currentKey),

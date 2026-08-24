@@ -183,6 +183,22 @@
 .caribbean-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 
 @media (max-height: 700px) {
+  .caribbean-production:not(.caribbean-production--campaign) {
+    height: 100dvh;
+  }
+
+  body:has(.caribbean-production:not(.caribbean-production--campaign)) .party-root {
+    left: max(12px, env(safe-area-inset-left));
+    transform: none;
+  }
+
+  .caribbean-commission-panel,
+  .caribbean-recovery-panel {
+    align-self: stretch;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
   .caribbean-manifest { min-height: 74px; }
   .caribbean-commission-panel,
   .caribbean-recovery-panel,
