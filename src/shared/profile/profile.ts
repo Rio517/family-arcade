@@ -15,6 +15,8 @@ const WIN_BASE_POINTS = 100;
 const POINTS_PER_BONUS = 15;
 const LOSS_CONSOLATION_POINTS = 25;
 
+export const DEFAULT_PRONOUNS = 'he/him';
+
 export interface GameHistoryEntry {
   code: string;
   /** Registry id of the game this was ('' on rows saved before we recorded it). */
@@ -27,6 +29,7 @@ export interface GameHistoryEntry {
 
 export interface Profile {
   name: string;
+  pronouns: string;
   points: number;
   wins: number;
   losses: number;
@@ -42,6 +45,7 @@ const MAX_HISTORY = 25;
 export function defaultProfile(): Profile {
   return {
     name: '',
+    pronouns: DEFAULT_PRONOUNS,
     points: 0,
     wins: 0,
     losses: 0,
@@ -120,6 +124,20 @@ export function setName(profile: Profile, name: string): Profile {
   return { ...profile, name: name.trim().slice(0, 20) };
 }
 
+export function pronounCodePointLength(value: string): number {
+  return [...value].length;
+}
+
+export function normalizePronouns(value: unknown): string {
+  if (typeof value !== 'string') return DEFAULT_PRONOUNS;
+  const clean = value.trim();
+  return clean.length > 0 && pronounCodePointLength(clean) <= 24 ? clean : DEFAULT_PRONOUNS;
+}
+
+export function setPronouns(profile: Profile, pronouns: string): Profile {
+  return { ...profile, pronouns: normalizePronouns(pronouns) };
+}
+
 /**
  * The household roster, in the family's chosen order — offered as one-tap
  * name chips wherever a game asks "who's playing?". (The Yahtzee logger
@@ -137,6 +155,7 @@ export function normalizeProfile(raw: unknown): Profile {
     : base.unlocked;
   return {
     name: typeof r.name === 'string' ? r.name : base.name,
+    pronouns: normalizePronouns(r.pronouns),
     points: Number.isFinite(r.points) ? (r.points as number) : base.points,
     wins: Number.isFinite(r.wins) ? (r.wins as number) : base.wins,
     losses: Number.isFinite(r.losses) ? (r.losses as number) : base.losses,

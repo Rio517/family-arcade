@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from 'playwright';
+import { evaluatePortIdentityEvidence } from './lib/caribbean-port-identity-evidence.mjs';
 
 const MODULE_URL = new URL(import.meta.url);
 const ROOT = fileURLToPath(new URL('..', MODULE_URL));
@@ -32,6 +33,7 @@ const SCREENSHOTS = [
   'minimum-screen-width.png',
   'minimum-screen-height.png',
   'minimum-screen-large-portrait.png',
+  'player-profile-desktop.png',
 ];
 const PORT_ORDER = [
   "Governor's House",
@@ -424,6 +426,54 @@ async function readLayout(page, name, expected) {
   return result;
 }
 
+async function readPlayerProfileLayout(page) {
+  const result = await page.evaluate(() => {
+    const visible = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden'
+        && rect.width > 0 && rect.height > 0;
+    };
+    const booth = document.querySelector('.booth');
+    if (!(booth instanceof HTMLElement)) throw new Error('Ticket Booth is not mounted');
+    const boothRect = booth.getBoundingClientRect();
+    const textElements = [booth, ...booth.querySelectorAll('*')].filter((element) => (
+      visible(element)
+      && [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
+    ));
+    const controls = [...booth.querySelectorAll('button, input')].filter(visible).map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        testId: element.getAttribute('data-testid'),
+        label: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? null,
+        width: rect.width,
+        height: rect.height,
+      };
+    });
+    const labels = [...booth.querySelectorAll('label')].filter(visible).map((label) => label.textContent?.trim());
+    const contained = [...booth.querySelectorAll('*')].filter(visible).every((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.left >= boothRect.left && rect.right <= boothRect.right;
+    });
+    return {
+      activePronouns: document.querySelector('.booth-hero .pstub-pronouns')?.textContent?.trim() ?? null,
+      labels,
+      minimumFontPx: Math.min(...textElements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize))),
+      controls,
+      undersizedControls: controls.filter((control) => control.width < 44 || control.height < 44),
+      horizontalOverflowPx: Math.max(0, booth.scrollWidth - booth.clientWidth),
+      contained,
+    };
+  });
+  invariant(result.activePronouns === 'they/them', `Booth displayed wrong saved pronouns: ${result.activePronouns}`);
+  invariant(result.labels.includes('Name') && result.labels.includes('Pronouns'), 'Booth editor labels are incomplete');
+  invariant(result.minimumFontPx >= 14, `Booth has ${result.minimumFontPx}px visible copy`);
+  invariant(result.undersizedControls.length === 0, `Booth has undersized controls: ${JSON.stringify(result.undersizedControls)}`);
+  invariant(result.horizontalOverflowPx === 0 && result.contained, 'Booth profile editor overflows its ticket column');
+  return result;
+}
+
 async function capture(page, screenshots, directory, filename) {
   await settle(page);
   const bytes = await page.screenshot({ animations: 'disabled' });
@@ -575,6 +625,24 @@ async function runJourney(browser, baseUrl, runDirectory) {
     invariant(resumedEnvelope.checksum === knownPrevious.checksum, 'Reloaded recovery checksum changed');
     invariant(canonicalJson(resumedEnvelope.payload.state) === canonicalJson(knownPrevious.payload.state), 'Reloaded recovery state changed');
 
+    await page.goto(`${baseUrl}/#/`, { waitUntil: 'networkidle' });
+    await page.getByTestId('booth-edit-profile').click();
+    await page.getByTestId('booth-profile-name').fill('Port Profile');
+    await page.getByTestId('booth-profile-pronouns').fill('they/them');
+    await page.getByTestId('booth-profile-save').click();
+    await page.getByText('they/them').waitFor();
+    const persistedProfile = await page.evaluate(() => {
+      const raw = localStorage.getItem('arcade.users.v1');
+      return raw === null ? null : JSON.parse(raw).users.find((user) => user.id === 'port-check-player')?.profile;
+    });
+    invariant(
+      persistedProfile?.name === 'Port Profile' && persistedProfile?.pronouns === 'they/them',
+      'Booth profile did not persist name and pronouns together',
+    );
+    await page.getByTestId('booth-edit-profile').click();
+    const playerProfileLayout = await readPlayerProfileLayout(page);
+    await capture(page, screenshots, runDirectory, 'player-profile-desktop.png');
+
     const trace = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), TRACE_KEY);
     invariant(trace.seedsConsumed[0] === 1702, `Production consumed wrong seed fixtures: ${JSON.stringify(trace.seedsConsumed)}`);
     invariant(trace.uuidsConsumed.length === 1 && trace.uuidsConsumed[0] === UUID_FIXTURES[0], `Production consumed wrong UUID fixtures: ${JSON.stringify(trace.uuidsConsumed)}`);
@@ -623,6 +691,7 @@ async function runJourney(browser, baseUrl, runDirectory) {
         minimumMeasuredTargetWidthPx: Math.min(...supportedLayouts.map((layout) => layout.minimumTargetWidthPx)),
         minimumMeasuredTargetHeightPx: Math.min(...supportedLayouts.map((layout) => layout.minimumTargetHeightPx)),
         horizontalOverflowPx: Math.max(...Object.values(layouts).map((layout) => layout.horizontalOverflowPx)),
+        boothProfile: playerProfileLayout,
       },
       requests: {
         externalCount: failures.external.length,
@@ -650,7 +719,19 @@ async function runJourney(browser, baseUrl, runDirectory) {
       },
       screenshots: SCREENSHOTS,
       determinism: { cleanRuns: 2, metricsByteIdentical: true, screenshotsByteIdentical: true },
+      schemaVersion: 2,
+      packagePhase: 'profile',
+      profile: {
+        status: 'profile-only',
+        defaultPronouns: 'he/him',
+        boothProfilePersisted: true,
+        setup: 'not-yet-observed',
+      },
+      art: { status: 'not-yet-observed' },
+      market: { status: 'not-yet-observed' },
     };
+    const verdict = evaluatePortIdentityEvidence(metrics);
+    invariant(verdict.ok, `Caribbean port identity evidence failed: ${verdict.issues.join(' | ')}`);
     return { metrics, screenshots };
   } finally {
     await context.close();

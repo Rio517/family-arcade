@@ -23,7 +23,8 @@ What's queued right now lives in **[NEXT_STEP.md](./NEXT_STEP.md)**.
 - **Accessibility floor.** Keyboard path for every interactive element,
   `data-testid` on interactive elements, dialogs close on Escape
   (`useDismissOnEscape`), animations behind `prefers-reduced-motion`, SVG icons
-  rather than emoji, 14px minimum font size, they/them for people by default.
+  rather than emoji, 14px minimum font size. Authored prose defaults to
+  they/them for people; the persisted player profile defaults to he/him.
 
 ## Verification (all three, every change)
 

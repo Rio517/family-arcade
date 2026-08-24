@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { useProfile } from '@shared/profile/useProfile';
 import { useUsers } from '@shared/profile/useUsers';
 import { playerColor } from '@shared/profile/playerColors';
-import type { GameHistoryEntry } from '@shared/profile/profile';
+import { pronounCodePointLength, type GameHistoryEntry } from '@shared/profile/profile';
 import { GAMES } from './registry';
 import '@shared/profile/player.css';
 
@@ -52,9 +52,11 @@ function HistoryRow({ entry, now }: { entry: GameHistoryEntry; now: number }) {
 
 export function PlayerBooth() {
   const { users, active, signIn, newPlayer } = useUsers();
-  const { profile, setName } = useProfile();
-  const [mode, setMode] = useState<'view' | 'switch' | 'rename' | 'new'>('view');
-  const [draft, setDraft] = useState('');
+  const { profile, setName, setPronouns } = useProfile();
+  const [mode, setMode] = useState<'view' | 'switch' | 'edit-profile' | 'new'>('view');
+  const [draftName, setDraftName] = useState('');
+  const [draftPronouns, setDraftPronouns] = useState('');
+  const [pronounsError, setPronounsError] = useState(false);
   // Sampled once per mount — "today" flipping to "yest." mid-visit isn't
   // worth an impure read on every render.
   const [now] = useState(() => Date.now());
@@ -63,12 +65,26 @@ export function PlayerBooth() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const clean = draft.trim();
+    const clean = draftName.trim();
     if (!clean) return;
-    if (mode === 'rename') setName(clean);
+    if (mode === 'edit-profile') {
+      setName(clean);
+      setPronouns(draftPronouns);
+    }
     if (mode === 'new') newPlayer(clean);
-    setDraft('');
+    setDraftName('');
+    setDraftPronouns('');
+    setPronounsError(false);
     setMode('view');
+  };
+
+  const changePronouns = (value: string) => {
+    if (pronounCodePointLength(value) <= 24) {
+      setDraftPronouns(value);
+      setPronounsError(false);
+      return;
+    }
+    setPronounsError(true);
   };
 
   return (
@@ -87,9 +103,11 @@ export function PlayerBooth() {
               </span>
               <span className="pstub-body">
                 <span className="pstub-name">{active.profile.name}</span>
+                <span className="pstub-pronouns">{profile.pronouns}</span>
                 <span className="pstub-stats">
                   <b>{profile.points}</b> tickets · {profile.wins} W · {profile.losses} L
                 </span>
+                <span className="booth-profile-note">Shared across every arcade game.</span>
               </span>
               <span className="pstub-admit" aria-hidden="true">ADMIT ONE</span>
             </div>
@@ -105,21 +123,25 @@ export function PlayerBooth() {
               </button>
               <button
                 type="button"
-                data-testid="booth-rename"
-                className={mode === 'rename' ? 'on' : ''}
+                data-testid="booth-edit-profile"
+                className={mode === 'edit-profile' ? 'on' : ''}
                 onClick={() => {
-                  setDraft(active.profile.name);
-                  setMode(mode === 'rename' ? 'view' : 'rename');
+                  setDraftName(active.profile.name);
+                  setDraftPronouns(profile.pronouns);
+                  setPronounsError(false);
+                  setMode(mode === 'edit-profile' ? 'view' : 'edit-profile');
                 }}
               >
-                Rename
+                Edit profile
               </button>
               <button
                 type="button"
                 data-testid="booth-new"
                 className={mode === 'new' ? 'on' : ''}
                 onClick={() => {
-                  setDraft('');
+                  setDraftName('');
+                  setDraftPronouns('');
+                  setPronounsError(false);
                   setMode(mode === 'new' ? 'view' : 'new');
                 }}
               >
@@ -161,22 +183,45 @@ export function PlayerBooth() {
               </div>
             )}
 
-            {(mode === 'rename' || mode === 'new') && (
+            {(mode === 'edit-profile' || mode === 'new') && (
               <form className="booth-form" onSubmit={submit}>
                 <label htmlFor="booth-name">
-                  {mode === 'rename' ? 'New name' : 'Who joins the arcade?'}
+                  {mode === 'edit-profile' ? 'Name' : 'Who joins the arcade?'}
                 </label>
-                <div className="booth-form-row">
+                <div className="booth-form-fields">
                   <input
                     id="booth-name"
-                    data-testid="booth-name"
-                    value={draft}
+                    data-testid={mode === 'edit-profile' ? 'booth-profile-name' : 'booth-name'}
+                    value={draftName}
                     maxLength={20}
-                    onChange={(e) => setDraft(e.target.value)}
+                    onChange={(e) => setDraftName(e.target.value)}
                     placeholder="Name"
                   />
-                  <button type="submit" data-testid="booth-save">
-                    {mode === 'rename' ? 'Save' : 'Make ticket'}
+                  {mode === 'edit-profile' && (
+                    <>
+                      <label htmlFor="booth-pronouns">Pronouns</label>
+                      <input
+                        id="booth-pronouns"
+                        data-testid="booth-profile-pronouns"
+                        value={draftPronouns}
+                        aria-describedby={pronounsError ? 'booth-pronouns-error' : undefined}
+                        onChange={(e) => changePronouns(e.target.value)}
+                        placeholder="Pronouns"
+                      />
+                      {pronounsError && (
+                        <p id="booth-pronouns-error" className="booth-form-error" role="alert">
+                          Use 24 characters or fewer
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="booth-form-row">
+                  <button
+                    type="submit"
+                    data-testid={mode === 'edit-profile' ? 'booth-profile-save' : 'booth-save'}
+                  >
+                    {mode === 'edit-profile' ? 'Save profile' : 'Make ticket'}
                   </button>
                 </div>
               </form>

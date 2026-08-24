@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   canAfford,
+  DEFAULT_PRONOUNS,
   defaultProfile,
   isUnlocked,
+  normalizePronouns,
   normalizeProfile,
   pointsForResult,
+  pronounCodePointLength,
   recordResult,
   selectSkin,
   setName,
+  setPronouns,
   unlockSkin,
 } from './profile';
 
@@ -82,6 +86,30 @@ describe('cosmetic unlocks (game-neutral)', () => {
 describe('setName', () => {
   it('trims and caps the name length', () => {
     expect(setName(defaultProfile(), '  Captain Longname McExtra  ').name).toBe('Captain Longname McE');
+  });
+});
+
+describe('pronouns', () => {
+  it('defaults and migrates missing or invalid stored pronouns', () => {
+    expect(defaultProfile().pronouns).toBe('he/him');
+    expect(normalizeProfile({ name: 'Mario' }).pronouns).toBe('he/him');
+    expect(normalizeProfile({ name: 'Mario', pronouns: ' she/her ' }).pronouns).toBe('she/her');
+    expect(normalizeProfile({ name: 'Mario', pronouns: '' }).pronouns).toBe('he/him');
+    expect(normalizeProfile({ name: 'Mario', pronouns: 'x'.repeat(25) }).pronouns).toBe('he/him');
+    expect(normalizeProfile({ name: 'Mario', pronouns: 7 }).pronouns).toBe('he/him');
+  });
+
+  it('normalizes explicit profile updates without mutating the profile', () => {
+    const profile = defaultProfile();
+    expect(setPronouns(profile, '  they/them ')).toMatchObject({ pronouns: 'they/them' });
+    expect(setPronouns(profile, '   ')).toMatchObject({ pronouns: 'he/him' });
+    expect(profile.pronouns).toBe(DEFAULT_PRONOUNS);
+  });
+
+  it('counts astral Unicode code points for the pronoun limit', () => {
+    expect(normalizePronouns('😀'.repeat(24))).toBe('😀'.repeat(24));
+    expect(normalizePronouns('😀'.repeat(25))).toBe('he/him');
+    expect(pronounCodePointLength('😀'.repeat(24))).toBe(24);
   });
 });
 

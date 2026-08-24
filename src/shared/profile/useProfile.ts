@@ -12,6 +12,7 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import {
   recordResult as pureRecordResult,
   setName as pureSetName,
+  setPronouns as pureSetPronouns,
   type Profile,
   type ResultInput,
 } from './profile';
@@ -21,6 +22,7 @@ import { rememberName } from './recentNames';
 export interface UseProfile {
   profile: Profile;
   setName: (name: string) => void;
+  setPronouns: (pronouns: string) => void;
   recordResult: (input: ResultInput) => void;
   /** Apply any pure profile transition; returns whether it changed anything. */
   update: (fn: (p: Profile) => Profile | null) => boolean;
@@ -46,6 +48,10 @@ export function useProfile(): UseProfile {
     setProfileState(pureSetName(getProfileSnapshot(), name));
   }, []);
 
+  const setPronouns = useCallback((pronouns: string) => {
+    setProfileState(pureSetPronouns(getProfileSnapshot(), pronouns));
+  }, []);
+
   const recordResult = useCallback((input: ResultInput) => {
     setProfileState(pureRecordResult(getProfileSnapshot(), input));
   }, []);
@@ -60,5 +66,5 @@ export function useProfile(): UseProfile {
     return false;
   }, []);
 
-  return { profile, setName, recordResult, update };
+  return { profile, setName, setPronouns, recordResult, update };
 }

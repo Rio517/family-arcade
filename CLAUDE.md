@@ -33,9 +33,10 @@ nothing needs a manual. Big visual changes are pitched as **mockups first**
   `prefers-reduced-motion`; interactive elements get `data-testid`, a keyboard
   path, and visible `:focus-visible` states; every dialog closes on Escape via
   `@shared/ui/useDismissOnEscape`; text is 14px or larger; icons are SVG, never
-  emoji; pronouns for people default to they/them. `npm run check` enforces the
-  JSX side of this — if you must silence a jsx-a11y rule, do it per-line with a
-  comment saying why, never globally.
+  emoji. Authored prose about people defaults to they/them, while persisted
+  product profiles default to he/him. `npm run check` enforces the JSX side of
+  this — if you must silence a jsx-a11y rule, do it per-line with a comment
+  saying why, never globally.
 
 ## Git & PR workflow (the #1 source of wasted work)
 

@@ -179,7 +179,8 @@
       1700000001000,
       1700000002000,
       1700000003000,
-      1700000004000
+      1700000004000,
+      1700000005000
     ],
     "seedsConsumed": [
       1702
@@ -226,15 +227,64 @@
     "minimumMeasuredFontPx": 14,
     "minimumMeasuredTargetWidthPx": 60.015625,
     "minimumMeasuredTargetHeightPx": 44,
-    "horizontalOverflowPx": 0
+    "horizontalOverflowPx": 0,
+    "boothProfile": {
+      "activePronouns": "they/them",
+      "labels": [
+        "Name",
+        "Pronouns"
+      ],
+      "minimumFontPx": 14,
+      "controls": [
+        {
+          "testId": "booth-switch",
+          "label": "Switch player",
+          "width": 135.328125,
+          "height": 44
+        },
+        {
+          "testId": "booth-edit-profile",
+          "label": "Edit profile",
+          "width": 135.34375,
+          "height": 44
+        },
+        {
+          "testId": "booth-new",
+          "label": "New player",
+          "width": 135.328125,
+          "height": 44
+        },
+        {
+          "testId": "booth-profile-name",
+          "label": "",
+          "width": 422,
+          "height": 44
+        },
+        {
+          "testId": "booth-profile-pronouns",
+          "label": "",
+          "width": 422,
+          "height": 44
+        },
+        {
+          "testId": "booth-profile-save",
+          "label": "Save profile",
+          "width": 422,
+          "height": 44
+        }
+      ],
+      "undersizedControls": [],
+      "horizontalOverflowPx": 0,
+      "contained": true
+    }
   },
   "requests": {
     "externalCount": 0,
     "failedCount": 0,
     "requestedPaths": [
       "/",
-      "/assets/index-B5ExcsKc.css",
-      "/assets/index-ClTW8Wbx.js",
+      "/assets/index-DodvFL21.css",
+      "/assets/index-f1QG7MZm.js",
       "/registerSW.js"
     ]
   },
@@ -269,11 +319,26 @@
     "port-minimum-supported.png",
     "minimum-screen-width.png",
     "minimum-screen-height.png",
-    "minimum-screen-large-portrait.png"
+    "minimum-screen-large-portrait.png",
+    "player-profile-desktop.png"
   ],
   "determinism": {
     "cleanRuns": 2,
     "metricsByteIdentical": true,
     "screenshotsByteIdentical": true
+  },
+  "schemaVersion": 2,
+  "packagePhase": "profile",
+  "profile": {
+    "status": "profile-only",
+    "defaultPronouns": "he/him",
+    "boothProfilePersisted": true,
+    "setup": "not-yet-observed"
+  },
+  "art": {
+    "status": "not-yet-observed"
+  },
+  "market": {
+    "status": "not-yet-observed"
   }
 }
