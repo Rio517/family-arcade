@@ -1,7 +1,7 @@
 # Caribbean Port Identity and Player Defaults
 
-**Date:** 2026-08-24  
-**Status:** Approved  
+**Date:** 2026-08-24
+**Status:** Approved
 **Branch:** `codex/caribbean-game`
 
 ## Context

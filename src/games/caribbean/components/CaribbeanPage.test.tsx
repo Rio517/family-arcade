@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createCampaign } from '../domain/createCampaign';
@@ -107,6 +107,7 @@ function seedSave(store: StorageLike): void {
 }
 
 afterEach(() => {
+  cleanup();
   if (originalWidth) Object.defineProperty(window, 'innerWidth', originalWidth);
   if (originalHeight) Object.defineProperty(window, 'innerHeight', originalHeight);
   window.location.hash = '';
