@@ -296,11 +296,11 @@ describe('<PortPage>', () => {
 
     const cases = [
       ["Governor's House", 'English control', 'Standing: Neutral (0)', 'Peace holds in Bridgetown.', 'No commission offered today.'],
-      ['Tavern', 'Hear concise leads from Bridgetown’s waterfront.'],
+      ['Tavern', 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.'],
       ['Market', '34 owned', '4 gold / unit', 'Cheap'],
       ['Shipyard', 'Sloop', 'Hold 54 / 100', 'Repairs and refits open after a profitable voyage.'],
       ['Divide Shares', 'Available after a profitable voyage'],
-      ["Captain's Log", 'Review one clear next action for every active lead.'],
+      ["Captain's Log", 'No leads yet'],
     ] as const;
 
     for (const [label, ...copy] of cases) {

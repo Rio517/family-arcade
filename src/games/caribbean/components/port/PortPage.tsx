@@ -6,11 +6,13 @@ import { provisionsMonths } from '../../domain/selectors';
 import type { CampaignStateV1, PortActivity } from '../../domain/types';
 import type { CaribbeanController } from '../../state/useCaribbean';
 import '../../styles/port.css';
+import { CaptainsLog } from '../log/CaptainsLog';
 import { DivideShares } from './DivideShares';
 import { GovernorHouse } from './GovernorHouse';
 import { Market } from './Market';
 import { PortMenu } from './PortMenu';
 import { ShipyardSummary } from './ShipyardSummary';
+import { Tavern } from './Tavern';
 
 type OpenActivity = Exclude<PortActivity, 'menu'>;
 
@@ -41,12 +43,7 @@ function ActivityContent({
     case 'governor':
       return <GovernorHouse state={state} />;
     case 'tavern':
-      return (
-        <div className="caribbean-port-stub">
-          <p className="caribbean-port-lede">Hear concise leads from Bridgetown’s waterfront.</p>
-          <p>The taproom is open; its first chart-worthy rumour arrives in the next package.</p>
-        </div>
-      );
+      return <Tavern state={state} busy={controller.busy} onAccept={controller.dispatch} />;
     case 'market':
       return <Market state={state} busy={controller.busy} onTrade={controller.dispatch} />;
     case 'shipyard':
@@ -56,12 +53,7 @@ function ActivityContent({
     case 'shares':
       return <DivideShares />;
     case 'log':
-      return (
-        <div className="caribbean-port-stub">
-          <p className="caribbean-port-lede">Review one clear next action for every active lead.</p>
-          <p>No lead has been marked on the chart yet.</p>
-        </div>
-      );
+      return <CaptainsLog state={state} />;
   }
 }
 

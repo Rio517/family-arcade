@@ -357,9 +357,112 @@
 
 .caribbean-port-action:focus-visible,
 .caribbean-port-close:focus-visible,
-.caribbean-market-action:focus-visible {
+.caribbean-market-action:focus-visible,
+.caribbean-tavern-mark:focus-visible {
   outline: 3px solid var(--caribbean-trade-wind);
   outline-offset: 3px;
+}
+
+.caribbean-tavern,
+.caribbean-captains-log,
+.caribbean-log-empty {
+  max-width: 650px;
+}
+
+.caribbean-tavern-rumour {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+  padding: 18px 20px;
+  border-inline-start: 2px solid var(--caribbean-brass);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--caribbean-deep-keel) 70%, transparent), transparent);
+}
+
+.caribbean-tavern-rumour blockquote {
+  max-width: 610px;
+  margin: 0;
+  color: var(--caribbean-sailcloth);
+  font-size: 18px;
+  font-weight: 620;
+  line-height: 1.55;
+}
+
+.caribbean-tavern-mark {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.caribbean-port .caribbean-tavern-mark {
+  padding-inline: 18px;
+  border-color: var(--caribbean-trade-wind);
+  background: color-mix(in srgb, var(--caribbean-trade-wind) 14%, var(--caribbean-deep-keel));
+}
+
+.caribbean-tavern-status {
+  min-height: 20px;
+  margin: 0;
+  color: var(--caribbean-trade-wind);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.caribbean-log-empty {
+  margin: 0;
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 76%, var(--caribbean-trade-wind));
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.caribbean-captains-log {
+  border-block: 1px solid color-mix(in srgb, var(--caribbean-brass) 46%, transparent);
+}
+
+.caribbean-captains-log header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 0;
+}
+
+.caribbean-captains-log h3 {
+  margin: 0;
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.caribbean-captains-log header p {
+  margin: 0;
+  color: var(--caribbean-brass);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.caribbean-log-action,
+.caribbean-log-terminal {
+  margin: 0;
+  padding: 16px 0;
+  border-top: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 20%, transparent);
+  color: var(--caribbean-sailcloth);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.caribbean-log-action span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--caribbean-trade-wind);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: .1em;
+  text-transform: uppercase;
 }
 
 .caribbean-port-stage--market {
