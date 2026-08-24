@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from 'playwright';
+import sharp from 'sharp';
 import {
   ART_ACTIVITY_CONTRAST_SPECS,
   ART_CAPTURE_FIXTURE_STATE,
@@ -23,6 +24,7 @@ const MODULE_URL = new URL(import.meta.url);
 const ROOT = fileURLToPath(new URL('..', MODULE_URL));
 const DIST = path.join(ROOT, 'dist');
 const OUT = path.join(ROOT, 'docs', 'screenshots', 'caribbean-port');
+const MISMATCH_DIAGNOSTIC_DIRECTORY = '/private/tmp/caribbean-port-identity-diagnostic';
 const HOST = '127.0.0.1';
 const PORT = 0;
 const ROUTE = '/#/caribbean';
@@ -602,6 +604,92 @@ async function readPlayerProfileLayout(page, name, viewport, expectedPronouns) {
   return measurement;
 }
 
+async function readProfileScreenshotState(page) {
+  return page.evaluate(() => {
+    const active = document.activeElement;
+    const activeInput = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active : null;
+    const selection = getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const describe = (node) => node instanceof HTMLElement ? {
+      tag: node.tagName, testId: node.dataset.testid ?? null, id: node.id || null,
+      name: node.getAttribute('name'), type: node.getAttribute('type'), value: 'value' in node ? node.value : null,
+    } : null;
+    return {
+      viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio },
+      scroll: {
+        window: { x: scrollX, y: scrollY },
+        documentElement: { left: document.documentElement.scrollLeft, top: document.documentElement.scrollTop },
+        body: { left: document.body.scrollLeft, top: document.body.scrollTop },
+      },
+      booth: (() => {
+        const element = document.querySelector('.booth');
+        return element instanceof HTMLElement ? { left: element.scrollLeft, top: element.scrollTop } : null;
+      })(),
+      activeElement: describe(active),
+      caret: activeInput ? { start: activeInput.selectionStart, end: activeInput.selectionEnd, direction: activeInput.selectionDirection } : null,
+      selection: range ? {
+        anchor: describe(selection.anchorNode?.parentElement ?? null), focus: describe(selection.focusNode?.parentElement ?? null),
+        startOffset: range.startOffset, endOffset: range.endOffset, collapsed: range.collapsed, text: selection.toString(),
+      } : null,
+      profileInputs: [...document.querySelectorAll('[data-testid="booth-profile-name"], [data-testid="booth-profile-pronouns"]')].map((element) => ({
+        testId: element.getAttribute('data-testid'), value: element instanceof HTMLInputElement ? element.value : null,
+        selectionStart: element instanceof HTMLInputElement ? element.selectionStart : null,
+        selectionEnd: element instanceof HTMLInputElement ? element.selectionEnd : null,
+      })),
+      fonts: document.fonts ? { status: document.fonts.status, size: document.fonts.size } : null,
+    };
+  });
+}
+
+export function profileScreenshotReadinessErrors(state) {
+  const errors = [];
+  if (!state || typeof state !== 'object') return ['profile screenshot state is missing'];
+  if (state.activeElement?.tag && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(state.activeElement.tag)) errors.push('profile screenshot retains an interactive focus target');
+  if (state.selection !== null) errors.push('profile screenshot retains a document selection');
+  if (state.caret !== null) errors.push('profile screenshot retains an input caret');
+  if (state.scroll?.window?.x !== 0 || state.scroll?.window?.y !== 0
+    || state.scroll?.documentElement?.left !== 0 || state.scroll?.documentElement?.top !== 0
+    || state.scroll?.body?.left !== 0 || state.scroll?.body?.top !== 0
+    || state.booth?.left !== 0 || state.booth?.top !== 0) errors.push('profile screenshot has non-deterministic scroll state');
+  if (state.fonts?.status !== 'loaded') errors.push('profile screenshot fonts are not ready');
+  if (!Array.isArray(state.profileInputs) || state.profileInputs.some((input) => input.selectionStart !== input.selectionEnd)) errors.push('profile screenshot retains an input selection range');
+  return errors;
+}
+
+async function preparePlayerProfileScreenshot(page) {
+  await page.evaluate(async () => {
+    const booth = document.querySelector('.booth');
+    if (!(booth instanceof HTMLElement)) throw new Error('Ticket Booth is not mounted for screenshot readiness');
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    getSelection()?.removeAllRanges();
+    for (const input of booth.querySelectorAll('input')) {
+      input.setSelectionRange(0, 0);
+      input.blur();
+    }
+    window.scrollTo(0, 0);
+    document.documentElement.scrollLeft = 0;
+    document.documentElement.scrollTop = 0;
+    document.body.scrollLeft = 0;
+    document.body.scrollTop = 0;
+    booth.scrollLeft = 0;
+    booth.scrollTop = 0;
+    await document.fonts.ready;
+    const signature = () => JSON.stringify({
+      scroll: [scrollX, scrollY, document.documentElement.scrollLeft, document.documentElement.scrollTop, document.body.scrollLeft, document.body.scrollTop, booth.scrollLeft, booth.scrollTop],
+      booth: booth.getBoundingClientRect().toJSON(),
+      active: document.activeElement?.tagName ?? null,
+    });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const firstPaint = signature();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    if (signature() !== firstPaint) throw new Error('Player profile screenshot layout did not stabilize across animation frames');
+  });
+  const state = await readProfileScreenshotState(page);
+  const errors = profileScreenshotReadinessErrors(state);
+  invariant(errors.length === 0, `Player profile screenshot is not ready: ${errors.join(' | ')}`);
+  return state;
+}
+
 async function capture(page, screenshots, directory, filename) {
   const backdrop = page.getByTestId('caribbean-port-backdrop');
   if (await backdrop.count() === 1 && !await backdrop.evaluate((element) => element.classList.contains('caribbean-port-backdrop--fallback'))) {
@@ -1115,6 +1203,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
   const failures = { console: [], page: [], requests: [], external: [], requestedPaths: [] };
   recordFailures(page, baseUrl, failures);
   const screenshots = new Map();
+  const screenshotStates = new Map();
   const layouts = {};
   let metrics;
   try {
@@ -1292,9 +1381,12 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
     await page.getByTestId('booth-edit-profile').click();
     const playerProfileDesktop = await readPlayerProfileLayout(page, 'desktop', { width: 1440, height: 900 }, 'she/her');
     layouts.profileDesktop = await readLayout(page, 'profileDesktop', VIEWPORTS.profileDesktop);
-    await page.evaluate(() => {
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    });
+    const preNormalizationProfileState = await readProfileScreenshotState(page);
+    invariant(
+      profileScreenshotReadinessErrors(preNormalizationProfileState).includes('profile screenshot retains an interactive focus target'),
+      'Player profile screenshot readiness probe did not observe the expected post-focus interactive target',
+    );
+    screenshotStates.set('player-profile-desktop.png', await preparePlayerProfileScreenshot(page));
     await capture(page, screenshots, runDirectory, 'player-profile-desktop.png');
     await page.setViewportSize({ width: 960, height: 600 });
     const playerProfileNarrow = await readPlayerProfileLayout(page, 'narrow', { width: 960, height: 600 }, 'she/her');
@@ -1485,7 +1577,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
       marketOverlaps: viewport.marketGeometry.overlapPairs,
     }));
     invariant(verdict.ok, `Caribbean port identity evidence failed: ${verdict.issues.join(' | ')}; ${JSON.stringify(artDiagnostics)}`);
-    return { metrics, screenshots };
+    return { metrics, screenshots, screenshotStates };
   } finally {
     await context.close();
   }
@@ -1506,14 +1598,85 @@ function assertRequestedGraphIsolation(metrics) {
   metrics.isolation.battleCssAbsent = true;
 }
 
-function compareRuns(first, second) {
+async function pixelMismatchStats(firstBytes, secondBytes) {
+  const [first, second] = await Promise.all([
+    sharp(firstBytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true }),
+    sharp(secondBytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true }),
+  ]);
+  if (first.info.width !== second.info.width || first.info.height !== second.info.height || first.info.channels !== second.info.channels) {
+    return { dimensionsMatch: false, first: first.info, second: second.info };
+  }
+  let changedPixels = 0;
+  let changedChannels = 0;
+  let totalAbsoluteDelta = 0;
+  let maximumChannelDelta = 0;
+  let minX = first.info.width;
+  let minY = first.info.height;
+  let maxX = -1;
+  let maxY = -1;
+  const coordinates = [];
+  for (let offset = 0; offset < first.data.length; offset += first.info.channels) {
+    let pixelChanged = false;
+    const delta = [];
+    for (let channel = 0; channel < first.info.channels; channel += 1) {
+      const value = Math.abs(first.data[offset + channel] - second.data[offset + channel]);
+      delta.push(value);
+      if (value !== 0) {
+        pixelChanged = true;
+        changedChannels += 1;
+        totalAbsoluteDelta += value;
+        maximumChannelDelta = Math.max(maximumChannelDelta, value);
+      }
+    }
+    if (!pixelChanged) continue;
+    changedPixels += 1;
+    const pixel = offset / first.info.channels;
+    const x = pixel % first.info.width;
+    const y = Math.floor(pixel / first.info.width);
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+    if (coordinates.length < 32) coordinates.push({ x, y, first: [...first.data.subarray(offset, offset + first.info.channels)], second: [...second.data.subarray(offset, offset + second.info.channels)], delta });
+  }
+  return {
+    dimensionsMatch: true, width: first.info.width, height: first.info.height, channels: first.info.channels,
+    changedPixels, changedChannels, totalAbsoluteDelta, maximumChannelDelta,
+    bounds: changedPixels === 0 ? null : { minX, minY, maxX, maxY, width: maxX - minX + 1, height: maxY - minY + 1 },
+    coordinates,
+  };
+}
+
+async function preserveProfileMismatch(first, second) {
+  fs.mkdirSync(MISMATCH_DIAGNOSTIC_DIRECTORY, { recursive: true });
+  const firstBytes = first.screenshots.get('player-profile-desktop.png');
+  const secondBytes = second.screenshots.get('player-profile-desktop.png');
+  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, 'player-profile-run-a.png'), firstBytes);
+  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, 'player-profile-run-b.png'), secondBytes);
+  let pixelStats;
+  try {
+    pixelStats = await pixelMismatchStats(firstBytes, secondBytes);
+  } catch (error) {
+    pixelStats = { error: error instanceof Error ? error.message : String(error) };
+  }
+  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, 'player-profile-mismatch.json'), `${JSON.stringify({
+    filename: 'player-profile-desktop.png', pixelStats,
+    runA: first.screenshotStates.get('player-profile-desktop.png') ?? null,
+    runB: second.screenshotStates.get('player-profile-desktop.png') ?? null,
+  }, null, 2)}\n`);
+}
+
+async function compareRuns(first, second) {
   const firstMetrics = Buffer.from(`${JSON.stringify(first.metrics, null, 2)}\n`);
   const secondMetrics = Buffer.from(`${JSON.stringify(second.metrics, null, 2)}\n`);
   invariant(firstMetrics.equals(secondMetrics), 'Two clean browser runs produced different metrics.json bytes');
   for (const filename of SCREENSHOTS) {
     const firstBytes = first.screenshots.get(filename);
     const secondBytes = second.screenshots.get(filename);
-    invariant(firstBytes?.equals(secondBytes), `Two clean browser runs produced different ${filename} bytes`);
+    if (!firstBytes?.equals(secondBytes)) {
+      if (filename === 'player-profile-desktop.png') await preserveProfileMismatch(first, second);
+      invariant(false, `Two clean browser runs produced different ${filename} bytes`);
+    }
   }
   return firstMetrics;
 }
@@ -1538,7 +1701,7 @@ export async function runPortCheck() {
     console.log('Running deterministic browser journey B…');
     const second = await runJourney(browser, baseUrl, secondDirectory, emittedArt, assetReport);
     assertRequestedGraphIsolation(second.metrics);
-    const metricsBytes = compareRuns(first, second);
+    const metricsBytes = await compareRuns(first, second);
     for (const filename of SCREENSHOTS) saveIfChanged(filename, first.screenshots.get(filename));
     saveIfChanged('metrics.json', metricsBytes);
     console.log(`Caribbean port evidence passed: ${SCREENSHOTS.length} deterministic screenshots, 2 events, recovery reloaded.`);

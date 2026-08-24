@@ -116,6 +116,25 @@ const MARKET_STATUS = {
   resolved: 'Cargo ledger updated.',
 };
 
+const MARKET_SAMPLE_KEYS = ['phase', 'actionTestId', 'stage', 'rows', 'actionStrips', 'stageClientWidth', 'stageScrollWidth', 'rowsClientWidth', 'rowsScrollWidth', 'actionStripWidths', 'scrollLeft', 'scrollTop', 'focusedTestId', 'status', 'ariaBusy'];
+const RECT_KEYS = ['x', 'y', 'width', 'height'];
+const MARKET_STRIP_WIDTH_KEYS = ['testId', 'clientWidth', 'scrollWidth'];
+const BOOTH_VIEWPORT_KEYS = ['viewport', 'activePronouns', 'labels', 'visibleText', 'controls', 'pageHorizontalOverflowPx', 'boothHorizontalOverflowPx', 'pageContained', 'boothContained', 'focusChecks'];
+const BOOTH_TEXT_KEYS = ['text', 'fontPx'];
+const BOOTH_CONTROL_KEYS = ['testId', 'label', 'width', 'height'];
+const BOOTH_FOCUS_KEYS = ['testId', 'focused', 'visible'];
+const ART_EMITTED_KEYS = ['url', 'contentType', 'precached'];
+const ART_REPORT_KEYS = ['historicalReview', 'representationReview', 'subjectRoi', 'sha256'];
+const ART_SCREENSHOT_KEYS = ['normal', 'fallback'];
+const ART_VIEWPORT_KEYS = ['name', 'viewport', 'focal', 'naturalSize', 'fixtureState', 'contrasts', 'menuGeometry', 'marketGeometry', 'activityContrasts'];
+const ART_VIEWPORT_SIZE_KEYS = ['width', 'height'];
+const ART_FOCAL_KEYS = ['xPercent', 'yPercent', 'roiVisibleRatio'];
+const ART_CONTRAST_KEYS = ['selector', 'minimumRatio', 'backgroundAlpha'];
+const ART_ACTIVITY_CONTRAST_KEYS = ['selector', 'text', 'minimumRatio', 'backgroundAlpha'];
+const ART_FIXTURE_KEYS = ['gold', 'provisions'];
+const ART_GEOMETRY_KEYS = ['leaves', 'overlapPairs'];
+const ART_LEAF_KEYS = ['id', 'contained', 'horizontalOverflowPx', 'verticalOverflowPx'];
+
 const BOOTH_CONTROLS = [
   'booth-switch',
   'booth-edit-profile',
@@ -170,18 +189,19 @@ function rectDrift(left, right) {
 function sampleShapeErrors(sample) {
   const errors = [];
   if (!isRecord(sample)) return ['sample must be an object'];
+  exactObject(errors, sample, MARKET_SAMPLE_KEYS, 'market sample');
   if (!MARKET_PHASES.includes(sample.phase)) errors.push('sample has an invalid phase');
   if (typeof sample.actionTestId !== 'string') errors.push('sample action id is missing');
-  if (!validRect(sample.stage)) errors.push('sample stage rectangle is malformed');
+  if (!exactObject(errors, sample.stage, RECT_KEYS, 'market sample stage') || !validRect(sample.stage)) errors.push('sample stage rectangle is malformed');
   if (!Array.isArray(sample.rows)) errors.push('sample rows must be an array');
-  else if (sample.rows.length !== 6 || sample.rows.some((rect) => !validRect(rect))) errors.push('sample rows must contain exactly six rectangles');
+  else if (sample.rows.length !== 6 || sample.rows.some((rect, index) => !exactObject(errors, rect, RECT_KEYS, `market sample row ${index}`) || !validRect(rect))) errors.push('sample rows must contain exactly six rectangles');
   if (!Array.isArray(sample.actionStrips)) errors.push('sample action strips must be an array');
-  else if (sample.actionStrips.length !== 6 || sample.actionStrips.some((rect) => !validRect(rect))) errors.push('sample action strips must contain exactly six rectangles');
+  else if (sample.actionStrips.length !== 6 || sample.actionStrips.some((rect, index) => !exactObject(errors, rect, RECT_KEYS, `market sample action strip ${index}`) || !validRect(rect))) errors.push('sample action strips must contain exactly six rectangles');
   for (const field of ['stageClientWidth', 'stageScrollWidth', 'rowsClientWidth', 'rowsScrollWidth']) {
     if (!finiteNonNegative(sample[field])) errors.push(`sample ${field} is invalid`);
   }
-  if (!Array.isArray(sample.actionStripWidths) || sample.actionStripWidths.length !== 6 || sample.actionStripWidths.some((entry) => (
-    !isRecord(entry) || typeof entry.testId !== 'string'
+  if (!Array.isArray(sample.actionStripWidths) || sample.actionStripWidths.length !== 6 || sample.actionStripWidths.some((entry, index) => (
+    !exactObject(errors, entry, MARKET_STRIP_WIDTH_KEYS, `market sample action strip width ${index}`) || typeof entry.testId !== 'string'
       || !finiteNonNegative(entry.clientWidth) || !finiteNonNegative(entry.scrollWidth)
   ))) errors.push('sample action strip widths are malformed');
   if (!finiteNonNegative(sample.scrollLeft) || !finiteNonNegative(sample.scrollTop)) errors.push('sample scroll position is invalid');
@@ -309,12 +329,13 @@ function validateBoothViewport(issues, value, name, width, height) {
     issues.push(`profile evidence must include Booth ${name} viewport evidence`);
     return;
   }
-  if (!isRecord(value.viewport) || value.viewport.width !== width || value.viewport.height !== height) issues.push(`Booth ${name} viewport is wrong`);
+  exactObject(issues, value, BOOTH_VIEWPORT_KEYS, `Booth ${name}`);
+  if (!exactObject(issues, value.viewport, ART_VIEWPORT_SIZE_KEYS, `Booth ${name} viewport`) || value.viewport.width !== width || value.viewport.height !== height) issues.push(`Booth ${name} viewport is wrong`);
   if (value.pageHorizontalOverflowPx !== 0 || value.boothHorizontalOverflowPx !== 0 || value.pageContained !== true || value.boothContained !== true) issues.push(`Booth ${name} must have zero horizontal overflow and full containment`);
   if (!sameMembers(value.labels, ['Name', 'Pronouns'])) issues.push(`Booth ${name} labels are incomplete`);
-  if (!Array.isArray(value.visibleText) || value.visibleText.length === 0 || value.visibleText.some((entry) => !isRecord(entry) || typeof entry.text !== 'string' || entry.fontPx < 14)) issues.push(`Booth ${name} visible copy is below 14px or missing`);
-  if (!Array.isArray(value.controls) || !sameMembers(value.controls.map((entry) => entry?.testId), BOOTH_CONTROLS) || value.controls.some((entry) => !isRecord(entry) || entry.width < 44 || entry.height < 44)) issues.push(`Booth ${name} controls must cover every control at 44px`);
-  if (!Array.isArray(value.focusChecks) || !sameMembers(value.focusChecks.map((entry) => entry?.testId), BOOTH_CONTROLS) || value.focusChecks.some((entry) => !isRecord(entry) || entry.focused !== true || entry.visible !== true)) issues.push(`Booth ${name} focus checks must cover every control`);
+  if (!Array.isArray(value.visibleText) || value.visibleText.length === 0 || value.visibleText.some((entry, index) => !exactObject(issues, entry, BOOTH_TEXT_KEYS, `Booth ${name} visible text ${index}`) || typeof entry.text !== 'string' || entry.fontPx < 14)) issues.push(`Booth ${name} visible copy is below 14px or missing`);
+  if (!Array.isArray(value.controls) || !sameMembers(value.controls.map((entry) => entry?.testId), BOOTH_CONTROLS) || value.controls.some((entry, index) => !exactObject(issues, entry, BOOTH_CONTROL_KEYS, `Booth ${name} control ${index}`) || entry.width < 44 || entry.height < 44)) issues.push(`Booth ${name} controls must cover every control at 44px`);
+  if (!Array.isArray(value.focusChecks) || !sameMembers(value.focusChecks.map((entry) => entry?.testId), BOOTH_CONTROLS) || value.focusChecks.some((entry, index) => !exactObject(issues, entry, BOOTH_FOCUS_KEYS, `Booth ${name} focus ${index}`) || entry.focused !== true || entry.visible !== true)) issues.push(`Booth ${name} focus checks must cover every control`);
 }
 
 function validSubjectRoi(value) {
@@ -323,8 +344,8 @@ function validSubjectRoi(value) {
 }
 
 function validateArtGeometry(issues, geometry, viewportName, state, expectedIds) {
-  if (!isRecord(geometry) || !Array.isArray(geometry.leaves) || !sameMembers(geometry.leaves.map((leaf) => leaf?.id), expectedIds)
-    || geometry.leaves.some((leaf) => !isRecord(leaf) || leaf.contained !== true || leaf.horizontalOverflowPx !== 0 || leaf.verticalOverflowPx !== 0)) issues.push(`art ${viewportName} ${state} geometry clips or escapes the viewport`);
+  if (!exactObject(issues, geometry, ART_GEOMETRY_KEYS, `art ${viewportName} ${state} geometry`) || !Array.isArray(geometry.leaves) || !sameMembers(geometry.leaves.map((leaf) => leaf?.id), expectedIds)
+    || geometry.leaves.some((leaf, index) => !exactObject(issues, leaf, ART_LEAF_KEYS, `art ${viewportName} ${state} leaf ${index}`) || leaf.contained !== true || leaf.horizontalOverflowPx !== 0 || leaf.verticalOverflowPx !== 0)) issues.push(`art ${viewportName} ${state} geometry clips or escapes the viewport`);
   if (!isRecord(geometry) || !Array.isArray(geometry.overlapPairs) || geometry.overlapPairs.length !== 0) issues.push(`art ${viewportName} ${state} interactive rectangles overlap`);
 }
 
@@ -334,34 +355,35 @@ function validateArtEvidence(issues, art) {
   if (!exactObject(issues, art, [...rawKeys, ...summaryKeys], 'art')) return;
   if (art.status !== 'verified') issues.push('art evidence must be verified');
   if (art.asset !== 'src/games/caribbean/assets/bridgetown-1675.webp') issues.push('art evidence names the wrong production asset');
-  if (!isRecord(art.emitted) || typeof art.emitted.url !== 'string' || !/^\/assets\/bridgetown-1675-[^/]+\.webp$/.test(art.emitted.url) || art.emitted.contentType !== 'image/webp') issues.push('art emitted WebP evidence is malformed');
+  if (!exactObject(issues, art.emitted, ART_EMITTED_KEYS, 'art emitted') || typeof art.emitted.url !== 'string' || !/^\/assets\/bridgetown-1675-[^/]+\.webp$/.test(art.emitted.url) || art.emitted.contentType !== 'image/webp') issues.push('art emitted WebP evidence is malformed');
   else if (art.emitted.precached !== true) issues.push('art emitted WebP must be precached');
-  if (!isRecord(art.report) || art.report.historicalReview !== 'pass' || art.report.representationReview !== 'pass' || art.report.sha256 !== FINAL_ART_SHA256) issues.push('art historical and representation reviews must pass');
+  if (!exactObject(issues, art.report, ART_REPORT_KEYS, 'art report') || art.report.historicalReview !== 'pass' || art.report.representationReview !== 'pass' || art.report.sha256 !== FINAL_ART_SHA256) issues.push('art historical and representation reviews must pass');
   if (!validSubjectRoi(art.report?.subjectRoi)) issues.push('art subject ROI is missing or malformed');
   const expectedScreenshots = ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}.png`);
   const expectedFallbacks = ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}-fallback.png`);
-  if (!isRecord(art.screenshots) || !sameMembers(art.screenshots.normal, expectedScreenshots) || !sameMembers(art.screenshots.fallback, expectedFallbacks)) issues.push('art screenshots must cover normal and fallback at every supported viewport');
+  if (!exactObject(issues, art.screenshots, ART_SCREENSHOT_KEYS, 'art screenshots') || !sameMembers(art.screenshots.normal, expectedScreenshots) || !sameMembers(art.screenshots.fallback, expectedFallbacks)) issues.push('art screenshots must cover normal and fallback at every supported viewport');
   if (!Array.isArray(art.viewports) || !sameMembers(art.viewports.map((viewport) => viewport?.name), ART_VIEWPORT_SPECS.map(({ name }) => name))) {
     issues.push('art viewport evidence must cover the exact supported set');
     return;
   }
   for (const spec of ART_VIEWPORT_SPECS) {
     const viewport = art.viewports.find((candidate) => candidate?.name === spec.name);
-    if (!isRecord(viewport) || !isRecord(viewport.viewport) || viewport.viewport.width !== spec.width || viewport.viewport.height !== spec.height
-      || !isRecord(viewport.naturalSize) || viewport.naturalSize.width !== 1920 || viewport.naturalSize.height !== 1080
-      || !isRecord(viewport.focal) || viewport.focal.xPercent !== spec.focalX || viewport.focal.yPercent !== spec.focalY
+    if (!exactObject(issues, viewport, ART_VIEWPORT_KEYS, `art ${spec.name} viewport`)
+      || !exactObject(issues, viewport.viewport, ART_VIEWPORT_SIZE_KEYS, `art ${spec.name} viewport size`) || viewport.viewport.width !== spec.width || viewport.viewport.height !== spec.height
+      || !exactObject(issues, viewport.naturalSize, ART_VIEWPORT_SIZE_KEYS, `art ${spec.name} natural size`) || viewport.naturalSize.width !== 1920 || viewport.naturalSize.height !== 1080
+      || !exactObject(issues, viewport.focal, ART_FOCAL_KEYS, `art ${spec.name} focal`) || viewport.focal.xPercent !== spec.focalX || viewport.focal.yPercent !== spec.focalY
       || !Number.isFinite(viewport.focal.roiVisibleRatio) || viewport.focal.roiVisibleRatio < 0.7 || viewport.focal.roiVisibleRatio > 1) issues.push(`art ${spec.name} focal evidence is wrong or hides the subject`);
     if (!Array.isArray(viewport?.contrasts) || !sameMembers(viewport.contrasts.map((sample) => sample?.selector), ART_CONTRAST_SELECTORS)
-      || viewport.contrasts.some((sample) => !isRecord(sample) || !Number.isFinite(sample.minimumRatio) || sample.minimumRatio < 4.5 || sample.backgroundAlpha !== 1)) issues.push(`art ${spec.name} contrast must be opaque and at least 4.5:1`);
+      || viewport.contrasts.some((sample, index) => !exactObject(issues, sample, ART_CONTRAST_KEYS, `art ${spec.name} contrast ${index}`) || !Number.isFinite(sample.minimumRatio) || sample.minimumRatio < 4.5 || sample.backgroundAlpha !== 1)) issues.push(`art ${spec.name} contrast must be opaque and at least 4.5:1`);
     if (!Array.isArray(viewport?.activityContrasts)) issues.push(`art ${spec.name} activity contrast must cover actual opaque states`);
     else {
       for (const activitySpec of ART_ACTIVITY_CONTRAST_SPECS) {
         const samples = viewport.activityContrasts.filter((sample) => sample?.selector === activitySpec.selector);
-        if (samples.length !== 1 || samples[0]?.text !== activitySpec.text || samples[0]?.backgroundAlpha !== 1 || !Number.isFinite(samples[0]?.minimumRatio) || samples[0].minimumRatio < 4.5) issues.push(`art ${spec.name} activity contrast is incomplete or insufficient`);
+        if (samples.length !== 1 || !exactObject(issues, samples[0], ART_ACTIVITY_CONTRAST_KEYS, `art ${spec.name} activity contrast ${activitySpec.selector}`) || samples[0]?.text !== activitySpec.text || samples[0]?.backgroundAlpha !== 1 || !Number.isFinite(samples[0]?.minimumRatio) || samples[0].minimumRatio < 4.5) issues.push(`art ${spec.name} activity contrast is incomplete or insufficient`);
       }
       if (viewport.activityContrasts.some((sample) => !ART_ACTIVITY_CONTRAST_SPECS.some(({ selector }) => selector === sample?.selector))) issues.push(`art ${spec.name} activity contrast contains an unexpected selector`);
     }
-    if (!isRecord(viewport?.fixtureState) || viewport.fixtureState.gold !== ART_CAPTURE_FIXTURE_STATE.gold || viewport.fixtureState.provisions !== ART_CAPTURE_FIXTURE_STATE.provisions) issues.push(`art ${spec.name} capture fixture must remain at 500 gold / 3.4 months`);
+    if (!exactObject(issues, viewport?.fixtureState, ART_FIXTURE_KEYS, `art ${spec.name} fixture`) || viewport.fixtureState.gold !== ART_CAPTURE_FIXTURE_STATE.gold || viewport.fixtureState.provisions !== ART_CAPTURE_FIXTURE_STATE.provisions) issues.push(`art ${spec.name} capture fixture must remain at 500 gold / 3.4 months`);
     validateArtGeometry(issues, viewport?.menuGeometry, spec.name, 'menu', ART_MENU_GEOMETRY_IDS);
     validateArtGeometry(issues, viewport?.marketGeometry, spec.name, 'market', ART_MARKET_GEOMETRY_IDS);
   }
@@ -436,7 +458,7 @@ export function evaluatePortIdentityEvidence(evidence) {
     || !finiteNonNegative(evidence.accessibility.minimumMeasuredTargetHeightPx) || evidence.accessibility.minimumMeasuredTargetHeightPx < 44
     || evidence.accessibility.horizontalOverflowPx !== 0) issues.push('accessibility is invalid');
   const boothProfile = evidence.accessibility?.boothProfile;
-  if (!isRecord(boothProfile)) {
+  if (!exactObject(issues, boothProfile, ['desktop', 'narrow'], 'Booth profile')) {
     issues.push('profile evidence must include Booth desktop viewport evidence');
     issues.push('profile evidence must include Booth narrow viewport evidence');
   } else {
@@ -464,8 +486,9 @@ export function evaluatePortIdentityEvidence(evidence) {
     } : null;
     if (!expectedProfileIdentity || Object.entries(expectedProfileIdentity).some(([key, value]) => evidence.profileIdentity[key] !== value)) issues.push('profileIdentity disagrees with raw profile evidence');
   }
+  const artIssueCount = issues.length;
   validateArtEvidence(issues, evidence.art);
-  if (isRecord(evidence.art) && Array.isArray(evidence.art.viewports)) validateFinalArtSummary(issues, evidence.art);
+  if (issues.length === artIssueCount && isRecord(evidence.art) && Array.isArray(evidence.art.viewports)) validateFinalArtSummary(issues, evidence.art);
   if (!isRecord(evidence.market) || evidence.market.status !== 'verified' || !Array.isArray(evidence.market.samples) || Object.keys(evidence.market).length !== 2) issues.push('market evidence must contain verified samples');
   const marketVerdict = isRecord(evidence.market) && Array.isArray(evidence.market.samples) ? validateMarketStability(evidence.market.samples) : null;
   if (marketVerdict && !marketVerdict.ok) issues.push(...marketVerdict.errors);

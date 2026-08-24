@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CARGO_IDS } from '../../src/games/caribbean/content/campaign';
-import { MARKET_PROBE_MINIMUM_NOW_FIXTURES, NOW_FIXTURES } from '../caribbean-port-check.mjs';
+import { MARKET_PROBE_MINIMUM_NOW_FIXTURES, NOW_FIXTURES, profileScreenshotReadinessErrors } from '../caribbean-port-check.mjs';
 
 import {
   EVIDENCE_CARGO_IDS,
@@ -39,9 +39,9 @@ const BOOTH_CONTROLS = [
 function boothViewport(width, height) {
   return {
     viewport: { width, height }, pageHorizontalOverflowPx: 0, boothHorizontalOverflowPx: 0,
-    pageContained: true, boothContained: true, labels: ['Name', 'Pronouns'],
+    activePronouns: 'she/her', pageContained: true, boothContained: true, labels: ['Name', 'Pronouns'],
     visibleText: [{ text: 'Pronouns', fontPx: 14 }],
-    controls: BOOTH_CONTROLS.map((testId) => ({ testId, width: 44, height: 44 })),
+    controls: BOOTH_CONTROLS.map((testId) => ({ testId, label: testId, width: 44, height: 44 })),
     focusChecks: BOOTH_CONTROLS.map((testId) => ({ testId, focused: true, visible: true })),
   };
 }
@@ -255,6 +255,42 @@ describe('evaluatePortIdentityEvidence', () => {
   });
 
   it.each([
+    ['a Market sample', (e) => { e.market.samples[0].unexpected = true; }],
+    ['a Market stage rectangle', (e) => { e.market.samples[0].stage.unexpected = true; }],
+    ['a Market row rectangle', (e) => { e.market.samples[0].rows[0].unexpected = true; }],
+    ['a Market action-strip rectangle', (e) => { e.market.samples[0].actionStrips[0].unexpected = true; }],
+    ['a Market strip-width record', (e) => { e.market.samples[0].actionStripWidths[0].unexpected = true; }],
+    ['a Booth viewport measurement', (e) => { e.accessibility.boothProfile.desktop.unexpected = true; }],
+    ['a Booth viewport record', (e) => { e.accessibility.boothProfile.desktop.viewport.unexpected = true; }],
+    ['a Booth visible-text record', (e) => { e.accessibility.boothProfile.desktop.visibleText[0].unexpected = true; }],
+    ['a Booth control record', (e) => { e.accessibility.boothProfile.desktop.controls[0].unexpected = true; }],
+    ['a Booth focus record', (e) => { e.accessibility.boothProfile.desktop.focusChecks[0].unexpected = true; }],
+    ['the raw art emission record', (e) => { e.art.emitted.unexpected = true; }],
+    ['the raw art report record', (e) => { e.art.report.unexpected = true; }],
+    ['the raw art screenshot record', (e) => { e.art.screenshots.unexpected = true; }],
+    ['a raw art viewport', (e) => { e.art.viewports[0].unexpected = true; }],
+    ['a raw art viewport-size record', (e) => { e.art.viewports[0].viewport.unexpected = true; }],
+    ['a raw art natural-size record', (e) => { e.art.viewports[0].naturalSize.unexpected = true; }],
+    ['a raw art focal record', (e) => { e.art.viewports[0].focal.unexpected = true; }],
+    ['a raw art contrast record', (e) => { e.art.viewports[0].contrasts[0].unexpected = true; }],
+    ['a raw art activity-contrast record', (e) => { e.art.viewports[0].activityContrasts[0].unexpected = true; }],
+    ['a raw art fixture record', (e) => { e.art.viewports[0].fixtureState.unexpected = true; }],
+    ['a raw art geometry record', (e) => { e.art.viewports[0].menuGeometry.unexpected = true; }],
+    ['a raw art geometry leaf', (e) => { e.art.viewports[0].menuGeometry.leaves[0].unexpected = true; }],
+  ])('fails closed on an unknown retained raw nested field in %s', (_label, mutate) => {
+    const evidence = completeEvidence();
+    mutate(evidence);
+    expect(evaluatePortIdentityEvidence(evidence).ok).toBe(false);
+  });
+
+  it('returns structured issues instead of throwing after a malformed raw art record', () => {
+    const evidence = completeEvidence();
+    evidence.art.viewports[0].contrasts = null;
+    expect(() => evaluatePortIdentityEvidence(evidence)).not.toThrow();
+    expect(evaluatePortIdentityEvidence(evidence)).toMatchObject({ ok: false, issues: expect.any(Array) });
+  });
+
+  it.each([
     ['unknown top-level fields', (e) => { e.unexpected = true; }],
     ['unknown nested fields', (e) => { e.art.unexpected = true; }],
     ['non-finite numbers', (e) => { e.art.minimumSubjectRoiVisibleFraction = Number.NaN; }],
@@ -324,5 +360,33 @@ describe('validateMarketStability', () => {
       }
       expect(validateMarketStability(samples)).toMatchObject({ ok: false, errors: expect.any(Array) });
     }
+  });
+});
+
+describe('player profile screenshot readiness', () => {
+  const ready = {
+    activeElement: { tag: 'BODY' }, caret: null, selection: null,
+    scroll: { window: { x: 0, y: 0 }, documentElement: { left: 0, top: 0 }, body: { left: 0, top: 0 } },
+    booth: { left: 0, top: 0 }, fonts: { status: 'loaded' },
+    profileInputs: [{ selectionStart: 0, selectionEnd: 0 }, { selectionStart: 0, selectionEnd: 0 }],
+  };
+
+  it('accepts the normalized pre-screenshot state', () => {
+    expect(profileScreenshotReadinessErrors(ready)).toEqual([]);
+  });
+
+  it('makes an omitted focus/selection/scroll normalization a failed evidence state', () => {
+    expect(profileScreenshotReadinessErrors({
+      ...ready,
+      activeElement: { tag: 'INPUT' }, caret: { start: 2, end: 2 }, selection: { collapsed: true },
+      scroll: { ...ready.scroll, window: { x: 0, y: 12 } }, booth: { left: 0, top: 8 },
+      profileInputs: [{ selectionStart: 1, selectionEnd: 4 }],
+    })).toEqual(expect.arrayContaining([
+      'profile screenshot retains an interactive focus target',
+      'profile screenshot retains a document selection',
+      'profile screenshot retains an input caret',
+      'profile screenshot has non-deterministic scroll state',
+      'profile screenshot retains an input selection range',
+    ]));
   });
 });
