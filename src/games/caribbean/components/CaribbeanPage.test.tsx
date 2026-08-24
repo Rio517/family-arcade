@@ -3,7 +3,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createCampaign } from '../domain/createCampaign';
-import { createJournal } from '../domain/replay';
+import { appendJournal, createJournal } from '../domain/replay';
+import { navalEngagedDraft, seaLegCompletedDraft, voyageStartedDraft } from '../domain/voyage';
 import { loadCampaign, saveCampaign, type StorageLike } from '../storage/persistence';
 import { createCampaignWriter, type LockManagerLike } from '../storage/writer';
 import type { CaribbeanRuntime } from '../state/runtime';
@@ -11,6 +12,7 @@ import { defaultProfile } from '@shared/profile/profile';
 import { emptyUsersState } from '@shared/profile/users';
 import { getUsersSnapshot, setUsersState } from '@shared/profile/usersStore';
 import { CaribbeanPage } from './CaribbeanPage';
+import type { CaribbeanController } from '../state/useCaribbean';
 
 const originalWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
 const originalHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
@@ -104,6 +106,33 @@ function seedSave(store: StorageLike): void {
     build: 'fixture', savedAt: 100, expectedRevision: { currentRaw: null, previousRaw: null },
   });
   if (!result.ok) throw new Error('fixture save failed');
+}
+
+function journalForMode(mode: 'port' | 'sailing' | 'encounter' | 'naval') {
+  const port = appendJournal(createJournal(createCampaign({ seed: 1702, name: 'Morgan' })), {
+    type: 'lead-accepted' as const, payload: { leadId: 'red-jackdaw' as const },
+  });
+  if (mode === 'port') return port;
+  const sailing = appendJournal(port, voyageStartedDraft(port.state));
+  if (mode === 'sailing') return sailing;
+  const encounter = appendJournal(sailing, seaLegCompletedDraft(sailing.state));
+  if (mode === 'encounter') return encounter;
+  return appendJournal(encounter, navalEngagedDraft(encounter.state));
+}
+
+function campaignController(mode: 'port' | 'sailing' | 'encounter' | 'naval'): CaribbeanController {
+  return {
+    load: { kind: 'empty', revision: { currentRaw: null, previousRaw: null } },
+    journal: journalForMode(mode), activity: 'menu', busy: false,
+    persistence: { kind: 'save-conflict', expected: { currentRaw: 'old', previousRaw: null }, actual: { currentRaw: 'new', previousRaw: 'old' } },
+    recoveryWriterCapability: 'available', recoveryFailure: null,
+    start: vi.fn(), resume: vi.fn(), continueWithoutSaving: vi.fn(), dispatch: vi.fn(),
+    setSail: vi.fn(), completeSeaLeg: vi.fn(), avoidEncounter: vi.fn(), engageEncounter: vi.fn(),
+    withdrawBattle: vi.fn(), resolveBattle: vi.fn(), portFocusTarget: null,
+    acknowledgePortFocus: vi.fn(), retrySaving: vi.fn(), reloadExternalSave: vi.fn(),
+    exportInMemoryJournal: vi.fn(() => '{"journal":"exact"}'), recover: vi.fn(),
+    continueRecovery: vi.fn(), abandon: vi.fn(), selectActivity: vi.fn(), closeActivity: vi.fn(),
+  } as CaribbeanController;
 }
 
 afterEach(() => {
@@ -297,5 +326,39 @@ describe('<CaribbeanPage>', () => {
       'data-testid',
       'caribbean-retry-saving-button',
     );
+  });
+
+  it.each(['port', 'sailing', 'encounter', 'naval'] as const)(
+    'keeps the active route beneath the persistence decision dialog: %s',
+    async (mode) => {
+      const { ActiveCampaign } = await import('./CaribbeanPage');
+      const controller = campaignController(mode);
+      const before = structuredClone(controller.journal);
+      render(<ActiveCampaign controller={controller} />);
+
+      expect(await screen.findByTestId('campaign-persistence-dialog')).toBeInTheDocument();
+      const routeTestId = {
+        port: 'caribbean-career-ready',
+        sailing: 'voyage-continue-east',
+        encounter: 'encounter-pursue',
+        naval: 'naval-battle-page',
+      }[mode];
+      expect(await screen.findByTestId(routeTestId)).toBeInTheDocument();
+      expect(screen.getByTestId('campaign-route')).toHaveAttribute('inert');
+      expect(controller.journal).toEqual(before);
+      expect(controller.dispatch).not.toHaveBeenCalled();
+    },
+  );
+
+  it('renders the exact sailing and encounter routes without a persistence decision', async () => {
+    const { ActiveCampaign } = await import('./CaribbeanPage');
+    for (const [mode, testId] of [['sailing', 'voyage-continue-east'], ['encounter', 'encounter-pursue']] as const) {
+      const controller = campaignController(mode);
+      controller.persistence = { kind: 'persisted' };
+      const rendered = render(<ActiveCampaign controller={controller} />);
+      expect(await screen.findByTestId(testId)).toBeInTheDocument();
+      expect(screen.queryByTestId('campaign-persistence-dialog')).not.toBeInTheDocument();
+      rendered.unmount();
+    }
   });
 });

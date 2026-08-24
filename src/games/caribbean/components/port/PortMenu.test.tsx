@@ -15,7 +15,7 @@ const EXPECTED_LABELS = [
 
 describe('<PortMenu>', () => {
   it('renders the seven Bridgetown actions in their exact semantic navigation order', () => {
-    render(<PortMenu activeActivity="menu" onSelect={vi.fn()} />);
+    render(<PortMenu activeActivity="menu" readiness={{ kind: 'ready', requiredProvisions: 2 }} busy={false} onSetSail={vi.fn()} onSelect={vi.fn()} />);
 
     const navigation = screen.getByRole('navigation', { name: 'Bridgetown activities' });
     const actions = within(navigation).getAllByRole('button');
@@ -25,7 +25,7 @@ describe('<PortMenu>', () => {
   });
 
   it('marks only the active activity and gives every control a stable unique test id', () => {
-    render(<PortMenu activeActivity="market" onSelect={vi.fn()} />);
+    render(<PortMenu activeActivity="market" readiness={{ kind: 'ready', requiredProvisions: 2 }} busy={false} onSetSail={vi.fn()} onSelect={vi.fn()} />);
 
     const actions = screen.getAllByRole('button');
     expect(screen.getByRole('button', { name: 'Market' })).toHaveAttribute('aria-current', 'page');
@@ -42,17 +42,77 @@ describe('<PortMenu>', () => {
     expect(new Set(actions.map((action) => action.dataset.testid)).size).toBe(actions.length);
   });
 
-  it('keeps Set Sail natively disabled with an adjacent reason and no selection path', () => {
-    const onSelect = vi.fn();
-    render(<PortMenu activeActivity="menu" onSelect={onSelect} />);
+  it.each([
+    ['not-in-bridgetown', 'Return to Bridgetown before setting a new course.'],
+    ['target-defeated', 'The Red Jackdaw lead is complete.'],
+    ['lead-not-active', 'Mark the Red Jackdaw rumour in the Tavern first.'],
+    ['flagship-unavailable', 'The flagship record is unavailable.'],
+    ['insufficient-provisions', 'Buy at least 2 provisions for the round trip.'],
+  ] as const)('enables Set Sail only when voyage readiness is ready: %s', (reason, copy) => {
+    render(<PortMenu
+      activeActivity="menu"
+      readiness={{ kind: 'blocked', reason, requiredProvisions: 2 }}
+      busy={false}
+      onSetSail={vi.fn()}
+      onSelect={vi.fn()}
+    />);
 
-    const setSail = screen.getByRole('button', { name: 'Set Sail' });
-    const reason = screen.getByText('Sea routes open in the next package.');
+    const setSail = screen.getByTestId('port-action-set-sail');
+    const explanation = screen.getByText(copy);
     expect(setSail).toBeDisabled();
-    expect(setSail).toHaveAttribute('aria-describedby', reason.id);
-    expect(setSail.parentElement).toContainElement(reason);
+    expect(setSail).toHaveAttribute('aria-describedby', explanation.id);
+  });
 
+  it('enables Set Sail only when voyage readiness is ready and guards busy activation', () => {
+    const onSetSail = vi.fn().mockResolvedValue({ kind: 'applied', eventId: 2 });
+    const { rerender } = render(<PortMenu
+      activeActivity="menu"
+      readiness={{ kind: 'ready', requiredProvisions: 2 }}
+      busy={false}
+      onSetSail={onSetSail}
+      onSelect={vi.fn()}
+    />);
+    const setSail = screen.getByTestId('port-action-set-sail');
+    expect(setSail).toBeEnabled();
     fireEvent.click(setSail);
-    expect(onSelect).not.toHaveBeenCalled();
+    fireEvent.click(setSail);
+    expect(onSetSail).toHaveBeenCalledTimes(1);
+
+    rerender(<PortMenu
+      activeActivity="menu"
+      readiness={{ kind: 'ready', requiredProvisions: 2 }}
+      busy
+      onSetSail={onSetSail}
+      onSelect={vi.fn()}
+    />);
+    expect(screen.getByTestId('port-action-set-sail')).toBeDisabled();
+  });
+
+  it('uses the selector-owned completed-target copy instead of Tavern instructions', () => {
+    render(<PortMenu
+      activeActivity="log"
+      readiness={{ kind: 'blocked', reason: 'target-defeated', requiredProvisions: 2 }}
+      busy={false}
+      onSetSail={vi.fn()}
+      onSelect={vi.fn()}
+    />);
+    expect(screen.getByText('The Red Jackdaw lead is complete.')).toBeInTheDocument();
+    expect(screen.queryByText(/Tavern first/)).not.toBeInTheDocument();
+  });
+
+  it('activates a ready Set Sail control from the keyboard once', () => {
+    const onSetSail = vi.fn().mockResolvedValue({ kind: 'applied', eventId: 2 });
+    render(<PortMenu
+      activeActivity="menu"
+      readiness={{ kind: 'ready', requiredProvisions: 2 }}
+      busy={false}
+      onSetSail={onSetSail}
+      onSelect={vi.fn()}
+    />);
+    const action = screen.getByTestId('port-action-set-sail');
+    action.focus();
+    fireEvent.keyDown(action, { key: 'Enter' });
+    fireEvent.click(action, { detail: 0 });
+    expect(onSetSail).toHaveBeenCalledTimes(1);
   });
 });

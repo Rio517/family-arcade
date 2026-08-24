@@ -19,7 +19,6 @@
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--caribbean-trade-wind) 4%, transparent) 1px, transparent 1px) 0 0 / 8.333% 100%,
     radial-gradient(ellipse at 18% 46%, color-mix(in srgb, var(--caribbean-trade-wind) 12%, transparent), transparent 36%),
     var(--caribbean-deep-keel);
 }

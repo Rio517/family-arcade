@@ -7,9 +7,9 @@ import { normalizePronouns, pronounCodePointLength } from '@shared/profile/profi
 import type {
   CaribbeanController,
   RecoveryActionFailure,
-  SaveCapabilityFailure,
 } from '../../state/useCaribbean';
 import { useModalFocus } from '../recovery/useModalFocus';
+import { PersistenceDecisionControls } from './PersistenceDecisionOverlay';
 
 const TALENTS = [
   ['fencing', 'Fencing'],
@@ -23,28 +23,6 @@ export interface CampaignSetupIdentity {
   playerName: string;
   pronouns: string;
   savePronouns(pronouns: string): void;
-}
-
-function downloadText(raw: string, filename: string): void {
-  const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
-function saveFailureCopy(failure: SaveCapabilityFailure): string {
-  if (failure.kind === 'writer-denied') {
-    return 'This tab could not acquire safe save ownership. Continue only if you accept a memory-only career.';
-  }
-  if (failure.kind === 'writer-unavailable') {
-    return 'Safe save ownership is unavailable in this browser. Continue only if you accept a memory-only career.';
-  }
-  if (failure.kind === 'operation-uncertain') {
-    return 'The last save operation has an uncertain outcome. Export or continue without saving before proceeding.';
-  }
-  return 'Campaign storage is unavailable. Continue only if you accept a memory-only career.';
 }
 
 function recoveryActionCopy(
@@ -304,27 +282,12 @@ export function CampaignSetup({
         )}
         {persistence.kind === 'consent-required' && (
           <div className="caribbean-alert" role="alert">
-            <p>{saveFailureCopy(persistence.failure)}</p>
-            <button data-testid="caribbean-continue-without-saving-button" type="button" onClick={controller.continueWithoutSaving}>Continue without saving</button>
+            <PersistenceDecisionControls controller={controller} />
           </div>
         )}
         {persistence.kind === 'save-conflict' && (
           <div className="caribbean-alert" role="alert">
-            <p>A newer save exists. This tab will not overwrite or adopt it without your choice.</p>
-            <div className="caribbean-action-row">
-              <button data-testid="caribbean-reload-newer-save-button" type="button" onClick={() => void controller.reloadExternalSave()}>Reload newer save</button>
-              <button
-                data-testid="caribbean-export-in-memory-journal-button"
-                type="button"
-                onClick={() => {
-                  const raw = controller.exportInMemoryJournal();
-                  if (raw !== null) downloadText(raw, 'caribbean-in-memory-journal.json');
-                }}
-              >
-                Export in-memory journal
-              </button>
-              <button data-testid="caribbean-continue-without-saving-button" type="button" onClick={controller.continueWithoutSaving}>Continue without saving</button>
-            </div>
+            <PersistenceDecisionControls controller={controller} />
           </div>
         )}
       </div>

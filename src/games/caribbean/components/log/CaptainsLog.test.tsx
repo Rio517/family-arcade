@@ -50,4 +50,42 @@ describe("<CaptainsLog>", () => {
     expect(screen.queryByText(NEXT_ACTION)).not.toBeInTheDocument();
     expect(container.querySelector('.caribbean-log-action')).toBeNull();
   });
+
+  it('shows the safe-return explanation without mutating the flagship', () => {
+    const state = acceptedState();
+    const flagshipBefore = structuredClone(state.fleet.ships[0]);
+    state.calendar.elapsedDays = 4;
+    state.world.lastVoyage = {
+      voyageId: 'voyage-2',
+      battleId: 'voyage-2-battle',
+      result: 'victory',
+      outcome: { kind: 'surrender', victorShipId: 'player' },
+      returnedDay: 4,
+    };
+    state.world.targetDefeated = true;
+    state.leads[0].status = 'completed';
+
+    render(<CaptainsLog state={state} />);
+
+    expect(screen.getByTestId('captains-log-last-voyage')).toHaveTextContent(
+      'Victory — Red Jackdaw surrendered · Returned on day 4.',
+    );
+    expect(screen.getByText(
+      'Bridgetown’s harbour crew made Mistral ready for the next departure; the battle outcome remains in this log, but its damage is not carried onto the ready flagship.',
+    )).toBeInTheDocument();
+    expect(state.world.lastVoyage.outcome).toEqual({ kind: 'surrender', victorShipId: 'player' });
+    expect(state.fleet.ships[0]).toEqual(flagshipBefore);
+  });
+
+  it('renders an avoided return without battle-damage copy', () => {
+    const state = acceptedState();
+    state.world.lastVoyage = {
+      voyageId: 'voyage-2', battleId: null, result: 'avoided', outcome: null, returnedDay: 2,
+    };
+    render(<CaptainsLog state={state} />);
+    expect(screen.getByTestId('captains-log-last-voyage')).toHaveTextContent(
+      'Avoided contact · Returned to Bridgetown on day 2.',
+    );
+    expect(screen.queryByText(/damage is not carried/i)).not.toBeInTheDocument();
+  });
 });

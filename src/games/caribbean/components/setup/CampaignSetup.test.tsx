@@ -275,6 +275,18 @@ describe('<CampaignSetup>', () => {
     expect(view.continueWithoutSaving).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps setup-only persistence decisions when the journal is null', () => {
+    const view = controller({
+      journal: null,
+      persistence: { kind: 'consent-required', intent: 'start', failure: { kind: 'writer-denied' } },
+    });
+    renderSetup(view, setupIdentity(), false);
+
+    expect(screen.getByRole('heading', { name: 'Sign a captain’s commission' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/memory-only career/i);
+    expect(screen.queryByTestId('campaign-persistence-dialog')).not.toBeInTheDocument();
+  });
+
   it('freezes a conflict behind reload, exact export, or non-saving continuation', () => {
     const view = controller({
       journal: cleanLoad().journal,

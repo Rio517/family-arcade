@@ -4,6 +4,7 @@ import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { BRIDGETOWN } from '../../content/campaign';
 import { provisionsMonths } from '../../domain/selectors';
 import type { CampaignStateV1, PortActivity } from '../../domain/types';
+import { voyageReadiness } from '../../domain/voyage';
 import type { CaribbeanController } from '../../state/useCaribbean';
 import '../../styles/port.css';
 import { CaptainsLog } from '../log/CaptainsLog';
@@ -64,19 +65,35 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
 
   const flagship = state.fleet.ships.find((ship) => ship.id === state.fleet.flagshipId);
   const months = provisionsMonths(state);
+  const readiness = voyageReadiness(state);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const triggerRefs = useRef<Partial<Record<OpenActivity, HTMLButtonElement | null>>>({});
+  const setSailRef = useRef<HTMLButtonElement | null>(null);
   const previousActivityRef = useRef(controller.activity);
+  const initialFocusAppliedRef = useRef(false);
+  const acknowledgedFocusRef = useRef(false);
+  const { acknowledgePortFocus, portFocusTarget } = controller;
 
   useEffect(() => {
     const previous = previousActivityRef.current;
     previousActivityRef.current = controller.activity;
     if (controller.activity === 'menu') {
-      if (previous !== 'menu') triggerRefs.current[previous]?.focus();
+      if (portFocusTarget === 'last-voyage' && !acknowledgedFocusRef.current) {
+        triggerRefs.current.log?.focus();
+        acknowledgedFocusRef.current = true;
+        acknowledgePortFocus();
+      } else if (previous !== 'menu') {
+        triggerRefs.current[previous]?.focus();
+      } else if (!initialFocusAppliedRef.current) {
+        initialFocusAppliedRef.current = true;
+        if (readiness.kind === 'ready') setSailRef.current?.focus();
+        else if (state.world.lastVoyage !== undefined) triggerRefs.current.log?.focus();
+        else headingRef.current?.focus();
+      }
       return;
     }
     headingRef.current?.focus();
-  }, [controller.activity]);
+  }, [controller.activity, portFocusTarget, acknowledgePortFocus, readiness.kind, state.world.lastVoyage]);
 
   const registerTrigger = useCallback((activity: OpenActivity, element: HTMLButtonElement | null) => {
     triggerRefs.current[activity] = element;
@@ -146,8 +163,12 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
 
       <PortMenu
         activeActivity={controller.activity}
+        readiness={readiness}
+        busy={controller.busy}
+        onSetSail={controller.setSail}
         onSelect={controller.selectActivity}
         registerTrigger={registerTrigger}
+        registerSetSailTrigger={(element) => { setSailRef.current = element; }}
       />
     </section>
   );

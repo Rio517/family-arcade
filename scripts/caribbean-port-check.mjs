@@ -49,6 +49,12 @@ const SCREENSHOTS = [
   'port-art-fallback.png',
   'player-profile-desktop.png',
 ];
+const VOYAGE_SCREENSHOTS = [
+  'sailing-desktop.png',
+  'encounter-desktop.png',
+  'sailing-minimum-supported.png',
+  'sailing-large-portrait-notice.png',
+];
 const PORT_ORDER = [
   "Governor's House",
   'Tavern',
@@ -178,6 +184,11 @@ function assertNormalBuildIsolation() {
   const assets = fs.readdirSync(path.join(DIST, 'assets'));
   const caribbeanGlbs = assets.filter((name) => /^caribbean-sloop.*\.glb$/i.test(name));
   invariant(caribbeanGlbs.length === 0, `Normal build shipped Caribbean sloop GLB: ${caribbeanGlbs.join(', ')}`);
+}
+
+function readUiSlice(argv) {
+  const argument = argv.find((value) => value.startsWith('--ui-slice='));
+  return argument?.slice('--ui-slice='.length) ?? null;
 }
 
 function fileResponsePath(requestUrl) {
@@ -1189,6 +1200,88 @@ async function readActiveEnvelope(page, key = CURRENT_SAVE_KEY) {
   return page.evaluate((storageKey) => localStorage.getItem(storageKey), key);
 }
 
+async function readVoyageEnvelope(page, expectedMode) {
+  const raw = await readActiveEnvelope(page);
+  invariant(typeof raw === 'string', `missing-${expectedMode}-save`);
+  const envelope = JSON.parse(raw);
+  invariant(envelope.version === 1, `wrong-${expectedMode}-save-version`);
+  invariant(envelope.checksum === checksumPayload(envelope.payload), `invalid-${expectedMode}-save-checksum`);
+  invariant(envelope.payload?.state?.mode?.kind === expectedMode, `missing-saved-${expectedMode}-mode`);
+  return envelope;
+}
+
+async function runVoyageUiCheck() {
+  buildNormalProduction();
+  const { server, baseUrl } = await startStaticServer();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-voyage-ui-'));
+  let browser;
+  try {
+    browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+    const context = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: 1,
+      locale: 'en-US',
+      timezoneId: 'UTC',
+      reducedMotion: 'reduce',
+    });
+    await installBrowserBoundary(context);
+    const page = await context.newPage();
+    const failures = { console: [], page: [], requests: [], external: [], requestedPaths: [] };
+    recordFailures(page, baseUrl, failures);
+    const screenshots = new Map();
+    try {
+      await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Start career' }).click();
+      await page.getByTestId('caribbean-career-ready').waitFor();
+      await page.getByRole('button', { name: 'Tavern' }).click();
+      await page.getByRole('button', { name: 'Mark on chart' }).click();
+      await page.getByText("Marked in the Captain's Log").waitFor();
+
+      const setSail = page.getByTestId('port-action-set-sail');
+      if (await setSail.count() !== 1 || !await setSail.isEnabled()) {
+        throw new Error('missing-port-action-set-sail');
+      }
+      await setSail.click();
+      await page.getByTestId('voyage-status').waitFor();
+      const sailingEnvelope = await readVoyageEnvelope(page, 'sailing');
+      invariant(sailingEnvelope.payload.events.at(-1)?.type === 'voyage-started', 'missing-voyage-started-event');
+      await capture(page, screenshots, directory, 'sailing-desktop.png');
+
+      await page.setViewportSize({ width: 960, height: 600 });
+      await page.getByTestId('voyage-status').waitFor();
+      await readLayout(page, 'sailingMinimumSupported', { width: 960, height: 600, supported: true });
+      await capture(page, screenshots, directory, 'sailing-minimum-supported.png');
+
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.getByTestId('voyage-continue-east').click();
+      await page.getByTestId('encounter-pursue').waitFor();
+      const encounterEnvelope = await readVoyageEnvelope(page, 'encounter');
+      invariant(encounterEnvelope.payload.events.at(-1)?.type === 'sea-leg-completed', 'missing-sea-leg-completed-event');
+      await capture(page, screenshots, directory, 'encounter-desktop.png');
+
+      await page.setViewportSize({ width: 1024, height: 1366 });
+      await page.getByTestId('caribbean-minimum-screen').waitFor();
+      await readLayout(page, 'sailingLargePortraitNotice', { width: 1024, height: 1366, supported: false });
+      await capture(page, screenshots, directory, 'sailing-large-portrait-notice.png');
+
+      invariant(failures.console.length === 0, `console-errors-${failures.console.join('|')}`);
+      invariant(failures.page.length === 0, `page-errors-${failures.page.join('|')}`);
+      invariant(failures.requests.length === 0, `request-errors-${failures.requests.join('|')}`);
+      invariant(failures.external.length === 0, `external-requests-${failures.external.join('|')}`);
+      invariant(!failures.requestedPaths.some((requestPath) => requestPath.endsWith('.glb')), 'naval-assets-requested-before-pursuit');
+      invariant(VOYAGE_SCREENSHOTS.every((filename) => screenshots.has(filename)), 'incomplete-voyage-screenshot-set');
+      for (const filename of VOYAGE_SCREENSHOTS) saveIfChanged(filename, screenshots.get(filename));
+      console.log(`CARIBBEAN_VOYAGE_UI_OK screenshots=${VOYAGE_SCREENSHOTS.length}`);
+    } finally {
+      await context.close();
+    }
+  } finally {
+    await browser?.close();
+    await stopStaticServer(server);
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
 async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetReport) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -1716,8 +1809,14 @@ export async function runPortCheck() {
 
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
 if (import.meta.url === invokedPath) {
-  runPortCheck().catch((error) => {
-    console.error(error instanceof Error ? error.stack ?? error.message : error);
+  const uiSlice = readUiSlice(process.argv.slice(2));
+  const command = uiSlice === 'voyage' ? runVoyageUiCheck : runPortCheck;
+  command().catch((error) => {
+    if (uiSlice === 'voyage') {
+      console.error(`CARIBBEAN_VOYAGE_UI_FAILED ${error instanceof Error ? error.message : String(error)}`);
+    } else {
+      console.error(error instanceof Error ? error.stack ?? error.message : error);
+    }
     process.exitCode = 1;
   });
 }

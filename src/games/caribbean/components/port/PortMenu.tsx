@@ -1,4 +1,7 @@
+import { useRef } from 'react';
+
 import type { PortActivity } from '../../domain/types';
+import type { VoyageBlockedReason, VoyageReadiness } from '../../domain/voyage';
 
 // This immutable action contract lives beside its only renderer by design.
 // eslint-disable-next-line react-refresh/only-export-components
@@ -14,21 +17,55 @@ export const PORT_ACTIONS = [
 
 interface PortMenuProps {
   activeActivity: PortActivity;
+  readiness: VoyageReadiness;
+  busy: boolean;
   onSelect(activity: Exclude<PortActivity, 'menu'>): void;
+  onSetSail(): Promise<unknown>;
   registerTrigger?(
     activity: Exclude<PortActivity, 'menu'>,
     element: HTMLButtonElement | null,
   ): void;
+  registerSetSailTrigger?(element: HTMLButtonElement | null): void;
 }
 
-export function PortMenu({ activeActivity, onSelect, registerTrigger }: PortMenuProps) {
+function portReadinessCopy(reason: VoyageBlockedReason): string {
+  switch (reason) {
+    case 'not-in-bridgetown': return 'Return to Bridgetown before setting a new course.';
+    case 'target-defeated': return 'The Red Jackdaw lead is complete.';
+    case 'lead-not-active': return 'Mark the Red Jackdaw rumour in the Tavern first.';
+    case 'flagship-unavailable': return 'The flagship record is unavailable.';
+    case 'insufficient-provisions': return 'Buy at least 2 provisions for the round trip.';
+  }
+}
+
+export function PortMenu({
+  activeActivity,
+  readiness,
+  busy,
+  onSelect,
+  onSetSail,
+  registerTrigger,
+  registerSetSailTrigger,
+}: PortMenuProps) {
+  const setSailInFlight = useRef(false);
+  const blocked = readiness.kind === 'blocked';
+  const reason = blocked
+    ? portReadinessCopy(readiness.reason)
+    : 'Two provisions cover the outbound leg and guaranteed return.';
+  const depart = () => {
+    if (blocked || busy || setSailInFlight.current) return;
+    setSailInFlight.current = true;
+    void onSetSail().finally(() => {
+      setSailInFlight.current = false;
+    });
+  };
   return (
     <nav className="caribbean-port-menu" aria-label="Bridgetown activities">
       <ol className="caribbean-port-actions">
         {PORT_ACTIONS.map((action) => (
           <li
             key={action.kind === 'activity' ? action.activity : action.kind}
-            className={action.kind === 'set-sail' ? 'caribbean-port-action-item caribbean-port-action-item--disabled' : 'caribbean-port-action-item'}
+            className={`caribbean-port-action-item${action.kind === 'set-sail' && (blocked || busy) ? ' caribbean-port-action-item--disabled' : ''}`}
           >
             {action.kind === 'activity' ? (
               <button
@@ -44,16 +81,18 @@ export function PortMenu({ activeActivity, onSelect, registerTrigger }: PortMenu
             ) : (
               <>
                 <button
+                  ref={registerSetSailTrigger}
                   className="caribbean-port-action"
                   data-testid="port-action-set-sail"
                   type="button"
-                  disabled
+                  disabled={blocked || busy}
                   aria-describedby="port-set-sail-reason"
+                  onClick={depart}
                 >
                   {action.label}
                 </button>
                 <span id="port-set-sail-reason" className="caribbean-port-action-reason">
-                  Sea routes open in the next package.
+                  {reason}
                 </span>
               </>
             )}

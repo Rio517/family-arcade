@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { createCampaign } from '../../domain/createCampaign';
-import { createJournal } from '../../domain/replay';
+import { appendJournal, createJournal } from '../../domain/replay';
 import type { PortActivity } from '../../domain/types';
 import { loadCampaign, type StorageLike } from '../../storage/persistence';
 import { createCampaignWriter, type LockManagerLike } from '../../storage/writer';
@@ -26,6 +26,14 @@ const CONSERVATIVE_GLYPH_EM = {
   monospaceDigits: 0.64,
 } as const;
 const STATUS_CONTENT_BUDGETS_PX = [64, 72, 68, 178, 92] as const;
+const ACTIVITY_LABEL_FOR_TEST = {
+  governor: "Governor's House",
+  tavern: 'Tavern',
+  market: 'Market',
+  shipyard: 'Shipyard',
+  shares: 'Divide Shares',
+  log: "Captain's Log",
+} as const;
 
 function ruleBodyContaining(css: string, selector: string, after = 0): string {
   const selectorIndex = css.indexOf(selector, after);
@@ -214,15 +222,41 @@ function makeRuntime(storage: StorageLike): CaribbeanRuntime {
   };
 }
 
+function makePortController(
+  journal: NonNullable<CaribbeanController['journal']>,
+  overrides: Partial<CaribbeanController> = {},
+): CaribbeanController {
+  return Object.assign({
+    load: { kind: 'empty', revision: { currentRaw: null, previousRaw: null } },
+    journal, activity: 'menu', busy: false, persistence: { kind: 'persisted' },
+    recoveryWriterCapability: 'available', recoveryFailure: null,
+    start: vi.fn(), resume: vi.fn(), continueWithoutSaving: vi.fn(), dispatch: vi.fn(),
+    setSail: vi.fn(), completeSeaLeg: vi.fn(), avoidEncounter: vi.fn(), engageEncounter: vi.fn(),
+    withdrawBattle: vi.fn(), resolveBattle: vi.fn(), portFocusTarget: null,
+    acknowledgePortFocus: vi.fn(), retrySaving: vi.fn(), reloadExternalSave: vi.fn(),
+    exportInMemoryJournal: vi.fn(), recover: vi.fn(), continueRecovery: vi.fn(), abandon: vi.fn(),
+    selectActivity: vi.fn(), closeActivity: vi.fn(),
+  } as CaribbeanController, overrides);
+}
+
 function StatefulPort({
   dispatch = vi.fn(async () => ({ kind: 'not-applied' as const })),
   onSelection = vi.fn(),
+  initialActivity = 'menu',
+  activeLead = false,
+  setSailOutcome = 'not-applied',
 }: {
   dispatch?: CaribbeanController['dispatch'];
   onSelection?: (activity: PortActivity) => void;
+  initialActivity?: PortActivity;
+  activeLead?: boolean;
+  setSailOutcome?: 'applied' | 'not-applied';
 }) {
-  const [journal] = useState(() => createJournal(createCampaign({ seed: 1702, name: 'Morgan' })));
-  const [activity, setActivity] = useState<PortActivity>('menu');
+  const [journal] = useState(() => {
+    const created = createJournal(createCampaign({ seed: 1702, name: 'Morgan' }));
+    return activeLead ? appendJournal(created, { type: 'lead-accepted', payload: { leadId: 'red-jackdaw' } }) : created;
+  });
+  const [activity, setActivity] = useState<PortActivity>(initialActivity);
   const controller: CaribbeanController = {
     load: { kind: 'empty', revision: { currentRaw: null, previousRaw: null } },
     journal,
@@ -235,7 +269,13 @@ function StatefulPort({
     resume: vi.fn(async () => undefined),
     continueWithoutSaving: vi.fn(),
     dispatch,
-    setSail: vi.fn(async () => ({ kind: 'not-applied' as const })),
+    setSail: vi.fn(async () => {
+      const outcome = setSailOutcome === 'applied'
+        ? { kind: 'applied' as const, eventId: journal.state.lastEventId + 1 }
+        : { kind: 'not-applied' as const };
+      if (outcome.kind === 'applied') setActivity('menu');
+      return outcome;
+    }),
     completeSeaLeg: vi.fn(async () => ({ kind: 'not-applied' as const })),
     avoidEncounter: vi.fn(async () => ({ kind: 'not-applied' as const })),
     engageEncounter: vi.fn(async () => ({ kind: 'not-applied' as const })),
@@ -356,6 +396,60 @@ describe('<PortPage>', () => {
     fireEvent.keyDown(heading, { key: 'Escape' });
     expect(screen.getByRole('heading', { name: 'Choose your next port action' })).toBeInTheDocument();
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it.each(['governor', 'tavern', 'market', 'shipyard', 'shares', 'log'] as const)(
+    'resets the open %s activity only after published departure',
+    async (activity) => {
+      const { rerender } = render(<StatefulPort initialActivity={activity} activeLead setSailOutcome="not-applied" />);
+      fireEvent.click(screen.getByTestId('port-action-set-sail'));
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByRole('heading', { name: ACTIVITY_LABEL_FOR_TEST[activity] })).toBeInTheDocument();
+
+      rerender(<StatefulPort initialActivity={activity} activeLead setSailOutcome="applied" />);
+      fireEvent.click(screen.getByTestId('port-action-set-sail'));
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Choose your next port action' })).toBeInTheDocument());
+    },
+  );
+
+  it('focuses the published last voyage action once', async () => {
+    const journal = appendJournal(createJournal(createCampaign({ seed: 1702, name: 'Morgan' })), {
+      type: 'lead-accepted', payload: { leadId: 'red-jackdaw' },
+    });
+    journal.state.world.lastVoyage = {
+      voyageId: 'voyage-2', battleId: null, result: 'avoided', outcome: null, returnedDay: 2,
+    };
+    const acknowledgePortFocus = vi.fn();
+    const controller = makePortController(journal, {
+      portFocusTarget: 'last-voyage', acknowledgePortFocus,
+    });
+    render(<PortPage controller={controller} />);
+    await waitFor(() => expect(screen.getByTestId('port-action-log')).toHaveFocus());
+    expect(acknowledgePortFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('focuses Set Sail on a ready reload and Log on a victorious reload', async () => {
+    const ready = appendJournal(createJournal(createCampaign({ seed: 1702, name: 'Morgan' })), {
+      type: 'lead-accepted', payload: { leadId: 'red-jackdaw' },
+    });
+    const { unmount } = render(<PortPage controller={makePortController(ready)} />);
+    await waitFor(() => expect(screen.getByTestId('port-action-set-sail')).toHaveFocus());
+    unmount();
+
+    const victorious = structuredClone(ready);
+    victorious.state.world.targetDefeated = true;
+    victorious.state.leads[0].status = 'completed';
+    victorious.state.world.lastVoyage = {
+      voyageId: 'voyage-2', battleId: 'voyage-2-battle', result: 'victory',
+      outcome: { kind: 'surrender', victorShipId: 'player' }, returnedDay: 2,
+    };
+    render(<PortPage controller={makePortController(victorious)} />);
+    await waitFor(() => expect(screen.getByTestId('port-action-log')).toHaveFocus());
+  });
+
+  it('focuses the harbour heading when no route or voyage summary is available', async () => {
+    render(<StatefulPort />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Choose your next port action' })).toHaveFocus());
   });
 
   it('gives every rendered interactive control a stable unique test id', () => {
