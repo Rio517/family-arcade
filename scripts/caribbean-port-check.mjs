@@ -42,9 +42,10 @@ const SCREENSHOTS = [
   'minimum-screen-width.png',
   'minimum-screen-height.png',
   'minimum-screen-large-portrait.png',
+  'port-tablet-landscape.png',
+  'port-compact-landscape.png',
+  'port-art-fallback.png',
   'player-profile-desktop.png',
-  ...ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}.png`),
-  ...ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}-fallback.png`),
 ];
 const PORT_ORDER = [
   "Governor's House",
@@ -57,7 +58,11 @@ const PORT_ORDER = [
 ];
 const VIEWPORTS = {
   setupDesktop: { width: 1440, height: 900, supported: true },
+  profileDesktop: { width: 1440, height: 900, supported: false, controllerMounted: false, noticeVisible: false, noticeFocused: false, targetRootSelector: '.booth' },
   portDesktop: { width: 1440, height: 900, supported: true },
+  portTabletLandscape: { width: 1180, height: 820, supported: true },
+  portCompactLandscape: { width: 1024, height: 768, supported: true },
+  artFallback: { width: 1440, height: 900, supported: true },
   minimumSupported: { width: 960, height: 600, supported: true },
   minimumWidth: { width: 959, height: 600, supported: false },
   minimumHeight: { width: 960, height: 599, supported: false },
@@ -417,7 +422,11 @@ async function readLayout(page, name, expected) {
       && [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
     ));
     const activeTargetSelector = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [role="button"]:not([aria-disabled="true"])';
-    const activeTargets = [...document.querySelectorAll(activeTargetSelector)].filter(visible);
+    const targetRoot = expectedViewport.targetRootSelector === undefined
+      ? document
+      : document.querySelector(expectedViewport.targetRootSelector);
+    if (!(targetRoot instanceof Document) && !(targetRoot instanceof HTMLElement)) throw new Error(`Target scope is missing: ${expectedViewport.targetRootSelector}`);
+    const activeTargets = [...targetRoot.querySelectorAll(activeTargetSelector)].filter(visible);
     const routeTargets = root === null ? [] : [...root.querySelectorAll(
       'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [role="button"]:not([aria-disabled="true"])',
     )].filter(visible);
@@ -474,14 +483,22 @@ async function readLayout(page, name, expected) {
   invariant(result.width === expected.width && result.height === expected.height, `${name} viewport drifted`);
   invariant(result.dpr === 1, `${name} used DPR ${result.dpr}`);
   invariant(result.horizontalOverflowPx === 0, `${name} has ${result.horizontalOverflowPx}px horizontal overflow`);
-  if (expected.supported) {
+  const expectedController = expected.controllerMounted ?? expected.supported;
+  const expectedNotice = expected.noticeVisible ?? !expected.supported;
+  const expectedNoticeFocus = expected.noticeFocused ?? !expected.supported;
+  if (expectedController) {
     invariant(result.controllerMounted && !result.noticeVisible, `${name} blocked a supported playfield`);
     invariant(result.minimumFontPx !== null && result.minimumFontPx >= 14, `${name} has ${result.minimumFontPx}px text`);
     invariant(result.undersizedTargets.length === 0, `${name} has undersized active targets: ${JSON.stringify(result.undersizedTargets)}`);
     invariant(result.occludedTargets.length === 0, `${name} has Party control occlusion: ${JSON.stringify(result.occludedTargets)}`);
     invariant(!result.partyObscured, `${name} renders the Party control beneath another surface`);
-  } else {
+  } else if (expectedNotice) {
     invariant(!result.controllerMounted && result.noticeVisible && result.noticeFocused, `${name} mounted a controller or failed to focus its notice`);
+  } else {
+    invariant(!result.controllerMounted && !result.noticeVisible && result.noticeFocused === expectedNoticeFocus,
+      `${name} mounted a Caribbean controller or unsupported notice unexpectedly`);
+    invariant(result.minimumFontPx !== null && result.minimumFontPx >= 14, `${name} has ${result.minimumFontPx}px text`);
+    invariant(result.undersizedTargets.length === 0, `${name} has undersized active targets: ${JSON.stringify(result.undersizedTargets)}`);
   }
   return result;
 }
@@ -515,7 +532,7 @@ const BOOTH_CONTROL_IDS = [
   'booth-profile-save',
 ];
 
-async function readPlayerProfileLayout(page, name, viewport) {
+async function readPlayerProfileLayout(page, name, viewport, expectedPronouns) {
   await page.getByTestId('booth-edit-profile').focus();
   await page.keyboard.press('Shift+Tab');
   const focusChecks = [];
@@ -576,7 +593,7 @@ async function readPlayerProfileLayout(page, name, viewport) {
     };
   });
   const measurement = { viewport, ...result, focusChecks };
-  invariant(result.activePronouns === 'they/them', `Booth displayed wrong saved pronouns: ${result.activePronouns}`);
+  invariant(result.activePronouns === expectedPronouns, `Booth displayed wrong saved pronouns: ${result.activePronouns}`);
   invariant(result.labels.includes('Name') && result.labels.includes('Pronouns'), 'Booth editor labels are incomplete');
   invariant(result.visibleText.every((entry) => entry.fontPx >= 14), `Booth has visible copy below 14px: ${JSON.stringify(result.visibleText)}`);
   invariant(result.controls.length === BOOTH_CONTROL_IDS.length && result.controls.every((control) => control.width >= 44 && control.height >= 44), `Booth has undersized controls: ${JSON.stringify(result.controls)}`);
@@ -809,6 +826,7 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
   const normalFailures = { console: [], page: [], requests: [], external: [], requestedPaths: [] };
   recordFailures(normalPage, baseUrl, normalFailures);
   const viewports = [];
+  let fallbackLayout;
   try {
     await setupArtPage(normalPage, baseUrl);
     await normalPage.getByTestId('caribbean-port-backdrop').waitFor();
@@ -952,11 +970,12 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
       }));
       throw new Error(`Forced art failure did not reach fallback: ${JSON.stringify({ diagnostic, failures: fallbackFailures })}; ${error.message}`);
     }
+    fallbackLayout = await readLayout(fallbackPage, 'artFallback', VIEWPORTS.artFallback);
     for (const spec of ART_VIEWPORT_SPECS) {
       await fallbackPage.setViewportSize({ width: spec.width, height: spec.height });
       await fallbackPage.getByRole('heading', { name: 'Choose your next port action', level: 2 }).waitFor();
       invariant(await fallbackPage.getByRole('button', { name: 'Market' }).isEnabled(), `${spec.name} fallback lost port controls`);
-      await capture(fallbackPage, screenshots, runDirectory, `port-art-${spec.name}-fallback.png`);
+      if (spec.name === 'desktop') await capture(fallbackPage, screenshots, runDirectory, 'port-art-fallback.png');
     }
     invariant(fallbackFailures.allowlistedRequests === 1, `Expected one allowlisted art failure, found ${fallbackFailures.allowlistedRequests}`);
     const expectedAbortConsole = fallbackFailures.console.filter((message) => message === 'Failed to load resource: net::ERR_FAILED');
@@ -968,7 +987,12 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
   } finally {
     await fallbackContext.close();
   }
-  return viewports;
+  invariant(fallbackLayout !== undefined, 'Forced art failure did not record its desktop viewport');
+  return {
+    viewports,
+    fallbackLayout,
+    localRequest: normalFailures.requestedPaths.includes(emitted.url),
+  };
 }
 
 async function readMarketGeometry(page, phase, actionTestId) {
@@ -1127,6 +1151,14 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
     layouts.portDesktop = await readLayout(page, 'portDesktop', VIEWPORTS.portDesktop);
     await capture(page, screenshots, runDirectory, 'port-desktop.png');
 
+    await page.setViewportSize({ width: VIEWPORTS.portTabletLandscape.width, height: VIEWPORTS.portTabletLandscape.height });
+    layouts.portTabletLandscape = await readLayout(page, 'portTabletLandscape', VIEWPORTS.portTabletLandscape);
+    await capture(page, screenshots, runDirectory, 'port-tablet-landscape.png');
+    await page.setViewportSize({ width: VIEWPORTS.portCompactLandscape.width, height: VIEWPORTS.portCompactLandscape.height });
+    layouts.portCompactLandscape = await readLayout(page, 'portCompactLandscape', VIEWPORTS.portCompactLandscape);
+    await capture(page, screenshots, runDirectory, 'port-compact-landscape.png');
+    await page.setViewportSize({ width: VIEWPORTS.portDesktop.width, height: VIEWPORTS.portDesktop.height });
+
     await page.getByRole('button', { name: 'Market' }).click();
     await page.getByRole('heading', { name: 'Market', level: 2 }).waitFor();
     await page.getByRole('button', { name: 'Buy 5 Provisions' }).click();
@@ -1241,25 +1273,31 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
     await page.goto(`${baseUrl}/#/`, { waitUntil: 'networkidle' });
     await page.getByTestId('booth-edit-profile').click();
     await page.getByTestId('booth-profile-name').fill('Port Profile');
-    await page.getByTestId('booth-profile-pronouns').fill('they/them');
+    await page.getByTestId('booth-profile-pronouns').fill('she/her');
     await page.getByTestId('booth-profile-save').click();
-    await page.getByText('they/them').waitFor();
+    await page.getByText('she/her').waitFor();
     const persistedProfile = await page.evaluate(() => {
       const raw = localStorage.getItem('arcade.users.v1');
       return raw === null ? null : JSON.parse(raw).users.find((user) => user.id === 'port-check-player')?.profile;
     });
     invariant(
-      persistedProfile?.name === 'Port Profile' && persistedProfile?.pronouns === 'they/them',
+      persistedProfile?.name === 'Port Profile' && persistedProfile?.pronouns === 'she/her',
       'Booth profile did not persist name and pronouns together',
     );
+    const postProfileEnvelope = verifyEnvelope(await readActiveEnvelope(page), 'site-wide profile change');
+    invariant(
+      postProfileEnvelope.payload.state.captain.name === 'Mario' && postProfileEnvelope.payload.state.captain.pronouns === 'they/them',
+      'Editing the site-wide profile rewrote the existing campaign identity snapshot',
+    );
     await page.getByTestId('booth-edit-profile').click();
-    const playerProfileDesktop = await readPlayerProfileLayout(page, 'desktop', { width: 1440, height: 900 });
+    await readPlayerProfileLayout(page, 'desktop', { width: 1440, height: 900 }, 'she/her');
+    layouts.profileDesktop = await readLayout(page, 'profileDesktop', VIEWPORTS.profileDesktop);
     await page.evaluate(() => {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     });
     await capture(page, screenshots, runDirectory, 'player-profile-desktop.png');
     await page.setViewportSize({ width: 960, height: 600 });
-    const playerProfileNarrow = await readPlayerProfileLayout(page, 'narrow', { width: 960, height: 600 });
+    await readPlayerProfileLayout(page, 'narrow', { width: 960, height: 600 }, 'she/her');
     await page.setViewportSize({ width: 1440, height: 900 });
 
     const trace = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), TRACE_KEY);
@@ -1283,7 +1321,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
 
     const marketSamples = await runMarketProbe(browser, baseUrl);
     console.log('Checking painted harbour art, focal crops, contrast, geometry, and fallback…');
-    const artViewports = await captureArtEvidence(
+    const artEvidence = await captureArtEvidence(
       browser,
       baseUrl,
       runDirectory,
@@ -1291,10 +1329,26 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
       emittedArt,
       assetReport.subjectRoi,
     );
+    layouts.artFallback = artEvidence.fallbackLayout;
     const supportedLayouts = [
-      layouts.setupDesktop, layouts.portDesktop, marketLayout, tavernLayout, logLayout,
-      layouts.minimumSupported, recoveryLayout,
+      layouts.setupDesktop, layouts.portDesktop, layouts.portTabletLandscape, layouts.portCompactLandscape,
+      layouts.artFallback, marketLayout, tavernLayout, logLayout, layouts.minimumSupported, recoveryLayout,
     ];
+    const artViewports = artEvidence.viewports;
+    const artLeaves = artViewports.flatMap((viewport) => [
+      ...viewport.menuGeometry.leaves,
+      ...viewport.marketGeometry.leaves,
+    ]);
+    const artOverlaps = artViewports.flatMap((viewport) => [
+      ...viewport.menuGeometry.overlapPairs,
+      ...viewport.marketGeometry.overlapPairs,
+    ]);
+    const artContrasts = artViewports.flatMap((viewport) => [
+      ...viewport.contrasts,
+      ...viewport.activityContrasts,
+    ]);
+    const marketVerdict = validateMarketStability(marketSamples);
+    invariant(marketVerdict.ok, 'Market probe did not produce a verified final stability summary');
     metrics = {
       browser: { name: 'Chromium', version: browser.version() },
       route: ROUTE,
@@ -1320,7 +1374,6 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
         minimumMeasuredTargetWidthPx: Math.min(...supportedLayouts.map((layout) => layout.minimumTargetWidthPx)),
         minimumMeasuredTargetHeightPx: Math.min(...supportedLayouts.map((layout) => layout.minimumTargetHeightPx)),
         horizontalOverflowPx: Math.max(...Object.values(layouts).map((layout) => layout.horizontalOverflowPx)),
-        boothProfile: { desktop: playerProfileDesktop, narrow: playerProfileNarrow },
       },
       requests: {
         externalCount: failures.external.length,
@@ -1338,6 +1391,8 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
         caribbeanGlbAbsent: true,
         glbRequested: false,
         previewResourceRequested: false,
+        moduleMarkersAbsent: false,
+        battleCssAbsent: false,
       },
       recovery: {
         quarantineKey: recoveredStorage.quarantineKeys[0],
@@ -1349,30 +1404,45 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
       screenshots: SCREENSHOTS,
       determinism: { cleanRuns: 2, metricsByteIdentical: true, screenshotsByteIdentical: true },
       schemaVersion: 2,
-      packagePhase: 'art',
-      profile: {
-        status: 'setup-verified',
+      packagePhase: 'complete',
+      profileIdentity: {
+        status: 'verified',
         defaultPronouns: 'he/him',
-        boothProfilePersisted: true,
-        setup: setupIdentity,
+        setupNamePrefilled: setupIdentity.prefill.captainName === 'Mario',
+        setupPronounsPrefilled: setupIdentity.prefill.pronouns === 'he/him',
+        campaignSnapshotPreserved: postProfileEnvelope.payload.state.captain.pronouns === 'they/them',
+        careerLengthControlAbsent: setupIdentity.careerLengthControlPresent === false,
+        newCampaignLength: setupEnvelope.payload.state.career.length,
       },
       art: {
         status: 'verified',
-        asset: 'src/games/caribbean/assets/bridgetown-1675.webp',
-        emitted: emittedArt,
-        report: {
-          historicalReview: assetReport.historicalReview,
-          representationReview: assetReport.representationReview,
-          subjectRoi: assetReport.subjectRoi,
-        },
-        screenshots: {
-          normal: ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}.png`),
-          fallback: ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}-fallback.png`),
-        },
-        viewports: artViewports,
+        loaded: artViewports.every((viewport) => viewport.naturalSize.width === 1920 && viewport.naturalSize.height === 1080),
+        localRequest: artEvidence.localRequest,
+        naturalWidth: artViewports[0].naturalSize.width,
+        naturalHeight: artViewports[0].naturalSize.height,
+        fallbackVerified: true,
+        precached: emittedArt.precached,
+        historicalReview: assetReport.historicalReview,
+        representationReview: assetReport.representationReview,
+        focalVisibleAt: artViewports.map((viewport) => `${viewport.viewport.width}x${viewport.viewport.height}`),
+        minimumSubjectRoiVisibleFraction: Math.min(...artViewports.map((viewport) => viewport.focal.roiVisibleRatio)),
+        minimumTextContrast: Math.min(...artContrasts.map((sample) => sample.minimumRatio)),
+        overlapCount: artOverlaps.length,
+        clippingCount: artLeaves.filter((leaf) => !leaf.contained || leaf.horizontalOverflowPx !== 0 || leaf.verticalOverflowPx !== 0).length,
+        sha256: assetReport.sha256,
       },
-      market: { status: 'verified', samples: marketSamples },
+      marketStability: {
+        status: 'verified',
+        sampleCount: marketSamples.length,
+        actionIds: EXPECTED_MARKET_ACTION_IDS,
+        maxDrift: marketVerdict.maxDrift,
+        horizontalOverflow: 0,
+        focusPreserved: true,
+        busyStatesVerified: true,
+        statusesVerified: true,
+      },
     };
+    assertRequestedGraphIsolation(metrics);
     const verdict = evaluatePortIdentityEvidence(metrics);
     const artDiagnostics = artViewports.map((viewport) => ({
       name: viewport.name,

@@ -19,19 +19,32 @@ const V2_FIELDS = [
   ...RETAINED_V1_SECTIONS,
   'schemaVersion',
   'packagePhase',
-  'profile',
+  'profileIdentity',
   'art',
-  'market',
+  'marketStability',
 ];
 
-const BOOTH_CONTROLS = [
-  'booth-switch',
-  'booth-edit-profile',
-  'booth-new',
-  'booth-profile-name',
-  'booth-profile-pronouns',
-  'booth-profile-save',
-];
+const FINAL_VIEWPORTS = Object.freeze({
+  setupDesktop: Object.freeze({ width: 1440, height: 900, expectedSupported: true, controllerMounted: true, noticeVisible: false, noticeFocused: false }),
+  profileDesktop: Object.freeze({ width: 1440, height: 900, expectedSupported: false, controllerMounted: false, noticeVisible: false, noticeFocused: false }),
+  portDesktop: Object.freeze({ width: 1440, height: 900, expectedSupported: true, controllerMounted: true, noticeVisible: false, noticeFocused: false }),
+  portTabletLandscape: Object.freeze({ width: 1180, height: 820, expectedSupported: true, controllerMounted: true, noticeVisible: false, noticeFocused: false }),
+  portCompactLandscape: Object.freeze({ width: 1024, height: 768, expectedSupported: true, controllerMounted: true, noticeVisible: false, noticeFocused: false }),
+  artFallback: Object.freeze({ width: 1440, height: 900, expectedSupported: true, controllerMounted: true, noticeVisible: false, noticeFocused: false }),
+  minimumSupported: Object.freeze({ width: 960, height: 600, expectedSupported: true, controllerMounted: true, noticeVisible: false, noticeFocused: false }),
+  minimumWidth: Object.freeze({ width: 959, height: 600, expectedSupported: false, controllerMounted: false, noticeVisible: true, noticeFocused: true }),
+  minimumHeight: Object.freeze({ width: 960, height: 599, expectedSupported: false, controllerMounted: false, noticeVisible: true, noticeFocused: true }),
+  largePortrait: Object.freeze({ width: 1024, height: 1366, expectedSupported: false, controllerMounted: false, noticeVisible: true, noticeFocused: true }),
+});
+
+const FINAL_SCREENSHOTS = Object.freeze([
+  'setup-desktop.png', 'port-desktop.png', 'market-desktop.png', 'tavern-desktop.png',
+  'captains-log-desktop.png', 'recovery-desktop.png', 'port-minimum-supported.png',
+  'minimum-screen-width.png', 'minimum-screen-height.png', 'minimum-screen-large-portrait.png',
+  'port-tablet-landscape.png', 'port-compact-landscape.png', 'port-art-fallback.png',
+  'player-profile-desktop.png',
+]);
+const FINAL_ART_SHA256 = '0c1c99213d2903fb84a027a6f64508548c631b8fdefc6e41031e7954854ec67d';
 
 export const EVIDENCE_CARGO_IDS = Object.freeze([
   'provisions', 'tools', 'luxuries', 'sugar-molasses', 'tobacco-dyewood', 'powder-arms',
@@ -234,216 +247,98 @@ export function marketStabilityFailure(verdict) {
   return verdict.errors.join(' | ');
 }
 
-function validateBoothViewport(issues, value, name, width, height) {
-  if (!isRecord(value)) {
-    issues.push(`profile evidence must include Booth ${name} viewport evidence`);
-    return;
-  }
-  if (!isRecord(value.viewport) || value.viewport.width !== width || value.viewport.height !== height) {
-    issues.push(`Booth ${name} viewport is wrong`);
-  }
-  if (value.pageHorizontalOverflowPx !== 0 || value.boothHorizontalOverflowPx !== 0
-    || value.pageContained !== true || value.boothContained !== true) {
-    issues.push(`Booth ${name} must have zero horizontal overflow and full containment`);
-  }
-  if (!sameMembers(value.labels, ['Name', 'Pronouns'])) {
-    issues.push(`Booth ${name} labels are incomplete`);
-  }
-  if (!Array.isArray(value.visibleText) || value.visibleText.length === 0
-    || value.visibleText.some((entry) => !isRecord(entry) || typeof entry.text !== 'string' || entry.fontPx < 14)) {
-    issues.push(`Booth ${name} visible copy is below 14px or missing`);
-  }
-  if (!Array.isArray(value.controls) || !sameMembers(value.controls.map((entry) => entry?.testId), BOOTH_CONTROLS)
-    || value.controls.some((entry) => !isRecord(entry) || entry.width < 44 || entry.height < 44)) {
-    issues.push(`Booth ${name} controls must cover every control at 44px`);
-  }
-  if (!Array.isArray(value.focusChecks)
-    || !sameMembers(value.focusChecks.map((entry) => entry?.testId), BOOTH_CONTROLS)
-    || value.focusChecks.some((entry) => !isRecord(entry) || entry.focused !== true || entry.visible !== true)) {
-    issues.push(`Booth ${name} focus checks must cover every control`);
+function exactObject(issues, value, keys, label) {
+  if (!exactKeys(issues, value, keys, label)) return false;
+  for (const key of keys) if (!(key in value)) issues.push(`${label} field ${key} is missing`);
+  return Object.keys(value).length === keys.length;
+}
+
+function exactArray(value, expected) {
+  return Array.isArray(value) && value.length === expected.length && value.every((entry, index) => entry === expected[index]);
+}
+
+function validStringArray(value) {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function validateViewports(issues, viewports) {
+  if (!exactObject(issues, viewports, Object.keys(FINAL_VIEWPORTS), 'viewports')) return;
+  for (const [name, expected] of Object.entries(FINAL_VIEWPORTS)) {
+    const value = viewports[name];
+    const keys = ['name', 'width', 'height', 'dpr', 'orientation', 'expectedSupported', 'controllerMounted', 'noticeVisible', 'noticeFocused', 'minimumFontPx', 'minimumTargetWidthPx', 'minimumTargetHeightPx', 'undersizedTargets', 'occludedTargets', 'partyObscured', 'horizontalOverflowPx'];
+    if (!exactObject(issues, value, keys, `viewports.${name}`)) continue;
+    if (value.name !== name || value.width !== expected.width || value.height !== expected.height || value.dpr !== 1
+      || value.orientation !== (expected.width >= expected.height ? 'landscape' : 'portrait')
+      || value.expectedSupported !== expected.expectedSupported || value.controllerMounted !== expected.controllerMounted
+      || value.noticeVisible !== expected.noticeVisible || value.noticeFocused !== expected.noticeFocused
+      || !finiteNonNegative(value.minimumFontPx) || value.minimumFontPx < 14
+      || !finiteNonNegative(value.minimumTargetWidthPx) || value.minimumTargetWidthPx < 44
+      || !finiteNonNegative(value.minimumTargetHeightPx) || value.minimumTargetHeightPx < 44
+      || !Array.isArray(value.undersizedTargets) || value.undersizedTargets.length !== 0
+      || !Array.isArray(value.occludedTargets) || value.occludedTargets.length !== 0
+      || value.partyObscured !== false || value.horizontalOverflowPx !== 0) {
+      issues.push(`viewports.${name} violates the final viewport contract`);
+    }
   }
 }
 
-function validSubjectRoi(value) {
-  return Array.isArray(value)
-    && value.length === 4
-    && value.every((entry) => Number.isFinite(entry) && entry >= 0 && entry <= 1)
-    && value[2] > 0
-    && value[3] > 0
-    && value[0] + value[2] <= 1
-    && value[1] + value[3] <= 1;
+function validateFixtures(issues, fixtures) {
+  const keys = ['nowProvided', 'seedsProvided', 'uuidsProvided', 'nowConsumed', 'seedsConsumed', 'uuidsConsumed'];
+  if (!exactObject(issues, fixtures, keys, 'fixtures')) return;
+  const now = Array.from({ length: 96 }, (_, index) => 1_700_000_000_000 + index * 1_000);
+  const seeds = [1702, 2702, 3702, 4702, 5702, 6702, 7702, 8702];
+  const uuids = Array.from({ length: 12 }, (_, index) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`);
+  if (!exactArray(fixtures.nowProvided, now) || !exactArray(fixtures.seedsProvided, seeds) || !exactArray(fixtures.uuidsProvided, uuids)
+    || !exactArray(fixtures.nowConsumed, now.slice(0, 6)) || !exactArray(fixtures.seedsConsumed, seeds.slice(0, 1))
+    || !exactArray(fixtures.uuidsConsumed, uuids.slice(0, 1))) issues.push('fixtures do not match the committed deterministic channel');
 }
 
-function validateArtGeometry(issues, geometry, viewportName, state, expectedIds) {
-  if (!isRecord(geometry) || !Array.isArray(geometry.leaves)
-    || !sameMembers(geometry.leaves.map((leaf) => leaf?.id), expectedIds)
-    || geometry.leaves.some((leaf) => !isRecord(leaf)
-      || leaf.contained !== true
-      || leaf.horizontalOverflowPx !== 0
-      || leaf.verticalOverflowPx !== 0)) {
-    issues.push(`art ${viewportName} ${state} geometry clips or escapes the viewport`);
-  }
-  if (!isRecord(geometry) || !Array.isArray(geometry.overlapPairs) || geometry.overlapPairs.length !== 0) {
-    issues.push(`art ${viewportName} ${state} interactive rectangles overlap`);
-  }
-}
-
-function validateArtEvidence(issues, art) {
-  if (!isRecord(art) || art.status !== 'verified') {
-    issues.push('art evidence must be verified');
-    return;
-  }
-  if (art.asset !== 'src/games/caribbean/assets/bridgetown-1675.webp') {
-    issues.push('art evidence names the wrong production asset');
-  }
-  if (!isRecord(art.emitted)
-    || typeof art.emitted.url !== 'string'
-    || !/^\/assets\/bridgetown-1675-[^/]+\.webp$/.test(art.emitted.url)
-    || art.emitted.contentType !== 'image/webp') {
-    issues.push('art emitted WebP evidence is malformed');
-  } else if (art.emitted.precached !== true) {
-    issues.push('art emitted WebP must be precached');
-  }
-  if (!isRecord(art.report)
-    || art.report.historicalReview !== 'pass'
-    || art.report.representationReview !== 'pass') {
-    issues.push('art historical and representation reviews must pass');
-  }
-  if (!validSubjectRoi(art.report?.subjectRoi)) issues.push('art subject ROI is missing or malformed');
-
-  const expectedScreenshots = ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}.png`);
-  const expectedFallbacks = ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}-fallback.png`);
-  if (!isRecord(art.screenshots)
-    || !sameMembers(art.screenshots.normal, expectedScreenshots)
-    || !sameMembers(art.screenshots.fallback, expectedFallbacks)) {
-    issues.push('art screenshots must cover normal and fallback at every supported viewport');
-  }
-
-  if (!Array.isArray(art.viewports)
-    || !sameMembers(art.viewports.map((viewport) => viewport?.name), ART_VIEWPORT_SPECS.map(({ name }) => name))) {
-    issues.push('art viewport evidence must cover the exact supported set');
-    return;
-  }
-  for (const spec of ART_VIEWPORT_SPECS) {
-    const viewport = art.viewports.find((candidate) => candidate?.name === spec.name);
-    if (!isRecord(viewport)
-      || !isRecord(viewport.viewport)
-      || viewport.viewport.width !== spec.width
-      || viewport.viewport.height !== spec.height
-      || !isRecord(viewport.focal)
-      || viewport.focal.xPercent !== spec.focalX
-      || viewport.focal.yPercent !== spec.focalY
-      || !Number.isFinite(viewport.focal.roiVisibleRatio)
-      || viewport.focal.roiVisibleRatio < 0.7
-      || viewport.focal.roiVisibleRatio > 1) {
-      issues.push(`art ${spec.name} focal evidence is wrong or hides the subject`);
-    }
-    if (!Array.isArray(viewport?.contrasts)
-      || !sameMembers(viewport.contrasts.map((sample) => sample?.selector), ART_CONTRAST_SELECTORS)
-      || viewport.contrasts.some((sample) => !isRecord(sample)
-        || !Number.isFinite(sample.minimumRatio)
-        || sample.minimumRatio < 4.5
-        || sample.backgroundAlpha !== 1)) {
-      issues.push(`art ${spec.name} contrast must be opaque and at least 4.5:1`);
-    }
-    if (!Array.isArray(viewport?.activityContrasts)) {
-      issues.push(`art ${spec.name} activity contrast must cover actual opaque states`);
-    } else {
-      for (const activitySpec of ART_ACTIVITY_CONTRAST_SPECS) {
-        const samples = viewport.activityContrasts.filter((sample) => sample?.selector === activitySpec.selector);
-        if (samples.length !== 1 || samples[0]?.text !== activitySpec.text) {
-          issues.push(`art ${spec.name} activity contrast must include exact ${activitySpec.selector} / ${activitySpec.text}`);
-          continue;
-        }
-        const sample = samples[0];
-        if (sample.backgroundAlpha !== 1) {
-          issues.push(`art ${spec.name} activity contrast ${activitySpec.selector} must resolve to an opaque background`);
-        }
-        if (!Number.isFinite(sample.minimumRatio) || sample.minimumRatio < 4.5) {
-          issues.push(`art ${spec.name} activity contrast ${activitySpec.selector} must be at least 4.5:1`);
-        }
-      }
-      if (viewport.activityContrasts.some((sample) => !ART_ACTIVITY_CONTRAST_SPECS.some(
-        ({ selector }) => selector === sample?.selector,
-      ))) {
-        issues.push(`art ${spec.name} activity contrast contains an unexpected selector`);
-      }
-    }
-    if (!isRecord(viewport?.fixtureState)
-      || viewport.fixtureState.gold !== ART_CAPTURE_FIXTURE_STATE.gold
-      || viewport.fixtureState.provisions !== ART_CAPTURE_FIXTURE_STATE.provisions) {
-      issues.push(`art ${spec.name} capture fixture must remain at 500 gold / 3.4 months`);
-    }
-    validateArtGeometry(issues, viewport?.menuGeometry, spec.name, 'menu', ART_MENU_GEOMETRY_IDS);
-    validateArtGeometry(issues, viewport?.marketGeometry, spec.name, 'market', ART_MARKET_GEOMETRY_IDS);
+function validateFinalArt(issues, art) {
+  const keys = ['status', 'loaded', 'localRequest', 'naturalWidth', 'naturalHeight', 'fallbackVerified', 'precached', 'historicalReview', 'representationReview', 'focalVisibleAt', 'minimumSubjectRoiVisibleFraction', 'minimumTextContrast', 'overlapCount', 'clippingCount', 'sha256'];
+  if (!exactObject(issues, art, keys, 'art')) return;
+  if (art.status !== 'verified' || art.loaded !== true || art.localRequest !== true || art.naturalWidth !== 1920 || art.naturalHeight !== 1080
+    || art.fallbackVerified !== true || art.precached !== true || art.historicalReview !== 'pass' || art.representationReview !== 'pass'
+    || !exactArray(art.focalVisibleAt, ['1440x900', '1180x820', '1024x768', '960x600'])
+    || !Number.isFinite(art.minimumSubjectRoiVisibleFraction) || art.minimumSubjectRoiVisibleFraction < 0.7
+    || !Number.isFinite(art.minimumTextContrast) || art.minimumTextContrast < 4.5
+    || art.overlapCount !== 0 || art.clippingCount !== 0 || art.sha256 !== FINAL_ART_SHA256) {
+    issues.push('art violates the final identity-and-fallback contract');
   }
 }
 
-/**
- * The staged evidence boundary is deliberately import-safe: the browser check
- * owns collection, while this pure evaluator makes a phase claim fail closed.
- */
+/** The pure final gate is intentionally strict: any absent, additional, or malformed channel fails closed. */
 export function evaluatePortIdentityEvidence(evidence) {
   const issues = [];
-  if (!exactKeys(issues, evidence, V2_FIELDS, 'evidence')) return { ok: false, issues };
-
-  for (const section of RETAINED_V1_SECTIONS) {
-    if (!(section in evidence)) issues.push(`retained v1 section ${section} is missing`);
-  }
+  if (!exactObject(issues, evidence, V2_FIELDS, 'evidence')) return { ok: false, issues };
   if (evidence.schemaVersion !== 2) issues.push('schemaVersion must be 2');
-  if (evidence.packagePhase !== 'art') issues.push('packagePhase must be art');
-
-  const profile = evidence.profile;
-  if (!isRecord(profile)) {
-    issues.push('profile evidence is missing');
-  } else if (
-    profile.status !== 'setup-verified'
-    || profile.defaultPronouns !== 'he/him'
-    || profile.boothProfilePersisted !== true
-    || Object.keys(profile).length !== 4
-  ) {
-    issues.push('profile evidence must be exact setup-verified evidence');
-  } else {
-    const setup = profile.setup;
-    if (
-      !isRecord(setup)
-      || Object.keys(setup).length !== 4
-      || !isRecord(setup.prefill)
-      || Object.keys(setup.prefill).length !== 2
-      || setup.prefill.captainName !== 'Mario'
-      || setup.prefill.pronouns !== 'he/him'
-      || !isRecord(setup.sharedPronounSnapshot)
-      || Object.keys(setup.sharedPronounSnapshot).length !== 2
-      || setup.sharedPronounSnapshot.profile !== 'they/them'
-      || setup.sharedPronounSnapshot.campaign !== 'they/them'
-      || setup.careerLengthControlPresent !== false
-      || !isRecord(setup.accessibility)
-      || Object.keys(setup.accessibility).length !== 3
-      || setup.accessibility.minimumFontPx < 14
-      || setup.accessibility.minimumTargetHeightPx < 44
-      || setup.accessibility.horizontalOverflowPx !== 0
-    ) {
-      issues.push('profile evidence must be exact setup-verified evidence');
-    }
-  }
-
-  const boothProfile = evidence.accessibility?.boothProfile;
-  if (!isRecord(boothProfile)) {
-    issues.push('profile evidence must include Booth desktop viewport evidence');
-    issues.push('profile evidence must include Booth narrow viewport evidence');
-  } else {
-    validateBoothViewport(issues, boothProfile.desktop, 'desktop', 1440, 900);
-    validateBoothViewport(issues, boothProfile.narrow, 'narrow', 960, 600);
-  }
-
-  validateArtEvidence(issues, evidence.art);
-  if (!isRecord(evidence.market) || evidence.market.status !== 'verified' || !Array.isArray(evidence.market.samples)
-    || Object.keys(evidence.market).length !== 2) {
-    issues.push('market evidence must contain verified samples');
-  } else {
-    const market = validateMarketStability(evidence.market.samples);
-    if (!market.ok) issues.push(...market.errors);
-  }
-
+  if (evidence.packagePhase !== 'complete') issues.push('packagePhase must be complete');
+  if (!exactObject(issues, evidence.browser, ['name', 'version'], 'browser') || evidence.browser.name !== 'Chromium' || typeof evidence.browser.version !== 'string' || evidence.browser.version.length === 0) issues.push('browser is invalid');
+  if (evidence.route !== '/#/caribbean') issues.push('route is invalid');
+  if (evidence.build !== 'normal production (BUILD_HARNESS unset)') issues.push('build is invalid');
+  validateViewports(issues, evidence.viewports);
+  validateFixtures(issues, evidence.fixtures);
+  if (!exactObject(issues, evidence.webLocks, ['realNavigatorLocks', 'calls'], 'webLocks') || evidence.webLocks.realNavigatorLocks !== true
+    || !Array.isArray(evidence.webLocks.calls) || evidence.webLocks.calls.length < 5 || evidence.webLocks.calls.some((call) => !isRecord(call) || !exactObject(issues, call, ['name', 'mode'], 'webLocks.calls') || call.name !== 'caribbean:campaign:writer' || call.mode !== 'exclusive')) issues.push('webLocks are invalid');
+  if (!exactObject(issues, evidence.journey, ['finalEventCount', 'eventTypes', 'saveChecksum', 'replayVerified'], 'journey') || evidence.journey.finalEventCount !== 2
+    || !exactArray(evidence.journey.eventTypes, ['market-traded', 'lead-accepted']) || !/^[a-f0-9]{8}$/.test(evidence.journey.saveChecksum) || evidence.journey.replayVerified !== true) issues.push('journey is invalid');
+  if (!exactObject(issues, evidence.accessibility, ['minimumMeasuredFontPx', 'minimumMeasuredTargetWidthPx', 'minimumMeasuredTargetHeightPx', 'horizontalOverflowPx'], 'accessibility')
+    || !finiteNonNegative(evidence.accessibility.minimumMeasuredFontPx) || evidence.accessibility.minimumMeasuredFontPx < 14
+    || !finiteNonNegative(evidence.accessibility.minimumMeasuredTargetWidthPx) || evidence.accessibility.minimumMeasuredTargetWidthPx < 44
+    || !finiteNonNegative(evidence.accessibility.minimumMeasuredTargetHeightPx) || evidence.accessibility.minimumMeasuredTargetHeightPx < 44
+    || evidence.accessibility.horizontalOverflowPx !== 0) issues.push('accessibility is invalid');
+  if (!exactObject(issues, evidence.requests, ['externalCount', 'failedCount', 'requestedPaths'], 'requests') || evidence.requests.externalCount !== 0 || evidence.requests.failedCount !== 0
+    || !validStringArray(evidence.requests.requestedPaths) || evidence.requests.requestedPaths.some((path) => !path.startsWith('/') || path.startsWith('//'))) issues.push('requests are invalid');
+  if (!exactObject(issues, evidence.failures, ['console', 'page', 'requests', 'external'], 'failures') || Object.values(evidence.failures).some((value) => !Array.isArray(value) || value.length !== 0)) issues.push('failures are invalid');
+  if (!exactObject(issues, evidence.isolation, ['previewHtmlAbsent', 'caribbeanGlbAbsent', 'glbRequested', 'previewResourceRequested', 'moduleMarkersAbsent', 'battleCssAbsent'], 'isolation')
+    || evidence.isolation.previewHtmlAbsent !== true || evidence.isolation.caribbeanGlbAbsent !== true || evidence.isolation.glbRequested !== false || evidence.isolation.previewResourceRequested !== false || evidence.isolation.moduleMarkersAbsent !== true || evidence.isolation.battleCssAbsent !== true) issues.push('isolation is invalid');
+  if (!exactObject(issues, evidence.recovery, ['quarantineKey', 'quarantineVerified', 'exportedCorruptRawVerified', 'recoveredChecksum', 'recoveryReloaded'], 'recovery')
+    || typeof evidence.recovery.quarantineKey !== 'string' || !evidence.recovery.quarantineKey.startsWith('caribbean:campaign:quarantine:') || evidence.recovery.quarantineVerified !== true || evidence.recovery.exportedCorruptRawVerified !== true || !/^[a-f0-9]{8}$/.test(evidence.recovery.recoveredChecksum) || evidence.recovery.recoveryReloaded !== true) issues.push('recovery is invalid');
+  if (!exactArray(evidence.screenshots, FINAL_SCREENSHOTS)) issues.push('screenshots are not the exact final set');
+  if (!exactObject(issues, evidence.determinism, ['cleanRuns', 'metricsByteIdentical', 'screenshotsByteIdentical'], 'determinism') || evidence.determinism.cleanRuns !== 2 || evidence.determinism.metricsByteIdentical !== true || evidence.determinism.screenshotsByteIdentical !== true) issues.push('determinism is invalid');
+  if (!exactObject(issues, evidence.profileIdentity, ['status', 'defaultPronouns', 'setupNamePrefilled', 'setupPronounsPrefilled', 'campaignSnapshotPreserved', 'careerLengthControlAbsent', 'newCampaignLength'], 'profileIdentity')
+    || evidence.profileIdentity.status !== 'verified' || evidence.profileIdentity.defaultPronouns !== 'he/him' || evidence.profileIdentity.setupNamePrefilled !== true || evidence.profileIdentity.setupPronounsPrefilled !== true || evidence.profileIdentity.campaignSnapshotPreserved !== true || evidence.profileIdentity.careerLengthControlAbsent !== true || evidence.profileIdentity.newCampaignLength !== 'adventure') issues.push('profileIdentity is invalid');
+  validateFinalArt(issues, evidence.art);
+  if (!exactObject(issues, evidence.marketStability, ['status', 'sampleCount', 'actionIds', 'maxDrift', 'horizontalOverflow', 'focusPreserved', 'busyStatesVerified', 'statusesVerified'], 'marketStability')
+    || evidence.marketStability.status !== 'verified' || evidence.marketStability.sampleCount !== 108 || !exactArray(evidence.marketStability.actionIds, EXPECTED_MARKET_ACTION_IDS) || !Number.isFinite(evidence.marketStability.maxDrift) || evidence.marketStability.maxDrift < 0 || evidence.marketStability.maxDrift > 1 || evidence.marketStability.horizontalOverflow !== 0 || evidence.marketStability.focusPreserved !== true || evidence.marketStability.busyStatesVerified !== true || evidence.marketStability.statusesVerified !== true) issues.push('marketStability is invalid');
   return { ok: issues.length === 0, issues };
 }

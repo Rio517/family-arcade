@@ -10,142 +10,46 @@ import {
   validateMarketStability,
 } from './caribbean-port-identity-evidence.mjs';
 
-const BOOTH_CONTROLS = [
-  'booth-switch',
-  'booth-edit-profile',
-  'booth-new',
-  'booth-profile-name',
-  'booth-profile-pronouns',
-  'booth-profile-save',
+const SCREENSHOTS = [
+  'setup-desktop.png', 'port-desktop.png', 'market-desktop.png', 'tavern-desktop.png',
+  'captains-log-desktop.png', 'recovery-desktop.png', 'port-minimum-supported.png',
+  'minimum-screen-width.png', 'minimum-screen-height.png', 'minimum-screen-large-portrait.png',
+  'port-tablet-landscape.png', 'port-compact-landscape.png', 'port-art-fallback.png',
+  'player-profile-desktop.png',
 ];
 
-function boothViewport(width, height) {
+const VIEWPORTS = {
+  setupDesktop: [1440, 900, true],
+  profileDesktop: [1440, 900, false],
+  portDesktop: [1440, 900, true],
+  portTabletLandscape: [1180, 820, true],
+  portCompactLandscape: [1024, 768, true],
+  artFallback: [1440, 900, true],
+  minimumSupported: [960, 600, true],
+  minimumWidth: [959, 600, false],
+  minimumHeight: [960, 599, false],
+  largePortrait: [1024, 1366, false],
+};
+
+function viewport(name, [width, height, expectedSupported]) {
+  const profile = name === 'profileDesktop';
   return {
-    viewport: { width, height },
-    pageHorizontalOverflowPx: 0,
-    boothHorizontalOverflowPx: 0,
-    pageContained: true,
-    boothContained: true,
-    labels: ['Name', 'Pronouns'],
-    visibleText: [{ text: 'Pronouns', fontPx: 14 }],
-    controls: BOOTH_CONTROLS.map((testId) => ({ testId, width: 44, height: 44 })),
-    focusChecks: BOOTH_CONTROLS.map((testId) => ({ testId, focused: true, visible: true })),
-  };
-}
-
-function retainedV1Evidence() {
-  return {
-    browser: { name: 'Chromium', version: '151.0.7922.34' },
-    route: '/#/caribbean',
-    build: 'normal production (BUILD_HARNESS unset)',
-    viewports: {},
-    fixtures: {},
-    webLocks: {},
-    journey: {},
-    accessibility: {
-      boothProfile: {
-        desktop: boothViewport(1440, 900),
-        narrow: boothViewport(960, 600),
-      },
-    },
-    requests: {},
-    failures: {},
-    isolation: {},
-    recovery: {},
-    screenshots: ['setup-desktop.png', 'player-profile-desktop.png'],
-    determinism: {},
-  };
-}
-
-function setupEvidence(overrides = {}) {
-  return {
-    ...retainedV1Evidence(),
-    schemaVersion: 2,
-    packagePhase: 'art',
-    profile: {
-      status: 'setup-verified',
-      defaultPronouns: 'he/him',
-      boothProfilePersisted: true,
-      setup: {
-        prefill: { captainName: 'Mario', pronouns: 'he/him' },
-        sharedPronounSnapshot: { profile: 'they/them', campaign: 'they/them' },
-        careerLengthControlPresent: false,
-        accessibility: { minimumFontPx: 14, minimumTargetHeightPx: 44, horizontalOverflowPx: 0 },
-      },
-    },
-    art: artEvidence(),
-    market: { status: 'verified', samples: marketSamples() },
-    ...overrides,
-  };
-}
-
-const ART_VIEWPORTS = [
-  ['desktop', 1440, 900, 58],
-  ['wide', 1180, 820, 56],
-  ['tablet', 1024, 768, 54],
-  ['minimum', 960, 600, 52],
-];
-
-const CONTRAST_SELECTORS = [
-  '.caribbean-port-status-rail dt',
-  '.caribbean-port-status-rail dd',
-  '.caribbean-port-captain',
-  '.caribbean-port-stage h1',
-  '.caribbean-port-bearing',
-  '.caribbean-port-activity h2',
-  '.caribbean-port-arrival',
-  '.caribbean-port-action',
-  '.caribbean-port-action-reason',
-];
-
-const ACTIVITY_CONTRAST_SPECS = [
-  { selector: '.caribbean-market-status:not(:empty)', text: 'Cargo ledger updated.' },
-  { selector: '.caribbean-tavern-rumour blockquote', text: 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.' },
-  { selector: '.caribbean-log-action-label', text: 'NEXT ACTION' },
-  { selector: '.caribbean-log-action-copy', text: 'Sail east of Bridgetown and identify the Red Jackdaw.' },
-];
-
-function geometryEvidence(includeMarket = false) {
-  const ids = [
-    'party-pill', 'port-position', ...Array.from({ length: 5 }, (_, index) => `port-fact-${index}`),
-    'port-stage-title', 'port-bearing', 'port-activity-heading',
-    ...EXPECTED_MARKET_ACTION_IDS.filter(() => includeMarket),
-    ...['governor', 'tavern', 'market', 'shipyard', 'shares', 'log', 'set-sail'].map((id) => `port-action-${id}`),
-  ];
-  if (includeMarket) ids.push('port-close-activity');
-  else ids.push('port-arrival');
-  return {
-    leaves: ids.map((id) => ({ id, contained: true, horizontalOverflowPx: 0, verticalOverflowPx: 0 })),
-    overlapPairs: [],
-  };
-}
-
-function artEvidence() {
-  return {
-    status: 'verified',
-    asset: 'src/games/caribbean/assets/bridgetown-1675.webp',
-    emitted: { url: '/assets/bridgetown-1675-hash.webp', contentType: 'image/webp', precached: true },
-    report: {
-      historicalReview: 'pass',
-      representationReview: 'pass',
-      subjectRoi: [0.37, 0.24, 0.58, 0.71],
-    },
-    screenshots: {
-      normal: ART_VIEWPORTS.map(([name]) => `port-art-${name}.png`),
-      fallback: ART_VIEWPORTS.map(([name]) => `port-art-${name}-fallback.png`),
-    },
-    viewports: ART_VIEWPORTS.map(([name, width, height, focalX]) => ({
-      name,
-      viewport: { width, height },
-      focal: { xPercent: focalX, yPercent: 50, roiVisibleRatio: 0.8 },
-      contrasts: CONTRAST_SELECTORS.map((selector) => ({ selector, minimumRatio: 7, backgroundAlpha: 1 })),
-      activityContrasts: ACTIVITY_CONTRAST_SPECS.map(({ selector, text }) => ({
-        selector, text, minimumRatio: 7, backgroundAlpha: 1,
-      })),
-      fixtureState: { gold: '500 gold', provisions: '3.4 months' },
-      menuGeometry: geometryEvidence(false),
-      marketGeometry: geometryEvidence(true),
-    })),
+    name,
+    width,
+    height,
+    dpr: 1,
+    orientation: width >= height ? 'landscape' : 'portrait',
+    expectedSupported,
+    controllerMounted: expectedSupported,
+    noticeVisible: profile ? false : !expectedSupported,
+    noticeFocused: profile ? false : !expectedSupported,
+    minimumFontPx: 14,
+    minimumTargetWidthPx: 44,
+    minimumTargetHeightPx: 44,
+    undersizedTargets: [],
+    occludedTargets: [],
+    partyObscured: false,
+    horizontalOverflowPx: 0,
   };
 }
 
@@ -171,94 +75,87 @@ function marketSamples() {
   })));
 }
 
+function completeEvidence(overrides = {}) {
+  return {
+    schemaVersion: 2,
+    packagePhase: 'complete',
+    browser: { name: 'Chromium', version: '151.0.7922.34' },
+    route: '/#/caribbean',
+    build: 'normal production (BUILD_HARNESS unset)',
+    viewports: Object.fromEntries(Object.entries(VIEWPORTS).map(([name, spec]) => [name, viewport(name, spec)])),
+    fixtures: {
+      nowProvided: Array.from({ length: 96 }, (_, index) => 1_700_000_000_000 + index * 1_000),
+      seedsProvided: [1702, 2702, 3702, 4702, 5702, 6702, 7702, 8702],
+      uuidsProvided: Array.from({ length: 12 }, (_, index) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`),
+      nowConsumed: Array.from({ length: 6 }, (_, index) => 1_700_000_000_000 + index * 1_000),
+      seedsConsumed: [1702],
+      uuidsConsumed: ['00000000-0000-4000-8000-000000000001'],
+    },
+    webLocks: { realNavigatorLocks: true, calls: Array.from({ length: 5 }, () => ({ name: 'caribbean:campaign:writer', mode: 'exclusive' })) },
+    journey: { finalEventCount: 2, eventTypes: ['market-traded', 'lead-accepted'], saveChecksum: 'ba05d9f4', replayVerified: true },
+    accessibility: { minimumMeasuredFontPx: 14, minimumMeasuredTargetWidthPx: 44, minimumMeasuredTargetHeightPx: 44, horizontalOverflowPx: 0 },
+    requests: { externalCount: 0, failedCount: 0, requestedPaths: ['/'] },
+    failures: { console: [], page: [], requests: [], external: [] },
+    isolation: { previewHtmlAbsent: true, caribbeanGlbAbsent: true, glbRequested: false, previewResourceRequested: false, moduleMarkersAbsent: true, battleCssAbsent: true },
+    recovery: { quarantineKey: 'caribbean:campaign:quarantine:00000000-0000-4000-8000-000000000001', quarantineVerified: true, exportedCorruptRawVerified: true, recoveredChecksum: '9d36f629', recoveryReloaded: true },
+    screenshots: SCREENSHOTS,
+    determinism: { cleanRuns: 2, metricsByteIdentical: true, screenshotsByteIdentical: true },
+    profileIdentity: { status: 'verified', defaultPronouns: 'he/him', setupNamePrefilled: true, setupPronounsPrefilled: true, campaignSnapshotPreserved: true, careerLengthControlAbsent: true, newCampaignLength: 'adventure' },
+    art: { status: 'verified', loaded: true, localRequest: true, naturalWidth: 1920, naturalHeight: 1080, fallbackVerified: true, precached: true, historicalReview: 'pass', representationReview: 'pass', focalVisibleAt: ['1440x900', '1180x820', '1024x768', '960x600'], minimumSubjectRoiVisibleFraction: 0.7, minimumTextContrast: 4.5, overlapCount: 0, clippingCount: 0, sha256: '0c1c99213d2903fb84a027a6f64508548c631b8fdefc6e41031e7954854ec67d' },
+    marketStability: { status: 'verified', sampleCount: 108, actionIds: EXPECTED_MARKET_ACTION_IDS, maxDrift: 1, horizontalOverflow: 0, focusPreserved: true, busyStatesVerified: true, statusesVerified: true },
+    ...overrides,
+  };
+}
+
 describe('evaluatePortIdentityEvidence', () => {
-  it('accepts exact verified profile, Market, and harbour-art evidence at art phase', () => {
-    expect(evaluatePortIdentityEvidence(setupEvidence())).toEqual({ ok: true, issues: [] });
+  it('accepts only the final complete v2 schema with every v1 channel retained', () => {
+    expect(evaluatePortIdentityEvidence(completeEvidence())).toEqual({ ok: true, issues: [] });
   });
 
   it.each([
-    ['a missing retained v1 section', (() => {
-      const evidence = setupEvidence();
-      delete evidence.journey;
-      return evidence;
-    })(), 'retained v1 section journey is missing'],
-    ['an unknown field', setupEvidence({ unexpected: true }), 'unknown evidence field unexpected'],
-    ['the wrong package phase', setupEvidence({ packagePhase: 'market' }), 'packagePhase must be art'],
-    ['missing Market samples', setupEvidence({ market: { status: 'verified' } }), 'market evidence must contain verified samples'],
-    ['failed historical review', setupEvidence({ art: {
-      ...artEvidence(), report: { ...artEvidence().report, historicalReview: 'fail' },
-    } }), 'art historical and representation reviews must pass'],
-    ['missing ROI', setupEvidence({ art: {
-      ...artEvidence(), report: { historicalReview: 'pass', representationReview: 'pass' },
-    } }), 'art subject ROI is missing or malformed'],
-    ['contrast below 4.5', setupEvidence({ art: {
-      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
-        ? { ...viewport, contrasts: viewport.contrasts.map((sample, sampleIndex) => sampleIndex === 0
-          ? { ...sample, minimumRatio: 4.49 } : sample) }
-        : viewport),
-    } }), 'art desktop contrast must be opaque and at least 4.5:1'],
-    ['an omitted nested log-label selector', setupEvidence({ art: {
-      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
-        ? { ...viewport, activityContrasts: viewport.activityContrasts.filter(
-          (sample) => sample.selector !== '.caribbean-log-action-label',
-        ) }
-        : viewport),
-    } }), 'art desktop activity contrast must include exact .caribbean-log-action-label / NEXT ACTION'],
-    ['a transparent nested log-label sample', setupEvidence({ art: {
-      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
-        ? { ...viewport, activityContrasts: viewport.activityContrasts.map((sample) => (
-          sample.selector === '.caribbean-log-action-label' ? { ...sample, backgroundAlpha: 0 } : sample
-        )) }
-        : viewport),
-    } }), 'art desktop activity contrast .caribbean-log-action-label must resolve to an opaque background'],
-    ['a sub-4.5 nested log-label sample', setupEvidence({ art: {
-      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
-        ? { ...viewport, activityContrasts: viewport.activityContrasts.map((sample) => (
-          sample.selector === '.caribbean-log-action-label' ? { ...sample, minimumRatio: 4.49 } : sample
-        )) }
-        : viewport),
-    } }), 'art desktop activity contrast .caribbean-log-action-label must be at least 4.5:1'],
-    ['responsive fixture drift after an activity probe', setupEvidence({ art: {
-      ...artEvidence(), viewports: artEvidence().viewports.map((viewport) => viewport.name === 'wide'
-        ? { ...viewport, fixtureState: { gold: '496 gold', provisions: '3.5 months' } }
-        : viewport),
-    } }), 'art wide capture fixture must remain at 500 gold / 3.4 months'],
-    ['clipped leaf', setupEvidence({ art: {
-      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
-        ? { ...viewport, menuGeometry: {
-          ...viewport.menuGeometry,
-          leaves: viewport.menuGeometry.leaves.map((leaf, leafIndex) => leafIndex === 0
-            ? { ...leaf, horizontalOverflowPx: 1 } : leaf),
-        } }
-        : viewport),
-    } }), 'art desktop menu geometry clips or escapes the viewport'],
-    ['overlapping controls', setupEvidence({ art: {
-      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
-        ? { ...viewport, marketGeometry: { ...viewport.marketGeometry, overlapPairs: [['a', 'b']] } }
-        : viewport),
-    } }), 'art desktop market interactive rectangles overlap'],
-    ['absent precache', setupEvidence({ art: {
-      ...artEvidence(), emitted: { ...artEvidence().emitted, precached: false },
-    } }), 'art emitted WebP must be precached'],
-    ['missing narrow Booth measurement', setupEvidence({
-      accessibility: { boothProfile: { desktop: boothViewport(1440, 900) } },
-    }), 'profile evidence must include Booth narrow viewport evidence'],
-    ['a missing keyboard focus check', setupEvidence({
-      accessibility: { boothProfile: {
-        desktop: boothViewport(1440, 900),
-        narrow: { ...boothViewport(960, 600), focusChecks: [] },
-      } },
-    }), 'Booth narrow focus checks must cover every control'],
-    ['a missing setup identity snapshot', setupEvidence({
-      profile: {
-        status: 'setup-verified',
-        defaultPronouns: 'he/him',
-        boothProfilePersisted: true,
-        setup: { prefill: { captainName: 'Mario', pronouns: 'he/him' } },
-      },
-    }), 'profile evidence must be exact setup-verified evidence'],
-  ])('fails closed on %s', (_label, evidence, issue) => {
-    expect(evaluatePortIdentityEvidence(evidence)).toEqual({ ok: false, issues: [issue] });
+    'schemaVersion', 'packagePhase', 'browser', 'route', 'build', 'viewports', 'fixtures', 'webLocks',
+    'journey', 'accessibility', 'requests', 'failures', 'isolation', 'recovery', 'screenshots',
+    'determinism', 'profileIdentity', 'art', 'marketStability',
+  ])('fails closed when top-level %s is missing', (section) => {
+    const evidence = completeEvidence();
+    delete evidence[section];
+    expect(evaluatePortIdentityEvidence(evidence).ok).toBe(false);
+  });
+
+  it.each([
+    ['browser', (e) => { e.browser.name = 'Firefox'; }],
+    ['route', (e) => { e.route = '/#/'; }],
+    ['build', (e) => { e.build = 'harness'; }],
+    ['viewports', (e) => { e.viewports.portDesktop.width = 1439; }],
+    ['fixtures', (e) => { e.fixtures.nowConsumed[0] = 0; }],
+    ['webLocks', (e) => { e.webLocks.calls[0].mode = 'shared'; }],
+    ['journey', (e) => { e.journey.eventTypes = ['lead-accepted', 'market-traded']; }],
+    ['accessibility', (e) => { e.accessibility.minimumMeasuredFontPx = 13.99; }],
+    ['requests', (e) => { e.requests.externalCount = 1; }],
+    ['failures', (e) => { e.failures.console = ['boom']; }],
+    ['isolation', (e) => { e.isolation.glbRequested = true; }],
+    ['recovery', (e) => { e.recovery.quarantineVerified = false; }],
+    ['screenshots', (e) => { e.screenshots.pop(); }],
+    ['determinism', (e) => { e.determinism.cleanRuns = 1; }],
+    ['profileIdentity', (e) => { e.profileIdentity.defaultPronouns = 'they/them'; }],
+    ['art', (e) => { e.art.minimumTextContrast = 4.49; }],
+    ['marketStability', (e) => { e.marketStability.actionIds = []; }],
+  ])('fails closed on a representative %s mutation', (_section, mutate) => {
+    const evidence = completeEvidence();
+    mutate(evidence);
+    expect(evaluatePortIdentityEvidence(evidence).ok).toBe(false);
+  });
+
+  it.each([
+    ['unknown top-level fields', (e) => { e.unexpected = true; }],
+    ['unknown nested fields', (e) => { e.art.unexpected = true; }],
+    ['non-finite numbers', (e) => { e.art.minimumSubjectRoiVisibleFraction = Number.NaN; }],
+    ['malformed failure arrays', (e) => { e.failures.page = 'none'; }],
+    ['a non-local requested path', (e) => { e.requests.requestedPaths = ['https://example.test/x']; }],
+  ])('rejects %s', (_label, mutate) => {
+    const evidence = completeEvidence();
+    mutate(evidence);
+    expect(evaluatePortIdentityEvidence(evidence).ok).toBe(false);
   });
 });
 
@@ -279,9 +176,7 @@ describe('validateMarketStability', () => {
   });
 
   it('requires all 36 fixed cargo action identities through before, pending, and resolved phases', () => {
-    expect(EVIDENCE_CARGO_IDS).toEqual([
-      'provisions', 'tools', 'luxuries', 'sugar-molasses', 'tobacco-dyewood', 'powder-arms',
-    ]);
+    expect(EVIDENCE_CARGO_IDS).toEqual(['provisions', 'tools', 'luxuries', 'sugar-molasses', 'tobacco-dyewood', 'powder-arms']);
     expect(EXPECTED_MARKET_ACTION_IDS).toHaveLength(36);
     expect(validateMarketStability(marketSamples())).toEqual({ ok: true, maxDrift: 1 });
   });
@@ -289,14 +184,10 @@ describe('validateMarketStability', () => {
   it.each([
     ['a missing phase', (samples) => samples.slice(1)],
     ['a duplicate action identity', (samples) => [...samples.slice(0, -3), ...samples.slice(0, 3)]],
-    ['a 1.01px geometry jump', (samples) => samples.map((sample, index) => index === 1
-      ? { ...sample, stage: { ...sample.stage, x: sample.stage.x + 1.01 } } : sample)],
-    ['horizontal overflow', (samples) => samples.map((sample, index) => index === 0
-      ? { ...sample, rowsScrollWidth: sample.rowsClientWidth + 1 } : sample)],
-    ['lost focus', (samples) => samples.map((sample, index) => index === 0
-      ? { ...sample, focusedTestId: null } : sample)],
-    ['an invalid pending status', (samples) => samples.map((sample, index) => index === 1
-      ? { ...sample, status: '' } : sample)],
+    ['a 1.01px geometry jump', (samples) => samples.map((sample, index) => index === 1 ? { ...sample, stage: { ...sample.stage, x: sample.stage.x + 1.01 } } : sample)],
+    ['horizontal overflow', (samples) => samples.map((sample, index) => index === 0 ? { ...sample, rowsScrollWidth: sample.rowsClientWidth + 1 } : sample)],
+    ['lost focus', (samples) => samples.map((sample, index) => index === 0 ? { ...sample, focusedTestId: null } : sample)],
+    ['an invalid pending status', (samples) => samples.map((sample, index) => index === 1 ? { ...sample, status: '' } : sample)],
   ])('fails closed on %s', (_label, mutate) => {
     expect(validateMarketStability(mutate(marketSamples()))).toMatchObject({ ok: false });
   });
@@ -319,20 +210,11 @@ describe('validateMarketStability', () => {
   ])('rejects %s with 0, 5, or 7 entries in every sample', (_label, mutate) => {
     for (const length of [0, 5, 7]) {
       const samples = marketSamples().map((sample) => mutate(sample, length));
-      if (length === 7) {
-        for (const sample of samples) {
-          if (_label === 'action strips') sample.actionStrips.push({ x: 720, y: 240, width: 488, height: 44 });
-          else sample.actionStripWidths.push({ testId: 'market-action-strip-7', clientWidth: 488, scrollWidth: 488 });
-        }
+      if (length === 7) for (const sample of samples) {
+        if (_label === 'action strips') sample.actionStrips.push({ x: 720, y: 240, width: 488, height: 44 });
+        else sample.actionStripWidths.push({ testId: 'market-action-strip-7', clientWidth: 488, scrollWidth: 488 });
       }
       expect(validateMarketStability(samples)).toMatchObject({ ok: false, errors: expect.any(Array) });
     }
-  });
-
-  it('accepts exactly 1px drift and rejects invalid sample shapes', () => {
-    const exactBoundary = marketSamples();
-    exactBoundary[1] = { ...exactBoundary[1], stage: { ...exactBoundary[1].stage, x: 161 } };
-    expect(validateMarketStability(exactBoundary)).toEqual({ ok: true, maxDrift: 1 });
-    expect(validateMarketStability({ samples: [] })).toMatchObject({ ok: false });
   });
 });

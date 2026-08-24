@@ -64,7 +64,10 @@ and resume, and rejects preview/naval resources in the normal bundle. It runs
 the journey twice from clean storage and updates evidence only after the
 metrics and reduced-motion screenshots match byte-for-byte.
 
-The current set includes the
+The final complete-v2 package keeps the original channel, storage, recovery,
+and isolation evidence while requiring an exact schema with no unknown fields.
+It runs the real route twice from clean browser storage and accepts the package
+only when metrics and every committed PNG are byte-identical. The current set includes the
 [`technical metrics`](../../screenshots/caribbean-port/metrics.json),
 [`setup`](../../screenshots/caribbean-port/setup-desktop.png),
 [`Bridgetown port`](../../screenshots/caribbean-port/port-desktop.png),
@@ -76,6 +79,17 @@ The current set includes the
 [`959×600 width notice`](../../screenshots/caribbean-port/minimum-screen-width.png),
 [`960×599 height notice`](../../screenshots/caribbean-port/minimum-screen-height.png),
 and [`1024×1366 portrait notice`](../../screenshots/caribbean-port/minimum-screen-large-portrait.png).
+
+It also records the same opening harbour at
+[`1180×820`](../../screenshots/caribbean-port/port-tablet-landscape.png) and
+[`1024×768`](../../screenshots/caribbean-port/port-compact-landscape.png), a
+forced local-art failure with working port controls at
+[`1440×900`](../../screenshots/caribbean-port/port-art-fallback.png), and the
+shared-player profile editor at
+[`1440×900`](../../screenshots/caribbean-port/player-profile-desktop.png).
+The route seeds Mario / `he/him`, changes the shared pronouns during setup,
+then verifies that a later profile edit does not rewrite the campaign snapshot;
+new campaigns are Adventure-only while legacy saves remain loadable.
 
 The painted-harbour evidence adds normal and forced image-error captures at
 [`1440×900`](../../screenshots/caribbean-port/port-art-desktop.png),
