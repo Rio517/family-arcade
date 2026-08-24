@@ -161,7 +161,7 @@ function completeEvidence(overrides = {}) {
     },
     requests: { externalCount: 0, failedCount: 0, requestedPaths: ['/'] },
     failures: { console: [], page: [], requests: [], external: [] },
-    isolation: { previewHtmlAbsent: true, caribbeanGlbAbsent: true, glbRequested: false, previewResourceRequested: false, moduleMarkersAbsent: true, battleCssAbsent: true },
+    isolation: { previewHtmlAbsent: true, caribbeanGlbAbsent: false, glbRequested: false, previewResourceRequested: false, moduleMarkersAbsent: true, battleCssAbsent: true },
     recovery: { quarantineKey: 'caribbean:campaign:quarantine:00000000-0000-4000-8000-000000000001', quarantineVerified: true, exportedCorruptRawVerified: true, recoveredChecksum: '9d36f629', recoveryReloaded: true },
     screenshots: SCREENSHOTS,
     determinism: { cleanRuns: 2, metricsByteIdentical: true, screenshotsByteIdentical: true },

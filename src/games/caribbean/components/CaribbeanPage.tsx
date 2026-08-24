@@ -95,9 +95,12 @@ function ControllerPage({ runtime }: { runtime: CaribbeanRuntime }) {
   const showCampaign = controller.journal !== null
     && !needsRecovery
     && !recoveryPhase;
+  const modeClass = showCampaign && controller.journal?.state.mode.kind === 'port'
+    ? ' caribbean-production--campaign caribbean-production--port'
+    : showCampaign ? ' caribbean-production--campaign' : '';
 
   return (
-    <div className={`caribbean-app caribbean-production${showCampaign ? ' caribbean-production--campaign' : ''}`}>
+    <div className={`caribbean-app caribbean-production${modeClass}`}>
       {showCampaign ? (
         <ActiveCampaign controller={controller} />
       ) : (

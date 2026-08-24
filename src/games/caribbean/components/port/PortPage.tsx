@@ -79,6 +79,7 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
     previousActivityRef.current = controller.activity;
     if (controller.activity === 'menu') {
       if (portFocusTarget === 'last-voyage' && !acknowledgedFocusRef.current) {
+        initialFocusAppliedRef.current = true;
         triggerRefs.current.log?.focus();
         acknowledgedFocusRef.current = true;
         acknowledgePortFocus();

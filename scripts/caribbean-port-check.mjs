@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from 'playwright';
 import sharp from 'sharp';
+import { normalBuildIsolationFailure } from './lib/caribbean-normal-build-isolation.mjs';
 import {
   ART_ACTIVITY_CONTRAST_SPECS,
   ART_CAPTURE_FIXTURE_STATE,
@@ -180,10 +181,15 @@ function buildNormalProduction() {
 }
 
 function assertNormalBuildIsolation() {
-  invariant(!fs.existsSync(path.join(DIST, 'preview-caribbean-game.html')), 'Normal build shipped preview-caribbean-game.html');
-  const assets = fs.readdirSync(path.join(DIST, 'assets'));
-  const caribbeanGlbs = assets.filter((name) => /^caribbean-sloop.*\.glb$/i.test(name));
-  invariant(caribbeanGlbs.length === 0, `Normal build shipped Caribbean sloop GLB: ${caribbeanGlbs.join(', ')}`);
+  const entries = fs.readdirSync(DIST, { recursive: true })
+    .filter((entry) => typeof entry === 'string');
+  const textualEntries = entries.filter((entry) => /\.(?:js|css|map)$/i.test(entry));
+  const shippedText = textualEntries
+    .map((entry) => fs.readFileSync(path.join(DIST, entry), 'utf8'))
+    .join('\n');
+  const failure = normalBuildIsolationFailure({ entries, shippedText });
+  invariant(failure === null, `Normal build shipped ${failure}`);
+  readEmittedNavalAssets();
 }
 
 function readUiSlice(argv) {
@@ -254,7 +260,7 @@ function saveIfChanged(filename, bytes) {
 
 async function installBrowserBoundary(context) {
   await context.addInitScript(
-    ({ nowFixtures, seedFixtures, uuidFixtures, traceKey, writerLock, usersRaw }) => {
+    ({ nowFixtures, seedFixtures, uuidFixtures, traceKey, writerLock, currentSaveKey, usersRaw }) => {
       const defaultTrace = {
         nowIndex: 0,
         seedIndex: 0,
@@ -317,6 +323,7 @@ async function installBrowserBoundary(context) {
         traceKey,
         writerLock,
         holdNextWriter: false,
+        failNextStorageWrite: false,
         writerHeld: false,
         releaseWriter() {
           releaseHeldWriter?.();
@@ -324,6 +331,17 @@ async function installBrowserBoundary(context) {
           control.writerHeld = false;
         },
       };
+      const nativeSetItem = Storage.prototype.setItem;
+      Object.defineProperty(Storage.prototype, 'setItem', {
+        configurable: true,
+        value(key, value) {
+          if (this === localStorage && key === currentSaveKey && control.failNextStorageWrite) {
+            control.failNextStorageWrite = false;
+            throw new DOMException('Port-check forced storage failure', 'QuotaExceededError');
+          }
+          return nativeSetItem.call(this, key, value);
+        },
+      });
       if (typeof LockManager !== 'undefined') {
         const nativeRequest = LockManager.prototype.request;
         Object.defineProperty(LockManager.prototype, 'request', {
@@ -350,6 +368,7 @@ async function installBrowserBoundary(context) {
       uuidFixtures: UUID_FIXTURES,
       traceKey: TRACE_KEY,
       writerLock: WRITER_LOCK,
+      currentSaveKey: CURRENT_SAVE_KEY,
       usersRaw: JSON.stringify({
         users: [{
           id: 'port-check-player',
@@ -406,6 +425,35 @@ function readEmittedArt() {
   };
 }
 
+function readEmittedNavalAssets() {
+  const assets = fs.readdirSync(path.join(DIST, 'assets'));
+  const patterns = [
+    /^CampaignNavalBattle-[^/]+\.js$/,
+    /^CampaignNavalBattle-[^/]+\.css$/,
+    /^caribbean-sloop-[^/]+\.glb$/,
+  ];
+  const names = patterns.map((pattern) => {
+    const matches = assets.filter((name) => pattern.test(name));
+    invariant(matches.length === 1, `Expected one emitted naval asset for ${pattern}, found ${matches.join(', ')}`);
+    return matches[0];
+  });
+  const precacheSources = fs.readdirSync(DIST, { recursive: true })
+    .filter((entry) => typeof entry === 'string' && /(?:^|\/)(?:sw|workbox-[^/]+)\.js$/.test(entry))
+    .map((entry) => fs.readFileSync(path.join(DIST, entry), 'utf8'));
+  const urls = names.map((name) => `/assets/${name}`);
+  invariant(
+    names.every((name) => precacheSources.some((source) => source.includes(`assets/${name}`))),
+    'Production naval assets are absent from the PWA precache',
+  );
+  return { names, urls };
+}
+
+function assertNoNavalAssetRequests(requestedPaths, emittedNaval, phase) {
+  const requested = new Set(requestedPaths);
+  const fetched = emittedNaval.urls.filter((url) => requested.has(url));
+  invariant(fetched.length === 0, `${phase}-requested-naval-assets-${fetched.join('|')}`);
+}
+
 async function verifyEmittedArtResponse(baseUrl, emitted) {
   const response = await fetch(`${baseUrl}${emitted.url}`, { method: 'HEAD', cache: 'no-store' });
   invariant(response.status === 200, `Emitted art returned ${response.status}`);
@@ -457,12 +505,15 @@ async function readLayout(page, name, expected) {
       && partyHitElement !== partyPill && !partyPill.contains(partyHitElement);
     const occludedTargets = partyRect === null ? [] : routeTargets.flatMap((element) => {
       const rect = element.getBoundingClientRect();
-      const intersects = Math.min(rect.right, partyRect.right) > Math.max(rect.left, partyRect.left)
-        && Math.min(rect.bottom, partyRect.bottom) > Math.max(rect.top, partyRect.top);
-      if (!intersects) return [];
+      const inlineIntersects = Math.min(rect.right, partyRect.right) > Math.max(rect.left, partyRect.left);
+      const blockClearance = Math.max(rect.top - partyRect.bottom, partyRect.top - rect.bottom);
+      if (!inlineIntersects || blockClearance >= 8) return [];
       return [{
         testId: element.getAttribute('data-testid'),
         label: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? null,
+        blockClearance,
+        targetRect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+        partyRect: { left: partyRect.left, top: partyRect.top, right: partyRect.right, bottom: partyRect.bottom },
       }];
     });
     const fontSizes = textElements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize));
@@ -1212,6 +1263,7 @@ async function readVoyageEnvelope(page, expectedMode) {
 
 async function runVoyageUiCheck() {
   buildNormalProduction();
+  const emittedNaval = readEmittedNavalAssets();
   const { server, baseUrl } = await startStaticServer();
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-voyage-ui-'));
   let browser;
@@ -1231,8 +1283,10 @@ async function runVoyageUiCheck() {
     const screenshots = new Map();
     try {
       await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
+      assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'setup');
       await page.getByRole('button', { name: 'Start career' }).click();
       await page.getByTestId('caribbean-career-ready').waitFor();
+      assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'port');
       await page.getByRole('button', { name: 'Tavern' }).click();
       await page.getByRole('button', { name: 'Mark on chart' }).click();
       await page.getByText("Marked in the Captain's Log").waitFor();
@@ -1245,6 +1299,7 @@ async function runVoyageUiCheck() {
       await page.getByTestId('voyage-status').waitFor();
       const sailingEnvelope = await readVoyageEnvelope(page, 'sailing');
       invariant(sailingEnvelope.payload.events.at(-1)?.type === 'voyage-started', 'missing-voyage-started-event');
+      assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'sailing');
       await capture(page, screenshots, directory, 'sailing-desktop.png');
 
       await page.setViewportSize({ width: 960, height: 600 });
@@ -1264,11 +1319,22 @@ async function runVoyageUiCheck() {
       await readLayout(page, 'sailingLargePortraitNotice', { width: 1024, height: 1366, supported: false });
       await capture(page, screenshots, directory, 'sailing-large-portrait-notice.png');
 
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.getByRole('button', { name: 'Resume career' }).click();
+      await page.getByTestId('encounter-avoid').waitFor();
+      await page.getByTestId('encounter-avoid').click();
+      await page.getByTestId('caribbean-career-ready').waitFor();
+      const returnedEnvelope = await readVoyageEnvelope(page, 'port');
+      invariant(returnedEnvelope.payload.events.at(-1)?.type === 'encounter-avoided', 'missing-encounter-avoided-event');
+      await settle(page);
+      const returnedFocus = await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? null);
+      invariant(returnedFocus === 'port-action-log', `avoid-return-focused-${returnedFocus ?? 'nothing'}`);
+      assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'avoid');
+
       invariant(failures.console.length === 0, `console-errors-${failures.console.join('|')}`);
       invariant(failures.page.length === 0, `page-errors-${failures.page.join('|')}`);
       invariant(failures.requests.length === 0, `request-errors-${failures.requests.join('|')}`);
       invariant(failures.external.length === 0, `external-requests-${failures.external.join('|')}`);
-      invariant(!failures.requestedPaths.some((requestPath) => requestPath.endsWith('.glb')), 'naval-assets-requested-before-pursuit');
       invariant(VOYAGE_SCREENSHOTS.every((filename) => screenshots.has(filename)), 'incomplete-voyage-screenshot-set');
       for (const filename of VOYAGE_SCREENSHOTS) saveIfChanged(filename, screenshots.get(filename));
       console.log(`CARIBBEAN_VOYAGE_UI_OK screenshots=${VOYAGE_SCREENSHOTS.length}`);
@@ -1282,7 +1348,57 @@ async function runVoyageUiCheck() {
   }
 }
 
-async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetReport) {
+async function runPortMemoryWarningProbe(browser, baseUrl) {
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    deviceScaleFactor: 1,
+    locale: 'en-US',
+    timezoneId: 'UTC',
+    reducedMotion: 'reduce',
+  });
+  await installBrowserBoundary(context);
+  const page = await context.newPage();
+  const failures = { console: [], page: [], requests: [], external: [], requestedPaths: [] };
+  recordFailures(page, baseUrl, failures);
+  try {
+    await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
+    await page.evaluate(() => { window.__CARIBBEAN_PORT_CHECK__.failNextStorageWrite = true; });
+    await page.getByRole('button', { name: 'Start career' }).click();
+    await page.getByRole('button', { name: 'Continue without saving' }).click();
+    await page.getByTestId('caribbean-career-ready').waitFor();
+    await page.getByText('This career is not being saved. Keep this tab open.').waitFor();
+    await settle(page);
+    const geometry = await page.evaluate(() => {
+      const wrapper = document.querySelector('.caribbean-production');
+      const warning = document.querySelector('.caribbean-memory-warning');
+      const commandRail = document.querySelector('.caribbean-port-menu');
+      if (!(wrapper instanceof HTMLElement) || !(warning instanceof HTMLElement) || !(commandRail instanceof HTMLElement)) {
+        throw new Error('Memory warning geometry requires the port wrapper, warning, and command rail');
+      }
+      const warningRect = warning.getBoundingClientRect();
+      const commandRect = commandRail.getBoundingClientRect();
+      return {
+        wrapperClasses: [...wrapper.classList],
+        warning: { top: warningRect.top, bottom: warningRect.bottom },
+        commandRail: { top: commandRect.top, bottom: commandRect.bottom },
+      };
+    });
+    invariant(geometry.wrapperClasses.includes('caribbean-production--port'), 'memory-warning-missing-port-wrapper');
+    invariant(
+      geometry.warning.bottom <= geometry.commandRail.top,
+      `memory-warning-overlaps-command-rail-${JSON.stringify(geometry)}`,
+    );
+    invariant(failures.console.length === 0, `Memory warning console errors: ${failures.console.join(' | ')}`);
+    invariant(failures.page.length === 0, `Memory warning page errors: ${failures.page.join(' | ')}`);
+    invariant(failures.requests.length === 0, `Memory warning failed requests: ${failures.requests.join(' | ')}`);
+    invariant(failures.external.length === 0, `Memory warning external requests: ${failures.external.join(' | ')}`);
+    return geometry;
+  } finally {
+    await context.close();
+  }
+}
+
+async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNaval, assetReport) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
@@ -1303,6 +1419,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
     console.log('Checking setup identity and Bridgetown journey…');
     await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
     invariant(await page.getByRole('heading', { name: 'Sign a captain’s commission' }).isVisible(), 'Production route did not reach setup');
+    assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'setup');
     layouts.setupDesktop = await readLayout(page, 'setupDesktop', VIEWPORTS.setupDesktop);
     await capture(page, screenshots, runDirectory, 'setup-desktop.png');
     const setupIdentity = await readSetupIdentityEvidence(page, layouts.setupDesktop);
@@ -1326,10 +1443,11 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
       campaign: setupEnvelope.payload.state.captain.pronouns,
     };
     console.log('Checking port activities and journal…');
+    assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'port');
     const menuLabels = await page.locator('[aria-label="Bridgetown activities"] button').allTextContents();
     invariant(canonicalJson(menuLabels.map((label) => label.trim())) === canonicalJson(PORT_ORDER), `Wrong port order: ${JSON.stringify(menuLabels)}`);
     invariant(await page.getByRole('button', { name: 'Set Sail' }).isDisabled(), 'Set Sail is not visibly unavailable');
-    invariant(await page.getByText('Sea routes open in the next package.').isVisible(), 'Set Sail reason is not visible');
+    invariant(await page.getByText('Mark the Red Jackdaw lead in the tavern first.').isVisible(), 'Set Sail reason is not visible');
     layouts.portDesktop = await readLayout(page, 'portDesktop', VIEWPORTS.portDesktop);
     await capture(page, screenshots, runDirectory, 'port-desktop.png');
 
@@ -1501,7 +1619,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
     invariant(failures.page.length === 0, `Page errors: ${failures.page.join(' | ')}`);
     invariant(failures.requests.length === 0, `Failed requests: ${failures.requests.join(' | ')}`);
     invariant(failures.external.length === 0, `External requests: ${failures.external.join(' | ')}`);
-    invariant(!failures.requestedPaths.some((requestPath) => requestPath.endsWith('.glb')), 'Production route requested a GLB');
+    assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'port-journey');
     invariant(!failures.requestedPaths.some((requestPath) => requestPath.includes('preview-caribbean')), 'Production route requested preview-caribbean');
 
     const marketSamples = await runMarketProbe(browser, baseUrl);
@@ -1603,7 +1721,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
       },
       isolation: {
         previewHtmlAbsent: true,
-        caribbeanGlbAbsent: true,
+        caribbeanGlbAbsent: false,
         glbRequested: false,
         previewResourceRequested: false,
         moduleMarkersAbsent: false,
@@ -1778,6 +1896,7 @@ export async function runPortCheck() {
   buildNormalProduction();
   assertNormalBuildIsolation();
   const emittedArt = readEmittedArt();
+  const emittedNaval = readEmittedNavalAssets();
   const assetReport = JSON.parse(fs.readFileSync(path.join(
     ROOT, 'docs/games/caribbean-career/bridgetown-asset-report.json',
   ), 'utf8'));
@@ -1789,11 +1908,13 @@ export async function runPortCheck() {
     await verifyEmittedArtResponse(baseUrl, emittedArt);
     browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
     console.log('Running deterministic browser journey A…');
-    const first = await runJourney(browser, baseUrl, firstDirectory, emittedArt, assetReport);
+    const first = await runJourney(browser, baseUrl, firstDirectory, emittedArt, emittedNaval, assetReport);
     assertRequestedGraphIsolation(first.metrics);
     console.log('Running deterministic browser journey B…');
-    const second = await runJourney(browser, baseUrl, secondDirectory, emittedArt, assetReport);
+    const second = await runJourney(browser, baseUrl, secondDirectory, emittedArt, emittedNaval, assetReport);
     assertRequestedGraphIsolation(second.metrics);
+    console.log('Checking memory-only port warning clearance…');
+    await runPortMemoryWarningProbe(browser, baseUrl);
     const metricsBytes = await compareRuns(first, second);
     for (const filename of SCREENSHOTS) saveIfChanged(filename, first.screenshots.get(filename));
     saveIfChanged('metrics.json', metricsBytes);

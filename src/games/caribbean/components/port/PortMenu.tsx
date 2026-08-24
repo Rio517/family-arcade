@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 
 import type { PortActivity } from '../../domain/types';
-import type { VoyageBlockedReason, VoyageReadiness } from '../../domain/voyage';
+import { voyageBlockedCopy, type VoyageReadiness } from '../../domain/voyage';
 
 // This immutable action contract lives beside its only renderer by design.
 // eslint-disable-next-line react-refresh/only-export-components
@@ -28,16 +28,6 @@ interface PortMenuProps {
   registerSetSailTrigger?(element: HTMLButtonElement | null): void;
 }
 
-function portReadinessCopy(reason: VoyageBlockedReason): string {
-  switch (reason) {
-    case 'not-in-bridgetown': return 'Return to Bridgetown before setting a new course.';
-    case 'target-defeated': return 'The Red Jackdaw lead is complete.';
-    case 'lead-not-active': return 'Mark the Red Jackdaw rumour in the Tavern first.';
-    case 'flagship-unavailable': return 'The flagship record is unavailable.';
-    case 'insufficient-provisions': return 'Buy at least 2 provisions for the round trip.';
-  }
-}
-
 export function PortMenu({
   activeActivity,
   readiness,
@@ -50,7 +40,7 @@ export function PortMenu({
   const setSailInFlight = useRef(false);
   const blocked = readiness.kind === 'blocked';
   const reason = blocked
-    ? portReadinessCopy(readiness.reason)
+    ? voyageBlockedCopy(readiness.reason)
     : 'Two provisions cover the outbound leg and guaranteed return.';
   const depart = () => {
     if (blocked || busy || setSailInFlight.current) return;

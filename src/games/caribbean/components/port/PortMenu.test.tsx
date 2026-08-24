@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { voyageBlockedCopy, type VoyageBlockedReason } from '../../domain/voyage';
 import { PORT_ACTIONS, PortMenu } from './PortMenu';
 
 const EXPECTED_LABELS = [
@@ -43,12 +44,12 @@ describe('<PortMenu>', () => {
   });
 
   it.each([
-    ['not-in-bridgetown', 'Return to Bridgetown before setting a new course.'],
-    ['target-defeated', 'The Red Jackdaw lead is complete.'],
-    ['lead-not-active', 'Mark the Red Jackdaw rumour in the Tavern first.'],
-    ['flagship-unavailable', 'The flagship record is unavailable.'],
-    ['insufficient-provisions', 'Buy at least 2 provisions for the round trip.'],
-  ] as const)('enables Set Sail only when voyage readiness is ready: %s', (reason, copy) => {
+    'not-in-bridgetown',
+    'target-defeated',
+    'lead-not-active',
+    'flagship-unavailable',
+    'insufficient-provisions',
+  ] satisfies VoyageBlockedReason[])('renders the domain-owned blocked copy for the complete readiness table: %s', (reason) => {
     render(<PortMenu
       activeActivity="menu"
       readiness={{ kind: 'blocked', reason, requiredProvisions: 2 }}
@@ -58,7 +59,7 @@ describe('<PortMenu>', () => {
     />);
 
     const setSail = screen.getByTestId('port-action-set-sail');
-    const explanation = screen.getByText(copy);
+    const explanation = screen.getByText(voyageBlockedCopy(reason));
     expect(setSail).toBeDisabled();
     expect(setSail).toHaveAttribute('aria-describedby', explanation.id);
   });

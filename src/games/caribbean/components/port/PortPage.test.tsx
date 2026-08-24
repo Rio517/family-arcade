@@ -298,6 +298,27 @@ function StatefulPort({
   return <PortPage controller={controller} />;
 }
 
+function StatefulReturnFocus({ onAcknowledge }: { onAcknowledge(): void }) {
+  const [target, setTarget] = useState<CaribbeanController['portFocusTarget']>('last-voyage');
+  const [journal] = useState(() => {
+    const active = appendJournal(createJournal(createCampaign({ seed: 1702, name: 'Morgan' })), {
+      type: 'lead-accepted', payload: { leadId: 'red-jackdaw' },
+    });
+    active.state.world.lastVoyage = {
+      voyageId: 'voyage-2', battleId: null, result: 'avoided', outcome: null, returnedDay: 2,
+    };
+    return active;
+  });
+  const controller = makePortController(journal, {
+    portFocusTarget: target,
+    acknowledgePortFocus() {
+      onAcknowledge();
+      setTarget(null);
+    },
+  });
+  return <PortPage controller={controller} />;
+}
+
 afterEach(() => {
   if (originalWidth) Object.defineProperty(window, 'innerWidth', originalWidth);
   if (originalHeight) Object.defineProperty(window, 'innerHeight', originalHeight);
@@ -426,6 +447,16 @@ describe('<PortPage>', () => {
     render(<PortPage controller={controller} />);
     await waitFor(() => expect(screen.getByTestId('port-action-log')).toHaveFocus());
     expect(acknowledgePortFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps focus on Captain\'s Log after acknowledgement clears the return target and rerenders', async () => {
+    const acknowledgePortFocus = vi.fn();
+    render(<StatefulReturnFocus onAcknowledge={acknowledgePortFocus} />);
+
+    await waitFor(() => expect(acknowledgePortFocus).toHaveBeenCalledTimes(1));
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByTestId('port-action-log')).toHaveFocus();
+    expect(screen.getByTestId('port-action-set-sail')).not.toHaveFocus();
   });
 
   it('focuses Set Sail on a ready reload and Log on a victorious reload', async () => {

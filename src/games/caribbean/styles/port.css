@@ -772,7 +772,7 @@
 /* Keep app chrome clear of the seven primary port commands. */
 body:has(.caribbean-port) .party-root {
   left: max(12px, env(safe-area-inset-left));
-  bottom: calc(110px + env(safe-area-inset-bottom));
+  bottom: calc(118px + env(safe-area-inset-bottom));
   transform: none;
 }
 
@@ -867,7 +867,7 @@ body:has(.caribbean-port) .party-root {
   }
 
   body:has(.caribbean-port) .party-root {
-    bottom: calc(130px + env(safe-area-inset-bottom));
+    bottom: calc(148px + env(safe-area-inset-bottom));
   }
 }
 

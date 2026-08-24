@@ -326,6 +326,10 @@ describe('<CaribbeanPage>', () => {
       'data-testid',
       'caribbean-retry-saving-button',
     );
+    expect(screen.getByTestId('caribbean-career-ready').closest('.caribbean-production')).toHaveClass(
+      'caribbean-production--campaign',
+      'caribbean-production--port',
+    );
   });
 
   it.each(['port', 'sailing', 'encounter', 'naval'] as const)(

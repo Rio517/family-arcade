@@ -659,8 +659,8 @@
     "requestedPaths": [
       "/",
       "/assets/bridgetown-1675-CHjsU7Fy.webp",
-      "/assets/index-DHP1sjMr.js",
-      "/assets/index-q_IFYJLx.css",
+      "/assets/index-BXQyqNrq.css",
+      "/assets/index-e-LYj48T.js",
       "/registerSW.js"
     ]
   },
@@ -672,7 +672,7 @@
   },
   "isolation": {
     "previewHtmlAbsent": true,
-    "caribbeanGlbAbsent": true,
+    "caribbeanGlbAbsent": false,
     "glbRequested": false,
     "previewResourceRequested": false,
     "moduleMarkersAbsent": true,
