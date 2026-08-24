@@ -199,6 +199,15 @@ export interface CaribbeanNavalSourceAudit {
   paths: string[];
   edges: CaribbeanNavalSourceEdge[];
 }
+export type CaribbeanNavalSourceDiagnostic =
+  | 'nonliteral-dynamic-import'
+  | 'nonliteral-commonjs-require'
+  | 'unsupported-import-meta-glob';
+export class CaribbeanNavalSourceAuditError extends Error {
+  readonly code: 'source-files';
+  readonly diagnostic: CaribbeanNavalSourceDiagnostic;
+  readonly importer: string;
+}
 export interface CaribbeanNavalSourceManifest {
   files: CaribbeanNavalSourceRow[];
   sourceHash: string;
@@ -1360,7 +1369,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 - Modify: `scripts/caribbean-naval-check.mjs`
 - Modify: `scripts/lib/caribbean-naval-check.test.mjs`
 
-**Interfaces:** Consumes Task 5's literal `CampaignVictoryTrace`, `driveCampaignVictory`, public tick, browser modes/screenshots, and all production interfaces. Produces port evidence schema version 3, `CARIBBEAN_NAVAL_SOURCE_SEEDS`/`auditCaribbeanNavalSourceClosure`/`collectCaribbeanNavalSourceManifest`, real clock integration, revised isolation, exact screenshot/stable-manifest contract, observational range validation, and naval `--semantic-probe`/`--verify`/`--capture` modes. Does not commit generated metrics/PNG bytes.
+**Interfaces:** Consumes Task 5's literal `CampaignVictoryTrace`, `driveCampaignVictory`, public tick, browser modes/screenshots, and all production interfaces. Produces port evidence schema version 3, `CARIBBEAN_NAVAL_SOURCE_SEEDS`/`auditCaribbeanNavalSourceClosure`/`collectCaribbeanNavalSourceManifest`, the exact `CaribbeanNavalSourceAuditError` syntax diagnostics, real clock integration, revised isolation, exact screenshot/stable-manifest contract, observational range validation, and naval `--semantic-probe`/`--verify`/`--capture` modes. Does not commit generated metrics/PNG bytes.
 
 - [ ] **Step 1: Define exact schema-v3 evaluator tests**
 
@@ -1524,7 +1533,15 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   | capture, clean Task 6 HEAD | docs destination via `saveIfChanged` | exit 0, `NAVAL_CAPTURE_OK head=<sha> changed=<n>` |
   | final verify, clean post-capture HEAD | unique temp; canonical stable-manifest equality plus fresh observation/artifact range validation | exit 0, `NAVAL_VERIFY_OK capture=<sha> source=<sha> artifacts=<n>` |
   | missing/unknown mode | no destination | exit 1, `NAVAL_CLI_FAILED mode` |
+  | semantic probe with any unsupported-loader fixture | no harness/docs output; exact temp removed | exit 1, exactly `NAVAL_SEMANTIC_PROBE_FAILED source-files diagnostic=<diagnostic>` |
+  | capture with any unsupported-loader fixture | no harness/docs output; exact temp removed | exit 1, exactly `NAVAL_CAPTURE_FAILED source-files diagnostic=<diagnostic>` |
+  | final verify with any unsupported-loader fixture | no accepted output; exact temp removed | exit 1, exactly `NAVAL_VERIFY_FAILED source-files diagnostic=<diagnostic>` |
   | semantic/stale/dirty/hash/source/stable-manifest/observation-range/artifact-manifest/destination/cleanup failure | no accepted output | exit 1, mode-specific `NAVAL_SEMANTIC_PROBE_FAILED <code>`, `NAVAL_CAPTURE_FAILED <code>`, or `NAVAL_VERIFY_FAILED <code>` |
+
+  In the three unsupported-loader rows, `<diagnostic>` is tested separately as
+  each exact literal `nonliteral-dynamic-import`,
+  `nonliteral-commonjs-require`, and `unsupported-import-meta-glob`; one parser
+  guard or shared fixture cannot satisfy another row.
 
   The verify fixture requires capture HEAD ancestor, exact source-file manifest
   and source hash, a zero-finding closure audit, and a clean tracked worktree.
@@ -1585,9 +1602,80 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   package/`@types`/`node:` imports; and rejected unknown bare specifiers. Add a
   new tracked transitive local import and require the
   closure/manifest to grow by exactly its dependency edge; then remove that
-  target from the tracked universe and require `source-files`. A nonliteral
-  dynamic import, unresolved path, and ambiguous extension candidates also
-  fail `source-files`. Delete one captured
+  target from the tracked universe and require `source-files`.
+
+  Before production exists, register these exact fixtures and three independent
+  named native tests. `makeTrackedGraph` creates a separate `mkdtemp` root,
+  writes the suite's already-valid package/TypeScript/Vite four-alias scaffold
+  plus only the listed case files, then runs local `git init` and explicit
+  `git add -- <all fixture paths>`; `t.after` removes that root. The case
+  importers live under the real `:(glob)src/games/caribbean/**` seed. The helper
+  performs no commit, network call, or global Git configuration.
+
+  ```js
+  const unsupportedLoaderFixtures = [
+    {
+      name: 'rejects nonliteral dynamic import with its source-files diagnostic',
+      importer: 'src/games/caribbean/dynamic.mjs',
+      diagnostic: 'nonliteral-dynamic-import',
+      files: {
+        'src/games/caribbean/dynamic.mjs': "const target = './dependency.mjs'; void import(target);\n",
+        'src/games/caribbean/dependency.mjs': 'export default 1;\n',
+      },
+    },
+    {
+      name: 'rejects nonliteral CommonJS require with its source-files diagnostic',
+      importer: 'src/games/caribbean/commonjs.cjs',
+      diagnostic: 'nonliteral-commonjs-require',
+      files: {
+        'src/games/caribbean/commonjs.cjs': "const target = './dependency.cjs'; require(target);\n",
+        'src/games/caribbean/dependency.cjs': 'module.exports = 1;\n',
+      },
+    },
+    {
+      name: 'rejects import.meta.glob with its source-files diagnostic',
+      importer: 'src/games/caribbean/glob.ts',
+      diagnostic: 'unsupported-import-meta-glob',
+      files: {
+        'src/games/caribbean/glob.ts': "export const modules = import.meta.glob('./views/*.tsx');\n",
+        'src/games/caribbean/views/a.tsx': 'export default function A() { return null; }\n',
+      },
+    },
+  ];
+
+  for (const fixture of unsupportedLoaderFixtures) {
+    test(fixture.name, async (t) => {
+      const root = await makeTrackedGraph(t, fixture.files);
+      const { auditCaribbeanNavalSourceClosure } =
+        await import('./caribbean-naval-verification.mjs');
+      assert.throws(
+        () => auditCaribbeanNavalSourceClosure(root),
+        (error) => {
+          assert.equal(error?.constructor?.name, 'CaribbeanNavalSourceAuditError');
+          assert.equal(error.code, 'source-files');
+          assert.equal(error.diagnostic, fixture.diagnostic);
+          assert.equal(error.importer, fixture.importer);
+          assert.equal(
+            error.message,
+            `CARIBBEAN_SOURCE_AUDIT_FAILED source-files diagnostic=${fixture.diagnostic} importer=${fixture.importer}`,
+          );
+          return true;
+        },
+      );
+    });
+  }
+  ```
+
+  Because the absent verification module is imported inside each test body,
+  Node collects all three names before RED failure. A fourth test named
+  `propagates every unsupported-loader diagnostic through every CLI mode and cleans`
+  injects each fixture into semantic-probe, capture, and verify and requires
+  the exact mode-specific failure string from the matrix, no accepted/harness/
+  docs output, and exact temp cleanup in all nine rows. Mode parsing succeeds first;
+  source audit owns the next precedence boundary, before harness launch,
+  clean/stale/ancestry checks, or destination mutation, so no unrelated error
+  can mask these diagnostics. Unresolved paths and ambiguous extension
+  candidates remain separate `source-files` fixtures. Delete one captured
   critical row and inject one out-of-closure `README.md` row; both must fail
   `source-files`. Change one retained file hash; it must fail `source-hash`.
   Also inject stale capture, dirty source, wrong destination, and cleanup
@@ -1608,12 +1696,17 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   mise exec node@20 -- npx vitest run scripts/lib/caribbean-naval-check.test.mjs
   ```
 
-  Expected RED: Node collects named real-closure, resolver, omitted-import,
-  missing/extra/hash-drift, stable/observation, and cleanup tests and they fail
-  on missing `caribbean-naval-verification.mjs`; Vitest independently collects
-  the existing CLI suite and fails on the historical `TASK8_TREE_FILES`/
-  missing required modes and result codes. Runner-initialization failure is not
-  accepted.
+  Expected RED: Node output lists and collects `rejects nonliteral dynamic
+  import with its source-files diagnostic`, `rejects nonliteral CommonJS
+  require with its source-files diagnostic`, `rejects import.meta.glob with its
+  source-files diagnostic`, and `propagates every unsupported-loader diagnostic
+  through every CLI mode and cleans`, the nine-row table,
+  plus named real-closure, resolver, omitted-import, missing/extra/hash-drift,
+  stable/observation, and cleanup tests. They fail on the missing
+  `caribbean-naval-verification.mjs`, after collection rather than runner
+  initialization. Vitest independently collects the existing CLI suite and
+  fails on the historical `TASK8_TREE_FILES`/missing required modes and result
+  codes. Runner-initialization failure is not accepted.
 
 - [ ] **Step 7: Implement semantic-probe, capture, and final verify modes**
 
@@ -1635,7 +1728,8 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   literally.
 
   Rerun the two Step 6 commands. Expected: every named native real-closure,
-  resolver, omitted-import, missing/extra/hash-drift, two-generation,
+  resolver, omitted-import, three distinct unsupported-loader diagnostics,
+  nine mode-propagation/cleanup rows, missing/extra/hash-drift, two-generation,
   stable-drift, range, artifact, destination, and cleanup test passes; the
   existing Vitest CLI suite passes under Vitest.
 
@@ -1674,7 +1768,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
 - [ ] **Step 9: Mutation proof, focused verification, review, and commit**
 
-  Mutate raw fixtures for duplicated resolution, changed literal event ID, changed mode order, terminal tick `11856`, wrong seed, `tickAfterReload: 1`, a naval request on avoid, missing prior v2 field, unknown nested key, and false recovery preservation. Each returns a failed verdict without throwing. Mutate first-RAF behavior and clock/Date installation order. In a temporary tracked graph, add a new local import and require automatic closure growth; remove its target, make it ambiguous, and make a dynamic import nonliteral, each requiring `source-files`. Omit each literal `kv.ts`/token-CSS/app-main critical row, add an out-of-closure source, reorder rows, and change a retained source hash; the verification suite must fail with `source-files` or `source-hash` exactly. Mutate stable manifest, observation ranges, artifact manifest, and each CLI destination; the owning browser/naval-verification test must fail. Different valid FPS/duration/resource/PNG observations must continue to pass.
+  Mutate raw fixtures for duplicated resolution, changed literal event ID, changed mode order, terminal tick `11856`, wrong seed, `tickAfterReload: 1`, a naval request on avoid, missing prior v2 field, unknown nested key, and false recovery preservation. Each returns a failed verdict without throwing. Mutate first-RAF behavior and clock/Date installation order. In a temporary tracked graph, add a new local import and require automatic closure growth; remove its target and make it ambiguous. Then mutation-kill the three unsupported-loader guards independently: change only nonliteral `import(variable)` handling to ignore/accept, run the native suite and require only the named dynamic-import diagnostic plus its three CLI rows to fail; restore it and require GREEN. Repeat for only CommonJS `require(variable)` and its distinct named diagnostic/three CLI rows, then for literal-pattern `import.meta.glob('./views/*.tsx')` and its distinct named diagnostic/three CLI rows. If one mutation is killed by another syntax fixture, the tests are improperly coupled and Task 6 remains incomplete. Omit each literal `kv.ts`/token-CSS/app-main critical row, add an out-of-closure source, reorder rows, and change a retained source hash; the verification suite must fail with `source-files` or `source-hash` exactly. Mutate stable manifest, observation ranges, artifact manifest, and each CLI destination; the owning browser/naval-verification test must fail. Different valid FPS/duration/resource/PNG observations must continue to pass. After restoring every mutation, rerun the full Step 9 matrix; all three parser fixtures and all nine mode-specific propagation/cleanup rows must be GREEN.
 
   Run:
 
@@ -1856,7 +1950,7 @@ The package is complete only when every statement is evidenced:
 16. Normal setup/port/sailing/avoid does not request naval assets; pursuit loads only local production assets; no harness/debug module ships; Battle Lab remains independently green.
 17. The real-session literal public-control trace mounts at tick zero, primes first RAF without a tick, advances through actual 16 ms RAF quanta to exact six-tick publications/final tick `11855`, preserves ordered clock/Date fixtures and `nowConsumed`, and fails closed on drift, timeout, or non-victory.
 18. Schema-v3 normal-route port metrics and its nine exact-clock/public-tick screenshots are byte-identical across two clean runs and fail closed on malformed/unknown evidence; this does not impose byte identity on the separate live naval-harness observations in criterion 19.
-19. Naval semantic probe is non-writing and tolerates stale tracked provenance; Task 7's clean-Task-6-HEAD capture owns honest observations; final clean `--verify` proves the exact sorted seed-to-fixed-point tracked-local import/HTML/CSS/build-entry closure and raw-byte row/hash manifest—including `kv.ts`, token CSS, and app main—while accepting varied in-range FPS/duration/resource/PNG observations and rejecting unresolved/omitted/new dependencies, missing/extra/reordered rows, hash, stable, range, and artifact drift.
+19. Naval semantic probe is non-writing and tolerates stale tracked provenance; Task 7's clean-Task-6-HEAD capture owns honest observations; final clean `--verify` proves the exact sorted seed-to-fixed-point tracked-local import/HTML/CSS/build-entry closure and raw-byte row/hash manifest—including `kv.ts`, token CSS, and app main—while accepting varied in-range FPS/duration/resource/PNG observations and rejecting unresolved/omitted/new dependencies; nonliteral dynamic imports; nonliteral CommonJS requires; every `import.meta.glob` call including literal patterns; missing/extra/reordered rows; and hash, stable, range, or artifact drift with the exact source diagnostic, mode prefix, and cleanup contract.
 20. Every Task 1–6 source commit has fresh focused tests, check, full Vitest, forced clean solution build, real package build, and diff check; Tasks 4–5 also commit inspected normal-production screenshots with their UI source; cumulative gates/review are fresh and zero-finding.
 21. Human first-time and target-iPad Safari/touch/offline/thermal observations remain honestly unobserved unless actually performed.
 22. Worktree is clean; no merge, push, rebase, fetch, or main change occurred.

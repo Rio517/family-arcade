@@ -903,6 +903,44 @@ exercise HTML -> `/src/app/main.tsx`, TypeScript -> CSS, CSS -> asset, alias,
 extension, directory-index, alias-config agreement, and declared-package
 resolution.
 
+Unsupported loader syntax has an exact, observable contract. The source audit
+throws `CaribbeanNavalSourceAuditError` with `code: 'source-files'`, the
+repository-relative `importer`, and exactly one `diagnostic`:
+`nonliteral-dynamic-import`, `nonliteral-commonjs-require`, or
+`unsupported-import-meta-glob`. Its exact message is
+`CARIBBEAN_SOURCE_AUDIT_FAILED source-files diagnostic=<diagnostic> importer=<path>`.
+Before collector implementation, three independent tracked temporary-repository
+fixtures register as separate native tests:
+
+```js
+// src/games/caribbean/dynamic.mjs
+const target = './dependency.mjs';
+void import(target);
+
+// src/games/caribbean/commonjs.cjs
+const target = './dependency.cjs';
+require(target);
+
+// src/games/caribbean/glob.ts — even a literal pattern is unsupported
+const modules = import.meta.glob('./views/*.tsx');
+```
+
+Each fixture also tracks the apparently referenced dependency so only its
+parser guard can own the failure. The named tests assert their distinct
+diagnostic/message, not only the shared `source-files` code. With each fixture
+injected as the collector root, all three CLI modes fail before harness work,
+publish no accepted output or docs bytes, remove the exact temporary directory
+in `finally`, and emit exactly the applicable mode prefix plus the diagnostic:
+`NAVAL_SEMANTIC_PROBE_FAILED source-files diagnostic=<diagnostic>`,
+`NAVAL_CAPTURE_FAILED source-files diagnostic=<diagnostic>`, or
+`NAVAL_VERIFY_FAILED source-files diagnostic=<diagnostic>`. Mutation proof
+independently changes each of the three parser branches to ignore its syntax;
+only that fixture's parser and CLI-propagation tests must turn red. Restoring
+all three branches returns the complete native suite to green. After valid mode
+parsing, this source audit precedes harness launch, clean/stale/ancestry checks,
+and destination mutation so an unrelated mode failure cannot mask a syntax
+diagnostic.
+
 Final paths are repository-relative POSIX strings sorted bytewise ascending.
 Each row is `{ path, sha256 }`, where `sha256` hashes the tracked file's raw
 bytes. `sourceHash` is SHA-256 of canonical JSON for the complete sorted row
