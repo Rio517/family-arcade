@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from 'playwright';
 import {
+  ART_ACTIVITY_CONTRAST_SPECS,
   ART_CONTRAST_SELECTORS,
   ART_VIEWPORT_SPECS,
   EXPECTED_MARKET_ACTION_IDS,
@@ -744,6 +745,44 @@ async function readArtViewport(page, spec, subjectRoi) {
   }, { viewportSpec: spec, roi: subjectRoi, contrastSelectors: ART_CONTRAST_SELECTORS, marketActionIds: EXPECTED_MARKET_ACTION_IDS });
 }
 
+async function readActivityContrast(page, activitySpec) {
+  return page.evaluate(({ selector, text }) => {
+    const parseColor = (value) => {
+      const numbers = value.match(/[\d.]+/g)?.map(Number) ?? [];
+      if (value.startsWith('color(srgb')) {
+        return { r: (numbers[0] ?? 0) * 255, g: (numbers[1] ?? 0) * 255, b: (numbers[2] ?? 0) * 255, a: numbers[3] ?? 1 };
+      }
+      return { r: numbers[0] ?? 0, g: numbers[1] ?? 0, b: numbers[2] ?? 0, a: numbers[3] ?? 1 };
+    };
+    const luminance = ({ r, g, b }) => {
+      const channel = (value) => {
+        const normalized = value / 255;
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    };
+    const element = document.querySelector(selector);
+    if (!(element instanceof HTMLElement)) throw new Error(`Activity contrast selector is not visible: ${selector}`);
+    const box = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden' || box.width <= 0 || box.height <= 0) {
+      throw new Error(`Activity contrast selector is not visible: ${selector}`);
+    }
+    const actualText = element.innerText.replace(/\s+/g, ' ').trim();
+    if (actualText !== text) throw new Error(`Activity contrast selector has wrong state: ${selector}=${actualText}`);
+    const foreground = parseColor(style.color);
+    const background = parseColor(style.backgroundColor);
+    const lighter = Math.max(luminance(foreground), luminance(background));
+    const darker = Math.min(luminance(foreground), luminance(background));
+    return {
+      selector,
+      text: actualText,
+      minimumRatio: (lighter + 0.05) / (darker + 0.05),
+      backgroundAlpha: background.a,
+    };
+  }, activitySpec);
+}
+
 async function setupArtPage(page, baseUrl) {
   await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Start career' }).click();
@@ -839,6 +878,24 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
         }
         return { leaves, overlapPairs: [...overlapKeys].map(JSON.parse).sort() };
       }, { marketActionIds: EXPECTED_MARKET_ACTION_IDS });
+      const activityContrasts = [];
+      await normalPage.getByTestId('market-provisions-buy-1').click();
+      await normalPage.getByTestId('caribbean-market-status').getByText('Cargo ledger updated.').waitFor();
+      activityContrasts.push(await readActivityContrast(normalPage, ART_ACTIVITY_CONTRAST_SPECS[0]));
+      await normalPage.getByRole('button', { name: 'Back to harbour' }).click();
+      await normalPage.getByRole('button', { name: 'Tavern' }).click();
+      await normalPage.getByRole('heading', { name: 'Tavern', level: 2 }).waitFor();
+      activityContrasts.push(await readActivityContrast(normalPage, ART_ACTIVITY_CONTRAST_SPECS[1]));
+      const markOnChart = normalPage.getByRole('button', { name: 'Mark on chart' });
+      if (await markOnChart.count() === 1) {
+        await markOnChart.click();
+        await normalPage.getByText("Marked in the Captain's Log").waitFor();
+      }
+      await normalPage.getByRole('button', { name: 'Back to harbour' }).click();
+      await normalPage.getByRole('button', { name: "Captain's Log" }).click();
+      await normalPage.getByText('Sail east of Bridgetown and identify the Red Jackdaw.').waitFor();
+      activityContrasts.push(await readActivityContrast(normalPage, ART_ACTIVITY_CONTRAST_SPECS[2]));
+      evidence.activityContrasts = activityContrasts;
       viewports.push(evidence);
       await normalPage.getByRole('button', { name: 'Back to harbour' }).click();
     }

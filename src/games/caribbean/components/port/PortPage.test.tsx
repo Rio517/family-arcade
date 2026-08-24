@@ -411,6 +411,16 @@ describe('<PortPage>', () => {
     expect(portCss).not.toMatch(/\.caribbean-port-horizon span\s*\{/);
   });
 
+  it('gives only non-empty Market live status a minimal opaque ink backplate', () => {
+    const portCss = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+    const statusRule = ruleBodyContaining(portCss, '.caribbean-market-status:not(:empty)');
+
+    expect(declaration(statusRule, 'width')).toBe('fit-content');
+    expect(declaration(statusRule, 'padding-inline')).toBe('6px');
+    expect(declaration(statusRule, 'background')).toBe('#07151d');
+    expect(ruleBodyContaining(portCss, '.caribbean-market-status')).not.toContain('background:');
+  });
+
   it.each([
     { label: 'minimum compact playfield', width: 960, height: 600, placeFont: 19 },
     { label: 'normal desktop playfield', width: 1440, height: 900, placeFont: 21 },

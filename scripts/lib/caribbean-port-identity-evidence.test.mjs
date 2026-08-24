@@ -98,6 +98,12 @@ const CONTRAST_SELECTORS = [
   '.caribbean-port-action-reason',
 ];
 
+const ACTIVITY_CONTRAST_SPECS = [
+  { selector: '.caribbean-market-status:not(:empty)', text: 'Cargo ledger updated.' },
+  { selector: '.caribbean-tavern-rumour blockquote', text: 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.' },
+  { selector: '.caribbean-log-action', text: 'NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.' },
+];
+
 function geometryEvidence(includeMarket = false) {
   const ids = [
     'party-pill', 'port-position', ...Array.from({ length: 5 }, (_, index) => `port-fact-${index}`),
@@ -132,6 +138,9 @@ function artEvidence() {
       viewport: { width, height },
       focal: { xPercent: focalX, yPercent: 50, roiVisibleRatio: 0.8 },
       contrasts: CONTRAST_SELECTORS.map((selector) => ({ selector, minimumRatio: 7, backgroundAlpha: 1 })),
+      activityContrasts: ACTIVITY_CONTRAST_SPECS.map(({ selector, text }) => ({
+        selector, text, minimumRatio: 7, backgroundAlpha: 1,
+      })),
       menuGeometry: geometryEvidence(false),
       marketGeometry: geometryEvidence(true),
     })),
@@ -186,6 +195,23 @@ describe('evaluatePortIdentityEvidence', () => {
           ? { ...sample, minimumRatio: 4.49 } : sample) }
         : viewport),
     } }), 'art desktop contrast must be opaque and at least 4.5:1'],
+    ['an omitted activity selector', setupEvidence({ art: {
+      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
+        ? { ...viewport, activityContrasts: viewport.activityContrasts.slice(1) }
+        : viewport),
+    } }), 'art desktop activity contrast must cover actual opaque states at least 4.5:1'],
+    ['a transparent activity sample', setupEvidence({ art: {
+      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
+        ? { ...viewport, activityContrasts: viewport.activityContrasts.map((sample, sampleIndex) => sampleIndex === 0
+          ? { ...sample, backgroundAlpha: 0 } : sample) }
+        : viewport),
+    } }), 'art desktop activity contrast must cover actual opaque states at least 4.5:1'],
+    ['a sub-4.5 activity sample', setupEvidence({ art: {
+      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
+        ? { ...viewport, activityContrasts: viewport.activityContrasts.map((sample, sampleIndex) => sampleIndex === 1
+          ? { ...sample, minimumRatio: 4.49 } : sample) }
+        : viewport),
+    } }), 'art desktop activity contrast must cover actual opaque states at least 4.5:1'],
     ['clipped leaf', setupEvidence({ art: {
       ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
         ? { ...viewport, menuGeometry: {

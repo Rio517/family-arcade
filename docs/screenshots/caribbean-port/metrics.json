@@ -587,8 +587,8 @@
     "requestedPaths": [
       "/",
       "/assets/bridgetown-1675-CHjsU7Fy.webp",
-      "/assets/index-Czt1k80f.css",
-      "/assets/index-otw37_Ew.js",
+      "/assets/index-BrHmmirw.js",
+      "/assets/index-DD2n53S3.css",
       "/registerSW.js"
     ]
   },
@@ -1198,7 +1198,27 @@
             }
           ],
           "overlapPairs": []
-        }
+        },
+        "activityContrasts": [
+          {
+            "selector": ".caribbean-market-status:not(:empty)",
+            "text": "Cargo ledger updated.",
+            "minimumRatio": 11.933028196729909,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-tavern-rumour blockquote",
+            "text": "The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.",
+            "minimumRatio": 13.115407441447779,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-log-action",
+            "text": "NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.",
+            "minimumRatio": 13.115407441447779,
+            "backgroundAlpha": 1
+          }
+        ]
       },
       {
         "name": "wide",
@@ -1703,7 +1723,27 @@
             }
           ],
           "overlapPairs": []
-        }
+        },
+        "activityContrasts": [
+          {
+            "selector": ".caribbean-market-status:not(:empty)",
+            "text": "Cargo ledger updated.",
+            "minimumRatio": 11.933028196729909,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-tavern-rumour blockquote",
+            "text": "The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.",
+            "minimumRatio": 13.115407441447779,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-log-action",
+            "text": "NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.",
+            "minimumRatio": 13.115407441447779,
+            "backgroundAlpha": 1
+          }
+        ]
       },
       {
         "name": "tablet",
@@ -2208,7 +2248,27 @@
             }
           ],
           "overlapPairs": []
-        }
+        },
+        "activityContrasts": [
+          {
+            "selector": ".caribbean-market-status:not(:empty)",
+            "text": "Cargo ledger updated.",
+            "minimumRatio": 11.933028196729909,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-tavern-rumour blockquote",
+            "text": "The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.",
+            "minimumRatio": 13.115407441447779,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-log-action",
+            "text": "NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.",
+            "minimumRatio": 13.115407441447779,
+            "backgroundAlpha": 1
+          }
+        ]
       },
       {
         "name": "minimum",
@@ -2713,7 +2773,27 @@
             }
           ],
           "overlapPairs": []
-        }
+        },
+        "activityContrasts": [
+          {
+            "selector": ".caribbean-market-status:not(:empty)",
+            "text": "Cargo ledger updated.",
+            "minimumRatio": 11.933028196729909,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-tavern-rumour blockquote",
+            "text": "The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.",
+            "minimumRatio": 13.115407441447779,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-log-action",
+            "text": "NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.",
+            "minimumRatio": 13.115407441447779,
+            "backgroundAlpha": 1
+          }
+        ]
       }
     ]
   },

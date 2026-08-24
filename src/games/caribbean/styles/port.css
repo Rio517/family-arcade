@@ -429,6 +429,7 @@
 .caribbean-tavern-rumour blockquote {
   max-width: 610px;
   margin: 0;
+  background: #07151d;
   color: var(--caribbean-sailcloth);
   font-size: 18px;
   font-weight: 620;
@@ -500,6 +501,7 @@
   margin: 0;
   padding: 16px 0;
   border-top: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 20%, transparent);
+  background: #07151d;
   color: var(--caribbean-sailcloth);
   font-size: 17px;
   line-height: 1.5;
@@ -749,6 +751,12 @@
   color: color-mix(in srgb, var(--caribbean-sailcloth) 80%, var(--caribbean-trade-wind));
   font-size: 14px;
   line-height: 20px;
+}
+
+.caribbean-market-status:not(:empty) {
+  width: fit-content;
+  padding-inline: 6px;
+  background: #07151d;
 }
 
 .caribbean-production--port .caribbean-memory-warning {

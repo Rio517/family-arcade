@@ -60,6 +60,18 @@ export const ART_CONTRAST_SELECTORS = Object.freeze([
   '.caribbean-port-action-reason',
 ]);
 
+export const ART_ACTIVITY_CONTRAST_SPECS = Object.freeze([
+  Object.freeze({ selector: '.caribbean-market-status:not(:empty)', text: 'Cargo ledger updated.' }),
+  Object.freeze({
+    selector: '.caribbean-tavern-rumour blockquote',
+    text: 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.',
+  }),
+  Object.freeze({
+    selector: '.caribbean-log-action',
+    text: 'NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.',
+  }),
+]);
+
 const ART_MENU_GEOMETRY_IDS = Object.freeze([
   'party-pill', 'port-position', 'port-fact-0', 'port-fact-1', 'port-fact-2', 'port-fact-3', 'port-fact-4',
   'port-stage-title', 'port-bearing', 'port-activity-heading',
@@ -324,6 +336,21 @@ function validateArtEvidence(issues, art) {
         || sample.minimumRatio < 4.5
         || sample.backgroundAlpha !== 1)) {
       issues.push(`art ${spec.name} contrast must be opaque and at least 4.5:1`);
+    }
+    if (!Array.isArray(viewport?.activityContrasts)
+      || !sameMembers(
+        viewport.activityContrasts.map((sample) => sample?.selector),
+        ART_ACTIVITY_CONTRAST_SPECS.map(({ selector }) => selector),
+      )
+      || viewport.activityContrasts.some((sample) => {
+        const activitySpec = ART_ACTIVITY_CONTRAST_SPECS.find(({ selector }) => selector === sample?.selector);
+        return !isRecord(sample)
+          || activitySpec?.text !== sample.text
+          || !Number.isFinite(sample.minimumRatio)
+          || sample.minimumRatio < 4.5
+          || sample.backgroundAlpha !== 1;
+      })) {
+      issues.push(`art ${spec.name} activity contrast must cover actual opaque states at least 4.5:1`);
     }
     validateArtGeometry(issues, viewport?.menuGeometry, spec.name, 'menu', ART_MENU_GEOMETRY_IDS);
     validateArtGeometry(issues, viewport?.marketGeometry, spec.name, 'market', ART_MARKET_GEOMETRY_IDS);
