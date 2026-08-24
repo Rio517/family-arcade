@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BATTLE_LAB_INPUT, SLOOP_CLASS } from './naval';
+import { BATTLE_LAB_INPUT, createRedJackdawBattleInput, SLOOP_CLASS } from './naval';
 
 describe('Caribbean naval content', () => {
   it('locks the one-class naval slice to the measured sloop', () => {
@@ -17,7 +17,15 @@ describe('Caribbean naval content', () => {
     });
   });
 
-  it('defines the deterministic Battle Lab encounter', () => {
+  it('uses the Red Jackdaw builder for the deterministic Battle Lab encounter', () => {
+    expect(BATTLE_LAB_INPUT).toEqual(createRedJackdawBattleInput({
+      battleId: 'battle-lab-red-jackdaw',
+      seed: 1702,
+      player: {
+        stableShipId: 'mistral', name: 'Mistral', classId: 'sloop',
+        hull: 100, sails: 100, crew: 52, cannon: 8,
+      },
+    }));
     expect(BATTLE_LAB_INPUT).toMatchObject({
       battleId: 'battle-lab-red-jackdaw',
       seed: 1702,

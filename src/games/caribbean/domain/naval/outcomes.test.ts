@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { evaluateOutcome } from './outcomes';
+import { decisiveFactForOutcome, evaluateOutcome } from './outcomes';
 import { fixture } from './testFixtures';
 import type { NavalShipState } from './types';
 
@@ -91,5 +91,21 @@ describe('naval battle outcomes', () => {
     const atLimit = fixture({ input: { timeLimitTicks: 12 }, tick: 12 });
     expect(evaluateOutcome(before)).toBeNull();
     expect(evaluateOutcome(atLimit)).toEqual({ kind: 'separated', shipId: 'player' });
+  });
+
+  it('derives reusable boarding and escape facts from the same terminal rules', () => {
+    const boarding = fixture({
+      player: { position: { x: 0, z: 0 }, heading: Math.PI / 2, speed: 1, crew: 50 },
+      opponent: { position: { x: 6, z: 0 }, heading: 0, speed: 0, sails: 24, crew: 16 },
+    });
+    const escape = fixture({ opponent: { position: { x: 93, z: 0 }, heading: Math.PI / 2, speed: 2 } });
+
+    expect(decisiveFactForOutcome(boarding, { kind: 'boarding-ready', victorShipId: 'player' })).toEqual({
+      kind: 'boarding-ready', victorShipId: 'player',
+      range: 6, relativeSpeed: 1, targetSails: 24, targetCrew: 16, playerCrew: 50,
+    });
+    expect(decisiveFactForOutcome(escape, { kind: 'escaped', shipId: 'opponent' })).toEqual({
+      kind: 'escaped', shipId: 'opponent', distance: 93, arenaRadius: 92, outwardSpeed: 2,
+    });
   });
 });

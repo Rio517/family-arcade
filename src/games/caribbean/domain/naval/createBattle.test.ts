@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BATTLE_LAB_INPUT } from '../../content/naval';
+import { BATTLE_LAB_INPUT, createRedJackdawBattleInput } from '../../content/naval';
 import { NAVAL_RELOAD_REQUIRED_WORK } from './balance';
 import { createNavalBattle, validateNavalInput } from './createBattle';
 import { command, fixture } from './testFixtures';
@@ -21,6 +21,22 @@ describe('createNavalBattle', () => {
     state.ships.player.hull = 1;
     expect(BATTLE_LAB_INPUT.player.hull).toBe(100);
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+  });
+
+  it('accepts a damaged flagship through the shared Red Jackdaw input boundary', () => {
+    const input = createRedJackdawBattleInput({
+      battleId: 'voyage-3-battle',
+      seed: 0x1234_5678,
+      player: {
+        stableShipId: 'mistral', name: 'Mistral', classId: 'sloop',
+        hull: 91, sails: 82, crew: 50, cannon: 8,
+      },
+    });
+
+    expect(validateNavalInput(input)).toEqual({ ok: true });
+    expect(createNavalBattle(input).ships.player).toMatchObject({
+      hull: 91, sails: 82, crew: 50, cannon: 8,
+    });
   });
 
   it('rejects invalid external input with all boundary issues', () => {

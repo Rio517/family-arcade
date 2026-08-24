@@ -88,6 +88,44 @@ export type NavalOutcome =
   | { kind: 'surrender' | 'sunk' | 'boarding-ready'; victorShipId: NavalShipId }
   | { kind: 'escaped' | 'separated'; shipId: NavalShipId };
 
+export type NavalDecisiveFact =
+  | {
+      kind: 'surrender';
+      victorShipId: NavalShipId;
+      surrenderedShipId: NavalShipId;
+      threshold: 'hull' | 'crew';
+      value: number;
+      thresholdValue: number;
+    }
+  | { kind: 'sunk'; victorShipId: NavalShipId; sunkShipId: NavalShipId; hull: number }
+  | {
+      kind: 'boarding-ready';
+      victorShipId: 'player';
+      range: number;
+      relativeSpeed: number;
+      targetSails: number;
+      targetCrew: number;
+      playerCrew: number;
+    }
+  | {
+      kind: 'escaped';
+      shipId: NavalShipId;
+      distance: number;
+      arenaRadius: number;
+      outwardSpeed: number;
+    }
+  | { kind: 'separated'; shipId: NavalShipId; timeLimitTicks: number };
+
+export interface NavalResolution {
+  battleId: string;
+  outcome: NavalOutcome;
+  atTick: number;
+  seedAfter: number;
+  player: { hull: number; sails: number; crew: number; cannon: number };
+  opponent: { hull: number; sails: number; crew: number; cannon: number };
+  decisive: NavalDecisiveFact;
+}
+
 export type NavalEvent =
   | { id: number; kind: 'volley'; atTick: number; shipId: NavalShipId; targetShipId: NavalShipId; result: VolleyResult }
   | { id: number; kind: 'damage'; atTick: number; shipId: NavalShipId; damage: Damage }
