@@ -39,8 +39,11 @@ describe('compactJournal', () => {
     expect(compacted.state).toEqual(journal.state);
     expect(compacted.initial).not.toBe(journal.state);
     expect(compacted.state).not.toBe(journal.state);
-    expect(compacted.state.lastEventId).toBe(257);
+    expect(compacted.initial).not.toBe(compacted.state);
     expect(validateJournal(compacted)).toEqual({ ok: true, value: compacted });
+    compacted.state.wealth.gold = 0;
+    expect(compacted.initial.wealth.gold).toBe(journal.state.wealth.gold);
+    expect(compacted.state.lastEventId).toBe(257);
   });
 
   it('continues the compacted log from the preserved event ID', () => {

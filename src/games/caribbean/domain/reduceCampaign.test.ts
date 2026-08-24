@@ -31,6 +31,22 @@ function acceptEvent(id = 1, atDay = 0): CampaignEvent {
   };
 }
 
+function marketEvent(payload: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    type: 'market-traded',
+    atDay: 0,
+    payload: {
+      portId: 'bridgetown',
+      shipId: 'mistral',
+      cargoId: 'provisions',
+      delta: 1,
+      unitPrice: 4,
+      ...payload,
+    },
+  };
+}
+
 describe('campaign journal append', () => {
   it('applies a quoted market event atomically and replays it canonically', () => {
     const journal = createJournal(initialCampaign());
@@ -94,6 +110,73 @@ describe('campaign journal append', () => {
       issues: [{ path: expectedIssue.split(':')[0], code: expectedIssue.split(':')[1] }],
     });
     else expect(validation).toMatchObject({ ok: true });
+  });
+
+  it.each([
+    ['portId'],
+    ['shipId'],
+    ['cargoId'],
+    ['delta'],
+    ['unitPrice'],
+  ] as const)('requires the market payload %s field', (field) => {
+    const event = marketEvent();
+    delete event.payload[field];
+
+    expect(validateCampaignEvent(event)).toEqual({
+      ok: false,
+      issues: [{ path: `payload.${field}`, code: 'missing' }],
+    });
+  });
+
+  it.each(['alpha', 'surprise'] as const)('rejects the extra market payload key %s', (field) => {
+    expect(validateCampaignEvent(marketEvent({ [field]: true }))).toEqual({
+      ok: false,
+      issues: [{ path: `payload.${field}`, code: 'unknown-key' }],
+    });
+  });
+
+  it.each([
+    ['portId', 7, 'wrong-type'],
+    ['shipId', 7, 'wrong-type'],
+    ['cargoId', 7, 'wrong-type'],
+    ['delta', '1', 'wrong-type'],
+    ['unitPrice', '4', 'wrong-type'],
+    ['portId', 'nassau', 'unknown-id'],
+    ['cargoId', 'people', 'unknown-id'],
+    ['delta', 0, 'out-of-range'],
+    ['delta', 1.5, 'not-integer'],
+    ['delta', Number.MAX_SAFE_INTEGER + 1, 'out-of-range'],
+    ['unitPrice', -1, 'out-of-range'],
+    ['unitPrice', 1.5, 'not-integer'],
+    ['unitPrice', Number.MAX_SAFE_INTEGER + 1, 'out-of-range'],
+  ] as const)('rejects market payload %s value %o as %s', (field, value, code) => {
+    expect(validateCampaignEvent(marketEvent({ [field]: value }))).toEqual({
+      ok: false,
+      issues: [{ path: `payload.${field}`, code }],
+    });
+  });
+
+  it('rejects unknown payload keys before field issues in stable order', () => {
+    expect(validateCampaignEvent(marketEvent({
+      zoo: true,
+      alpha: true,
+      portId: 7,
+      shipId: 8,
+      cargoId: 9,
+      delta: 1.5,
+      unitPrice: Number.MAX_SAFE_INTEGER + 1,
+    }))).toEqual({
+      ok: false,
+      issues: [
+        { path: 'payload.alpha', code: 'unknown-key' },
+        { path: 'payload.zoo', code: 'unknown-key' },
+        { path: 'payload.portId', code: 'wrong-type' },
+        { path: 'payload.shipId', code: 'wrong-type' },
+        { path: 'payload.cargoId', code: 'wrong-type' },
+        { path: 'payload.delta', code: 'not-integer' },
+        { path: 'payload.unitPrice', code: 'out-of-range' },
+      ],
+    });
   });
 
   it('rejects payload accessors and reads a descriptor-safe proxy without live gets', () => {

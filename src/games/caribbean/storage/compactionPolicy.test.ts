@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { canonicalJson } from '../canonicalJson';
 import { createCampaign } from '../domain/createCampaign';
 import { createJournal } from '../domain/replay';
 import {
@@ -19,10 +20,17 @@ describe('journal compaction policy', () => {
     expect(crossesCompactionThreshold(1, 512 * 1024 + 1)).toBe(true);
   });
 
-  it('measures canonical JSON as UTF-8 and uses it for journal decisions', () => {
-    const journal = createJournal(createCampaign({ seed: 1702 }));
+  it('measures canonical JSON in UTF-8 bytes rather than JavaScript code units', () => {
+    const journal = createJournal(createCampaign({
+      seed: 1702,
+      name: 'Māna 🌊',
+      pronouns: 'él/elle',
+    }));
+    const canonical = canonicalJson(journal);
+    const expectedUtf8Bytes = new TextEncoder().encode(canonical).byteLength;
 
-    expect(journalUtf8Bytes(journal)).toBeGreaterThan(0);
+    expect(expectedUtf8Bytes).not.toBe(canonical.length);
+    expect(journalUtf8Bytes(journal)).toBe(expectedUtf8Bytes);
     expect(shouldCompactJournal(journal)).toBe(false);
   });
 });
