@@ -154,6 +154,7 @@ function snapshotJson(value: unknown, path: string, issues: ValidationIssue[]): 
 }
 
 function snapshotNestedRecord(value: unknown, path: string, issues: ValidationIssue[]): PlainRecord | null {
+  if (value === undefined) return null;
   const snapshot = snapshotJson(value, path, issues);
   if (!isPlainRecord(snapshot)) {
     if (snapshot !== INVALID) issue(issues, path, 'wrong-type');
@@ -262,6 +263,7 @@ function validateDay(value: unknown, path: string, issues: ValidationIssue[]): v
 }
 
 function validateStableId(value: unknown, path: string, issues: ValidationIssue[]): value is string {
+  if (value === undefined) return false;
   if (typeof value !== 'string') {
     issue(issues, path, 'wrong-type');
     return false;
@@ -315,6 +317,12 @@ function validateFiniteNumber(value: unknown, path: string, issues: ValidationIs
   if (value === undefined) return;
   if (typeof value !== 'number') issue(issues, path, 'wrong-type');
   else if (!Number.isFinite(value)) issue(issues, path, 'not-finite');
+}
+
+function validateNavalShipId(value: unknown, path: string, issues: ValidationIssue[]): void {
+  if (value === undefined) return;
+  if (typeof value !== 'string') issue(issues, path, 'wrong-type');
+  else if (value !== 'player' && value !== 'opponent') issue(issues, path, 'unknown-id');
 }
 
 function validateNavalShipInput(value: unknown, path: string, issues: ValidationIssue[]): PlainRecord | null {
@@ -381,6 +389,7 @@ function validateOutcome(value: unknown, path: string, issues: ValidationIssue[]
   const outcome = snapshotNestedRecord(value, path, issues);
   if (!outcome) return null;
   const kind = required(outcome, 'kind', path, issues);
+  if (kind === undefined) return null;
   if (typeof kind !== 'string') issue(issues, `${path}.kind`, 'wrong-type');
   else if (kind === 'surrender' || kind === 'sunk' || kind === 'boarding-ready') {
     validateKeys(outcome, ['kind', 'victorShipId'], path, issues);
@@ -414,40 +423,39 @@ function validateResolution(value: unknown, path: string, issues: ValidationIssu
   if (decisive) {
     const kind = required(decisive, 'kind', `${path}.decisive`, issues);
     const decisivePath = `${path}.decisive`;
+    if (kind === undefined) return null;
     if (typeof kind !== 'string') issue(issues, `${decisivePath}.kind`, 'wrong-type');
     else if (kind === 'surrender') {
       validateKeys(decisive, ['kind', 'victorShipId', 'surrenderedShipId', 'threshold', 'value', 'thresholdValue'], decisivePath, issues);
-      for (const key of ['victorShipId', 'surrenderedShipId', 'threshold'] as const) {
-        const field = required(decisive, key, decisivePath, issues);
-        if (field !== undefined && typeof field !== 'string') issue(issues, `${decisivePath}.${key}`, 'wrong-type');
-      }
+      validateNavalShipId(required(decisive, 'victorShipId', decisivePath, issues), `${decisivePath}.victorShipId`, issues);
+      validateNavalShipId(required(decisive, 'surrenderedShipId', decisivePath, issues), `${decisivePath}.surrenderedShipId`, issues);
+      const threshold = required(decisive, 'threshold', decisivePath, issues);
+      if (threshold !== undefined && typeof threshold !== 'string') issue(issues, `${decisivePath}.threshold`, 'wrong-type');
+      else if (threshold !== undefined && threshold !== 'hull' && threshold !== 'crew') issue(issues, `${decisivePath}.threshold`, 'unknown-id');
       validateFiniteNumber(required(decisive, 'value', decisivePath, issues), `${decisivePath}.value`, issues);
       validateFiniteNumber(required(decisive, 'thresholdValue', decisivePath, issues), `${decisivePath}.thresholdValue`, issues);
     } else if (kind === 'sunk') {
       validateKeys(decisive, ['kind', 'victorShipId', 'sunkShipId', 'hull'], decisivePath, issues);
-      for (const key of ['victorShipId', 'sunkShipId'] as const) {
-        const field = required(decisive, key, decisivePath, issues);
-        if (field !== undefined && typeof field !== 'string') issue(issues, `${decisivePath}.${key}`, 'wrong-type');
-      }
+      validateNavalShipId(required(decisive, 'victorShipId', decisivePath, issues), `${decisivePath}.victorShipId`, issues);
+      validateNavalShipId(required(decisive, 'sunkShipId', decisivePath, issues), `${decisivePath}.sunkShipId`, issues);
       validateFiniteNumber(required(decisive, 'hull', decisivePath, issues), `${decisivePath}.hull`, issues);
     } else if (kind === 'boarding-ready') {
       validateKeys(decisive, ['kind', 'victorShipId', 'range', 'relativeSpeed', 'targetSails', 'targetCrew', 'playerCrew'], decisivePath, issues);
       const victor = required(decisive, 'victorShipId', decisivePath, issues);
       if (victor !== undefined && typeof victor !== 'string') issue(issues, `${decisivePath}.victorShipId`, 'wrong-type');
+      else if (victor !== undefined && victor !== 'player') issue(issues, `${decisivePath}.victorShipId`, 'unknown-id');
       for (const key of ['range', 'relativeSpeed', 'targetSails', 'targetCrew', 'playerCrew'] as const) {
         validateFiniteNumber(required(decisive, key, decisivePath, issues), `${decisivePath}.${key}`, issues);
       }
     } else if (kind === 'escaped') {
       validateKeys(decisive, ['kind', 'shipId', 'distance', 'arenaRadius', 'outwardSpeed'], decisivePath, issues);
-      const shipId = required(decisive, 'shipId', decisivePath, issues);
-      if (shipId !== undefined && typeof shipId !== 'string') issue(issues, `${decisivePath}.shipId`, 'wrong-type');
+      validateNavalShipId(required(decisive, 'shipId', decisivePath, issues), `${decisivePath}.shipId`, issues);
       for (const key of ['distance', 'arenaRadius', 'outwardSpeed'] as const) {
         validateFiniteNumber(required(decisive, key, decisivePath, issues), `${decisivePath}.${key}`, issues);
       }
     } else if (kind === 'separated') {
       validateKeys(decisive, ['kind', 'shipId', 'timeLimitTicks'], decisivePath, issues);
-      const shipId = required(decisive, 'shipId', decisivePath, issues);
-      if (shipId !== undefined && typeof shipId !== 'string') issue(issues, `${decisivePath}.shipId`, 'wrong-type');
+      validateNavalShipId(required(decisive, 'shipId', decisivePath, issues), `${decisivePath}.shipId`, issues);
       validateFiniteNumber(required(decisive, 'timeLimitTicks', decisivePath, issues), `${decisivePath}.timeLimitTicks`, issues);
     } else issue(issues, `${decisivePath}.kind`, 'unknown-id');
   }

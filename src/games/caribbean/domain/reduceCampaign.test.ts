@@ -48,7 +48,261 @@ function marketEvent(payload: Record<string, unknown> = {}) {
   };
 }
 
+const STRATEGIC_EVENT_FIXTURES = {
+  'voyage-started': {
+    id: 2,
+    type: 'voyage-started',
+    atDay: 0,
+    payload: { voyageId: 'voyage-2' },
+  },
+  'sea-leg-completed': {
+    id: 3,
+    type: 'sea-leg-completed',
+    atDay: 0,
+    payload: {
+      voyageId: 'voyage-2',
+      encounterId: 'voyage-2-contact',
+      checkpoint: {
+        tick: 3_600,
+        position: { x: 24, z: 4 },
+        heading: Math.PI / 2,
+        elapsedDays: 1,
+        provisionsUsed: 1,
+      },
+      navigationRng: { before: 3_913_270_709, after: 3_424_590_736 },
+    },
+  },
+  'encounter-avoided': {
+    id: 4,
+    type: 'encounter-avoided',
+    atDay: 1,
+    payload: { voyageId: 'voyage-2', encounterId: 'voyage-2-contact' },
+  },
+  'naval-engaged': {
+    id: 4,
+    type: 'naval-engaged',
+    atDay: 1,
+    payload: {
+      voyageId: 'voyage-2',
+      encounterId: 'voyage-2-contact',
+      battleId: 'voyage-2-battle',
+      navalRng: { before: 3_992_748_115, after: 1_971_161_494 },
+      input: {
+        battleId: 'voyage-2-battle',
+        seed: 1_971_161_494,
+        windFrom: Math.PI / 3,
+        windStrength: 1,
+        arenaRadius: 92,
+        timeLimitTicks: 14_400,
+        objective: 'capture-red-jackdaw',
+        player: {
+          id: 'player', stableShipId: 'mistral', name: 'Mistral', classId: 'sloop',
+          position: { x: 0, z: -36 }, heading: 0,
+          hull: 100, sails: 100, crew: 50, cannon: 8,
+        },
+        opponent: {
+          id: 'opponent', stableShipId: 'red-jackdaw', name: 'Red Jackdaw', classId: 'sloop',
+          position: { x: 0, z: 36 }, heading: Math.PI,
+          hull: 100, sails: 100, crew: 48, cannon: 8,
+        },
+      },
+    },
+  },
+  'battle-withdrawn': {
+    id: 5,
+    type: 'battle-withdrawn',
+    atDay: 1,
+    payload: { voyageId: 'voyage-2', battleId: 'voyage-2-battle' },
+  },
+  'naval-resolved': {
+    id: 5,
+    type: 'naval-resolved',
+    atDay: 1,
+    payload: {
+      voyageId: 'voyage-2',
+      battleId: 'voyage-2-battle',
+      resolution: {
+        battleId: 'voyage-2-battle',
+        outcome: { kind: 'surrender', victorShipId: 'player' },
+        atTick: 7,
+        seedAfter: 1,
+        player: { hull: 67, sails: 44, crew: 22, cannon: 3 },
+        opponent: { hull: 100, sails: 100, crew: 8, cannon: 8 },
+        decisive: {
+          kind: 'surrender', victorShipId: 'player', surrenderedShipId: 'opponent',
+          threshold: 'crew', value: 8, thresholdValue: 8,
+        },
+      },
+    },
+  },
+} as const;
+
+type StrategicEventName = keyof typeof STRATEGIC_EVENT_FIXTURES;
+
+function strategicEvent(name: StrategicEventName): Record<string, unknown> {
+  return structuredClone(STRATEGIC_EVENT_FIXTURES[name]) as unknown as Record<string, unknown>;
+}
+
+function valueAtPath(input: unknown, path: string): unknown {
+  return path.split('.').reduce<unknown>((value, key) => (value as Record<string, unknown>)[key], input);
+}
+
+function setAtPath(input: unknown, path: string, value: unknown): void {
+  const keys = path.split('.');
+  const final = keys.pop();
+  if (!final) throw new Error('fixture path must not be empty');
+  const parent = keys.reduce<unknown>((current, key) => (current as Record<string, unknown>)[key], input);
+  (parent as Record<string, unknown>)[final] = value;
+}
+
+function deleteAtPath(input: unknown, path: string): void {
+  const keys = path.split('.');
+  const final = keys.pop();
+  if (!final) throw new Error('fixture path must not be empty');
+  const parent = keys.reduce<unknown>((current, key) => (current as Record<string, unknown>)[key], input);
+  delete (parent as Record<string, unknown>)[final];
+}
+
+const STRATEGIC_REQUIRED_FIELDS: ReadonlyArray<readonly [StrategicEventName, string]> = [
+  ['voyage-started', 'id'], ['voyage-started', 'type'], ['voyage-started', 'atDay'], ['voyage-started', 'payload'], ['voyage-started', 'payload.voyageId'],
+  ['sea-leg-completed', 'id'], ['sea-leg-completed', 'type'], ['sea-leg-completed', 'atDay'], ['sea-leg-completed', 'payload'],
+  ['sea-leg-completed', 'payload.voyageId'], ['sea-leg-completed', 'payload.encounterId'], ['sea-leg-completed', 'payload.checkpoint'],
+  ['sea-leg-completed', 'payload.checkpoint.tick'], ['sea-leg-completed', 'payload.checkpoint.position'],
+  ['sea-leg-completed', 'payload.checkpoint.position.x'], ['sea-leg-completed', 'payload.checkpoint.position.z'],
+  ['sea-leg-completed', 'payload.checkpoint.heading'], ['sea-leg-completed', 'payload.checkpoint.elapsedDays'],
+  ['sea-leg-completed', 'payload.checkpoint.provisionsUsed'], ['sea-leg-completed', 'payload.navigationRng'],
+  ['sea-leg-completed', 'payload.navigationRng.before'], ['sea-leg-completed', 'payload.navigationRng.after'],
+  ['encounter-avoided', 'id'], ['encounter-avoided', 'type'], ['encounter-avoided', 'atDay'], ['encounter-avoided', 'payload'],
+  ['encounter-avoided', 'payload.voyageId'], ['encounter-avoided', 'payload.encounterId'],
+  ['naval-engaged', 'id'], ['naval-engaged', 'type'], ['naval-engaged', 'atDay'], ['naval-engaged', 'payload'],
+  ['naval-engaged', 'payload.voyageId'], ['naval-engaged', 'payload.encounterId'], ['naval-engaged', 'payload.battleId'],
+  ['naval-engaged', 'payload.navalRng'], ['naval-engaged', 'payload.navalRng.before'], ['naval-engaged', 'payload.navalRng.after'],
+  ['naval-engaged', 'payload.input'], ['naval-engaged', 'payload.input.battleId'], ['naval-engaged', 'payload.input.seed'],
+  ['naval-engaged', 'payload.input.windFrom'], ['naval-engaged', 'payload.input.windStrength'], ['naval-engaged', 'payload.input.arenaRadius'],
+  ['naval-engaged', 'payload.input.timeLimitTicks'], ['naval-engaged', 'payload.input.objective'],
+  ...(['player', 'opponent'] as const).flatMap((ship) => [
+    ['naval-engaged', `payload.input.${ship}`],
+    ...(['id', 'stableShipId', 'name', 'classId', 'position', 'position.x', 'position.z', 'heading', 'hull', 'sails', 'crew', 'cannon'] as const)
+      .map((field) => ['naval-engaged', `payload.input.${ship}.${field}`] as const),
+  ] as const),
+  ['battle-withdrawn', 'id'], ['battle-withdrawn', 'type'], ['battle-withdrawn', 'atDay'], ['battle-withdrawn', 'payload'],
+  ['battle-withdrawn', 'payload.voyageId'], ['battle-withdrawn', 'payload.battleId'],
+  ['naval-resolved', 'id'], ['naval-resolved', 'type'], ['naval-resolved', 'atDay'], ['naval-resolved', 'payload'],
+  ['naval-resolved', 'payload.voyageId'], ['naval-resolved', 'payload.battleId'], ['naval-resolved', 'payload.resolution'],
+  ['naval-resolved', 'payload.resolution.battleId'], ['naval-resolved', 'payload.resolution.outcome'],
+  ['naval-resolved', 'payload.resolution.outcome.kind'], ['naval-resolved', 'payload.resolution.outcome.victorShipId'],
+  ['naval-resolved', 'payload.resolution.atTick'], ['naval-resolved', 'payload.resolution.seedAfter'],
+  ...(['player', 'opponent'] as const).flatMap((ship) => [
+    ['naval-resolved', `payload.resolution.${ship}`],
+    ...(['hull', 'sails', 'crew', 'cannon'] as const)
+      .map((field) => ['naval-resolved', `payload.resolution.${ship}.${field}`] as const),
+  ] as const),
+  ['naval-resolved', 'payload.resolution.decisive'], ['naval-resolved', 'payload.resolution.decisive.kind'],
+  ['naval-resolved', 'payload.resolution.decisive.victorShipId'], ['naval-resolved', 'payload.resolution.decisive.surrenderedShipId'],
+  ['naval-resolved', 'payload.resolution.decisive.threshold'], ['naval-resolved', 'payload.resolution.decisive.value'],
+  ['naval-resolved', 'payload.resolution.decisive.thresholdValue'],
+];
+
+const STRATEGIC_RECORD_PATHS: ReadonlyArray<readonly [StrategicEventName, string]> = [
+  ['voyage-started', 'payload'],
+  ['sea-leg-completed', 'payload'], ['sea-leg-completed', 'payload.checkpoint'], ['sea-leg-completed', 'payload.checkpoint.position'], ['sea-leg-completed', 'payload.navigationRng'],
+  ['encounter-avoided', 'payload'],
+  ['naval-engaged', 'payload'], ['naval-engaged', 'payload.navalRng'], ['naval-engaged', 'payload.input'],
+  ['naval-engaged', 'payload.input.player'], ['naval-engaged', 'payload.input.player.position'],
+  ['naval-engaged', 'payload.input.opponent'], ['naval-engaged', 'payload.input.opponent.position'],
+  ['battle-withdrawn', 'payload'],
+  ['naval-resolved', 'payload'], ['naval-resolved', 'payload.resolution'], ['naval-resolved', 'payload.resolution.outcome'],
+  ['naval-resolved', 'payload.resolution.player'], ['naval-resolved', 'payload.resolution.opponent'], ['naval-resolved', 'payload.resolution.decisive'],
+];
+
 describe('campaign journal append', () => {
+  it.each(Object.keys(STRATEGIC_EVENT_FIXTURES) as StrategicEventName[])(
+    'parses the exact detached %s event literal',
+    (name) => {
+      // Kills removal of any strategic discriminant branch and literal snapshot drift.
+      const raw = strategicEvent(name);
+
+      expect(validateCampaignEvent(raw)).toEqual({ ok: true, value: raw });
+    },
+  );
+
+  it.each(STRATEGIC_REQUIRED_FIELDS)(
+    'rejects %s when required field %s is missing with one exact syntax issue',
+    (name, path) => {
+      // Kills required-field fallthrough, including nested checkpoint/input/resolution fields.
+      const raw = strategicEvent(name);
+      deleteAtPath(raw, path);
+
+      expect(validateCampaignEvent(raw)).toEqual({
+        ok: false,
+        issues: [{ path, code: 'missing' }],
+      });
+    },
+  );
+
+  it.each(STRATEGIC_REQUIRED_FIELDS)(
+    'rejects %s when required field %s has the wrong JSON shape',
+    (name, path) => {
+      // Kills casts that brand malformed nested values as CampaignEvent fields.
+      const raw = strategicEvent(name);
+      const original = valueAtPath(raw, path);
+      setAtPath(raw, path, typeof original === 'number' ? 'not-a-number' : typeof original === 'string' ? 7 : null);
+
+      expect(validateCampaignEvent(raw)).toMatchObject({ ok: false });
+    },
+  );
+
+  it.each(STRATEGIC_RECORD_PATHS)(
+    'rejects %s unknown key at nested record %s',
+    (name, path) => {
+      // Kills any exact-key check removed from a strategic nested record.
+      const raw = strategicEvent(name);
+      const record = valueAtPath(raw, path) as Record<string, unknown>;
+      record.extra = true;
+
+      expect(validateCampaignEvent(raw)).toEqual({
+        ok: false,
+        issues: [{ path: `${path}.extra`, code: 'unknown-key' }],
+      });
+    },
+  );
+
+  it.each([
+    ['voyage-started', 'payload.voyageId', 'mutated-voyage'],
+    ['sea-leg-completed', 'payload.checkpoint.position.x', 999],
+    ['encounter-avoided', 'payload.encounterId', 'mutated-contact'],
+    ['naval-engaged', 'payload.input.player.sails', 1],
+    ['battle-withdrawn', 'payload.battleId', 'mutated-battle'],
+    ['naval-resolved', 'payload.resolution.player.hull', 1],
+  ] as const)(
+    'does not alias caller-owned %s data after parsing %s',
+    (name, mutationPath, mutationValue) => {
+      // Kills returning caller payloads or nested checkpoint/input/resolution aliases.
+      const raw = strategicEvent(name);
+      const expected = structuredClone(raw);
+      const parsed = validateCampaignEvent(raw);
+      expect(parsed).toEqual({ ok: true, value: expected });
+      if (!parsed.ok) throw new Error('fixture must parse');
+
+      setAtPath(raw, mutationPath, mutationValue);
+
+      expect(parsed.value).toEqual(expected);
+      expect(parsed.value.payload).not.toBe(raw.payload);
+    },
+  );
+
+  it.each([
+    ['surrender victor', 'payload.resolution.decisive.victorShipId', 'spectator'],
+    ['surrendered ship', 'payload.resolution.decisive.surrenderedShipId', 'spectator'],
+    ['surrender threshold', 'payload.resolution.decisive.threshold', 'morale'],
+  ] as const)('rejects malformed decisive %s literal', (_label, path, value) => {
+    // Kills string-only decisive parsing that falsely brands unknown literal members.
+    const raw = strategicEvent('naval-resolved');
+    setAtPath(raw, path, value);
+
+    expect(validateCampaignEvent(raw)).toMatchObject({ ok: false });
+  });
+
   it('recognizes the replayable voyage event syntax before predecessor reduction', () => {
     // Catches an event union that leaves strategic events as unknown IDs.
     expect(validateCampaignEvent({

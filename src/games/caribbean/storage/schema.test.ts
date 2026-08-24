@@ -40,6 +40,22 @@ describe('migrateSaveEnvelope', () => {
 });
 
 describe('parseSaveEnvelope', () => {
+  it('parses a legacy V1 journal whose worlds have no lastVoyage field without adding one', () => {
+    // Kills making the optional Task-2 summary mandatory or migration-time default insertion.
+    const journal = validJournal();
+    delete journal.initial.world.lastVoyage;
+    delete journal.state.world.lastVoyage;
+    const envelope = validEnvelope(journal);
+    const raw = canonicalJson(envelope);
+
+    const parsed = parseSaveEnvelope(raw);
+
+    expect(parsed).toEqual({ ok: true, envelope });
+    if (!parsed.ok) throw new Error('fixture must parse');
+    expect(Object.prototype.hasOwnProperty.call(parsed.envelope.payload.initial.world, 'lastVoyage')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(parsed.envelope.payload.state.world, 'lastVoyage')).toBe(false);
+  });
+
   it('parses and validates the exact current envelope', () => {
     const envelope = validEnvelope();
 

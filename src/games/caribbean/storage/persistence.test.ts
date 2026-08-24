@@ -48,6 +48,87 @@ function activeModeJournals(): Record<'sailing' | 'encounter' | 'naval', Campaig
   return { sailing, encounter, naval };
 }
 
+type ActiveModeKind = 'sailing' | 'encounter' | 'naval';
+type ActiveModeMutation = readonly [
+  string,
+  ActiveModeKind,
+  (state: CampaignJournal['state']) => void,
+];
+
+const ACTIVE_MODE_MUTATIONS: readonly ActiveModeMutation[] = [
+  ['sailing checkpoint', 'sailing', (state) => {
+    if (state.mode.kind !== 'sailing') throw new Error('fixture must sail');
+    state.mode.checkpoint.position.x = 1;
+  }],
+  ['sailing lineage ID', 'sailing', (state) => {
+    if (state.mode.kind !== 'sailing') throw new Error('fixture must sail');
+    state.mode.voyageId = 'voyage-99';
+  }],
+  ['sailing lead', 'sailing', (state) => { state.leads[0].status = 'completed'; }],
+  ['sailing target', 'sailing', (state) => { state.world.targetDefeated = true; }],
+  ['sailing flagship', 'sailing', (state) => { state.fleet.flagshipId = 'missing'; }],
+  ['sailing return provision', 'sailing', (state) => { state.fleet.ships[0].cargo.provisions = 1; }],
+  ['encounter checkpoint', 'encounter', (state) => {
+    if (state.mode.kind !== 'encounter') throw new Error('fixture must encounter');
+    state.mode.returnCheckpoint.position.x = 25;
+  }],
+  ['encounter lineage ID', 'encounter', (state) => {
+    if (state.mode.kind !== 'encounter') throw new Error('fixture must encounter');
+    state.mode.encounterId = 'wrong-contact';
+  }],
+  ['encounter lead', 'encounter', (state) => { state.leads[0].status = 'completed'; }],
+  ['encounter target', 'encounter', (state) => { state.world.targetDefeated = true; }],
+  ['encounter flagship', 'encounter', (state) => { state.fleet.flagshipId = 'missing'; }],
+  ['encounter return provision', 'encounter', (state) => { state.fleet.ships[0].cargo.provisions = 0; }],
+  ['naval checkpoint', 'naval', (state) => {
+    if (state.mode.kind !== 'naval') throw new Error('fixture must engage');
+    state.mode.returnCheckpoint.position.z = 5;
+  }],
+  ['naval lineage ID', 'naval', (state) => {
+    if (state.mode.kind !== 'naval') throw new Error('fixture must engage');
+    state.mode.voyageId = 'voyage-99';
+  }],
+  ['naval lead', 'naval', (state) => { state.leads[0].status = 'completed'; }],
+  ['naval target', 'naval', (state) => { state.world.targetDefeated = true; }],
+  ['naval flagship', 'naval', (state) => { state.fleet.flagshipId = 'missing'; }],
+  ['naval return provision', 'naval', (state) => { state.fleet.ships[0].cargo.provisions = 0; }],
+  ['naval wrapper battle ID', 'naval', (state) => {
+    if (state.mode.kind !== 'naval') throw new Error('fixture must engage');
+    state.mode.battleId = 'wrong-battle';
+  }],
+  ['naval input battle ID', 'naval', (state) => {
+    if (state.mode.kind !== 'naval') throw new Error('fixture must engage');
+    state.mode.input.battleId = 'wrong-battle';
+  }],
+  ['naval RNG state', 'naval', (state) => { state.rng.naval += 1; }],
+  ['naval input seed', 'naval', (state) => {
+    if (state.mode.kind !== 'naval') throw new Error('fixture must engage');
+    state.mode.input.seed += 1;
+  }],
+  ['naval player sails', 'naval', (state) => {
+    if (state.mode.kind !== 'naval') throw new Error('fixture must engage');
+    state.mode.input.player.sails -= 1;
+  }],
+  ['naval opponent cannon', 'naval', (state) => {
+    if (state.mode.kind !== 'naval') throw new Error('fixture must engage');
+    state.mode.input.opponent.cannon -= 1;
+  }],
+  ['naval objective', 'naval', (state) => {
+    if (state.mode.kind !== 'naval') throw new Error('fixture must engage');
+    (state.mode.input as unknown as Record<string, unknown>).objective = 'sink-red-jackdaw';
+  }],
+];
+
+function mutatedCompactedJournal(
+  kind: ActiveModeKind,
+  mutate: ActiveModeMutation[2],
+): CampaignJournal {
+  const journal = compactJournal(activeModeJournals()[kind]);
+  mutate(journal.initial);
+  mutate(journal.state);
+  return journal;
+}
+
 function journalWithLegalTrades(count: number): CampaignJournal {
   let journal = initialJournal();
   for (let index = 0; index < count; index += 1) {
@@ -148,6 +229,32 @@ function saveSuccessfully(
 }
 
 describe('loadCampaign', () => {
+  it.each(['sailing', 'encounter', 'naval'] as const)(
+    'saves and loads direct and empty-event compacted %s modes with canonical equality',
+    (kind) => {
+      // Kills save/load paths that only accept port states or reset nonzero checkpoint lineage.
+      const directJournal = activeModeJournals()[kind];
+      const directStorage = new MemoryStorage();
+      const directSave = saveSuccessfully(directStorage, directJournal, EMPTY_REVISION, 100);
+      const directLoad = loadCampaign(directStorage);
+      expect(directLoad).toMatchObject({ kind: 'loaded', recovered: false });
+      if (directLoad.kind !== 'loaded') throw new Error('fixture must load');
+      expect(canonicalJson(directLoad.journal)).toBe(canonicalJson(directJournal));
+      expect(directLoad.journal.state.mode).toEqual(directJournal.state.mode);
+      expect(directStorage.revision()).toEqual(directSave.revision);
+
+      const compacted = compactJournal(directJournal);
+      const compactedStorage = new MemoryStorage();
+      saveSuccessfully(compactedStorage, compacted, EMPTY_REVISION, 110);
+      const compactedLoad = loadCampaign(compactedStorage);
+      expect(compactedLoad).toMatchObject({ kind: 'loaded', recovered: false });
+      if (compactedLoad.kind !== 'loaded') throw new Error('fixture must load');
+      expect(compactedLoad.journal.events).toEqual([]);
+      expect(compactedLoad.journal.initial.lastEventId).toBe(directJournal.state.lastEventId);
+      expect(canonicalJson(compactedLoad.journal)).toBe(canonicalJson(compacted));
+    },
+  );
+
   it.each(['sailing', 'encounter', 'naval'] as const)('round-trips direct and compacted %s checkpoints without predecessor events', (kind) => {
     // Catches save parsing that treats an active resume mode as port-only history.
     const journal = activeModeJournals()[kind];
@@ -188,6 +295,86 @@ describe('loadCampaign', () => {
     const storage = new MemoryStorage(revision);
 
     expect(loadCampaign(storage)).toMatchObject({ kind: 'unreadable' });
+    expect(storage.revision()).toEqual(revision);
+    expect(storage.writes).toEqual([]);
+  });
+
+  it.each(ACTIVE_MODE_MUTATIONS)(
+    'rejects compacted current invariant mutation %s for %s without rewriting raw bytes',
+    (label, kind, mutate) => {
+      // Each row kills the named compacted-state validator after predecessor events are gone.
+      const journal = mutatedCompactedJournal(kind, mutate);
+      const currentRaw = envelopeRaw(journal, 90, `mutated-current-${label}`);
+      const revision = { currentRaw, previousRaw: null };
+      const storage = new MemoryStorage(revision);
+
+      expect(loadCampaign(storage)).toEqual({
+        kind: 'unreadable',
+        unreadableSlots: [{ slot: 'current', raw: currentRaw, code: 'invalid-journal' }],
+        revision,
+      });
+      expect(storage.revision()).toEqual(revision);
+      expect(storage.writes).toEqual([]);
+    },
+  );
+
+  it.each(ACTIVE_MODE_MUTATIONS)(
+    'never promotes compacted previous invariant mutation %s for %s',
+    (label, kind, mutate) => {
+      // Kills recovery fallback that trusts the previous checksum without semantic validation.
+      const journal = mutatedCompactedJournal(kind, mutate);
+      const previousRaw = envelopeRaw(journal, 90, `mutated-previous-${label}`);
+      const revision = { currentRaw: '{corrupt-current-exact', previousRaw };
+      const storage = new MemoryStorage(revision);
+
+      expect(loadCampaign(storage)).toEqual({
+        kind: 'unreadable',
+        unreadableSlots: [
+          { slot: 'current', raw: revision.currentRaw, code: 'malformed-json' },
+          { slot: 'previous', raw: previousRaw, code: 'invalid-journal' },
+        ],
+        revision,
+      });
+      expect(storage.revision()).toEqual(revision);
+      expect(storage.writes).toEqual([]);
+    },
+  );
+
+  it('loads a legacy V1 world with no lastVoyage unchanged, then rotates its exact raw bytes on first departure', () => {
+    // Kills optional-summary regression and reserialization of the old current before rotation.
+    const legacy = acceptedJournal();
+    delete legacy.initial.world.lastVoyage;
+    delete legacy.state.world.lastVoyage;
+    const legacyRaw = envelopeRaw(legacy, 80, 'legacy-v1');
+    const initialRevision = { currentRaw: legacyRaw, previousRaw: null };
+    const storage = new MemoryStorage(initialRevision);
+    const loaded = loadCampaign(storage);
+    expect(loaded).toMatchObject({ kind: 'loaded', journal: legacy, revision: initialRevision });
+    if (loaded.kind !== 'loaded') throw new Error('fixture must load');
+    expect(Object.prototype.hasOwnProperty.call(loaded.journal.state.world, 'lastVoyage')).toBe(false);
+    expect(storage.revision()).toEqual(initialRevision);
+
+    const departed = appendJournal(loaded.journal, voyageStartedDraft(loaded.journal.state));
+    const saved = saveSuccessfully(storage, departed, loaded.revision, 90);
+    expect(saved.revision.previousRaw).toBe(legacyRaw);
+    expect(storage.revision().previousRaw).toBe(legacyRaw);
+    expect(loadCampaign(storage)).toMatchObject({ kind: 'loaded', journal: departed, recovered: false });
+  });
+
+  it('rejects and preserves an exact unknown future-version raw envelope', () => {
+    // Kills migration dispatch that coerces or rewrites an unsupported future version.
+    const futureRaw = canonicalJson({
+      ...JSON.parse(envelopeRaw(initialJournal(), 100, 'future-build')),
+      version: 99,
+    });
+    const revision = { currentRaw: futureRaw, previousRaw: null };
+    const storage = new MemoryStorage(revision);
+
+    expect(loadCampaign(storage)).toEqual({
+      kind: 'unreadable',
+      unreadableSlots: [{ slot: 'current', raw: futureRaw, code: 'unsupported-version' }],
+      revision,
+    });
     expect(storage.revision()).toEqual(revision);
     expect(storage.writes).toEqual([]);
   });

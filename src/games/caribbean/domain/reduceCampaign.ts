@@ -36,7 +36,7 @@ function spendVoyageCost(state: CampaignStateV1, elapsedDays: number, provisions
   state.calendar.elapsedDays += elapsedDays;
 }
 
-function classifyResolution(outcome: NavalOutcome): 'victory' | 'defeat' | 'unresolved' {
+export function classifyResolution(outcome: NavalOutcome): 'victory' | 'defeat' | 'unresolved' {
   switch (outcome.kind) {
     case 'escaped':
     case 'separated':

@@ -21,7 +21,349 @@ function secondSloop(id = 'second-sloop'): ShipState {
   return ship;
 }
 
+type StrategicModeKind = 'sailing' | 'encounter' | 'naval';
+
+function strategicBase(): CampaignStateV1 {
+  const state = validCampaign();
+  state.leads = [{
+    id: 'red-jackdaw', kind: 'rumour', status: 'active',
+    acceptedDay: 0, expiresDay: 18,
+  }];
+  return state;
+}
+
+function strategicModeState(kind: StrategicModeKind): CampaignStateV1 {
+  const state = strategicBase();
+  if (kind === 'sailing') {
+    state.lastEventId = 2;
+    state.fleet.ships[0].cargo.provisions = 2;
+    state.mode = {
+      kind: 'sailing',
+      voyageId: 'voyage-2',
+      checkpoint: {
+        tick: 0,
+        position: { x: 0, z: 0 },
+        heading: Math.PI / 2,
+        elapsedDays: 0,
+        provisionsUsed: 0,
+      },
+    };
+    return state;
+  }
+  if (kind === 'encounter') {
+    state.lastEventId = 3;
+    state.fleet.ships[0].cargo.provisions = 1;
+    state.mode = {
+      kind: 'encounter',
+      voyageId: 'voyage-2',
+      encounterId: 'voyage-2-contact',
+      returnCheckpoint: {
+        tick: 3_600,
+        position: { x: 24, z: 4 },
+        heading: Math.PI / 2,
+        elapsedDays: 1,
+        provisionsUsed: 1,
+      },
+    };
+    return state;
+  }
+  state.lastEventId = 4;
+  state.rng.naval = 1_971_161_494;
+  state.fleet.ships[0].cargo.provisions = 1;
+  state.mode = {
+    kind: 'naval',
+    voyageId: 'voyage-2',
+    battleId: 'voyage-2-battle',
+    returnCheckpoint: {
+      tick: 3_600,
+      position: { x: 24, z: 4 },
+      heading: Math.PI / 2,
+      elapsedDays: 1,
+      provisionsUsed: 1,
+    },
+    input: {
+      battleId: 'voyage-2-battle',
+      seed: 1_971_161_494,
+      windFrom: Math.PI / 3,
+      windStrength: 1,
+      arenaRadius: 92,
+      timeLimitTicks: 14_400,
+      objective: 'capture-red-jackdaw',
+      player: {
+        id: 'player', stableShipId: 'mistral', name: 'Mistral', classId: 'sloop',
+        position: { x: 0, z: -36 }, heading: 0,
+        hull: 100, sails: 100, crew: 50, cannon: 8,
+      },
+      opponent: {
+        id: 'opponent', stableShipId: 'red-jackdaw', name: 'Red Jackdaw', classId: 'sloop',
+        position: { x: 0, z: 36 }, heading: Math.PI,
+        hull: 100, sails: 100, crew: 48, cannon: 8,
+      },
+    },
+  };
+  return state;
+}
+
+function setStrategicPath(state: CampaignStateV1, path: string, value: unknown): void {
+  const keys = path.split('.');
+  const final = keys.pop();
+  if (!final) throw new Error('fixture path must not be empty');
+  const parent = keys.reduce<unknown>((current, key) => (current as Record<string, unknown>)[key], state);
+  (parent as Record<string, unknown>)[final] = value;
+}
+
+type StrategicModeMutation = readonly [
+  string,
+  StrategicModeKind,
+  (state: CampaignStateV1) => void,
+];
+
+const STRATEGIC_MODE_MUTATIONS: readonly StrategicModeMutation[] = [
+  ['sailing voyage lineage', 'sailing', (state) => setStrategicPath(state, 'mode.voyageId', 'voyage-3')],
+  ['sailing contact checkpoint', 'sailing', (state) => setStrategicPath(state, 'mode.checkpoint', structuredClone(RED_JACKDAW_VOYAGE.contact))],
+  ['sailing completed lead', 'sailing', (state) => { state.leads[0].status = 'completed'; }],
+  ['sailing missing lead', 'sailing', (state) => { state.leads = []; }],
+  ['sailing defeated target', 'sailing', (state) => { state.world.targetDefeated = true; }],
+  ['sailing missing flagship', 'sailing', (state) => { state.fleet.flagshipId = 'missing'; }],
+  ['sailing one provision', 'sailing', (state) => { state.fleet.ships[0].cargo.provisions = 1; }],
+  ['encounter voyage lineage', 'encounter', (state) => setStrategicPath(state, 'mode.voyageId', 'voyage-3')],
+  ['encounter contact lineage', 'encounter', (state) => setStrategicPath(state, 'mode.encounterId', 'voyage-2-wrong')],
+  ['encounter start checkpoint', 'encounter', (state) => setStrategicPath(state, 'mode.returnCheckpoint', structuredClone(RED_JACKDAW_VOYAGE.start))],
+  ['encounter range-only checkpoint', 'encounter', (state) => setStrategicPath(state, 'mode.returnCheckpoint.position.x', 25)],
+  ['encounter lineage underflow', 'encounter', (state) => { state.lastEventId = 1; }],
+  ['encounter completed lead', 'encounter', (state) => { state.leads[0].status = 'completed'; }],
+  ['encounter missing lead', 'encounter', (state) => { state.leads = []; }],
+  ['encounter defeated target', 'encounter', (state) => { state.world.targetDefeated = true; }],
+  ['encounter missing flagship', 'encounter', (state) => { state.fleet.flagshipId = 'missing'; }],
+  ['encounter zero provisions', 'encounter', (state) => { state.fleet.ships[0].cargo.provisions = 0; }],
+  ['naval voyage lineage', 'naval', (state) => setStrategicPath(state, 'mode.voyageId', 'voyage-3')],
+  ['naval wrapper battle lineage', 'naval', (state) => setStrategicPath(state, 'mode.battleId', 'voyage-2-wrong')],
+  ['naval input battle lineage', 'naval', (state) => setStrategicPath(state, 'mode.input.battleId', 'voyage-2-wrong')],
+  ['naval return checkpoint', 'naval', (state) => setStrategicPath(state, 'mode.returnCheckpoint.position.z', 5)],
+  ['naval lineage underflow', 'naval', (state) => { state.lastEventId = 2; }],
+  ['naval completed lead', 'naval', (state) => { state.leads[0].status = 'completed'; }],
+  ['naval missing lead', 'naval', (state) => { state.leads = []; }],
+  ['naval defeated target', 'naval', (state) => { state.world.targetDefeated = true; }],
+  ['naval missing flagship', 'naval', (state) => { state.fleet.flagshipId = 'missing'; }],
+  ['naval zero provisions', 'naval', (state) => { state.fleet.ships[0].cargo.provisions = 0; }],
+  ['naval RNG seed mismatch', 'naval', (state) => { state.rng.naval = 1_971_161_495; }],
+  ['naval input seed mismatch', 'naval', (state) => setStrategicPath(state, 'mode.input.seed', 1_971_161_495)],
+  ...([
+    ['windFrom', 0], ['windStrength', 2], ['arenaRadius', 93], ['timeLimitTicks', 14_401],
+    ['objective', 'sink-red-jackdaw'],
+  ] as const).map(([field, value]) => [
+    `naval builder ${field}`,
+    'naval',
+    (state: CampaignStateV1) => setStrategicPath(state, `mode.input.${field}`, value),
+  ] as const),
+  ...(['player', 'opponent'] as const).flatMap((ship) => ([
+    ['id', ship === 'player' ? 'opponent' : 'player'],
+    ['stableShipId', `${ship}-wrong`], ['name', `${ship} wrong`], ['classId', 'wrong-class'],
+    ['position.x', 1], ['position.z', 1], ['heading', 1],
+    ['hull', 99], ['sails', 99], ['crew', ship === 'player' ? 49 : 47], ['cannon', 7],
+  ] as const).map(([field, value]) => [
+    `naval ${ship} ${field}`,
+    'naval',
+    (state: CampaignStateV1) => setStrategicPath(state, `mode.input.${ship}.${field}`, value),
+  ] as const)),
+];
+
 describe('validateCampaign', () => {
+  it.each(['sailing', 'encounter', 'naval'] as const)(
+    'accepts the hand-authored canonical %s checkpoint literal',
+    (kind) => {
+      // Kills any validator drift from the authored route, lineage, or shared battle builder.
+      const state = strategicModeState(kind);
+
+      expect(validateCampaign(state)).toEqual({ ok: true, value: state });
+    },
+  );
+
+  it.each(STRATEGIC_MODE_MUTATIONS)(
+    'rejects the one-at-a-time %s mutation in a compactable %s checkpoint',
+    (_label, kind, mutate) => {
+      // Every row names the exact production equality/readiness branch it kills.
+      const state = strategicModeState(kind);
+      mutate(state);
+
+      expect(validateCampaign(state)).toMatchObject({ ok: false });
+    },
+  );
+
+  it.each([
+    ['sailing', 'voyageId'], ['sailing', 'checkpoint'],
+    ['encounter', 'voyageId'], ['encounter', 'encounterId'], ['encounter', 'returnCheckpoint'],
+    ['naval', 'voyageId'], ['naval', 'battleId'], ['naval', 'input'], ['naval', 'returnCheckpoint'],
+  ] as const)(
+    'is total when canonical %s mode field %s is an accessor or non-enumerable',
+    (kind, field) => {
+      // Kills live property reads and descriptor elision at each new direct mode field.
+      const accessorState = strategicModeState(kind);
+      const accessorMode = accessorState.mode as unknown as Record<string, unknown>;
+      const value = accessorMode[field];
+      let reads = 0;
+      Object.defineProperty(accessorMode, field, {
+        configurable: true,
+        enumerable: true,
+        get: () => {
+          reads += 1;
+          throw new Error('unsafe live read');
+        },
+      });
+      expect(() => validateCampaign(accessorState)).not.toThrow();
+      expect(validateCampaign(accessorState)).toMatchObject({ ok: false });
+      expect(reads).toBe(0);
+
+      const hiddenState = strategicModeState(kind);
+      const hiddenMode = hiddenState.mode as unknown as Record<string, unknown>;
+      Object.defineProperty(hiddenMode, field, {
+        configurable: true,
+        enumerable: false,
+        value,
+      });
+      expect(() => validateCampaign(hiddenState)).not.toThrow();
+      expect(validateCampaign(hiddenState)).toMatchObject({ ok: false });
+    },
+  );
+
+  it.each(['sailing', 'encounter', 'naval'] as const)(
+    'accepts descriptor-safe %s mode proxies without live gets and rejects symbols, hidden keys, and throwing traps',
+    (kind) => {
+      // Kills direct mode reads and catch removal from the untrusted JSON snapshot boundary.
+      const proxied = strategicModeState(kind);
+      const target = proxied.mode;
+      let reads = 0;
+      proxied.mode = new Proxy(target, {
+        get: () => {
+          reads += 1;
+          throw new Error('unsafe live read');
+        },
+      });
+      expect(validateCampaign(proxied)).toMatchObject({ ok: true });
+      expect(reads).toBe(0);
+
+      const symbolState = strategicModeState(kind);
+      (symbolState.mode as unknown as Record<PropertyKey, unknown>)[Symbol('hidden')] = true;
+      expect(() => validateCampaign(symbolState)).not.toThrow();
+      expect(validateCampaign(symbolState)).toMatchObject({ ok: false });
+
+      const hiddenState = strategicModeState(kind);
+      Object.defineProperty(hiddenState.mode, 'hidden', { configurable: true, value: true });
+      expect(() => validateCampaign(hiddenState)).not.toThrow();
+      expect(validateCampaign(hiddenState)).toMatchObject({ ok: false });
+
+      const throwingState = strategicModeState(kind);
+      throwingState.mode = new Proxy(throwingState.mode, {
+        ownKeys: () => { throw new Error('unsafe key trap'); },
+      });
+      expect(() => validateCampaign(throwingState)).not.toThrow();
+      expect(validateCampaign(throwingState)).toMatchObject({ ok: false });
+    },
+  );
+
+  it.each([
+    ['sailing', 'checkpoint.position.x'],
+    ['encounter', 'returnCheckpoint.position.x'],
+    ['naval', 'input.player.sails'],
+    ['naval', 'input.opponent.cannon'],
+  ] as const)('rejects a nested accessor in %s mode at %s without invoking it', (kind, path) => {
+    // Kills nested descriptor bypasses in checkpoint and full-builder equality.
+    const state = strategicModeState(kind);
+    const keys = path.split('.');
+    const final = keys.pop();
+    if (!final) throw new Error('fixture path must not be empty');
+    const parent = keys.reduce<unknown>((current, key) => (current as Record<string, unknown>)[key], state.mode);
+    let reads = 0;
+    Object.defineProperty(parent as object, final, {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        throw new Error('unsafe nested read');
+      },
+    });
+
+    expect(() => validateCampaign(state)).not.toThrow();
+    expect(validateCampaign(state)).toMatchObject({ ok: false });
+    expect(reads).toBe(0);
+  });
+
+  it.each([
+    ['avoided', null, null, false, 'active'],
+    ['withdrew', 'voyage-2-battle', null, false, 'active'],
+    ['victory', 'voyage-2-battle', { kind: 'sunk', victorShipId: 'player' }, true, 'completed'],
+    ['defeat', 'voyage-2-battle', { kind: 'surrender', victorShipId: 'opponent' }, false, 'active'],
+    ['unresolved', 'voyage-2-battle', { kind: 'separated', shipId: 'opponent' }, false, 'active'],
+  ] as const)(
+    'accepts the exact optional lastVoyage %s result invariant',
+    (result, battleId, outcome, targetDefeated, leadStatus) => {
+      // Kills omission of any durable result member or its target/lead binding.
+      const state = strategicBase();
+      state.calendar.elapsedDays = 2;
+      state.world.targetDefeated = targetDefeated;
+      state.leads[0].status = leadStatus;
+      state.world.lastVoyage = {
+        voyageId: 'voyage-2', battleId, result, outcome, returnedDay: 2,
+      };
+
+      expect(validateCampaign(state)).toEqual({ ok: true, value: state });
+    },
+  );
+
+  it.each([
+    ['avoided with a battle', (state: CampaignStateV1) => { state.world.lastVoyage!.battleId = 'voyage-2-battle'; }],
+    ['avoided with an outcome', (state: CampaignStateV1) => { state.world.lastVoyage!.outcome = { kind: 'escaped', shipId: 'player' }; }],
+    ['withdrawn without a battle', (state: CampaignStateV1) => {
+      state.world.lastVoyage!.result = 'withdrew';
+      state.world.lastVoyage!.battleId = null;
+    }],
+    ['victory with opponent victor', (state: CampaignStateV1) => {
+      state.world.lastVoyage!.result = 'victory';
+      state.world.lastVoyage!.battleId = 'voyage-2-battle';
+      state.world.lastVoyage!.outcome = { kind: 'sunk', victorShipId: 'opponent' };
+    }],
+    ['defeat with player victor', (state: CampaignStateV1) => {
+      state.world.lastVoyage!.result = 'defeat';
+      state.world.lastVoyage!.battleId = 'voyage-2-battle';
+      state.world.lastVoyage!.outcome = { kind: 'surrender', victorShipId: 'player' };
+    }],
+    ['unresolved with victor outcome', (state: CampaignStateV1) => {
+      state.world.lastVoyage!.result = 'unresolved';
+      state.world.lastVoyage!.battleId = 'voyage-2-battle';
+      state.world.lastVoyage!.outcome = { kind: 'boarding-ready', victorShipId: 'player' };
+    }],
+    ['returned day drift', (state: CampaignStateV1) => { state.world.lastVoyage!.returnedDay = 1; }],
+    ['negative returned day', (state: CampaignStateV1) => { state.world.lastVoyage!.returnedDay = -1; }],
+    ['unknown summary key', (state: CampaignStateV1) => {
+      (state.world.lastVoyage as unknown as Record<string, unknown>).extra = true;
+    }],
+    ['unknown outcome key', (state: CampaignStateV1) => {
+      state.world.lastVoyage!.result = 'defeat';
+      state.world.lastVoyage!.battleId = 'voyage-2-battle';
+      state.world.lastVoyage!.outcome = { kind: 'surrender', victorShipId: 'opponent' };
+      (state.world.lastVoyage!.outcome as unknown as Record<string, unknown>).extra = true;
+    }],
+  ] as const)('rejects lastVoyage mismatch: %s', (_label, mutate) => {
+    // Each row kills one outcome/result/day/exact-key invariant.
+    const state = strategicBase();
+    state.calendar.elapsedDays = 2;
+    state.world.lastVoyage = {
+      voyageId: 'voyage-2', battleId: null, result: 'avoided', outcome: null, returnedDay: 2,
+    };
+    mutate(state);
+
+    expect(validateCampaign(state)).toMatchObject({ ok: false });
+  });
+
+  it('accepts the legacy V1 world with no lastVoyage own property', () => {
+    // Kills accidentally making the post-Task-2 summary required on legacy saves.
+    const state = validCampaign();
+    delete state.world.lastVoyage;
+
+    expect(Object.prototype.hasOwnProperty.call(state.world, 'lastVoyage')).toBe(false);
+    expect(validateCampaign(state)).toEqual({ ok: true, value: state });
+  });
+
   it('binds durable victory summaries to the target and Red Jackdaw lead terminal state', () => {
     // Catches compacted victory states that claim success without completing the strategic lead.
     const state = validCampaign();

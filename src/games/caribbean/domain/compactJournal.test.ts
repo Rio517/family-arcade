@@ -6,7 +6,7 @@ import { compactJournal } from './compactJournal';
 import { createCampaign } from './createCampaign';
 import { marketTradeDraft, quoteTrade } from './economy';
 import { appendJournal, createJournal, validateJournal } from './replay';
-import { navalEngagedDraft, seaLegCompletedDraft, voyageStartedDraft } from './voyage';
+import { battleWithdrawnDraft, navalEngagedDraft, seaLegCompletedDraft, voyageStartedDraft } from './voyage';
 
 function activeLeadJournal() {
   const state = createCampaign({ seed: 1702 });
@@ -78,5 +78,26 @@ describe('compactJournal', () => {
     const continued = appendJournal(compacted, marketTradeDraft(quote));
 
     expect(continued.events[0].id).toBe(compacted.state.lastEventId + 1);
+  });
+
+  it('continues a compacted returned battle with literal voyage-6 and preserved lastVoyage', () => {
+    // Kills compaction that drops strategic return summary or resets post-return event lineage.
+    const active = activeLeadJournal();
+    const departed = appendJournal(active, voyageStartedDraft(active.state));
+    const contact = appendJournal(departed, seaLegCompletedDraft(departed.state));
+    const engaged = appendJournal(contact, navalEngagedDraft(contact.state));
+    const returned = appendJournal(engaged, battleWithdrawnDraft(engaged.state));
+    const compacted = compactJournal(returned);
+
+    expect(compacted.events).toEqual([]);
+    expect(compacted.initial.lastEventId).toBe(5);
+    expect(compacted.initial.world.lastVoyage).toEqual({
+      voyageId: 'voyage-2', battleId: 'voyage-2-battle',
+      result: 'withdrew', outcome: null, returnedDay: 2,
+    });
+    const continued = appendJournal(compacted, voyageStartedDraft(compacted.state));
+    expect(continued.events).toEqual([{
+      id: 6, type: 'voyage-started', atDay: 2, payload: { voyageId: 'voyage-6' },
+    }]);
   });
 });

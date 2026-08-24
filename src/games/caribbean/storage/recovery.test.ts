@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { createCampaign } from '../domain/createCampaign';
+import { compactJournal } from '../domain/compactJournal';
 import { marketTradeDraft, quoteTrade } from '../domain/economy';
 import type { CampaignJournal } from '../domain/events';
 import { appendJournal, createJournal } from '../domain/replay';
+import { navalEngagedDraft, seaLegCompletedDraft, voyageStartedDraft } from '../domain/voyage';
 import { canonicalJson, checksumPayload } from './checksum';
 import {
   CURRENT_SAVE_KEY,
@@ -77,6 +79,14 @@ function acceptedJournal(seed = 1702): CampaignJournal {
     type: 'lead-accepted',
     payload: { leadId: 'red-jackdaw' },
   });
+}
+
+function activeModeJournals(): Record<'sailing' | 'encounter' | 'naval', CampaignJournal> {
+  const active = acceptedJournal();
+  const sailing = appendJournal(active, voyageStartedDraft(active.state));
+  const encounter = appendJournal(sailing, seaLegCompletedDraft(sailing.state));
+  const naval = appendJournal(encounter, navalEngagedDraft(encounter.state));
+  return { sailing, encounter, naval };
 }
 
 function oversizedJournal(): CampaignJournal {
@@ -339,6 +349,34 @@ describe('serializeRecoveryExport', () => {
 });
 
 describe('recoverCampaign safe acquisition and publication', () => {
+  it.each(['sailing', 'encounter', 'naval'] as const)(
+    'recovers the exact compacted previous %s mode after quarantining corrupt current bytes',
+    (kind) => {
+      // Kills recovery publication that drops resumable mode/lineage or loses corrupt evidence.
+      const journal = compactJournal(activeModeJournals()[kind]);
+      const previousRaw = envelopeRaw(journal, 100, `previous-${kind}`);
+      const source = {
+        currentRaw: `{broken-current-${kind}-ålesund`,
+        previousRaw,
+      };
+      const storage = new ScriptedStorage(source);
+      const loaded = loadedFrom(storage);
+      expect(loaded.journal).toEqual(journal);
+      expect(loaded.journal.state.mode).toEqual(journal.state.mode);
+
+      const result = recoverCampaign(storage, loaded, RECOVERY_OPTIONS);
+
+      expect(result).toMatchObject({ ok: true, kind: 'recovered', journal });
+      if (!result.ok || result.kind !== 'recovered') throw new Error('fixture must recover');
+      expect(result.revision.previousRaw).toBe(previousRaw);
+      expect(storage.raw(quarantineKey())).toContain(source.currentRaw);
+      const current = parseSaveEnvelope(result.revision.currentRaw ?? '');
+      expect(current).toMatchObject({ ok: true, envelope: { payload: journal } });
+      if (!current.ok) throw new Error('fixture must parse');
+      expect(current.envelope.payload.state.mode).toEqual(journal.state.mode);
+    },
+  );
+
   it('quarantines and verifies corrupt current before removal, then republishes valid previous', () => {
     const revision = corruptCurrentRevision();
     const storage = new ScriptedStorage(revision);
