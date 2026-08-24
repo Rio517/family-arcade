@@ -1,0 +1,303 @@
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { CaribbeanPage } from './components/CaribbeanPage';
+import { createCampaign } from './domain/createCampaign';
+import { marketTradeDraft, quoteTrade } from './domain/economy';
+import { appendJournal, createJournal } from './domain/replay';
+import type { CampaignJournal } from './domain/events';
+import type { CaribbeanRuntime } from './state/runtime';
+import {
+  CURRENT_SAVE_KEY,
+  PREVIOUS_SAVE_KEY,
+  loadCampaign,
+  saveCampaign,
+  type StorageLike,
+} from './storage/persistence';
+import { QUARANTINE_KEY_PREFIX, serializeRecoveryExport } from './storage/recovery';
+import { parseSaveEnvelope } from './storage/schema';
+import { createCampaignWriter, type LockManagerLike } from './storage/writer';
+
+const originalWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+const originalHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+
+const immediateLocks: LockManagerLike = {
+  async request(_name, _options, callback) {
+    return await callback({});
+  },
+};
+
+function deferredLocks() {
+  let callback: (() => unknown | PromiseLike<unknown>) | null = null;
+  let resolveRequest: ((value: unknown) => void) | null = null;
+  let rejectRequest: ((error: unknown) => void) | null = null;
+  const request = vi.fn((
+    _name: string,
+    _options: { mode: 'exclusive' },
+    next: (lock: unknown) => unknown | PromiseLike<unknown>,
+  ) => {
+    callback = () => next({});
+    return new Promise((resolve, reject) => {
+      resolveRequest = resolve;
+      rejectRequest = reject;
+    });
+  });
+  return {
+    locks: { request } as LockManagerLike,
+    request,
+    async settle() {
+      if (callback === null || resolveRequest === null) throw new Error('No pending lock request');
+      try {
+        resolveRequest(await callback());
+      } catch (error) {
+        rejectRequest?.(error);
+      }
+    },
+  };
+}
+
+function setViewport(width = 1440, height = 900): void {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });
+}
+
+function runtime(options: {
+  storage?: StorageLike;
+  locks?: LockManagerLike | null;
+  seed?: number;
+  now?: number[];
+  quarantineIds?: string[];
+} = {}): CaribbeanRuntime {
+  const times = [...(options.now ?? [100, 200, 300, 400, 500, 600])];
+  const ids = [...(options.quarantineIds ?? ['00000000-0000-4000-8000-000000000001'])];
+  return {
+    storage: options.storage ?? window.localStorage,
+    storageCapability: { kind: 'available' },
+    writer: createCampaignWriter(options.locks === undefined ? immediateLocks : options.locks),
+    build: 'integration-build',
+    now: () => times.shift() ?? 999,
+    makeSeed: () => options.seed ?? 1702,
+    makeQuarantineId: () => ids.shift() ?? '00000000-0000-4000-8000-000000000099',
+  };
+}
+
+function persist(store: StorageLike, journal: CampaignJournal, savedAt: number): CampaignJournal {
+  const loaded = loadCampaign(store);
+  if (loaded.kind === 'storage-unavailable' || loaded.kind === 'unreadable') {
+    throw new Error(`fixture load failed: ${loaded.kind}`);
+  }
+  const result = saveCampaign(store, journal, {
+    build: 'integration-build',
+    savedAt,
+    expectedRevision: loaded.revision,
+  });
+  if (!result.ok) throw new Error(`fixture save failed: ${result.reason}`);
+  return result.journal;
+}
+
+async function beginRecommendedCareer(root: HTMLElement = document.body): Promise<void> {
+  fireEvent.click(within(root).getByRole('button', { name: 'Start career' }));
+  await within(root).findByTestId('caribbean-career-ready');
+}
+
+async function openPortActivity(label: string, root: HTMLElement = document.body): Promise<void> {
+  fireEvent.click(within(root).getByRole('button', { name: label }));
+  await waitFor(() => expect(within(root).getByRole('heading', { name: label, level: 2 })).toHaveFocus());
+}
+
+async function closeActivity(root: HTMLElement = document.body): Promise<void> {
+  fireEvent.click(within(root).getByRole('button', { name: 'Back to harbour' }));
+  await within(root).findByRole('heading', { name: 'Choose your next port action' });
+}
+
+function loadedJournal(store: StorageLike): CampaignJournal {
+  const loaded = loadCampaign(store);
+  if (loaded.kind !== 'loaded') throw new Error(`expected loaded save, got ${loaded.kind}`);
+  return loaded.journal;
+}
+
+describe('Caribbean integrated production journey', () => {
+  let capturedBlobParts: unknown[] | null;
+
+  beforeEach(() => {
+    setViewport();
+    window.location.hash = '#/caribbean';
+    window.localStorage.clear();
+    capturedBlobParts = null;
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    vi.stubGlobal('Blob', class {
+      constructor(parts: unknown[]) {
+        capturedBlobParts = parts;
+      }
+    });
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:caribbean-integration'),
+      revokeObjectURL: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    window.localStorage.clear();
+    window.location.hash = '';
+    if (originalWidth) Object.defineProperty(window, 'innerWidth', originalWidth);
+    if (originalHeight) Object.defineProperty(window, 'innerHeight', originalHeight);
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('persists setup -> trade -> rumour -> log while port navigation stays transient', async () => {
+    const store = window.localStorage;
+    const first = render(<CaribbeanPage runtime={runtime({ storage: store, seed: 1702, now: [100, 200, 300] })} />);
+
+    await beginRecommendedCareer();
+    await openPortActivity('Market');
+    fireEvent.click(screen.getByRole('button', { name: 'Buy 5 Provisions' }));
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Cargo summary' })).getByText('3.9 months')).toBeVisible());
+    await closeActivity();
+    await openPortActivity('Tavern');
+    fireEvent.click(screen.getByRole('button', { name: 'Mark on chart' }));
+    await screen.findByText("Marked in the Captain's Log");
+    await closeActivity();
+    await openPortActivity("Captain's Log");
+
+    expect(screen.getByText('Sail east of Bridgetown and identify the Red Jackdaw.')).toBeVisible();
+    expect(loadedJournal(store).state.lastEventId).toBe(2);
+    first.unmount();
+
+    render(<CaribbeanPage runtime={runtime({ storage: store })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Resume career' }));
+    await screen.findByTestId('caribbean-career-ready');
+    expect(screen.getByRole('region', { name: 'Voyage status' })).toHaveTextContent('3.9 months');
+    expect(loadedJournal(store).state.lastEventId).toBe(2);
+  });
+
+  it('exports corrupt bytes, quarantines them under writer ownership, republishes the canonical previous save, and resumes after reload', async () => {
+    const store = window.localStorage;
+    const initial = createJournal(createCampaign({ seed: 1702, name: 'Morgan' }));
+    persist(store, initial, 10);
+    const quote = quoteTrade(initial.state, {
+      portId: 'bridgetown', shipId: 'mistral', cargoId: 'provisions', delta: 5,
+    });
+    if (!quote.ok) throw new Error('fixture trade must quote');
+    persist(store, appendJournal(initial, marketTradeDraft(quote)), 20);
+    const knownPreviousRaw = store.getItem(PREVIOUS_SAVE_KEY);
+    if (knownPreviousRaw === null) throw new Error('fixture previous save is missing');
+    const knownPrevious = parseSaveEnvelope(knownPreviousRaw);
+    if (!knownPrevious.ok) throw new Error('fixture previous save is invalid');
+    const corruptCurrentRaw = '{not-json:exact-corrupt-current';
+    store.setItem(CURRENT_SAVE_KEY, corruptCurrentRaw);
+    const degraded = loadCampaign(store);
+    if (degraded.kind !== 'loaded') throw new Error('fixture did not degrade to previous');
+
+    const view = render(<CaribbeanPage runtime={runtime({ storage: store, now: [30, 40] })} />);
+    expect(screen.getByRole('heading', { name: 'Campaign recovery required' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Download recovery file' }));
+    expect(capturedBlobParts).toEqual([
+      serializeRecoveryExport(degraded.revision, degraded.unreadableSlots),
+    ]);
+    expect(String(capturedBlobParts?.[0])).toContain(corruptCurrentRaw);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recover known-good campaign' }));
+    await screen.findByRole('heading', { name: 'Morgan’s commission' });
+
+    const quarantineKeys = Object.keys(store).filter((key) => key.startsWith(QUARANTINE_KEY_PREFIX));
+    expect(quarantineKeys).toHaveLength(1);
+    expect(store.getItem(quarantineKeys[0])).toContain(corruptCurrentRaw);
+    const recovered = loadCampaign(store);
+    expect(recovered).toMatchObject({ kind: 'loaded', recovered: false, unreadableSlots: [] });
+    if (recovered.kind !== 'loaded') throw new Error('recovery did not publish a clean save');
+    expect(recovered.journal).toEqual(knownPrevious.envelope.payload);
+    const recoveredCurrentRaw = store.getItem(CURRENT_SAVE_KEY);
+    if (recoveredCurrentRaw === null) throw new Error('recovered current is missing');
+    const recoveredEnvelope = parseSaveEnvelope(recoveredCurrentRaw);
+    if (!recoveredEnvelope.ok) throw new Error('recovered current is invalid');
+    expect(recoveredEnvelope.envelope.checksum).toBe(knownPrevious.envelope.checksum);
+    view.unmount();
+
+    render(<CaribbeanPage runtime={runtime({ storage: store })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Resume career' }));
+    expect(await screen.findByTestId('caribbean-career-ready')).toHaveTextContent('Morgan');
+    expect(screen.getByRole('region', { name: 'Voyage status' })).toHaveTextContent('3.4 months');
+    expect(loadCampaign(store)).toMatchObject({ kind: 'loaded', recovered: false, unreadableSlots: [] });
+  });
+
+  it('publishes nothing without a writer until explicit memory consent and never changes storage afterward', async () => {
+    const store = window.localStorage;
+    render(<CaribbeanPage runtime={runtime({ storage: store, locks: null })} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/safe save ownership is unavailable/i);
+    expect(screen.queryByTestId('caribbean-career-ready')).not.toBeInTheDocument();
+    expect(store.getItem(CURRENT_SAVE_KEY)).toBeNull();
+    expect(store.getItem(PREVIOUS_SAVE_KEY)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue without saving' }));
+    await screen.findByTestId('caribbean-career-ready');
+    expect(screen.getByRole('status')).toHaveTextContent('This career is not being saved. Keep this tab open.');
+    await openPortActivity('Market');
+    fireEvent.click(screen.getByRole('button', { name: 'Buy 5 Provisions' }));
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Cargo summary' })).getByText('3.9 months')).toBeVisible());
+
+    expect(screen.getByRole('status')).toHaveTextContent('This career is not being saved. Keep this tab open.');
+    expect(store.getItem(CURRENT_SAVE_KEY)).toBeNull();
+    expect(store.getItem(PREVIOUS_SAVE_KEY)).toBeNull();
+  });
+
+  it('freezes a two-controller conflict, exports the local fork, then reloads the external journal by choice', async () => {
+    const store = window.localStorage;
+    persist(store, createJournal(createCampaign({ seed: 1702, name: 'Morgan' })), 10);
+    const tree = render(
+      <>
+        <div data-testid="controller-a"><CaribbeanPage runtime={runtime({ storage: store })} /></div>
+        <div data-testid="controller-b"><CaribbeanPage runtime={runtime({ storage: store })} /></div>
+      </>,
+    );
+    const a = within(tree.getByTestId('controller-a'));
+    const b = within(tree.getByTestId('controller-b'));
+    fireEvent.click(a.getByRole('button', { name: 'Resume career' }));
+    fireEvent.click(b.getByRole('button', { name: 'Resume career' }));
+    await a.findByTestId('caribbean-career-ready');
+    await b.findByTestId('caribbean-career-ready');
+
+    await openPortActivity('Tavern', tree.getByTestId('controller-a'));
+    fireEvent.click(a.getByRole('button', { name: 'Mark on chart' }));
+    await a.findByText("Marked in the Captain's Log");
+    await openPortActivity('Market', tree.getByTestId('controller-b'));
+    fireEvent.click(b.getByRole('button', { name: 'Buy 5 Provisions' }));
+    expect(await b.findByRole('alert')).toHaveTextContent(/newer save exists/i);
+    expect(loadedJournal(store).events.map((event) => event.type)).toEqual(['lead-accepted']);
+
+    fireEvent.click(b.getByRole('button', { name: 'Export in-memory journal' }));
+    expect(String(capturedBlobParts?.[0])).toContain('market-traded');
+    fireEvent.click(b.getByRole('button', { name: 'Reload newer save' }));
+    await b.findByTestId('caribbean-career-ready');
+    expect(loadedJournal(store).events.map((event) => event.type)).toEqual(['lead-accepted']);
+    await openPortActivity("Captain's Log", tree.getByTestId('controller-b'));
+    expect(b.getByText('Sail east of Bridgetown and identify the Red Jackdaw.')).toBeVisible();
+  });
+
+  it('lets an acquired mutation finish exactly once after unmount and a new page resumes it', async () => {
+    const store = window.localStorage;
+    persist(store, createJournal(createCampaign({ seed: 1702, name: 'Morgan' })), 10);
+    const injected = runtime({ storage: store });
+    const first = render(<CaribbeanPage runtime={injected} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Resume career' }));
+    await screen.findByTestId('caribbean-career-ready');
+    const deferred = deferredLocks();
+    injected.writer = createCampaignWriter(deferred.locks);
+    await openPortActivity('Tavern');
+    fireEvent.click(screen.getByRole('button', { name: 'Mark on chart' }));
+    await waitFor(() => expect(deferred.request).toHaveBeenCalledTimes(1));
+    first.unmount();
+
+    await act(async () => deferred.settle());
+
+    expect(loadedJournal(store).events.map((event) => event.type)).toEqual(['lead-accepted']);
+    render(<CaribbeanPage runtime={runtime({ storage: store })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Resume career' }));
+    await screen.findByTestId('caribbean-career-ready');
+    await openPortActivity("Captain's Log");
+    expect(screen.getByText('Sail east of Bridgetown and identify the Red Jackdaw.')).toBeVisible();
+  });
+});

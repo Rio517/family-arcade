@@ -692,6 +692,13 @@
   bottom: 104px;
 }
 
+/* Keep app chrome clear of the seven primary port commands. */
+body:has(.caribbean-port) .party-root {
+  left: max(12px, env(safe-area-inset-left));
+  bottom: calc(110px + env(safe-area-inset-bottom));
+  transform: none;
+}
+
 @media (max-height: 700px) {
   .caribbean-port {
     grid-template-rows: 62px minmax(0, 1fr) auto;
@@ -759,6 +766,10 @@
 
   .caribbean-market-row {
     padding-block: 3px;
+  }
+
+  body:has(.caribbean-port) .party-root {
+    bottom: calc(130px + env(safe-area-inset-bottom));
   }
 }
 

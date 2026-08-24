@@ -1,0 +1,279 @@
+{
+  "browser": {
+    "name": "Chromium",
+    "version": "151.0.7922.34"
+  },
+  "route": "/#/caribbean",
+  "build": "normal production (BUILD_HARNESS unset)",
+  "viewports": {
+    "setupDesktop": {
+      "name": "setupDesktop",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1,
+      "orientation": "landscape",
+      "expectedSupported": true,
+      "controllerMounted": true,
+      "noticeVisible": false,
+      "noticeFocused": false,
+      "minimumFontPx": 14,
+      "minimumTargetWidthPx": 93.03125,
+      "minimumTargetHeightPx": 44,
+      "undersizedTargets": [],
+      "occludedTargets": [],
+      "partyObscured": false,
+      "horizontalOverflowPx": 0
+    },
+    "portDesktop": {
+      "name": "portDesktop",
+      "width": 1440,
+      "height": 900,
+      "dpr": 1,
+      "orientation": "landscape",
+      "expectedSupported": true,
+      "controllerMounted": true,
+      "noticeVisible": false,
+      "noticeFocused": false,
+      "minimumFontPx": 14,
+      "minimumTargetWidthPx": 93.03125,
+      "minimumTargetHeightPx": 44,
+      "undersizedTargets": [],
+      "occludedTargets": [],
+      "partyObscured": false,
+      "horizontalOverflowPx": 0
+    },
+    "minimumSupported": {
+      "name": "minimumSupported",
+      "width": 960,
+      "height": 600,
+      "dpr": 1,
+      "orientation": "landscape",
+      "expectedSupported": true,
+      "controllerMounted": true,
+      "noticeVisible": false,
+      "noticeFocused": false,
+      "minimumFontPx": 14,
+      "minimumTargetWidthPx": 93.03125,
+      "minimumTargetHeightPx": 44,
+      "undersizedTargets": [],
+      "occludedTargets": [],
+      "partyObscured": false,
+      "horizontalOverflowPx": 0
+    },
+    "minimumWidth": {
+      "name": "minimumWidth",
+      "width": 959,
+      "height": 600,
+      "dpr": 1,
+      "orientation": "landscape",
+      "expectedSupported": false,
+      "controllerMounted": false,
+      "noticeVisible": true,
+      "noticeFocused": true,
+      "minimumFontPx": 14,
+      "minimumTargetWidthPx": 93.03125,
+      "minimumTargetHeightPx": 44,
+      "undersizedTargets": [],
+      "occludedTargets": [],
+      "partyObscured": false,
+      "horizontalOverflowPx": 0
+    },
+    "minimumHeight": {
+      "name": "minimumHeight",
+      "width": 960,
+      "height": 599,
+      "dpr": 1,
+      "orientation": "landscape",
+      "expectedSupported": false,
+      "controllerMounted": false,
+      "noticeVisible": true,
+      "noticeFocused": true,
+      "minimumFontPx": 14,
+      "minimumTargetWidthPx": 93.03125,
+      "minimumTargetHeightPx": 44,
+      "undersizedTargets": [],
+      "occludedTargets": [],
+      "partyObscured": false,
+      "horizontalOverflowPx": 0
+    },
+    "largePortrait": {
+      "name": "largePortrait",
+      "width": 1024,
+      "height": 1366,
+      "dpr": 1,
+      "orientation": "portrait",
+      "expectedSupported": false,
+      "controllerMounted": false,
+      "noticeVisible": true,
+      "noticeFocused": true,
+      "minimumFontPx": 14,
+      "minimumTargetWidthPx": 93.03125,
+      "minimumTargetHeightPx": 44,
+      "undersizedTargets": [],
+      "occludedTargets": [],
+      "partyObscured": false,
+      "horizontalOverflowPx": 0
+    }
+  },
+  "fixtures": {
+    "nowProvided": [
+      1700000000000,
+      1700000001000,
+      1700000002000,
+      1700000003000,
+      1700000004000,
+      1700000005000,
+      1700000006000,
+      1700000007000,
+      1700000008000,
+      1700000009000,
+      1700000010000,
+      1700000011000,
+      1700000012000,
+      1700000013000,
+      1700000014000,
+      1700000015000,
+      1700000016000,
+      1700000017000,
+      1700000018000,
+      1700000019000,
+      1700000020000,
+      1700000021000,
+      1700000022000,
+      1700000023000,
+      1700000024000,
+      1700000025000,
+      1700000026000,
+      1700000027000,
+      1700000028000,
+      1700000029000,
+      1700000030000,
+      1700000031000
+    ],
+    "seedsProvided": [
+      1702,
+      2702,
+      3702,
+      4702,
+      5702,
+      6702,
+      7702,
+      8702
+    ],
+    "uuidsProvided": [
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000003",
+      "00000000-0000-4000-8000-000000000004",
+      "00000000-0000-4000-8000-000000000005",
+      "00000000-0000-4000-8000-000000000006",
+      "00000000-0000-4000-8000-000000000007",
+      "00000000-0000-4000-8000-000000000008",
+      "00000000-0000-4000-8000-000000000009",
+      "00000000-0000-4000-8000-000000000010",
+      "00000000-0000-4000-8000-000000000011",
+      "00000000-0000-4000-8000-000000000012"
+    ],
+    "nowConsumed": [
+      1700000000000,
+      1700000001000,
+      1700000002000,
+      1700000003000,
+      1700000004000
+    ],
+    "seedsConsumed": [
+      1702
+    ],
+    "uuidsConsumed": [
+      "00000000-0000-4000-8000-000000000001"
+    ]
+  },
+  "webLocks": {
+    "realNavigatorLocks": true,
+    "calls": [
+      {
+        "name": "caribbean:campaign:writer",
+        "mode": "exclusive"
+      },
+      {
+        "name": "caribbean:campaign:writer",
+        "mode": "exclusive"
+      },
+      {
+        "name": "caribbean:campaign:writer",
+        "mode": "exclusive"
+      },
+      {
+        "name": "caribbean:campaign:writer",
+        "mode": "exclusive"
+      },
+      {
+        "name": "caribbean:campaign:writer",
+        "mode": "exclusive"
+      }
+    ]
+  },
+  "journey": {
+    "finalEventCount": 2,
+    "eventTypes": [
+      "market-traded",
+      "lead-accepted"
+    ],
+    "saveChecksum": "c9715934",
+    "replayVerified": true
+  },
+  "accessibility": {
+    "minimumMeasuredFontPx": 14,
+    "minimumMeasuredTargetWidthPx": 60.015625,
+    "minimumMeasuredTargetHeightPx": 44,
+    "horizontalOverflowPx": 0
+  },
+  "requests": {
+    "externalCount": 0,
+    "failedCount": 0,
+    "requestedPaths": [
+      "/",
+      "/assets/index-B5ExcsKc.css",
+      "/assets/index-DqSFhtqf.js",
+      "/registerSW.js"
+    ]
+  },
+  "failures": {
+    "console": [],
+    "page": [],
+    "requests": [],
+    "external": []
+  },
+  "isolation": {
+    "previewHtmlAbsent": true,
+    "caribbeanGlbAbsent": true,
+    "glbRequested": false,
+    "previewResourceRequested": false,
+    "moduleMarkersAbsent": true,
+    "battleCssAbsent": true
+  },
+  "recovery": {
+    "quarantineKey": "caribbean:campaign:quarantine:00000000-0000-4000-8000-000000000001",
+    "quarantineVerified": true,
+    "exportedCorruptRawVerified": true,
+    "recoveredChecksum": "ae0c5e71",
+    "recoveryReloaded": true
+  },
+  "screenshots": [
+    "setup-desktop.png",
+    "port-desktop.png",
+    "market-desktop.png",
+    "tavern-desktop.png",
+    "captains-log-desktop.png",
+    "recovery-desktop.png",
+    "port-minimum-supported.png",
+    "minimum-screen-width.png",
+    "minimum-screen-height.png",
+    "minimum-screen-large-portrait.png"
+  ],
+  "determinism": {
+    "cleanRuns": 2,
+    "metricsByteIdentical": true,
+    "screenshotsByteIdentical": true
+  }
+}

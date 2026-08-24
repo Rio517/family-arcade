@@ -52,6 +52,33 @@ offline-capable—not a browser novelty.
 | [naval-battle-playtest.md](./naval-battle-playtest.md) | Honest three-session and target-iPad evidence ledger with exact thresholds |
 | [naval-battle-review.md](./naval-battle-review.md) | Current production naval milestone decision and implementation boundary |
 
+## Production Bridgetown evidence
+
+Run `npm run caribbean:port-check` to build the normal production app, serve it
+on a loopback-only port, and drive the registry route at `/#/caribbean` in
+Chromium. The gate uses the real browser Web Lock and `localStorage`, completes
+setup, trade, rumour acceptance, save recovery, quarantine, republish, reload,
+and resume, and rejects preview/naval resources in the normal bundle. It runs
+the journey twice from clean storage and updates evidence only after the
+metrics and reduced-motion screenshots match byte-for-byte.
+
+The current set includes the
+[`technical metrics`](../../screenshots/caribbean-port/metrics.json),
+[`setup`](../../screenshots/caribbean-port/setup-desktop.png),
+[`Bridgetown port`](../../screenshots/caribbean-port/port-desktop.png),
+[`market`](../../screenshots/caribbean-port/market-desktop.png),
+[`tavern`](../../screenshots/caribbean-port/tavern-desktop.png),
+[`Captain's Log`](../../screenshots/caribbean-port/captains-log-desktop.png),
+[`recovery decision`](../../screenshots/caribbean-port/recovery-desktop.png),
+[`exact 960×600 playfield`](../../screenshots/caribbean-port/port-minimum-supported.png),
+[`959×600 width notice`](../../screenshots/caribbean-port/minimum-screen-width.png),
+[`960×599 height notice`](../../screenshots/caribbean-port/minimum-screen-height.png),
+and [`1024×1366 portrait notice`](../../screenshots/caribbean-port/minimum-screen-large-portrait.png).
+
+This is repeatable desktop-browser engineering evidence, not a claim of human
+comprehension or physical-device approval. A real target iPad, Safari/touch,
+offline installation, and first-time-player observation remain unobserved.
+
 ## Production naval evidence
 
 Run `npm run caribbean:naval-check` to build the harness-only production entry,
