@@ -7,6 +7,15 @@ export const CAMPAIGN_LENGTH_LABELS = {
   legend: 'Legend',
 } as const satisfies Record<CampaignLength, string>;
 
+function campaignLocation(state: CampaignStateV1): string {
+  switch (state.mode.kind) {
+    case 'sailing': return 'Under sail';
+    case 'encounter': return 'Red Jackdaw contact';
+    case 'naval': return 'Naval engagement';
+    default: return 'Bridgetown';
+  }
+}
+
 export function formatCaribbeanSaveSummary(state: CampaignStateV1): {
   title: string;
   meta: string;
@@ -17,6 +26,6 @@ export function formatCaribbeanSaveSummary(state: CampaignStateV1): {
     : `${months.toFixed(1)} months provisions`;
   return {
     title: `Caribbean Career — ${state.captain.name}`,
-    meta: `${CAMPAIGN_LENGTH_LABELS[state.career.length]} · Bridgetown · ${provisions}`,
+    meta: `${CAMPAIGN_LENGTH_LABELS[state.career.length]} · ${campaignLocation(state)} · ${provisions}`,
   };
 }

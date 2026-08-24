@@ -18,7 +18,8 @@ describe('browser Caribbean runtime', () => {
     expect(second).toBe(first);
     expect(second.storage).toBe(first.storage);
     expect(second.writer).toBe(first.writer);
-    expect(first.build).toBe('caribbean-port-1');
+    // Kills retaining the old port-only build identity after sailing ships.
+    expect(first.build).toBe('caribbean-sailing-1');
   });
 
   it('guards localStorage property access and exposes one captured unavailable capability', async () => {

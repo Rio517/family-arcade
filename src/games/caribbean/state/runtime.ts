@@ -47,7 +47,7 @@ function createBrowserRuntime(): CaribbeanRuntime {
     storage,
     storageCapability,
     writer: createCampaignWriter(locks),
-    build: 'caribbean-port-1',
+    build: 'caribbean-sailing-1',
     now: () => Date.now(),
     makeSeed: () => crypto.getRandomValues(new Uint32Array(1))[0],
     makeQuarantineId: () => crypto.randomUUID(),

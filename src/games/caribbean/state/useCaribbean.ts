@@ -2,9 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { canonicalJson } from '../canonicalJson';
 import { createCampaign } from '../domain/createCampaign';
-import type { CampaignEventDraft, CampaignJournal } from '../domain/events';
+import type { CampaignEvent, CampaignEventDraft, CampaignJournal } from '../domain/events';
+import type { NavalResolution } from '../domain/naval/types';
 import { appendJournal, createJournal } from '../domain/replay';
-import type { CreateCampaignOptions, PortActivity } from '../domain/types';
+import type { CampaignStateV1, CreateCampaignOptions, PortActivity } from '../domain/types';
+import {
+  battleWithdrawnDraft,
+  encounterAvoidedDraft,
+  navalEngagedDraft,
+  navalResolvedDraft,
+  seaLegCompletedDraft,
+  voyageStartedDraft,
+  VoyageTransitionError,
+} from '../domain/voyage';
 import {
   abandonCampaign,
   continueRecovery as continueStoredRecovery,
@@ -19,6 +29,7 @@ import {
   type SaveResult,
 } from '../storage/persistence';
 import type { WriterRunResult } from '../storage/writer';
+import { NamedActionGate } from './namedActionGate';
 import type { CaribbeanRuntime } from './runtime';
 
 type WriterOperationUncertainFailure = {
@@ -132,6 +143,14 @@ export interface CaribbeanController {
   resume(): Promise<void>;
   continueWithoutSaving(): void;
   dispatch(draft: CampaignEventDraft): Promise<CampaignDispatchOutcome>;
+  setSail?(): Promise<CampaignDispatchOutcome>;
+  completeSeaLeg?(): Promise<CampaignDispatchOutcome>;
+  avoidEncounter?(): Promise<CampaignDispatchOutcome>;
+  engageEncounter?(): Promise<CampaignDispatchOutcome>;
+  withdrawBattle?(): Promise<CampaignDispatchOutcome>;
+  resolveBattle?(resolution: NavalResolution): Promise<CampaignDispatchOutcome>;
+  portFocusTarget?: 'last-voyage' | null;
+  acknowledgePortFocus?(): void;
   retrySaving(): Promise<void>;
   reloadExternalSave(): Promise<void>;
   exportInMemoryJournal(): string | null;
@@ -142,7 +161,30 @@ export interface CaribbeanController {
   closeActivity(): void;
 }
 
+export type ActiveCaribbeanController = CaribbeanController & Required<Pick<
+  CaribbeanController,
+  | 'setSail'
+  | 'completeSeaLeg'
+  | 'avoidEncounter'
+  | 'engageEncounter'
+  | 'withdrawBattle'
+  | 'resolveBattle'
+  | 'portFocusTarget'
+  | 'acknowledgePortFocus'
+>>;
+
 type StartOptions = Omit<CreateCampaignOptions, 'seed'>;
+
+export interface EventPublication {
+  predecessor: CampaignJournal;
+  publishedJournal: CampaignJournal;
+  appendedEvent: CampaignEvent;
+}
+
+type PublishEventCandidate = (
+  generation: number,
+  publication: EventPublication,
+) => void;
 
 type PendingIntent =
   | {
@@ -162,12 +204,15 @@ type PendingIntent =
       kind: 'event';
       candidate: CampaignJournal;
       predecessor: CampaignJournal;
+      appendedEvent: CampaignEvent;
       expectedRevision: ActiveSaveRevision;
     }
   | {
       kind: 'memory-save';
       candidate: CampaignJournal;
       predecessor: CampaignJournal | null;
+      publicationPredecessor: CampaignJournal | null;
+      appendedEvent: CampaignEvent | null;
       expectedRevision: ActiveSaveRevision;
     };
 
@@ -373,7 +418,7 @@ function initialSnapshot(runtime: CaribbeanRuntime): {
   };
 }
 
-export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
+export function useCaribbean(runtime: CaribbeanRuntime): ActiveCaribbeanController {
   const [initial] = useState(() => initialSnapshot(runtime));
   const [load, setLoad] = useState<LoadResult>(initial.load);
   const [journal, setJournal] = useState<CampaignJournal | null>(null);
@@ -381,6 +426,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
   const [busy, setBusy] = useState(false);
   const [persistence, setPersistence] = useState<CaribbeanPersistencePhase>(initial.persistence);
   const [recoveryFailure, setRecoveryFailure] = useState<RecoveryActionFailure | null>(null);
+  const [portFocusTarget, setPortFocusTarget] = useState<'last-voyage' | null>(null);
 
   const loadRef = useRef(load);
   const journalRef = useRef(journal);
@@ -389,10 +435,14 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
   const pendingRef = useRef<PendingIntent | null>(null);
   const busyRef = useRef(false);
   const generationRef = useRef(0);
+  const namedActionGateRef = useRef(new NamedActionGate());
+  const consumedEventTokensRef = useRef(new Set<string>());
 
   useEffect(() => {
     generationRef.current += 1;
     const generation = generationRef.current;
+    namedActionGateRef.current.reset();
+    consumedEventTokensRef.current.clear();
     const next = initialSnapshot(runtime);
     loadRef.current = next.load;
     journalRef.current = null;
@@ -409,6 +459,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     setBusy(false);
     setPersistence(next.persistence);
     setRecoveryFailure(null);
+    setPortFocusTarget(null);
     return () => {
       if (generationRef.current === generation) generationRef.current += 1;
     };
@@ -442,6 +493,31 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     journalRef.current = next;
     setJournal(next);
   }, [current]);
+
+  const publishEventCandidate = useCallback<PublishEventCandidate>((
+    generation,
+    publication,
+  ): void => {
+    if (!current(generation)) return;
+    updateJournal(generation, publication.publishedJournal);
+    const token = [
+      publication.predecessor.state.campaignId,
+      publication.appendedEvent.id,
+      publication.appendedEvent.type,
+    ].join(':');
+    if (consumedEventTokensRef.current.has(token)) return;
+    consumedEventTokensRef.current.add(token);
+    switch (publication.appendedEvent.type) {
+      case 'voyage-started':
+        setActivity('menu');
+        break;
+      case 'encounter-avoided':
+      case 'battle-withdrawn':
+      case 'naval-resolved':
+        setPortFocusTarget('last-voyage');
+        break;
+    }
+  }, [current, updateJournal]);
 
   const updatePersistence = useCallback((generation: number, next: CaribbeanPersistencePhase): void => {
     if (!current(generation)) return;
@@ -480,7 +556,25 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     if (!current(generation)) return;
     if (outcome.kind === 'saved') {
       pendingRef.current = null;
-      updateJournal(generation, outcome.journal);
+      if (intent.kind === 'event') {
+        publishEventCandidate(generation, {
+          predecessor: intent.predecessor,
+          publishedJournal: outcome.journal,
+          appendedEvent: intent.appendedEvent,
+        });
+      } else if (
+        intent.kind === 'memory-save'
+        && intent.publicationPredecessor !== null
+        && intent.appendedEvent !== null
+      ) {
+        publishEventCandidate(generation, {
+          predecessor: intent.publicationPredecessor,
+          publishedJournal: outcome.journal,
+          appendedEvent: intent.appendedEvent,
+        });
+      } else {
+        updateJournal(generation, outcome.journal);
+      }
       updateLoad(generation, syntheticLoaded(
         outcome.journal,
         outcome.revision,
@@ -510,7 +604,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     updateLoad(generation, outcome.load);
     updateJournal(generation, null);
     updatePersistence(generation, { kind: 'recovery-required' });
-  }, [current, holdForConsent, runtime.build, updateJournal, updateLoad, updatePersistence]);
+  }, [current, holdForConsent, publishEventCandidate, runtime.build, updateJournal, updateLoad, updatePersistence]);
 
   const start = useCallback(async (options: StartOptions): Promise<void> => {
     const generation = begin();
@@ -624,10 +718,20 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
       kind: 'memory-save',
       candidate,
       predecessor: pending.predecessor,
+      publicationPredecessor: pending.kind === 'event' ? pending.predecessor : null,
+      appendedEvent: pending.kind === 'event' ? pending.appendedEvent : null,
       expectedRevision: pending.expectedRevision,
     };
-    journalRef.current = candidate;
-    setJournal(candidate);
+    if (pending.kind === 'event') {
+      publishEventCandidate(generationRef.current, {
+        predecessor: pending.predecessor,
+        publishedJournal: candidate,
+        appendedEvent: pending.appendedEvent,
+      });
+    } else {
+      journalRef.current = candidate;
+      setJournal(candidate);
+    }
     const reason: MemoryOnlyReason = phase.kind === 'save-conflict'
       ? 'save-conflict'
       : phase.failure.kind;
@@ -637,7 +741,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     const next: CaribbeanPersistencePhase = { kind: 'memory-only', reason, canRetrySaving };
     persistenceRef.current = next;
     setPersistence(next);
-  }, [runtime]);
+  }, [publishEventCandidate, runtime]);
 
   const dispatch = useCallback(async (draft: CampaignEventDraft): Promise<CampaignDispatchOutcome> => {
     const activeJournal = journalRef.current;
@@ -645,20 +749,35 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     if (activeJournal === null || busyRef.current) return { kind: 'not-applied' };
     if (phase.kind === 'memory-only') {
       const candidate = appendJournal(activeJournal, draft);
-      journalRef.current = candidate;
-      setJournal(candidate);
+      const appendedEvent = candidate.events.at(-1);
+      if (appendedEvent === undefined) throw new Error('Dispatch candidate did not append an event');
+      publishEventCandidate(generationRef.current, {
+        predecessor: activeJournal,
+        publishedJournal: candidate,
+        appendedEvent,
+      });
       const pending = pendingRef.current;
-      if (pending?.kind === 'memory-save') pendingRef.current = { ...pending, candidate };
+      if (pending?.kind === 'memory-save') {
+        pendingRef.current = {
+          ...pending,
+          candidate,
+          publicationPredecessor: activeJournal,
+          appendedEvent,
+        };
+      }
       return { kind: 'applied', eventId: candidate.state.lastEventId };
     }
     if (phase.kind !== 'persisted') return { kind: 'not-applied' };
     const expectedRevision = revisionOf(loadRef.current);
     if (expectedRevision === null) return { kind: 'not-applied' };
     const candidate = appendJournal(activeJournal, draft);
+    const appendedEvent = candidate.events.at(-1);
+    if (appendedEvent === undefined) throw new Error('Dispatch candidate did not append an event');
     const intent: Extract<PendingIntent, { kind: 'event' }> = {
       kind: 'event',
       candidate,
       predecessor: activeJournal,
+      appendedEvent,
       expectedRevision: cloneRevision(expectedRevision),
     };
     const generation = begin();
@@ -675,7 +794,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
       if (runResult.kind === 'operation-result') {
         applyLockedSave(generation, intent, runResult.result);
         return runResult.result.kind === 'saved'
-          ? { kind: 'applied', eventId: runResult.result.journal.state.lastEventId }
+          ? { kind: 'applied', eventId: appendedEvent.id }
           : { kind: 'not-applied' };
       } else {
         holdForConsent(generation, intent, writerFailure(runResult)!);
@@ -684,7 +803,37 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     } finally {
       finish(generation);
     }
-  }, [applyLockedSave, begin, current, finish, holdForConsent, runtime]);
+  }, [applyLockedSave, begin, current, finish, holdForConsent, publishEventCandidate, runtime]);
+
+  const dispatchNamedAction = useCallback(async (
+    createDraft: (state: CampaignStateV1) => CampaignEventDraft,
+  ): Promise<CampaignDispatchOutcome> => {
+    const owner = namedActionGateRef.current.acquire(generationRef.current);
+    if (owner === null) return { kind: 'not-applied' };
+    try {
+      const active = journalRef.current;
+      if (active === null || busyRef.current) return { kind: 'not-applied' };
+      let draft: CampaignEventDraft;
+      try {
+        draft = createDraft(active.state);
+      } catch (error) {
+        if (error instanceof VoyageTransitionError) return { kind: 'not-applied' };
+        throw error;
+      }
+      return await dispatch(draft);
+    } finally {
+      namedActionGateRef.current.release(owner);
+    }
+  }, [dispatch]);
+
+  const setSail = useCallback(() => dispatchNamedAction(voyageStartedDraft), [dispatchNamedAction]);
+  const completeSeaLeg = useCallback(() => dispatchNamedAction(seaLegCompletedDraft), [dispatchNamedAction]);
+  const avoidEncounter = useCallback(() => dispatchNamedAction(encounterAvoidedDraft), [dispatchNamedAction]);
+  const engageEncounter = useCallback(() => dispatchNamedAction(navalEngagedDraft), [dispatchNamedAction]);
+  const withdrawBattle = useCallback(() => dispatchNamedAction(battleWithdrawnDraft), [dispatchNamedAction]);
+  const resolveBattle = useCallback((resolution: NavalResolution) => dispatchNamedAction(
+    (state) => navalResolvedDraft(state, structuredClone(resolution)),
+  ), [dispatchNamedAction]);
 
   const retrySaving = useCallback(async (): Promise<void> => {
     const phase = persistenceRef.current;
@@ -938,6 +1087,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
   }, []);
 
   const closeActivity = useCallback((): void => setActivity('menu'), []);
+  const acknowledgePortFocus = useCallback((): void => setPortFocusTarget(null), []);
 
   return {
     load,
@@ -951,6 +1101,14 @@ export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
     resume,
     continueWithoutSaving,
     dispatch,
+    setSail,
+    completeSeaLeg,
+    avoidEncounter,
+    engageEncounter,
+    withdrawBattle,
+    resolveBattle,
+    portFocusTarget,
+    acknowledgePortFocus,
     retrySaving,
     reloadExternalSave,
     exportInMemoryJournal,
