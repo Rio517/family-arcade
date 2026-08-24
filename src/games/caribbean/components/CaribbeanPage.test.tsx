@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createCampaign } from '../domain/createCampaign';
@@ -17,6 +17,44 @@ const immediateLocks: LockManagerLike = {
 const deniedLocks: LockManagerLike = {
   async request() { throw new Error('ownership denied'); },
 };
+
+function observedImmediateLocks() {
+  const request = vi.fn((
+    _name: string,
+    _options: { mode: 'exclusive' },
+    callback: (lock: unknown) => unknown | PromiseLike<unknown>,
+  ) => Promise.resolve(callback({})));
+  return { locks: { request } as LockManagerLike, request };
+}
+
+function deferredLocks() {
+  let callback: (() => unknown | PromiseLike<unknown>) | null = null;
+  let resolveRequest: ((value: unknown) => void) | null = null;
+  let rejectRequest: ((error: unknown) => void) | null = null;
+  const request = vi.fn((
+    _name: string,
+    _options: { mode: 'exclusive' },
+    next: (lock: unknown) => unknown | PromiseLike<unknown>,
+  ) => {
+    callback = () => next({});
+    return new Promise((resolve, reject) => {
+      resolveRequest = resolve;
+      rejectRequest = reject;
+    });
+  });
+  return {
+    locks: { request } as LockManagerLike,
+    request,
+    async settle() {
+      if (!callback || !resolveRequest) throw new Error('No pending lock request');
+      try {
+        resolveRequest(await callback());
+      } catch (error) {
+        rejectRequest?.(error);
+      }
+    },
+  };
+}
 
 function setViewport(width: number, height: number): void {
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
@@ -103,23 +141,57 @@ describe('<CaribbeanPage>', () => {
     seedSave(store);
     window.location.hash = '#/caribbean?resume=1';
 
-    render(<CaribbeanPage runtime={runtime(store)} />);
+    const observed = observedImmediateLocks();
+    const injected = runtime(store);
+    injected.writer = createCampaignWriter(observed.locks);
+    const writesBefore = vi.mocked(store.setItem).mock.calls.length;
+    render(<CaribbeanPage runtime={injected} />);
 
     expect(await screen.findByTestId('caribbean-career-ready')).toHaveTextContent('Morgan');
+    expect(observed.request).toHaveBeenCalledTimes(1);
+    expect(store.setItem).toHaveBeenCalledTimes(writesBefore);
     expect(loadCampaign(store)).toMatchObject({ kind: 'loaded', recovered: false });
   });
 
-  it('does not bypass recovery for a degraded save even with the resume query', () => {
+  it('survives StrictMode rehearsal and settles one deferred query resume without a duplicate or stale summary', async () => {
+    setViewport(1440, 900);
+    const store = storage();
+    seedSave(store);
+    window.location.hash = '#/caribbean?resume=1';
+    const deferred = deferredLocks();
+    const injected = runtime(store);
+    injected.writer = createCampaignWriter(deferred.locks);
+    const writesBefore = vi.mocked(store.setItem).mock.calls.length;
+
+    render(<StrictMode><CaribbeanPage runtime={injected} /></StrictMode>);
+
+    await waitFor(() => expect(deferred.request).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('heading', { name: 'Morgan’s commission' })).toBeInTheDocument();
+    expect(screen.queryByTestId('caribbean-career-ready')).not.toBeInTheDocument();
+
+    await act(async () => deferred.settle());
+
+    expect(await screen.findByTestId('caribbean-career-ready')).toHaveTextContent('Morgan');
+    expect(screen.queryByRole('heading', { name: 'Morgan’s commission' })).not.toBeInTheDocument();
+    expect(deferred.request).toHaveBeenCalledTimes(1);
+    expect(store.setItem).toHaveBeenCalledTimes(writesBefore);
+  });
+
+  it('does not bypass recovery or request writer ownership for a degraded save even with the resume query', () => {
     setViewport(1440, 900);
     const store = storage();
     seedSave(store);
     store.setItem('caribbean:campaign:previous', '{corrupt');
     window.location.hash = '#/caribbean?resume=1';
 
-    render(<CaribbeanPage runtime={runtime(store)} />);
+    const observed = observedImmediateLocks();
+    const injected = runtime(store);
+    injected.writer = createCampaignWriter(observed.locks);
+    render(<CaribbeanPage runtime={injected} />);
 
     expect(screen.getByRole('heading', { name: 'Campaign recovery required' })).toBeInTheDocument();
     expect(screen.queryByTestId('caribbean-career-ready')).not.toBeInTheDocument();
+    expect(observed.request).not.toHaveBeenCalled();
   });
 
   it('renders saving-disabled setup and constructs memory state only after the explicit second action', () => {

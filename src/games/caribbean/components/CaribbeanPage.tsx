@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { getBrowserCaribbeanRuntime, type CaribbeanRuntime } from '../state/runtime';
 import { useCaribbean } from '../state/useCaribbean';
@@ -15,22 +15,27 @@ function requestedResume(): boolean {
 
 function ControllerPage({ runtime }: { runtime: CaribbeanRuntime }) {
   const controller = useCaribbean(runtime);
-  const autoResumeAttempted = useRef(false);
   const load = controller.load;
+  const { busy, journal, persistence, resume } = controller;
   const needsRecovery = load.kind === 'unreadable'
     || load.kind === 'loaded' && (load.recovered || load.unreadableSlots.length > 0);
 
   useEffect(() => {
     if (
-      autoResumeAttempted.current
-      || !requestedResume()
+      !requestedResume()
+      || journal !== null
+      || busy
+      || persistence.kind !== 'persisted'
       || load.kind !== 'loaded'
       || load.recovered
       || load.unreadableSlots.length > 0
     ) return;
-    autoResumeAttempted.current = true;
-    void controller.resume();
-  }, [controller, load]);
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void resume();
+    });
+    return () => { active = false; };
+  }, [busy, journal, persistence.kind, resume, load]);
 
   const savingAvailable = runtime.storageCapability.kind === 'available'
     && runtime.writer.capability === 'available'
