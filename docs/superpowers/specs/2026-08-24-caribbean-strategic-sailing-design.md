@@ -141,13 +141,18 @@ only when all canonical conditions are true:
 5. the flagship carries at least two provisions, the exact outbound-plus-return
    cost.
 
-The closed failure codes and UI copy are:
+When several conditions fail, the selector returns the first failure in this
+exact precedence: `not-in-bridgetown`, `target-defeated`, `lead-not-active`,
+`flagship-unavailable`, `insufficient-provisions`. Target completion must
+outrank lead status because a victory intentionally makes the lead
+`completed`; the resulting instruction must never tell the player to accept an
+already-completed rumour. The closed failure codes and UI copy are:
 
 | Code | Player-facing reason |
 | --- | --- |
 | `not-in-bridgetown` | Return to Bridgetown before setting a new course. |
-| `lead-not-active` | Mark the Red Jackdaw rumour in the Tavern first. |
 | `target-defeated` | The Red Jackdaw lead is complete. |
+| `lead-not-active` | Mark the Red Jackdaw rumour in the Tavern first. |
 | `flagship-unavailable` | The flagship record is unavailable. |
 | `insufficient-provisions` | Buy at least 2 provisions for the round trip. |
 
@@ -196,6 +201,39 @@ construction omits it until the first return. Every reducer-created return
 sets it, so journal compaction retains the last outcome even after its event
 array is checkpointed away. UI resolves prose from codes and naval facts; no
 display sentence enters canonical state.
+
+### Canonical intermediate-mode validity
+
+Because `compactJournal` may turn the current state into an event-free,
+authoritative checkpoint, each accepted strategic mode must be reachable from
+the one authored route without consulting an earlier event. Validation uses
+`RED_JACKDAW_VOYAGE`, `createRedJackdawBattleInput`, the current flagship, and
+the current `lastEventId`; it does not duplicate their literals in storage
+code.
+
+| Mode | Exact invariants at validate/load/compact/recover boundaries |
+| --- | --- |
+| `sailing` | `voyageId === voyage-${lastEventId}`; checkpoint is deeply equal to `RED_JACKDAW_VOYAGE.start`; active Red Jackdaw lead; undefeated target; current flagship exists; flagship has at least 2 provisions. |
+| `encounter` | `voyageId === voyage-${lastEventId - 1}`; `encounterId === ${voyageId}-contact`; `returnCheckpoint` is deeply equal to `RED_JACKDAW_VOYAGE.contact`; active lead; undefeated target; current flagship exists; at least 1 provision remains for the guaranteed return. |
+| `naval` | `voyageId === voyage-${lastEventId - 2}`; `battleId === ${voyageId}-battle`; wrapper and `input.battleId` both equal that ID; `returnCheckpoint` deeply equals the authored contact; active lead; undefeated target; current flagship exists; at least 1 provision remains; `input.seed === rng.naval`; and the entire input deeply equals `createRedJackdawBattleInput({ battleId, seed: rng.naval, player: currentFlagshipSnapshot })`. |
+
+The arithmetic requires a positive safe integer result; underflow is invalid.
+The full builder comparison covers stable ship IDs, names, class, positions,
+headings, systems, wind, arena, objective, and time limit. Unknown or extra
+keys remain invalid.
+
+The compatibility matrix is mandatory for each of `sailing`, `encounter`, and
+`naval`:
+
+| Operation | Required positive case | Required mutation failures |
+| --- | --- | --- |
+| direct validation | exact literal reachable state accepted | route checkpoint; lineage ID; active lead; undefeated target; flagship; guaranteed return provision; plus naval RNG/input equality where applicable |
+| save/load | save envelope round-trips canonical equality | one invariant mutation in `current` rejects without rewriting raw bytes |
+| compact/load | compacted nonzero `initial.lastEventId` loads with empty events and canonical equality | the same per-mode mutations in the compacted `initial` reject even though no predecessor event exists |
+| corrupt-current recovery | exact previous intermediate snapshot resumes its same mode | mutated previous is not promoted; both exact raw slots remain exportable/quarantinable |
+
+Port-only legacy V1 bytes remain accepted without `lastVoyage`; this strictness
+applies only to newly accepted active modes.
 
 ### Event union
 
@@ -267,6 +305,21 @@ After a non-victory return, the lead becomes `expired` when the new campaign
 day is at or beyond its exact `expiresDay`; otherwise it stays active. A player
 victory sets `world.targetDefeated = true` and the lead to `completed`.
 
+`LastVoyageSummary.result` uses this exhaustive mapping; campaign code has no
+second interpretation:
+
+| Return fact | Stored `result` | Lead/target effect |
+| --- | --- | --- |
+| encounter avoided | `avoided` | active unless the return day expires it; target undefeated |
+| battle withdrawn | `withdrew` | active unless the return day expires it; target undefeated |
+| `surrender`, `sunk`, or `boarding-ready` with `victorShipId: 'player'` | `victory` | lead completed; target defeated |
+| `surrender`, `sunk`, or `boarding-ready` with `victorShipId: 'opponent'` | `defeat` | active unless expired; target undefeated |
+| `escaped` with either `shipId` | `unresolved` | active unless expired; target undefeated |
+| `separated` with either `shipId` | `unresolved` | active unless expired; target undefeated |
+
+Opponent escape is not a strategic victory, and player escape is not a stored
+defeat: neither resolves the authored target.
+
 ## Naval Handoff and Resolution
 
 ### One battle-input builder
@@ -277,6 +330,11 @@ arena, time limit, objective, positions, and the Red Jackdaw ship definition.
 `BATTLE_LAB_INPUT` is rebuilt through the same helper, while the campaign
 passes a snapshot of its current flagship. This removes the current risk that
 the lab and campaign silently copy different encounter numbers.
+
+Builder tests compare the entire `NavalBattleInput` with `toEqual`, including
+every player and opponent field. They include a damaged non-default flagship
+and prove each call owns fresh nested position objects; partial object matching
+is not sufficient for this persistence boundary.
 
 Aim legality remains in `domain/naval/geometry.ts`; boarding, surrender,
 escape, and separation remain in `domain/naval/outcomes.ts`; damage and volley
@@ -314,7 +372,11 @@ code does not reproduce aim, boarding, or outcome thresholds.
 
 The campaign reducer accepts only a terminal resolution whose battle ID equals
 the persisted input and whose exact bounded facts validate against that input.
-It does not accept a bare `NavalOutcome` from React.
+`atTick` is an integer in `0..input.timeLimitTicks`. Each final hull, sails,
+crew, and cannon value is an integer no lower than zero and no greater than
+that same ship's saved input value; combat cannot heal or add crew/cannon. The
+validator rejects a value that is within class maximum but above its own
+engagement input. It does not accept a bare `NavalOutcome` from React.
 
 ### Safe-return ruling
 
@@ -354,16 +416,71 @@ outcome merely disables the deck and shows the result. The player then chooses
 Exactly-once behavior has four layers:
 
 1. the button has a synchronous in-flight guard;
-2. `busyRef` rejects a concurrent controller mutation;
+2. a separate synchronous `namedActionInFlightRef` is acquired before reading
+   state or constructing a draft and remains held through dispatch settlement
+   in persisted and memory-only modes;
 3. the reducer requires matching current `naval` mode and battle ID; and
 4. the first applied event returns to `port`, so the same draft is no longer a
    legal successor even in memory-only mode.
+
+`busyRef` continues to own writer/runtime serialization; it is not reused as
+the named-action guard because memory-only dispatch does not set it. Direct
+domain draft-helper calls throw on a wrong predecessor. Named controller
+actions normalize an expected wrong-predecessor/domain-precondition failure to
+`{ kind: 'not-applied' }`; simultaneous duplicate action promises both fulfill,
+exactly one may be `applied`, and none rejects as an exact-once mechanism.
+Unexpected implementation errors still reject and remain test-visible.
 
 A save failure does not visually claim return. The existing consent/conflict
 flow owns the pending candidate. **Continue without saving** publishes that
 candidate once for the mounted session; **Reload external save** discards it;
 retry uses the original expected revision. No battle component adopts a
 revision or writes storage directly.
+
+An active predecessor route remains mounted whenever a journal exists and the
+persistence phase becomes `consent-required` or `save-conflict`.
+`CaribbeanPage` renders the current port/sailing/encounter/naval screen plus a
+top-level accessible persistence decision dialog; it does not replace the
+route with the commission form. The dialog makes the route inert, takes focus,
+and returns focus to the initiating control when dismissed. For a terminal
+battle, the transient session and result modal remain mounted beneath it:
+
+- **Continue without saving** publishes the pending port candidate once and
+  only then unmounts the naval route;
+- **Reload newer save** discards the candidate and shows the externally loaded
+  route; if it is the same naval predecessor, the existing terminal modal is
+  still present and can retry Return;
+- export never publishes or changes route state; and
+- a further save/lock conflict keeps the same predecessor and candidate
+  ownership.
+
+No UI infers return until `controller.journal.state.mode.kind === 'port'`.
+
+Set Sail is governed only by `voyageReadiness`, even while any Governor,
+Tavern, Market, Shipyard, Shares, or Log activity is open. A successfully published `voyage-started`
+resets transient `activity` to `menu`; a `not-applied` departure preserves the
+open activity and its focus context. Every successful avoid, withdrawal, or
+resolution sets a transient one-shot port-focus intent for the Captain's Log
+outcome trigger. On a reload/resume directly into port, `PortPage` focuses Set
+Sail when readiness is `ready`; otherwise it focuses Captain's Log when
+`lastVoyage` exists, falling back to the harbour heading only when neither is
+applicable. Consuming focus intent never mutates the journal.
+
+### Terminal resolution presentation states
+
+The campaign wrapper distinguishes three terminal presentations:
+
+| State | Modal actions | Campaign effect |
+| --- | --- | --- |
+| valid terminal summary, no dispatch pending | campaign-specific result copy plus **Return to Bridgetown** only | none until Return |
+| Return dispatch is `not-applied` because consent/conflict is pending | same terminal modal remains beneath the persistence dialog | pending candidate remains controller-owned |
+| summary/validation/reducer contract error before a candidate exists | `Battle result could not be verified.` plus **Restart engagement** and **Withdraw to Bridgetown** | restart rebuilds transient session from saved input; withdraw appends `battle-withdrawn`; no automatic dispatch |
+
+The invalid-resolution escape hatch is intentionally different from a normal
+terminal result. It never displays Battle Lab copy. Restart clears only the
+transient error/session; withdrawal is available only in this explicit error
+branch or from nonterminal Options, never beside a valid Return action. Focus,
+inert background behavior, and diagnostics remain modal-safe.
 
 ## Pause, Reload, Resume, and Abandonment
 
@@ -399,9 +516,9 @@ revision or writes storage directly.
 | canonical naval drift | `NavalSession` | pause, show diagnostic, restart from saved input; append no campaign event |
 | Three.js construction/render failure | existing naval viewport | keep the labelled HTML tactical chart and working battle rules |
 | storage unavailable/lock denied | controller | require explicit memory-only consent; do not claim persistence |
-| save conflict | controller | freeze writes; reload/export/memory-only choices remain authoritative |
+| save conflict | controller plus active-route persistence dialog | freeze writes; keep predecessor route/result mounted; reload/export/memory-only choices remain authoritative |
 | unreadable current/previous slot | storage recovery | preserve and quarantine exact raw bytes before mutation |
-| invalid terminal resolution | naval resolution validator/campaign reducer | keep result unsaved and offer deterministic restart/withdrawal |
+| invalid terminal resolution | naval resolution validator plus campaign result-error modal | keep result unsaved; show campaign-specific error; offer deterministic restart/withdrawal |
 | unsupported screen | `MinimumScreenGate` | focused notice; no controller or naval session mounted |
 
 ## Experience and Visual Direction
@@ -507,15 +624,20 @@ must not assume a campaign began at event zero.
 ### Domain and mutation resistance
 
 - literal Set Sail readiness cases for every closed reason;
+- literal post-victory readiness proves `target-defeated` outranks the completed
+  lead's `lead-not-active` condition;
 - exact authored checkpoint, two-provision round trip, day advance, lead expiry,
   and RNG before/after;
-- wrong mode/ID/checkpoint/RNG/input/resolution rejection with no mutation;
+- exact per-mode save/compact/load/recover matrix plus wrong
+  mode/ID/checkpoint/lead/target/provision/RNG/input rejection with no mutation;
 - battle input equality between authored builder, campaign transition, and
-  `BATTLE_LAB_INPUT` defaults;
+  `BATTLE_LAB_INPUT` defaults, using whole-object equality and damaged inputs;
 - one terminal summary for every naval outcome branch;
+- resolution system monotonicity against each saved ship input and exact time
+  limit enforcement;
 - mutations of boarding, aim, surrender, and escape thresholds caught in their
   existing naval source-of-truth tests rather than copied campaign assertions;
-- avoid, withdraw, defeat, unresolved, and victory returns;
+- every row of the exhaustive outcome-to-result table plus avoid and withdraw;
 - victory alone completes the lead and target; and
 - replay/compaction/migration/recovery from nonzero checkpoints and every newly
   accepted mode.
@@ -523,14 +645,22 @@ must not assume a campaign began at event zero.
 ### Controller and component proof
 
 - each named action delegates exactly one draft through existing writer logic;
+- simultaneous duplicates in persisted and memory-only modes fulfill with at
+  most one applied result and no duplicate-promise rejection;
 - duplicate clicks, StrictMode effects, late promises, storage failures,
   conflicts, memory consent, runtime replacement, and external reload never
   apply a result twice;
+- consent/conflict uses an active-route modal and preserves a terminal battle
+  result until the pending candidate is published or discarded;
 - Set Sail reason/enablement, focus, encounter choices, status, Captain's Log,
   and exact mode routing;
+- successful departure from every open port activity clears it only after
+  publication; all return paths and reload have the exact focus rules above;
 - campaign battle uses the same `NavalBattlePage`, full-bleed scene, controls,
   HTML fallback, audio, outcome, and diagnostics;
 - campaign result action returns while Battle Lab's default remains rematch;
+- invalid campaign resolution uses restart/withdraw error actions while a valid
+  result exposes Return only;
 - hidden document pauses, visible return stays paused, reload restarts from
   byte-identical input, and unsupported resize disposes the session; and
 - no campaign event occurs between `naval-engaged` and withdrawal/resolution.
@@ -560,6 +690,37 @@ The gate measures 14 px text, 44 px targets, contrast, focus, clipping,
 horizontal overflow, request/page/console failures, event counts, mode sequence,
 RNG lineage, input checksum, exactly-once resolution, reload restart, recovery,
 and two-run byte identity.
+
+The normal victory is driven through public battle controls by one committed
+golden command trace for the exact second-voyage input produced from campaign
+seed `1702`: `voyage-5-battle`, naval seed `1971161494`, Mistral
+`100/100/50/8`, and the authored Red Jackdaw. The trace samples the existing
+`captureCaptain` policy at six-tick HUD boundaries but is stored as literal
+JSON; the browser never imports the test captain or calls a session/debug
+bridge. A pure replay test locks the trace to `boarding-ready` for `player` at
+tick `11855`, `seedAfter: 1310878278`, player `78/61/44/8`, and opponent
+`88/14/9/8`.
+
+`BattleHud` exposes a visible elapsed-engagement value with a read-only exact
+tick attribute. Playwright installs its clock, pauses after the battle mounts,
+applies each trace row through the rendered rudder/sail/ammunition/fire
+controls only when the published tick equals that row, then advances exactly
+`100ms` (six 60 Hz ticks). Overshoot, a missing boundary, a different input,
+or any non-player-victory terminal outcome fails closed. Each victory run has
+a `330_000ms` outcome deadline; expected fake-clock wall time is under 90
+seconds, and the two-clean-run package budget is 8 minutes. The evidence suite
+has both a pure scheduler RED and a normal-route browser RED before the schema
+can turn green.
+
+`caribbean:naval-check` gains explicit non-writing `--verify` and writing
+`--capture` modes. Initial execution preflight does not invoke the legacy
+mutating default. After the mode lands, repeat/final gates use `--verify` and
+write only to a temporary directory. Task 7 runs `--capture` once from a clean
+Task 6 HEAD before any other evidence bytes change, owns and stages the
+resulting `docs/screenshots/caribbean-naval/metrics.json` plus only genuinely
+changed naval screenshots, then uses `--verify` after the evidence commit.
+Captured provenance therefore names the clean Task 6 source HEAD and reports
+`worktreeDirtyBeforeCapture: false`.
 
 Normal production now intentionally contains a lazy production naval chunk and
 the precached local sloop GLB. Isolation changes from “naval absent” to:
