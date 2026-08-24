@@ -51,6 +51,8 @@ offline-capable—not a browser novelty.
 | [five-minute vertical-slice plan](../../superpowers/plans/2026-08-23-caribbean-five-minute-vertical-slice.md) | Execution-ready TDD plan for the first production loop and its stop/go gate |
 | [naval-battle-playtest.md](./naval-battle-playtest.md) | Honest three-session and target-iPad evidence ledger with exact thresholds |
 | [naval-battle-review.md](./naval-battle-review.md) | Current production naval milestone decision and implementation boundary |
+| [bridgetown-visual-reference.md](./bridgetown-visual-reference.md) | Authoritative historical visual basis, limits, and representation gate for the painted harbour |
+| [bridgetown-asset-report.json](./bridgetown-asset-report.json) | Reproducible ImageGen prompt history, production asset identity, crop contract, and review disposition |
 
 ## Production Bridgetown evidence
 
@@ -74,6 +76,19 @@ The current set includes the
 [`959×600 width notice`](../../screenshots/caribbean-port/minimum-screen-width.png),
 [`960×599 height notice`](../../screenshots/caribbean-port/minimum-screen-height.png),
 and [`1024×1366 portrait notice`](../../screenshots/caribbean-port/minimum-screen-large-portrait.png).
+
+The painted-harbour evidence adds normal and forced image-error captures at
+[`1440×900`](../../screenshots/caribbean-port/port-art-desktop.png),
+[`1180×820`](../../screenshots/caribbean-port/port-art-wide.png),
+[`1024×768`](../../screenshots/caribbean-port/port-art-tablet.png), and
+[`960×600`](../../screenshots/caribbean-port/port-art-minimum.png), with the
+corresponding `-fallback` files in the same folder. The browser gate calculates
+the exact `object-fit: cover` transform, requires at least 70% of the reported
+ship/town subject ROI to remain visible, checks opaque text backplates at WCAG
+4.5:1 or better, enumerates control clipping and overlap, verifies the emitted
+WebP MIME type, and confirms the hashed asset is in the production PWA
+precache. Its isolated failure run aborts only that emitted WebP while every
+other page, console, or request failure remains fatal.
 
 This is repeatable desktop-browser engineering evidence, not a claim of human
 comprehension or physical-device approval. A real target iPad, Safari/touch,

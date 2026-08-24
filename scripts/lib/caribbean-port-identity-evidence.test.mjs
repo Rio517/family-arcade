@@ -61,7 +61,7 @@ function setupEvidence(overrides = {}) {
   return {
     ...retainedV1Evidence(),
     schemaVersion: 2,
-    packagePhase: 'market',
+    packagePhase: 'art',
     profile: {
       status: 'setup-verified',
       defaultPronouns: 'he/him',
@@ -73,9 +73,68 @@ function setupEvidence(overrides = {}) {
         accessibility: { minimumFontPx: 14, minimumTargetHeightPx: 44, horizontalOverflowPx: 0 },
       },
     },
-    art: { status: 'not-yet-observed' },
+    art: artEvidence(),
     market: { status: 'verified', samples: marketSamples() },
     ...overrides,
+  };
+}
+
+const ART_VIEWPORTS = [
+  ['desktop', 1440, 900, 58],
+  ['wide', 1180, 820, 56],
+  ['tablet', 1024, 768, 54],
+  ['minimum', 960, 600, 52],
+];
+
+const CONTRAST_SELECTORS = [
+  '.caribbean-port-status-rail dt',
+  '.caribbean-port-status-rail dd',
+  '.caribbean-port-captain',
+  '.caribbean-port-stage h1',
+  '.caribbean-port-bearing',
+  '.caribbean-port-activity h2',
+  '.caribbean-port-arrival',
+  '.caribbean-port-action',
+  '.caribbean-port-action-reason',
+];
+
+function geometryEvidence(includeMarket = false) {
+  const ids = [
+    'party-pill', 'port-position', ...Array.from({ length: 5 }, (_, index) => `port-fact-${index}`),
+    'port-stage-title', 'port-bearing', 'port-activity-heading',
+    ...EXPECTED_MARKET_ACTION_IDS.filter(() => includeMarket),
+    ...['governor', 'tavern', 'market', 'shipyard', 'shares', 'log', 'set-sail'].map((id) => `port-action-${id}`),
+  ];
+  if (includeMarket) ids.push('port-close-activity');
+  else ids.push('port-arrival');
+  return {
+    leaves: ids.map((id) => ({ id, contained: true, horizontalOverflowPx: 0, verticalOverflowPx: 0 })),
+    overlapPairs: [],
+  };
+}
+
+function artEvidence() {
+  return {
+    status: 'verified',
+    asset: 'src/games/caribbean/assets/bridgetown-1675.webp',
+    emitted: { url: '/assets/bridgetown-1675-hash.webp', contentType: 'image/webp', precached: true },
+    report: {
+      historicalReview: 'pass',
+      representationReview: 'pass',
+      subjectRoi: [0.37, 0.24, 0.58, 0.71],
+    },
+    screenshots: {
+      normal: ART_VIEWPORTS.map(([name]) => `port-art-${name}.png`),
+      fallback: ART_VIEWPORTS.map(([name]) => `port-art-${name}-fallback.png`),
+    },
+    viewports: ART_VIEWPORTS.map(([name, width, height, focalX]) => ({
+      name,
+      viewport: { width, height },
+      focal: { xPercent: focalX, yPercent: 50, roiVisibleRatio: 0.8 },
+      contrasts: CONTRAST_SELECTORS.map((selector) => ({ selector, minimumRatio: 7, backgroundAlpha: 1 })),
+      menuGeometry: geometryEvidence(false),
+      marketGeometry: geometryEvidence(true),
+    })),
   };
 }
 
@@ -102,7 +161,7 @@ function marketSamples() {
 }
 
 describe('evaluatePortIdentityEvidence', () => {
-  it('accepts exact profile evidence while Market is verified and art remains pending', () => {
+  it('accepts exact verified profile, Market, and harbour-art evidence at art phase', () => {
     expect(evaluatePortIdentityEvidence(setupEvidence())).toEqual({ ok: true, issues: [] });
   });
 
@@ -113,9 +172,37 @@ describe('evaluatePortIdentityEvidence', () => {
       return evidence;
     })(), 'retained v1 section journey is missing'],
     ['an unknown field', setupEvidence({ unexpected: true }), 'unknown evidence field unexpected'],
-    ['the wrong package phase', setupEvidence({ packagePhase: 'profile' }), 'packagePhase must be market'],
+    ['the wrong package phase', setupEvidence({ packagePhase: 'market' }), 'packagePhase must be art'],
     ['missing Market samples', setupEvidence({ market: { status: 'verified' } }), 'market evidence must contain verified samples'],
-    ['premature art success', setupEvidence({ art: { status: 'verified' } }), 'art must remain not-yet-observed during market phase'],
+    ['failed historical review', setupEvidence({ art: {
+      ...artEvidence(), report: { ...artEvidence().report, historicalReview: 'fail' },
+    } }), 'art historical and representation reviews must pass'],
+    ['missing ROI', setupEvidence({ art: {
+      ...artEvidence(), report: { historicalReview: 'pass', representationReview: 'pass' },
+    } }), 'art subject ROI is missing or malformed'],
+    ['contrast below 4.5', setupEvidence({ art: {
+      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
+        ? { ...viewport, contrasts: viewport.contrasts.map((sample, sampleIndex) => sampleIndex === 0
+          ? { ...sample, minimumRatio: 4.49 } : sample) }
+        : viewport),
+    } }), 'art desktop contrast must be opaque and at least 4.5:1'],
+    ['clipped leaf', setupEvidence({ art: {
+      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
+        ? { ...viewport, menuGeometry: {
+          ...viewport.menuGeometry,
+          leaves: viewport.menuGeometry.leaves.map((leaf, leafIndex) => leafIndex === 0
+            ? { ...leaf, horizontalOverflowPx: 1 } : leaf),
+        } }
+        : viewport),
+    } }), 'art desktop menu geometry clips or escapes the viewport'],
+    ['overlapping controls', setupEvidence({ art: {
+      ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
+        ? { ...viewport, marketGeometry: { ...viewport.marketGeometry, overlapPairs: [['a', 'b']] } }
+        : viewport),
+    } }), 'art desktop market interactive rectangles overlap'],
+    ['absent precache', setupEvidence({ art: {
+      ...artEvidence(), emitted: { ...artEvidence().emitted, precached: false },
+    } }), 'art emitted WebP must be precached'],
     ['missing narrow Booth measurement', setupEvidence({
       accessibility: { boothProfile: { desktop: boothViewport(1440, 900) } },
     }), 'profile evidence must include Booth narrow viewport evidence'],

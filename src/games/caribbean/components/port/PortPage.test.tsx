@@ -289,6 +289,28 @@ describe('<PortPage>', () => {
     expect(screen.getByText('Captain Morgan')).toBeInTheDocument();
   });
 
+  it('keeps exactly one harbour backdrop while menu, Market, Tavern, and Log rerender', () => {
+    render(<StatefulPort />);
+
+    expect(screen.getAllByTestId('caribbean-port-backdrop')).toHaveLength(1);
+    for (const activity of ['Market', 'Tavern', "Captain's Log"] as const) {
+      fireEvent.click(screen.getByRole('button', { name: activity }));
+      expect(screen.getAllByTestId('caribbean-port-backdrop')).toHaveLength(1);
+      fireEvent.click(screen.getByRole('button', { name: 'Back to harbour' }));
+      expect(screen.getAllByTestId('caribbean-port-backdrop')).toHaveLength(1);
+    }
+  });
+
+  it('keeps the gradient fallback and every port control usable when harbour art fails', () => {
+    render(<StatefulPort />);
+    fireEvent.error(screen.getByTestId('caribbean-port-art'));
+
+    expect(screen.getByTestId('caribbean-port-backdrop')).toHaveClass('caribbean-port-backdrop--fallback');
+    const actions = ["Governor's House", 'Tavern', 'Market', 'Shipyard', 'Divide Shares', "Captain's Log"];
+    for (const name of actions) expect(screen.getByRole('button', { name })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Set Sail' })).toBeDisabled();
+  });
+
   it('opens six useful nonempty activities without dispatching a canonical event', () => {
     const dispatch = vi.fn(async () => ({ kind: 'not-applied' as const }));
     const onSelection = vi.fn();
@@ -376,6 +398,17 @@ describe('<PortPage>', () => {
     expect(portCss).not.toMatch(/@media\s*\([^)]*max-width/s);
     expect(portCss).not.toContain('.caribbean-minimum-screen');
     expect(portCss).not.toMatch(/grid-template-columns:\s*(?:[3-9]\d\d|\d{4,})px\s+1fr/);
+  });
+
+  it('keeps one brass registration line and no abstract faux skyline blocks', () => {
+    const portCss = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+    render(<StatefulPort />);
+
+    expect(document.querySelector('.caribbean-port-horizon')).toBeInTheDocument();
+    expect(document.querySelector('.caribbean-port-horizon span')).not.toBeInTheDocument();
+    expect(portCss).toMatch(/\.caribbean-port-horizon::before\s*\{[^}]*height:\s*1px/s);
+    expect(portCss).not.toContain('.caribbean-port-horizon::after');
+    expect(portCss).not.toMatch(/\.caribbean-port-horizon span\s*\{/);
   });
 
   it.each([

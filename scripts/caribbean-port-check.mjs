@@ -8,7 +8,14 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from 'playwright';
-import { evaluatePortIdentityEvidence, marketStabilityFailure, validateMarketStability } from './lib/caribbean-port-identity-evidence.mjs';
+import {
+  ART_CONTRAST_SELECTORS,
+  ART_VIEWPORT_SPECS,
+  EXPECTED_MARKET_ACTION_IDS,
+  evaluatePortIdentityEvidence,
+  marketStabilityFailure,
+  validateMarketStability,
+} from './lib/caribbean-port-identity-evidence.mjs';
 
 const MODULE_URL = new URL(import.meta.url);
 const ROOT = fileURLToPath(new URL('..', MODULE_URL));
@@ -34,6 +41,8 @@ const SCREENSHOTS = [
   'minimum-screen-height.png',
   'minimum-screen-large-portrait.png',
   'player-profile-desktop.png',
+  ...ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}.png`),
+  ...ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}-fallback.png`),
 ];
 const PORT_ORDER = [
   "Governor's House",
@@ -69,6 +78,7 @@ const MIME = {
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.webmanifest': 'application/manifest+json',
+  '.webp': 'image/webp',
   '.woff2': 'font/woff2',
 };
 
@@ -335,7 +345,7 @@ async function installBrowserBoundary(context) {
   );
 }
 
-function recordFailures(page, baseUrl, failures) {
+function recordFailures(page, baseUrl, failures, allowedFailedUrl = null) {
   const localOrigin = new URL(baseUrl).origin;
   page.on('console', (message) => {
     if (message.type() === 'error') failures.console.push(message.text());
@@ -349,11 +359,38 @@ function recordFailures(page, baseUrl, failures) {
     if (url.origin === localOrigin) failures.requestedPaths.push(url.pathname);
   });
   page.on('requestfailed', (request) => {
+    if (request.url() === allowedFailedUrl) {
+      failures.allowlistedRequests = (failures.allowlistedRequests ?? 0) + 1;
+      return;
+    }
     failures.requests.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? 'failed'}`);
   });
   page.on('response', (response) => {
     if (response.status() >= 400) failures.requests.push(`${response.status()} ${response.url()}`);
   });
+}
+
+function readEmittedArt() {
+  const assetsDirectory = path.join(DIST, 'assets');
+  const names = fs.readdirSync(assetsDirectory).filter((name) => /^bridgetown-1675-[^/]+\.webp$/.test(name));
+  invariant(names.length === 1, `Expected one emitted Bridgetown WebP, found ${names.join(', ')}`);
+  const name = names[0];
+  const url = `/assets/${name}`;
+  const precacheSources = fs.readdirSync(DIST, { recursive: true })
+    .filter((entry) => typeof entry === 'string' && /(?:^|\/)(?:sw|workbox-[^/]+)\.js$/.test(entry))
+    .map((entry) => fs.readFileSync(path.join(DIST, entry), 'utf8'));
+  return {
+    url,
+    contentType: 'image/webp',
+    precached: precacheSources.some((source) => source.includes(`assets/${name}`)),
+  };
+}
+
+async function verifyEmittedArtResponse(baseUrl, emitted) {
+  const response = await fetch(`${baseUrl}${emitted.url}`, { method: 'HEAD', cache: 'no-store' });
+  invariant(response.status === 200, `Emitted art returned ${response.status}`);
+  invariant(response.headers.get('content-type') === 'image/webp', `Emitted art used ${response.headers.get('content-type')}`);
+  invariant(emitted.precached, 'Emitted art is absent from the production PWA precache');
 }
 
 async function settle(page) {
@@ -547,10 +584,311 @@ async function readPlayerProfileLayout(page, name, viewport) {
 }
 
 async function capture(page, screenshots, directory, filename) {
+  const backdrop = page.getByTestId('caribbean-port-backdrop');
+  if (await backdrop.count() === 1 && !await backdrop.evaluate((element) => element.classList.contains('caribbean-port-backdrop--fallback'))) {
+    const art = page.getByTestId('caribbean-port-art');
+    await art.evaluate(async (element) => {
+      if (!(element instanceof HTMLImageElement)) throw new Error('Port art is not an image');
+      if (!element.complete) {
+        await new Promise((resolve, reject) => {
+          element.addEventListener('load', resolve, { once: true });
+          element.addEventListener('error', reject, { once: true });
+        });
+      }
+      if (element.naturalWidth === 0) throw new Error('Port art completed without decoded pixels');
+      await element.decode();
+    });
+    await page.waitForFunction(() => document.querySelector('[data-testid="caribbean-port-backdrop"]')?.classList.contains('caribbean-port-backdrop--loaded'));
+  }
   await settle(page);
   const bytes = await page.screenshot({ animations: 'disabled' });
   screenshots.set(filename, bytes);
   fs.writeFileSync(path.join(directory, filename), bytes);
+}
+
+async function readArtViewport(page, spec, subjectRoi) {
+  return page.evaluate(({ viewportSpec, roi, contrastSelectors, marketActionIds }) => {
+    const visible = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    };
+    const rect = (element) => {
+      const value = element.getBoundingClientRect();
+      return { left: value.left, top: value.top, right: value.right, bottom: value.bottom, width: value.width, height: value.height };
+    };
+    const parseColor = (value) => {
+      const numbers = value.match(/[\d.]+/g)?.map(Number) ?? [];
+      if (value.startsWith('color(srgb')) {
+        return { r: (numbers[0] ?? 0) * 255, g: (numbers[1] ?? 0) * 255, b: (numbers[2] ?? 0) * 255, a: numbers[3] ?? 1 };
+      }
+      return { r: numbers[0] ?? 0, g: numbers[1] ?? 0, b: numbers[2] ?? 0, a: numbers[3] ?? 1 };
+    };
+    const luminance = ({ r, g, b }) => {
+      const channel = (value) => {
+        const normalized = value / 255;
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    };
+    const contrast = (foreground, background) => {
+      const lighter = Math.max(luminance(foreground), luminance(background));
+      const darker = Math.min(luminance(foreground), luminance(background));
+      return (lighter + 0.05) / (darker + 0.05);
+    };
+    const art = document.querySelector('[data-testid="caribbean-port-art"]');
+    const container = document.querySelector('[data-testid="caribbean-port-backdrop"]');
+    const shell = document.querySelector('[data-testid="caribbean-career-ready"]');
+    if (!(art instanceof HTMLImageElement) || !(container instanceof HTMLElement) || !(shell instanceof HTMLElement)) {
+      throw new Error('Harbour art probe could not find its production elements');
+    }
+    const containerRect = container.getBoundingClientRect();
+    const shellStyle = getComputedStyle(shell);
+    const focalX = Number.parseFloat(shellStyle.getPropertyValue('--caribbean-port-art-focal-x'));
+    const focalY = Number.parseFloat(shellStyle.getPropertyValue('--caribbean-port-art-focal-y'));
+    const sourceWidth = art.naturalWidth;
+    const sourceHeight = art.naturalHeight;
+    const scale = Math.max(containerRect.width / sourceWidth, containerRect.height / sourceHeight);
+    const renderedWidth = sourceWidth * scale;
+    const renderedHeight = sourceHeight * scale;
+    const offsetX = (containerRect.width - renderedWidth) * focalX / 100;
+    const offsetY = (containerRect.height - renderedHeight) * focalY / 100;
+    const subject = {
+      left: offsetX + roi[0] * renderedWidth,
+      top: offsetY + roi[1] * renderedHeight,
+      right: offsetX + (roi[0] + roi[2]) * renderedWidth,
+      bottom: offsetY + (roi[1] + roi[3]) * renderedHeight,
+    };
+    const intersectionWidth = Math.max(0, Math.min(containerRect.width, subject.right) - Math.max(0, subject.left));
+    const intersectionHeight = Math.max(0, Math.min(containerRect.height, subject.bottom) - Math.max(0, subject.top));
+    const subjectArea = (subject.right - subject.left) * (subject.bottom - subject.top);
+
+    const contrasts = contrastSelectors.map((selector) => {
+      const elements = [...document.querySelectorAll(selector)].filter(visible);
+      if (elements.length === 0) throw new Error(`Contrast selector has no visible elements: ${selector}`);
+      const samples = elements.map((element) => {
+        const style = getComputedStyle(element);
+        const foreground = parseColor(style.color);
+        const background = parseColor(style.backgroundColor);
+        return { ratio: contrast(foreground, background), backgroundAlpha: background.a };
+      });
+      return {
+        selector,
+        minimumRatio: Math.min(...samples.map((sample) => sample.ratio)),
+        backgroundAlpha: Math.min(...samples.map((sample) => sample.backgroundAlpha)),
+      };
+    });
+
+    const geometry = (market) => {
+      const entries = [
+        ['party-pill', document.querySelector('[data-testid="party-pill"]')],
+        ['port-position', document.querySelector('.caribbean-port-position')],
+        ...[...document.querySelectorAll('.caribbean-port-status-rail dl > div')].map((element, index) => [`port-fact-${index}`, element]),
+        ['port-stage-title', document.querySelector('.caribbean-port-stage h1')],
+        ['port-bearing', document.querySelector('.caribbean-port-bearing')],
+        ['port-activity-heading', document.querySelector('.caribbean-port-activity h2')],
+        ...['governor', 'tavern', 'market', 'shipyard', 'shares', 'log', 'set-sail'].map((id) => [
+          `port-action-${id}`, document.querySelector(`[data-testid="port-action-${id}"]`),
+        ]),
+        ...(market
+          ? [
+            ['port-close-activity', document.querySelector('[data-testid="port-close-activity"]')],
+            ...marketActionIds.map((id) => [id, document.querySelector(`[data-testid="${id}"]`)]),
+          ]
+          : [['port-arrival', document.querySelector('.caribbean-port-arrival')]]),
+      ];
+      const leaves = entries.map(([id, element]) => {
+        if (!(element instanceof HTMLElement) || !visible(element)) throw new Error(`Geometry leaf is missing: ${id}`);
+        const value = rect(element);
+        return {
+          id,
+          contained: value.left >= 0 && value.top >= 0 && value.right <= innerWidth && value.bottom <= innerHeight,
+          horizontalOverflowPx: Math.max(0, element.scrollWidth - element.clientWidth),
+          verticalOverflowPx: Math.max(0, element.scrollHeight - element.clientHeight),
+        };
+      });
+      const interactive = entries.filter(([id]) => id === 'party-pill'
+        || id === 'port-close-activity'
+        || id.startsWith('port-action-')
+        || id.startsWith('market-'));
+      const overlapPairs = [];
+      for (let leftIndex = 0; leftIndex < interactive.length; leftIndex += 1) {
+        for (let rightIndex = leftIndex + 1; rightIndex < interactive.length; rightIndex += 1) {
+          const [leftId, leftElement] = interactive[leftIndex];
+          const [rightId, rightElement] = interactive[rightIndex];
+          if (leftElement.contains(rightElement) || rightElement.contains(leftElement)) continue;
+          const leftRect = rect(leftElement);
+          const rightRect = rect(rightElement);
+          if (Math.min(leftRect.right, rightRect.right) > Math.max(leftRect.left, rightRect.left)
+            && Math.min(leftRect.bottom, rightRect.bottom) > Math.max(leftRect.top, rightRect.top)) {
+            overlapPairs.push([leftId, rightId]);
+          }
+        }
+      }
+      return { leaves, overlapPairs };
+    };
+
+    return {
+      name: viewportSpec.name,
+      viewport: { width: innerWidth, height: innerHeight },
+      focal: {
+        xPercent: focalX,
+        yPercent: focalY,
+        roiVisibleRatio: subjectArea === 0 ? 0 : intersectionWidth * intersectionHeight / subjectArea,
+      },
+      naturalSize: { width: sourceWidth, height: sourceHeight },
+      contrasts,
+      menuGeometry: geometry(false),
+    };
+  }, { viewportSpec: spec, roi: subjectRoi, contrastSelectors: ART_CONTRAST_SELECTORS, marketActionIds: EXPECTED_MARKET_ACTION_IDS });
+}
+
+async function setupArtPage(page, baseUrl) {
+  await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Start career' }).click();
+  await page.getByTestId('caribbean-career-ready').waitFor();
+}
+
+async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, emitted, subjectRoi) {
+  const normalContext = await browser.newContext({
+    viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'en-US', timezoneId: 'UTC', reducedMotion: 'reduce',
+  });
+  await installBrowserBoundary(normalContext);
+  const normalPage = await normalContext.newPage();
+  const normalFailures = { console: [], page: [], requests: [], external: [], requestedPaths: [] };
+  recordFailures(normalPage, baseUrl, normalFailures);
+  const viewports = [];
+  try {
+    await setupArtPage(normalPage, baseUrl);
+    await normalPage.getByTestId('caribbean-port-backdrop').waitFor();
+    await normalPage.waitForFunction(() => document.querySelector('[data-testid="caribbean-port-backdrop"]')?.classList.contains('caribbean-port-backdrop--loaded'));
+    await normalPage.evaluate(async () => { await document.querySelector('[data-testid="caribbean-port-art"]').decode(); });
+    for (const spec of ART_VIEWPORT_SPECS) {
+      await normalPage.setViewportSize({ width: spec.width, height: spec.height });
+      await normalPage.getByRole('heading', { name: 'Choose your next port action', level: 2 }).waitFor();
+      const evidence = await readArtViewport(normalPage, spec, subjectRoi);
+      invariant(evidence.naturalSize.width === 1920 && evidence.naturalSize.height === 1080, 'Browser decoded the wrong art dimensions');
+      await capture(normalPage, screenshots, runDirectory, `port-art-${spec.name}.png`);
+      await normalPage.getByRole('button', { name: 'Market' }).click();
+      await normalPage.getByRole('heading', { name: 'Market', level: 2 }).waitFor();
+      evidence.marketGeometry = await normalPage.evaluate(async ({ marketActionIds }) => {
+        const visible = (element) => {
+          if (!(element instanceof HTMLElement)) return false;
+          const style = getComputedStyle(element);
+          const box = element.getBoundingClientRect();
+          return style.display !== 'none' && style.visibility !== 'hidden' && box.width > 0 && box.height > 0;
+        };
+        const baseEntries = [
+          ['party-pill', document.querySelector('[data-testid="party-pill"]')],
+          ['port-position', document.querySelector('.caribbean-port-position')],
+          ...[...document.querySelectorAll('.caribbean-port-status-rail dl > div')].map((element, index) => [`port-fact-${index}`, element]),
+          ['port-stage-title', document.querySelector('.caribbean-port-stage h1')],
+          ['port-bearing', document.querySelector('.caribbean-port-bearing')],
+          ['port-activity-heading', document.querySelector('.caribbean-port-activity h2')],
+          ...['governor', 'tavern', 'market', 'shipyard', 'shares', 'log', 'set-sail'].map((id) => [`port-action-${id}`, document.querySelector(`[data-testid="port-action-${id}"]`)]),
+          ['port-close-activity', document.querySelector('[data-testid="port-close-activity"]')],
+        ];
+        const measure = ([id, element]) => {
+          if (!(element instanceof HTMLElement) || !visible(element)) throw new Error(`Market geometry leaf is missing: ${id}`);
+          const box = element.getBoundingClientRect();
+          return {
+            id,
+            contained: box.left >= 0 && box.top >= 0 && box.right <= innerWidth && box.bottom <= innerHeight,
+            horizontalOverflowPx: Math.max(0, element.scrollWidth - element.clientWidth),
+            verticalOverflowPx: Math.max(0, element.scrollHeight - element.clientHeight),
+          };
+        };
+        const stage = document.querySelector('.caribbean-port-stage--market');
+        if (!(stage instanceof HTMLElement)) throw new Error('Market geometry stage is missing');
+        stage.scrollTop = 0;
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const leaves = baseEntries.map(measure);
+        const overlapKeys = new Set();
+        const interactiveSelector = '[data-testid="party-pill"], [data-testid="port-close-activity"], [data-testid^="port-action-"], [data-testid^="market-"]';
+        for (const actionId of marketActionIds) {
+          const action = document.querySelector(`[data-testid="${actionId}"]`);
+          if (!(action instanceof HTMLElement)) throw new Error(`Market geometry leaf is missing: ${actionId}`);
+          action.scrollIntoView({ block: 'center', inline: 'nearest' });
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          leaves.push(measure([actionId, action]));
+          const actionRect = action.getBoundingClientRect();
+          for (const candidate of [...document.querySelectorAll(interactiveSelector)].filter(visible)) {
+            if (candidate === action || action.contains(candidate) || candidate.contains(action)) continue;
+            const candidateRect = candidate.getBoundingClientRect();
+            if (Math.min(actionRect.right, candidateRect.right) > Math.max(actionRect.left, candidateRect.left)
+              && Math.min(actionRect.bottom, candidateRect.bottom) > Math.max(actionRect.top, candidateRect.top)) {
+              const pair = [actionId, candidate.getAttribute('data-testid')].sort();
+              overlapKeys.add(JSON.stringify(pair));
+            }
+          }
+        }
+        const fixedInteractive = baseEntries.filter(([id]) => id === 'party-pill'
+          || id === 'port-close-activity' || id.startsWith('port-action-'));
+        for (let leftIndex = 0; leftIndex < fixedInteractive.length; leftIndex += 1) {
+          for (let rightIndex = leftIndex + 1; rightIndex < fixedInteractive.length; rightIndex += 1) {
+            const [leftId, leftElement] = fixedInteractive[leftIndex];
+            const [rightId, rightElement] = fixedInteractive[rightIndex];
+            const left = leftElement.getBoundingClientRect();
+            const right = rightElement.getBoundingClientRect();
+            if (Math.min(left.right, right.right) > Math.max(left.left, right.left)
+              && Math.min(left.bottom, right.bottom) > Math.max(left.top, right.top)) {
+              overlapKeys.add(JSON.stringify([leftId, rightId].sort()));
+            }
+          }
+        }
+        return { leaves, overlapPairs: [...overlapKeys].map(JSON.parse).sort() };
+      }, { marketActionIds: EXPECTED_MARKET_ACTION_IDS });
+      viewports.push(evidence);
+      await normalPage.getByRole('button', { name: 'Back to harbour' }).click();
+    }
+    invariant(normalFailures.console.length === 0 && normalFailures.page.length === 0
+      && normalFailures.requests.length === 0 && normalFailures.external.length === 0,
+    `Normal art capture failures: ${JSON.stringify(normalFailures)}`);
+  } finally {
+    await normalContext.close();
+  }
+
+  const fallbackContext = await browser.newContext({
+    viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'en-US', timezoneId: 'UTC', reducedMotion: 'reduce',
+    serviceWorkers: 'block',
+  });
+  await installBrowserBoundary(fallbackContext);
+  const fallbackPage = await fallbackContext.newPage();
+  const failedUrl = `${baseUrl}${emitted.url}`;
+  const fallbackFailures = { console: [], page: [], requests: [], external: [], requestedPaths: [], allowlistedRequests: 0 };
+  recordFailures(fallbackPage, baseUrl, fallbackFailures, failedUrl);
+  await fallbackPage.route(failedUrl, (route) => route.abort('failed'));
+  try {
+    await setupArtPage(fallbackPage, baseUrl);
+    try {
+      await fallbackPage.waitForFunction(() => document.querySelector('[data-testid="caribbean-port-backdrop"]')?.classList.contains('caribbean-port-backdrop--fallback'), null, { timeout: 5_000 });
+    } catch (error) {
+      const diagnostic = await fallbackPage.evaluate(() => ({
+        className: document.querySelector('[data-testid="caribbean-port-backdrop"]')?.className ?? null,
+        artSrc: document.querySelector('[data-testid="caribbean-port-art"]')?.src ?? null,
+        artComplete: document.querySelector('[data-testid="caribbean-port-art"]')?.complete ?? null,
+        naturalWidth: document.querySelector('[data-testid="caribbean-port-art"]')?.naturalWidth ?? null,
+      }));
+      throw new Error(`Forced art failure did not reach fallback: ${JSON.stringify({ diagnostic, failures: fallbackFailures })}; ${error.message}`);
+    }
+    for (const spec of ART_VIEWPORT_SPECS) {
+      await fallbackPage.setViewportSize({ width: spec.width, height: spec.height });
+      await fallbackPage.getByRole('heading', { name: 'Choose your next port action', level: 2 }).waitFor();
+      invariant(await fallbackPage.getByRole('button', { name: 'Market' }).isEnabled(), `${spec.name} fallback lost port controls`);
+      await capture(fallbackPage, screenshots, runDirectory, `port-art-${spec.name}-fallback.png`);
+    }
+    invariant(fallbackFailures.allowlistedRequests === 1, `Expected one allowlisted art failure, found ${fallbackFailures.allowlistedRequests}`);
+    const expectedAbortConsole = fallbackFailures.console.filter((message) => message === 'Failed to load resource: net::ERR_FAILED');
+    invariant(expectedAbortConsole.length === 1, `Expected one console companion for the allowlisted abort, found ${expectedAbortConsole.length}`);
+    fallbackFailures.console = fallbackFailures.console.filter((message) => message !== 'Failed to load resource: net::ERR_FAILED');
+    invariant(fallbackFailures.console.length === 0 && fallbackFailures.page.length === 0
+      && fallbackFailures.requests.length === 0 && fallbackFailures.external.length === 0,
+    `Fallback art capture failures: ${JSON.stringify(fallbackFailures)}`);
+  } finally {
+    await fallbackContext.close();
+  }
+  return viewports;
 }
 
 async function readMarketGeometry(page, phase, actionTestId) {
@@ -659,7 +997,7 @@ async function readActiveEnvelope(page, key = CURRENT_SAVE_KEY) {
   return page.evaluate((storageKey) => localStorage.getItem(storageKey), key);
 }
 
-async function runJourney(browser, baseUrl, runDirectory) {
+async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetReport) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
@@ -836,6 +1174,9 @@ async function runJourney(browser, baseUrl, runDirectory) {
     );
     await page.getByTestId('booth-edit-profile').click();
     const playerProfileDesktop = await readPlayerProfileLayout(page, 'desktop', { width: 1440, height: 900 });
+    await page.evaluate(() => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    });
     await capture(page, screenshots, runDirectory, 'player-profile-desktop.png');
     await page.setViewportSize({ width: 960, height: 600 });
     const playerProfileNarrow = await readPlayerProfileLayout(page, 'narrow', { width: 960, height: 600 });
@@ -861,6 +1202,15 @@ async function runJourney(browser, baseUrl, runDirectory) {
     invariant(!failures.requestedPaths.some((requestPath) => requestPath.includes('preview-caribbean')), 'Production route requested preview-caribbean');
 
     const marketSamples = await runMarketProbe(browser, baseUrl);
+    console.log('Checking painted harbour art, focal crops, contrast, geometry, and fallback…');
+    const artViewports = await captureArtEvidence(
+      browser,
+      baseUrl,
+      runDirectory,
+      screenshots,
+      emittedArt,
+      assetReport.subjectRoi,
+    );
     const supportedLayouts = [
       layouts.setupDesktop, layouts.portDesktop, marketLayout, tavernLayout, logLayout,
       layouts.minimumSupported, recoveryLayout,
@@ -919,18 +1269,39 @@ async function runJourney(browser, baseUrl, runDirectory) {
       screenshots: SCREENSHOTS,
       determinism: { cleanRuns: 2, metricsByteIdentical: true, screenshotsByteIdentical: true },
       schemaVersion: 2,
-      packagePhase: 'market',
+      packagePhase: 'art',
       profile: {
         status: 'setup-verified',
         defaultPronouns: 'he/him',
         boothProfilePersisted: true,
         setup: setupIdentity,
       },
-      art: { status: 'not-yet-observed' },
+      art: {
+        status: 'verified',
+        asset: 'src/games/caribbean/assets/bridgetown-1675.webp',
+        emitted: emittedArt,
+        report: {
+          historicalReview: assetReport.historicalReview,
+          representationReview: assetReport.representationReview,
+          subjectRoi: assetReport.subjectRoi,
+        },
+        screenshots: {
+          normal: ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}.png`),
+          fallback: ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}-fallback.png`),
+        },
+        viewports: artViewports,
+      },
       market: { status: 'verified', samples: marketSamples },
     };
     const verdict = evaluatePortIdentityEvidence(metrics);
-    invariant(verdict.ok, `Caribbean port identity evidence failed: ${verdict.issues.join(' | ')}`);
+    const artDiagnostics = artViewports.map((viewport) => ({
+      name: viewport.name,
+      menuLeaves: viewport.menuGeometry.leaves.filter((leaf) => !leaf.contained || leaf.horizontalOverflowPx !== 0 || leaf.verticalOverflowPx !== 0),
+      menuOverlaps: viewport.menuGeometry.overlapPairs,
+      marketLeaves: viewport.marketGeometry.leaves.filter((leaf) => !leaf.contained || leaf.horizontalOverflowPx !== 0 || leaf.verticalOverflowPx !== 0),
+      marketOverlaps: viewport.marketGeometry.overlapPairs,
+    }));
+    invariant(verdict.ok, `Caribbean port identity evidence failed: ${verdict.issues.join(' | ')}; ${JSON.stringify(artDiagnostics)}`);
     return { metrics, screenshots };
   } finally {
     await context.close();
@@ -967,17 +1338,22 @@ function compareRuns(first, second) {
 export async function runPortCheck() {
   buildNormalProduction();
   assertNormalBuildIsolation();
+  const emittedArt = readEmittedArt();
+  const assetReport = JSON.parse(fs.readFileSync(path.join(
+    ROOT, 'docs/games/caribbean-career/bridgetown-asset-report.json',
+  ), 'utf8'));
   const { server, baseUrl } = await startStaticServer();
   let browser;
   const firstDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-run-a-'));
   const secondDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-run-b-'));
   try {
+    await verifyEmittedArtResponse(baseUrl, emittedArt);
     browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
     console.log('Running deterministic browser journey A…');
-    const first = await runJourney(browser, baseUrl, firstDirectory);
+    const first = await runJourney(browser, baseUrl, firstDirectory, emittedArt, assetReport);
     assertRequestedGraphIsolation(first.metrics);
     console.log('Running deterministic browser journey B…');
-    const second = await runJourney(browser, baseUrl, secondDirectory);
+    const second = await runJourney(browser, baseUrl, secondDirectory, emittedArt, assetReport);
     assertRequestedGraphIsolation(second.metrics);
     const metricsBytes = compareRuns(first, second);
     for (const filename of SCREENSHOTS) saveIfChanged(filename, first.screenshots.get(filename));

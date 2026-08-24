@@ -10,6 +10,7 @@ import { CaptainsLog } from '../log/CaptainsLog';
 import { DivideShares } from './DivideShares';
 import { GovernorHouse } from './GovernorHouse';
 import { Market } from './Market';
+import { PortBackdrop } from './PortBackdrop';
 import { PortMenu } from './PortMenu';
 import { ShipyardSummary } from './ShipyardSummary';
 import { Tavern } from './Tavern';
@@ -104,6 +105,7 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
       data-testid="caribbean-career-ready"
       aria-labelledby="caribbean-port-title"
     >
+      <PortBackdrop />
       <header className="caribbean-port-status-rail" role="region" aria-label="Voyage status">
         <p className="caribbean-port-position">
           <span>{BRIDGETOWN.name}</span>
@@ -118,7 +120,7 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
         </dl>
       </header>
 
-      <div className="caribbean-port-horizon" aria-hidden="true"><span /></div>
+      <div className="caribbean-port-horizon" aria-hidden="true" />
 
       <div className={`caribbean-port-stage${activeActivity === 'market' ? ' caribbean-port-stage--market' : ''}`}>
         <p className="caribbean-port-captain">Captain {state.captain.name}</p>

@@ -6,6 +6,8 @@
 }
 
 .caribbean-port {
+  --caribbean-port-art-focal-x: 58%;
+  --caribbean-port-art-focal-y: 50%;
   position: fixed;
   inset: 0;
   isolation: isolate;
@@ -27,6 +29,53 @@
   font-size: 16px;
 }
 
+.caribbean-port-backdrop {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 72% 18%, color-mix(in srgb, var(--caribbean-sailcloth) 45%, transparent), transparent 31%),
+    linear-gradient(180deg, var(--caribbean-trade-wind), var(--caribbean-harbor-glass) 58%, var(--caribbean-deep-keel));
+}
+
+.caribbean-port-backdrop img {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--caribbean-port-art-focal-x) var(--caribbean-port-art-focal-y);
+  opacity: 0;
+}
+
+.caribbean-port-backdrop--loaded img {
+  opacity: 1;
+}
+
+.caribbean-port-backdrop--fallback img {
+  display: none;
+}
+
+.caribbean-port-backdrop--loaded::before,
+.caribbean-port-backdrop--loaded::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+}
+
+.caribbean-port-backdrop--loaded::before {
+  background: rgba(7, 21, 29, .22);
+}
+
+.caribbean-port-backdrop--loaded::after {
+  background: rgba(244, 224, 184, .04);
+}
+
 .caribbean-port-status-rail {
   position: relative;
   z-index: 4;
@@ -35,8 +84,7 @@
   grid-template-columns: clamp(244px, 20vw, 288px) minmax(0, 1fr);
   align-items: stretch;
   border-bottom: 1px solid color-mix(in srgb, var(--caribbean-brass) 58%, transparent);
-  background: color-mix(in srgb, var(--caribbean-deep-keel) 88%, transparent);
-  backdrop-filter: blur(12px);
+  background: #07151d;
 }
 
 .caribbean-port-position {
@@ -95,6 +143,7 @@
 
 .caribbean-port-status-rail dt {
   overflow: hidden;
+  background: #07151d;
   color: color-mix(in srgb, var(--caribbean-sailcloth) 55%, var(--caribbean-trade-wind));
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -103,17 +152,18 @@
 .caribbean-port-status-rail dd {
   margin: 0;
   overflow: hidden;
+  background: #07151d;
   color: var(--caribbean-sailcloth);
   font-size: 14px;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .caribbean-port-horizon {
   position: absolute;
-  z-index: -1;
+  z-index: 1;
   inset: 70px 0 88px;
   overflow: hidden;
   pointer-events: none;
@@ -129,28 +179,6 @@
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--caribbean-brass) 78%, transparent) 9% 91%, transparent);
 }
 
-.caribbean-port-horizon::after {
-  content: "";
-  position: absolute;
-  top: 49%;
-  left: 0;
-  right: 0;
-  height: 72px;
-  opacity: .72;
-  background:
-    linear-gradient(166deg, transparent 0 42%, color-mix(in srgb, var(--caribbean-deep-keel) 66%, transparent) 42% 100%),
-    linear-gradient(90deg, transparent 0 6%, var(--caribbean-harbor-glass) 6% 9%, transparent 9% 15%, var(--caribbean-harbor-glass) 15% 21%, transparent 21% 73%, var(--caribbean-harbor-glass) 73% 80%, transparent 80% 87%, var(--caribbean-harbor-glass) 87% 94%, transparent 94%);
-}
-
-.caribbean-port-horizon span {
-  position: absolute;
-  top: calc(49% - 7px);
-  left: 4vw;
-  right: 4vw;
-  height: 15px;
-  background: repeating-linear-gradient(90deg, transparent 0 calc(14.285% - 1px), color-mix(in srgb, var(--caribbean-brass) 75%, transparent) calc(14.285% - 1px) 14.285%);
-}
-
 .caribbean-port-stage {
   position: relative;
   z-index: 2;
@@ -160,21 +188,28 @@
   justify-self: center;
   padding: 22px clamp(28px, 5vw, 72px) 26px;
   border-left: 2px solid var(--caribbean-brass);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--caribbean-deep-keel) 88%, transparent), color-mix(in srgb, var(--caribbean-harbor-glass) 60%, transparent) 70%, transparent);
+  background: transparent;
 }
 
 .caribbean-port-captain {
+  width: fit-content;
   margin: 0 0 8px;
+  padding: 4px 7px;
+  background: #07151d;
   color: var(--caribbean-trade-wind);
 }
 
 .caribbean-port-stage h1 {
+  width: fit-content;
+  min-block-size: 1.4em;
   margin: 0;
+  padding: 3px 10px 6px;
+  background: #07151d;
   font-family: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
   font-size: clamp(48px, 7vw, 82px);
   font-weight: 570;
   letter-spacing: -.025em;
-  line-height: .9;
+  line-height: 1.15;
   text-transform: uppercase;
 }
 
@@ -186,17 +221,23 @@
 }
 
 .caribbean-port-bearing {
+  width: fit-content;
   margin: 0 0 8px;
+  padding: 4px 7px;
+  background: #07151d;
 }
 
 .caribbean-port-activity h2 {
+  width: fit-content;
   margin: 0 0 12px;
+  padding: 5px 9px;
+  background: #07151d;
   color: var(--caribbean-sailcloth);
   font-family: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
   font-size: clamp(27px, 3.2vw, 39px);
   font-weight: 650;
   letter-spacing: .01em;
-  line-height: 1;
+  line-height: 1.1;
   text-transform: uppercase;
 }
 
@@ -214,13 +255,18 @@
 }
 
 .caribbean-port-arrival {
+  width: fit-content;
   max-width: 630px;
   margin: 0;
+  padding: 8px 10px;
+  background: #07151d;
 }
 
 .caribbean-port-stub > p {
   max-width: 650px;
   margin: 8px 0 0;
+  padding: 6px 9px;
+  background: #07151d;
 }
 
 .caribbean-port-stub .caribbean-port-lede {
@@ -238,6 +284,7 @@
   grid-template-columns: 118px 1fr;
   gap: 16px;
   padding: 8px 0;
+  background: #07151d;
   border-bottom: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 14%, transparent);
 }
 
@@ -273,7 +320,7 @@
   margin-top: 16px;
   padding: 0 16px;
   border-color: color-mix(in srgb, var(--caribbean-trade-wind) 55%, transparent);
-  background: color-mix(in srgb, var(--caribbean-deep-keel) 62%, transparent);
+  background: #07151d;
 }
 
 .caribbean-port-menu {
@@ -281,7 +328,7 @@
   z-index: 4;
   align-self: end;
   padding: 0 clamp(10px, 2vw, 30px) max(8px, env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--caribbean-deep-keel) 92%, transparent) 24%);
+  background: linear-gradient(180deg, transparent, rgba(7, 21, 29, .92) 24%);
 }
 
 .caribbean-port-actions {
@@ -319,7 +366,7 @@
   padding: 7px 8px;
   border: 0;
   border-top: 2px solid transparent;
-  background: color-mix(in srgb, var(--caribbean-deep-keel) 76%, transparent);
+  background: #07151d;
   color: var(--caribbean-sailcloth);
   font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
@@ -349,6 +396,7 @@
   display: block;
   min-height: 34px;
   padding: 4px 5px 0;
+  background: #07151d;
   color: color-mix(in srgb, var(--caribbean-sailcloth) 66%, var(--caribbean-deep-keel));
   font-size: 14px;
   line-height: 1.15;
@@ -375,7 +423,7 @@
   gap: 16px;
   padding: 18px 20px;
   border-inline-start: 2px solid var(--caribbean-brass);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--caribbean-deep-keel) 70%, transparent), transparent);
+  background: #07151d;
 }
 
 .caribbean-tavern-rumour blockquote {
@@ -408,6 +456,8 @@
 
 .caribbean-log-empty {
   margin: 0;
+  padding: 8px 10px;
+  background: #07151d;
   color: color-mix(in srgb, var(--caribbean-sailcloth) 76%, var(--caribbean-trade-wind));
   font-size: 16px;
   line-height: 1.5;
@@ -415,6 +465,7 @@
 
 .caribbean-captains-log {
   border-block: 1px solid color-mix(in srgb, var(--caribbean-brass) 46%, transparent);
+  background: #07151d;
 }
 
 .caribbean-captains-log header {
@@ -517,7 +568,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border-block: 1px solid color-mix(in srgb, var(--caribbean-brass) 46%, transparent);
-  background: color-mix(in srgb, var(--caribbean-deep-keel) 54%, transparent);
+  background: #07151d;
 }
 
 .caribbean-market-summary > div {
@@ -592,6 +643,7 @@
   align-items: center;
   gap: 12px;
   padding: 5px 0;
+  background: #07151d;
   border-bottom: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 17%, transparent);
 }
 
@@ -662,7 +714,7 @@
 .caribbean-port .caribbean-market-action {
   padding: 0 6px;
   border: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 38%, transparent);
-  background: color-mix(in srgb, var(--caribbean-deep-keel) 66%, transparent);
+  background: #07151d;
   color: var(--caribbean-sailcloth);
   font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
@@ -708,6 +760,27 @@ body:has(.caribbean-port) .party-root {
   left: max(12px, env(safe-area-inset-left));
   bottom: calc(110px + env(safe-area-inset-bottom));
   transform: none;
+}
+
+@media (width <= 1180px) {
+  .caribbean-port {
+    --caribbean-port-art-focal-x: 56%;
+    --caribbean-port-art-focal-y: 50%;
+  }
+}
+
+@media (width <= 1024px) {
+  .caribbean-port {
+    --caribbean-port-art-focal-x: 54%;
+    --caribbean-port-art-focal-y: 50%;
+  }
+}
+
+@media (width <= 960px) {
+  .caribbean-port {
+    --caribbean-port-art-focal-x: 52%;
+    --caribbean-port-art-focal-y: 50%;
+  }
 }
 
 @media (max-height: 700px) {
@@ -785,9 +858,12 @@ body:has(.caribbean-port) .party-root {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .caribbean-port-horizon::before,
-  .caribbean-port-horizon span {
+  .caribbean-port-horizon::before {
     animation: caribbean-port-course-in 700ms cubic-bezier(.2, .8, .2, 1) both;
+  }
+
+  .caribbean-port-backdrop img {
+    transition: opacity 240ms ease-out;
   }
 
   .caribbean-port-action,

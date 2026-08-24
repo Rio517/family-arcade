@@ -41,6 +41,38 @@ export const EXPECTED_MARKET_ACTION_IDS = Object.freeze(EVIDENCE_CARGO_IDS.flatM
   'buy-1', 'buy-5', 'buy-max', 'sell-1', 'sell-5', 'sell-all',
 ].map((action) => `market-${cargoId}-${action}`)).sort());
 
+export const ART_VIEWPORT_SPECS = Object.freeze([
+  Object.freeze({ name: 'desktop', width: 1440, height: 900, focalX: 58, focalY: 50 }),
+  Object.freeze({ name: 'wide', width: 1180, height: 820, focalX: 56, focalY: 50 }),
+  Object.freeze({ name: 'tablet', width: 1024, height: 768, focalX: 54, focalY: 50 }),
+  Object.freeze({ name: 'minimum', width: 960, height: 600, focalX: 52, focalY: 50 }),
+]);
+
+export const ART_CONTRAST_SELECTORS = Object.freeze([
+  '.caribbean-port-status-rail dt',
+  '.caribbean-port-status-rail dd',
+  '.caribbean-port-captain',
+  '.caribbean-port-stage h1',
+  '.caribbean-port-bearing',
+  '.caribbean-port-activity h2',
+  '.caribbean-port-arrival',
+  '.caribbean-port-action',
+  '.caribbean-port-action-reason',
+]);
+
+const ART_MENU_GEOMETRY_IDS = Object.freeze([
+  'party-pill', 'port-position', 'port-fact-0', 'port-fact-1', 'port-fact-2', 'port-fact-3', 'port-fact-4',
+  'port-stage-title', 'port-bearing', 'port-activity-heading',
+  'port-action-governor', 'port-action-tavern', 'port-action-market', 'port-action-shipyard',
+  'port-action-shares', 'port-action-log', 'port-action-set-sail', 'port-arrival',
+].sort());
+
+const ART_MARKET_GEOMETRY_IDS = Object.freeze([
+  ...ART_MENU_GEOMETRY_IDS.filter((id) => id !== 'port-arrival'),
+  ...EXPECTED_MARKET_ACTION_IDS,
+  'port-close-activity',
+].sort());
+
 const MARKET_PHASES = ['before', 'pending', 'resolved'];
 const MARKET_STATUS = {
   before: '',
@@ -211,6 +243,93 @@ function validateBoothViewport(issues, value, name, width, height) {
   }
 }
 
+function validSubjectRoi(value) {
+  return Array.isArray(value)
+    && value.length === 4
+    && value.every((entry) => Number.isFinite(entry) && entry >= 0 && entry <= 1)
+    && value[2] > 0
+    && value[3] > 0
+    && value[0] + value[2] <= 1
+    && value[1] + value[3] <= 1;
+}
+
+function validateArtGeometry(issues, geometry, viewportName, state, expectedIds) {
+  if (!isRecord(geometry) || !Array.isArray(geometry.leaves)
+    || !sameMembers(geometry.leaves.map((leaf) => leaf?.id), expectedIds)
+    || geometry.leaves.some((leaf) => !isRecord(leaf)
+      || leaf.contained !== true
+      || leaf.horizontalOverflowPx !== 0
+      || leaf.verticalOverflowPx !== 0)) {
+    issues.push(`art ${viewportName} ${state} geometry clips or escapes the viewport`);
+  }
+  if (!isRecord(geometry) || !Array.isArray(geometry.overlapPairs) || geometry.overlapPairs.length !== 0) {
+    issues.push(`art ${viewportName} ${state} interactive rectangles overlap`);
+  }
+}
+
+function validateArtEvidence(issues, art) {
+  if (!isRecord(art) || art.status !== 'verified') {
+    issues.push('art evidence must be verified');
+    return;
+  }
+  if (art.asset !== 'src/games/caribbean/assets/bridgetown-1675.webp') {
+    issues.push('art evidence names the wrong production asset');
+  }
+  if (!isRecord(art.emitted)
+    || typeof art.emitted.url !== 'string'
+    || !/^\/assets\/bridgetown-1675-[^/]+\.webp$/.test(art.emitted.url)
+    || art.emitted.contentType !== 'image/webp') {
+    issues.push('art emitted WebP evidence is malformed');
+  } else if (art.emitted.precached !== true) {
+    issues.push('art emitted WebP must be precached');
+  }
+  if (!isRecord(art.report)
+    || art.report.historicalReview !== 'pass'
+    || art.report.representationReview !== 'pass') {
+    issues.push('art historical and representation reviews must pass');
+  }
+  if (!validSubjectRoi(art.report?.subjectRoi)) issues.push('art subject ROI is missing or malformed');
+
+  const expectedScreenshots = ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}.png`);
+  const expectedFallbacks = ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}-fallback.png`);
+  if (!isRecord(art.screenshots)
+    || !sameMembers(art.screenshots.normal, expectedScreenshots)
+    || !sameMembers(art.screenshots.fallback, expectedFallbacks)) {
+    issues.push('art screenshots must cover normal and fallback at every supported viewport');
+  }
+
+  if (!Array.isArray(art.viewports)
+    || !sameMembers(art.viewports.map((viewport) => viewport?.name), ART_VIEWPORT_SPECS.map(({ name }) => name))) {
+    issues.push('art viewport evidence must cover the exact supported set');
+    return;
+  }
+  for (const spec of ART_VIEWPORT_SPECS) {
+    const viewport = art.viewports.find((candidate) => candidate?.name === spec.name);
+    if (!isRecord(viewport)
+      || !isRecord(viewport.viewport)
+      || viewport.viewport.width !== spec.width
+      || viewport.viewport.height !== spec.height
+      || !isRecord(viewport.focal)
+      || viewport.focal.xPercent !== spec.focalX
+      || viewport.focal.yPercent !== spec.focalY
+      || !Number.isFinite(viewport.focal.roiVisibleRatio)
+      || viewport.focal.roiVisibleRatio < 0.7
+      || viewport.focal.roiVisibleRatio > 1) {
+      issues.push(`art ${spec.name} focal evidence is wrong or hides the subject`);
+    }
+    if (!Array.isArray(viewport?.contrasts)
+      || !sameMembers(viewport.contrasts.map((sample) => sample?.selector), ART_CONTRAST_SELECTORS)
+      || viewport.contrasts.some((sample) => !isRecord(sample)
+        || !Number.isFinite(sample.minimumRatio)
+        || sample.minimumRatio < 4.5
+        || sample.backgroundAlpha !== 1)) {
+      issues.push(`art ${spec.name} contrast must be opaque and at least 4.5:1`);
+    }
+    validateArtGeometry(issues, viewport?.menuGeometry, spec.name, 'menu', ART_MENU_GEOMETRY_IDS);
+    validateArtGeometry(issues, viewport?.marketGeometry, spec.name, 'market', ART_MARKET_GEOMETRY_IDS);
+  }
+}
+
 /**
  * The staged evidence boundary is deliberately import-safe: the browser check
  * owns collection, while this pure evaluator makes a phase claim fail closed.
@@ -223,7 +342,7 @@ export function evaluatePortIdentityEvidence(evidence) {
     if (!(section in evidence)) issues.push(`retained v1 section ${section} is missing`);
   }
   if (evidence.schemaVersion !== 2) issues.push('schemaVersion must be 2');
-  if (evidence.packagePhase !== 'market') issues.push('packagePhase must be market');
+  if (evidence.packagePhase !== 'art') issues.push('packagePhase must be art');
 
   const profile = evidence.profile;
   if (!isRecord(profile)) {
@@ -268,9 +387,7 @@ export function evaluatePortIdentityEvidence(evidence) {
     validateBoothViewport(issues, boothProfile.narrow, 'narrow', 960, 600);
   }
 
-  if (!isRecord(evidence.art) || Object.keys(evidence.art).length !== 1 || evidence.art.status !== 'not-yet-observed') {
-    issues.push('art must remain not-yet-observed during market phase');
-  }
+  validateArtEvidence(issues, evidence.art);
   if (!isRecord(evidence.market) || evidence.market.status !== 'verified' || !Array.isArray(evidence.market.samples)
     || Object.keys(evidence.market).length !== 2) {
     issues.push('market evidence must contain verified samples');
