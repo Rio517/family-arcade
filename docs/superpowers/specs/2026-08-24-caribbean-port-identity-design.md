@@ -77,6 +77,9 @@ Add `pronouns: string` to the game-neutral `Profile` contract.
 - `normalizeProfile()` returns a trimmed valid stored value or `he/him` for old,
   missing, malformed, blank, or overlong values.
 - Pronouns remain free text with a maximum of 24 Unicode code points.
+- Both profile editors count Unicode code points rather than UTF-16 units, so
+  24 astral characters are accepted and a 25th is rejected with a visible,
+  programmatically associated error. Native `maxLength` is not the contract.
 - Add a pure `setPronouns(profile, value)` transition. A blank edit restores the
   default `he/him`; it does not create an empty persisted identity.
 - Keep the existing users storage key. This is an additive, normalizer-owned
@@ -106,6 +109,11 @@ snapshot into `CampaignSetup`.
 - Pronouns initially equal the site-wide profile pronouns.
 - The setup labels them as shared player pronouns and saves edits back to the
   player profile when the commission is submitted.
+- Submission computes `normalizePronouns(draftPronouns)` exactly once and passes
+  that same value to both profile persistence and campaign creation. Blank,
+  whitespace-only, malformed, or overlong programmatic input therefore creates
+  neither a split identity nor an exception. The captain snapshot is likewise
+  `draftName.trim() || 'Captain'`.
 - The resulting campaign copies the chosen name and pronouns into its journal.
   Later profile changes never rewrite an existing campaign.
 
@@ -113,7 +121,10 @@ snapshot into `CampaignSetup`.
 
 ### Asset
 
-Create one original production-owned raster illustration with ImageGen:
+Create one original production-owned raster illustration with ImageGen. Before
+generation, write a cited visual-reference note from museum/archive sources for
+period vessels, waterfront warehouses, and Bridgetown fortifications. The art
+review must cover both historical plausibility and representation:
 
 - Bridgetown harbour, Barbados, circa 1675;
 - view from or just above the waterfront;
@@ -123,13 +134,19 @@ Create one original production-owned raster illustration with ImageGen:
 - painterly historical-adventure illustration with believable materials;
 - no readable text, flags with modern symbols, fantasy architecture, neon,
   steampunk machinery, or cinematic skull imagery;
+- no foreground or identifiable people, caricatures, or anonymous enslaved
+  labour used as scenery; distant unidentifiable harbour silhouettes are the
+  maximum human presence;
 - landscape composition with the primary town/ship detail right of centre and
   quieter water/sky behind the left-side content region.
 
 Promote a visually inspected, optimized local WebP into
-`src/games/caribbean/assets/`. Record source prompt, generated-source identity,
-dimensions, byte size, SHA-256, optimization command, and production status in
-the Caribbean asset ledger. No remote runtime dependency is allowed.
+`src/games/caribbean/assets/`. Record every generation/edit prompt,
+generated-source identity/output hint, dimensions, byte size, SHA-256,
+deterministic centre-crop command and tool version, historical review,
+representation review, and production status in the Caribbean asset ledger.
+Reject and regenerate until those reviews pass; no arbitrary one-edit limit
+applies. No remote runtime dependency is allowed.
 
 ### Port composition
 
@@ -169,11 +186,22 @@ actions are available.
 
 - Keep quote legality derived from the current canonical state.
 - Do not replace every row's reason text with `Trade is being saved` while busy.
-- Expose one persistent Market-level polite status line for saving/completion.
+- Expose one persistent Market-level polite status line and stable
+  `aria-busy` container with exact states: idle is empty; saving announces
+  `Saving trade.`; success announces `Cargo ledger updated.`; failure announces
+  `Trade was not saved.`.
 - Keep action-specific disabled explanations available to assistive technology.
 - Keep a stable, always-mounted visual reason slot per row with a bounded
   two-line geometry.
-- Preserve focus on the activated control when the state updates.
+- Preserve focus on the activated control when the state updates. Because a
+  native-disabled button loses focus in Chromium, the activated action uses a
+  managed retained-focus state: it remains a real button with `aria-disabled`
+  and synchronous pointer/keyboard guards through pending and resolved states;
+  unrelated illegal actions may remain natively disabled. Once focus leaves,
+  the retained action can return to ordinary native-disabled semantics.
+- The controller reports a closed presentation outcome (`applied` or
+  `not-applied`) so the Market never claims success for consent, conflict,
+  unavailable storage, or a rejected save. This does not alter domain events.
 
 ### Layout
 
@@ -186,11 +214,15 @@ actions are available.
 ### Acceptance measurement
 
 A real-browser stability probe uses a separate clean campaign from the canonical
-two-event evidence journey. For every Market action that can be made legal, it
-captures the Market stage, all six row rectangles, action-strip rectangles,
-scroll offsets, and focused element before click, during the pending save, and
-after resolution. Maximum geometry drift is 1 CSS pixel; horizontal scroll is
-zero and focus remains on the activated action.
+two-event evidence journey. It drives all 36 goods/actions (six goods times Buy
+1, Buy 5, Max, Sell 1, Sell 5, Sell all) through legal real UI sequences. For
+each it captures the Market stage, all six row rectangles, action-strip
+rectangles, `clientWidth`, `scrollWidth`, scroll offsets, status, and focused
+element before click, during the pending save, and after resolution. Maximum
+geometry drift is 1 CSS pixel; computed horizontal overflow
+`max(0, scrollWidth - clientWidth)` is zero for the stage and relevant
+containers; focus remains on the activated action even when Max or Sell all
+becomes illegal after resolution.
 
 ## Architecture and Data Flow
 
@@ -216,7 +248,8 @@ profile hook but the shared profile layer never imports Caribbean code.
 
 - Malformed legacy pronouns normalize to `he/him` without preventing sign-in.
 - Profile persistence failure retains the existing safe storage behavior; it
-  must not block campaign creation.
+  must not create a profile/campaign pronoun mismatch or block campaign
+  creation with the already-normalized value.
 - A blank/invalid profile name keeps existing validation behavior.
 - Existing campaigns and saves are byte-compatible because campaign state and
   event schemas do not change.
@@ -236,7 +269,8 @@ profile hook but the shared profile layer never imports Caribbean code.
   image crop through the local scrim.
 - Market busy state uses `aria-busy`; one persistent polite live region
   announces save state without replacing the node.
-- Disabled action explanations remain programmatically associated.
+- Disabled action explanations remain programmatically associated; retained
+  `aria-disabled` actions are guarded for pointer and keyboard activation.
 - Reduced-motion mode has no image pan/zoom or entrance animation.
 - Keyboard order, Escape behavior, modal inertness, and restored focus from the
   approved package remain unchanged.
@@ -247,6 +281,9 @@ profile hook but the shared profile layer never imports Caribbean code.
 
 - Old profile JSON without pronouns normalizes to `he/him`.
 - Blank/malformed/overlong pronouns normalize safely.
+- The shared profile/setup input boundary accepts exactly 24 Unicode code
+  points (including astral characters), rejects 25, and never relies on native
+  UTF-16 `maxLength` behavior.
 - Switching site-wide users switches pronouns.
 - Editing profile pronouns persists and updates subscribers.
 - Campaign setup prefills active profile name/pronouns.
@@ -260,19 +297,27 @@ profile hook but the shared profile layer never imports Caribbean code.
 
 - Unit tests preserve exact quotes/events and busy duplicate suppression.
 - Component tests keep the status/live-region nodes persistent.
-- Browser geometry tests cover buy, sell, Sell all, and Max paths with pending
-  and resolved saves.
-- A mutation that restores per-row busy reasons or removes stable scrollbar
-  geometry fails the browser evaluator.
+- Browser geometry tests cover the exact set of 36 action IDs and all 108
+  before/pending/resolved samples.
+- Pending, applied, and not-applied paths preserve the status-node identity,
+  `aria-busy`, reason associations, and activated focus.
+- A static CSS contract mutation catches removal of `scrollbar-gutter: stable`;
+  browser evidence independently catches real geometry or overflow drift.
 
 ### Art and visual review
 
 - Production bundle emits the local optimized image and requests no remote URL.
-- Asset hash/bytes/dimensions match the ledger.
+- Asset hash/bytes/dimensions, generation identity, prompts, preparation command
+  and tool version match the ledger; a cited visual-reference document and
+  explicit historical/representation reviews are present.
 - Normal port, each activity, Market, setup, recovery, exact `960x600`, and
   image-failure fallback are inspected at original resolution.
 - Browser evidence records text contrast samples, no clipping/overlap, target
   size, font size, overflow, image load, focal visibility, and Market drift.
+- Evidence uses a versioned additive schema: every existing browser, route,
+  build, viewport, fixture, Web Locks, journey, accessibility, request,
+  failure, isolation, recovery, screenshot, and determinism channel remains
+  fail-closed, with new profile-identity, art, and Market-stability sections.
 - Human and physical-device evidence remains explicitly unobserved unless a
   human performs it.
 
