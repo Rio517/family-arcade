@@ -125,7 +125,7 @@ describe('<CaribbeanPage>', () => {
       }],
       activeId: 'mario',
     });
-    render(<CaribbeanPage runtime={runtime(store)} />);
+    const { unmount } = render(<CaribbeanPage runtime={runtime(store)} />);
 
     expect(screen.getByLabelText('Captain name')).toHaveValue('Mario');
     expect(screen.getByLabelText('Player pronouns')).toHaveValue('he/him');
@@ -141,6 +141,7 @@ describe('<CaribbeanPage>', () => {
       journal: { state: { captain: { name: 'Red Morgan', pronouns: 'they/them' } } },
     });
     expect(getUsersSnapshot().users[0]?.profile).toMatchObject({ name: 'Mario', pronouns: 'they/them' });
+    unmount();
   });
 
   it('keeps the controller-owning child outside the tree on unsupported screens', () => {

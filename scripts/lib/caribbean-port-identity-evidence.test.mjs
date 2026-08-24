@@ -31,6 +31,68 @@ const VIEWPORTS = {
   largePortrait: [1024, 1366, false],
 };
 
+const BOOTH_CONTROLS = [
+  'booth-switch', 'booth-edit-profile', 'booth-new', 'booth-profile-name',
+  'booth-profile-pronouns', 'booth-profile-save',
+];
+
+function boothViewport(width, height) {
+  return {
+    viewport: { width, height }, pageHorizontalOverflowPx: 0, boothHorizontalOverflowPx: 0,
+    pageContained: true, boothContained: true, labels: ['Name', 'Pronouns'],
+    visibleText: [{ text: 'Pronouns', fontPx: 14 }],
+    controls: BOOTH_CONTROLS.map((testId) => ({ testId, width: 44, height: 44 })),
+    focusChecks: BOOTH_CONTROLS.map((testId) => ({ testId, focused: true, visible: true })),
+  };
+}
+
+function rawArtEvidence() {
+  const artViewports = [
+    ['desktop', 1440, 900, 58], ['wide', 1180, 820, 56],
+    ['tablet', 1024, 768, 54], ['minimum', 960, 600, 52],
+  ];
+  const selectors = [
+    '.caribbean-port-status-rail dt', '.caribbean-port-status-rail dd', '.caribbean-port-captain',
+    '.caribbean-port-stage h1', '.caribbean-port-bearing', '.caribbean-port-activity h2',
+    '.caribbean-port-arrival', '.caribbean-port-action', '.caribbean-port-action-reason',
+  ];
+  const activity = [
+    ['.caribbean-market-status:not(:empty)', 'Cargo ledger updated.'],
+    ['.caribbean-tavern-rumour blockquote', 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.'],
+    ['.caribbean-log-action-label', 'NEXT ACTION'],
+    ['.caribbean-log-action-copy', 'Sail east of Bridgetown and identify the Red Jackdaw.'],
+  ];
+  const geometry = (market) => ({
+    leaves: [
+      'party-pill', 'port-position', ...Array.from({ length: 5 }, (_, index) => `port-fact-${index}`),
+      'port-stage-title', 'port-bearing', 'port-activity-heading',
+      ...['governor', 'tavern', 'market', 'shipyard', 'shares', 'log', 'set-sail'].map((id) => `port-action-${id}`),
+      ...(market ? ['port-close-activity', ...EXPECTED_MARKET_ACTION_IDS] : ['port-arrival']),
+    ].map((id) => ({ id, contained: true, horizontalOverflowPx: 0, verticalOverflowPx: 0 })),
+    overlapPairs: [],
+  });
+  return {
+    status: 'verified', asset: 'src/games/caribbean/assets/bridgetown-1675.webp',
+    emitted: { url: '/assets/bridgetown-1675-hash.webp', contentType: 'image/webp', precached: true },
+    report: {
+      historicalReview: 'pass', representationReview: 'pass', subjectRoi: [0.37, 0.24, 0.58, 0.71],
+      sha256: '0c1c99213d2903fb84a027a6f64508548c631b8fdefc6e41031e7954854ec67d',
+    },
+    screenshots: {
+      normal: artViewports.map(([name]) => `port-art-${name}.png`),
+      fallback: artViewports.map(([name]) => `port-art-${name}-fallback.png`),
+    },
+    viewports: artViewports.map(([name, width, height, focalX]) => ({
+      name, viewport: { width, height }, naturalSize: { width: 1920, height: 1080 },
+      focal: { xPercent: focalX, yPercent: 50, roiVisibleRatio: 0.8 },
+      contrasts: selectors.map((selector) => ({ selector, minimumRatio: 7, backgroundAlpha: 1 })),
+      activityContrasts: activity.map(([selector, text]) => ({ selector, text, minimumRatio: 7, backgroundAlpha: 1 })),
+      fixtureState: { gold: '500 gold', provisions: '3.4 months' },
+      menuGeometry: geometry(false), marketGeometry: geometry(true),
+    })),
+  };
+}
+
 function viewport(name, [width, height, expectedSupported]) {
   const profile = name === 'profileDesktop';
   return {
@@ -93,15 +155,34 @@ function completeEvidence(overrides = {}) {
     },
     webLocks: { realNavigatorLocks: true, calls: Array.from({ length: 5 }, () => ({ name: 'caribbean:campaign:writer', mode: 'exclusive' })) },
     journey: { finalEventCount: 2, eventTypes: ['market-traded', 'lead-accepted'], saveChecksum: 'ba05d9f4', replayVerified: true },
-    accessibility: { minimumMeasuredFontPx: 14, minimumMeasuredTargetWidthPx: 44, minimumMeasuredTargetHeightPx: 44, horizontalOverflowPx: 0 },
+    accessibility: {
+      minimumMeasuredFontPx: 14, minimumMeasuredTargetWidthPx: 44, minimumMeasuredTargetHeightPx: 44, horizontalOverflowPx: 0,
+      boothProfile: { desktop: boothViewport(1440, 900), narrow: boothViewport(960, 600) },
+    },
     requests: { externalCount: 0, failedCount: 0, requestedPaths: ['/'] },
     failures: { console: [], page: [], requests: [], external: [] },
     isolation: { previewHtmlAbsent: true, caribbeanGlbAbsent: true, glbRequested: false, previewResourceRequested: false, moduleMarkersAbsent: true, battleCssAbsent: true },
     recovery: { quarantineKey: 'caribbean:campaign:quarantine:00000000-0000-4000-8000-000000000001', quarantineVerified: true, exportedCorruptRawVerified: true, recoveredChecksum: '9d36f629', recoveryReloaded: true },
     screenshots: SCREENSHOTS,
     determinism: { cleanRuns: 2, metricsByteIdentical: true, screenshotsByteIdentical: true },
+    profile: {
+      status: 'setup-verified', defaultPronouns: 'he/him', boothProfilePersisted: true,
+      setup: {
+        prefill: { captainName: 'Mario', pronouns: 'he/him' },
+        sharedPronounSnapshot: { profile: 'they/them', campaign: 'they/them' },
+        careerLengthControlPresent: false,
+        accessibility: { minimumFontPx: 14, minimumTargetHeightPx: 44, horizontalOverflowPx: 0 },
+      },
+    },
     profileIdentity: { status: 'verified', defaultPronouns: 'he/him', setupNamePrefilled: true, setupPronounsPrefilled: true, campaignSnapshotPreserved: true, careerLengthControlAbsent: true, newCampaignLength: 'adventure' },
-    art: { status: 'verified', loaded: true, localRequest: true, naturalWidth: 1920, naturalHeight: 1080, fallbackVerified: true, precached: true, historicalReview: 'pass', representationReview: 'pass', focalVisibleAt: ['1440x900', '1180x820', '1024x768', '960x600'], minimumSubjectRoiVisibleFraction: 0.7, minimumTextContrast: 4.5, overlapCount: 0, clippingCount: 0, sha256: '0c1c99213d2903fb84a027a6f64508548c631b8fdefc6e41031e7954854ec67d' },
+    art: {
+      ...rawArtEvidence(), loaded: true, localRequest: true, naturalWidth: 1920, naturalHeight: 1080,
+      fallbackVerified: true, precached: true, historicalReview: 'pass', representationReview: 'pass',
+      focalVisibleAt: ['1440x900', '1180x820', '1024x768', '960x600'],
+      minimumSubjectRoiVisibleFraction: 0.8, minimumTextContrast: 7, overlapCount: 0, clippingCount: 0,
+      sha256: '0c1c99213d2903fb84a027a6f64508548c631b8fdefc6e41031e7954854ec67d',
+    },
+    market: { status: 'verified', samples: marketSamples() },
     marketStability: { status: 'verified', sampleCount: 108, actionIds: EXPECTED_MARKET_ACTION_IDS, maxDrift: 1, horizontalOverflow: 0, focusPreserved: true, busyStatesVerified: true, statusesVerified: true },
     ...overrides,
   };
@@ -115,7 +196,7 @@ describe('evaluatePortIdentityEvidence', () => {
   it.each([
     'schemaVersion', 'packagePhase', 'browser', 'route', 'build', 'viewports', 'fixtures', 'webLocks',
     'journey', 'accessibility', 'requests', 'failures', 'isolation', 'recovery', 'screenshots',
-    'determinism', 'profileIdentity', 'art', 'marketStability',
+    'determinism', 'profile', 'profileIdentity', 'art', 'market', 'marketStability',
   ])('fails closed when top-level %s is missing', (section) => {
     const evidence = completeEvidence();
     delete evidence[section];
@@ -141,6 +222,33 @@ describe('evaluatePortIdentityEvidence', () => {
     ['art', (e) => { e.art.minimumTextContrast = 4.49; }],
     ['marketStability', (e) => { e.marketStability.actionIds = []; }],
   ])('fails closed on a representative %s mutation', (_section, mutate) => {
+    const evidence = completeEvidence();
+    mutate(evidence);
+    expect(evaluatePortIdentityEvidence(evidence).ok).toBe(false);
+  });
+
+  it.each([
+    ['the retained Booth profile measurements', (e) => { delete e.accessibility.boothProfile; }],
+    ['a retained Booth control measurement', (e) => { e.accessibility.boothProfile.desktop.controls.pop(); }],
+    ['the retained art asset observation', (e) => { delete e.art.asset; }],
+    ['a retained raw art viewport ROI', (e) => { e.art.viewports[0].focal.roiVisibleRatio = 0.69; }],
+    ['a retained raw art contrast observation', (e) => { e.art.viewports[0].contrasts[0].minimumRatio = 4.49; }],
+    ['raw market samples', (e) => { e.market.samples.pop(); }],
+  ])('fails closed when %s is absent or invalid', (_label, mutate) => {
+    const evidence = completeEvidence();
+    mutate(evidence);
+    expect(evaluatePortIdentityEvidence(evidence).ok).toBe(false);
+  });
+
+  it.each([
+    ['profile identity default pronouns', (e) => { e.profileIdentity.defaultPronouns = 'they/them'; }],
+    ['profile identity setup prefill claim', (e) => { e.profileIdentity.setupNamePrefilled = false; }],
+    ['art summary hash', (e) => { e.art.sha256 = 'not-the-raw-hash'; }],
+    ['art summary focal ROI', (e) => { e.art.minimumSubjectRoiVisibleFraction = 0.81; }],
+    ['market sample count', (e) => { e.marketStability.sampleCount = 107; }],
+    ['market action identities', (e) => { e.marketStability.actionIds = []; }],
+    ['market focus claim', (e) => { e.marketStability.focusPreserved = false; }],
+  ])('rejects a summary that disagrees with retained raw evidence: %s', (_label, mutate) => {
     const evidence = completeEvidence();
     mutate(evidence);
     expect(evaluatePortIdentityEvidence(evidence).ok).toBe(false);

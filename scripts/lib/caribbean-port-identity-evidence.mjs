@@ -7,6 +7,9 @@ const RETAINED_V1_SECTIONS = [
   'webLocks',
   'journey',
   'accessibility',
+  'profile',
+  'art',
+  'market',
   'requests',
   'failures',
   'isolation',
@@ -20,7 +23,6 @@ const V2_FIELDS = [
   'schemaVersion',
   'packagePhase',
   'profileIdentity',
-  'art',
   'marketStability',
 ];
 
@@ -113,6 +115,15 @@ const MARKET_STATUS = {
   pending: 'Saving trade.',
   resolved: 'Cargo ledger updated.',
 };
+
+const BOOTH_CONTROLS = [
+  'booth-switch',
+  'booth-edit-profile',
+  'booth-new',
+  'booth-profile-name',
+  'booth-profile-pronouns',
+  'booth-profile-save',
+];
 
 function isRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -293,23 +304,121 @@ function validateFixtures(issues, fixtures) {
     || !exactArray(fixtures.uuidsConsumed, uuids.slice(0, 1))) issues.push('fixtures do not match the committed deterministic channel');
 }
 
-function validateFinalArt(issues, art) {
-  const keys = ['status', 'loaded', 'localRequest', 'naturalWidth', 'naturalHeight', 'fallbackVerified', 'precached', 'historicalReview', 'representationReview', 'focalVisibleAt', 'minimumSubjectRoiVisibleFraction', 'minimumTextContrast', 'overlapCount', 'clippingCount', 'sha256'];
-  if (!exactObject(issues, art, keys, 'art')) return;
-  if (art.status !== 'verified' || art.loaded !== true || art.localRequest !== true || art.naturalWidth !== 1920 || art.naturalHeight !== 1080
-    || art.fallbackVerified !== true || art.precached !== true || art.historicalReview !== 'pass' || art.representationReview !== 'pass'
-    || !exactArray(art.focalVisibleAt, ['1440x900', '1180x820', '1024x768', '960x600'])
-    || !Number.isFinite(art.minimumSubjectRoiVisibleFraction) || art.minimumSubjectRoiVisibleFraction < 0.7
-    || !Number.isFinite(art.minimumTextContrast) || art.minimumTextContrast < 4.5
-    || art.overlapCount !== 0 || art.clippingCount !== 0 || art.sha256 !== FINAL_ART_SHA256) {
-    issues.push('art violates the final identity-and-fallback contract');
+function validateBoothViewport(issues, value, name, width, height) {
+  if (!isRecord(value)) {
+    issues.push(`profile evidence must include Booth ${name} viewport evidence`);
+    return;
   }
+  if (!isRecord(value.viewport) || value.viewport.width !== width || value.viewport.height !== height) issues.push(`Booth ${name} viewport is wrong`);
+  if (value.pageHorizontalOverflowPx !== 0 || value.boothHorizontalOverflowPx !== 0 || value.pageContained !== true || value.boothContained !== true) issues.push(`Booth ${name} must have zero horizontal overflow and full containment`);
+  if (!sameMembers(value.labels, ['Name', 'Pronouns'])) issues.push(`Booth ${name} labels are incomplete`);
+  if (!Array.isArray(value.visibleText) || value.visibleText.length === 0 || value.visibleText.some((entry) => !isRecord(entry) || typeof entry.text !== 'string' || entry.fontPx < 14)) issues.push(`Booth ${name} visible copy is below 14px or missing`);
+  if (!Array.isArray(value.controls) || !sameMembers(value.controls.map((entry) => entry?.testId), BOOTH_CONTROLS) || value.controls.some((entry) => !isRecord(entry) || entry.width < 44 || entry.height < 44)) issues.push(`Booth ${name} controls must cover every control at 44px`);
+  if (!Array.isArray(value.focusChecks) || !sameMembers(value.focusChecks.map((entry) => entry?.testId), BOOTH_CONTROLS) || value.focusChecks.some((entry) => !isRecord(entry) || entry.focused !== true || entry.visible !== true)) issues.push(`Booth ${name} focus checks must cover every control`);
+}
+
+function validSubjectRoi(value) {
+  return Array.isArray(value) && value.length === 4 && value.every((entry) => Number.isFinite(entry) && entry >= 0 && entry <= 1)
+    && value[2] > 0 && value[3] > 0 && value[0] + value[2] <= 1 && value[1] + value[3] <= 1;
+}
+
+function validateArtGeometry(issues, geometry, viewportName, state, expectedIds) {
+  if (!isRecord(geometry) || !Array.isArray(geometry.leaves) || !sameMembers(geometry.leaves.map((leaf) => leaf?.id), expectedIds)
+    || geometry.leaves.some((leaf) => !isRecord(leaf) || leaf.contained !== true || leaf.horizontalOverflowPx !== 0 || leaf.verticalOverflowPx !== 0)) issues.push(`art ${viewportName} ${state} geometry clips or escapes the viewport`);
+  if (!isRecord(geometry) || !Array.isArray(geometry.overlapPairs) || geometry.overlapPairs.length !== 0) issues.push(`art ${viewportName} ${state} interactive rectangles overlap`);
+}
+
+function validateArtEvidence(issues, art) {
+  const rawKeys = ['status', 'asset', 'emitted', 'report', 'screenshots', 'viewports'];
+  const summaryKeys = ['loaded', 'localRequest', 'naturalWidth', 'naturalHeight', 'fallbackVerified', 'precached', 'historicalReview', 'representationReview', 'focalVisibleAt', 'minimumSubjectRoiVisibleFraction', 'minimumTextContrast', 'overlapCount', 'clippingCount', 'sha256'];
+  if (!exactObject(issues, art, [...rawKeys, ...summaryKeys], 'art')) return;
+  if (art.status !== 'verified') issues.push('art evidence must be verified');
+  if (art.asset !== 'src/games/caribbean/assets/bridgetown-1675.webp') issues.push('art evidence names the wrong production asset');
+  if (!isRecord(art.emitted) || typeof art.emitted.url !== 'string' || !/^\/assets\/bridgetown-1675-[^/]+\.webp$/.test(art.emitted.url) || art.emitted.contentType !== 'image/webp') issues.push('art emitted WebP evidence is malformed');
+  else if (art.emitted.precached !== true) issues.push('art emitted WebP must be precached');
+  if (!isRecord(art.report) || art.report.historicalReview !== 'pass' || art.report.representationReview !== 'pass' || art.report.sha256 !== FINAL_ART_SHA256) issues.push('art historical and representation reviews must pass');
+  if (!validSubjectRoi(art.report?.subjectRoi)) issues.push('art subject ROI is missing or malformed');
+  const expectedScreenshots = ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}.png`);
+  const expectedFallbacks = ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}-fallback.png`);
+  if (!isRecord(art.screenshots) || !sameMembers(art.screenshots.normal, expectedScreenshots) || !sameMembers(art.screenshots.fallback, expectedFallbacks)) issues.push('art screenshots must cover normal and fallback at every supported viewport');
+  if (!Array.isArray(art.viewports) || !sameMembers(art.viewports.map((viewport) => viewport?.name), ART_VIEWPORT_SPECS.map(({ name }) => name))) {
+    issues.push('art viewport evidence must cover the exact supported set');
+    return;
+  }
+  for (const spec of ART_VIEWPORT_SPECS) {
+    const viewport = art.viewports.find((candidate) => candidate?.name === spec.name);
+    if (!isRecord(viewport) || !isRecord(viewport.viewport) || viewport.viewport.width !== spec.width || viewport.viewport.height !== spec.height
+      || !isRecord(viewport.naturalSize) || viewport.naturalSize.width !== 1920 || viewport.naturalSize.height !== 1080
+      || !isRecord(viewport.focal) || viewport.focal.xPercent !== spec.focalX || viewport.focal.yPercent !== spec.focalY
+      || !Number.isFinite(viewport.focal.roiVisibleRatio) || viewport.focal.roiVisibleRatio < 0.7 || viewport.focal.roiVisibleRatio > 1) issues.push(`art ${spec.name} focal evidence is wrong or hides the subject`);
+    if (!Array.isArray(viewport?.contrasts) || !sameMembers(viewport.contrasts.map((sample) => sample?.selector), ART_CONTRAST_SELECTORS)
+      || viewport.contrasts.some((sample) => !isRecord(sample) || !Number.isFinite(sample.minimumRatio) || sample.minimumRatio < 4.5 || sample.backgroundAlpha !== 1)) issues.push(`art ${spec.name} contrast must be opaque and at least 4.5:1`);
+    if (!Array.isArray(viewport?.activityContrasts)) issues.push(`art ${spec.name} activity contrast must cover actual opaque states`);
+    else {
+      for (const activitySpec of ART_ACTIVITY_CONTRAST_SPECS) {
+        const samples = viewport.activityContrasts.filter((sample) => sample?.selector === activitySpec.selector);
+        if (samples.length !== 1 || samples[0]?.text !== activitySpec.text || samples[0]?.backgroundAlpha !== 1 || !Number.isFinite(samples[0]?.minimumRatio) || samples[0].minimumRatio < 4.5) issues.push(`art ${spec.name} activity contrast is incomplete or insufficient`);
+      }
+      if (viewport.activityContrasts.some((sample) => !ART_ACTIVITY_CONTRAST_SPECS.some(({ selector }) => selector === sample?.selector))) issues.push(`art ${spec.name} activity contrast contains an unexpected selector`);
+    }
+    if (!isRecord(viewport?.fixtureState) || viewport.fixtureState.gold !== ART_CAPTURE_FIXTURE_STATE.gold || viewport.fixtureState.provisions !== ART_CAPTURE_FIXTURE_STATE.provisions) issues.push(`art ${spec.name} capture fixture must remain at 500 gold / 3.4 months`);
+    validateArtGeometry(issues, viewport?.menuGeometry, spec.name, 'menu', ART_MENU_GEOMETRY_IDS);
+    validateArtGeometry(issues, viewport?.marketGeometry, spec.name, 'market', ART_MARKET_GEOMETRY_IDS);
+  }
+}
+
+function validateProfileEvidence(issues, profile) {
+  if (!isRecord(profile) || profile.status !== 'setup-verified' || profile.defaultPronouns !== 'he/him' || profile.boothProfilePersisted !== true || Object.keys(profile).length !== 4) {
+    issues.push('profile evidence must be exact setup-verified evidence');
+    return;
+  }
+  const setup = profile.setup;
+  if (!isRecord(setup) || Object.keys(setup).length !== 4 || !isRecord(setup.prefill) || Object.keys(setup.prefill).length !== 2 || setup.prefill.captainName !== 'Mario' || setup.prefill.pronouns !== 'he/him'
+    || !isRecord(setup.sharedPronounSnapshot) || Object.keys(setup.sharedPronounSnapshot).length !== 2 || setup.sharedPronounSnapshot.profile !== 'they/them' || setup.sharedPronounSnapshot.campaign !== 'they/them'
+    || setup.careerLengthControlPresent !== false || !isRecord(setup.accessibility) || Object.keys(setup.accessibility).length !== 3
+    || setup.accessibility.minimumFontPx < 14 || setup.accessibility.minimumTargetHeightPx < 44 || setup.accessibility.horizontalOverflowPx !== 0) issues.push('profile evidence must be exact setup-verified evidence');
+}
+
+function countArtGeometry(art, key, innerKey) {
+  return art.viewports.reduce((total, viewport) => total + (viewport[key]?.[innerKey]?.length ?? 0), 0);
+}
+
+function minimumArtContrast(art) {
+  return Math.min(...art.viewports.flatMap((viewport) => [...viewport.contrasts, ...viewport.activityContrasts].map((sample) => sample.minimumRatio)));
+}
+
+function validateFinalArtSummary(issues, art) {
+  const focalVisibleAt = art.viewports.map((viewport) => `${viewport.viewport.width}x${viewport.viewport.height}`);
+  const minimumSubjectRoiVisibleFraction = Math.min(...art.viewports.map((viewport) => viewport.focal.roiVisibleRatio));
+  const expected = {
+    status: 'verified', loaded: art.viewports.every((viewport) => viewport.naturalSize.width === 1920 && viewport.naturalSize.height === 1080),
+    localRequest: /^\/assets\/bridgetown-1675-[^/]+\.webp$/.test(art.emitted.url), naturalWidth: art.viewports[0]?.naturalSize.width,
+    naturalHeight: art.viewports[0]?.naturalSize.height, fallbackVerified: sameMembers(art.screenshots.fallback, ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}-fallback.png`)),
+    precached: art.emitted.precached, historicalReview: art.report.historicalReview, representationReview: art.report.representationReview,
+    focalVisibleAt, minimumSubjectRoiVisibleFraction, minimumTextContrast: minimumArtContrast(art),
+    overlapCount: countArtGeometry(art, 'menuGeometry', 'overlapPairs') + countArtGeometry(art, 'marketGeometry', 'overlapPairs'),
+    clippingCount: art.viewports.reduce((total, viewport) => total + ['menuGeometry', 'marketGeometry'].reduce((subtotal, geometry) => subtotal + (geometry.leaves?.filter((leaf) => !leaf.contained || leaf.horizontalOverflowPx !== 0 || leaf.verticalOverflowPx !== 0).length ?? 0), 0), 0),
+    sha256: art.report.sha256,
+  };
+  for (const [key, value] of Object.entries(expected)) if (art[key] !== value && !exactArray(art[key], value)) issues.push(`art summary ${key} disagrees with raw evidence`);
+}
+
+function marketSummary(samples, verdict) {
+  return {
+    status: 'verified', sampleCount: samples.length,
+    actionIds: [...new Set(samples.map((sample) => sample.actionTestId))].sort(), maxDrift: verdict.maxDrift,
+    horizontalOverflow: samples.reduce((total, sample) => total + Number(sample.stageScrollWidth > sample.stageClientWidth || sample.rowsScrollWidth > sample.rowsClientWidth || sample.scrollLeft !== 0 || sample.actionStripWidths.some((entry) => entry.scrollWidth > entry.clientWidth)), 0),
+    focusPreserved: samples.every((sample) => sample.focusedTestId === sample.actionTestId),
+    busyStatesVerified: samples.every((sample) => sample.ariaBusy === (sample.phase === 'pending')),
+    statusesVerified: samples.every((sample) => sample.status === MARKET_STATUS[sample.phase]),
+  };
 }
 
 /** The pure final gate is intentionally strict: any absent, additional, or malformed channel fails closed. */
 export function evaluatePortIdentityEvidence(evidence) {
   const issues = [];
   if (!exactObject(issues, evidence, V2_FIELDS, 'evidence')) return { ok: false, issues };
+  for (const section of RETAINED_V1_SECTIONS) if (!(section in evidence)) issues.push(`retained v1 section ${section} is missing`);
   if (evidence.schemaVersion !== 2) issues.push('schemaVersion must be 2');
   if (evidence.packagePhase !== 'complete') issues.push('packagePhase must be complete');
   if (!exactObject(issues, evidence.browser, ['name', 'version'], 'browser') || evidence.browser.name !== 'Chromium' || typeof evidence.browser.version !== 'string' || evidence.browser.version.length === 0) issues.push('browser is invalid');
@@ -321,11 +430,19 @@ export function evaluatePortIdentityEvidence(evidence) {
     || !Array.isArray(evidence.webLocks.calls) || evidence.webLocks.calls.length < 5 || evidence.webLocks.calls.some((call) => !isRecord(call) || !exactObject(issues, call, ['name', 'mode'], 'webLocks.calls') || call.name !== 'caribbean:campaign:writer' || call.mode !== 'exclusive')) issues.push('webLocks are invalid');
   if (!exactObject(issues, evidence.journey, ['finalEventCount', 'eventTypes', 'saveChecksum', 'replayVerified'], 'journey') || evidence.journey.finalEventCount !== 2
     || !exactArray(evidence.journey.eventTypes, ['market-traded', 'lead-accepted']) || !/^[a-f0-9]{8}$/.test(evidence.journey.saveChecksum) || evidence.journey.replayVerified !== true) issues.push('journey is invalid');
-  if (!exactObject(issues, evidence.accessibility, ['minimumMeasuredFontPx', 'minimumMeasuredTargetWidthPx', 'minimumMeasuredTargetHeightPx', 'horizontalOverflowPx'], 'accessibility')
+  if (!exactObject(issues, evidence.accessibility, ['minimumMeasuredFontPx', 'minimumMeasuredTargetWidthPx', 'minimumMeasuredTargetHeightPx', 'horizontalOverflowPx', 'boothProfile'], 'accessibility')
     || !finiteNonNegative(evidence.accessibility.minimumMeasuredFontPx) || evidence.accessibility.minimumMeasuredFontPx < 14
     || !finiteNonNegative(evidence.accessibility.minimumMeasuredTargetWidthPx) || evidence.accessibility.minimumMeasuredTargetWidthPx < 44
     || !finiteNonNegative(evidence.accessibility.minimumMeasuredTargetHeightPx) || evidence.accessibility.minimumMeasuredTargetHeightPx < 44
     || evidence.accessibility.horizontalOverflowPx !== 0) issues.push('accessibility is invalid');
+  const boothProfile = evidence.accessibility?.boothProfile;
+  if (!isRecord(boothProfile)) {
+    issues.push('profile evidence must include Booth desktop viewport evidence');
+    issues.push('profile evidence must include Booth narrow viewport evidence');
+  } else {
+    validateBoothViewport(issues, boothProfile.desktop, 'desktop', 1440, 900);
+    validateBoothViewport(issues, boothProfile.narrow, 'narrow', 960, 600);
+  }
   if (!exactObject(issues, evidence.requests, ['externalCount', 'failedCount', 'requestedPaths'], 'requests') || evidence.requests.externalCount !== 0 || evidence.requests.failedCount !== 0
     || !validStringArray(evidence.requests.requestedPaths) || evidence.requests.requestedPaths.some((path) => !path.startsWith('/') || path.startsWith('//'))) issues.push('requests are invalid');
   if (!exactObject(issues, evidence.failures, ['console', 'page', 'requests', 'external'], 'failures') || Object.values(evidence.failures).some((value) => !Array.isArray(value) || value.length !== 0)) issues.push('failures are invalid');
@@ -335,10 +452,24 @@ export function evaluatePortIdentityEvidence(evidence) {
     || typeof evidence.recovery.quarantineKey !== 'string' || !evidence.recovery.quarantineKey.startsWith('caribbean:campaign:quarantine:') || evidence.recovery.quarantineVerified !== true || evidence.recovery.exportedCorruptRawVerified !== true || !/^[a-f0-9]{8}$/.test(evidence.recovery.recoveredChecksum) || evidence.recovery.recoveryReloaded !== true) issues.push('recovery is invalid');
   if (!exactArray(evidence.screenshots, FINAL_SCREENSHOTS)) issues.push('screenshots are not the exact final set');
   if (!exactObject(issues, evidence.determinism, ['cleanRuns', 'metricsByteIdentical', 'screenshotsByteIdentical'], 'determinism') || evidence.determinism.cleanRuns !== 2 || evidence.determinism.metricsByteIdentical !== true || evidence.determinism.screenshotsByteIdentical !== true) issues.push('determinism is invalid');
-  if (!exactObject(issues, evidence.profileIdentity, ['status', 'defaultPronouns', 'setupNamePrefilled', 'setupPronounsPrefilled', 'campaignSnapshotPreserved', 'careerLengthControlAbsent', 'newCampaignLength'], 'profileIdentity')
-    || evidence.profileIdentity.status !== 'verified' || evidence.profileIdentity.defaultPronouns !== 'he/him' || evidence.profileIdentity.setupNamePrefilled !== true || evidence.profileIdentity.setupPronounsPrefilled !== true || evidence.profileIdentity.campaignSnapshotPreserved !== true || evidence.profileIdentity.careerLengthControlAbsent !== true || evidence.profileIdentity.newCampaignLength !== 'adventure') issues.push('profileIdentity is invalid');
-  validateFinalArt(issues, evidence.art);
-  if (!exactObject(issues, evidence.marketStability, ['status', 'sampleCount', 'actionIds', 'maxDrift', 'horizontalOverflow', 'focusPreserved', 'busyStatesVerified', 'statusesVerified'], 'marketStability')
-    || evidence.marketStability.status !== 'verified' || evidence.marketStability.sampleCount !== 108 || !exactArray(evidence.marketStability.actionIds, EXPECTED_MARKET_ACTION_IDS) || !Number.isFinite(evidence.marketStability.maxDrift) || evidence.marketStability.maxDrift < 0 || evidence.marketStability.maxDrift > 1 || evidence.marketStability.horizontalOverflow !== 0 || evidence.marketStability.focusPreserved !== true || evidence.marketStability.busyStatesVerified !== true || evidence.marketStability.statusesVerified !== true) issues.push('marketStability is invalid');
+  validateProfileEvidence(issues, evidence.profile);
+  if (!exactObject(issues, evidence.profileIdentity, ['status', 'defaultPronouns', 'setupNamePrefilled', 'setupPronounsPrefilled', 'campaignSnapshotPreserved', 'careerLengthControlAbsent', 'newCampaignLength'], 'profileIdentity')) issues.push('profileIdentity is invalid');
+  else {
+    const profile = evidence.profile;
+    const expectedProfileIdentity = isRecord(profile) && isRecord(profile.setup) ? {
+      status: 'verified', defaultPronouns: profile.defaultPronouns,
+      setupNamePrefilled: profile.setup.prefill?.captainName === 'Mario', setupPronounsPrefilled: profile.setup.prefill?.pronouns === profile.defaultPronouns,
+      campaignSnapshotPreserved: profile.setup.sharedPronounSnapshot?.profile === 'they/them' && profile.setup.sharedPronounSnapshot?.campaign === 'they/them',
+      careerLengthControlAbsent: profile.setup.careerLengthControlPresent === false, newCampaignLength: 'adventure',
+    } : null;
+    if (!expectedProfileIdentity || Object.entries(expectedProfileIdentity).some(([key, value]) => evidence.profileIdentity[key] !== value)) issues.push('profileIdentity disagrees with raw profile evidence');
+  }
+  validateArtEvidence(issues, evidence.art);
+  if (isRecord(evidence.art) && Array.isArray(evidence.art.viewports)) validateFinalArtSummary(issues, evidence.art);
+  if (!isRecord(evidence.market) || evidence.market.status !== 'verified' || !Array.isArray(evidence.market.samples) || Object.keys(evidence.market).length !== 2) issues.push('market evidence must contain verified samples');
+  const marketVerdict = isRecord(evidence.market) && Array.isArray(evidence.market.samples) ? validateMarketStability(evidence.market.samples) : null;
+  if (marketVerdict && !marketVerdict.ok) issues.push(...marketVerdict.errors);
+  if (!exactObject(issues, evidence.marketStability, ['status', 'sampleCount', 'actionIds', 'maxDrift', 'horizontalOverflow', 'focusPreserved', 'busyStatesVerified', 'statusesVerified'], 'marketStability')) issues.push('marketStability is invalid');
+  else if (!marketVerdict?.ok || Object.entries(marketSummary(evidence.market.samples, marketVerdict)).some(([key, value]) => evidence.marketStability[key] !== value && !exactArray(evidence.marketStability[key], value))) issues.push('marketStability disagrees with raw market evidence');
   return { ok: issues.length === 0, issues };
 }

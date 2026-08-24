@@ -1290,14 +1290,14 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
       'Editing the site-wide profile rewrote the existing campaign identity snapshot',
     );
     await page.getByTestId('booth-edit-profile').click();
-    await readPlayerProfileLayout(page, 'desktop', { width: 1440, height: 900 }, 'she/her');
+    const playerProfileDesktop = await readPlayerProfileLayout(page, 'desktop', { width: 1440, height: 900 }, 'she/her');
     layouts.profileDesktop = await readLayout(page, 'profileDesktop', VIEWPORTS.profileDesktop);
     await page.evaluate(() => {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     });
     await capture(page, screenshots, runDirectory, 'player-profile-desktop.png');
     await page.setViewportSize({ width: 960, height: 600 });
-    await readPlayerProfileLayout(page, 'narrow', { width: 960, height: 600 }, 'she/her');
+    const playerProfileNarrow = await readPlayerProfileLayout(page, 'narrow', { width: 960, height: 600 }, 'she/her');
     await page.setViewportSize({ width: 1440, height: 900 });
 
     const trace = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), TRACE_KEY);
@@ -1349,6 +1349,35 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
     ]);
     const marketVerdict = validateMarketStability(marketSamples);
     invariant(marketVerdict.ok, 'Market probe did not produce a verified final stability summary');
+    const profile = {
+      status: 'setup-verified',
+      defaultPronouns: 'he/him',
+      boothProfilePersisted: persistedProfile?.name === 'Port Profile' && persistedProfile?.pronouns === 'she/her',
+      setup: setupIdentity,
+    };
+    const art = {
+      status: 'verified',
+      asset: 'src/games/caribbean/assets/bridgetown-1675.webp',
+      emitted: emittedArt,
+      report: {
+        historicalReview: assetReport.historicalReview,
+        representationReview: assetReport.representationReview,
+        subjectRoi: assetReport.subjectRoi,
+        sha256: assetReport.sha256,
+      },
+      screenshots: {
+        normal: ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}.png`),
+        fallback: ART_VIEWPORT_SPECS.map(({ name }) => `port-art-${name}-fallback.png`),
+      },
+      viewports: artViewports,
+    };
+    const market = { status: 'verified', samples: marketSamples };
+    const marketHorizontalOverflow = marketSamples.reduce((total, sample) => total + Number(
+      sample.stageScrollWidth > sample.stageClientWidth
+      || sample.rowsScrollWidth > sample.rowsClientWidth
+      || sample.scrollLeft !== 0
+      || sample.actionStripWidths.some((entry) => entry.scrollWidth > entry.clientWidth),
+    ), 0);
     metrics = {
       browser: { name: 'Chromium', version: browser.version() },
       route: ROUTE,
@@ -1374,6 +1403,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
         minimumMeasuredTargetWidthPx: Math.min(...supportedLayouts.map((layout) => layout.minimumTargetWidthPx)),
         minimumMeasuredTargetHeightPx: Math.min(...supportedLayouts.map((layout) => layout.minimumTargetHeightPx)),
         horizontalOverflowPx: Math.max(...Object.values(layouts).map((layout) => layout.horizontalOverflowPx)),
+        boothProfile: { desktop: playerProfileDesktop, narrow: playerProfileNarrow },
       },
       requests: {
         externalCount: failures.external.length,
@@ -1405,41 +1435,44 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, assetRepor
       determinism: { cleanRuns: 2, metricsByteIdentical: true, screenshotsByteIdentical: true },
       schemaVersion: 2,
       packagePhase: 'complete',
+      profile,
       profileIdentity: {
         status: 'verified',
-        defaultPronouns: 'he/him',
-        setupNamePrefilled: setupIdentity.prefill.captainName === 'Mario',
-        setupPronounsPrefilled: setupIdentity.prefill.pronouns === 'he/him',
-        campaignSnapshotPreserved: postProfileEnvelope.payload.state.captain.pronouns === 'they/them',
-        careerLengthControlAbsent: setupIdentity.careerLengthControlPresent === false,
+        defaultPronouns: profile.defaultPronouns,
+        setupNamePrefilled: profile.setup.prefill.captainName === 'Mario',
+        setupPronounsPrefilled: profile.setup.prefill.pronouns === profile.defaultPronouns,
+        campaignSnapshotPreserved: profile.setup.sharedPronounSnapshot.profile === 'they/them'
+          && profile.setup.sharedPronounSnapshot.campaign === 'they/them',
+        careerLengthControlAbsent: profile.setup.careerLengthControlPresent === false,
         newCampaignLength: setupEnvelope.payload.state.career.length,
       },
       art: {
-        status: 'verified',
+        ...art,
         loaded: artViewports.every((viewport) => viewport.naturalSize.width === 1920 && viewport.naturalSize.height === 1080),
-        localRequest: artEvidence.localRequest,
+        localRequest: /^\/assets\/bridgetown-1675-[^/]+\.webp$/.test(art.emitted.url),
         naturalWidth: artViewports[0].naturalSize.width,
         naturalHeight: artViewports[0].naturalSize.height,
-        fallbackVerified: true,
-        precached: emittedArt.precached,
-        historicalReview: assetReport.historicalReview,
-        representationReview: assetReport.representationReview,
+        fallbackVerified: art.screenshots.fallback.length === ART_VIEWPORT_SPECS.length,
+        precached: art.emitted.precached,
+        historicalReview: art.report.historicalReview,
+        representationReview: art.report.representationReview,
         focalVisibleAt: artViewports.map((viewport) => `${viewport.viewport.width}x${viewport.viewport.height}`),
         minimumSubjectRoiVisibleFraction: Math.min(...artViewports.map((viewport) => viewport.focal.roiVisibleRatio)),
         minimumTextContrast: Math.min(...artContrasts.map((sample) => sample.minimumRatio)),
         overlapCount: artOverlaps.length,
         clippingCount: artLeaves.filter((leaf) => !leaf.contained || leaf.horizontalOverflowPx !== 0 || leaf.verticalOverflowPx !== 0).length,
-        sha256: assetReport.sha256,
+        sha256: art.report.sha256,
       },
+      market,
       marketStability: {
         status: 'verified',
-        sampleCount: marketSamples.length,
-        actionIds: EXPECTED_MARKET_ACTION_IDS,
+        sampleCount: market.samples.length,
+        actionIds: [...new Set(market.samples.map((sample) => sample.actionTestId))].sort(),
         maxDrift: marketVerdict.maxDrift,
-        horizontalOverflow: 0,
-        focusPreserved: true,
-        busyStatesVerified: true,
-        statusesVerified: true,
+        horizontalOverflow: marketHorizontalOverflow,
+        focusPreserved: market.samples.every((sample) => sample.focusedTestId === sample.actionTestId),
+        busyStatesVerified: market.samples.every((sample) => sample.ariaBusy === (sample.phase === 'pending')),
+        statusesVerified: market.samples.every((sample) => sample.status === (sample.phase === 'before' ? '' : sample.phase === 'pending' ? 'Saving trade.' : 'Cargo ledger updated.')),
       },
     };
     assertRequestedGraphIsolation(metrics);
