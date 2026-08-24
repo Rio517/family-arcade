@@ -41,6 +41,21 @@ function declaration(ruleBody: string, property: string): string | null {
   return ruleBody.match(new RegExp(`(?:^|;)\\s*${escaped}:\\s*([^;]+)`))?.[1]?.trim() ?? null;
 }
 
+function optionalRuleBodyWithDeclaration(css: string, selector: string, property: string): string | null {
+  let cursor = 0;
+  while (cursor < css.length) {
+    const selectorIndex = css.indexOf(selector, cursor);
+    if (selectorIndex < 0) return null;
+    const openBrace = css.indexOf('{', selectorIndex);
+    const closeBrace = css.indexOf('}', openBrace);
+    if (openBrace < 0 || closeBrace < 0) return null;
+    const body = css.slice(openBrace + 1, closeBrace);
+    if (declaration(body, property) !== null) return body;
+    cursor = closeBrace + 1;
+  }
+  return null;
+}
+
 function ruleBodyWithDeclaration(css: string, selector: string, property: string, after = 0): string {
   let cursor = after;
   while (cursor < css.length) {
@@ -86,6 +101,68 @@ function lengthPixels(value: string, viewportWidth: number): number {
   if (trimmed.endsWith('px')) return Number.parseFloat(trimmed);
   if (trimmed.endsWith('vw')) return Number.parseFloat(trimmed) * viewportWidth / 100;
   throw new Error(`Unsupported CSS length in layout contract: ${trimmed}`);
+}
+
+function shorthandBlockPixels(value: string, viewportWidth: number): number {
+  const terms = splitCssTerms(value);
+  const start = terms[0] ?? '';
+  const end = terms.length < 3 ? start : terms[2] ?? '';
+  return lengthPixels(start, viewportWidth) + lengthPixels(end, viewportWidth);
+}
+
+function blockEndPixels(value: string, viewportWidth: number): number {
+  const terms = splitCssTerms(value);
+  const end = terms.length < 3 ? terms[0] : terms[2];
+  return lengthPixels(end ?? '', viewportWidth);
+}
+
+function cascadedBlockEndPixels(
+  css: string,
+  selectors: readonly string[],
+  viewportWidth: number,
+): number {
+  let value: number | null = null;
+  for (const selector of selectors) {
+    const shorthandRule = optionalRuleBodyWithDeclaration(css, selector, 'margin');
+    if (shorthandRule !== null) {
+      value = blockEndPixels(declaration(shorthandRule, 'margin') ?? '', viewportWidth);
+    }
+    const longhandRule = optionalRuleBodyWithDeclaration(css, selector, 'margin-bottom');
+    if (longhandRule !== null) {
+      value = lengthPixels(declaration(longhandRule, 'margin-bottom') ?? '', viewportWidth);
+    }
+  }
+  if (value === null) throw new Error(`Missing block-end margin for ${selectors.join(' -> ')}`);
+  return value;
+}
+
+function cascadedDeclaration(
+  css: string,
+  property: string,
+  selectors: readonly string[],
+): string {
+  let value: string | null = null;
+  for (const selector of selectors) {
+    const body = optionalRuleBodyWithDeclaration(css, selector, property);
+    value = body === null ? value : declaration(body, property);
+  }
+  if (value === null) throw new Error(`Missing ${property} declaration for ${selectors.join(' -> ')}`);
+  return value;
+}
+
+function lineBoxPixels(
+  css: string,
+  selectors: readonly string[],
+  viewportWidth: number,
+  inheritedLineHeight: number,
+): number {
+  const fontSize = lengthPixels(cascadedDeclaration(css, 'font-size', selectors), viewportWidth);
+  const lineHeightValue = selectors.reduce<string | null>((value, selector) => {
+    const body = optionalRuleBodyWithDeclaration(css, selector, 'line-height');
+    return body === null ? value : declaration(body, 'line-height');
+  }, null);
+  const lineHeight = lineHeightValue === null ? inheritedLineHeight : Number.parseFloat(lineHeightValue);
+  return fontSize * lineHeight;
 }
 
 function horizontalPaddingPixels(ruleBody: string, viewportWidth: number): number {
@@ -371,5 +448,201 @@ describe('<PortPage>', () => {
     expect(positionRule).not.toMatch(/overflow:\s*(?:hidden|clip)/);
     expect(labelsRule).toMatch(/white-space:\s*nowrap/);
     expect(labelsRule).not.toMatch(/text-overflow:\s*ellipsis/);
+  });
+
+  it('fits the complete Market ledger and Back control inside the 1440x900 desktop stage', () => {
+    setViewport(1440, 900);
+    render(<StatefulPort />);
+    fireEvent.click(screen.getByRole('button', { name: 'Market' }));
+
+    const shell = screen.getByTestId('caribbean-career-ready');
+    const status = within(shell).getByRole('region', { name: 'Voyage status' });
+    const navigation = within(shell).getByRole('navigation', { name: 'Bridgetown activities' });
+    const activity = within(shell).getByRole('region', { name: 'Port activity' });
+    const back = within(activity).getByRole('button', { name: 'Back to harbour' });
+    const stage = activity.closest('.caribbean-port-stage');
+    const market = activity.querySelector('.caribbean-market');
+    const rows = within(activity).getAllByRole('listitem');
+    const reasonRows = rows.filter((row) => row.querySelector('.caribbean-market-reasons') !== null);
+
+    expect(stage).not.toBeNull();
+    if (market === null) throw new Error('Market ledger must remain inside the activity');
+    expect(stage).toHaveClass('caribbean-port-stage--market');
+    expect(status.parentElement).toBe(shell);
+    expect(stage?.parentElement).toBe(shell);
+    expect(navigation.parentElement).toBe(shell);
+    expect(activity).toContainElement(back);
+    expect(rows).toHaveLength(6);
+    expect(reasonRows).toHaveLength(5);
+
+    const viewportWidth = 1440;
+    const viewportHeight = 900;
+    const portCss = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+    const desktopCss = portCss.slice(0, portCss.indexOf('@media (max-height: 700px)'));
+    const tokensCss = readFileSync(resolve('src/shared/styles/tokens.css'), 'utf8');
+    const bodyRule = ruleBodyWithDeclaration(tokensCss, 'body', 'line-height');
+    const inheritedLineHeight = Number.parseFloat(declaration(bodyRule, 'line-height') ?? '');
+
+    const portRule = ruleBodyContaining(desktopCss, '.caribbean-port');
+    const statusHeight = lengthPixels(
+      splitCssTerms(declaration(portRule, 'grid-template-rows') ?? '')[0] ?? '',
+      viewportWidth,
+    );
+    const menuRule = ruleBodyContaining(desktopCss, '.caribbean-port-menu');
+    const menuPadding = declaration(menuRule, 'padding') ?? '';
+    const menuBottom = lengthPixels(menuPadding.match(/max\(([^,]+)/)?.[1] ?? '', viewportWidth);
+    const actionsRule = ruleBodyContaining(desktopCss, '.caribbean-port-actions');
+    const itemRule = ruleBodyContaining(desktopCss, '.caribbean-port-action-item');
+    const menuHeight = lengthPixels(splitCssTerms(declaration(actionsRule, 'padding') ?? '')[0] ?? '', viewportWidth)
+      + lengthPixels(splitCssTerms(declaration(itemRule, 'padding') ?? '')[0] ?? '', viewportWidth)
+      + lengthPixels(cascadedDeclaration(desktopCss, 'min-height', ['.caribbean-port-action']), viewportWidth)
+      + lengthPixels(cascadedDeclaration(desktopCss, 'min-height', ['.caribbean-port-action-reason']), viewportWidth)
+      + menuBottom;
+    const middleTrack = viewportHeight - statusHeight - menuHeight;
+
+    const stageRule = ruleBodyContaining(desktopCss, '.caribbean-port-stage');
+    const marketStageRule = ruleBodyContaining(desktopCss, '.caribbean-port-stage--market');
+    const stageMargins = shorthandBlockPixels(declaration(marketStageRule, 'margin-block') ?? '', viewportWidth);
+    const stagePadding = declaration(marketStageRule, 'padding-block') === null
+      ? shorthandBlockPixels(declaration(stageRule, 'padding') ?? '', viewportWidth)
+      : shorthandBlockPixels(declaration(marketStageRule, 'padding-block') ?? '', viewportWidth);
+    const stageContent = middleTrack - stageMargins - stagePadding;
+
+    expect(declaration(stageRule, 'min-height')).toBe('0');
+    expect(declaration(marketStageRule, 'overflow-y')).toBe('auto');
+
+    const captainLine = lineBoxPixels(
+      desktopCss,
+      ['.caribbean-port-captain', '.caribbean-port-stage--market .caribbean-port-captain'],
+      viewportWidth,
+      inheritedLineHeight,
+    );
+    const captainMargin = cascadedBlockEndPixels(
+      desktopCss,
+      ['.caribbean-port-captain', '.caribbean-port-stage--market .caribbean-port-captain'],
+      viewportWidth,
+    );
+    const placeLine = lineBoxPixels(
+      desktopCss,
+      ['.caribbean-port-stage h1', '.caribbean-port-stage--market h1'],
+      viewportWidth,
+      inheritedLineHeight,
+    );
+    const activityMargin = lengthPixels(cascadedDeclaration(
+      desktopCss,
+      'margin-top',
+      ['.caribbean-port-activity', '.caribbean-port-stage--market .caribbean-port-activity'],
+    ), viewportWidth);
+    const activityPadding = lengthPixels(cascadedDeclaration(
+      desktopCss,
+      'padding-top',
+      ['.caribbean-port-activity', '.caribbean-port-stage--market .caribbean-port-activity'],
+    ), viewportWidth);
+    const bearingLine = lineBoxPixels(
+      desktopCss,
+      ['.caribbean-port-bearing', '.caribbean-port-stage--market .caribbean-port-bearing'],
+      viewportWidth,
+      inheritedLineHeight,
+    );
+    const bearingMargin = cascadedBlockEndPixels(
+      desktopCss,
+      ['.caribbean-port-bearing', '.caribbean-port-stage--market .caribbean-port-bearing'],
+      viewportWidth,
+    );
+    const activityHeadingLine = lineBoxPixels(
+      desktopCss,
+      ['.caribbean-port-activity h2', '.caribbean-port-stage--market .caribbean-port-activity h2'],
+      viewportWidth,
+      inheritedLineHeight,
+    );
+    const activityHeadingMargin = cascadedBlockEndPixels(
+      desktopCss,
+      ['.caribbean-port-activity h2', '.caribbean-port-stage--market .caribbean-port-activity h2'],
+      viewportWidth,
+    );
+    const activityChrome = captainLine + captainMargin + placeLine
+      + activityMargin + activityPadding + 1
+      + bearingLine + bearingMargin + activityHeadingLine + activityHeadingMargin;
+
+    const summaryFactRule = ruleBodyContaining(desktopCss, '.caribbean-market-summary > div');
+    const summaryLabelLine = lineBoxPixels(
+      desktopCss,
+      ['.caribbean-market-summary dt'],
+      viewportWidth,
+      inheritedLineHeight,
+    );
+    const summaryValueLine = lineBoxPixels(
+      desktopCss,
+      ['.caribbean-market-summary dd'],
+      viewportWidth,
+      inheritedLineHeight,
+    );
+    const summaryValueRule = ruleBodyContaining(desktopCss, '.caribbean-market-summary dd');
+    const summaryHeight = shorthandBlockPixels(declaration(summaryFactRule, 'padding') ?? '', viewportWidth)
+      + summaryLabelLine
+      + lengthPixels(splitCssTerms(declaration(summaryValueRule, 'margin') ?? '')[0] ?? '', viewportWidth)
+      + summaryValueLine
+      + 2;
+    const marketRule = ruleBodyWithDeclaration(desktopCss, '.caribbean-market', 'gap');
+    const summaryAndGap = summaryHeight + lengthPixels(declaration(marketRule, 'gap') ?? '', viewportWidth);
+
+    const marketActionHeight = lengthPixels(cascadedDeclaration(
+      desktopCss,
+      'min-height',
+      ['.caribbean-market-action'],
+    ), viewportWidth);
+    const rowRule = ruleBodyContaining(desktopCss, '.caribbean-market-row');
+    const rowChrome = shorthandBlockPixels(declaration(rowRule, 'padding') ?? '', viewportWidth) + 1;
+    const reasonsRule = ruleBodyWithDeclaration(desktopCss, '.caribbean-market-reasons', 'min-height');
+    const reasonHeight = lengthPixels(declaration(reasonsRule, 'min-height') ?? '', viewportWidth)
+      + lengthPixels(declaration(reasonsRule, 'margin-top') ?? '', viewportWidth);
+    const rowsHeight = marketActionHeight + rowChrome
+      + reasonRows.length * (marketActionHeight + reasonHeight + rowChrome);
+
+    const closeRule = ruleBodyContaining(desktopCss, '.caribbean-port-close');
+    const closeStyleRule = ruleBodyContaining(desktopCss, '.caribbean-port .caribbean-port-close');
+    const marketCloseRule = optionalRuleBodyWithDeclaration(
+      desktopCss,
+      '.caribbean-port-stage--market .caribbean-port-close',
+      'position',
+    );
+    const closeIsOutOfFlow = declaration(marketCloseRule ?? '', 'position') === 'absolute';
+    const closeFlowHeight = closeIsOutOfFlow
+      ? 0
+      : lengthPixels(declaration(closeRule, 'min-height') ?? '', viewportWidth)
+        + lengthPixels(declaration(closeStyleRule, 'margin-top') ?? '', viewportWidth);
+    const requiredContent = activityChrome + summaryAndGap + rowsHeight + closeFlowHeight;
+    const clearance = stageContent - requiredContent;
+
+    expect(clearance).toBeGreaterThanOrEqual(8);
+
+    const marketActivityRule = ruleBodyContaining(
+      desktopCss,
+      '.caribbean-port-stage--market .caribbean-port-activity',
+    );
+    const marketHeadingRule = ruleBodyWithDeclaration(
+      desktopCss,
+      '.caribbean-port-stage--market .caribbean-port-activity h2',
+      'padding-inline-end',
+    );
+    const marketBearingRule = ruleBodyWithDeclaration(
+      desktopCss,
+      '.caribbean-port-stage--market .caribbean-port-bearing',
+      'padding-inline-end',
+    );
+    const closeWidth = lengthPixels(declaration(marketCloseRule ?? '', 'min-width') ?? '', viewportWidth);
+    const headingReserve = lengthPixels(declaration(marketHeadingRule, 'padding-inline-end') ?? '', viewportWidth);
+    const bearingReserve = lengthPixels(declaration(marketBearingRule, 'padding-inline-end') ?? '', viewportWidth);
+    const closeOffset = lengthPixels(declaration(marketCloseRule ?? '', 'inset-block-start') ?? '', viewportWidth);
+    const headerHeight = activityPadding + bearingLine + bearingMargin
+      + activityHeadingLine + activityHeadingMargin;
+
+    expect(declaration(marketActivityRule, 'position')).toBe('relative');
+    expect(closeIsOutOfFlow).toBe(true);
+    expect(headingReserve - closeWidth).toBeGreaterThanOrEqual(8);
+    expect(bearingReserve - closeWidth).toBeGreaterThanOrEqual(8);
+    expect(closeOffset + marketActionHeight).toBeLessThanOrEqual(headerHeight);
+    expect(back.compareDocumentPosition(market) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
   });
 });

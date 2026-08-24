@@ -370,7 +370,37 @@
 }
 
 .caribbean-port-stage--market .caribbean-port-activity {
+  position: relative;
   max-width: 1060px;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.caribbean-port-stage--market .caribbean-port-captain {
+  margin-bottom: 3px;
+}
+
+.caribbean-port-stage--market h1 {
+  font-size: 52px;
+}
+
+.caribbean-port-stage--market .caribbean-port-bearing {
+  margin-bottom: 4px;
+  padding-inline-end: 166px;
+}
+
+.caribbean-port-stage--market .caribbean-port-activity h2 {
+  margin-bottom: 6px;
+  padding-inline-end: 166px;
+  font-size: 30px;
+}
+
+.caribbean-port-stage--market .caribbean-port-close {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-end: 0;
+  min-width: 154px;
+  margin-top: 0;
 }
 
 .caribbean-market {

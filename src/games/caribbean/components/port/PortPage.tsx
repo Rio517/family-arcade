@@ -95,6 +95,16 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
   const heading = activeActivity === null
     ? 'Choose your next port action'
     : ACTIVITY_LABELS[activeActivity];
+  const closeControl = activeActivity === null ? null : (
+    <button
+      className="caribbean-port-close"
+      data-testid="port-close-activity"
+      type="button"
+      onClick={closeActivity}
+    >
+      Back to harbour
+    </button>
+  );
 
   return (
     <section
@@ -132,15 +142,9 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
             </p>
           ) : (
             <>
+              {activeActivity === 'market' ? closeControl : null}
               <ActivityContent activity={activeActivity} state={state} controller={controller} />
-              <button
-                className="caribbean-port-close"
-                data-testid="port-close-activity"
-                type="button"
-                onClick={closeActivity}
-              >
-                Back to harbour
-              </button>
+              {activeActivity === 'market' ? null : closeControl}
             </>
           )}
         </section>
