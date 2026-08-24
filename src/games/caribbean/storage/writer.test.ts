@@ -90,6 +90,15 @@ class ControlledLocks implements LockManagerLike {
       pending.result.reject,
     );
   }
+
+  async callTwiceResolvingSecond(index: number): Promise<void> {
+    const pending = this.pending[index];
+    if (!pending) throw new Error(`No pending request at ${index}`);
+    Promise.resolve(pending.callback({ name: 'first-lock' })).catch(() => undefined);
+    const second = await pending.callback({ name: 'second-lock' });
+    pending.result.resolve(second);
+    await pending.result.promise;
+  }
 }
 
 describe('createCampaignWriter', () => {
@@ -233,6 +242,34 @@ describe('createCampaignWriter', () => {
     const result = await runPromise;
     expect(result.kind).toBe('writer-protocol-failure');
     expect(operation).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps callback-twice FIFO closed when the adapter resolves from the second callback', async () => {
+    const locks = new ControlledLocks();
+    const writer = createCampaignWriter(locks);
+    const operation = deferred<string>();
+    let aSettled = false;
+
+    const a = writer.run(() => operation.promise).then((result) => {
+      aSettled = true;
+      return result;
+    });
+    await flushMicrotasks();
+    await locks.callTwiceResolvingSecond(0);
+    const bOperation = vi.fn(() => 'B');
+    const b = writer.run(bOperation);
+    await flushMicrotasks();
+
+    expect(aSettled).toBe(false);
+    expect(locks.calls).toHaveLength(1);
+    expect(bOperation).not.toHaveBeenCalled();
+
+    operation.resolve('A');
+    await expect(a).resolves.toMatchObject({ kind: 'writer-protocol-failure' });
+    await flushMicrotasks();
+    expect(locks.calls).toHaveLength(2);
+    locks.grant(1);
+    await expect(b).resolves.toEqual({ kind: 'operation-result', result: 'B' });
   });
 
   it('settles immediately unavailable runs in invocation order without callbacks', async () => {

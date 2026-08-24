@@ -72,7 +72,9 @@ export function createCampaignWriter(
           );
 
           if (protocolError !== null) {
-            return { kind: 'writer-protocol-failure', error: protocolError };
+            const error = protocolError;
+            if (callbackCompletion !== null) await callbackCompletion;
+            return { kind: 'writer-protocol-failure', error };
           }
           if (!callbackStarted) {
             return {

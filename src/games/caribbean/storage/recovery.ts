@@ -61,6 +61,11 @@ export type OperationReachableRevision =
       kind: 'remove-outcome-unknown';
       failedOperation: 'remove-current' | 'remove-previous';
       acceptableRevisions: readonly ActiveSaveRevision[];
+    }
+  | {
+      kind: 'write-outcome-unknown';
+      failedOperation: 'write-current' | 'write-previous';
+      acceptableRevisions: readonly ActiveSaveRevision[];
     };
 
 export interface RecoveryContinuation {
@@ -452,46 +457,88 @@ function recoveryTargets(
   return parsed.unreadableSlots.map(({ slot, raw }) => ({ slot, sourceRaw: raw }));
 }
 
-function expectedAfterSaveFailure(
-  before: ActiveSaveRevision,
-  failure: Exclude<SaveResult, { ok: true }>,
-): ActiveSaveRevision {
-  if (
-    failure.reason === 'storage-unavailable'
-    && failure.operation === 'write-current'
-    && before.currentRaw !== null
-  ) {
-    return { currentRaw: before.currentRaw, previousRaw: before.currentRaw };
-  }
-  return cloneRevision(before);
+interface SaveWriteFailure {
+  failedOperation: 'write-current' | 'write-previous';
+  acceptableRevisions: readonly ActiveSaveRevision[];
+}
+
+function saveCampaignWithWriteOutcomes(
+  storage: StorageLike,
+  journal: CampaignJournal,
+  options: {
+    build: string;
+    savedAt: number;
+    expectedRevision: ActiveSaveRevision;
+  },
+): { result: SaveResult; failedWrite: SaveWriteFailure | null } {
+  let trackedRevision = cloneRevision(options.expectedRevision);
+  let failedWrite: SaveWriteFailure | null = null;
+  const trackedStorage: StorageLike = {
+    getItem: (key) => storage.getItem(key),
+    removeItem: (key) => storage.removeItem(key),
+    setItem: (key, value) => {
+      const failedOperation = key === PREVIOUS_SAVE_KEY
+        ? 'write-previous'
+        : key === CURRENT_SAVE_KEY
+          ? 'write-current'
+          : null;
+      if (failedOperation === null) {
+        storage.setItem(key, value);
+        return;
+      }
+
+      const before = cloneRevision(trackedRevision);
+      const after = failedOperation === 'write-previous'
+        ? { currentRaw: before.currentRaw, previousRaw: value }
+        : { currentRaw: value, previousRaw: before.previousRaw };
+      try {
+        storage.setItem(key, value);
+      } catch (error) {
+        failedWrite = {
+          failedOperation,
+          acceptableRevisions: uniqueRevisions([before, after]),
+        };
+        throw error;
+      }
+      trackedRevision = after;
+    },
+  };
+  const result = saveCampaign(trackedStorage, journal, options);
+  return { result, failedWrite };
 }
 
 function performRecoveryAction(
   storage: StorageLike,
   inputContinuation: RecoveryContinuation,
-  resumed: boolean,
   initialRevision?: ActiveSaveRevision,
 ): RecoveryResult {
   let continuation = inputContinuation;
   let revision = initialRevision;
+  let revisionWasJustRead = revision !== undefined;
   if (revision === undefined) {
     const read = readAndValidateRevision(storage, continuation);
     if (!read.ok) return read;
     revision = read.revision;
+    revisionWasJustRead = true;
   }
 
   const targets = recoveryTargets(continuation);
   let completedRemove = continuation.stage === 'cleanup';
   for (const target of targets) {
+    if (!revisionWasJustRead) {
+      const read = readAndValidateRevision(storage, continuation);
+      if (!read.ok) return read;
+      revision = read.revision;
+      revisionWasJustRead = true;
+    }
+
     const { slot } = target;
     const activeRaw = rawForSlot(revision, slot);
     if (activeRaw === null) continue;
     if (continuation.action === 'recover' && activeRaw !== target.sourceRaw) continue;
 
-    if (resumed) {
-      const quarantine = verifyContinuationQuarantine(storage, continuation);
-      if (!quarantine.ok) return quarantine.result;
-    }
+    const quarantine = verifyContinuationQuarantine(storage, continuation);
+    if (!quarantine.ok) return quarantine.result;
 
     const before = cloneRevision(revision);
     const after = afterRemoval(before, slot);
@@ -513,12 +560,7 @@ function performRecoveryAction(
     completedRemove = true;
     revision = after;
     continuation = knownContinuation(continuation, revision, 'cleanup');
-
-    if (resumed) {
-      const read = readAndValidateRevision(storage, continuation);
-      if (!read.ok) return read;
-      revision = read.revision;
-    }
+    revisionWasJustRead = false;
   }
 
   if (continuation.action === 'abandon') {
@@ -539,16 +581,20 @@ function performRecoveryAction(
     return { ok: false, reason: 'invalid-recovery-source' };
   }
 
-  if (resumed) {
-    const quarantine = verifyContinuationQuarantine(storage, continuation);
-    if (!quarantine.ok) return quarantine.result;
-  }
+  const read = readAndValidateRevision(storage, continuation);
+  if (!read.ok) return read;
+  revision = read.revision;
+  continuation = knownContinuation(continuation, revision, 'republish');
 
-  const saveResult = saveCampaign(storage, republish.journal, {
+  const quarantine = verifyContinuationQuarantine(storage, continuation);
+  if (!quarantine.ok) return quarantine.result;
+
+  const saveAttempt = saveCampaignWithWriteOutcomes(storage, republish.journal, {
     build: republish.build,
     savedAt: republish.savedAt,
     expectedRevision: revision,
   });
+  const saveResult = saveAttempt.result;
   if (saveResult.ok) {
     return {
       ok: true,
@@ -562,13 +608,28 @@ function performRecoveryAction(
     return externalConflict(continuation, saveResult.actual);
   }
 
-  const expected = expectedAfterSaveFailure(revision, saveResult);
+  const acceptableRevisions = saveAttempt.failedWrite?.acceptableRevisions
+    ?? [cloneRevision(revision)];
   const actual = readRevision(storage);
-  if (actual.ok && !sameRevision(actual.revision, expected)) {
+  if (
+    actual.ok
+    && !acceptableRevisions.some((candidate) => sameRevision(candidate, actual.revision))
+  ) {
     return externalConflict(continuation, actual.revision);
   }
-  const remaining = actual.ok ? actual.revision : expected;
-  const resumable = knownContinuation(continuation, remaining, 'republish');
+  const resumable = actual.ok
+    ? knownContinuation(continuation, actual.revision, 'republish')
+    : saveAttempt.failedWrite === null
+      ? knownContinuation(continuation, revision, 'republish')
+      : {
+          ...continuation,
+          stage: 'republish' as const,
+          remaining: {
+            kind: 'write-outcome-unknown' as const,
+            failedOperation: saveAttempt.failedWrite.failedOperation,
+            acceptableRevisions,
+          },
+        };
   return {
     ok: false,
     reason: 'continuation-required',
@@ -730,7 +791,6 @@ export function recoverCampaign(
   return performRecoveryAction(
     storage,
     acquired.continuation,
-    false,
     acquired.revision,
   );
 }
@@ -766,7 +826,6 @@ export function abandonCampaign(
   return performRecoveryAction(
     storage,
     acquired.continuation,
-    false,
     acquired.revision,
   );
 }
@@ -789,5 +848,5 @@ export function continueRecovery(
         republish: null,
       }
     : continuation;
-  return performRecoveryAction(storage, executable, true, read.revision);
+  return performRecoveryAction(storage, executable, read.revision);
 }

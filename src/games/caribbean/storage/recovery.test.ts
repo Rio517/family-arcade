@@ -43,6 +43,7 @@ interface Fault {
 interface Hook {
   label: OperationLabel;
   occurrence: number;
+  timing: 'before' | 'after';
   run(storage: ScriptedStorage): void;
 }
 
@@ -121,26 +122,31 @@ class ScriptedStorage implements StorageLike {
   getItem(key: string): string | null {
     const label = this.label('get', key);
     const occurrence = this.record(label);
-    this.runHooks(label, occurrence);
+    this.runHooks(label, occurrence, 'before');
     this.maybeThrow(label, occurrence, 'before');
-    return this.values.get(key) ?? null;
+    const value = this.values.get(key) ?? null;
+    this.runHooks(label, occurrence, 'after');
+    this.maybeThrow(label, occurrence, 'after');
+    return value;
   }
 
   setItem(key: string, value: string): void {
     const label = this.label('set', key);
     const occurrence = this.record(label);
-    this.runHooks(label, occurrence);
+    this.runHooks(label, occurrence, 'before');
     this.maybeThrow(label, occurrence, 'before');
     this.values.set(key, value);
+    this.runHooks(label, occurrence, 'after');
     this.maybeThrow(label, occurrence, 'after');
   }
 
   removeItem(key: string): void {
     const label = this.label('remove', key);
     const occurrence = this.record(label);
-    this.runHooks(label, occurrence);
+    this.runHooks(label, occurrence, 'before');
     this.maybeThrow(label, occurrence, 'before');
     this.values.delete(key);
+    this.runHooks(label, occurrence, 'after');
     this.maybeThrow(label, occurrence, 'after');
   }
 
@@ -178,8 +184,16 @@ class ScriptedStorage implements StorageLike {
     this.faults.push({ label, occurrence, timing });
   }
 
+  failNext(label: OperationLabel, timing: Fault['timing'] = 'before'): void {
+    this.failAt(label, (this.counts.get(label) ?? 0) + 1, timing);
+  }
+
   hookAt(label: OperationLabel, occurrence: number, run: Hook['run']): void {
-    this.hooks.push({ label, occurrence, run });
+    this.hooks.push({ label, occurrence, timing: 'before', run });
+  }
+
+  hookAfterAt(label: OperationLabel, occurrence: number, run: Hook['run']): void {
+    this.hooks.push({ label, occurrence, timing: 'after', run });
   }
 
   resetObservations(): void {
@@ -199,9 +213,19 @@ class ScriptedStorage implements StorageLike {
     return occurrence;
   }
 
-  private runHooks(label: OperationLabel, occurrence: number): void {
+  private runHooks(
+    label: OperationLabel,
+    occurrence: number,
+    timing: Hook['timing'],
+  ): void {
     for (const hook of this.hooks) {
-      if (hook.label === label && hook.occurrence === occurrence) hook.run(this);
+      if (
+        hook.label === label
+        && hook.occurrence === occurrence
+        && hook.timing === timing
+      ) {
+        hook.run(this);
+      }
     }
   }
 
@@ -313,7 +337,9 @@ describe('recoverCampaign safe acquisition and publication', () => {
       'get:current', 'get:previous', 'get:quarantine',
       'set:quarantine', 'get:quarantine',
       'get:current', 'get:previous',
+      'get:quarantine',
       'remove:current',
+      'get:current', 'get:previous', 'get:quarantine',
       'get:current', 'get:previous',
       'set:current',
     ]);
@@ -344,12 +370,45 @@ describe('recoverCampaign safe acquisition and publication', () => {
       'get:current', 'get:previous', 'get:quarantine',
       'set:quarantine', 'get:quarantine',
       'get:current', 'get:previous',
+      'get:quarantine',
       'remove:previous',
+      'get:current', 'get:previous', 'get:quarantine',
       'get:current', 'get:previous',
       'set:previous', 'set:current',
     ]);
     expect(result.revision.previousRaw).toBe(revision.currentRaw);
     expect(storage.revision()).toEqual(result.revision);
+  });
+
+  it('stops initial recovery if quarantine disappears after cleanup before republish', () => {
+    const source = corruptCurrentRevision();
+    const afterCleanup = { currentRaw: null, previousRaw: source.previousRaw };
+    const storage = new ScriptedStorage(source);
+    const loaded = loadedFrom(storage);
+    storage.hookAfterAt('remove:current', 1, (target) => {
+      target.forceRemove(quarantineKey());
+    });
+
+    const result = recoverCampaign(storage, loaded, RECOVERY_OPTIONS);
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'quarantine-invalidated',
+      cause: 'quarantine-missing',
+      quarantineKey: quarantineKey(),
+      expectedRaw: canonicalJson({
+        version: 1,
+        game: 'caribbean',
+        quarantinedAt: RECOVERY_OPTIONS.quarantinedAt,
+        sourceRevision: source,
+        unreadableSlots: loaded.unreadableSlots,
+      }),
+      actualRaw: null,
+      stage: 'republish',
+      sourceRevision: source,
+    });
+    expect(storage.revision()).toEqual(afterCleanup);
+    expect(storage.operations).not.toContain('set:current');
   });
 
   it('adopts saveCampaign compacted journal and exact returned revision', () => {
@@ -508,9 +567,41 @@ describe('abandonCampaign', () => {
       'get:current', 'get:previous', 'get:quarantine',
       'set:quarantine', 'get:quarantine',
       'get:current', 'get:previous',
-      'remove:previous', 'remove:current',
+      'get:quarantine', 'remove:previous',
+      'get:current', 'get:previous',
+      'get:quarantine', 'remove:current',
     ]);
     expect(storage.revision()).toEqual(EMPTY_REVISION);
+  });
+
+  it('stops initial abandonment before removing a replacement current installed after previous cleanup', () => {
+    const source = {
+      currentRaw: envelopeRaw(acceptedJournal(), 200, 'source-current'),
+      previousRaw: envelopeRaw(initialJournal(), 100, 'source-previous'),
+    };
+    const external = {
+      currentRaw: envelopeRaw(acceptedJournal(818), 900, 'replacement-current'),
+      previousRaw: null,
+    };
+    const storage = new ScriptedStorage(source);
+    const load = nonEmptyFrom(storage);
+    storage.hookAfterAt('remove:previous', 1, (target) => {
+      target.installRevision(external);
+    });
+
+    const result = abandonCampaign(storage, load, ABANDON_OPTIONS);
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'external-revision-conflict',
+      cause: 'active-revision-conflict',
+      quarantineKey: quarantineKey(ABANDON_OPTIONS.quarantineId),
+      stage: 'cleanup',
+      sourceRevision: source,
+      actualRevision: external,
+    });
+    expect(storage.revision()).toEqual(external);
+    expect(storage.operations.filter((entry) => entry === 'remove:current')).toEqual([]);
   });
 
   it('quarantines and abandons both unreadable raw slots without parsing or normalizing them', () => {
@@ -527,7 +618,10 @@ describe('abandonCampaign', () => {
     const raw = storage.raw(quarantineKey(ABANDON_OPTIONS.quarantineId));
     expect(raw).toContain('{bad-current-ñ');
     expect(raw).toContain('{bad-previous-東京');
-    expect(storage.operations.slice(-2)).toEqual(['remove:previous', 'remove:current']);
+    expect(storage.operations.filter((entry) => entry.startsWith('remove:'))).toEqual([
+      'remove:previous',
+      'remove:current',
+    ]);
   });
 });
 
@@ -555,6 +649,121 @@ describe('recovery failures before and after verified quarantine', () => {
       expect(storage.operations.filter((entry) => entry.startsWith('remove:'))).toEqual([]);
     },
   );
+
+  it.each([
+    ['write-previous', 'set:previous', corruptPreviousRevision()],
+    ['write-current', 'set:current', corruptCurrentRevision()],
+  ] as const)(
+    'continues safely when %s commits and then throws',
+    (failedOperation, label, source) => {
+      const storage = new ScriptedStorage(source);
+      const loaded = loadedFrom(storage);
+      storage.failAt(label, 1, 'after');
+
+      const failed = recoverCampaign(storage, loaded, RECOVERY_OPTIONS);
+      const continuation = requireContinuation(failed);
+      const committed = storage.revision();
+
+      expect(failed).toMatchObject({
+        ok: false,
+        reason: 'continuation-required',
+        cause: 'republish-failed',
+        saveFailure: {
+          ok: false,
+          reason: 'storage-unavailable',
+          operation: failedOperation,
+        },
+        continuation: {
+          stage: 'republish',
+          remaining: { kind: 'known', revision: committed },
+        },
+      });
+      if (failedOperation === 'write-current') {
+        expect(loadCampaign(storage)).toMatchObject({
+          kind: 'loaded',
+          build: RECOVERY_OPTIONS.build,
+          journal: loaded.journal,
+        });
+      }
+
+      storage.clearFaultsAndHooks();
+      storage.resetObservations();
+      expect(continueRecovery(storage, continuation, 'continue')).toMatchObject({
+        ok: true,
+        kind: 'recovered',
+      });
+    },
+  );
+
+  it('keeps unrelated bytes terminal when write-current commits and then throws', () => {
+    const source = corruptCurrentRevision();
+    const external = {
+      currentRaw: envelopeRaw(acceptedJournal(919), 901, 'unrelated-current'),
+      previousRaw: source.previousRaw,
+    };
+    const storage = new ScriptedStorage(source);
+    const loaded = loadedFrom(storage);
+    storage.hookAfterAt('set:current', 1, (target) => target.installRevision(external));
+    storage.failAt('set:current', 1, 'after');
+
+    const result = recoverCampaign(storage, loaded, RECOVERY_OPTIONS);
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'external-revision-conflict',
+      actualRevision: external,
+      stage: 'republish',
+      sourceRevision: source,
+    });
+    expect('continuation' in result).toBe(false);
+    expect(storage.revision()).toEqual(external);
+  });
+
+  it('carries the finite write-current before/after revisions when the outcome reread fails', () => {
+    const source = corruptCurrentRevision();
+    const storage = new ScriptedStorage(source);
+    const loaded = loadedFrom(storage);
+    const proposedCurrent = envelopeRaw(
+      loaded.journal,
+      RECOVERY_OPTIONS.savedAt,
+      RECOVERY_OPTIONS.build,
+    );
+    storage.hookAfterAt('set:current', 1, (target) => {
+      target.failNext('get:current');
+    });
+    storage.failAt('set:current', 1, 'after');
+
+    const failed = recoverCampaign(storage, loaded, RECOVERY_OPTIONS);
+    const continuation = requireContinuation(failed);
+
+    expect(failed).toMatchObject({
+      ok: false,
+      reason: 'continuation-required',
+      cause: 'republish-failed',
+      continuation: {
+        stage: 'republish',
+        remaining: {
+          kind: 'write-outcome-unknown',
+          failedOperation: 'write-current',
+          acceptableRevisions: [
+            { currentRaw: null, previousRaw: source.previousRaw },
+            { currentRaw: proposedCurrent, previousRaw: source.previousRaw },
+          ],
+        },
+      },
+    });
+    expect(storage.revision()).toEqual({
+      currentRaw: proposedCurrent,
+      previousRaw: source.previousRaw,
+    });
+
+    storage.clearFaultsAndHooks();
+    storage.resetObservations();
+    expect(continueRecovery(storage, continuation, 'continue')).toMatchObject({
+      ok: true,
+      kind: 'recovered',
+    });
+  });
 
   it('returns verify-quarantine failure and removes nothing when verification read throws', () => {
     const revision = corruptCurrentRevision();
@@ -1076,11 +1285,11 @@ describe('continueRecovery external-writer isolation', () => {
     const freshResult = recoverCampaign(storage, freshLoad, freshOptions);
 
     expect(freshResult).toMatchObject({ ok: true, kind: 'recovered' });
-    expect(storage.operations.slice(0, 8)).toEqual([
+    expect(storage.operations.slice(0, 9)).toEqual([
       'get:current', 'get:previous', 'get:quarantine',
       'set:quarantine', 'get:quarantine',
       'get:current', 'get:previous',
-      'remove:previous',
+      'get:quarantine', 'remove:previous',
     ]);
     expect(storage.raw(oldContinuation.quarantineKey)).toBe(oldContinuation.quarantineRaw);
     expect(storage.raw(quarantineKey(freshOptions.quarantineId))).not.toBeNull();
