@@ -177,6 +177,34 @@ describe('validateMarketStability', () => {
     expect(validateMarketStability(mutate(marketSamples()))).toMatchObject({ ok: false });
   });
 
+  it.each([
+    ['null rows', (sample) => ({ ...sample, rows: null })],
+    ['non-array rows', (sample) => ({ ...sample, rows: {} })],
+    ['null action strips', (sample) => ({ ...sample, actionStrips: null })],
+    ['non-array action strips', (sample) => ({ ...sample, actionStrips: {} })],
+  ])('returns a failed verdict rather than throwing for %s', (_label, mutate) => {
+    const samples = marketSamples();
+    samples[0] = mutate(samples[0]);
+    expect(() => validateMarketStability(samples)).not.toThrow();
+    expect(validateMarketStability(samples)).toMatchObject({ ok: false, errors: expect.any(Array) });
+  });
+
+  it.each([
+    ['action strips', (sample, length) => ({ ...sample, actionStrips: sample.actionStrips.slice(0, length) })],
+    ['strip-width entries', (sample, length) => ({ ...sample, actionStripWidths: sample.actionStripWidths.slice(0, length) })],
+  ])('rejects %s with 0, 5, or 7 entries in every sample', (_label, mutate) => {
+    for (const length of [0, 5, 7]) {
+      const samples = marketSamples().map((sample) => mutate(sample, length));
+      if (length === 7) {
+        for (const sample of samples) {
+          if (_label === 'action strips') sample.actionStrips.push({ x: 720, y: 240, width: 488, height: 44 });
+          else sample.actionStripWidths.push({ testId: 'market-action-strip-7', clientWidth: 488, scrollWidth: 488 });
+        }
+      }
+      expect(validateMarketStability(samples)).toMatchObject({ ok: false, errors: expect.any(Array) });
+    }
+  });
+
   it('accepts exactly 1px drift and rejects invalid sample shapes', () => {
     const exactBoundary = marketSamples();
     exactBoundary[1] = { ...exactBoundary[1], stage: { ...exactBoundary[1].stage, x: 161 } };

@@ -97,13 +97,13 @@ function sampleShapeErrors(sample) {
   if (typeof sample.actionTestId !== 'string') errors.push('sample action id is missing');
   if (!validRect(sample.stage)) errors.push('sample stage rectangle is malformed');
   if (!Array.isArray(sample.rows)) errors.push('sample rows must be an array');
-  else if (sample.rows.length !== 6 || sample.rows.some((rect) => !validRect(rect))) errors.push('sample rows are malformed');
+  else if (sample.rows.length !== 6 || sample.rows.some((rect) => !validRect(rect))) errors.push('sample rows must contain exactly six rectangles');
   if (!Array.isArray(sample.actionStrips)) errors.push('sample action strips must be an array');
-  else if (sample.actionStrips.some((rect) => !validRect(rect))) errors.push('sample action strips are malformed');
+  else if (sample.actionStrips.length !== 6 || sample.actionStrips.some((rect) => !validRect(rect))) errors.push('sample action strips must contain exactly six rectangles');
   for (const field of ['stageClientWidth', 'stageScrollWidth', 'rowsClientWidth', 'rowsScrollWidth']) {
     if (!finiteNonNegative(sample[field])) errors.push(`sample ${field} is invalid`);
   }
-  if (!Array.isArray(sample.actionStripWidths) || sample.actionStripWidths.some((entry) => (
+  if (!Array.isArray(sample.actionStripWidths) || sample.actionStripWidths.length !== 6 || sample.actionStripWidths.some((entry) => (
     !isRecord(entry) || typeof entry.testId !== 'string'
       || !finiteNonNegative(entry.clientWidth) || !finiteNonNegative(entry.scrollWidth)
   ))) errors.push('sample action strip widths are malformed');
@@ -125,7 +125,8 @@ export function validateMarketStability(samples, maxDrift = 1) {
   for (const sample of samples) {
     const shapeErrors = sampleShapeErrors(sample);
     if (shapeErrors.length > 0) errors.push(...shapeErrors);
-    if (!isRecord(sample) || typeof sample.actionTestId !== 'string' || !MARKET_PHASES.includes(sample.phase)) continue;
+    if (shapeErrors.length > 0 || !isRecord(sample)
+      || typeof sample.actionTestId !== 'string' || !MARKET_PHASES.includes(sample.phase)) continue;
     const phaseMap = byAction.get(sample.actionTestId) ?? new Map();
     if (phaseMap.has(sample.phase)) errors.push(`duplicate ${sample.phase} sample for ${sample.actionTestId}`);
     phaseMap.set(sample.phase, sample);
