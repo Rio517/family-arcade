@@ -4,6 +4,8 @@ import { createCampaign } from '../domain/createCampaign';
 import { marketTradeDraft, quoteTrade } from '../domain/economy';
 import type { CampaignJournal } from '../domain/events';
 import { appendJournal, createJournal } from '../domain/replay';
+import { compactJournal } from '../domain/compactJournal';
+import { navalEngagedDraft, seaLegCompletedDraft, voyageStartedDraft } from '../domain/voyage';
 import { canonicalJson, checksumPayload } from './checksum';
 import {
   CURRENT_SAVE_KEY,
@@ -36,6 +38,14 @@ function acceptedJournal(): CampaignJournal {
     type: 'lead-accepted',
     payload: { leadId: 'red-jackdaw' },
   });
+}
+
+function activeModeJournals(): Record<'sailing' | 'encounter' | 'naval', CampaignJournal> {
+  const active = acceptedJournal();
+  const sailing = appendJournal(active, voyageStartedDraft(active.state));
+  const encounter = appendJournal(sailing, seaLegCompletedDraft(sailing.state));
+  const naval = appendJournal(encounter, navalEngagedDraft(encounter.state));
+  return { sailing, encounter, naval };
 }
 
 function journalWithLegalTrades(count: number): CampaignJournal {
@@ -138,6 +148,18 @@ function saveSuccessfully(
 }
 
 describe('loadCampaign', () => {
+  it.each(['sailing', 'encounter', 'naval'] as const)('round-trips direct and compacted %s checkpoints without predecessor events', (kind) => {
+    // Catches save parsing that treats an active resume mode as port-only history.
+    const journal = activeModeJournals()[kind];
+    const direct = new MemoryStorage({ currentRaw: envelopeRaw(journal), previousRaw: null });
+    expect(loadCampaign(direct)).toMatchObject({ kind: 'loaded', journal, recovered: false });
+
+    const compacted = compactJournal(journal);
+    const stored = new MemoryStorage({ currentRaw: envelopeRaw(compacted), previousRaw: null });
+    expect(loadCampaign(stored)).toMatchObject({ kind: 'loaded', journal: compacted, recovered: false });
+    expect(compacted.events).toEqual([]);
+    expect(compacted.initial.lastEventId).toBe(journal.state.lastEventId);
+  });
   it('loads an empty store without writing or deleting', () => {
     const storage = new MemoryStorage();
 
