@@ -416,18 +416,21 @@ outcome merely disables the deck and shows the result. The player then chooses
 Exactly-once behavior has four layers:
 
 1. the button has a synchronous in-flight guard;
-2. a separate synchronous `namedActionInFlightRef` is acquired before reading
-   state or constructing a draft and remains held through dispatch settlement
-   in persisted and memory-only modes;
+2. a separate synchronous named-action gate stores an invocation token plus the
+   controller generation before reading state or constructing a draft and
+   remains held through dispatch settlement in persisted and memory-only modes;
 3. the reducer requires matching current `naval` mode and battle ID; and
 4. the first applied event returns to `port`, so the same draft is no longer a
    legal successor even in memory-only mode.
 
 `busyRef` continues to own writer/runtime serialization; it is not reused as
-the named-action guard because memory-only dispatch does not set it. Direct
-domain draft-helper calls throw on a wrong predecessor. Named controller
-actions normalize an expected wrong-predecessor/domain-precondition failure to
-`{ kind: 'not-applied' }`; simultaneous duplicate action promises both fulfill,
+the named-action guard because memory-only dispatch does not set it. A runtime
+replacement resets the gate for the new generation. An old invocation releases
+only when both its token and generation still own the gate; stale completion A
+cannot clear new-runtime invocation B and admit C. Direct domain draft-helper
+calls throw on a wrong predecessor. Named controller actions normalize an
+expected wrong-predecessor/domain-precondition failure to
+`{ kind: 'not-applied' }`; simultaneous duplicate promises both fulfill,
 exactly one may be `applied`, and none rejects as an exact-once mechanism.
 Unexpected implementation errors still reject and remain test-visible.
 
@@ -456,15 +459,33 @@ battle, the transient session and result modal remain mounted beneath it:
 
 No UI infers return until `controller.journal.state.mode.kind === 'port'`.
 
+All transient consequences of an event live at one campaign-candidate
+publication boundary, not on the initiating named-action promise. The boundary
+receives predecessor plus candidate, publishes the journal, and applies an
+event token `{ campaignId, eventId, type }` at most once per controller
+generation:
+
+- `voyage-started` resets port activity to `menu`;
+- `encounter-avoided`, `battle-withdrawn`, and `naval-resolved` set one-shot
+  `portFocusTarget: 'last-voyage'`; and
+- every other event has no transient effect.
+
+Immediate persisted save, direct memory-only dispatch, and delayed
+**Continue without saving** all use this same boundary. A later retry that
+persists an already-published memory candidate, a repeated consent action, or a
+conflict refresh does not apply the token again. Pending, denied, failed, and
+conflicted candidates have no transient effect before publication; external
+reload discards the candidate without applying it.
+
 Set Sail is governed only by `voyageReadiness`, even while any Governor,
-Tavern, Market, Shipyard, Shares, or Log activity is open. A successfully published `voyage-started`
-resets transient `activity` to `menu`; a `not-applied` departure preserves the
-open activity and its focus context. Every successful avoid, withdrawal, or
-resolution sets a transient one-shot port-focus intent for the Captain's Log
-outcome trigger. On a reload/resume directly into port, `PortPage` focuses Set
-Sail when readiness is `ready`; otherwise it focuses Captain's Log when
-`lastVoyage` exists, falling back to the harbour heading only when neither is
-applicable. Consuming focus intent never mutates the journal.
+Tavern, Market, Shipyard, Shares, or Log activity is open. Before candidate
+publication, activity/focus remain exactly as they were. The publication
+boundary above owns departure clearing and return focus whether publication is
+immediate or delayed by consent. On a reload/resume directly into port,
+`PortPage` focuses Set Sail when readiness is `ready`; otherwise it focuses
+Captain's Log when `lastVoyage` exists, falling back to the harbour heading
+only when neither is applicable. Consuming focus intent never mutates the
+journal.
 
 ### Terminal resolution presentation states
 
@@ -497,7 +518,16 @@ inert background behavior, and diagnostics remain modal-safe.
 - Resize into an unsupported viewport unmounts and disposes the session. Resize
   back constructs the same fresh duel from saved input.
 - **Withdraw to Bridgetown** is available from the battle Options disclosure.
-  It appends `battle-withdrawn`; it never fabricates an `escaped` naval outcome.
+  For a nonterminal battle, the wrapper calls `session.setPaused(true)`
+  synchronously before invoking `withdrawBattle`, so no RAF tick overlaps the
+  writer wait. Applied publication unmounts to port. Writer denial, write
+  failure, or conflict keeps the predecessor battle mounted and paused beneath
+  the decision overlay. Memory consent publishes and unmounts; external reload
+  either replaces the route or retains the reloaded naval predecessor paused;
+  an unexpected rejection keeps it paused with explicit Retry withdrawal and
+  Resume battle choices. Nothing auto-resumes. Terminal-error withdrawal is
+  already terminal and is asserted separately. Withdrawal appends
+  `battle-withdrawn`; it never fabricates an `escaped` naval outcome.
 - Encounter **Avoid and return** appends `encounter-avoided`.
 - The existing destructive **Abandon campaign** remains a storage recovery
   action, not a voyage shortcut. It quarantines the entire active journal,
@@ -619,6 +649,14 @@ Compatibility requirements are exact:
 Checkpoint replay starts from any validated `initial.lastEventId`; new events
 must not assume a campaign began at event zero.
 
+`validateJournal` evolves a validated state through events in order. It checks
+the next literal ID, then calls `reduceCampaign(current, event)`; the reducer is
+the only owner of `event.atDay === current.calendar.elapsedDays` and of each
+transition's day change. Replay validation does not compare every event to the
+initial day or duplicate which event advances time. The canonical direct
+stream includes event days `0 -> 1 -> 2`; a post-leg event stamped day 0 is
+invalid, and the same rule starts from a nonzero compacted checkpoint/day.
+
 ## Testing and Evidence
 
 ### Domain and mutation resistance
@@ -647,9 +685,16 @@ must not assume a campaign began at event zero.
 - each named action delegates exactly one draft through existing writer logic;
 - simultaneous duplicates in persisted and memory-only modes fulfill with at
   most one applied result and no duplicate-promise rejection;
+- in both persistence modes, literal invocation A acquires generation 1,
+  runtime replacement resets to generation 2, B acquires generation 2, stale
+  A settles, C is rejected while B remains owner, and only B can release;
 - duplicate clicks, StrictMode effects, late promises, storage failures,
   conflicts, memory consent, runtime replacement, and external reload never
   apply a result twice;
+- departure clearing and return focus occur exactly once at candidate
+  publication for immediate saved, direct memory, and delayed consent paths;
+  denial, write failure, conflict, retry, repeated consent, and reload-discard
+  prove zero early or duplicate transient effects;
 - consent/conflict uses an active-route modal and preserves a terminal battle
   result until the pending candidate is published or discarded;
 - Set Sail reason/enablement, focus, encounter choices, status, Captain's Log,
@@ -663,6 +708,9 @@ must not assume a campaign began at event zero.
   result exposes Return only;
 - hidden document pauses, visible return stays paused, reload restarts from
   byte-identical input, and unsupported resize disposes the session; and
+- nonterminal withdrawal pauses synchronously before a deferred writer can
+  observe even one more RAF tick, and every applied/pending/conflict/rejection/
+  reload branch keeps the pause/unmount contract above; and
 - no campaign event occurs between `naval-engaged` and withdrawal/resolution.
 
 ### Deterministic browser evidence
@@ -702,25 +750,64 @@ tick `11855`, `seedAfter: 1310878278`, player `78/61/44/8`, and opponent
 `88/14/9/8`.
 
 `BattleHud` exposes a visible elapsed-engagement value with a read-only exact
-tick attribute. Playwright installs its clock, pauses after the battle mounts,
-applies each trace row through the rendered rudder/sail/ammunition/fire
-controls only when the published tick equals that row, then advances exactly
-`100ms` (six 60 Hz ticks). Overshoot, a missing boundary, a different input,
-or any non-player-victory terminal outcome fails closed. Each victory run has
-a `330_000ms` outcome deadline; expected fake-clock wall time is under 90
-seconds, and the two-clean-run package budget is 8 minutes. The evidence suite
-has both a pure scheduler RED and a normal-route browser RED before the schema
-can turn green.
+tick attribute. The clock fixture order is locked: install the context seed,
+UUID, lock, and storage fixtures; create the page; install Playwright's clock;
+install the page-scoped `Date.now` fixture after that clock; navigate; and
+assert the recorded campaign timestamp consumed the page fixture. Pause the
+clock on the encounter before activating Pursue, so the real `NavalSession`
+is constructed and mounted under the installed paused clock. Mount must expose
+tick 0. The first `page.clock.runFor(16)` only primes the first RAF and must
+still expose tick 0.
 
-`caribbean:naval-check` gains explicit non-writing `--verify` and writing
-`--capture` modes. Initial execution preflight does not invoke the legacy
-mutating default. After the mode lands, repeat/final gates use `--verify` and
-write only to a temporary directory. Task 7 runs `--capture` once from a clean
-Task 6 HEAD before any other evidence bytes change, owns and stages the
-resulting `docs/screenshots/caribbean-naval/metrics.json` plus only genuinely
-changed naval screenshots, then uses `--verify` after the evidence commit.
-Captured provenance therefore names the clean Task 6 source HEAD and reports
-`worktreeDirtyBeforeCapture: false`.
+The winning driver applies each trace row through rendered public controls.
+Held/released keyboard input drives rudder, and the rendered sail,
+ammunition, and fire controls drive their commands. It then advances one real
+RAF quantum at a time with `page.clock.runFor(16)`, reading the public HUD
+after each quantum until it observes exactly the next six-tick boundary or
+the exact terminal tick `11855`. It never equates 100 milliseconds with six
+simulation ticks. A skipped boundary, unexpected tick, different input, or
+non-player-victory outcome fails closed. The real-session integration covers
+the tick-zero mount, first-RAF priming, reload/remount at tick zero, a terminal
+tick in the middle of a six-tick cadence, the held-key rudder path, the
+rendered rudder button's existing 140 ms release timer, and exact
+`nowConsumed`. A real Node wall timer—not the installed browser clock—aborts
+each victory run after `330_000ms`; the two-clean-run package budget is eight
+minutes. The suite observes a pure scheduler RED, then a real-browser
+truncated-trace RED, before either implementation turns green.
+
+`caribbean:naval-check` has three required, mutually exclusive modes:
+
+- `--semantic-probe` generates into a uniquely created temporary directory,
+  runs the real harness and semantic evaluator, never compares provenance or
+  tracked bytes, cleans the directory in `finally`, and exits 0 with exactly
+  `NAVAL_SEMANTIC_PROBE_OK tracked=stale` or
+  `NAVAL_SEMANTIC_PROBE_OK tracked=current` when semantics pass;
+- `--capture` requires a clean tracked Task 6 HEAD, writes through
+  `saveIfChanged` only to `docs/screenshots/caribbean-naval`, and exits 0 with
+  `NAVAL_CAPTURE_OK head=<sha> changed=<n>`; and
+- `--verify` is the post-capture/post-commit gate. It generates into a unique
+  temporary directory, validates semantics, requires the tracked capture HEAD
+  to be an ancestor, requires the current source-file manifest and source hash
+  to match the capture, requires a clean tracked worktree, normalizes only the
+  candidate/current `headCommitAtCapture` and `worktreeDirtyBeforeCapture`
+  fields to their tracked values, then byte-compares normalized metrics and
+  every PNG. It cleans the exact temporary directory in `finally` and exits 0
+  only with `NAVAL_VERIFY_OK capture=<sha> source=<sha> artifacts=<n>`.
+
+Missing/unknown modes exit 1 with `NAVAL_CLI_FAILED mode`. Semantic-probe,
+capture, and verify failures exit 1 with, respectively,
+`NAVAL_SEMANTIC_PROBE_FAILED <code>`, `NAVAL_CAPTURE_FAILED <code>`, or
+`NAVAL_VERIFY_FAILED <code>`, where `<code>` is exactly one of `semantic`,
+`stale-capture`, `dirty-worktree`, `source-hash`, `source-files`,
+`metrics-byte`, `screenshot-byte`, `destination`, or `cleanup` as applicable.
+Tests inject each failure, including
+byte drift and cleanup on both success and failure. Task 7 captures once from
+a clean Task 6 HEAD before any other evidence bytes change, stages only the
+metrics and genuinely changed screenshots, uses `--semantic-probe` for the
+pre-commit live-harness check, and runs final `--verify` only after the evidence
+commit is clean. Captured provenance therefore names the clean Task 6 source
+HEAD and reports `worktreeDirtyBeforeCapture: false` without making the final
+gate impossible to satisfy after the documentation commit.
 
 Normal production now intentionally contains a lazy production naval chunk and
 the precached local sloop GLB. Isolation changes from “naval absent” to:
