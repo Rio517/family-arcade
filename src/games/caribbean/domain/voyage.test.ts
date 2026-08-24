@@ -292,9 +292,6 @@ describe('voyage transition sequence', () => {
     ['input seed', (draft: ReturnType<typeof navalEngagedDraft>) => { draft.payload.input.seed += 1; }],
     ['player sails', (draft: ReturnType<typeof navalEngagedDraft>) => { draft.payload.input.player.sails -= 1; }],
     ['opponent cannon', (draft: ReturnType<typeof navalEngagedDraft>) => { draft.payload.input.opponent.cannon -= 1; }],
-    ['objective', (draft: ReturnType<typeof navalEngagedDraft>) => {
-      (draft.payload.input as unknown as Record<string, unknown>).objective = 'sink-red-jackdaw';
-    }],
   ] as const)('rejects mismatched engagement %s without mutating encounter state', (_label, mutate) => {
     // Kills wrapper/RNG/full-builder comparisons independently.
     const { contact } = voyageJournals();
@@ -303,6 +300,19 @@ describe('voyage transition sequence', () => {
     const before = structuredClone(contact);
 
     expect(() => appendJournal(contact, draft)).toThrow(/Invalid voyage/);
+    expect(contact).toEqual(before);
+  });
+
+  it('rejects a same-shape invalid objective at the event boundary without mutating encounter state', () => {
+    // Kills deferring NavalBattleInput literal branding to voyage builder equality.
+    const { contact } = voyageJournals();
+    const draft = navalEngagedDraft(contact.state);
+    (draft.payload.input as unknown as Record<string, unknown>).objective = 'sink-red-jackdaw';
+    const before = structuredClone(contact);
+
+    expect(() => appendJournal(contact, draft)).toThrow(
+      'Invalid campaign event: payload.input.objective:unknown-id',
+    );
     expect(contact).toEqual(before);
   });
 

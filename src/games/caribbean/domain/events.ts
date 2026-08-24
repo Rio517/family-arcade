@@ -101,7 +101,12 @@ function snapshotRecord(
   }
 }
 
-function snapshotJson(value: unknown, path: string, issues: ValidationIssue[]): unknown {
+function snapshotJson(
+  value: unknown,
+  path: string,
+  issues: ValidationIssue[],
+  ancestors: Set<object> = new Set(),
+): unknown {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
     if (Number.isFinite(value)) return value;
@@ -112,6 +117,11 @@ function snapshotJson(value: unknown, path: string, issues: ValidationIssue[]): 
     issue(issues, path, 'non-json');
     return INVALID;
   }
+  if (ancestors.has(value)) {
+    issue(issues, path, 'non-json');
+    return INVALID;
+  }
+  ancestors.add(value);
   try {
     if (!Array.isArray(value) && !isPlainRecord(value)) {
       issue(issues, path, 'non-json');
@@ -123,14 +133,24 @@ function snapshotJson(value: unknown, path: string, issues: ValidationIssue[]): 
       return INVALID;
     }
     if (Array.isArray(value)) {
+      const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+      if (
+        !lengthDescriptor
+        || !('value' in lengthDescriptor)
+        || !Number.isSafeInteger(lengthDescriptor.value)
+        || lengthDescriptor.value < 0
+      ) {
+        issue(issues, path, 'non-json');
+        return INVALID;
+      }
       const result: unknown[] = [];
-      for (let index = 0; index < value.length; index += 1) {
+      for (let index = 0; index < lengthDescriptor.value; index += 1) {
         const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
         const itemPath = `${path}.${index}`;
         if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
           issue(issues, itemPath, 'non-json');
           result[index] = INVALID;
-        } else result[index] = snapshotJson(descriptor.value, itemPath, issues);
+        } else result[index] = snapshotJson(descriptor.value, itemPath, issues, ancestors);
       }
       for (const key of keys.filter((candidate): candidate is string => typeof candidate === 'string' && !/^(0|[1-9]\d*)$/.test(candidate) && candidate !== 'length')) {
         issue(issues, `${path}.${key}`, 'unknown-key');
@@ -144,18 +164,22 @@ function snapshotJson(value: unknown, path: string, issues: ValidationIssue[]): 
       if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
         issue(issues, child, 'non-json');
         result[key] = INVALID;
-      } else result[key] = snapshotJson(descriptor.value, child, issues);
+      } else result[key] = snapshotJson(descriptor.value, child, issues, ancestors);
     }
     return result;
   } catch {
     issue(issues, path, 'non-json');
     return INVALID;
+  } finally {
+    ancestors.delete(value);
   }
 }
 
 function snapshotNestedRecord(value: unknown, path: string, issues: ValidationIssue[]): PlainRecord | null {
   if (value === undefined) return null;
+  const before = issues.length;
   const snapshot = snapshotJson(value, path, issues);
+  if (issues.length !== before) return null;
   if (!isPlainRecord(snapshot)) {
     if (snapshot !== INVALID) issue(issues, path, 'wrong-type');
     return null;
@@ -325,15 +349,26 @@ function validateNavalShipId(value: unknown, path: string, issues: ValidationIss
   else if (value !== 'player' && value !== 'opponent') issue(issues, path, 'unknown-id');
 }
 
-function validateNavalShipInput(value: unknown, path: string, issues: ValidationIssue[]): PlainRecord | null {
+function validateNavalShipInput(
+  value: unknown,
+  path: string,
+  expectedId: 'player' | 'opponent',
+  issues: ValidationIssue[],
+): PlainRecord | null {
   const before = issues.length;
   const ship = snapshotNestedRecord(value, path, issues);
   if (!ship) return null;
   validateKeys(ship, ['id', 'stableShipId', 'name', 'classId', 'position', 'heading', 'hull', 'sails', 'crew', 'cannon'], path, issues);
-  for (const key of ['id', 'stableShipId', 'name', 'classId'] as const) {
+  for (const key of ['stableShipId', 'name'] as const) {
     const field = required(ship, key, path, issues);
     if (field !== undefined && typeof field !== 'string') issue(issues, `${path}.${key}`, 'wrong-type');
   }
+  const id = required(ship, 'id', path, issues);
+  if (id !== undefined && typeof id !== 'string') issue(issues, `${path}.id`, 'wrong-type');
+  else if (id !== undefined && id !== expectedId) issue(issues, `${path}.id`, 'unknown-id');
+  const classId = required(ship, 'classId', path, issues);
+  if (classId !== undefined && typeof classId !== 'string') issue(issues, `${path}.classId`, 'wrong-type');
+  else if (classId !== undefined && classId !== 'sloop') issue(issues, `${path}.classId`, 'unknown-id');
   const positionValue = required(ship, 'position', path, issues);
   const position = positionValue === undefined ? null : snapshotNestedRecord(positionValue, `${path}.position`, issues);
   if (position) {
@@ -352,18 +387,19 @@ function validateNavalInput(value: unknown, path: string, issues: ValidationIssu
   const input = snapshotNestedRecord(value, path, issues);
   if (!input) return null;
   validateKeys(input, ['battleId', 'seed', 'windFrom', 'windStrength', 'arenaRadius', 'timeLimitTicks', 'objective', 'player', 'opponent'], path, issues);
-  for (const key of ['battleId', 'objective'] as const) {
-    const field = required(input, key, path, issues);
-    if (field !== undefined && typeof field !== 'string') issue(issues, `${path}.${key}`, 'wrong-type');
-  }
+  const battleId = required(input, 'battleId', path, issues);
+  if (battleId !== undefined && typeof battleId !== 'string') issue(issues, `${path}.battleId`, 'wrong-type');
+  const objective = required(input, 'objective', path, issues);
+  if (objective !== undefined && typeof objective !== 'string') issue(issues, `${path}.objective`, 'wrong-type');
+  else if (objective !== undefined && objective !== 'capture-red-jackdaw') issue(issues, `${path}.objective`, 'unknown-id');
   validateRngUint32(required(input, 'seed', path, issues), `${path}.seed`, issues);
   for (const key of ['windFrom', 'windStrength', 'arenaRadius', 'timeLimitTicks'] as const) {
     validateFiniteNumber(required(input, key, path, issues), `${path}.${key}`, issues);
   }
   const player = required(input, 'player', path, issues);
-  if (player !== undefined) validateNavalShipInput(player, `${path}.player`, issues);
+  if (player !== undefined) validateNavalShipInput(player, `${path}.player`, 'player', issues);
   const opponent = required(input, 'opponent', path, issues);
-  if (opponent !== undefined) validateNavalShipInput(opponent, `${path}.opponent`, issues);
+  if (opponent !== undefined) validateNavalShipInput(opponent, `${path}.opponent`, 'opponent', issues);
   if (issues.length !== before) return null;
   const parsed = input as unknown as NavalBattleInput;
   if (!validateBattleInput(parsed).ok) {

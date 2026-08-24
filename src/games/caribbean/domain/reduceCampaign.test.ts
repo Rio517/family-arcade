@@ -303,6 +303,120 @@ describe('campaign journal append', () => {
     expect(validateCampaignEvent(raw)).toMatchObject({ ok: false });
   });
 
+  it.each([
+    ['objective', 'payload.input.objective', 'sink-red-jackdaw'],
+    ['player id', 'payload.input.player.id', 'captain'],
+    ['player class', 'payload.input.player.classId', 'brig'],
+    ['opponent id', 'payload.input.opponent.id', 'captain'],
+    ['opponent class', 'payload.input.opponent.classId', 'brig'],
+  ] as const)(
+    'rejects same-shape naval input literal %s at its parser path',
+    (_label, path, invalidLiteral) => {
+      // Kills string-only branding of NavalBattleInput literal members.
+      const raw = strategicEvent('naval-engaged');
+      setAtPath(raw, path, invalidLiteral);
+
+      expect(validateCampaignEvent(raw)).toEqual({
+        ok: false,
+        issues: [{ path, code: 'unknown-id' }],
+      });
+    },
+  );
+
+  it.each([
+    ['outcome kind', 'payload.resolution.outcome', { kind: 'captured', victorShipId: 'player' }, 'payload.resolution.outcome.kind'],
+    ['outcome victor', 'payload.resolution.outcome', { kind: 'sunk', victorShipId: 'spectator' }, 'payload.resolution.outcome.victorShipId'],
+    ['outcome ship', 'payload.resolution.outcome', { kind: 'escaped', shipId: 'spectator' }, 'payload.resolution.outcome.shipId'],
+    ['decisive kind', 'payload.resolution.decisive', { kind: 'captured' }, 'payload.resolution.decisive.kind'],
+    ['sunk victor', 'payload.resolution.decisive', { kind: 'sunk', victorShipId: 'spectator', sunkShipId: 'opponent', hull: 0 }, 'payload.resolution.decisive.victorShipId'],
+    ['sunk ship', 'payload.resolution.decisive', { kind: 'sunk', victorShipId: 'player', sunkShipId: 'spectator', hull: 0 }, 'payload.resolution.decisive.sunkShipId'],
+    ['boarding victor', 'payload.resolution.decisive', { kind: 'boarding-ready', victorShipId: 'opponent', range: 1, relativeSpeed: 0, targetSails: 20, targetCrew: 10, playerCrew: 30 }, 'payload.resolution.decisive.victorShipId'],
+    ['escaped ship', 'payload.resolution.decisive', { kind: 'escaped', shipId: 'spectator', distance: 93, arenaRadius: 92, outwardSpeed: 1 }, 'payload.resolution.decisive.shipId'],
+    ['separated ship', 'payload.resolution.decisive', { kind: 'separated', shipId: 'spectator', timeLimitTicks: 14_400 }, 'payload.resolution.decisive.shipId'],
+  ] as const)(
+    'rejects same-shape naval resolution literal %s at its parser path',
+    (_label, mutationPath, invalidLiteral, expectedPath) => {
+      // Kills any outcome/decisive union branch that brands an arbitrary string.
+      const raw = strategicEvent('naval-resolved');
+      setAtPath(raw, mutationPath, structuredClone(invalidLiteral));
+
+      expect(validateCampaignEvent(raw)).toEqual({
+        ok: false,
+        issues: [{ path: expectedPath, code: 'unknown-id' }],
+      });
+    },
+  );
+
+  it.each([
+    ['surrender', { kind: 'surrender', victorShipId: 'player' }, { kind: 'surrender', victorShipId: 'player', surrenderedShipId: 'opponent', threshold: 'hull', value: 9, thresholdValue: 10 }],
+    ['sunk', { kind: 'sunk', victorShipId: 'opponent' }, { kind: 'sunk', victorShipId: 'opponent', sunkShipId: 'player', hull: 0 }],
+    ['boarding-ready', { kind: 'boarding-ready', victorShipId: 'player' }, { kind: 'boarding-ready', victorShipId: 'player', range: 1, relativeSpeed: 0, targetSails: 20, targetCrew: 10, playerCrew: 30 }],
+    ['escaped', { kind: 'escaped', shipId: 'player' }, { kind: 'escaped', shipId: 'player', distance: 93, arenaRadius: 92, outwardSpeed: 1 }],
+    ['separated', { kind: 'separated', shipId: 'opponent' }, { kind: 'separated', shipId: 'opponent', timeLimitTicks: 14_400 }],
+  ] as const)(
+    'accepts exact naval outcome and decisive %s union members',
+    (_label, outcome, decisive) => {
+      // Kills accidental omission of any declared outcome/decisive literal branch.
+      const raw = strategicEvent('naval-resolved');
+      setAtPath(raw, 'payload.resolution.outcome', structuredClone(outcome));
+      setAtPath(raw, 'payload.resolution.decisive', structuredClone(decisive));
+
+      expect(validateCampaignEvent(raw)).toMatchObject({ ok: true });
+    },
+  );
+
+  it.each([
+    ['naval input', 'naval-engaged', 'payload.input'],
+    ['naval position', 'naval-engaged', 'payload.input.player.position'],
+    ['naval resolution', 'naval-resolved', 'payload.resolution'],
+    ['naval outcome', 'naval-resolved', 'payload.resolution.outcome'],
+  ] as const)(
+    'rejects a Proxy-wrapped array at nested %s without live gets',
+    (_label, name, path) => {
+      // Kills direct array length/property reads in the recursive JSON snapshotter.
+      const raw = strategicEvent(name);
+      let liveGets = 0;
+      const nestedArray = new Proxy([], {
+        get(target, key, receiver) {
+          liveGets += 1;
+          return Reflect.get(target, key, receiver);
+        },
+      });
+      setAtPath(raw, path, nestedArray);
+
+      expect(validateCampaignEvent(raw)).toEqual({
+        ok: false,
+        issues: [{ path, code: 'wrong-type' }],
+      });
+      expect(liveGets).toBe(0);
+    },
+  );
+
+  it.each([
+    ['input', 'naval-engaged', 'payload.input.player.position', 'payload.input.player.position', false],
+    ['resolution', 'naval-resolved', 'payload.resolution.decisive', 'payload.resolution.decisive', false],
+    ['array', 'naval-engaged', 'payload.input.player.position', 'payload.input.player.position.0', true],
+  ] as const)(
+    'promptly rejects a cyclic nested %s graph with one stable issue',
+    (_label, name, mutationPath, expectedPath, arrayCycle) => {
+      // Kills removal of ancestor tracking from recursive record and array snapshots.
+      const raw = strategicEvent(name);
+      if (arrayCycle) {
+        const cycle: unknown[] = [];
+        cycle.push(cycle);
+        setAtPath(raw, mutationPath, cycle);
+      } else {
+        const ancestorPath = name === 'naval-engaged' ? 'payload.input' : 'payload.resolution';
+        setAtPath(raw, mutationPath, valueAtPath(raw, ancestorPath));
+      }
+
+      expect(validateCampaignEvent(raw)).toEqual({
+        ok: false,
+        issues: [{ path: expectedPath, code: 'non-json' }],
+      });
+    },
+  );
+
   it('recognizes the replayable voyage event syntax before predecessor reduction', () => {
     // Catches an event union that leaves strategic events as unknown IDs.
     expect(validateCampaignEvent({
