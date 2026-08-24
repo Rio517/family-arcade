@@ -229,53 +229,292 @@
     "minimumMeasuredTargetHeightPx": 44,
     "horizontalOverflowPx": 0,
     "boothProfile": {
-      "activePronouns": "they/them",
-      "labels": [
-        "Name",
-        "Pronouns"
-      ],
-      "minimumFontPx": 14,
-      "controls": [
-        {
-          "testId": "booth-switch",
-          "label": "Switch player",
-          "width": 135.328125,
-          "height": 44
+      "desktop": {
+        "viewport": {
+          "width": 1440,
+          "height": 900
         },
-        {
-          "testId": "booth-edit-profile",
-          "label": "Edit profile",
-          "width": 135.34375,
-          "height": 44
+        "activePronouns": "they/them",
+        "labels": [
+          "Name",
+          "Pronouns"
+        ],
+        "visibleText": [
+          {
+            "text": "✦ Ticket Booth ✦",
+            "fontPx": 14
+          },
+          {
+            "text": "P",
+            "fontPx": 16.8
+          },
+          {
+            "text": "Port Profile",
+            "fontPx": 16.8
+          },
+          {
+            "text": "they/them",
+            "fontPx": 14
+          },
+          {
+            "text": "0 tickets · 0 W · 0 L",
+            "fontPx": 14
+          },
+          {
+            "text": "0",
+            "fontPx": 14
+          },
+          {
+            "text": "Shared across every arcade game.",
+            "fontPx": 14
+          },
+          {
+            "text": "ADMIT ONE",
+            "fontPx": 14
+          },
+          {
+            "text": "Switch player",
+            "fontPx": 14
+          },
+          {
+            "text": "Edit profile",
+            "fontPx": 14
+          },
+          {
+            "text": "New player",
+            "fontPx": 14
+          },
+          {
+            "text": "Name",
+            "fontPx": 14
+          },
+          {
+            "text": "Pronouns",
+            "fontPx": 14
+          },
+          {
+            "text": "Save profile",
+            "fontPx": 16
+          }
+        ],
+        "controls": [
+          {
+            "testId": "booth-switch",
+            "label": "Switch player",
+            "width": 135.328125,
+            "height": 44
+          },
+          {
+            "testId": "booth-edit-profile",
+            "label": "Edit profile",
+            "width": 135.34375,
+            "height": 44
+          },
+          {
+            "testId": "booth-new",
+            "label": "New player",
+            "width": 135.328125,
+            "height": 44
+          },
+          {
+            "testId": "booth-profile-name",
+            "label": "",
+            "width": 422,
+            "height": 44
+          },
+          {
+            "testId": "booth-profile-pronouns",
+            "label": "",
+            "width": 422,
+            "height": 44
+          },
+          {
+            "testId": "booth-profile-save",
+            "label": "Save profile",
+            "width": 422,
+            "height": 44
+          }
+        ],
+        "pageHorizontalOverflowPx": 0,
+        "boothHorizontalOverflowPx": 0,
+        "pageContained": true,
+        "boothContained": true,
+        "focusChecks": [
+          {
+            "testId": "booth-switch",
+            "focused": true,
+            "visible": true
+          },
+          {
+            "testId": "booth-edit-profile",
+            "focused": true,
+            "visible": true
+          },
+          {
+            "testId": "booth-new",
+            "focused": true,
+            "visible": true
+          },
+          {
+            "testId": "booth-profile-name",
+            "focused": true,
+            "visible": true
+          },
+          {
+            "testId": "booth-profile-pronouns",
+            "focused": true,
+            "visible": true
+          },
+          {
+            "testId": "booth-profile-save",
+            "focused": true,
+            "visible": true
+          }
+        ]
+      },
+      "narrow": {
+        "viewport": {
+          "width": 960,
+          "height": 600
         },
-        {
-          "testId": "booth-new",
-          "label": "New player",
-          "width": 135.328125,
-          "height": 44
-        },
-        {
-          "testId": "booth-profile-name",
-          "label": "",
-          "width": 422,
-          "height": 44
-        },
-        {
-          "testId": "booth-profile-pronouns",
-          "label": "",
-          "width": 422,
-          "height": 44
-        },
-        {
-          "testId": "booth-profile-save",
-          "label": "Save profile",
-          "width": 422,
-          "height": 44
-        }
-      ],
-      "undersizedControls": [],
-      "horizontalOverflowPx": 0,
-      "contained": true
+        "activePronouns": "they/them",
+        "labels": [
+          "Name",
+          "Pronouns"
+        ],
+        "visibleText": [
+          {
+            "text": "✦ Ticket Booth ✦",
+            "fontPx": 14
+          },
+          {
+            "text": "P",
+            "fontPx": 16.8
+          },
+          {
+            "text": "Port Profile",
+            "fontPx": 16.8
+          },
+          {
+            "text": "they/them",
+            "fontPx": 14
+          },
+          {
+            "text": "0 tickets · 0 W · 0 L",
+            "fontPx": 14
+          },
+          {
+            "text": "0",
+            "fontPx": 14
+          },
+          {
+            "text": "Shared across every arcade game.",
+            "fontPx": 14
+          },
+          {
+            "text": "ADMIT ONE",
+            "fontPx": 14
+          },
+          {
+            "text": "Switch player",
+            "fontPx": 14
+          },
+          {
+            "text": "Edit profile",
+            "fontPx": 14
+          },
+          {
+            "text": "New player",
+            "fontPx": 14
+          },
+          {
+            "text": "Name",
+            "fontPx": 14
+          },
+          {
+            "text": "Pronouns",
+            "fontPx": 14
+          },
+          {
+            "text": "Save profile",
+            "fontPx": 16
+          }
+        ],
+        "controls": [
+          {
+            "testId": "booth-switch",
+            "label": "Switch player",
+            "width": 135.328125,
+            "height": 44
+          },
+          {
+            "testId": "booth-edit-profile",
+            "label": "Edit profile",
+            "width": 135.34375,
+            "height": 44
+          },
+          {
+            "testId": "booth-new",
+            "label": "New player",
+            "width": 135.328125,
+            "height": 44
+          },
+          {
+            "testId": "booth-profile-name",
+            "label": "",
+            "width": 422,
+            "height": 44
+          },
+          {
+            "testId": "booth-profile-pronouns",
+            "label": "",
+            "width": 422,
+            "height": 44
+          },
+          {
+            "testId": "booth-profile-save",
+            "label": "Save profile",
+            "width": 422,
+            "height": 44
+          }
+        ],
+        "pageHorizontalOverflowPx": 0,
+        "boothHorizontalOverflowPx": 0,
+        "pageContained": true,
+        "boothContained": true,
+        "focusChecks": [
+          {
+            "testId": "booth-switch",
+            "focused": true,
+            "visible": true
+          },
+          {
+            "testId": "booth-edit-profile",
+            "focused": true,
+            "visible": true
+          },
+          {
+            "testId": "booth-new",
+            "focused": true,
+            "visible": true
+          },
+          {
+            "testId": "booth-profile-name",
+            "focused": true,
+            "visible": true
+          },
+          {
+            "testId": "booth-profile-pronouns",
+            "focused": true,
+            "visible": true
+          },
+          {
+            "testId": "booth-profile-save",
+            "focused": true,
+            "visible": true
+          }
+        ]
+      }
     }
   },
   "requests": {
@@ -283,8 +522,8 @@
     "failedCount": 0,
     "requestedPaths": [
       "/",
-      "/assets/index-DodvFL21.css",
-      "/assets/index-f1QG7MZm.js",
+      "/assets/index-Di5xpT4P.css",
+      "/assets/index-moigaiGV.js",
       "/registerSW.js"
     ]
   },

@@ -426,7 +426,32 @@ async function readLayout(page, name, expected) {
   return result;
 }
 
-async function readPlayerProfileLayout(page) {
+const BOOTH_CONTROL_IDS = [
+  'booth-switch',
+  'booth-edit-profile',
+  'booth-new',
+  'booth-profile-name',
+  'booth-profile-pronouns',
+  'booth-profile-save',
+];
+
+async function readPlayerProfileLayout(page, name, viewport) {
+  await page.getByTestId('booth-edit-profile').focus();
+  await page.keyboard.press('Shift+Tab');
+  const focusChecks = [];
+  for (const testId of BOOTH_CONTROL_IDS) {
+    const focus = await page.evaluate((id) => {
+      const element = document.querySelector(`[data-testid="${id}"]`);
+      if (!(element instanceof HTMLElement)) return { focused: false, visible: false };
+      const style = getComputedStyle(element);
+      return {
+        focused: document.activeElement === element,
+        visible: style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) >= 2,
+      };
+    }, testId);
+    focusChecks.push({ testId, ...focus });
+    if (testId !== BOOTH_CONTROL_IDS.at(-1)) await page.keyboard.press('Tab');
+  }
   const result = await page.evaluate(() => {
     const visible = (element) => {
       if (!(element instanceof HTMLElement)) return false;
@@ -459,19 +484,25 @@ async function readPlayerProfileLayout(page) {
     return {
       activePronouns: document.querySelector('.booth-hero .pstub-pronouns')?.textContent?.trim() ?? null,
       labels,
-      minimumFontPx: Math.min(...textElements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize))),
+      visibleText: textElements.map((element) => ({
+        text: element.textContent?.trim() ?? '',
+        fontPx: Number.parseFloat(getComputedStyle(element).fontSize),
+      })),
       controls,
-      undersizedControls: controls.filter((control) => control.width < 44 || control.height < 44),
-      horizontalOverflowPx: Math.max(0, booth.scrollWidth - booth.clientWidth),
-      contained,
+      pageHorizontalOverflowPx: Math.max(0, document.documentElement.scrollWidth - innerWidth, document.body.scrollWidth - innerWidth),
+      boothHorizontalOverflowPx: Math.max(0, booth.scrollWidth - booth.clientWidth),
+      pageContained: document.documentElement.scrollWidth <= innerWidth && document.body.scrollWidth <= innerWidth,
+      boothContained: contained,
     };
   });
+  const measurement = { viewport, ...result, focusChecks };
   invariant(result.activePronouns === 'they/them', `Booth displayed wrong saved pronouns: ${result.activePronouns}`);
   invariant(result.labels.includes('Name') && result.labels.includes('Pronouns'), 'Booth editor labels are incomplete');
-  invariant(result.minimumFontPx >= 14, `Booth has ${result.minimumFontPx}px visible copy`);
-  invariant(result.undersizedControls.length === 0, `Booth has undersized controls: ${JSON.stringify(result.undersizedControls)}`);
-  invariant(result.horizontalOverflowPx === 0 && result.contained, 'Booth profile editor overflows its ticket column');
-  return result;
+  invariant(result.visibleText.every((entry) => entry.fontPx >= 14), `Booth has visible copy below 14px: ${JSON.stringify(result.visibleText)}`);
+  invariant(result.controls.length === BOOTH_CONTROL_IDS.length && result.controls.every((control) => control.width >= 44 && control.height >= 44), `Booth has undersized controls: ${JSON.stringify(result.controls)}`);
+  invariant(result.pageHorizontalOverflowPx === 0 && result.boothHorizontalOverflowPx === 0 && result.pageContained && result.boothContained, `Booth profile editor overflows its page or ticket column: ${JSON.stringify(measurement)}`);
+  invariant(focusChecks.every((check) => check.focused && check.visible), `Booth ${name} Tab focus is not visibly complete: ${JSON.stringify(focusChecks)}`);
+  return measurement;
 }
 
 async function capture(page, screenshots, directory, filename) {
@@ -640,8 +671,11 @@ async function runJourney(browser, baseUrl, runDirectory) {
       'Booth profile did not persist name and pronouns together',
     );
     await page.getByTestId('booth-edit-profile').click();
-    const playerProfileLayout = await readPlayerProfileLayout(page);
+    const playerProfileDesktop = await readPlayerProfileLayout(page, 'desktop', { width: 1440, height: 900 });
     await capture(page, screenshots, runDirectory, 'player-profile-desktop.png');
+    await page.setViewportSize({ width: 960, height: 600 });
+    const playerProfileNarrow = await readPlayerProfileLayout(page, 'narrow', { width: 960, height: 600 });
+    await page.setViewportSize({ width: 1440, height: 900 });
 
     const trace = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), TRACE_KEY);
     invariant(trace.seedsConsumed[0] === 1702, `Production consumed wrong seed fixtures: ${JSON.stringify(trace.seedsConsumed)}`);
@@ -691,7 +725,7 @@ async function runJourney(browser, baseUrl, runDirectory) {
         minimumMeasuredTargetWidthPx: Math.min(...supportedLayouts.map((layout) => layout.minimumTargetWidthPx)),
         minimumMeasuredTargetHeightPx: Math.min(...supportedLayouts.map((layout) => layout.minimumTargetHeightPx)),
         horizontalOverflowPx: Math.max(...Object.values(layouts).map((layout) => layout.horizontalOverflowPx)),
-        boothProfile: playerProfileLayout,
+        boothProfile: { desktop: playerProfileDesktop, narrow: playerProfileNarrow },
       },
       requests: {
         externalCount: failures.external.length,

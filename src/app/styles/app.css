@@ -485,7 +485,12 @@
   color: var(--teal);
   border-color: rgba(52, 224, 200, 0.5);
   background: rgba(52, 224, 200, 0.1);
-  outline: none;
+}
+.booth-actions button:focus-visible,
+.booth-form-fields input:focus-visible,
+.booth-form-row button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
 }
 .booth-roster { margin-top: 4px; }
 .booth-empty { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 6px 2px; }

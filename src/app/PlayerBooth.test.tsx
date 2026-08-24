@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import { activeProfile } from '@shared/profile/users';
 import { getUsersSnapshot, resetUsersStore } from '@shared/profile/usersStore';
 import { PlayerBooth } from './PlayerBooth';
+
+const boothStyles = readFileSync('src/app/styles/app.css', 'utf8');
 
 function seedUsers(users: Array<{ id: string; name: string; pronouns?: string }>, activeId = users[0]?.id) {
   localStorage.setItem('arcade.users.v1', JSON.stringify({
@@ -100,5 +103,13 @@ describe('<PlayerBooth>', () => {
 
     expect(screen.getByText('they/them')).toBeVisible();
     expect(screen.queryByText('he/him')).not.toBeInTheDocument();
+  });
+
+  it('keeps the editor controls at 44px with an explicit keyboard-focus indicator', () => {
+    expect(boothStyles).toMatch(/\.booth-actions button\s*{[\s\S]*?min-height: 44px;/);
+    expect(boothStyles).toMatch(/\.booth-form-fields input\s*{[\s\S]*?min-height: 44px;/);
+    expect(boothStyles).toMatch(/\.booth-form-row button\s*{[\s\S]*?min-height: 44px;/);
+    expect(boothStyles).toContain('.booth-form-fields input:focus-visible');
+    expect(boothStyles).toContain('.booth-form-row button:focus-visible');
   });
 });
