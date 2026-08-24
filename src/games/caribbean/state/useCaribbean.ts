@@ -31,6 +31,7 @@ import {
 import type { WriterRunResult } from '../storage/writer';
 import { NamedActionGate } from './namedActionGate';
 import type { CaribbeanRuntime } from './runtime';
+import { toMemorySaveIntent } from './toMemorySaveIntent';
 
 type WriterOperationUncertainFailure = {
   kind: 'operation-uncertain';
@@ -143,14 +144,14 @@ export interface CaribbeanController {
   resume(): Promise<void>;
   continueWithoutSaving(): void;
   dispatch(draft: CampaignEventDraft): Promise<CampaignDispatchOutcome>;
-  setSail?(): Promise<CampaignDispatchOutcome>;
-  completeSeaLeg?(): Promise<CampaignDispatchOutcome>;
-  avoidEncounter?(): Promise<CampaignDispatchOutcome>;
-  engageEncounter?(): Promise<CampaignDispatchOutcome>;
-  withdrawBattle?(): Promise<CampaignDispatchOutcome>;
-  resolveBattle?(resolution: NavalResolution): Promise<CampaignDispatchOutcome>;
-  portFocusTarget?: 'last-voyage' | null;
-  acknowledgePortFocus?(): void;
+  setSail(): Promise<CampaignDispatchOutcome>;
+  completeSeaLeg(): Promise<CampaignDispatchOutcome>;
+  avoidEncounter(): Promise<CampaignDispatchOutcome>;
+  engageEncounter(): Promise<CampaignDispatchOutcome>;
+  withdrawBattle(): Promise<CampaignDispatchOutcome>;
+  resolveBattle(resolution: NavalResolution): Promise<CampaignDispatchOutcome>;
+  portFocusTarget: 'last-voyage' | null;
+  acknowledgePortFocus(): void;
   retrySaving(): Promise<void>;
   reloadExternalSave(): Promise<void>;
   exportInMemoryJournal(): string | null;
@@ -160,18 +161,6 @@ export interface CaribbeanController {
   selectActivity(activity: PortActivity): void;
   closeActivity(): void;
 }
-
-export type ActiveCaribbeanController = CaribbeanController & Required<Pick<
-  CaribbeanController,
-  | 'setSail'
-  | 'completeSeaLeg'
-  | 'avoidEncounter'
-  | 'engageEncounter'
-  | 'withdrawBattle'
-  | 'resolveBattle'
-  | 'portFocusTarget'
-  | 'acknowledgePortFocus'
->>;
 
 type StartOptions = Omit<CreateCampaignOptions, 'seed'>;
 
@@ -418,7 +407,7 @@ function initialSnapshot(runtime: CaribbeanRuntime): {
   };
 }
 
-export function useCaribbean(runtime: CaribbeanRuntime): ActiveCaribbeanController {
+export function useCaribbean(runtime: CaribbeanRuntime): CaribbeanController {
   const [initial] = useState(() => initialSnapshot(runtime));
   const [load, setLoad] = useState<LoadResult>(initial.load);
   const [journal, setJournal] = useState<CampaignJournal | null>(null);
@@ -714,14 +703,7 @@ export function useCaribbean(runtime: CaribbeanRuntime): ActiveCaribbeanControll
     }
     if (candidate === null) return;
 
-    pendingRef.current = {
-      kind: 'memory-save',
-      candidate,
-      predecessor: pending.predecessor,
-      publicationPredecessor: pending.kind === 'event' ? pending.predecessor : null,
-      appendedEvent: pending.kind === 'event' ? pending.appendedEvent : null,
-      expectedRevision: pending.expectedRevision,
-    };
+    pendingRef.current = toMemorySaveIntent({ ...pending, candidate });
     if (pending.kind === 'event') {
       publishEventCandidate(generationRef.current, {
         predecessor: pending.predecessor,

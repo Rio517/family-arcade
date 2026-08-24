@@ -18,7 +18,7 @@ import {
   runtime,
   strategicJournals,
 } from './useCaribbeanActionsTestSupport';
-import { useCaribbean, type ActiveCaribbeanController } from './useCaribbean';
+import { useCaribbean, type CaribbeanController } from './useCaribbean';
 
 afterEach(() => {
   cleanup();
@@ -35,7 +35,7 @@ describe('useCaribbean publication lifecycle', () => {
     const deferred = deferredLocks();
     injected.writer = createCampaignWriter(deferred.locks);
     act(() => hook.result.current.selectActivity('market'));
-    let departure!: ReturnType<ActiveCaribbeanController['setSail']>;
+    let departure!: ReturnType<CaribbeanController['setSail']>;
 
     act(() => { departure = hook.result.current.setSail(); });
     await act(async () => { await Promise.resolve(); });
@@ -177,7 +177,7 @@ describe('useCaribbean publication lifecycle', () => {
     await act(() => hook.result.current.resume());
     const deferredA = deferredLocks();
     runtimeA.writer = createCampaignWriter(deferredA.locks);
-    let actionA!: ReturnType<ActiveCaribbeanController['setSail']>;
+    let actionA!: ReturnType<CaribbeanController['setSail']>;
     act(() => { actionA = hook.result.current.setSail(); });
     await act(async () => { await Promise.resolve(); });
 
@@ -185,11 +185,11 @@ describe('useCaribbean publication lifecycle', () => {
     await act(() => hook.result.current.resume());
     const deferredB = deferredLocks();
     runtimeB.writer = createCampaignWriter(deferredB.locks);
-    let actionB!: ReturnType<ActiveCaribbeanController['setSail']>;
+    let actionB!: ReturnType<CaribbeanController['setSail']>;
     act(() => { actionB = hook.result.current.setSail(); });
     await act(async () => { await Promise.resolve(); });
 
-    let settledA!: PromiseSettledResult<Awaited<ReturnType<ActiveCaribbeanController['setSail']>>>;
+    let settledA!: PromiseSettledResult<Awaited<ReturnType<CaribbeanController['setSail']>>>;
     await act(async () => {
       await deferredA.acquire();
       settledA = await Promise.allSettled([actionA]).then(([entry]) => entry);
@@ -198,7 +198,7 @@ describe('useCaribbean publication lifecycle', () => {
       { status: 'fulfilled', value: { kind: 'not-applied' } },
     ]);
 
-    let settledB!: PromiseSettledResult<Awaited<ReturnType<ActiveCaribbeanController['setSail']>>>;
+    let settledB!: PromiseSettledResult<Awaited<ReturnType<CaribbeanController['setSail']>>>;
     await act(async () => {
       await deferredB.acquire();
       settledB = await Promise.allSettled([actionB]).then(([entry]) => entry);

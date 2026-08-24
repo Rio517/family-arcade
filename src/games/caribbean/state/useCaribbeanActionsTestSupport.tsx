@@ -13,7 +13,7 @@ import {
   type LockManagerLike,
 } from '../storage/writer';
 import type { CaribbeanRuntime } from './runtime';
-import { useCaribbean, type ActiveCaribbeanController, type CaribbeanController } from './useCaribbean';
+import { useCaribbean, type CaribbeanController } from './useCaribbean';
 
 export type MemoryStorage = StorageLike & {
   getItem: ReturnType<typeof vi.fn<(key: string) => string | null>>;
@@ -148,7 +148,7 @@ export const ACTIONS = [
   { name: 'resolveBattle', predecessor: ({ engaged }: ReturnType<typeof strategicJournals>) => engaged, eventId: 5, eventType: 'naval-resolved', mode: 'port' },
 ] as const;
 
-export function invoke(controller: ActiveCaribbeanController, name: NamedActionName) {
+export function invoke(controller: CaribbeanController, name: NamedActionName) {
   if (name !== 'resolveBattle') return controller[name]();
   const fallback = strategicJournals().engaged;
   const input = controller.journal?.state.mode.kind === 'naval'

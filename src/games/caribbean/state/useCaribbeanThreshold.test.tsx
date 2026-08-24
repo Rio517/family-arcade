@@ -288,6 +288,69 @@ describe('useCaribbean event-257 publication', () => {
     30_000,
   );
 
+  it.each(['departure', 'resolution'] as const)(
+    'retains event-257 %s publication through a failed retry, repeated consent, and successful retry',
+    async (history) => {
+      // Kills dropping publication metadata when an existing memory-save returns to memory-only.
+      const resolutionFixture = history === 'resolution' ? resolutionThresholdFixture() : null;
+      const predecessor = history === 'departure'
+        ? departureThresholdPredecessor()
+        : resolutionFixture!.predecessor;
+      const hook = await createPersistedController(predecessor);
+      hook.injected.writer = failedWriter();
+      act(() => hook.result.current.selectActivity('market'));
+
+      await act(() => history === 'departure'
+        ? hook.result.current.setSail()
+        : hook.result.current.resolveBattle(resolutionFixture!.resolution));
+      act(() => hook.result.current.continueWithoutSaving());
+      expect(hook.result.current.journal?.events).toHaveLength(257);
+      if (history === 'departure') {
+        expect(hook.result.current.activity).toBe('menu');
+        act(() => hook.result.current.selectActivity('tavern'));
+      } else {
+        expect(hook.result.current.portFocusTarget).toBe('last-voyage');
+        act(() => hook.result.current.acknowledgePortFocus());
+      }
+
+      const realGet = hook.storage.getItem.getMockImplementation()!;
+      let failNextRead = true;
+      hook.storage.getItem.mockImplementation((key) => {
+        if (failNextRead) {
+          failNextRead = false;
+          throw new Error('retry read unavailable');
+        }
+        return realGet(key);
+      });
+      hook.injected.writer = createCampaignWriter(immediateLocks);
+      await act(() => hook.result.current.retrySaving());
+      expect(hook.result.current.persistence.kind).toBe('consent-required');
+
+      act(() => hook.result.current.continueWithoutSaving());
+      expect(hook.result.current.persistence).toMatchObject({
+        kind: 'memory-only',
+        canRetrySaving: true,
+      });
+      hook.storage.getItem.mockImplementation(realGet);
+      await act(() => hook.result.current.retrySaving());
+
+      expect(hook.result.current.persistence).toEqual({ kind: 'persisted' });
+      expect(hook.result.current.journal?.events).toEqual([]);
+      const loaded = loadCampaign(hook.storage);
+      if (loaded.kind !== 'loaded') throw new Error('repeated-consent retry must load');
+      expect(canonicalJson(hook.result.current.journal)).toBe(canonicalJson(loaded.journal));
+      if (history === 'departure') {
+        expect(hook.result.current.activity).toBe('tavern');
+      } else {
+        expect(hook.result.current.portFocusTarget).toBeNull();
+        expect(hook.result.current.journal?.state.world.lastVoyage).toMatchObject({
+          voyageId: 'voyage-254', battleId: 'voyage-254-battle', result: 'victory',
+        });
+      }
+    },
+    30_000,
+  );
+
   it('adopts the compacted journal returned by a successful mutation save', async () => {
     const storage = memoryStorage();
     const journal = departureThresholdPredecessor();

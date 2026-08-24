@@ -11,7 +11,7 @@ import { CampaignSetup, type CampaignSetupIdentity } from './CampaignSetup';
 const EMPTY_REVISION = { currentRaw: null, previousRaw: null };
 
 function controller(overrides: Partial<CaribbeanController> = {}): CaribbeanController {
-  return {
+  const base: CaribbeanController = {
     load: { kind: 'empty', revision: EMPTY_REVISION },
     journal: null,
     activity: 'menu',
@@ -23,6 +23,14 @@ function controller(overrides: Partial<CaribbeanController> = {}): CaribbeanCont
     resume: vi.fn().mockResolvedValue(undefined),
     continueWithoutSaving: vi.fn(),
     dispatch: vi.fn().mockResolvedValue({ kind: 'not-applied' }),
+    setSail: vi.fn().mockResolvedValue({ kind: 'not-applied' }),
+    completeSeaLeg: vi.fn().mockResolvedValue({ kind: 'not-applied' }),
+    avoidEncounter: vi.fn().mockResolvedValue({ kind: 'not-applied' }),
+    engageEncounter: vi.fn().mockResolvedValue({ kind: 'not-applied' }),
+    withdrawBattle: vi.fn().mockResolvedValue({ kind: 'not-applied' }),
+    resolveBattle: vi.fn().mockResolvedValue({ kind: 'not-applied' }),
+    portFocusTarget: null,
+    acknowledgePortFocus: vi.fn(),
     retrySaving: vi.fn().mockResolvedValue(undefined),
     reloadExternalSave: vi.fn().mockResolvedValue(undefined),
     exportInMemoryJournal: vi.fn(() => '{"journal":"exact"}'),
@@ -31,8 +39,8 @@ function controller(overrides: Partial<CaribbeanController> = {}): CaribbeanCont
     abandon: vi.fn().mockResolvedValue(undefined),
     selectActivity: vi.fn(),
     closeActivity: vi.fn(),
-    ...overrides,
   };
+  return Object.assign(base, overrides);
 }
 
 function cleanLoad(length: 'voyage' | 'legend' = 'voyage'): Extract<LoadResult, { kind: 'loaded' }> {
