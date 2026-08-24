@@ -766,7 +766,7 @@
 }
 
 .caribbean-production--port .caribbean-memory-warning {
-  bottom: 104px;
+  bottom: 112px;
 }
 
 /* Keep app chrome clear of the seven primary port commands. */
@@ -798,6 +798,10 @@ body:has(.caribbean-port) .party-root {
 }
 
 @media (max-height: 700px) {
+  .caribbean-production--port .caribbean-memory-warning {
+    bottom: 128px;
+  }
+
   .caribbean-port {
     grid-template-rows: 62px minmax(0, 1fr) auto;
   }

@@ -105,12 +105,12 @@ function resolutionFor(input: NavalBattleInput, outcome: NavalOutcome): NavalRes
 
 describe('voyage readiness', () => {
   it.each([
-    ['not-in-bridgetown', 'Return to Bridgetown before setting sail.'],
+    ['not-in-bridgetown', 'Return to Bridgetown before setting a new course.'],
     ['target-defeated', 'The Red Jackdaw lead is complete.'],
-    ['lead-not-active', 'Mark the Red Jackdaw lead in the tavern first.'],
-    ['flagship-unavailable', 'Choose an available flagship before setting sail.'],
-    ['insufficient-provisions', 'Bring at least 2 provisions for this voyage.'],
-  ] as const)('keeps player-facing blocked copy canonical for %s', (reason, copy) => {
+    ['lead-not-active', 'Mark the Red Jackdaw rumour in the Tavern first.'],
+    ['flagship-unavailable', 'The flagship record is unavailable.'],
+    ['insufficient-provisions', 'Buy at least 2 provisions for the round trip.'],
+  ] as const)('keeps the approved player-facing blocked-copy table exact for %s', (reason, copy) => {
     expect(voyageBlockedCopy(reason)).toBe(copy);
   });
 

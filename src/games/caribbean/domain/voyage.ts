@@ -46,11 +46,11 @@ export function voyageReadiness(state: CampaignStateV1): VoyageReadiness {
 
 export function voyageBlockedCopy(reason: VoyageBlockedReason): string {
   switch (reason) {
-    case 'not-in-bridgetown': return 'Return to Bridgetown before setting sail.';
+    case 'not-in-bridgetown': return 'Return to Bridgetown before setting a new course.';
     case 'target-defeated': return 'The Red Jackdaw lead is complete.';
-    case 'lead-not-active': return 'Mark the Red Jackdaw lead in the tavern first.';
-    case 'flagship-unavailable': return 'Choose an available flagship before setting sail.';
-    case 'insufficient-provisions': return 'Bring at least 2 provisions for this voyage.';
+    case 'lead-not-active': return 'Mark the Red Jackdaw rumour in the Tavern first.';
+    case 'flagship-unavailable': return 'The flagship record is unavailable.';
+    case 'insufficient-provisions': return 'Buy at least 2 provisions for the round trip.';
   }
 }
 

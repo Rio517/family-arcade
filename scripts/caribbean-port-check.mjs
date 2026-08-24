@@ -1348,9 +1348,9 @@ async function runVoyageUiCheck() {
   }
 }
 
-async function runPortMemoryWarningProbe(browser, baseUrl) {
+async function runPortMemoryWarningProbe(browser, baseUrl, viewport) {
   const context = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
+    viewport,
     deviceScaleFactor: 1,
     locale: 'en-US',
     timezoneId: 'UTC',
@@ -1363,12 +1363,12 @@ async function runPortMemoryWarningProbe(browser, baseUrl) {
   try {
     await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
     await page.evaluate(() => { window.__CARIBBEAN_PORT_CHECK__.failNextStorageWrite = true; });
-    await page.getByRole('button', { name: 'Start career' }).click();
-    await page.getByRole('button', { name: 'Continue without saving' }).click();
+    await page.getByTestId('caribbean-start-career-button').evaluate((button) => button.click());
+    await page.getByTestId('caribbean-continue-without-saving-button').evaluate((button) => button.click());
     await page.getByTestId('caribbean-career-ready').waitFor();
     await page.getByText('This career is not being saved. Keep this tab open.').waitFor();
     await settle(page);
-    const geometry = await page.evaluate(() => {
+    const geometry = await page.evaluate((viewport) => {
       const wrapper = document.querySelector('.caribbean-production');
       const warning = document.querySelector('.caribbean-memory-warning');
       const commandRail = document.querySelector('.caribbean-port-menu');
@@ -1378,15 +1378,17 @@ async function runPortMemoryWarningProbe(browser, baseUrl) {
       const warningRect = warning.getBoundingClientRect();
       const commandRect = commandRail.getBoundingClientRect();
       return {
+        viewport,
         wrapperClasses: [...wrapper.classList],
         warning: { top: warningRect.top, bottom: warningRect.bottom },
         commandRail: { top: commandRect.top, bottom: commandRect.bottom },
+        clearance: commandRect.top - warningRect.bottom,
       };
-    });
+    }, viewport);
     invariant(geometry.wrapperClasses.includes('caribbean-production--port'), 'memory-warning-missing-port-wrapper');
     invariant(
-      geometry.warning.bottom <= geometry.commandRail.top,
-      `memory-warning-overlaps-command-rail-${JSON.stringify(geometry)}`,
+      geometry.clearance >= 8,
+      `memory-warning-clearance-below-8px-${JSON.stringify(geometry)}`,
     );
     invariant(failures.console.length === 0, `Memory warning console errors: ${failures.console.join(' | ')}`);
     invariant(failures.page.length === 0, `Memory warning page errors: ${failures.page.join(' | ')}`);
@@ -1447,7 +1449,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
     const menuLabels = await page.locator('[aria-label="Bridgetown activities"] button').allTextContents();
     invariant(canonicalJson(menuLabels.map((label) => label.trim())) === canonicalJson(PORT_ORDER), `Wrong port order: ${JSON.stringify(menuLabels)}`);
     invariant(await page.getByRole('button', { name: 'Set Sail' }).isDisabled(), 'Set Sail is not visibly unavailable');
-    invariant(await page.getByText('Mark the Red Jackdaw lead in the tavern first.').isVisible(), 'Set Sail reason is not visible');
+    invariant(await page.getByText('Mark the Red Jackdaw rumour in the Tavern first.').isVisible(), 'Set Sail reason is not visible');
     layouts.portDesktop = await readLayout(page, 'portDesktop', VIEWPORTS.portDesktop);
     await capture(page, screenshots, runDirectory, 'port-desktop.png');
 
@@ -1913,8 +1915,9 @@ export async function runPortCheck() {
     console.log('Running deterministic browser journey B…');
     const second = await runJourney(browser, baseUrl, secondDirectory, emittedArt, emittedNaval, assetReport);
     assertRequestedGraphIsolation(second.metrics);
-    console.log('Checking memory-only port warning clearance…');
-    await runPortMemoryWarningProbe(browser, baseUrl);
+    console.log('Checking memory-only port warning clearance at desktop and exact supported minimum…');
+    await runPortMemoryWarningProbe(browser, baseUrl, { width: 960, height: 600 });
+    await runPortMemoryWarningProbe(browser, baseUrl, { width: 1440, height: 900 });
     const metricsBytes = await compareRuns(first, second);
     for (const filename of SCREENSHOTS) saveIfChanged(filename, first.screenshots.get(filename));
     saveIfChanged('metrics.json', metricsBytes);
