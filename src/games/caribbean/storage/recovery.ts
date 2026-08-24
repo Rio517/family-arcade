@@ -11,6 +11,7 @@ import {
   type StorageLike,
   type UnreadableSlot,
 } from './persistence';
+import { parseSaveEnvelope } from './schema';
 
 export const QUARANTINE_KEY_PREFIX = 'caribbean:campaign:quarantine:';
 
@@ -58,6 +59,11 @@ export type RecoveryStage =
 export type OperationReachableRevision =
   | { kind: 'known'; revision: ActiveSaveRevision }
   | {
+      kind: 'current-write-installed';
+      revision: ActiveSaveRevision;
+      journal: CampaignJournal;
+    }
+  | {
       kind: 'remove-outcome-unknown';
       failedOperation: 'remove-current' | 'remove-previous';
       acceptableRevisions: readonly ActiveSaveRevision[];
@@ -66,6 +72,10 @@ export type OperationReachableRevision =
       kind: 'write-outcome-unknown';
       failedOperation: 'write-current' | 'write-previous';
       acceptableRevisions: readonly ActiveSaveRevision[];
+      installedCurrent: null | {
+        revision: ActiveSaveRevision;
+        journal: CampaignJournal;
+      };
     };
 
 export interface RecoveryContinuation {
@@ -331,6 +341,9 @@ function acceptableRevision(
   actual: ActiveSaveRevision,
 ): boolean {
   if (remaining.kind === 'known') return sameRevision(remaining.revision, actual);
+  if (remaining.kind === 'current-write-installed') {
+    return sameRevision(remaining.revision, actual);
+  }
   return remaining.acceptableRevisions.some((candidate) => sameRevision(candidate, actual));
 }
 
@@ -460,6 +473,10 @@ function recoveryTargets(
 interface SaveWriteFailure {
   failedOperation: 'write-current' | 'write-previous';
   acceptableRevisions: readonly ActiveSaveRevision[];
+  installedCurrent: null | {
+    revision: ActiveSaveRevision;
+    journal: CampaignJournal;
+  };
 }
 
 function saveCampaignWithWriteOutcomes(
@@ -494,9 +511,15 @@ function saveCampaignWithWriteOutcomes(
       try {
         storage.setItem(key, value);
       } catch (error) {
+        const installed = failedOperation === 'write-current'
+          ? parseSaveEnvelope(value)
+          : null;
         failedWrite = {
           failedOperation,
           acceptableRevisions: uniqueRevisions([before, after]),
+          installedCurrent: installed?.ok
+            ? { revision: cloneRevision(after), journal: installed.envelope.payload }
+            : null,
         };
         throw error;
       }
@@ -520,6 +543,26 @@ function performRecoveryAction(
     if (!read.ok) return read;
     revision = read.revision;
     revisionWasJustRead = true;
+  }
+
+  const installedCurrent = continuation.remaining.kind === 'current-write-installed'
+    ? continuation.remaining
+    : continuation.remaining.kind === 'write-outcome-unknown'
+      ? continuation.remaining.installedCurrent
+      : null;
+  if (
+    continuation.action === 'recover'
+    && continuation.stage === 'republish'
+    && installedCurrent !== null
+    && sameRevision(installedCurrent.revision, revision)
+  ) {
+    return {
+      ok: true,
+      kind: 'recovered',
+      quarantineKey: continuation.quarantineKey,
+      revision: cloneRevision(installedCurrent.revision),
+      journal: installedCurrent.journal,
+    };
   }
 
   const targets = recoveryTargets(continuation);
@@ -617,8 +660,20 @@ function performRecoveryAction(
   ) {
     return externalConflict(continuation, actual.revision);
   }
+  const installedCurrentAfterWrite = saveAttempt.failedWrite?.installedCurrent ?? null;
   const resumable = actual.ok
-    ? knownContinuation(continuation, actual.revision, 'republish')
+    ? installedCurrentAfterWrite !== null
+        && sameRevision(installedCurrentAfterWrite.revision, actual.revision)
+      ? {
+          ...continuation,
+          stage: 'republish' as const,
+          remaining: {
+            kind: 'current-write-installed' as const,
+            revision: cloneRevision(installedCurrentAfterWrite.revision),
+            journal: installedCurrentAfterWrite.journal,
+          },
+        }
+      : knownContinuation(continuation, actual.revision, 'republish')
     : saveAttempt.failedWrite === null
       ? knownContinuation(continuation, revision, 'republish')
       : {
@@ -628,6 +683,7 @@ function performRecoveryAction(
             kind: 'write-outcome-unknown' as const,
             failedOperation: saveAttempt.failedWrite.failedOperation,
             acceptableRevisions,
+            installedCurrent: saveAttempt.failedWrite.installedCurrent,
           },
         };
   return {

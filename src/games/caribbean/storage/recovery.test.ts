@@ -300,6 +300,26 @@ function corruptPreviousRevision(journal = acceptedJournal()): ActiveSaveRevisio
   };
 }
 
+type DegradedSourceKind = 'corrupt-current' | 'corrupt-previous';
+
+function degradedSource(
+  kind: DegradedSourceKind,
+  journal: CampaignJournal,
+): ActiveSaveRevision {
+  return kind === 'corrupt-current'
+    ? corruptCurrentRevision(journal)
+    : corruptPreviousRevision(journal);
+}
+
+function knownGoodRaw(
+  kind: DegradedSourceKind,
+  source: ActiveSaveRevision,
+): string {
+  const raw = kind === 'corrupt-current' ? source.previousRaw : source.currentRaw;
+  if (raw === null) throw new Error('Fixture must retain one known-good save');
+  return raw;
+}
+
 describe('serializeRecoveryExport', () => {
   it('canonicalizes the exact revision and unreadable bytes without reparsing Unicode or malformed JSON', () => {
     const revision = {
@@ -652,7 +672,6 @@ describe('recovery failures before and after verified quarantine', () => {
 
   it.each([
     ['write-previous', 'set:previous', corruptPreviousRevision()],
-    ['write-current', 'set:current', corruptCurrentRevision()],
   ] as const)(
     'continues safely when %s commits and then throws',
     (failedOperation, label, source) => {
@@ -678,20 +697,133 @@ describe('recovery failures before and after verified quarantine', () => {
           remaining: { kind: 'known', revision: committed },
         },
       });
-      if (failedOperation === 'write-current') {
-        expect(loadCampaign(storage)).toMatchObject({
-          kind: 'loaded',
-          build: RECOVERY_OPTIONS.build,
-          journal: loaded.journal,
-        });
-      }
-
       storage.clearFaultsAndHooks();
       storage.resetObservations();
       expect(continueRecovery(storage, continuation, 'continue')).toMatchObject({
         ok: true,
         kind: 'recovered',
       });
+    },
+  );
+
+  const sourceKinds: DegradedSourceKind[] = [
+    'corrupt-current',
+    'corrupt-previous',
+  ];
+  const outcomeRereads = [
+    { label: 'successful outcome reread', fails: false },
+    { label: 'failing outcome reread', fails: true },
+  ] as const;
+
+  it.each(sourceKinds.flatMap((sourceKind) => (
+    outcomeRereads.map((outcomeReread) => ({ sourceKind, outcomeReread }))
+  )))(
+    'adopts an already committed current without duplicate writes for $sourceKind after a $outcomeReread.label',
+    ({ sourceKind, outcomeReread }) => {
+      const source = degradedSource(sourceKind, oversizedJournal());
+      const preservedRaw = knownGoodRaw(sourceKind, source);
+      const storage = new ScriptedStorage(source);
+      const loaded = loadedFrom(storage);
+      if (outcomeReread.fails) {
+        storage.hookAfterAt('set:current', 1, (target) => {
+          target.failNext('get:current');
+        });
+      }
+      storage.failAt('set:current', 1, 'after');
+
+      const failed = recoverCampaign(storage, loaded, RECOVERY_OPTIONS);
+      const continuation = requireContinuation(failed);
+      const committed = storage.revision();
+      const installed = parseSaveEnvelope(committed.currentRaw ?? '');
+      if (!installed.ok) throw new Error('Committed current must be canonical');
+      const expectedJournal: CampaignJournal = {
+        initial: loaded.journal.state,
+        events: [],
+        state: loaded.journal.state,
+      };
+      const expectedRevision = {
+        currentRaw: envelopeRaw(
+          expectedJournal,
+          RECOVERY_OPTIONS.savedAt,
+          RECOVERY_OPTIONS.build,
+        ),
+        previousRaw: preservedRaw,
+      };
+
+      expect(failed).toMatchObject({
+        ok: false,
+        reason: 'continuation-required',
+        cause: 'republish-failed',
+        saveFailure: {
+          ok: false,
+          reason: 'storage-unavailable',
+          operation: 'write-current',
+        },
+      });
+      expect(committed).toEqual(expectedRevision);
+      expect(installed.envelope.payload).toEqual(expectedJournal);
+      if (outcomeReread.fails) {
+        expect(continuation.remaining).toMatchObject({
+          kind: 'write-outcome-unknown',
+          failedOperation: 'write-current',
+          acceptableRevisions: expect.arrayContaining([committed]),
+        });
+      }
+
+      storage.clearFaultsAndHooks();
+      storage.resetObservations();
+      const recovered = continueRecovery(storage, continuation, 'continue');
+
+      expect(recovered).toEqual({
+        ok: true,
+        kind: 'recovered',
+        quarantineKey: quarantineKey(),
+        revision: expectedRevision,
+        journal: expectedJournal,
+      });
+      expect(storage.revision()).toEqual(expectedRevision);
+      expect(storage.operations.filter((entry) => (
+        entry.startsWith('set:') || entry.startsWith('remove:')
+      ))).toEqual([]);
+    },
+  );
+
+  it.each(sourceKinds)(
+    'retries publication from the exact before candidate for %s',
+    (sourceKind) => {
+      const source = degradedSource(sourceKind, acceptedJournal(808));
+      const preservedRaw = knownGoodRaw(sourceKind, source);
+      const storage = new ScriptedStorage(source);
+      const loaded = loadedFrom(storage);
+      storage.failAt('set:current');
+
+      const continuation = requireContinuation(
+        recoverCampaign(storage, loaded, RECOVERY_OPTIONS),
+      );
+      storage.clearFaultsAndHooks();
+      storage.resetObservations();
+
+      const recovered = continueRecovery(storage, continuation, 'continue');
+      expect(recovered).toMatchObject({
+        ok: true,
+        kind: 'recovered',
+        journal: loaded.journal,
+      });
+      if (!recovered.ok || recovered.kind !== 'recovered') {
+        throw new Error('Expected recovered before-candidate retry');
+      }
+      expect(storage.revision()).toEqual(recovered.revision);
+      expect(recovered.revision).toEqual({
+        currentRaw: envelopeRaw(
+          loaded.journal,
+          RECOVERY_OPTIONS.savedAt,
+          RECOVERY_OPTIONS.build,
+        ),
+        previousRaw: preservedRaw,
+      });
+      expect(storage.operations.filter((entry) => entry === 'set:current')).toEqual([
+        'set:current',
+      ]);
     },
   );
 
@@ -717,52 +849,6 @@ describe('recovery failures before and after verified quarantine', () => {
     });
     expect('continuation' in result).toBe(false);
     expect(storage.revision()).toEqual(external);
-  });
-
-  it('carries the finite write-current before/after revisions when the outcome reread fails', () => {
-    const source = corruptCurrentRevision();
-    const storage = new ScriptedStorage(source);
-    const loaded = loadedFrom(storage);
-    const proposedCurrent = envelopeRaw(
-      loaded.journal,
-      RECOVERY_OPTIONS.savedAt,
-      RECOVERY_OPTIONS.build,
-    );
-    storage.hookAfterAt('set:current', 1, (target) => {
-      target.failNext('get:current');
-    });
-    storage.failAt('set:current', 1, 'after');
-
-    const failed = recoverCampaign(storage, loaded, RECOVERY_OPTIONS);
-    const continuation = requireContinuation(failed);
-
-    expect(failed).toMatchObject({
-      ok: false,
-      reason: 'continuation-required',
-      cause: 'republish-failed',
-      continuation: {
-        stage: 'republish',
-        remaining: {
-          kind: 'write-outcome-unknown',
-          failedOperation: 'write-current',
-          acceptableRevisions: [
-            { currentRaw: null, previousRaw: source.previousRaw },
-            { currentRaw: proposedCurrent, previousRaw: source.previousRaw },
-          ],
-        },
-      },
-    });
-    expect(storage.revision()).toEqual({
-      currentRaw: proposedCurrent,
-      previousRaw: source.previousRaw,
-    });
-
-    storage.clearFaultsAndHooks();
-    storage.resetObservations();
-    expect(continueRecovery(storage, continuation, 'continue')).toMatchObject({
-      ok: true,
-      kind: 'recovered',
-    });
   });
 
   it('returns verify-quarantine failure and removes nothing when verification read throws', () => {
