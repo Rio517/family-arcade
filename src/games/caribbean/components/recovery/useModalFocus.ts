@@ -20,6 +20,31 @@ interface ModalFocusOptions {
   onDismiss(): void;
 }
 
+function modalBackgroundBranches(
+  dialog: HTMLElement | null,
+  localBackground: HTMLElement | null,
+): HTMLElement[] {
+  const branches = new Set<HTMLElement>();
+  const add = (element: HTMLElement | null) => {
+    if (element !== null && element !== dialog && !element.contains(dialog)) {
+      branches.add(element);
+    }
+  };
+  add(localBackground);
+
+  let activeBranch: HTMLElement | null = dialog;
+  while (activeBranch?.parentElement) {
+    const parent = activeBranch.parentElement;
+    for (const sibling of parent.children) {
+      if (sibling !== activeBranch && sibling instanceof HTMLElement) add(sibling);
+    }
+    if (parent === document.body) break;
+    activeBranch = parent;
+  }
+
+  return [...branches];
+}
+
 export function useModalFocus({
   active,
   dialogRef,
@@ -36,8 +61,11 @@ export function useModalFocus({
     const dialog = dialogRef.current;
     const background = backgroundRef.current;
     const returnFocus = returnFocusRef.current;
-    const priorInert = background?.getAttribute('inert') ?? null;
-    background?.setAttribute('inert', '');
+    const inertSnapshots = modalBackgroundBranches(dialog, background).map((element) => ({
+      element,
+      priorInert: element.getAttribute('inert'),
+    }));
+    for (const { element } of inertSnapshots) element.setAttribute('inert', '');
     initialFocusRef.current?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -62,9 +90,9 @@ export function useModalFocus({
     window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
-      if (background !== null) {
-        if (priorInert === null) background.removeAttribute('inert');
-        else background.setAttribute('inert', priorInert);
+      for (const { element, priorInert } of inertSnapshots) {
+        if (priorInert === null) element.removeAttribute('inert');
+        else element.setAttribute('inert', priorInert);
       }
       returnFocus?.focus();
     };
