@@ -10,6 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 import {
   ART_ACTIVITY_CONTRAST_SPECS,
+  ART_CAPTURE_FIXTURE_STATE,
   ART_CONTRAST_SELECTORS,
   ART_VIEWPORT_SPECS,
   EXPECTED_MARKET_ACTION_IDS,
@@ -730,6 +731,15 @@ async function readArtViewport(page, spec, subjectRoi) {
       return { leaves, overlapPairs };
     };
 
+    const statusValue = (label) => {
+      const row = [...document.querySelectorAll('.caribbean-port-status-rail dl > div')].find(
+        (candidate) => candidate.querySelector('dt')?.textContent?.trim() === label,
+      );
+      const value = row?.querySelector('dd')?.textContent?.trim();
+      if (value === undefined) throw new Error(`Missing art fixture status: ${label}`);
+      return value;
+    };
+
     return {
       name: viewportSpec.name,
       viewport: { width: innerWidth, height: innerHeight },
@@ -739,6 +749,7 @@ async function readArtViewport(page, spec, subjectRoi) {
         roiVisibleRatio: subjectArea === 0 ? 0 : intersectionWidth * intersectionHeight / subjectArea,
       },
       naturalSize: { width: sourceWidth, height: sourceHeight },
+      fixtureState: { gold: statusValue('Gold'), provisions: statusValue('Provisions') },
       contrasts,
       menuGeometry: geometry(false),
     };
@@ -808,6 +819,9 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
       await normalPage.getByRole('heading', { name: 'Choose your next port action', level: 2 }).waitFor();
       const evidence = await readArtViewport(normalPage, spec, subjectRoi);
       invariant(evidence.naturalSize.width === 1920 && evidence.naturalSize.height === 1080, 'Browser decoded the wrong art dimensions');
+      invariant(evidence.fixtureState.gold === ART_CAPTURE_FIXTURE_STATE.gold
+        && evidence.fixtureState.provisions === ART_CAPTURE_FIXTURE_STATE.provisions,
+      `Art capture fixture drifted before ${spec.name}: ${JSON.stringify(evidence.fixtureState)}`);
       await capture(normalPage, screenshots, runDirectory, `port-art-${spec.name}.png`);
       await normalPage.getByRole('button', { name: 'Market' }).click();
       await normalPage.getByRole('heading', { name: 'Market', level: 2 }).waitFor();
@@ -878,7 +892,15 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
         }
         return { leaves, overlapPairs: [...overlapKeys].map(JSON.parse).sort() };
       }, { marketActionIds: EXPECTED_MARKET_ACTION_IDS });
+      viewports.push(evidence);
+      await normalPage.getByRole('button', { name: 'Back to harbour' }).click();
+    }
+    for (const [index, spec] of ART_VIEWPORT_SPECS.entries()) {
+      await normalPage.setViewportSize({ width: spec.width, height: spec.height });
+      await normalPage.getByRole('heading', { name: 'Choose your next port action', level: 2 }).waitFor();
       const activityContrasts = [];
+      await normalPage.getByRole('button', { name: 'Market' }).click();
+      await normalPage.getByRole('heading', { name: 'Market', level: 2 }).waitFor();
       await normalPage.getByTestId('market-provisions-buy-1').click();
       await normalPage.getByTestId('caribbean-market-status').getByText('Cargo ledger updated.').waitFor();
       activityContrasts.push(await readActivityContrast(normalPage, ART_ACTIVITY_CONTRAST_SPECS[0]));
@@ -894,9 +916,10 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
       await normalPage.getByRole('button', { name: 'Back to harbour' }).click();
       await normalPage.getByRole('button', { name: "Captain's Log" }).click();
       await normalPage.getByText('Sail east of Bridgetown and identify the Red Jackdaw.').waitFor();
-      activityContrasts.push(await readActivityContrast(normalPage, ART_ACTIVITY_CONTRAST_SPECS[2]));
-      evidence.activityContrasts = activityContrasts;
-      viewports.push(evidence);
+      for (const activitySpec of ART_ACTIVITY_CONTRAST_SPECS.slice(2)) {
+        activityContrasts.push(await readActivityContrast(normalPage, activitySpec));
+      }
+      viewports[index].activityContrasts = activityContrasts;
       await normalPage.getByRole('button', { name: 'Back to harbour' }).click();
     }
     invariant(normalFailures.console.length === 0 && normalFailures.page.length === 0

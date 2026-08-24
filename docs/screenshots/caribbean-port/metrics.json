@@ -587,8 +587,8 @@
     "requestedPaths": [
       "/",
       "/assets/bridgetown-1675-CHjsU7Fy.webp",
-      "/assets/index-BrHmmirw.js",
-      "/assets/index-DD2n53S3.css",
+      "/assets/index-DHP1sjMr.js",
+      "/assets/index-q_IFYJLx.css",
       "/registerSW.js"
     ]
   },
@@ -710,6 +710,10 @@
           "width": 1920,
           "height": 1080
         },
+        "fixtureState": {
+          "gold": "500 gold",
+          "provisions": "3.4 months"
+        },
         "contrasts": [
           {
             "selector": ".caribbean-port-status-rail dt",
@@ -1213,8 +1217,14 @@
             "backgroundAlpha": 1
           },
           {
-            "selector": ".caribbean-log-action",
-            "text": "NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.",
+            "selector": ".caribbean-log-action-label",
+            "text": "NEXT ACTION",
+            "minimumRatio": 8.888993634296273,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-log-action-copy",
+            "text": "Sail east of Bridgetown and identify the Red Jackdaw.",
             "minimumRatio": 13.115407441447779,
             "backgroundAlpha": 1
           }
@@ -1235,6 +1245,10 @@
           "width": 1920,
           "height": 1080
         },
+        "fixtureState": {
+          "gold": "500 gold",
+          "provisions": "3.4 months"
+        },
         "contrasts": [
           {
             "selector": ".caribbean-port-status-rail dt",
@@ -1738,8 +1752,14 @@
             "backgroundAlpha": 1
           },
           {
-            "selector": ".caribbean-log-action",
-            "text": "NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.",
+            "selector": ".caribbean-log-action-label",
+            "text": "NEXT ACTION",
+            "minimumRatio": 8.888993634296273,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-log-action-copy",
+            "text": "Sail east of Bridgetown and identify the Red Jackdaw.",
             "minimumRatio": 13.115407441447779,
             "backgroundAlpha": 1
           }
@@ -1760,6 +1780,10 @@
           "width": 1920,
           "height": 1080
         },
+        "fixtureState": {
+          "gold": "500 gold",
+          "provisions": "3.4 months"
+        },
         "contrasts": [
           {
             "selector": ".caribbean-port-status-rail dt",
@@ -2263,8 +2287,14 @@
             "backgroundAlpha": 1
           },
           {
-            "selector": ".caribbean-log-action",
-            "text": "NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.",
+            "selector": ".caribbean-log-action-label",
+            "text": "NEXT ACTION",
+            "minimumRatio": 8.888993634296273,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-log-action-copy",
+            "text": "Sail east of Bridgetown and identify the Red Jackdaw.",
             "minimumRatio": 13.115407441447779,
             "backgroundAlpha": 1
           }
@@ -2285,6 +2315,10 @@
           "width": 1920,
           "height": 1080
         },
+        "fixtureState": {
+          "gold": "500 gold",
+          "provisions": "3.4 months"
+        },
         "contrasts": [
           {
             "selector": ".caribbean-port-status-rail dt",
@@ -2788,8 +2822,14 @@
             "backgroundAlpha": 1
           },
           {
-            "selector": ".caribbean-log-action",
-            "text": "NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.",
+            "selector": ".caribbean-log-action-label",
+            "text": "NEXT ACTION",
+            "minimumRatio": 8.888993634296273,
+            "backgroundAlpha": 1
+          },
+          {
+            "selector": ".caribbean-log-action-copy",
+            "text": "Sail east of Bridgetown and identify the Red Jackdaw.",
             "minimumRatio": 13.115407441447779,
             "backgroundAlpha": 1
           }

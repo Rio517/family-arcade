@@ -101,7 +101,8 @@ const CONTRAST_SELECTORS = [
 const ACTIVITY_CONTRAST_SPECS = [
   { selector: '.caribbean-market-status:not(:empty)', text: 'Cargo ledger updated.' },
   { selector: '.caribbean-tavern-rumour blockquote', text: 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.' },
-  { selector: '.caribbean-log-action', text: 'NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.' },
+  { selector: '.caribbean-log-action-label', text: 'NEXT ACTION' },
+  { selector: '.caribbean-log-action-copy', text: 'Sail east of Bridgetown and identify the Red Jackdaw.' },
 ];
 
 function geometryEvidence(includeMarket = false) {
@@ -141,6 +142,7 @@ function artEvidence() {
       activityContrasts: ACTIVITY_CONTRAST_SPECS.map(({ selector, text }) => ({
         selector, text, minimumRatio: 7, backgroundAlpha: 1,
       })),
+      fixtureState: { gold: '500 gold', provisions: '3.4 months' },
       menuGeometry: geometryEvidence(false),
       marketGeometry: geometryEvidence(true),
     })),
@@ -195,23 +197,32 @@ describe('evaluatePortIdentityEvidence', () => {
           ? { ...sample, minimumRatio: 4.49 } : sample) }
         : viewport),
     } }), 'art desktop contrast must be opaque and at least 4.5:1'],
-    ['an omitted activity selector', setupEvidence({ art: {
+    ['an omitted nested log-label selector', setupEvidence({ art: {
       ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
-        ? { ...viewport, activityContrasts: viewport.activityContrasts.slice(1) }
+        ? { ...viewport, activityContrasts: viewport.activityContrasts.filter(
+          (sample) => sample.selector !== '.caribbean-log-action-label',
+        ) }
         : viewport),
-    } }), 'art desktop activity contrast must cover actual opaque states at least 4.5:1'],
-    ['a transparent activity sample', setupEvidence({ art: {
+    } }), 'art desktop activity contrast must include exact .caribbean-log-action-label / NEXT ACTION'],
+    ['a transparent nested log-label sample', setupEvidence({ art: {
       ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
-        ? { ...viewport, activityContrasts: viewport.activityContrasts.map((sample, sampleIndex) => sampleIndex === 0
-          ? { ...sample, backgroundAlpha: 0 } : sample) }
+        ? { ...viewport, activityContrasts: viewport.activityContrasts.map((sample) => (
+          sample.selector === '.caribbean-log-action-label' ? { ...sample, backgroundAlpha: 0 } : sample
+        )) }
         : viewport),
-    } }), 'art desktop activity contrast must cover actual opaque states at least 4.5:1'],
-    ['a sub-4.5 activity sample', setupEvidence({ art: {
+    } }), 'art desktop activity contrast .caribbean-log-action-label must resolve to an opaque background'],
+    ['a sub-4.5 nested log-label sample', setupEvidence({ art: {
       ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
-        ? { ...viewport, activityContrasts: viewport.activityContrasts.map((sample, sampleIndex) => sampleIndex === 1
-          ? { ...sample, minimumRatio: 4.49 } : sample) }
+        ? { ...viewport, activityContrasts: viewport.activityContrasts.map((sample) => (
+          sample.selector === '.caribbean-log-action-label' ? { ...sample, minimumRatio: 4.49 } : sample
+        )) }
         : viewport),
-    } }), 'art desktop activity contrast must cover actual opaque states at least 4.5:1'],
+    } }), 'art desktop activity contrast .caribbean-log-action-label must be at least 4.5:1'],
+    ['responsive fixture drift after an activity probe', setupEvidence({ art: {
+      ...artEvidence(), viewports: artEvidence().viewports.map((viewport) => viewport.name === 'wide'
+        ? { ...viewport, fixtureState: { gold: '496 gold', provisions: '3.5 months' } }
+        : viewport),
+    } }), 'art wide capture fixture must remain at 500 gold / 3.4 months'],
     ['clipped leaf', setupEvidence({ art: {
       ...artEvidence(), viewports: artEvidence().viewports.map((viewport, index) => index === 0
         ? { ...viewport, menuGeometry: {

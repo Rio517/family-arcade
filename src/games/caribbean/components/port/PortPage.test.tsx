@@ -421,6 +421,17 @@ describe('<PortPage>', () => {
     expect(ruleBodyContaining(portCss, '.caribbean-market-status')).not.toContain('background:');
   });
 
+  it('gives each separately styled Captain\'s Log action run an explicit opaque ink background', () => {
+    const portCss = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+    const labelRule = ruleBodyContaining(portCss, '.caribbean-log-action-label');
+    const copyRule = ruleBodyContaining(portCss, '.caribbean-log-action-copy');
+
+    expect(declaration(labelRule, 'background')).toBe('#07151d');
+    expect(declaration(copyRule, 'background')).toBe('#07151d');
+    expect(declaration(labelRule, 'color')).toBe('var(--caribbean-trade-wind)');
+    expect(declaration(copyRule, 'color')).toBe('var(--caribbean-sailcloth)');
+  });
+
   it.each([
     { label: 'minimum compact playfield', width: 960, height: 600, placeFont: 19 },
     { label: 'normal desktop playfield', width: 1440, height: 900, placeFont: 21 },

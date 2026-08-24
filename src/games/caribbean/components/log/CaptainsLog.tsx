@@ -15,8 +15,8 @@ export function CaptainsLog({ state }: { state: CampaignStateV1 }) {
       </header>
       {view.status === 'active' ? (
         <p className="caribbean-log-action">
-          <span>Next action</span>
-          {view.nextAction}
+          <span className="caribbean-log-action-label">Next action</span>
+          <span className="caribbean-log-action-copy">{view.nextAction}</span>
         </p>
       ) : (
         <p className="caribbean-log-terminal">{view.terminalCopy}</p>

@@ -67,10 +67,19 @@ export const ART_ACTIVITY_CONTRAST_SPECS = Object.freeze([
     text: 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.',
   }),
   Object.freeze({
-    selector: '.caribbean-log-action',
-    text: 'NEXT ACTION Sail east of Bridgetown and identify the Red Jackdaw.',
+    selector: '.caribbean-log-action-label',
+    text: 'NEXT ACTION',
+  }),
+  Object.freeze({
+    selector: '.caribbean-log-action-copy',
+    text: 'Sail east of Bridgetown and identify the Red Jackdaw.',
   }),
 ]);
+
+export const ART_CAPTURE_FIXTURE_STATE = Object.freeze({
+  gold: '500 gold',
+  provisions: '3.4 months',
+});
 
 const ART_MENU_GEOMETRY_IDS = Object.freeze([
   'party-pill', 'port-position', 'port-fact-0', 'port-fact-1', 'port-fact-2', 'port-fact-3', 'port-fact-4',
@@ -337,20 +346,33 @@ function validateArtEvidence(issues, art) {
         || sample.backgroundAlpha !== 1)) {
       issues.push(`art ${spec.name} contrast must be opaque and at least 4.5:1`);
     }
-    if (!Array.isArray(viewport?.activityContrasts)
-      || !sameMembers(
-        viewport.activityContrasts.map((sample) => sample?.selector),
-        ART_ACTIVITY_CONTRAST_SPECS.map(({ selector }) => selector),
-      )
-      || viewport.activityContrasts.some((sample) => {
-        const activitySpec = ART_ACTIVITY_CONTRAST_SPECS.find(({ selector }) => selector === sample?.selector);
-        return !isRecord(sample)
-          || activitySpec?.text !== sample.text
-          || !Number.isFinite(sample.minimumRatio)
-          || sample.minimumRatio < 4.5
-          || sample.backgroundAlpha !== 1;
-      })) {
-      issues.push(`art ${spec.name} activity contrast must cover actual opaque states at least 4.5:1`);
+    if (!Array.isArray(viewport?.activityContrasts)) {
+      issues.push(`art ${spec.name} activity contrast must cover actual opaque states`);
+    } else {
+      for (const activitySpec of ART_ACTIVITY_CONTRAST_SPECS) {
+        const samples = viewport.activityContrasts.filter((sample) => sample?.selector === activitySpec.selector);
+        if (samples.length !== 1 || samples[0]?.text !== activitySpec.text) {
+          issues.push(`art ${spec.name} activity contrast must include exact ${activitySpec.selector} / ${activitySpec.text}`);
+          continue;
+        }
+        const sample = samples[0];
+        if (sample.backgroundAlpha !== 1) {
+          issues.push(`art ${spec.name} activity contrast ${activitySpec.selector} must resolve to an opaque background`);
+        }
+        if (!Number.isFinite(sample.minimumRatio) || sample.minimumRatio < 4.5) {
+          issues.push(`art ${spec.name} activity contrast ${activitySpec.selector} must be at least 4.5:1`);
+        }
+      }
+      if (viewport.activityContrasts.some((sample) => !ART_ACTIVITY_CONTRAST_SPECS.some(
+        ({ selector }) => selector === sample?.selector,
+      ))) {
+        issues.push(`art ${spec.name} activity contrast contains an unexpected selector`);
+      }
+    }
+    if (!isRecord(viewport?.fixtureState)
+      || viewport.fixtureState.gold !== ART_CAPTURE_FIXTURE_STATE.gold
+      || viewport.fixtureState.provisions !== ART_CAPTURE_FIXTURE_STATE.provisions) {
+      issues.push(`art ${spec.name} capture fixture must remain at 500 gold / 3.4 months`);
     }
     validateArtGeometry(issues, viewport?.menuGeometry, spec.name, 'menu', ART_MENU_GEOMETRY_IDS);
     validateArtGeometry(issues, viewport?.marketGeometry, spec.name, 'market', ART_MARKET_GEOMETRY_IDS);

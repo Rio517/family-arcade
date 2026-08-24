@@ -507,15 +507,21 @@
   line-height: 1.5;
 }
 
-.caribbean-log-action span {
+.caribbean-log-action-label {
   display: block;
   margin-bottom: 5px;
+  background: #07151d;
   color: var(--caribbean-trade-wind);
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   font-size: 14px;
   font-weight: 750;
   letter-spacing: .1em;
   text-transform: uppercase;
+}
+
+.caribbean-log-action-copy {
+  background: #07151d;
+  color: var(--caribbean-sailcloth);
 }
 
 .caribbean-port-stage--market {

@@ -29,7 +29,8 @@ describe("<CaptainsLog>", () => {
 
     expect(screen.getByRole('heading', { name: 'Red Jackdaw' })).toBeInTheDocument();
     expect(screen.getByText('18 days remaining')).toBeInTheDocument();
-    expect(screen.getByText(NEXT_ACTION)).toBeInTheDocument();
+    expect(screen.getByText('Next action')).toHaveClass('caribbean-log-action-label');
+    expect(screen.getByText(NEXT_ACTION)).toHaveClass('caribbean-log-action-copy');
     expect(screen.getAllByTestId('captains-log-red-jackdaw')).toHaveLength(1);
     expect(container.querySelectorAll('ol, ul, [role="progressbar"], map')).toHaveLength(0);
     expect(container.querySelector('[data-priority], [data-pinned], [data-clue-tree]')).toBeNull();
