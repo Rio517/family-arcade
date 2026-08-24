@@ -160,6 +160,21 @@ describe('loadCampaign', () => {
     expect(compacted.events).toEqual([]);
     expect(compacted.initial.lastEventId).toBe(journal.state.lastEventId);
   });
+
+  it.each(['sailing', 'encounter', 'naval'] as const)('recovers the exact previous %s checkpoint without rewriting unreadable bytes', (kind) => {
+    // Catches recovery promoting a corrupted active mode or changing raw evidence before recovery.
+    const journal = activeModeJournals()[kind];
+    const previousRaw = envelopeRaw(compactJournal(journal), 90, `previous-${kind}`);
+    const revision = { currentRaw: '{corrupt-current', previousRaw };
+    const storage = new MemoryStorage(revision);
+
+    expect(loadCampaign(storage)).toMatchObject({
+      kind: 'loaded', recovered: true, journal: compactJournal(journal),
+      unreadableSlots: [{ slot: 'current', raw: '{corrupt-current', code: 'malformed-json' }], revision,
+    });
+    expect(storage.revision()).toEqual(revision);
+    expect(storage.writes).toEqual([]);
+  });
   it('loads an empty store without writing or deleting', () => {
     const storage = new MemoryStorage();
 
