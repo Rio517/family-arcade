@@ -115,7 +115,7 @@ function parseSlot(
     : { kind: 'unreadable', unreadable: { slot, raw, code: parsed.code } };
 }
 
-function sameRevision(left: ActiveSaveRevision, right: ActiveSaveRevision): boolean {
+export function sameRevision(left: ActiveSaveRevision, right: ActiveSaveRevision): boolean {
   return left.currentRaw === right.currentRaw
     && left.previousRaw === right.previousRaw;
 }
