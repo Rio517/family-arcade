@@ -175,6 +175,22 @@ describe('loadCampaign', () => {
     expect(storage.revision()).toEqual(revision);
     expect(storage.writes).toEqual([]);
   });
+
+  it.each(['sailing', 'encounter', 'naval'] as const)('never promotes a mutated previous %s checkpoint', (kind) => {
+    // Catches recovery accepting cross-field-invalid compacted state with no predecessor events.
+    const previous = compactJournal(activeModeJournals()[kind]);
+    if (previous.initial.mode.kind === 'sailing') previous.initial.mode.voyageId = 'voyage-99';
+    if (previous.initial.mode.kind === 'encounter') previous.initial.mode.encounterId = 'wrong-contact';
+    if (previous.initial.mode.kind === 'naval') previous.initial.mode.input.seed = 0;
+    previous.state = structuredClone(previous.initial);
+    const previousRaw = envelopeRaw(previous, 90, `mutated-${kind}`);
+    const revision = { currentRaw: '{corrupt-current', previousRaw };
+    const storage = new MemoryStorage(revision);
+
+    expect(loadCampaign(storage)).toMatchObject({ kind: 'unreadable' });
+    expect(storage.revision()).toEqual(revision);
+    expect(storage.writes).toEqual([]);
+  });
   it('loads an empty store without writing or deleting', () => {
     const storage = new MemoryStorage();
 
