@@ -6,7 +6,7 @@ import type {
   PortId,
   ShipClassId,
 } from '../content/types';
-import type { NavalBattleInput, Point } from './naval/types';
+import type { NavalBattleInput, NavalOutcome, Point } from './naval/types';
 
 export type CampaignLength = 'adventure' | 'voyage' | 'legend';
 export type Talent = 'fencing' | 'gunnery' | 'navigation' | 'charm' | 'medicine';
@@ -25,6 +25,14 @@ export interface PrizeSnapshot {
   battleId: string;
   ship: ShipState;
   willingCrew: number;
+}
+
+export interface LastVoyageSummary {
+  voyageId: string;
+  battleId: string | null;
+  result: 'avoided' | 'withdrew' | 'victory' | 'defeat' | 'unresolved';
+  outcome: NavalOutcome | null;
+  returnedDay: number;
 }
 
 export type CampaignMode =
@@ -103,6 +111,7 @@ export interface CampaignStateV1 {
       defense: 'guarded';
     }>;
     targetDefeated: boolean;
+    lastVoyage?: LastVoyageSummary;
   };
   leads: LeadState[];
   relationships: Record<string, {

@@ -48,6 +48,12 @@ function marketEvent(payload: Record<string, unknown> = {}) {
 }
 
 describe('campaign journal append', () => {
+  it('recognizes the replayable voyage event syntax before predecessor reduction', () => {
+    // Catches an event union that leaves strategic events as unknown IDs.
+    expect(validateCampaignEvent({
+      id: 2, type: 'voyage-started', atDay: 0, payload: { voyageId: 'voyage-2' },
+    })).toMatchObject({ ok: true });
+  });
   it('applies a quoted market event atomically and replays it canonically', () => {
     const journal = createJournal(initialCampaign());
     const quote = quoteTrade(journal.state, {

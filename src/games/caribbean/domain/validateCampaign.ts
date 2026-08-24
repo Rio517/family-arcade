@@ -8,7 +8,10 @@ import {
   isShipClassId,
   PORT_IDS,
 } from '../content/campaign';
+import { createRedJackdawBattleInput } from '../content/naval';
+import { RED_JACKDAW_VOYAGE } from '../content/voyage';
 import { SLOOP_CLASS } from '../content/naval';
+import { canonicalJson } from '../canonicalJson';
 import type { CampaignStateV1, ValidationIssue, ValidationResult } from './types';
 
 const ROOT_KEYS = [
@@ -409,6 +412,29 @@ function validateCalendar(root: PlainRecord, problems: JsonProblems, nonEnumerab
   validateInteger(required(calendar, 'elapsedDays', path, problems, nonEnumerable, issues), `${path}.elapsedDays`, 0, Number.MAX_SAFE_INTEGER, issues);
 }
 
+function sameJson(left: unknown, right: unknown): boolean {
+  return canonicalJson(left) === canonicalJson(right);
+}
+
+function activeRedJackdaw(root: PlainRecord): boolean {
+  const leads = root.leads;
+  return Array.isArray(leads) && leads.some((lead) => isPlainRecord(lead) && lead.id === 'red-jackdaw' && lead.status === 'active');
+}
+
+function flagship(root: PlainRecord): PlainRecord | null {
+  const fleet = root.fleet;
+  if (!isPlainRecord(fleet) || typeof fleet.flagshipId !== 'string' || !Array.isArray(fleet.ships)) return null;
+  return fleet.ships.find((ship) => isPlainRecord(ship) && ship.id === fleet.flagshipId) as PlainRecord | undefined ?? null;
+}
+
+function voyageInvariant(
+  path: string,
+  valid: boolean,
+  issues: ValidationIssue[],
+): void {
+  if (!valid) issue(issues, path, 'invariant');
+}
+
 function validateMode(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'mode';
   const rawMode = required(root, 'mode', '$', problems, nonEnumerable, issues);
@@ -420,16 +446,62 @@ function validateMode(root: PlainRecord, problems: JsonProblems, nonEnumerable: 
   }
   const kind = required(rawMode, 'kind', path, problems, nonEnumerable, issues);
   if (!validateString(kind, `${path}.kind`, issues)) return;
-  if (kind !== 'port') {
+  if (kind === 'port') {
+    validateKeys(rawMode, ['kind', 'portId'], path, problems, nonEnumerable, issues);
+    const portId = required(rawMode, 'portId', path, problems, nonEnumerable, issues);
+    if (validateString(portId, `${path}.portId`, issues) && !isPortId(portId)) {
+      issue(issues, `${path}.portId`, 'unknown-id');
+    }
+    return;
+  }
+  if (kind !== 'sailing' && kind !== 'encounter' && kind !== 'naval') {
     issue(issues, `${path}.kind`, 'unknown-id');
     discardAtOrBelow(path, problems, nonEnumerable);
     return;
   }
-  validateKeys(rawMode, ['kind', 'portId'], path, problems, nonEnumerable, issues);
-  const portId = required(rawMode, 'portId', path, problems, nonEnumerable, issues);
-  if (validateString(portId, `${path}.portId`, issues) && !isPortId(portId)) {
-    issue(issues, `${path}.portId`, 'unknown-id');
+  const lastEventId = root.lastEventId;
+  const ship = flagship(root);
+  const world = isPlainRecord(root.world) ? root.world : null;
+  const common = activeRedJackdaw(root) && world?.targetDefeated === false && ship !== null;
+  const provisions = ship && isPlainRecord(ship.cargo) ? ship.cargo.provisions : null;
+  if (kind === 'sailing') {
+    validateKeys(rawMode, ['kind', 'voyageId', 'checkpoint'], path, problems, nonEnumerable, issues);
+    const voyageId = required(rawMode, 'voyageId', path, problems, nonEnumerable, issues);
+    const checkpoint = required(rawMode, 'checkpoint', path, problems, nonEnumerable, issues);
+    validateStableId(voyageId, `${path}.voyageId`, issues);
+    voyageInvariant(`${path}.voyageId`, typeof lastEventId === 'number' && lastEventId >= 1 && voyageId === `voyage-${lastEventId}`, issues);
+    voyageInvariant(`${path}.checkpoint`, sameJson(checkpoint, RED_JACKDAW_VOYAGE.start), issues);
+    voyageInvariant(path, common && typeof provisions === 'number' && provisions >= 2, issues);
+    return;
   }
+  if (kind === 'encounter') {
+    validateKeys(rawMode, ['kind', 'voyageId', 'encounterId', 'returnCheckpoint'], path, problems, nonEnumerable, issues);
+    const voyageId = required(rawMode, 'voyageId', path, problems, nonEnumerable, issues);
+    const encounterId = required(rawMode, 'encounterId', path, problems, nonEnumerable, issues);
+    const checkpoint = required(rawMode, 'returnCheckpoint', path, problems, nonEnumerable, issues);
+    validateStableId(voyageId, `${path}.voyageId`, issues);
+    validateStableId(encounterId, `${path}.encounterId`, issues);
+    voyageInvariant(`${path}.voyageId`, typeof lastEventId === 'number' && lastEventId >= 2 && voyageId === `voyage-${lastEventId - 1}`, issues);
+    voyageInvariant(`${path}.encounterId`, typeof voyageId === 'string' && encounterId === `${voyageId}-contact`, issues);
+    voyageInvariant(`${path}.returnCheckpoint`, sameJson(checkpoint, RED_JACKDAW_VOYAGE.contact), issues);
+    voyageInvariant(path, common && typeof provisions === 'number' && provisions >= 1, issues);
+    return;
+  }
+  validateKeys(rawMode, ['kind', 'voyageId', 'battleId', 'input', 'returnCheckpoint'], path, problems, nonEnumerable, issues);
+  const voyageId = required(rawMode, 'voyageId', path, problems, nonEnumerable, issues);
+  const battleId = required(rawMode, 'battleId', path, problems, nonEnumerable, issues);
+  const input = required(rawMode, 'input', path, problems, nonEnumerable, issues);
+  const checkpoint = required(rawMode, 'returnCheckpoint', path, problems, nonEnumerable, issues);
+  validateStableId(voyageId, `${path}.voyageId`, issues);
+  validateStableId(battleId, `${path}.battleId`, issues);
+  voyageInvariant(`${path}.voyageId`, typeof lastEventId === 'number' && lastEventId >= 3 && voyageId === `voyage-${lastEventId - 2}`, issues);
+  voyageInvariant(`${path}.battleId`, typeof voyageId === 'string' && battleId === `${voyageId}-battle`, issues);
+  voyageInvariant(`${path}.returnCheckpoint`, sameJson(checkpoint, RED_JACKDAW_VOYAGE.contact), issues);
+  const expected = ship && typeof battleId === 'string' && isPlainRecord(ship)
+    ? createRedJackdawBattleInput({ battleId, seed: root.rng && isPlainRecord(root.rng) ? root.rng.naval as number : Number.NaN, player: { stableShipId: ship.id as string, name: ship.name as string, classId: ship.classId as 'sloop', hull: ship.hull as number, sails: ship.sails as number, crew: ship.crew as number, cannon: ship.cannon as number } })
+    : null;
+  voyageInvariant(`${path}.input`, expected !== null && sameJson(input, expected), issues);
+  voyageInvariant(path, common && typeof provisions === 'number' && provisions >= 1, issues);
 }
 
 function validateCaptain(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
@@ -614,7 +686,7 @@ function validateStandings(root: PlainRecord, problems: JsonProblems, nonEnumera
 
 function validateWorld(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'world';
-  const world = recordValue(required(root, 'world', '$', problems, nonEnumerable, issues), path, ['ports', 'targetDefeated'], problems, nonEnumerable, issues);
+  const world = recordValue(required(root, 'world', '$', problems, nonEnumerable, issues), path, ['ports', 'targetDefeated', 'lastVoyage'], problems, nonEnumerable, issues);
   if (!world) return;
   const portsPath = `${path}.ports`;
   const ports = recordValue(required(world, 'ports', path, problems, nonEnumerable, issues), portsPath, PORT_IDS, problems, nonEnumerable, issues);
@@ -628,6 +700,38 @@ function validateWorld(root: PlainRecord, problems: JsonProblems, nonEnumerable:
     }
   }
   validateBoolean(required(world, 'targetDefeated', path, problems, nonEnumerable, issues), `${path}.targetDefeated`, issues);
+  if (Object.prototype.hasOwnProperty.call(world, 'lastVoyage')) {
+    const summaryPath = `${path}.lastVoyage`;
+    const summary = recordValue(world.lastVoyage, summaryPath, ['voyageId', 'battleId', 'result', 'outcome', 'returnedDay'], problems, nonEnumerable, issues);
+    if (!summary) return;
+    validateStableId(required(summary, 'voyageId', summaryPath, problems, nonEnumerable, issues), `${summaryPath}.voyageId`, issues);
+    const battleId = required(summary, 'battleId', summaryPath, problems, nonEnumerable, issues);
+    if (battleId !== null) validateStableId(battleId, `${summaryPath}.battleId`, issues);
+    const result = required(summary, 'result', summaryPath, problems, nonEnumerable, issues);
+    const results = ['avoided', 'withdrew', 'victory', 'defeat', 'unresolved'];
+    if (validateString(result, `${summaryPath}.result`, issues) && !results.includes(result)) issue(issues, `${summaryPath}.result`, 'unknown-id');
+    const outcome = required(summary, 'outcome', summaryPath, problems, nonEnumerable, issues);
+    const outcomeValid = outcome === null || (isPlainRecord(outcome) && (
+      (['surrender', 'sunk', 'boarding-ready'].includes(outcome.kind as string) && Object.keys(outcome).length === 2 && (outcome.victorShipId === 'player' || outcome.victorShipId === 'opponent')) ||
+      (['escaped', 'separated'].includes(outcome.kind as string) && Object.keys(outcome).length === 2 && (outcome.shipId === 'player' || outcome.shipId === 'opponent'))
+    ));
+    if (!outcomeValid) issue(issues, `${summaryPath}.outcome`, 'invariant');
+    validateInteger(required(summary, 'returnedDay', summaryPath, problems, nonEnumerable, issues), `${summaryPath}.returnedDay`, 0, Number.MAX_SAFE_INTEGER, issues);
+    const matches = result === 'avoided' || result === 'withdrew'
+      ? outcome === null && (result === 'avoided' ? battleId === null : typeof battleId === 'string')
+      : outcome !== null && typeof battleId === 'string' && (
+        result === 'unresolved' ? isPlainRecord(outcome) && ['escaped', 'separated'].includes(outcome.kind as string)
+          : result === 'victory' ? isPlainRecord(outcome) && outcome.victorShipId === 'player'
+            : isPlainRecord(outcome) && outcome.victorShipId === 'opponent'
+      );
+    voyageInvariant(
+      summaryPath,
+      matches
+        && summary.returnedDay === (isPlainRecord(root.calendar) ? root.calendar.elapsedDays : undefined)
+        && (result === 'victory' ? world.targetDefeated === true : world.targetDefeated === false),
+      issues,
+    );
+  }
 }
 
 function validateLeads(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {

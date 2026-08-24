@@ -168,26 +168,29 @@ export function validateJournal(input: unknown): ValidationResult<CampaignJourna
 
   if (initial?.ok && events && eventShapesValid) {
     let semanticsValid = true;
+    let current = initial.value;
     events.forEach((event, index) => {
-      const expectedId = initial.value.lastEventId + index + 1;
+      const expectedId = current.lastEventId + 1;
       if (expectedId > 0xffff_ffff || event.id !== expectedId) {
         issues.push({ path: `events.${index}.id`, code: 'invariant' });
         semanticsValid = false;
+        return;
       }
-      if (event.atDay !== initial.value.calendar.elapsedDays) {
-        issues.push({ path: `events.${index}.atDay`, code: 'invariant' });
+      try {
+        current = reduceCampaign(current, event);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        issues.push({
+          path: message.startsWith('Invalid campaign event: expected day') ? `events.${index}.atDay` : `events.${index}`,
+          code: 'invariant',
+        });
         semanticsValid = false;
       }
     });
 
     if (semanticsValid) {
-      try {
-        const replayed = replayCampaign(initial.value, events);
-        if (state?.ok && canonicalJson(replayed) !== canonicalJson(state.value)) {
-          issues.push({ path: 'state', code: 'replay-mismatch' });
-        }
-      } catch {
-        issues.push({ path: 'events', code: 'invariant' });
+      if (state?.ok && canonicalJson(current) !== canonicalJson(state.value)) {
+        issues.push({ path: 'state', code: 'replay-mismatch' });
       }
     }
   }

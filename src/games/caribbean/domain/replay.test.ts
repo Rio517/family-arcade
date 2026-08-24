@@ -9,6 +9,7 @@ import {
   replayCampaign,
   validateJournal,
 } from './replay';
+import { navalEngagedDraft, seaLegCompletedDraft, voyageStartedDraft } from './voyage';
 
 const ACCEPT_RED_JACKDAW = {
   type: 'lead-accepted',
@@ -110,6 +111,25 @@ describe('replayCampaign', () => {
 });
 
 describe('validateJournal', () => {
+  it('folds event-day validation through reducer-owned voyage advancement', () => {
+    // Catches the former initial-day comparison after the sea leg advances to day one.
+    const initial = initialCampaign();
+    initial.leads = [{ id: 'red-jackdaw', kind: 'rumour', status: 'active', acceptedDay: 0, expiresDay: 18 }];
+    initial.lastEventId = 1;
+    const departed = appendJournal(createJournal(initial), voyageStartedDraft(initial));
+    const contact = appendJournal(departed, seaLegCompletedDraft(departed.state));
+    const engaged = appendJournal(contact, navalEngagedDraft(contact.state));
+
+    expect(engaged.events.map((event) => event.atDay)).toEqual([0, 0, 1]);
+    expect(validateJournal(engaged)).toEqual({ ok: true, value: engaged });
+
+    const wrongDay = structuredClone(engaged);
+    wrongDay.events[2].atDay = 0;
+    expect(validateJournal(wrongDay)).toEqual({
+      ok: false,
+      issues: [{ path: 'events.2.atDay', code: 'invariant' }],
+    });
+  });
   it('accepts a replay-equivalent journal and returns a safe clone', () => {
     const journal = acceptedJournal();
 

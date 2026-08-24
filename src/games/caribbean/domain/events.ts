@@ -2,9 +2,11 @@ import { isCargoId, isPortId } from '../content/campaign';
 import type { CargoId, LeadId, PortId } from '../content/types';
 import type {
   CampaignStateV1,
+  SailingCheckpoint,
   ValidationIssue,
   ValidationResult,
 } from './types';
+import type { NavalBattleInput, NavalResolution } from './naval/types';
 
 export type CampaignEvent =
   | {
@@ -24,7 +26,19 @@ export type CampaignEvent =
         delta: number;
         unitPrice: number;
       };
-    };
+    }
+  | { id: number; type: 'voyage-started'; atDay: number; payload: { voyageId: string } }
+  | {
+      id: number; type: 'sea-leg-completed'; atDay: number;
+      payload: { voyageId: string; encounterId: string; checkpoint: SailingCheckpoint; navigationRng: { before: number; after: number } };
+    }
+  | { id: number; type: 'encounter-avoided'; atDay: number; payload: { voyageId: string; encounterId: string } }
+  | {
+      id: number; type: 'naval-engaged'; atDay: number;
+      payload: { voyageId: string; encounterId: string; battleId: string; navalRng: { before: number; after: number }; input: NavalBattleInput };
+    }
+  | { id: number; type: 'battle-withdrawn'; atDay: number; payload: { voyageId: string; battleId: string } }
+  | { id: number; type: 'naval-resolved'; atDay: number; payload: { voyageId: string; battleId: string; resolution: NavalResolution } };
 
 type DraftOf<Event> = Event extends CampaignEvent ? Omit<Event, 'id' | 'atDay'> : never;
 export type CampaignEventDraft = DraftOf<CampaignEvent>;
@@ -167,6 +181,46 @@ function validateDay(value: unknown, path: string, issues: ValidationIssue[]): v
   return true;
 }
 
+function validateStableId(value: unknown, path: string, issues: ValidationIssue[]): value is string {
+  if (typeof value !== 'string') {
+    issue(issues, path, 'wrong-type');
+    return false;
+  }
+  if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(value)) {
+    issue(issues, path, 'out-of-range');
+    return false;
+  }
+  return true;
+}
+
+function validateCheckpoint(value: unknown, path: string, issues: ValidationIssue[]): void {
+  const checkpoint = snapshotRecord(value, path, issues);
+  if (!checkpoint) return;
+  validateKeys(checkpoint, ['tick', 'position', 'heading', 'elapsedDays', 'provisionsUsed'], path, issues);
+  for (const key of ['tick', 'heading', 'elapsedDays', 'provisionsUsed'] as const) {
+    const field = required(checkpoint, key, path, issues);
+    if (typeof field !== 'number') issue(issues, `${path}.${key}`, 'wrong-type');
+    else if (!Number.isFinite(field)) issue(issues, `${path}.${key}`, 'not-finite');
+    else if (!Number.isSafeInteger(field) && key !== 'heading') issue(issues, `${path}.${key}`, 'out-of-range');
+  }
+  const position = snapshotRecord(required(checkpoint, 'position', path, issues), `${path}.position`, issues);
+  if (!position) return;
+  validateKeys(position, ['x', 'z'], `${path}.position`, issues);
+  for (const key of ['x', 'z'] as const) {
+    const field = required(position, key, `${path}.position`, issues);
+    if (typeof field !== 'number') issue(issues, `${path}.position.${key}`, 'wrong-type');
+    else if (!Number.isFinite(field)) issue(issues, `${path}.position.${key}`, 'not-finite');
+  }
+}
+
+function validateRngPair(value: unknown, path: string, issues: ValidationIssue[]): void {
+  const pair = snapshotRecord(value, path, issues);
+  if (!pair) return;
+  validateKeys(pair, ['before', 'after'], path, issues);
+  validateUint32(required(pair, 'before', path, issues), `${path}.before`, issues);
+  validateUint32(required(pair, 'after', path, issues), `${path}.after`, issues);
+}
+
 export function validateCampaignEvent(input: unknown): ValidationResult<CampaignEvent> {
   const issues: ValidationIssue[] = [];
   const event = snapshotRecord(input, '$', issues);
@@ -179,7 +233,7 @@ export function validateCampaignEvent(input: unknown): ValidationResult<Campaign
   let validType: CampaignEvent['type'] | null = null;
   if (type !== undefined) {
     if (typeof type !== 'string') issue(issues, 'type', 'wrong-type');
-    else if (type === 'lead-accepted' || type === 'market-traded') validType = type;
+    else if (['lead-accepted', 'market-traded', 'voyage-started', 'sea-leg-completed', 'encounter-avoided', 'naval-engaged', 'battle-withdrawn', 'naval-resolved'].includes(type)) validType = type as CampaignEvent['type'];
     else issue(issues, 'type', 'unknown-id');
   }
 
@@ -224,6 +278,41 @@ export function validateCampaignEvent(input: unknown): ValidationResult<Campaign
       else if (!Number.isSafeInteger(unitPrice) || unitPrice < 0) issue(issues, 'payload.unitPrice', 'out-of-range');
     }
   }
+  if (payload && validType === 'voyage-started') {
+    validateKeys(payload, ['voyageId'], 'payload', issues);
+    validateStableId(required(payload, 'voyageId', 'payload', issues), 'payload.voyageId', issues);
+  }
+  if (payload && validType === 'sea-leg-completed') {
+    validateKeys(payload, ['voyageId', 'encounterId', 'checkpoint', 'navigationRng'], 'payload', issues);
+    validateStableId(required(payload, 'voyageId', 'payload', issues), 'payload.voyageId', issues);
+    validateStableId(required(payload, 'encounterId', 'payload', issues), 'payload.encounterId', issues);
+    validateCheckpoint(required(payload, 'checkpoint', 'payload', issues), 'payload.checkpoint', issues);
+    validateRngPair(required(payload, 'navigationRng', 'payload', issues), 'payload.navigationRng', issues);
+  }
+  if (payload && validType === 'encounter-avoided') {
+    validateKeys(payload, ['voyageId', 'encounterId'], 'payload', issues);
+    validateStableId(required(payload, 'voyageId', 'payload', issues), 'payload.voyageId', issues);
+    validateStableId(required(payload, 'encounterId', 'payload', issues), 'payload.encounterId', issues);
+  }
+  if (payload && validType === 'naval-engaged') {
+    validateKeys(payload, ['voyageId', 'encounterId', 'battleId', 'navalRng', 'input'], 'payload', issues);
+    validateStableId(required(payload, 'voyageId', 'payload', issues), 'payload.voyageId', issues);
+    validateStableId(required(payload, 'encounterId', 'payload', issues), 'payload.encounterId', issues);
+    validateStableId(required(payload, 'battleId', 'payload', issues), 'payload.battleId', issues);
+    validateRngPair(required(payload, 'navalRng', 'payload', issues), 'payload.navalRng', issues);
+    if (!snapshotRecord(required(payload, 'input', 'payload', issues), 'payload.input', issues)) return { ok: false, issues };
+  }
+  if (payload && validType === 'battle-withdrawn') {
+    validateKeys(payload, ['voyageId', 'battleId'], 'payload', issues);
+    validateStableId(required(payload, 'voyageId', 'payload', issues), 'payload.voyageId', issues);
+    validateStableId(required(payload, 'battleId', 'payload', issues), 'payload.battleId', issues);
+  }
+  if (payload && validType === 'naval-resolved') {
+    validateKeys(payload, ['voyageId', 'battleId', 'resolution'], 'payload', issues);
+    validateStableId(required(payload, 'voyageId', 'payload', issues), 'payload.voyageId', issues);
+    validateStableId(required(payload, 'battleId', 'payload', issues), 'payload.battleId', issues);
+    if (!snapshotRecord(required(payload, 'resolution', 'payload', issues), 'payload.resolution', issues)) return { ok: false, issues };
+  }
 
   if (issues.length > 0) return { ok: false, issues };
   if (validType === 'lead-accepted') return {
@@ -245,5 +334,11 @@ export function validateCampaignEvent(input: unknown): ValidationResult<Campaign
       },
     },
   };
+  if (validType === 'voyage-started') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: { voyageId: payload?.voyageId as string } } };
+  if (validType === 'sea-leg-completed') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: payload as unknown as Extract<CampaignEvent, { type: 'sea-leg-completed' }>['payload'] } };
+  if (validType === 'encounter-avoided') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: payload as unknown as Extract<CampaignEvent, { type: 'encounter-avoided' }>['payload'] } };
+  if (validType === 'naval-engaged') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: payload as unknown as Extract<CampaignEvent, { type: 'naval-engaged' }>['payload'] } };
+  if (validType === 'battle-withdrawn') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: payload as unknown as Extract<CampaignEvent, { type: 'battle-withdrawn' }>['payload'] } };
+  if (validType === 'naval-resolved') return { ok: true, value: { id: event.id as number, type: validType, atDay: event.atDay as number, payload: payload as unknown as Extract<CampaignEvent, { type: 'naval-resolved' }>['payload'] } };
   return { ok: false, issues: [{ path: '$', code: 'invariant' }] };
 }

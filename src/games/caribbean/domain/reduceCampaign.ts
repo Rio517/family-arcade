@@ -1,10 +1,16 @@
 import { LEADS } from '../content/campaign';
+import { createRedJackdawBattleInput } from '../content/naval';
+import { RED_JACKDAW_VOYAGE } from '../content/voyage';
+import { canonicalJson } from '../canonicalJson';
 import { quoteTrade } from './economy';
 import {
   type CampaignEvent,
   validateCampaignEvent,
 } from './events';
 import type { CampaignStateV1, ValidationIssue } from './types';
+import { nextSeed } from './naval/rng';
+import { validateNavalResolution } from './naval/resolution';
+import type { NavalOutcome } from './naval/types';
 import { validateCampaign } from './validateCampaign';
 
 function formatIssues(issues: readonly ValidationIssue[]): string {
@@ -13,6 +19,46 @@ function formatIssues(issues: readonly ValidationIssue[]): string {
 
 function assertNever(value: never): never {
   throw new Error(`Unhandled campaign event: ${String(value)}`);
+}
+
+function sameJson(left: unknown, right: unknown): boolean {
+  return canonicalJson(left) === canonicalJson(right);
+}
+
+function currentFlagship(state: CampaignStateV1) {
+  return state.fleet.ships.find((ship) => ship.id === state.fleet.flagshipId);
+}
+
+function spendVoyageCost(state: CampaignStateV1, elapsedDays: number, provisionsUsed: number): void {
+  const ship = currentFlagship(state);
+  if (!ship || ship.cargo.provisions < provisionsUsed) throw new Error('Invalid voyage: insufficient provisions');
+  ship.cargo.provisions -= provisionsUsed;
+  state.calendar.elapsedDays += elapsedDays;
+}
+
+function classifyResolution(outcome: NavalOutcome): 'victory' | 'defeat' | 'unresolved' {
+  if (outcome.kind === 'escaped' || outcome.kind === 'separated') return 'unresolved';
+  return (outcome as Extract<NavalOutcome, { victorShipId: 'player' | 'opponent' }>).victorShipId === 'player' ? 'victory' : 'defeat';
+}
+
+function returnToBridgetown(
+  state: CampaignStateV1,
+  eventId: number,
+  summary: NonNullable<CampaignStateV1['world']['lastVoyage']>,
+): void {
+  spendVoyageCost(state, RED_JACKDAW_VOYAGE.returnCost.elapsedDays, RED_JACKDAW_VOYAGE.returnCost.provisionsUsed);
+  state.mode = { kind: 'port', portId: 'bridgetown' };
+  state.world.lastVoyage = { ...summary, returnedDay: state.calendar.elapsedDays };
+  const lead = state.leads.find((entry) => entry.id === 'red-jackdaw');
+  if (lead) {
+    if (summary?.result === 'victory') {
+      lead.status = 'completed';
+      state.world.targetDefeated = true;
+    } else if (lead.expiresDay !== null && state.calendar.elapsedDays >= lead.expiresDay) {
+      lead.status = 'expired';
+    }
+  }
+  state.lastEventId = eventId;
 }
 
 export function reduceCampaign(
@@ -76,6 +122,52 @@ export function reduceCampaign(
       next.wealth.gold = quote.goldAfter;
       ship.cargo[event.payload.cargoId] = quote.quantityAfter;
       next.lastEventId = event.id;
+      break;
+    }
+    case 'voyage-started': {
+      if (state.mode.kind !== 'port' || state.mode.portId !== 'bridgetown') throw new Error('Invalid voyage: wrong predecessor');
+      if (event.payload.voyageId !== `voyage-${event.id}`) throw new Error('Invalid voyage: wrong voyage ID');
+      if (!state.leads.some((lead) => lead.id === 'red-jackdaw' && lead.status === 'active') || state.world.targetDefeated || !currentFlagship(state) || currentFlagship(state)!.cargo.provisions < 2) throw new Error('Invalid voyage: not ready');
+      next.mode = { kind: 'sailing', voyageId: event.payload.voyageId, checkpoint: structuredClone(RED_JACKDAW_VOYAGE.start) };
+      next.lastEventId = event.id;
+      break;
+    }
+    case 'sea-leg-completed': {
+      if (state.mode.kind !== 'sailing') throw new Error('Invalid voyage: wrong predecessor');
+      if (event.payload.voyageId !== state.mode.voyageId || event.payload.encounterId !== `${state.mode.voyageId}-contact` || !sameJson(event.payload.checkpoint, RED_JACKDAW_VOYAGE.contact) || event.payload.navigationRng.before !== state.rng.navigation || event.payload.navigationRng.after !== nextSeed(state.rng.navigation)) throw new Error('Invalid voyage: invalid sea leg');
+      spendVoyageCost(next, RED_JACKDAW_VOYAGE.contact.elapsedDays, RED_JACKDAW_VOYAGE.contact.provisionsUsed);
+      next.rng.navigation = event.payload.navigationRng.after;
+      next.mode = { kind: 'encounter', voyageId: state.mode.voyageId, encounterId: event.payload.encounterId, returnCheckpoint: structuredClone(RED_JACKDAW_VOYAGE.contact) };
+      next.lastEventId = event.id;
+      break;
+    }
+    case 'encounter-avoided': {
+      if (state.mode.kind !== 'encounter' || event.payload.voyageId !== state.mode.voyageId || event.payload.encounterId !== state.mode.encounterId) throw new Error('Invalid voyage: wrong predecessor');
+      returnToBridgetown(next, event.id, { voyageId: state.mode.voyageId, battleId: null, result: 'avoided', outcome: null, returnedDay: 0 });
+      break;
+    }
+    case 'naval-engaged': {
+      if (state.mode.kind !== 'encounter') throw new Error('Invalid voyage: wrong predecessor');
+      const ship = currentFlagship(state);
+      if (!ship || event.payload.voyageId !== state.mode.voyageId || event.payload.encounterId !== state.mode.encounterId || event.payload.battleId !== `${state.mode.voyageId}-battle` || event.payload.navalRng.before !== state.rng.naval || event.payload.navalRng.after !== nextSeed(state.rng.naval)) throw new Error('Invalid voyage: invalid engagement');
+      const expected = { battleId: event.payload.battleId, seed: event.payload.navalRng.after, player: { stableShipId: ship.id, name: ship.name, classId: ship.classId, hull: ship.hull, sails: ship.sails, crew: ship.crew, cannon: ship.cannon } };
+      if (!sameJson(event.payload.input, createRedJackdawBattleInput(expected))) throw new Error('Invalid voyage: invalid battle input');
+      next.rng.naval = event.payload.navalRng.after;
+      next.mode = { kind: 'naval', voyageId: state.mode.voyageId, battleId: event.payload.battleId, input: structuredClone(event.payload.input), returnCheckpoint: structuredClone(RED_JACKDAW_VOYAGE.contact) };
+      next.lastEventId = event.id;
+      break;
+    }
+    case 'battle-withdrawn': {
+      if (state.mode.kind !== 'naval' || event.payload.voyageId !== state.mode.voyageId || event.payload.battleId !== state.mode.battleId) throw new Error('Invalid voyage: wrong predecessor');
+      returnToBridgetown(next, event.id, { voyageId: state.mode.voyageId, battleId: state.mode.battleId, result: 'withdrew', outcome: null, returnedDay: 0 });
+      break;
+    }
+    case 'naval-resolved': {
+      if (state.mode.kind !== 'naval' || event.payload.voyageId !== state.mode.voyageId || event.payload.battleId !== state.mode.battleId) throw new Error('Invalid voyage: wrong predecessor');
+      const resolution = validateNavalResolution(state.mode.input, event.payload.resolution);
+      if (!resolution.ok) throw new Error(`Invalid naval resolution: ${resolution.issues.join(', ')}`);
+      const result = classifyResolution(resolution.value.outcome);
+      returnToBridgetown(next, event.id, { voyageId: state.mode.voyageId, battleId: state.mode.battleId, result, outcome: structuredClone(resolution.value.outcome), returnedDay: 0 });
       break;
     }
     default:

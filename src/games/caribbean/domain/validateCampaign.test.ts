@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { createCampaign } from './createCampaign';
+import { RED_JACKDAW_VOYAGE } from '../content/voyage';
+import { createRedJackdawBattleInput } from '../content/naval';
+import { nextSeed } from './naval/rng';
 import type { CampaignMode, CampaignStateV1, ShipState, ValidationIssue } from './types';
 import { validateCampaign } from './validateCampaign';
 
@@ -19,6 +22,42 @@ function secondSloop(id = 'second-sloop'): ShipState {
 }
 
 describe('validateCampaign', () => {
+  it('accepts the authored compactable sailing, encounter, and naval checkpoints', () => {
+    // Catches acceptance of resumable modes without relaxing their cross-field facts.
+    const sailing = validCampaign();
+    sailing.lastEventId = 2;
+    sailing.leads = [{ id: 'red-jackdaw', kind: 'rumour', status: 'active', acceptedDay: 0, expiresDay: 18 }];
+    sailing.mode = { kind: 'sailing', voyageId: 'voyage-2', checkpoint: structuredClone(RED_JACKDAW_VOYAGE.start) };
+    sailing.fleet.ships[0].cargo.provisions = 2;
+    expect(validateCampaign(sailing).ok).toBe(true);
+
+    const encounter = structuredClone(sailing);
+    encounter.lastEventId = 3;
+    encounter.mode = {
+      kind: 'encounter', voyageId: 'voyage-2', encounterId: 'voyage-2-contact',
+      returnCheckpoint: structuredClone(RED_JACKDAW_VOYAGE.contact),
+    };
+    encounter.fleet.ships[0].cargo.provisions = 1;
+    expect(validateCampaign(encounter).ok).toBe(true);
+
+    const naval = structuredClone(encounter);
+    naval.lastEventId = 4;
+    naval.rng.naval = nextSeed(naval.rng.naval);
+    naval.mode = {
+      kind: 'naval', voyageId: 'voyage-2', battleId: 'voyage-2-battle',
+      returnCheckpoint: structuredClone(RED_JACKDAW_VOYAGE.contact),
+      input: createRedJackdawBattleInput({
+        battleId: 'voyage-2-battle', seed: naval.rng.naval,
+        player: {
+          stableShipId: naval.fleet.ships[0].id, name: naval.fleet.ships[0].name,
+          classId: naval.fleet.ships[0].classId, hull: naval.fleet.ships[0].hull,
+          sails: naval.fleet.ships[0].sails, crew: naval.fleet.ships[0].crew,
+          cannon: naval.fleet.ships[0].cannon,
+        },
+      }),
+    };
+    expect(validateCampaign(naval).ok).toBe(true);
+  });
   it('returns a detached canonical campaign snapshot when it is valid', () => {
     const state = validCampaign();
 
@@ -268,15 +307,12 @@ describe('validateCampaign', () => {
   });
 
   it.each([
-    ['sailing', { kind: 'sailing', voyageId: 'voyage-1', checkpoint: {} }],
-    ['encounter', { kind: 'encounter', encounterId: 'encounter-1', voyageId: 'voyage-1', returnCheckpoint: {} }],
-    ['naval', { kind: 'naval', battleId: 'battle-1', voyageId: 'voyage-1', input: {}, returnCheckpoint: {} }],
     ['capture', { kind: 'capture', battleId: 'battle-1', prize: {}, voyageId: 'voyage-1', returnCheckpoint: {} }],
     ['boarding', { kind: 'boarding', battleId: 'battle-1', voyageId: 'voyage-1', returnCheckpoint: {} }],
     ['treasure', { kind: 'treasure', leadId: 'red-jackdaw' }],
     ['shares', { kind: 'shares', portId: 'bridgetown' }],
     ['retired', { kind: 'retired', score: 0 }],
-  ] as const)('reserves but rejects the %s mode until its transition package exists', (_kind, mode) => {
+  ] as const)('continues to reject the unsupported reserved %s mode', (_kind, mode) => {
     const state = validCampaign();
     state.mode = mode as CampaignMode;
     expectIssues(state, [{ path: 'mode.kind', code: 'unknown-id' }]);
