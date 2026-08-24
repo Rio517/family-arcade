@@ -169,4 +169,77 @@ describe('naval terminal resolution', () => {
     expect(nonterminal.input).toEqual(before);
     expect(terminal.input).toEqual(BATTLE_LAB_INPUT);
   });
+
+  it('rejects boarding-ready when the target is already sunk', () => {
+    const state = terminalState(
+      { kind: 'boarding-ready', victorShipId: 'player' },
+      {
+        player: { position: { x: 0, z: 0 }, heading: Math.PI / 2, speed: 1, crew: 50 },
+        opponent: { position: { x: 6, z: 0 }, heading: 0, speed: 0, hull: 64, sails: 24, crew: 16, cannon: 6 },
+      },
+    );
+    const summary = summarizeNavalResolution(state);
+
+    expect(validateNavalResolution(state.input, {
+      ...summary,
+      opponent: { ...summary.opponent, hull: 0 },
+    })).toMatchObject({ ok: false });
+  });
+
+  it.each([
+    [
+      'surrender when the surrendered ship is sunk',
+      () => {
+        const state = terminalState({ kind: 'surrender', victorShipId: 'player' }, { opponent: { hull: 20 } });
+        const summary = summarizeNavalResolution(state);
+        return {
+          ...summary,
+          opponent: { ...summary.opponent, hull: 0 },
+          decisive: {
+            kind: 'surrender' as const, victorShipId: 'player' as const, surrenderedShipId: 'opponent' as const,
+            threshold: 'hull' as const, value: 0, thresholdValue: 20,
+          },
+        };
+      },
+    ],
+    [
+      'escape when the escaping ship is sunk',
+      () => {
+        const state = terminalState(
+          { kind: 'escaped', shipId: 'opponent' },
+          { opponent: { position: { x: 93, z: 0 }, heading: Math.PI / 2, speed: 2 } },
+        );
+        const summary = summarizeNavalResolution(state);
+        return { ...summary, opponent: { ...summary.opponent, hull: 0 } };
+      },
+    ],
+    [
+      'separation when either ship has surrendered',
+      () => {
+        const state = terminalState({ kind: 'separated', shipId: 'player' }, { tick: 14_400 });
+        const summary = summarizeNavalResolution(state);
+        return { ...summary, opponent: { ...summary.opponent, crew: 8 } };
+      },
+    ],
+    [
+      'separation when either ship is sunk',
+      () => {
+        const state = terminalState({ kind: 'separated', shipId: 'player' }, { tick: 14_400 });
+        const summary = summarizeNavalResolution(state);
+        return { ...summary, opponent: { ...summary.opponent, hull: 0 } };
+      },
+    ],
+  ] as const)('rejects a lower-priority %s', (_label, invalidSummary) => {
+    expect(validateNavalResolution(BATTLE_LAB_INPUT, invalidSummary())).toMatchObject({ ok: false });
+  });
+
+  it('rejects a later surrender when player surrender has evaluator precedence', () => {
+    const state = terminalState(
+      { kind: 'surrender', victorShipId: 'player' },
+      { player: { hull: 20 }, opponent: { crew: 8 } },
+    );
+    const summary = summarizeNavalResolution(state);
+
+    expect(validateNavalResolution(state.input, summary)).toMatchObject({ ok: false });
+  });
 });

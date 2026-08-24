@@ -21,21 +21,36 @@ function opposingShip(shipId: NavalShipId): NavalShipId {
   return shipId === 'player' ? 'opponent' : 'player';
 }
 
-function sunkOutcome(state: NavalState): NavalOutcome | null {
+function systemTerminalOutcome(
+  ships: Record<NavalShipId, Pick<NavalShipState, 'hull' | 'crew'>>,
+): NavalOutcome | null {
   for (const shipId of SHIP_IDS) {
-    if (state.ships[shipId].hull <= 0) return { kind: 'sunk', victorShipId: opposingShip(shipId) };
+    if (ships[shipId].hull <= 0) return { kind: 'sunk', victorShipId: opposingShip(shipId) };
   }
-  return null;
-}
-
-function surrenderOutcome(state: NavalState): NavalOutcome | null {
   for (const shipId of SHIP_IDS) {
-    const ship = state.ships[shipId];
+    const ship = ships[shipId];
     if (ship.hull <= SURRENDER_HULL_THRESHOLD || ship.crew <= SURRENDER_CREW_THRESHOLD) {
       return { kind: 'surrender', victorShipId: opposingShip(shipId) };
     }
   }
   return null;
+}
+
+function outcomesEqual(left: NavalOutcome, right: NavalOutcome): boolean {
+  return left.kind === right.kind
+    && ('victorShipId' in left && 'victorShipId' in right
+      ? left.victorShipId === right.victorShipId
+      : 'shipId' in left && 'shipId' in right && left.shipId === right.shipId);
+}
+
+function sunkOutcome(state: NavalState): NavalOutcome | null {
+  const outcome = systemTerminalOutcome(state.ships);
+  return outcome?.kind === 'sunk' ? outcome : null;
+}
+
+function surrenderOutcome(state: NavalState): NavalOutcome | null {
+  const outcome = systemTerminalOutcome(state.ships);
+  return outcome?.kind === 'surrender' ? outcome : null;
 }
 
 function boardingMeasurements(state: NavalState): Pick<Extract<NavalDecisiveFact, { kind: 'boarding-ready' }>, 'range' | 'relativeSpeed' | 'targetSails' | 'targetCrew' | 'playerCrew'> {
@@ -159,6 +174,8 @@ export function decisiveFactMatches(
   atTick: number,
 ): boolean {
   if (outcome.kind !== decisive.kind) return false;
+  const systemOutcome = systemTerminalOutcome(finalShips);
+  if (systemOutcome && !outcomesEqual(systemOutcome, outcome)) return false;
 
   if (decisive.kind === 'surrender') {
     if (!('victorShipId' in outcome)) return false;
