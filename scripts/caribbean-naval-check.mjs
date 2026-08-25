@@ -172,7 +172,7 @@ export function captureSourceProvenance({ root = ROOT, sourceFiles = null } = {}
           path: relativePath,
           sha256: createHash('sha256').update(fs.readFileSync(path.join(root, relativePath))).digest('hex'),
         }));
-        return { sourceFiles: rows, sourceHash: createHash('sha256').update(JSON.stringify(rows)).digest('hex') };
+        return { files: rows, sourceHash: createHash('sha256').update(JSON.stringify(rows)).digest('hex') };
       })();
   return {
     headCommitAtCapture: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
@@ -180,8 +180,8 @@ export function captureSourceProvenance({ root = ROOT, sourceFiles = null } = {}
       'git', ['status', '--porcelain', '--untracked-files=all'], { cwd: root, encoding: 'utf8' },
     ).trim().length > 0,
     sourceTreeSha256: manifest.sourceHash,
-    sourceTreeFiles: manifest.sourceFiles.map((row) => row.path),
-    sourceFiles: manifest.sourceFiles,
+    sourceTreeFiles: manifest.files.map((row) => row.path),
+    sourceFiles: manifest.files,
     sourceHash: manifest.sourceHash,
   };
 }
@@ -832,7 +832,7 @@ function stableDisplay(display) {
 function stableNavalManifest(source, canonical, glb, handedness, scenario, fallback, motion) {
   return {
     version: 1,
-    sourceFiles: source.sourceFiles,
+    sourceFiles: source.files,
     sourceHash: source.sourceHash,
     canonicalInput: canonical.canonicalInput,
     viewports: VIEWPORTS,
@@ -979,8 +979,8 @@ export async function runNavalCheck({ destination, source, captureHead }) {
           'git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ROOT, encoding: 'utf8' },
         ).trim().length > 0,
         sourceTreeSha256: resolvedSource.sourceHash,
-        sourceTreeFiles: resolvedSource.sourceFiles.map((row) => row.path),
-        sourceFiles: resolvedSource.sourceFiles,
+        sourceTreeFiles: resolvedSource.files.map((row) => row.path),
+        sourceFiles: resolvedSource.files,
         sourceHash: resolvedSource.sourceHash,
       },
       canonicalInput: canonical.canonicalInput,

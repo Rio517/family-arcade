@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import { chromium } from 'playwright';
 
@@ -23,6 +24,125 @@ const trace = JSON.parse(fs.readFileSync(
   new URL('../fixtures/caribbean-campaign-victory.json', import.meta.url),
   'utf8',
 ));
+
+test('strategic causality rejects mount-before-save same-byte writes and wrong RNG lineage', async () => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.evaluateStrategicSailingCausality, 'function');
+  const valid = {
+    storageWrites: [{
+      sequence: 1,
+      key: 'caribbean:campaign:current',
+      before: '{"old":true}',
+      after: '{"payload":{"state":{"mode":{"kind":"naval"}}}}',
+    }],
+    lifecycle: [{ sequence: 2, type: 'naval-mount', storageWriteCount: 1 }],
+    navigationEvents: [
+      { before: 3_913_270_709, after: 3_424_590_736 },
+      { before: 3_424_590_736, after: 2_953_755_055 },
+    ],
+    navalEvents: [{ before: 3_992_748_115, after: 1_971_161_494 }],
+    initialWorldRng: 2_180_952_782,
+    returnedWorldRng: 2_180_952_782,
+  };
+  assert.deepEqual(portCommand.evaluateStrategicSailingCausality(valid), {
+    persistedBeforeMount: true,
+    campaignWritesDuringBattle: 0,
+    navigationTransitionsVerified: true,
+    navalTransitionVerified: true,
+    worldUnchanged: true,
+  });
+
+  const mountedBeforeSave = structuredClone(valid);
+  mountedBeforeSave.lifecycle[0].sequence = 0;
+  assert.equal(portCommand.evaluateStrategicSailingCausality(mountedBeforeSave).persistedBeforeMount, false);
+
+  const sameBytes = structuredClone(valid);
+  sameBytes.storageWrites.push({
+    sequence: 3,
+    key: 'caribbean:campaign:current',
+    before: valid.storageWrites[0].after,
+    after: valid.storageWrites[0].after,
+  });
+  assert.equal(portCommand.evaluateStrategicSailingCausality(sameBytes).campaignWritesDuringBattle, 1);
+
+  const writeBeforeRemount = structuredClone(sameBytes);
+  writeBeforeRemount.lifecycle.push({ sequence: 4, type: 'naval-mount', storageWriteCount: 2 });
+  assert.equal(portCommand.evaluateStrategicSailingCausality(writeBeforeRemount).campaignWritesDuringBattle, 1);
+
+  const wrongRng = structuredClone(valid);
+  wrongRng.navigationEvents[1].after += 1;
+  wrongRng.navalEvents[0].after += 1;
+  const wrongVerdict = portCommand.evaluateStrategicSailingCausality(wrongRng);
+  assert.equal(wrongVerdict.navigationTransitionsVerified, false);
+  assert.equal(wrongVerdict.navalTransitionVerified, false);
+
+  const disconnectedNavigation = structuredClone(valid);
+  disconnectedNavigation.navigationEvents[1] = { before: 1, after: 1_015_568_748 };
+  assert.equal(
+    portCommand.evaluateStrategicSailingCausality(disconnectedNavigation).navigationTransitionsVerified,
+    false,
+  );
+});
+
+test('whole-command deadline aborts work and awaits cleanup before rejecting', async () => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(portCommand.PORT_CHECK_DEADLINE_MS, 900_000);
+  assert.equal(typeof portCommand.runWithPortCheckDeadline, 'function');
+  let cleaned = false;
+  let latePublication = false;
+  await assert.rejects(
+    portCommand.runWithPortCheckDeadline(async (signal) => {
+      try {
+        while (!signal.aborted) await delay(1);
+        await delay(2);
+        if (!signal.aborted) latePublication = true;
+        signal.throwIfAborted();
+      } finally {
+        cleaned = true;
+      }
+    }, 10),
+    /Port evidence command exceeded 10ms/,
+  );
+  assert.equal(cleaned, true);
+  assert.equal(latePublication, false);
+});
+
+test('port operation cleans started browser server and run directories after injected failure', async () => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.runPortCheckOperation, 'function');
+  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-operation-output-'));
+  let browserClosed = 0;
+  let serverStopped = 0;
+  let runDirectories = [];
+  try {
+    await assert.rejects(portCommand.runPortCheckOperation({
+      outputDirectory,
+      signal: new AbortController().signal,
+      dependencies: {
+        build: async () => {},
+        assertIsolation: () => {},
+        readArt: () => ({}),
+        readNaval: () => ({}),
+        readAssetReport: () => ({}),
+        startServer: async () => ({ server: { fixture: true }, baseUrl: 'http://fixture.invalid' }),
+        verifyArtResponse: async () => {},
+        launchBrowser: async () => ({ close: async () => { browserClosed += 1; } }),
+        stopServer: async () => { serverStopped += 1; },
+        afterResourcesStarted(resources) {
+          runDirectories = resources.runDirectories;
+          throw new Error('injected post-start failure');
+        },
+      },
+    }), /injected post-start failure/);
+    assert.equal(browserClosed, 1);
+    assert.equal(serverStopped, 1);
+    assert.equal(runDirectories.length, 2);
+    assert.ok(runDirectories.every((directory) => !fs.existsSync(directory)));
+    assert.deepEqual(fs.readdirSync(outputDirectory), []);
+  } finally {
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
 
 test('real NavalSession obeys installed clock boundaries', { timeout: 600_000 }, async (t) => {
   const portCommand = await import('../caribbean-port-check.mjs');
@@ -88,6 +208,24 @@ test('real NavalSession obeys installed clock boundaries', { timeout: 600_000 },
     campaignWritesDuringBattle: 0,
     returnedTo: 'bridgetown',
   });
+  assert.deepEqual(result.rng, {
+    navigationTransitionsVerified: true,
+    navalTransitionVerified: true,
+    worldUnchanged: true,
+  });
+  assert.deepEqual(result.navalInput, {
+    persistedBeforeMount: true,
+    byteEqualAfterReload: true,
+    tickAfterReload: 0,
+  });
+  assert.deepEqual(result.completion, {
+    canonicalSaveEqualAfterReload: true,
+    leadStatus: 'completed',
+    setSailDisabled: true,
+    setSailReason: 'The Red Jackdaw lead is complete.',
+    victoryReturnCopy: 'Victory — Red Jackdaw ready to board · Returned on day 4.',
+    safeReturnCopy: 'Bridgetown’s harbour crew made Mistral ready for the next departure; the battle outcome remains in this log, but its damage is not carried onto the ready flagship.',
+  });
   assert.deepEqual(
     result.screenshotStates.get('campaign-result-desktop.png'),
     {
@@ -138,16 +276,31 @@ test('real NavalSession obeys installed clock boundaries', { timeout: 600_000 },
   );
 });
 
-test('programmatic port evidence rejects unsafe destinations before browser work and caller cleanup still runs', async () => {
+test('programmatic port evidence rejects descendants and symlink aliases of tracked evidence', async () => {
   const portCommand = await import('../caribbean-port-check.mjs');
   const trackedDirectory = path.resolve('docs/screenshots/caribbean-port');
   const trackedBefore = fileHashes(trackedDirectory);
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-forced-failure-'));
+  const symlink = path.join(temporary, 'tracked-alias');
   try {
+    fs.symlinkSync(trackedDirectory, symlink, 'dir');
     await assert.rejects(portCommand.runPortCheck(undefined), /outputDirectory/);
     await assert.rejects(portCommand.runPortCheck({}), /outputDirectory/);
     await assert.rejects(portCommand.runPortCheck({ outputDirectory: '' }), /outputDirectory/);
     await assert.rejects(portCommand.runPortCheck({ outputDirectory: trackedDirectory }), /tracked docs/);
+    assert.throws(
+      () => portCommand.validateProgrammaticPortDestination(path.join(trackedDirectory, 'review-run')),
+      /tracked evidence/,
+    );
+    assert.throws(
+      () => portCommand.validateProgrammaticPortDestination(path.resolve('docs/games')),
+      /tracked evidence/,
+    );
+    assert.throws(
+      () => portCommand.validateProgrammaticPortDestination(symlink),
+      /tracked evidence/,
+    );
+    assert.equal(portCommand.validateProgrammaticPortDestination(temporary), fs.realpathSync(temporary));
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
   }

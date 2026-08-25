@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,6 +25,165 @@ const SOURCE_SEEDS = [
   ':(glob)src/games/caribbean/**',
   ':(glob)public/**',
 ];
+
+const NAVAL_SCREENSHOTS = [
+  { name: 'battle-boundary-supported.png', width: 960, height: 600, state: 'battle-boundary' },
+  { name: 'battle-desktop.png', width: 1440, height: 900, state: 'battle' },
+  { name: 'battle-minimum-supported.png', width: 1024, height: 768, state: 'battle-minimum' },
+  { name: 'battle-tablet-landscape.png', width: 1180, height: 820, state: 'battle-tablet' },
+  { name: 'boarding-ready-result.png', width: 1180, height: 820, state: 'boarding-ready' },
+  { name: 'briefing-tablet.png', width: 1180, height: 820, state: 'briefing' },
+  { name: 'broadside-handedness.png', width: 1180, height: 820, state: 'starboard-broadside' },
+  { name: 'decision-tablet.png', width: 1180, height: 820, state: 'decision' },
+  { name: 'fallback-tablet-landscape.png', width: 1024, height: 768, state: 'fallback' },
+  { name: 'minimum-screen-phone-landscape.png', width: 844, height: 390, state: 'unsupported-landscape' },
+  { name: 'minimum-screen-phone-portrait.png', width: 430, height: 932, state: 'unsupported-portrait' },
+];
+
+const FIXTURE_SOURCE_FILES = [{
+  path: 'package.json',
+  sha256: '1111111111111111111111111111111111111111111111111111111111111111',
+}];
+const FIXTURE_SOURCE_HASH = 'ee14b07d6b9b60df47675ab00178e3f17c6a84f1d278f135cfdbeb01309678c0';
+
+function pngBytes(width, height, variant = 0) {
+  const bytes = Buffer.alloc(25);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]).copy(bytes);
+  bytes.writeUInt32BE(width, 16);
+  bytes.writeUInt32BE(height, 20);
+  bytes[24] = variant;
+  return bytes;
+}
+
+function stableManifest({
+  sourceFiles = FIXTURE_SOURCE_FILES,
+  sourceHash = FIXTURE_SOURCE_HASH,
+} = {}) {
+  const supported = {
+    battle: true,
+    notice: false,
+    fullBleed: true,
+    centerClear: true,
+    controlsVisible: true,
+    touchSized: true,
+    labelsContained: true,
+    shortcutKeys: true,
+    sailControl: true,
+    noOuterScroll: true,
+  };
+  const unsupported = { notice: true, battle: false, liveFrame: false, focused: true };
+  return {
+    version: 1,
+    sourceFiles,
+    sourceHash,
+    canonicalInput: { battleId: 'battle-lab-red-jackdaw', seed: 1702 },
+    viewports: {
+      tablet: { width: 1180, height: 820 },
+      desktop: { width: 1440, height: 900 },
+      minimum: { width: 1024, height: 768 },
+      boundary: { width: 960, height: 600 },
+      phonePortrait: { width: 430, height: 932 },
+      phoneLandscape: { width: 844, height: 390 },
+    },
+    screenshots: structuredClone(NAVAL_SCREENSHOTS),
+    asset: {
+      path: '/assets/caribbean-sloop-fixture.glb',
+      sha256: '3333333333333333333333333333333333333333333333333333333333333333',
+    },
+    handedness: {
+      portVectorPositiveX: true,
+      starboardVectorNegativeX: true,
+      portMuzzlePositiveX: true,
+      starboardMuzzleNegativeX: true,
+      steeringPortPositive: true,
+      steeringStarboardNegative: true,
+      rudderReleased: true,
+    },
+    outcome: {
+      ok: true,
+      outcome: 'boarding-ready',
+      initial: {
+        distance: 7.02,
+        outcomeInjected: false,
+        damageInjectedAfterStart: false,
+        timeInjected: false,
+        opponent: { hull: 72, sails: 30, crew: 18, cannon: 6 },
+      },
+    },
+    fallback: {
+      ok: true,
+      chart: true,
+      retry: true,
+      restart: true,
+      battleControls: true,
+      labelsClear: true,
+    },
+    motion: {
+      normal: { preference: 'no-preference', reducedMotion: false },
+      reduced: { preference: 'reduce', reducedMotion: true },
+    },
+    display: {
+      supported: {
+        boundary: structuredClone(supported),
+        desktop: structuredClone(supported),
+        minimum: structuredClone(supported),
+        tablet: structuredClone(supported),
+      },
+      unsupported: {
+        landscape: structuredClone(unsupported),
+        portrait: structuredClone(unsupported),
+      },
+      resize: {
+        notice: true,
+        noticeFocused: true,
+        battleUnmounted: true,
+        tickStopped: true,
+        restoredWithNewSession: true,
+      },
+      prebattle: {
+        decision: { legendComplete: true, ctaVisible: true, noOuterScroll: true },
+        briefing: { legendComplete: true, ctaVisible: true, noOuterScroll: true },
+      },
+    },
+  };
+}
+
+function validGeneration({ sourceFiles, sourceHash, variant = 0, captureHead = null } = {}) {
+  const manifest = stableManifest({ sourceFiles, sourceHash });
+  return {
+    verdict: { ok: true },
+    capture: captureHead === null ? undefined : {
+      headCommitAtCapture: captureHead,
+      worktreeDirtyBeforeCapture: false,
+    },
+    source: captureHead === null ? undefined : {
+      headCommitAtCapture: captureHead,
+      worktreeDirtyBeforeCapture: false,
+      sourceTreeSha256: manifest.sourceHash,
+      sourceTreeFiles: manifest.sourceFiles.map((row) => row.path),
+      sourceFiles: manifest.sourceFiles,
+      sourceHash: manifest.sourceHash,
+    },
+    stableManifest: manifest,
+    observations: validObservations(variant),
+    artifacts: manifest.screenshots.map((row) => ({
+      ...row,
+      bytes: pngBytes(row.width, row.height, variant),
+    })),
+  };
+}
+
+function writeGeneration(directory, generation, { artifactVariant = null } = {}) {
+  const { artifacts: _artifacts, ...metrics } = generation;
+  fs.writeFileSync(path.join(directory, 'metrics.json'), `${JSON.stringify(metrics, null, 2)}\n`);
+  for (const [index, artifact] of generation.artifacts.entries()) {
+    const row = generation.stableManifest.screenshots[index];
+    const bytes = artifactVariant === null
+      ? artifact.bytes
+      : pngBytes(row.width, row.height, artifactVariant);
+    fs.writeFileSync(path.join(directory, artifact.name), bytes);
+  }
+}
 
 function writeFiles(root, files) {
   for (const [relative, contents] of Object.entries(files)) {
@@ -58,6 +218,7 @@ async function makeTrackedGraph(t, files = {}) {
     'scripts/caribbean-naval-check.mjs': "import './lib/caribbean-naval-evidence.mjs';\n",
     'scripts/fixtures/caribbean-campaign-victory.json': '{}\n',
     'scripts/lib/caribbean-naval-evidence.mjs': 'export const naval = true;\n',
+    'scripts/lib/caribbean-port-identity-evidence.mjs': 'export const identity = true;\n',
     'scripts/lib/caribbean-campaign-victory-driver.mjs': 'export const driver = true;\n',
     'src/app/main.tsx': "import '@shared/styles/tokens.css'; import './App';\n",
     'src/app/App.tsx': "import '@app/registry'; export default function App() { return null; }\n",
@@ -66,6 +227,7 @@ async function makeTrackedGraph(t, files = {}) {
     'src/shared/styles/tokens.css': ':root { --ink: #000; }\n',
     'src/shared/storage/kv.ts': 'export const kv = true;\n',
     'src/test/.keep': '\n',
+    'public/.keep': '\n',
   };
   writeFiles(root, { ...scaffold, ...files });
   execFileSync('git', ['init', '-q'], { cwd: root });
@@ -226,6 +388,22 @@ const annotatedBindingFailures = [
     source: "const modulePath = './dependency'; modulePath = './other'; void import(/* @vite-ignore */ modulePath);",
   },
   {
+    name: 'object destructuring assignment target',
+    source: "const modulePath = './dependency'; const source = {}; ({ value: modulePath } = source); void import(/* @vite-ignore */ modulePath);",
+  },
+  {
+    name: 'array destructuring assignment target',
+    source: "const modulePath = './dependency'; const source = []; [modulePath] = source; void import(/* @vite-ignore */ modulePath);",
+  },
+  {
+    name: 'for-of assignment target',
+    source: "const modulePath = './dependency'; for (modulePath of ['./other']) {} void import(/* @vite-ignore */ modulePath);",
+  },
+  {
+    name: 'for-in assignment target',
+    source: "const modulePath = './dependency'; for (modulePath in { other: true }) {} void import(/* @vite-ignore */ modulePath);",
+  },
+  {
     name: 'referenced initializer',
     source: "const suffix = 'dependency'; const modulePath = './' + suffix; void import(/* @vite-ignore */ modulePath);",
   },
@@ -346,11 +524,9 @@ test('requires an explicit mode and enforces destination plus exact cleanup outc
   const docsDirectory = path.join(root, 'docs', 'screenshots', 'caribbean-naval');
   const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-cleanup-parent-'));
   t.after(() => fs.rmSync(tempParent, { recursive: true, force: true }));
-  const generated = ({ source }) => ({
-    verdict: { ok: true },
-    stableManifest: { version: 1, sourceFiles: source.sourceFiles, sourceHash: source.sourceHash, screenshots: [] },
-    observations: validObservations(),
-    artifacts: [],
+  const generated = ({ source }) => validGeneration({
+    sourceFiles: source.files ?? source.sourceFiles,
+    sourceHash: source.sourceHash,
   });
 
   let harnessCalls = 0;
@@ -393,14 +569,12 @@ test('keeps semantic probe temporary while capture and verify honor clean proven
   const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-mode-parent-'));
   t.after(() => fs.rmSync(tempParent, { recursive: true, force: true }));
   const generate = async ({ destination, source, captureHead: observedHead }) => {
-    const generation = {
-      verdict: { ok: true },
-      capture: { headCommitAtCapture: observedHead, worktreeDirtyBeforeCapture: false },
-      stableManifest: { version: 1, sourceFiles: source.sourceFiles, sourceHash: source.sourceHash, screenshots: [] },
-      observations: validObservations(),
-      artifacts: [],
-    };
-    fs.writeFileSync(path.join(destination, 'metrics.json'), `${JSON.stringify(generation, null, 2)}\n`);
+    const generation = validGeneration({
+      sourceFiles: source.files ?? source.sourceFiles,
+      sourceHash: source.sourceHash,
+      captureHead: observedHead,
+    });
+    writeGeneration(destination, generation);
     return generation;
   };
   const run = async (mode) => {
@@ -412,14 +586,14 @@ test('keeps semantic probe temporary while capture and verify honor clean proven
 
   assert.deepEqual(await run('semantic-probe'), { code: 0, lines: ['NAVAL_SEMANTIC_PROBE_OK tracked=stale'] });
   const capture = await run('capture');
-  assert.deepEqual(capture, { code: 0, lines: [`NAVAL_CAPTURE_OK head=${captureHead} changed=1`] });
-  assert.deepEqual(fs.readdirSync(docsDirectory), ['metrics.json']);
-  execFileSync('git', ['add', '--', 'docs/screenshots/caribbean-naval/metrics.json'], { cwd: root });
+  assert.deepEqual(capture, { code: 0, lines: [`NAVAL_CAPTURE_OK head=${captureHead} changed=12`] });
+  assert.deepEqual(fs.readdirSync(docsDirectory).sort(), ['metrics.json', ...NAVAL_SCREENSHOTS.map((row) => row.name)].sort());
+  execFileSync('git', ['add', '--', 'docs/screenshots/caribbean-naval'], { cwd: root });
   execFileSync('git', ['-c', 'user.name=Task 6', '-c', 'user.email=task6@example.invalid', 'commit', '-qm', 'capture'], { cwd: root });
   const sourceHash = JSON.parse(fs.readFileSync(path.join(docsDirectory, 'metrics.json'), 'utf8')).stableManifest.sourceHash;
   assert.deepEqual(await run('verify'), {
     code: 0,
-    lines: [`NAVAL_VERIFY_OK capture=${captureHead} source=${sourceHash} artifacts=0`],
+    lines: [`NAVAL_VERIFY_OK capture=${captureHead} source=${sourceHash} artifacts=11`],
   });
 
   fs.appendFileSync(path.join(root, 'package.json'), '\n');
@@ -433,6 +607,204 @@ test('keeps semantic probe temporary while capture and verify honor clean proven
   assert.deepEqual(dirtyLines, ['NAVAL_VERIFY_FAILED dirty-worktree']);
   assert.equal(harnessCalls, 0);
   assert.deepEqual(fs.readdirSync(tempParent), []);
+});
+
+test('semantic probe classifies an invalid tracked manifest as stale without writing docs', async (t) => {
+  const { runNavalEvidenceCli } = await import('./caribbean-naval-verification.mjs');
+  const root = await makeTrackedGraph(t);
+  const docsDirectory = path.join(root, 'docs', 'screenshots', 'caribbean-naval');
+  fs.mkdirSync(docsDirectory, { recursive: true });
+  const invalidMetrics = Buffer.from('{"stableManifest":{"version":1}}\n');
+  fs.writeFileSync(path.join(docsDirectory, 'metrics.json'), invalidMetrics);
+  const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-stale-probe-parent-'));
+  t.after(() => fs.rmSync(tempParent, { recursive: true, force: true }));
+  const lines = [];
+  const code = await runNavalEvidenceCli({
+    mode: 'semantic-probe',
+    root,
+    docsDirectory,
+    tempParent,
+    generate: async ({ source }) => validGeneration({
+      sourceFiles: source.files,
+      sourceHash: source.sourceHash,
+    }),
+    writeLine: (line) => lines.push(line),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(lines, ['NAVAL_SEMANTIC_PROBE_OK tracked=stale']);
+  assert.deepEqual(fs.readFileSync(path.join(docsDirectory, 'metrics.json')), invalidMetrics);
+  assert.deepEqual(fs.readdirSync(tempParent), []);
+});
+
+test('capture publishes validated returned bytes instead of divergent candidate files', async (t) => {
+  const verification = await import('./caribbean-naval-verification.mjs');
+  const root = await makeTrackedGraph(t);
+  execFileSync('git', ['-c', 'user.name=Task 6', '-c', 'user.email=task6@example.invalid', 'commit', '-qm', 'fixture'], { cwd: root });
+  const docsDirectory = path.join(root, 'docs', 'screenshots', 'caribbean-naval');
+  const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-publish-parent-'));
+  t.after(() => fs.rmSync(tempParent, { recursive: true, force: true }));
+  let returned;
+  const lines = [];
+  const code = await verification.runNavalEvidenceCli({
+    mode: 'capture',
+    root,
+    docsDirectory,
+    tempParent,
+    generate: async ({ destination, source, captureHead }) => {
+      returned = validGeneration({
+        sourceFiles: source.files ?? source.sourceFiles,
+        sourceHash: source.sourceHash,
+        variant: 1,
+        captureHead,
+      });
+      writeGeneration(destination, returned, { artifactVariant: 9 });
+      return returned;
+    },
+    writeLine: (line) => lines.push(line),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(lines, [`NAVAL_CAPTURE_OK head=${returned.capture.headCommitAtCapture} changed=12`]);
+  for (const artifact of returned.artifacts) {
+    assert.deepEqual(fs.readFileSync(path.join(docsDirectory, artifact.name)), artifact.bytes, artifact.name);
+  }
+});
+
+test('verify rejects a corrupt tracked artifact even when fresh generation is valid', async (t) => {
+  const verification = await import('./caribbean-naval-verification.mjs');
+  const root = await makeTrackedGraph(t);
+  execFileSync('git', ['-c', 'user.name=Task 6', '-c', 'user.email=task6@example.invalid', 'commit', '-qm', 'fixture'], { cwd: root });
+  const captureHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  const source = verification.collectCaribbeanNavalSourceManifest(root);
+  const docsDirectory = path.join(root, 'docs', 'screenshots', 'caribbean-naval');
+  fs.mkdirSync(docsDirectory, { recursive: true });
+  const captured = validGeneration({
+    sourceFiles: source.files ?? source.sourceFiles,
+    sourceHash: source.sourceHash,
+    captureHead,
+  });
+  writeGeneration(docsDirectory, captured);
+  fs.writeFileSync(path.join(docsDirectory, NAVAL_SCREENSHOTS[0].name), Buffer.from('corrupt tracked png'));
+  execFileSync('git', ['add', '--', 'docs/screenshots/caribbean-naval'], { cwd: root });
+  execFileSync('git', ['-c', 'user.name=Task 6', '-c', 'user.email=task6@example.invalid', 'commit', '-qm', 'capture'], { cwd: root });
+  const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-corrupt-parent-'));
+  t.after(() => fs.rmSync(tempParent, { recursive: true, force: true }));
+  const lines = [];
+  const code = await verification.runNavalEvidenceCli({
+    mode: 'verify', root, docsDirectory, tempParent,
+    generate: async ({ destination, source: current, captureHead: observedHead }) => {
+      const fresh = validGeneration({
+        sourceFiles: current.files ?? current.sourceFiles,
+        sourceHash: current.sourceHash,
+        variant: 1,
+        captureHead: observedHead,
+      });
+      writeGeneration(destination, fresh);
+      return fresh;
+    },
+    writeLine: (line) => lines.push(line),
+  });
+  assert.equal(code, 1);
+  assert.deepEqual(lines, ['NAVAL_VERIFY_FAILED artifact-manifest']);
+});
+
+test('rejects symbolic dirty or mismatched capture provenance metadata', async (t) => {
+  const verification = await import('./caribbean-naval-verification.mjs');
+  for (const fixture of [
+    {
+      name: 'symbolic head',
+      mutate(generation) {
+        generation.capture.headCommitAtCapture = 'HEAD';
+        generation.source.headCommitAtCapture = 'HEAD';
+      },
+    },
+    {
+      name: 'dirty capture',
+      mutate(generation) { generation.capture.worktreeDirtyBeforeCapture = true; },
+    },
+    {
+      name: 'mismatched source head',
+      mutate(generation) { generation.source.headCommitAtCapture = '0'.repeat(40); },
+    },
+  ]) await t.test(fixture.name, async (row) => {
+    const root = await makeTrackedGraph(row);
+    execFileSync('git', ['-c', 'user.name=Task 6', '-c', 'user.email=task6@example.invalid', 'commit', '-qm', 'fixture'], { cwd: root });
+    const captureHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+    const source = verification.collectCaribbeanNavalSourceManifest(root);
+    const docsDirectory = path.join(root, 'docs', 'screenshots', 'caribbean-naval');
+    fs.mkdirSync(docsDirectory, { recursive: true });
+    const captured = validGeneration({
+      sourceFiles: source.files ?? source.sourceFiles,
+      sourceHash: source.sourceHash,
+      captureHead,
+    });
+    fixture.mutate(captured);
+    writeGeneration(docsDirectory, captured);
+    execFileSync('git', ['add', '--', 'docs/screenshots/caribbean-naval'], { cwd: root });
+    execFileSync('git', ['-c', 'user.name=Task 6', '-c', 'user.email=task6@example.invalid', 'commit', '-qm', 'capture'], { cwd: root });
+    const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-provenance-parent-'));
+    row.after(() => fs.rmSync(tempParent, { recursive: true, force: true }));
+    const lines = [];
+    const code = await verification.runNavalEvidenceCli({
+      mode: 'verify', root, docsDirectory, tempParent,
+      generate: async ({ destination, source: current, captureHead: observedHead }) => {
+        const fresh = validGeneration({
+          sourceFiles: current.files ?? current.sourceFiles,
+          sourceHash: current.sourceHash,
+          captureHead: observedHead,
+        });
+        writeGeneration(destination, fresh);
+        return fresh;
+      },
+      writeLine: (line) => lines.push(line),
+    });
+    assert.equal(code, 1);
+    assert.deepEqual(lines, ['NAVAL_VERIFY_FAILED stale-capture']);
+  });
+});
+
+test('capture fails closed when generation edits source or moves HEAD', async (t) => {
+  const verification = await import('./caribbean-naval-verification.mjs');
+  for (const fixture of [
+    {
+      name: 'source edit',
+      expected: 'dirty-worktree',
+      mutate(root) { fs.appendFileSync(path.join(root, 'package.json'), '\n'); },
+    },
+    {
+      name: 'head movement',
+      expected: 'stale-capture',
+      mutate(root) {
+        execFileSync('git', [
+          '-c', 'user.name=Task 6', '-c', 'user.email=task6@example.invalid',
+          'commit', '--allow-empty', '-qm', 'move head',
+        ], { cwd: root });
+      },
+    },
+  ]) await t.test(fixture.name, async (row) => {
+    const root = await makeTrackedGraph(row);
+    execFileSync('git', ['-c', 'user.name=Task 6', '-c', 'user.email=task6@example.invalid', 'commit', '-qm', 'fixture'], { cwd: root });
+    const docsDirectory = path.join(root, 'docs', 'screenshots', 'caribbean-naval');
+    const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-drift-parent-'));
+    row.after(() => fs.rmSync(tempParent, { recursive: true, force: true }));
+    const lines = [];
+    const code = await verification.runNavalEvidenceCli({
+      mode: 'capture', root, docsDirectory, tempParent,
+      generate: async ({ destination, source, captureHead }) => {
+        const generation = validGeneration({
+          sourceFiles: source.files ?? source.sourceFiles,
+          sourceHash: source.sourceHash,
+          captureHead,
+        });
+        writeGeneration(destination, generation);
+        fixture.mutate(root);
+        return generation;
+      },
+      writeLine: (line) => lines.push(line),
+    });
+    assert.equal(code, 1);
+    assert.deepEqual(lines, [`NAVAL_CAPTURE_FAILED ${fixture.expected}`]);
+    assert.equal(fs.existsSync(docsDirectory), false);
+  });
 });
 
 test('resolves the tracked fixed-point graph and grows for a new transitive edge', async (t) => {
@@ -464,6 +836,17 @@ test('resolves the tracked fixed-point graph and grows for a new transitive edge
   const verification = await import('./caribbean-naval-verification.mjs');
   assert.deepEqual(verification.CARIBBEAN_NAVAL_SOURCE_SEEDS, SOURCE_SEEDS);
   const audit = verification.auditCaribbeanNavalSourceClosure(root);
+  assert.deepEqual(Object.keys(audit).sort(), ['edges', 'paths', 'seeds']);
+  for (const literal of SOURCE_SEEDS.filter((seed) => !seed.startsWith(':(glob)'))) {
+    assert.ok(audit.seeds.includes(literal), `seed set missing literal ${literal}`);
+  }
+  for (const prefix of [
+    'scripts/lib/caribbean-naval-',
+    'scripts/lib/caribbean-port-identity-',
+    'scripts/lib/caribbean-campaign-',
+    'src/games/caribbean/',
+    'public/',
+  ]) assert.ok(audit.seeds.some((seed) => seed.startsWith(prefix)), `seed set missing glob class ${prefix}`);
   for (const required of [
     'src/games/caribbean/entry.ts',
     'src/games/caribbean/nested/index.ts',
@@ -483,14 +866,15 @@ test('resolves the tracked fixed-point graph and grows for a new transitive edge
   assert.ok(audit.edges.every((edge) => audit.paths.includes(edge.importer) && audit.paths.includes(edge.target)));
 
   const before = verification.collectCaribbeanNavalSourceManifest(root);
+  assert.deepEqual(Object.keys(before).sort(), ['files', 'sourceHash']);
   writeFiles(root, {
     'src/games/caribbean/transitive.js': "export * from './automatic';\n",
     'src/games/caribbean/automatic.ts': 'export const automatic = true;\n',
   });
   execFileSync('git', ['add', '--', 'src/games/caribbean/transitive.js', 'src/games/caribbean/automatic.ts'], { cwd: root });
   const after = verification.collectCaribbeanNavalSourceManifest(root);
-  assert.equal(after.sourceFiles.length, before.sourceFiles.length + 1);
-  assert.ok(after.sourceFiles.some((row) => row.path === 'src/games/caribbean/automatic.ts'));
+  assert.equal(after.files.length, before.files.length + 1);
+  assert.ok(after.files.some((row) => row.path === 'src/games/caribbean/automatic.ts'));
   assert.notEqual(after.sourceHash, before.sourceHash);
 });
 
@@ -515,63 +899,75 @@ test('rejects unresolved, ambiguous, unknown bare, and alias disagreement edges'
   }
 });
 
+test('rejects generic directory URLs and ignores Vite alias comments or decoys', async (t) => {
+  const { auditCaribbeanNavalSourceClosure } = await import('./caribbean-naval-verification.mjs');
+  const directoryRoot = await makeTrackedGraph(t, {
+    'src/games/caribbean/directory.ts': "export const root = new URL('../..', import.meta.url);\n",
+  });
+  assert.throws(
+    () => auditCaribbeanNavalSourceClosure(directoryRoot),
+    (error) => error?.code === 'source-files' && /unresolved edge/.test(error.message),
+  );
+
+  const decoyRoot = await makeTrackedGraph(t, {
+    'vite.config.ts': [
+      "import { fileURLToPath, URL } from 'node:url';",
+      "// '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),",
+      'export default { resolve: { alias: {',
+      "  '@shared': fileURLToPath(new URL('./src/wrong', import.meta.url)),",
+      "  '@games': fileURLToPath(new URL('./src/games', import.meta.url)),",
+      "  '@app': fileURLToPath(new URL('./src/app', import.meta.url)),",
+      "  '@test': fileURLToPath(new URL('./src/test', import.meta.url)),",
+      '} } };',
+    ].join('\n'),
+    'src/wrong/decoy.ts': 'export const decoy = true;\n',
+  });
+  assert.throws(
+    () => auditCaribbeanNavalSourceClosure(decoyRoot),
+    (error) => error?.code === 'source-files' && /alias @shared disagrees/.test(error.message),
+  );
+});
+
+test('requires every literal seed and every mandated glob class', async (t) => {
+  const { auditCaribbeanNavalSourceClosure } = await import('./caribbean-naval-verification.mjs');
+  const missingLiteral = await makeTrackedGraph(t);
+  execFileSync('git', ['rm', '--cached', '-q', '--', 'knip.json'], { cwd: missingLiteral });
+  assert.throws(
+    () => auditCaribbeanNavalSourceClosure(missingLiteral),
+    (error) => error?.code === 'source-files' && /required seed is missing: knip\.json/.test(error.message),
+  );
+
+  const emptyGlob = await makeTrackedGraph(t);
+  execFileSync('git', ['rm', '--cached', '-q', '--', 'scripts/lib/caribbean-port-identity-evidence.mjs'], { cwd: emptyGlob });
+  assert.throws(
+    () => auditCaribbeanNavalSourceClosure(emptyGlob),
+    (error) => error?.code === 'source-files'
+      && /required seed class is empty: :\(glob\)scripts\/lib\/caribbean-port-identity-\*\.mjs/.test(error.message),
+  );
+});
+
 test('rejects missing extra reordered and hash-drifted captured source manifests exactly', async (t) => {
   const root = await makeTrackedGraph(t);
   const verification = await import('./caribbean-naval-verification.mjs');
   const current = verification.collectCaribbeanNavalSourceManifest(root);
+  assert.ok(Array.isArray(current.files), 'public source manifest must expose files');
   const missing = structuredClone(current);
-  missing.sourceFiles.pop();
+  missing.files.pop();
   assert.throws(() => verification.verifySourceManifest(missing, current), (error) => error?.code === 'source-files');
   const extra = structuredClone(current);
-  extra.sourceFiles.push({ path: 'README.md', sha256: '0'.repeat(64) });
+  extra.files.push({ path: 'README.md', sha256: '0'.repeat(64) });
   assert.throws(() => verification.verifySourceManifest(extra, current), (error) => error?.code === 'source-files');
   const reordered = structuredClone(current);
-  reordered.sourceFiles.reverse();
+  reordered.files.reverse();
   assert.throws(() => verification.verifySourceManifest(reordered, current), (error) => error?.code === 'source-files');
   const changed = structuredClone(current);
-  changed.sourceFiles[0].sha256 = 'f'.repeat(64);
+  changed.files[0].sha256 = 'f'.repeat(64);
   assert.throws(() => verification.verifySourceManifest(changed, current), (error) => error?.code === 'source-hash');
 });
 
 test('accepts variable observations and pixels but rejects stable range and artifact drift', async () => {
   const verification = await import('./caribbean-naval-verification.mjs');
-  const pngBytes = (width, height, variant) => {
-    const bytes = Buffer.alloc(25);
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]).copy(bytes);
-    bytes.writeUInt32BE(width, 16);
-    bytes.writeUInt32BE(height, 20);
-    bytes[24] = variant;
-    return bytes;
-  };
-  const makeGeneration = (variant = 0) => ({
-    stableManifest: {
-      version: 1,
-      sourceFiles: [{ path: 'package.json', sha256: '1'.repeat(64) }],
-      sourceHash: '2'.repeat(64),
-      canonicalInput: { battleId: 'battle-lab-red-jackdaw', seed: 1702 },
-      viewports: { tablet: { width: 1180, height: 820 } },
-      screenshots: [{ name: 'battle.png', width: 1, height: 1, state: 'battle' }],
-      asset: { path: '/assets/caribbean-sloop-hash.glb', sha256: '3'.repeat(64) },
-      handedness: { portVectorX: 1, starboardVectorX: -1 },
-      outcome: { ok: true, outcome: 'boarding-ready' },
-      fallback: { ok: true },
-      motion: { normal: 'no-preference', reduced: 'reduce' },
-      display: { supported: true, unsupported: true },
-    },
-    observations: {
-      fpsSamples: Array(20).fill(60 + variant), sustainedFps: 60 + variant,
-      maxDrawCalls: 33 + variant, maxTriangles: 8_000 + variant,
-      boardingDuration: 3 + variant / 10,
-      samples: Array.from({ length: 20 }, (_, index) => ({
-        tick: (index + 1) * (60 + variant), paused: false, outcome: null,
-        textures: 3, geometries: 30, materials: 30, bufferAttributes: 100,
-        activeEffects: index === variant ? 4 + variant : 0, effectCapacity: 96,
-      })),
-      growthAfterWarmup: { textures: 0, geometries: 0, materials: 0, bufferAttributes: 0, effectCapacity: 0 },
-      failures: { console: [], page: [], requests: [], unhandledRejections: [], allocation: [], capacity: [], pool: [] },
-    },
-    artifacts: [{ name: 'battle.png', width: 1, height: 1, state: 'battle', bytes: pngBytes(1, 1, variant) }],
-  });
+  const makeGeneration = (variant = 0) => validGeneration({ variant });
   const captured = makeGeneration(0);
   const fresh = makeGeneration(1);
   assert.doesNotThrow(() => verification.verifyNavalGeneration(captured, fresh));
@@ -601,10 +997,32 @@ test('accepts variable observations and pixels but rejects stable range and arti
     mutate(invalid);
     assert.throws(() => verification.verifyNavalGeneration(captured, invalid), (error) => error?.code === 'artifact-manifest');
   }
+
+  for (const mutate of [
+    (value) => { value.stableManifest.extra = true; },
+    (value) => { delete value.stableManifest.fallback.labelsClear; },
+    (value) => {
+      value.stableManifest.sourceFiles[0].path = 'nested/../package.json';
+      value.stableManifest.sourceHash = createHash('sha256')
+        .update(verification.canonicalJson(value.stableManifest.sourceFiles)).digest('hex');
+    },
+    (value) => { value.stableManifest.screenshots.reverse(); },
+    (value) => { value.stableManifest.screenshots.push(structuredClone(value.stableManifest.screenshots[0])); },
+    (value) => { value.stableManifest.screenshots[0].name = '../../escape.png'; value.artifacts[0].name = '../../escape.png'; },
+    (value) => { value.stableManifest.screenshots[0].name = '/absolute.png'; value.artifacts[0].name = '/absolute.png'; },
+    (value) => { value.stableManifest.screenshots[0].name = 'nested/name.png'; value.artifacts[0].name = 'nested/name.png'; },
+  ]) {
+    const invalid = makeGeneration(1);
+    mutate(invalid);
+    assert.throws(
+      () => verification.validateFreshNavalGeneration(invalid),
+      (error) => ['stable-manifest', 'artifact-manifest'].includes(error?.code),
+    );
+  }
 });
 
 test('accepts two real temporary harness generations with honest observations', { timeout: 240_000 }, async (t) => {
-  const root = path.resolve(new URL('../..', import.meta.url).pathname);
+  const root = path.resolve(process.cwd());
   const verification = await import('./caribbean-naval-verification.mjs');
   const { runNavalCheck } = await import('../caribbean-naval-check.mjs');
   const source = verification.collectCaribbeanNavalSourceManifest(root);
@@ -624,7 +1042,7 @@ test('accepts two real temporary harness generations with honest observations', 
 
 test('audits the real tracked dependency closure', async () => {
   const verification = await import('./caribbean-naval-verification.mjs');
-  const root = path.resolve(new URL('../..', import.meta.url).pathname);
+  const root = path.resolve(process.cwd());
   const audit = verification.auditCaribbeanNavalSourceClosure(root);
   for (const required of [
     'src/shared/storage/kv.ts',
@@ -657,25 +1075,31 @@ test('audits the real tracked dependency closure', async () => {
     assert.ok(audit.edges.some((edge) => edge.importer === importer && edge.specifier === specifier && edge.target === target), `${importer} ${specifier}`);
   }
   assert.ok(audit.edges.every((edge) => audit.paths.includes(edge.importer) && audit.paths.includes(edge.target)));
-  assert.ok(audit.paths.every((relative) => audit.trackedPaths.includes(relative)));
+  assert.deepEqual(Object.keys(audit).sort(), ['edges', 'paths', 'seeds']);
+  for (const literal of SOURCE_SEEDS.filter((seed) => !seed.startsWith(':(glob)'))) {
+    assert.ok(audit.seeds.includes(literal), `real closure seed set missing ${literal}`);
+  }
+  const manifest = verification.collectCaribbeanNavalSourceManifest(root);
+  assert.deepEqual(Object.keys(manifest).sort(), ['files', 'sourceHash']);
 });
 
 test('fails closed when critical real rows are omitted reordered injected or rehashed', async () => {
   const verification = await import('./caribbean-naval-verification.mjs');
-  const root = path.resolve(new URL('../..', import.meta.url).pathname);
+  const root = path.resolve(process.cwd());
   const current = verification.collectCaribbeanNavalSourceManifest(root);
+  assert.ok(Array.isArray(current.files), 'public source manifest must expose files');
   for (const critical of ['src/shared/storage/kv.ts', 'src/shared/styles/tokens.css', 'src/app/main.tsx']) {
     const omitted = structuredClone(current);
-    omitted.sourceFiles = omitted.sourceFiles.filter((row) => row.path !== critical);
+    omitted.files = omitted.files.filter((row) => row.path !== critical);
     assert.throws(() => verification.verifySourceManifest(omitted, current), (error) => error?.code === 'source-files', critical);
   }
   const injected = structuredClone(current);
-  injected.sourceFiles.push({ path: 'README.md', sha256: '0'.repeat(64) });
+  injected.files.push({ path: 'README.md', sha256: '0'.repeat(64) });
   assert.throws(() => verification.verifySourceManifest(injected, current), (error) => error?.code === 'source-files');
   const reordered = structuredClone(current);
-  [reordered.sourceFiles[0], reordered.sourceFiles[1]] = [reordered.sourceFiles[1], reordered.sourceFiles[0]];
+  [reordered.files[0], reordered.files[1]] = [reordered.files[1], reordered.files[0]];
   assert.throws(() => verification.verifySourceManifest(reordered, current), (error) => error?.code === 'source-files');
   const rehashed = structuredClone(current);
-  rehashed.sourceFiles[0].sha256 = 'f'.repeat(64);
+  rehashed.files[0].sha256 = 'f'.repeat(64);
   assert.throws(() => verification.verifySourceManifest(rehashed, current), (error) => error?.code === 'source-hash');
 });

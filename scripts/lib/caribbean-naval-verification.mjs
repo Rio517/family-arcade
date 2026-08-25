@@ -32,6 +32,93 @@ const RESOLUTION_EXTENSIONS = [
 ];
 const SCRIPT_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const NAVAL_SCREENSHOT_MANIFEST = [
+  { name: 'battle-boundary-supported.png', width: 960, height: 600, state: 'battle-boundary' },
+  { name: 'battle-desktop.png', width: 1440, height: 900, state: 'battle' },
+  { name: 'battle-minimum-supported.png', width: 1024, height: 768, state: 'battle-minimum' },
+  { name: 'battle-tablet-landscape.png', width: 1180, height: 820, state: 'battle-tablet' },
+  { name: 'boarding-ready-result.png', width: 1180, height: 820, state: 'boarding-ready' },
+  { name: 'briefing-tablet.png', width: 1180, height: 820, state: 'briefing' },
+  { name: 'broadside-handedness.png', width: 1180, height: 820, state: 'starboard-broadside' },
+  { name: 'decision-tablet.png', width: 1180, height: 820, state: 'decision' },
+  { name: 'fallback-tablet-landscape.png', width: 1024, height: 768, state: 'fallback' },
+  { name: 'minimum-screen-phone-landscape.png', width: 844, height: 390, state: 'unsupported-landscape' },
+  { name: 'minimum-screen-phone-portrait.png', width: 430, height: 932, state: 'unsupported-portrait' },
+];
+const NAVAL_STABLE_STATIC = {
+  canonicalInput: { battleId: 'battle-lab-red-jackdaw', seed: 1702 },
+  viewports: {
+    tablet: { width: 1180, height: 820 },
+    desktop: { width: 1440, height: 900 },
+    minimum: { width: 1024, height: 768 },
+    boundary: { width: 960, height: 600 },
+    phonePortrait: { width: 430, height: 932 },
+    phoneLandscape: { width: 844, height: 390 },
+  },
+  handedness: {
+    portVectorPositiveX: true,
+    starboardVectorNegativeX: true,
+    portMuzzlePositiveX: true,
+    starboardMuzzleNegativeX: true,
+    steeringPortPositive: true,
+    steeringStarboardNegative: true,
+    rudderReleased: true,
+  },
+  outcome: {
+    ok: true,
+    outcome: 'boarding-ready',
+    initial: {
+      distance: 7.02,
+      outcomeInjected: false,
+      damageInjectedAfterStart: false,
+      timeInjected: false,
+      opponent: { hull: 72, sails: 30, crew: 18, cannon: 6 },
+    },
+  },
+  fallback: {
+    ok: true,
+    chart: true,
+    retry: true,
+    restart: true,
+    battleControls: true,
+    labelsClear: true,
+  },
+  motion: {
+    normal: { preference: 'no-preference', reducedMotion: false },
+    reduced: { preference: 'reduce', reducedMotion: true },
+  },
+  display: {
+    supported: Object.fromEntries(['boundary', 'desktop', 'minimum', 'tablet'].map((name) => [name, {
+      battle: true,
+      notice: false,
+      fullBleed: true,
+      centerClear: true,
+      controlsVisible: true,
+      touchSized: true,
+      labelsContained: true,
+      shortcutKeys: true,
+      sailControl: true,
+      noOuterScroll: true,
+    }])),
+    unsupported: Object.fromEntries(['landscape', 'portrait'].map((name) => [name, {
+      notice: true,
+      battle: false,
+      liveFrame: false,
+      focused: true,
+    }])),
+    resize: {
+      notice: true,
+      noticeFocused: true,
+      battleUnmounted: true,
+      tickStopped: true,
+      restoredWithNewSession: true,
+    },
+    prebattle: {
+      decision: { legendComplete: true, ctaVisible: true, noOuterScroll: true },
+      briefing: { legendComplete: true, ctaVisible: true, noOuterScroll: true },
+    },
+  },
+};
 
 function bytewise(left, right) {
   return Buffer.compare(Buffer.from(left), Buffer.from(right));
@@ -86,11 +173,81 @@ function trackedPaths(root, pathspecs = null) {
   return nulPaths(output, pathspecs === null ? 'tracked universe' : 'source seeds');
 }
 
+function validatedSeedPaths(root, universe) {
+  for (const seed of CARIBBEAN_NAVAL_SOURCE_SEEDS) {
+    if (seed.startsWith(':(glob)')) {
+      if (trackedPaths(root, [seed]).length === 0) sourceFailure(`required seed class is empty: ${seed}`);
+    } else if (!universe.has(seed)) {
+      sourceFailure(`required seed is missing: ${seed}`);
+    }
+  }
+  return trackedPaths(root, CARIBBEAN_NAVAL_SOURCE_SEEDS);
+}
+
 function parseJsonConfig(root, relative) {
   const raw = fs.readFileSync(path.join(root, relative), 'utf8');
   const parsed = ts.parseConfigFileTextToJson(relative, raw);
   if (parsed.error || !parsed.config) sourceFailure(`${relative} could not be parsed`);
   return parsed.config;
+}
+
+function propertyName(node) {
+  if (ts.isIdentifier(node) || ts.isStringLiteral(node) || ts.isNumericLiteral(node)) return node.text;
+  return null;
+}
+
+function variableObject(source, identifier) {
+  const matches = [];
+  const visit = (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)
+      && node.name.text === identifier && ts.isObjectLiteralExpression(node.initializer)) {
+      matches.push(node.initializer);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function objectValue(source, object, key) {
+  const matches = object.properties.filter((property) => (
+    (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property))
+      && propertyName(property.name) === key
+  ));
+  if (matches.length !== 1) return null;
+  const property = matches[0];
+  if (ts.isPropertyAssignment(property)) {
+    if (ts.isObjectLiteralExpression(property.initializer)) return property.initializer;
+    if (ts.isIdentifier(property.initializer)) return variableObject(source, property.initializer.text);
+    return property.initializer;
+  }
+  return variableObject(source, property.name.text);
+}
+
+function viteConfigObject(source) {
+  const exports = source.statements.filter((statement) => ts.isExportAssignment(statement) && !statement.isExportEquals);
+  if (exports.length !== 1) return null;
+  const expression = exports[0].expression;
+  if (ts.isObjectLiteralExpression(expression)) return expression;
+  if (ts.isCallExpression(expression) && expression.arguments.length === 1
+    && ts.isObjectLiteralExpression(expression.arguments[0])) return expression.arguments[0];
+  return null;
+}
+
+function viteAliasExpression(source, aliasesObject, name) {
+  const matches = aliasesObject.properties.filter((property) => (
+    ts.isPropertyAssignment(property) && propertyName(property.name) === name
+  ));
+  if (matches.length !== 1) return null;
+  const outer = matches[0].initializer;
+  if (!ts.isCallExpression(outer) || !ts.isIdentifier(outer.expression)
+    || outer.expression.text !== 'fileURLToPath' || outer.arguments.length !== 1) return null;
+  const url = outer.arguments[0];
+  if (!ts.isNewExpression(url) || !ts.isIdentifier(url.expression) || url.expression.text !== 'URL') return null;
+  const args = url.arguments ?? [];
+  const target = args.length === 2 ? literalText(args[0]) : null;
+  if (target === null || !isImportMetaUrl(args[1])) return null;
+  return { target, url };
 }
 
 function loadAliases(root, universe) {
@@ -106,18 +263,25 @@ function loadAliases(root, universe) {
     aliases[name] = target;
   }
   const vite = fs.readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
+  const source = ts.createSourceFile('vite.config.ts', vite, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const configObject = viteConfigObject(source);
+  const resolveObject = configObject && objectValue(source, configObject, 'resolve');
+  const aliasObject = resolveObject && ts.isObjectLiteralExpression(resolveObject)
+    ? objectValue(source, resolveObject, 'alias')
+    : null;
+  if (!aliasObject || !ts.isObjectLiteralExpression(aliasObject)) sourceFailure('vite.config.ts alias object is missing');
+  const directoryUrlNodes = new Set();
   for (const name of ALIAS_NAMES) {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const expression = new RegExp(`['\"]${escaped}['\"]\\s*:\\s*fileURLToPath\\(new URL\\(['\"]([^'\"]+)['\"]\\s*,\\s*import\\.meta\\.url\\)\\)`);
-    const match = vite.match(expression);
-    if (!match) sourceFailure(`vite.config.ts alias ${name} is missing`);
-    const target = path.posix.normalize(match[1].replace(/^\.\//, ''));
+    const expression = viteAliasExpression(source, aliasObject, name);
+    if (!expression) sourceFailure(`vite.config.ts alias ${name} is missing`);
+    const target = path.posix.normalize(expression.target.replace(/^\.\//, ''));
     if (target !== aliases[name]) sourceFailure(`vite.config.ts alias ${name} disagrees with tsconfig.app.json`);
     const absolute = path.join(root, target);
     if (!fs.statSync(absolute, { throwIfNoEntry: false })?.isDirectory()) sourceFailure(`vite.config.ts alias ${name} is not a directory`);
     if (!universe.some((relative) => relative.startsWith(`${target}/`))) sourceFailure(`vite.config.ts alias ${name} has no tracked source`);
+    directoryUrlNodes.add(`${expression.url.getStart(source)}:${expression.url.end}`);
   }
-  return aliases;
+  return { aliases, directoryUrlNodes };
 }
 
 function packageRoots(root) {
@@ -182,10 +346,27 @@ function isAssignmentOperator(kind) {
 }
 
 function identifierIsWritten(identifier) {
-  const parent = identifier.parent;
-  if (ts.isBinaryExpression(parent) && parent.left === identifier && isAssignmentOperator(parent.operatorToken.kind)) return true;
-  return (ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent))
-    && (parent.operator === ts.SyntaxKind.PlusPlusToken || parent.operator === ts.SyntaxKind.MinusMinusToken);
+  let child = identifier;
+  let parent = child.parent;
+  if ((ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent))
+    && (parent.operator === ts.SyntaxKind.PlusPlusToken || parent.operator === ts.SyntaxKind.MinusMinusToken)) return true;
+  while (parent) {
+    if (ts.isBinaryExpression(parent) && isAssignmentOperator(parent.operatorToken.kind)) {
+      return parent.left === child;
+    }
+    if (ts.isForInStatement(parent) || ts.isForOfStatement(parent)) return parent.initializer === child;
+    const assignmentPatternParent = ts.isParenthesizedExpression(parent)
+      || ts.isArrayLiteralExpression(parent)
+      || ts.isObjectLiteralExpression(parent)
+      || ts.isSpreadElement(parent)
+      || (ts.isPropertyAssignment(parent) && parent.initializer === child)
+      || (ts.isShorthandPropertyAssignment(parent) && parent.name === child)
+      || (ts.isBinaryExpression(parent) && isAssignmentOperator(parent.operatorToken.kind) && parent.left === child);
+    if (!assignmentPatternParent) return false;
+    child = parent;
+    parent = parent.parent;
+  }
+  return false;
 }
 
 function exactViteIgnoreArgumentTrivia(argument, source) {
@@ -275,7 +456,12 @@ function scriptEdges(relative, source, checker) {
       const args = node.arguments ?? [];
       const specifier = args.length >= 2 ? literalText(args[0]) : null;
       if (specifier !== null && isImportMetaUrl(args[1]) && !isRemoteOrEmbedded(specifier)) {
-        edges.push({ specifier, typeOnly: false, kind: 'url' });
+        edges.push({
+          specifier,
+          typeOnly: false,
+          kind: 'url',
+          nodeKey: `${node.getStart(source)}:${node.end}`,
+        });
       }
     }
     ts.forEachChild(node, visit);
@@ -366,13 +552,14 @@ function localBase(importer, specifier, aliases, forceRelative = false) {
 
 const DIRECTORY_REFERENCE = Symbol('directory-reference');
 
-function resolveLocal(root, importer, edge, aliases, universe) {
+function resolveLocal(root, importer, edge, aliases, universe, viteDirectoryUrlNodes) {
   const { specifier } = edge;
   const base = localBase(importer, specifier, aliases, edge.kind === 'document');
   if (base === null) return null;
   if (base === '..' || base.startsWith('../') || path.posix.isAbsolute(base)) sourceFailure(`edge escapes repository importer=${importer}`);
   if (edge.kind === 'url' && fs.statSync(path.join(root, base), { throwIfNoEntry: false })?.isDirectory()) {
-    return DIRECTORY_REFERENCE;
+    if (importer === 'vite.config.ts' && viteDirectoryUrlNodes.has(edge.nodeKey)) return DIRECTORY_REFERENCE;
+    sourceFailure(`unresolved edge importer=${importer} specifier=${specifier}`);
   }
   const hasExtension = path.posix.extname(base) !== '';
   const candidates = hasExtension
@@ -407,9 +594,8 @@ export function auditCaribbeanNavalSourceClosure(root) {
   for (const relative of universePaths) {
     if (!fs.statSync(path.join(absoluteRoot, relative), { throwIfNoEntry: false })?.isFile()) sourceFailure(`tracked path is not a file: ${relative}`);
   }
-  const seeds = trackedPaths(absoluteRoot, CARIBBEAN_NAVAL_SOURCE_SEEDS);
-  if (seeds.length === 0) sourceFailure('seed set is empty');
-  const aliases = loadAliases(absoluteRoot, universePaths);
+  const seeds = validatedSeedPaths(absoluteRoot, universe);
+  const { aliases, directoryUrlNodes } = loadAliases(absoluteRoot, universePaths);
   const packages = packageRoots(absoluteRoot);
   const scriptProgram = createScriptProgram(absoluteRoot, universePaths);
   const closure = new Set(seeds);
@@ -419,7 +605,7 @@ export function auditCaribbeanNavalSourceClosure(root) {
     const importer = queue.shift();
     const raw = fs.readFileSync(path.join(absoluteRoot, importer), 'utf8');
     for (const edge of extractedEdges(importer, raw, scriptProgram)) {
-      const target = resolveLocal(absoluteRoot, importer, edge, aliases, universe);
+      const target = resolveLocal(absoluteRoot, importer, edge, aliases, universe, directoryUrlNodes);
       if (target === DIRECTORY_REFERENCE) continue;
       if (target === null) {
         if (isRemoteOrEmbedded(edge.specifier) || externalAllowed(edge.specifier, edge.typeOnly, packages)) continue;
@@ -437,25 +623,24 @@ export function auditCaribbeanNavalSourceClosure(root) {
     if (!closure.has(edge.importer) || !closure.has(edge.target)) sourceFailure(`closure omitted edge ${edge.importer} -> ${edge.target}`);
   }
   return {
+    seeds,
     paths,
     edges: edges.sort((left, right) => bytewise(`${left.importer}\0${left.specifier}\0${left.target}`, `${right.importer}\0${right.specifier}\0${right.target}`)),
-    trackedPaths: universePaths,
-    unresolved: [],
   };
 }
 
 export function collectCaribbeanNavalSourceManifest(root) {
   const audit = auditCaribbeanNavalSourceClosure(root);
-  const sourceFiles = audit.paths.map((relative) => ({
+  const files = audit.paths.map((relative) => ({
     path: relative,
     sha256: sha256(fs.readFileSync(path.join(root, relative))),
   }));
-  return { sourceFiles, sourceHash: sha256(canonicalJson(sourceFiles)), audit };
+  return { files, sourceHash: sha256(canonicalJson(files)) };
 }
 
 export function verifySourceManifest(captured, current) {
-  const capturedFiles = captured?.sourceFiles;
-  const currentFiles = current?.sourceFiles;
+  const capturedFiles = captured?.files ?? captured?.sourceFiles;
+  const currentFiles = current?.files ?? current?.sourceFiles;
   if (!Array.isArray(capturedFiles) || !Array.isArray(currentFiles)
     || capturedFiles.length !== currentFiles.length
     || capturedFiles.some((row, index) => row?.path !== currentFiles[index]?.path)) {
@@ -510,7 +695,73 @@ function pngDimensions(bytes) {
   return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
 }
 
+function exactKeys(value, expected) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    && canonicalJson(Object.keys(value).sort(bytewise)) === canonicalJson([...expected].sort(bytewise));
+}
+
+function safeBasename(name) {
+  return typeof name === 'string' && name.length > 0 && !path.isAbsolute(name)
+    && name === path.basename(name) && !name.includes('/') && !name.includes('\\')
+    && name !== '.' && name !== '..';
+}
+
+function containedFile(base, name) {
+  if (!safeBasename(name)) throw new CaribbeanNavalVerificationError('artifact-manifest');
+  const absoluteBase = path.resolve(base);
+  const candidate = path.resolve(absoluteBase, name);
+  if (candidate === absoluteBase || !candidate.startsWith(`${absoluteBase}${path.sep}`)) {
+    throw new CaribbeanNavalVerificationError('artifact-manifest');
+  }
+  return candidate;
+}
+
+export function validateStableNavalManifest(manifest) {
+  const keys = [
+    'version', 'sourceFiles', 'sourceHash', 'canonicalInput', 'viewports', 'screenshots',
+    'asset', 'handedness', 'outcome', 'fallback', 'motion', 'display',
+  ];
+  if (!exactKeys(manifest, keys) || manifest.version !== 1) {
+    throw new CaribbeanNavalVerificationError('stable-manifest');
+  }
+  const files = manifest.sourceFiles;
+  if (!Array.isArray(files) || files.length === 0) throw new CaribbeanNavalVerificationError('stable-manifest');
+  let prior = null;
+  const seen = new Set();
+  for (const row of files) {
+    if (!exactKeys(row, ['path', 'sha256']) || typeof row.path !== 'string'
+      || row.path.length === 0 || row.path.includes('\\') || path.posix.isAbsolute(row.path)
+      || row.path !== path.posix.normalize(row.path) || row.path === '.'
+      || row.path === '..' || row.path.startsWith('../') || !/^[a-f0-9]{64}$/.test(row.sha256)
+      || seen.has(row.path) || (prior !== null && bytewise(prior, row.path) >= 0)) {
+      throw new CaribbeanNavalVerificationError('stable-manifest');
+    }
+    seen.add(row.path);
+    prior = row.path;
+  }
+  if (!/^[a-f0-9]{64}$/.test(manifest.sourceHash)
+    || manifest.sourceHash !== sha256(canonicalJson(files))) {
+    throw new CaribbeanNavalVerificationError('stable-manifest');
+  }
+  for (const [key, expected] of Object.entries(NAVAL_STABLE_STATIC)) {
+    if (canonicalJson(manifest[key]) !== canonicalJson(expected)) {
+      throw new CaribbeanNavalVerificationError('stable-manifest');
+    }
+  }
+  if (canonicalJson(manifest.screenshots) !== canonicalJson(NAVAL_SCREENSHOT_MANIFEST)
+    || !manifest.screenshots.every((row) => safeBasename(row.name))) {
+    throw new CaribbeanNavalVerificationError('stable-manifest');
+  }
+  if (!exactKeys(manifest.asset, ['path', 'sha256'])
+    || !/^\/assets\/caribbean-sloop-[A-Za-z0-9_-]+\.glb$/.test(manifest.asset.path)
+    || !/^[a-f0-9]{64}$/.test(manifest.asset.sha256)) {
+    throw new CaribbeanNavalVerificationError('stable-manifest');
+  }
+  return true;
+}
+
 function verifyArtifacts(stableManifest, artifacts) {
+  validateStableNavalManifest(stableManifest);
   const expected = stableManifest?.screenshots;
   if (!Array.isArray(expected) || !Array.isArray(artifacts) || expected.length !== artifacts.length) {
     throw new CaribbeanNavalVerificationError('artifact-manifest');
@@ -527,15 +778,16 @@ function verifyArtifacts(stableManifest, artifacts) {
 }
 
 export function verifyNavalGeneration(captured, fresh) {
+  validateFreshNavalGeneration(captured);
+  validateFreshNavalGeneration(fresh);
   if (canonicalJson(captured?.stableManifest) !== canonicalJson(fresh?.stableManifest)) {
     throw new CaribbeanNavalVerificationError('stable-manifest');
   }
-  validateFreshNavalGeneration(fresh);
   return true;
 }
 
 export function validateFreshNavalGeneration(generation) {
-  if (generation?.stableManifest?.version !== 1) throw new CaribbeanNavalVerificationError('stable-manifest');
+  validateStableNavalManifest(generation?.stableManifest);
   verifyObservations(generation?.observations);
   verifyArtifacts(generation?.stableManifest, generation?.artifacts);
   return true;
@@ -550,6 +802,7 @@ function head(root) {
 }
 
 function captureHeadIsAncestor(root, captureHead) {
+  if (!/^[a-f0-9]{40}$/.test(captureHead)) return false;
   try {
     execFileSync('git', ['merge-base', '--is-ancestor', captureHead, 'HEAD'], { cwd: root, stdio: 'ignore' });
     return true;
@@ -558,19 +811,40 @@ function captureHeadIsAncestor(root, captureHead) {
   }
 }
 
+function validateGenerationProvenance(generation, expectedHead, expectedSource) {
+  if (!/^[a-f0-9]{40}$/.test(expectedHead)
+    || generation?.capture?.headCommitAtCapture !== expectedHead
+    || generation?.source?.headCommitAtCapture !== expectedHead
+    || generation?.capture?.worktreeDirtyBeforeCapture !== false
+    || generation?.source?.worktreeDirtyBeforeCapture !== false) {
+    throw new CaribbeanNavalVerificationError('stale-capture');
+  }
+  verifySourceManifest(generation.stableManifest, expectedSource);
+  verifySourceManifest(generation.source, expectedSource);
+}
+
+function validateRepositoryUnchanged(root, expectedHead, expectedSource) {
+  if (!cleanTrackedWorktree(root)) throw new CaribbeanNavalVerificationError('dirty-worktree');
+  if (head(root) !== expectedHead) throw new CaribbeanNavalVerificationError('stale-capture');
+  const current = collectCaribbeanNavalSourceManifest(root);
+  verifySourceManifest(expectedSource, current);
+  return current;
+}
+
 export function readNavalGeneration(directory) {
   const metricsPath = path.join(directory, 'metrics.json');
   if (!fs.existsSync(metricsPath)) return null;
   const metrics = JSON.parse(fs.readFileSync(metricsPath, 'utf8'));
+  validateStableNavalManifest(metrics.stableManifest);
   const artifacts = (metrics.stableManifest?.screenshots ?? []).map((row) => ({
     ...row,
-    bytes: fs.readFileSync(path.join(directory, row.name)),
+    bytes: fs.readFileSync(containedFile(directory, row.name)),
   }));
   return { ...metrics, artifacts };
 }
 
-function copyIfChanged(source, destination) {
-  const next = fs.readFileSync(source);
+function saveBytesIfChanged(destination, bytes) {
+  const next = Buffer.from(bytes);
   const current = fs.statSync(destination, { throwIfNoEntry: false })?.isFile() ? fs.readFileSync(destination) : null;
   if (current?.equals(next)) return false;
   fs.mkdirSync(path.dirname(destination), { recursive: true });
@@ -579,9 +853,19 @@ function copyIfChanged(source, destination) {
 }
 
 function publishGeneration(tempDirectory, docsDirectory, generation) {
-  const names = ['metrics.json', ...(generation.stableManifest?.screenshots ?? []).map((row) => row.name)];
+  validateFreshNavalGeneration(generation);
+  const metricsPath = containedFile(tempDirectory, 'metrics.json');
+  const metricsBytes = fs.readFileSync(metricsPath);
+  const parsedMetrics = JSON.parse(metricsBytes);
+  const { artifacts: _artifacts, ...returnedMetrics } = generation;
+  if (canonicalJson(parsedMetrics) !== canonicalJson(returnedMetrics)) {
+    throw new CaribbeanNavalVerificationError('artifact-manifest');
+  }
   let changed = 0;
-  for (const name of names) changed += Number(copyIfChanged(path.join(tempDirectory, name), path.join(docsDirectory, name)));
+  changed += Number(saveBytesIfChanged(containedFile(docsDirectory, 'metrics.json'), metricsBytes));
+  for (const artifact of generation.artifacts) {
+    changed += Number(saveBytesIfChanged(containedFile(docsDirectory, artifact.name), artifact.bytes));
+  }
   return changed;
 }
 
@@ -610,6 +894,7 @@ export async function runNavalEvidenceCli({
   let line = null;
   try {
     const source = collectCaribbeanNavalSourceManifest(root);
+    const operationHead = mode === 'semantic-probe' ? null : head(root);
     const expectedDocs = path.join(path.resolve(root), 'docs', 'screenshots', 'caribbean-naval');
     if (path.resolve(docsDirectory) !== expectedDocs) throw new CaribbeanNavalVerificationError('destination');
     if (mode !== 'semantic-probe' && !cleanTrackedWorktree(root)) throw new CaribbeanNavalVerificationError('dirty-worktree');
@@ -617,26 +902,31 @@ export async function runNavalEvidenceCli({
     const generation = await generate({
       destination: tempDirectory,
       source,
-      captureHead: mode === 'semantic-probe' ? null : head(root),
+      captureHead: operationHead,
     });
     if (!generation || generation.verdict?.ok !== true) throw new CaribbeanNavalVerificationError('semantic');
     validateFreshNavalGeneration(generation);
+    if (mode !== 'semantic-probe') {
+      validateGenerationProvenance(generation, operationHead, source);
+      validateRepositoryUnchanged(root, operationHead, source);
+    }
     if (mode === 'semantic-probe') {
-      const captured = readNavalGeneration(docsDirectory);
       let tracked = 'stale';
-      if (captured !== null) {
-        try {
+      try {
+        const captured = readNavalGeneration(docsDirectory);
+        if (captured !== null) {
           verifySourceManifest(captured.stableManifest, source);
           if (canonicalJson(captured.stableManifest) === canonicalJson(generation.stableManifest)) tracked = 'current';
-        } catch {
-          tracked = 'stale';
         }
+      } catch {
+        tracked = 'stale';
       }
       line = `${prefix}_OK tracked=${tracked}`;
       result = 0;
     } else if (mode === 'capture') {
+      validateRepositoryUnchanged(root, operationHead, source);
       const changed = publishGeneration(tempDirectory, docsDirectory, generation);
-      line = `${prefix}_OK head=${head(root)} changed=${changed}`;
+      line = `${prefix}_OK head=${operationHead} changed=${changed}`;
       result = 0;
     } else {
       const captured = readNavalGeneration(docsDirectory);
@@ -645,8 +935,10 @@ export async function runNavalEvidenceCli({
       if (typeof captureHead !== 'string' || !captureHeadIsAncestor(root, captureHead)) {
         throw new CaribbeanNavalVerificationError('stale-capture');
       }
+      validateGenerationProvenance(captured, captureHead, source);
       verifySourceManifest(captured.stableManifest, source);
       verifyNavalGeneration(captured, generation);
+      validateRepositoryUnchanged(root, operationHead, source);
       line = `${prefix}_OK capture=${captureHead} source=${source.sourceHash} artifacts=${generation.artifacts.length}`;
       result = 0;
     }

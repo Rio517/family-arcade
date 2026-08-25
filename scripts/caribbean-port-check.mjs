@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -29,6 +29,7 @@ const MODULE_URL = new URL(import.meta.url);
 const ROOT = fileURLToPath(new URL('..', MODULE_URL));
 const DIST = path.join(ROOT, 'dist');
 const OUT = path.join(ROOT, 'docs', 'screenshots', 'caribbean-port');
+const TRACKED_EVIDENCE_ROOT = path.join(ROOT, 'docs');
 const MISMATCH_DIAGNOSTIC_DIRECTORY = '/private/tmp/caribbean-port-identity-diagnostic';
 const HOST = '127.0.0.1';
 const PORT = 0;
@@ -104,6 +105,7 @@ const VIEWPORTS = {
   largePortrait: { width: 1024, height: 1366, supported: false },
 };
 export const MARKET_PROBE_MINIMUM_NOW_FIXTURES = 42;
+export const PORT_CHECK_DEADLINE_MS = 900_000;
 export const NOW_FIXTURES = Array.from({ length: 96 }, (_, index) => 1_700_000_000_000 + index * 1_000);
 const SEED_FIXTURES = [1702, 2702, 3702, 4702, 5702, 6702, 7702, 8702];
 const UUID_FIXTURES = Array.from(
@@ -199,11 +201,115 @@ function verifyEnvelope(raw, label) {
   return envelope;
 }
 
-function buildNormalProduction() {
+function abortReason(signal) {
+  return signal?.reason instanceof Error ? signal.reason : new Error('Port evidence command aborted');
+}
+
+async function buildNormalProduction(signal) {
   const env = { ...process.env };
   delete env.BUILD_HARNESS;
   console.log('Building the normal production bundle…');
-  execFileSync('npm', ['run', 'build'], { cwd: ROOT, env, stdio: 'inherit' });
+  await new Promise((resolve, reject) => {
+    const child = spawn('npm', ['run', 'build'], { cwd: ROOT, env, stdio: 'inherit' });
+    const abort = () => child.kill('SIGTERM');
+    signal?.addEventListener('abort', abort, { once: true });
+    child.once('error', reject);
+    child.once('exit', (code) => {
+      signal?.removeEventListener('abort', abort);
+      if (signal?.aborted) reject(abortReason(signal));
+      else if (code === 0) resolve();
+      else reject(new Error(`npm run build exited ${code}`));
+    });
+  });
+}
+
+export async function runWithPortCheckDeadline(operation, timeoutMs = PORT_CHECK_DEADLINE_MS) {
+  invariant(Number.isFinite(timeoutMs) && timeoutMs > 0, 'port evidence deadline is invalid');
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new Error(`Port evidence command exceeded ${timeoutMs}ms`));
+  }, timeoutMs);
+  timer.unref?.();
+  try {
+    const result = await operation(controller.signal);
+    if (controller.signal.aborted) throw abortReason(controller.signal);
+    return result;
+  } catch (error) {
+    if (controller.signal.aborted) throw abortReason(controller.signal);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function insideDirectory(candidate, parent) {
+  const relative = path.relative(parent, candidate);
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+}
+
+export function validateProgrammaticPortDestination(outputDirectory) {
+  invariant(typeof outputDirectory === 'string' && outputDirectory.trim().length > 0,
+    'programmatic port evidence outputDirectory is invalid');
+  const lexical = path.resolve(outputDirectory);
+  const trackedLexical = path.resolve(TRACKED_EVIDENCE_ROOT);
+  if (lexical === path.resolve(OUT)) throw new Error('programmatic port evidence cannot target tracked docs');
+  invariant(!insideDirectory(lexical, trackedLexical),
+    'programmatic port evidence cannot target tracked evidence');
+  invariant(fs.statSync(lexical, { throwIfNoEntry: false })?.isDirectory(),
+    'programmatic port evidence outputDirectory must be an existing directory');
+  const resolved = fs.realpathSync(lexical);
+  const trackedResolved = fs.realpathSync(trackedLexical);
+  invariant(!insideDirectory(resolved, trackedResolved),
+    'programmatic port evidence cannot target tracked evidence');
+  return resolved;
+}
+
+function independentNextSeed(seed) {
+  return (Math.imul(1_664_525, seed >>> 0) + 1_013_904_223) >>> 0;
+}
+
+export function evaluateStrategicSailingCausality({
+  storageWrites,
+  lifecycle,
+  navigationEvents,
+  navalEvents,
+  initialWorldRng,
+  returnedWorldRng,
+}) {
+  const mounts = Array.isArray(lifecycle)
+    ? lifecycle.filter((row) => row?.type === 'naval-mount' && Number.isSafeInteger(row.sequence))
+    : [];
+  const writes = Array.isArray(storageWrites) ? storageWrites : [];
+  const firstMount = mounts[0] ?? null;
+  const persistedBeforeMount = firstMount !== null && writes.some((write) => {
+    if (write?.key !== CURRENT_SAVE_KEY || !Number.isSafeInteger(write.sequence)
+      || write.sequence >= firstMount.sequence || typeof write.after !== 'string') return false;
+    try {
+      return JSON.parse(write.after)?.payload?.state?.mode?.kind === 'naval';
+    } catch {
+      return false;
+    }
+  });
+  const campaignWritesDuringBattle = firstMount === null ? -1 : writes.filter((write) => (
+    [CURRENT_SAVE_KEY, PREVIOUS_SAVE_KEY].includes(write?.key)
+      && Number.isSafeInteger(write.sequence) && write.sequence > firstMount.sequence
+  )).length;
+  const navigationTransitionsVerified = Array.isArray(navigationEvents)
+    && navigationEvents.length === 2
+    && navigationEvents.every((transition) => Number.isSafeInteger(transition?.before)
+      && transition.after === independentNextSeed(transition.before))
+    && navigationEvents[1].before === navigationEvents[0].after;
+  const navalTransitionVerified = Array.isArray(navalEvents)
+    && navalEvents.length === 1
+    && Number.isSafeInteger(navalEvents[0]?.before)
+    && navalEvents[0].after === independentNextSeed(navalEvents[0].before);
+  return {
+    persistedBeforeMount,
+    campaignWritesDuringBattle,
+    navigationTransitionsVerified,
+    navalTransitionVerified,
+    worldUnchanged: Number.isSafeInteger(initialWorldRng) && returnedWorldRng === initialWorldRng,
+  };
 }
 
 function assertNormalBuildIsolation() {
@@ -322,7 +428,7 @@ export function publishNormalRouteComparison({ comparison, metricsBytes, outputD
 
 async function installBrowserBoundary(context, { installDate = true } = {}) {
   await context.addInitScript(
-    ({ nowFixtures, seedFixtures, uuidFixtures, traceKey, writerLock, currentSaveKey, usersRaw, installDateFixture }) => {
+    ({ nowFixtures, seedFixtures, uuidFixtures, traceKey, writerLock, currentSaveKey, previousSaveKey, usersRaw, installDateFixture }) => {
       const defaultTrace = {
         nowIndex: 0,
         seedIndex: 0,
@@ -331,6 +437,9 @@ async function installBrowserBoundary(context, { installDate = true } = {}) {
         seedsConsumed: [],
         uuidsConsumed: [],
         locks: [],
+        sequence: 0,
+        storageWrites: [],
+        lifecycle: [],
       };
       let trace = defaultTrace;
       try {
@@ -339,7 +448,31 @@ async function installBrowserBoundary(context, { installDate = true } = {}) {
       } catch {
         trace = defaultTrace;
       }
-      const persist = () => sessionStorage.setItem(traceKey, JSON.stringify(trace));
+      const persist = () => {
+        let latest = defaultTrace;
+        try {
+          const raw = sessionStorage.getItem(traceKey);
+          if (raw !== null) latest = { ...defaultTrace, ...JSON.parse(raw) };
+        } catch {
+          latest = defaultTrace;
+        }
+        trace = {
+          ...latest,
+          seedIndex: trace.seedIndex,
+          uuidIndex: trace.uuidIndex,
+          seedsConsumed: trace.seedsConsumed,
+          uuidsConsumed: trace.uuidsConsumed,
+          locks: trace.locks,
+          sequence: trace.sequence,
+          storageWrites: trace.storageWrites,
+          lifecycle: trace.lifecycle,
+          ...(installDateFixture ? {
+            nowIndex: trace.nowIndex,
+            nowConsumed: trace.nowConsumed,
+          } : {}),
+        };
+        sessionStorage.setItem(traceKey, JSON.stringify(trace));
+      };
       localStorage.setItem('arcade.users.v1', usersRaw);
 
       if (installDateFixture) {
@@ -403,9 +536,38 @@ async function installBrowserBoundary(context, { installDate = true } = {}) {
             control.failNextStorageWrite = false;
             throw new DOMException('Port-check forced storage failure', 'QuotaExceededError');
           }
-          return nativeSetItem.call(this, key, value);
+          const before = this === localStorage ? localStorage.getItem(key) : null;
+          const result = nativeSetItem.call(this, key, value);
+          if (this === localStorage && (key === currentSaveKey || key === previousSaveKey)) {
+            trace.storageWrites.push({
+              sequence: ++trace.sequence,
+              key,
+              before,
+              after: String(value),
+            });
+            persist();
+          }
+          return result;
         },
       });
+      let navalMounted = false;
+      let observer = null;
+      const recordNavalMount = () => {
+        if (navalMounted) return;
+        const visible = document.querySelector('[data-testid="naval-elapsed"]');
+        if (visible === null) return;
+        navalMounted = true;
+        observer?.disconnect();
+        trace.lifecycle.push({
+          sequence: ++trace.sequence,
+          type: 'naval-mount',
+          storageWriteCount: trace.storageWrites.length,
+        });
+        persist();
+      };
+      observer = new MutationObserver(recordNavalMount);
+      observer.observe(document, { childList: true, subtree: true });
+      recordNavalMount();
       if (typeof LockManager !== 'undefined') {
         const nativeRequest = LockManager.prototype.request;
         Object.defineProperty(LockManager.prototype, 'request', {
@@ -433,6 +595,7 @@ async function installBrowserBoundary(context, { installDate = true } = {}) {
       traceKey: TRACE_KEY,
       writerLock: WRITER_LOCK,
       currentSaveKey: CURRENT_SAVE_KEY,
+      previousSaveKey: PREVIOUS_SAVE_KEY,
       installDateFixture: installDate,
       usersRaw: JSON.stringify({
         users: [{
@@ -459,6 +622,9 @@ async function installPageDateBoundary(page) {
       seedsConsumed: [],
       uuidsConsumed: [],
       locks: [],
+      sequence: 0,
+      storageWrites: [],
+      lifecycle: [],
     };
     let trace = defaultTrace;
     try {
@@ -467,7 +633,21 @@ async function installPageDateBoundary(page) {
     } catch {
       trace = defaultTrace;
     }
-    const persist = () => sessionStorage.setItem(traceKey, JSON.stringify(trace));
+    const persist = () => {
+      let latest = defaultTrace;
+      try {
+        const raw = sessionStorage.getItem(traceKey);
+        if (raw !== null) latest = { ...defaultTrace, ...JSON.parse(raw) };
+      } catch {
+        latest = defaultTrace;
+      }
+      trace = {
+        ...latest,
+        nowIndex: trace.nowIndex,
+        nowConsumed: trace.nowConsumed,
+      };
+      sessionStorage.setItem(traceKey, JSON.stringify(trace));
+    };
     Object.defineProperty(Date, 'now', {
       configurable: true,
       value: () => {
@@ -1501,7 +1681,7 @@ async function readVoyageEnvelope(page, expectedMode) {
 }
 
 async function runVoyageUiCheck() {
-  buildNormalProduction();
+  await buildNormalProduction();
   const emittedNaval = readEmittedNavalAssets();
   const { server, baseUrl } = await startStaticServer();
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-voyage-ui-'));
@@ -1756,6 +1936,8 @@ export async function runStrategicSailingJourney({
   let firstPublishedTick;
   let tickAfterReload;
   let tickAtTerminalCapture;
+  let terminalBoundaryTrace;
+  let completion;
   let renderedRudderReleasedAt140ms = false;
   let intermediateModeRecovered = false;
   let unreadableBytesPreserved = false;
@@ -1937,17 +2119,46 @@ export async function runStrategicSailingJourney({
     screenshotStates.set('campaign-result-desktop.png', terminalCaptureState);
     await maybeCapture('campaign-result-desktop.png', true);
     accessibilitySamples.push(await readStrategicSurface(page));
+    terminalBoundaryTrace = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), TRACE_KEY);
 
     await page.getByTestId('naval-result-action').click();
     await page.getByTestId('caribbean-career-ready').waitFor();
     modeSequence.push('port');
     focus.resolvedReturnLog = await exactActiveElement(page, '[data-testid="port-action-log"]');
     invariant(focus.resolvedReturnLog, 'resolved return did not focus Captain’s Log');
+    const returnedRaw = await readActiveEnvelope(page);
     const returnedEnvelope = await readVoyageEnvelope(page, 'port');
     const resolutionEvents = returnedEnvelope.payload.events.filter((event) => event.type === 'naval-resolved');
     invariant(resolutionEvents.length === 1, `strategic resolution count was ${resolutionEvents.length}`);
+    await reloadStrategicResume(page);
+    await page.getByTestId('caribbean-career-ready').waitFor();
+    const reloadedReturnedRaw = await readActiveEnvelope(page);
+    const reloadedReturnedEnvelope = await readVoyageEnvelope(page, 'port');
+    const canonicalSaveEqualAfterReload = returnedRaw === reloadedReturnedRaw
+      && canonicalJson(returnedEnvelope.payload.state) === canonicalJson(reloadedReturnedEnvelope.payload.state);
+    invariant(canonicalSaveEqualAfterReload, 'returned port save changed after reload');
+    const leadStatus = reloadedReturnedEnvelope.payload.state.leads
+      .find((lead) => lead.id === 'red-jackdaw')?.status ?? null;
+    invariant(leadStatus === 'completed', `returned Red Jackdaw lead was ${leadStatus}`);
+    const setSail = page.getByTestId('port-action-set-sail');
+    const setSailDisabled = await setSail.isDisabled();
+    invariant(setSailDisabled, 'post-victory Set Sail remained enabled');
+    const setSailReason = 'The Red Jackdaw lead is complete.';
+    invariant(await page.getByText(setSailReason, { exact: true }).isVisible(), 'post-victory Set Sail reason drifted');
     await page.getByTestId('port-action-log').click();
     await page.getByTestId('captains-log-last-voyage').waitFor();
+    const victoryReturnCopy = 'Victory — Red Jackdaw ready to board · Returned on day 4.';
+    const safeReturnCopy = 'Bridgetown’s harbour crew made Mistral ready for the next departure; the battle outcome remains in this log, but its damage is not carried onto the ready flagship.';
+    invariant(await page.getByText(victoryReturnCopy, { exact: true }).isVisible(), 'victory return Log copy drifted');
+    invariant(await page.getByText(safeReturnCopy, { exact: true }).isVisible(), 'safe-return Log copy drifted');
+    completion = {
+      canonicalSaveEqualAfterReload,
+      leadStatus,
+      setSailDisabled,
+      setSailReason,
+      victoryReturnCopy,
+      safeReturnCopy,
+    };
     await maybeCapture('returned-log-desktop.png', true);
     accessibilitySamples.push(await readStrategicSurface(page));
 
@@ -2018,6 +2229,20 @@ export async function runStrategicSailingJourney({
     const events = returnedEnvelope.payload.events;
     const navigationEvents = events.filter((event) => event.type === 'sea-leg-completed');
     const navalEvents = events.filter((event) => event.type === 'naval-engaged');
+    const causality = evaluateStrategicSailingCausality({
+      storageWrites: terminalBoundaryTrace.storageWrites,
+      lifecycle: terminalBoundaryTrace.lifecycle,
+      navigationEvents: navigationEvents.map((event) => event.payload.navigationRng),
+      navalEvents: navalEvents.map((event) => event.payload.navalRng),
+      initialWorldRng: initialState.rng.world,
+      returnedWorldRng: returnedEnvelope.payload.state.rng.world,
+    });
+    invariant(causality.persistedBeforeMount, 'naval input was not persisted before the first public mount');
+    invariant(causality.campaignWritesDuringBattle === 0,
+      `campaign wrote ${causality.campaignWritesDuringBattle} times while battle was live`);
+    invariant(causality.navigationTransitionsVerified, 'navigation RNG lineage was not independently verified');
+    invariant(causality.navalTransitionVerified, 'naval RNG lineage was not independently verified');
+    invariant(causality.worldUnchanged, 'world RNG changed during strategic sailing');
     const firstEncounterShip = firstEncounterEnvelope.payload.state.fleet.ships[0];
     const avoidedShip = avoidedEnvelope.payload.state.fleet.ships[0];
     const accessibility = minimumStrategicAccessibility(accessibilitySamples);
@@ -2035,17 +2260,12 @@ export async function runStrategicSailingJourney({
         provisionsUsed: firstEncounterShip.cargo.provisions - avoidedShip.cargo.provisions,
       },
       rng: {
-        navigationTransitionsVerified: navigationEvents.length === 2
-          && navigationEvents.every((event) => event.payload.navigationRng.after !== event.payload.navigationRng.before)
-          && returnedEnvelope.payload.state.rng.navigation === navigationEvents.at(-1).payload.navigationRng.after,
-        navalTransitionVerified: navalEvents.length === 1
-          && navalEvents[0].payload.navalRng.after !== navalEvents[0].payload.navalRng.before
-          && navalEnvelope.payload.state.rng.naval === navalEvents[0].payload.navalRng.after,
-        worldUnchanged: returnedEnvelope.payload.state.rng.world === initialState.rng.world,
+        navigationTransitionsVerified: causality.navigationTransitionsVerified,
+        navalTransitionVerified: causality.navalTransitionVerified,
+        worldUnchanged: causality.worldUnchanged,
       },
       navalInput: {
-        persistedBeforeMount: typeof navalRaw === 'string'
-          && JSON.parse(navalRaw).payload.state.mode.kind === 'naval',
+        persistedBeforeMount: causality.persistedBeforeMount,
         byteEqualAfterReload: savedInputBytes === canonicalJson(reloadedNavalEnvelope.payload.state.mode.input),
         tickAfterReload,
       },
@@ -2055,10 +2275,11 @@ export async function runStrategicSailingJourney({
         atTick: terminal.atTick,
         seedAfter: terminal.seedAfter,
         exactlyOnce: resolutionEvents.length === 1,
-        campaignWritesDuringBattle: rawBeforeVictory === navalRaw ? 0 : 1,
+        campaignWritesDuringBattle: causality.campaignWritesDuringBattle,
         returnedTo: returnedEnvelope.payload.state.mode.portId,
       },
       recovery: { intermediateModeRecovered, unreadableBytesPreserved },
+      completion,
       focus,
       accessibility,
       viewports: {
@@ -2106,7 +2327,7 @@ export async function runStrategicSailingJourney({
 }
 
 async function runBattleUiCheck() {
-  buildNormalProduction();
+  await buildNormalProduction();
   const { server, baseUrl } = await startStaticServer();
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-battle-ui-'));
   let browser;
@@ -2863,7 +3084,8 @@ async function compareRuns(first, second) {
 
 function attachStrategicEvidence(run, strategic) {
   const evidence = Object.fromEntries(Object.entries(strategic).filter(([key]) => (
-    key !== 'clock' && key !== 'fixtures' && key !== 'screenshotBytes' && key !== 'screenshotStates'
+    key !== 'clock' && key !== 'completion' && key !== 'fixtures'
+      && key !== 'screenshotBytes' && key !== 'screenshotStates'
   )));
   run.metrics.schemaVersion = 3;
   run.metrics.strategicSailing = evidence;
@@ -2877,35 +3099,57 @@ function attachStrategicEvidence(run, strategic) {
   for (const [filename, state] of strategic.screenshotStates) run.screenshotStates.set(filename, state);
 }
 
-export async function runPortCheck(options) {
-  const usesTrackedCliDestination = arguments.length === 0;
-  let outputDirectory = OUT;
-  if (!usesTrackedCliDestination) {
-    invariant(options && typeof options === 'object'
-      && Object.prototype.hasOwnProperty.call(options, 'outputDirectory'),
-    'programmatic port evidence requires an explicit outputDirectory');
-    outputDirectory = options.outputDirectory;
-    invariant(typeof outputDirectory === 'string' && outputDirectory.trim().length > 0,
-      'programmatic port evidence outputDirectory is invalid');
-    invariant(path.resolve(outputDirectory) !== path.resolve(OUT),
-      'programmatic port evidence cannot target tracked docs');
-  }
-  buildNormalProduction();
-  assertNormalBuildIsolation();
-  const emittedArt = readEmittedArt();
-  const emittedNaval = readEmittedNavalAssets();
-  const assetReport = JSON.parse(fs.readFileSync(path.join(
-    ROOT, 'docs/games/caribbean-career/bridgetown-asset-report.json',
-  ), 'utf8'));
-  const { server, baseUrl } = await startStaticServer();
+async function runPortCheckOperationCore({ outputDirectory, signal, dependencies = {} }) {
+  invariant(signal instanceof AbortSignal, 'port evidence operation signal is invalid');
+  const services = {
+    build: buildNormalProduction,
+    assertIsolation: assertNormalBuildIsolation,
+    readArt: readEmittedArt,
+    readNaval: readEmittedNavalAssets,
+    readAssetReport: () => JSON.parse(fs.readFileSync(path.join(
+      ROOT, 'docs/games/caribbean-career/bridgetown-asset-report.json',
+    ), 'utf8')),
+    startServer: startStaticServer,
+    verifyArtResponse: verifyEmittedArtResponse,
+    launchBrowser: () => chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined }),
+    stopServer: stopStaticServer,
+    afterResourcesStarted: () => {},
+    ...dependencies,
+  };
+  await services.build(signal);
+  signal.throwIfAborted();
+  services.assertIsolation();
+  const emittedArt = services.readArt();
+  const emittedNaval = services.readNaval();
+  const assetReport = services.readAssetReport();
+  signal.throwIfAborted();
+  const { server, baseUrl } = await services.startServer(signal);
   let browser;
+  let browserClosePromise;
   const firstDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-run-a-'));
   const secondDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-run-b-'));
+  const closeBrowser = () => {
+    if (browser === undefined) return Promise.resolve();
+    browserClosePromise ??= Promise.resolve().then(() => browser.close());
+    return browserClosePromise;
+  };
+  const abortBrowser = () => { void closeBrowser(); };
+  signal.addEventListener('abort', abortBrowser, { once: true });
   try {
-    await verifyEmittedArtResponse(baseUrl, emittedArt);
-    browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+    await services.verifyArtResponse(baseUrl, emittedArt, signal);
+    signal.throwIfAborted();
+    browser = await services.launchBrowser(signal);
+    signal.throwIfAborted();
+    await services.afterResourcesStarted({
+      browser,
+      server,
+      baseUrl,
+      runDirectories: [firstDirectory, secondDirectory],
+    });
+    signal.throwIfAborted();
     console.log('Running deterministic browser journey A…');
     const first = await runJourney(browser, baseUrl, firstDirectory, emittedArt, emittedNaval, assetReport);
+    signal.throwIfAborted();
     assertRequestedGraphIsolation(first.metrics);
     const firstStrategic = await runStrategicSailingJourney({
       browser,
@@ -2913,9 +3157,11 @@ export async function runPortCheck(options) {
       runDirectory: firstDirectory,
       emittedNaval,
     });
+    signal.throwIfAborted();
     attachStrategicEvidence(first, firstStrategic);
     console.log('Running deterministic browser journey B…');
     const second = await runJourney(browser, baseUrl, secondDirectory, emittedArt, emittedNaval, assetReport);
+    signal.throwIfAborted();
     assertRequestedGraphIsolation(second.metrics);
     const secondStrategic = await runStrategicSailingJourney({
       browser,
@@ -2923,11 +3169,14 @@ export async function runPortCheck(options) {
       runDirectory: secondDirectory,
       emittedNaval,
     });
+    signal.throwIfAborted();
     attachStrategicEvidence(second, secondStrategic);
     console.log('Checking memory-only port warning clearance at desktop and exact supported minimum…');
     await runPortMemoryWarningProbe(browser, baseUrl, { width: 960, height: 600 });
     await runPortMemoryWarningProbe(browser, baseUrl, { width: 1440, height: 900 });
+    signal.throwIfAborted();
     const { metricsBytes, comparison } = await compareRuns(first, second);
+    signal.throwIfAborted();
     const publication = publishNormalRouteComparison({ comparison, metricsBytes, outputDirectory });
     if (process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1') {
       const artifacts = [...publication.artifactHashes]
@@ -2942,11 +3191,38 @@ export async function runPortCheck(options) {
     console.log(`Caribbean port evidence passed: 22 byte-identical screenshots plus one terminal WebGL observation; run A selected, integrated route resolved, recovery reloaded.`);
     return { metrics: first.metrics, comparison, publication };
   } finally {
-    await browser?.close();
-    await stopStaticServer(server);
-    fs.rmSync(firstDirectory, { recursive: true, force: true });
-    fs.rmSync(secondDirectory, { recursive: true, force: true });
+    signal.removeEventListener('abort', abortBrowser);
+    try {
+      await closeBrowser();
+    } finally {
+      try {
+        await services.stopServer(server);
+      } finally {
+        fs.rmSync(firstDirectory, { recursive: true, force: true });
+        fs.rmSync(secondDirectory, { recursive: true, force: true });
+      }
+    }
   }
+}
+
+export async function runPortCheckOperation({ outputDirectory, signal, dependencies } = {}) {
+  const safeOutputDirectory = validateProgrammaticPortDestination(outputDirectory);
+  return runPortCheckOperationCore({ outputDirectory: safeOutputDirectory, signal, dependencies });
+}
+
+export async function runPortCheck(options) {
+  const usesTrackedCliDestination = arguments.length === 0;
+  let outputDirectory = OUT;
+  if (!usesTrackedCliDestination) {
+    invariant(options && typeof options === 'object'
+      && Object.prototype.hasOwnProperty.call(options, 'outputDirectory'),
+    'programmatic port evidence requires an explicit outputDirectory');
+    outputDirectory = validateProgrammaticPortDestination(options.outputDirectory);
+  }
+  return runWithPortCheckDeadline(
+    (signal) => runPortCheckOperationCore({ outputDirectory, signal }),
+    PORT_CHECK_DEADLINE_MS,
+  );
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
