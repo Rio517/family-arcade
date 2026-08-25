@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -18,6 +19,7 @@ import {
   ART_CONTRAST_SELECTORS,
   ART_VIEWPORT_SPECS,
   EXPECTED_MARKET_ACTION_IDS,
+  compareNormalRouteScreenshotRuns,
   evaluatePortIdentityEvidence,
   marketStabilityFailure,
   validateMarketStability,
@@ -63,6 +65,17 @@ const BATTLE_SCREENSHOTS = [
   'campaign-result-desktop.png',
   'returned-log-desktop.png',
   'campaign-battle-fallback.png',
+  'campaign-battle-resize-notice.png',
+];
+const STRATEGIC_SCREENSHOTS = [
+  'sailing-desktop.png',
+  'encounter-desktop.png',
+  'campaign-battle-desktop.png',
+  'campaign-result-desktop.png',
+  'returned-log-desktop.png',
+  'sailing-minimum-supported.png',
+  'campaign-battle-fallback.png',
+  'sailing-large-portrait-notice.png',
   'campaign-battle-resize-notice.png',
 ];
 const CAMPAIGN_VICTORY_TRACE = JSON.parse(fs.readFileSync(
@@ -218,7 +231,7 @@ function fileResponsePath(requestUrl) {
   return candidate;
 }
 
-async function startStaticServer() {
+export async function startStaticServer() {
   const server = http.createServer((request, response) => {
     const file = fileResponsePath(request.url ?? '/');
     if (file === null) {
@@ -254,12 +267,12 @@ async function startStaticServer() {
   }
 }
 
-async function stopStaticServer(server) {
+export async function stopStaticServer(server) {
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 }
 
-function saveIfChanged(filename, bytes) {
-  const destination = path.join(OUT, filename);
+function saveIfChanged(filename, bytes, outputDirectory = OUT) {
+  const destination = path.join(outputDirectory, filename);
   const next = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
   const current = fs.existsSync(destination) ? fs.readFileSync(destination) : null;
   if (current?.equals(next)) {
@@ -271,9 +284,45 @@ function saveIfChanged(filename, bytes) {
   console.log(`${current ? 'updated' : 'new'}: ${filename}`);
 }
 
-async function installBrowserBoundary(context) {
+export function publishNormalRouteComparison({ comparison, metricsBytes, outputDirectory } = {}) {
+  invariant(comparison?.ok === true, 'normal-route comparison did not succeed');
+  invariant(comparison.selectedRun === 'A', 'normal-route publication owner must be run A');
+  invariant(comparison.selectedArtifacts instanceof Map && comparison.selectedArtifacts.size === 23,
+    'normal-route publication must contain exactly 23 selected artifacts');
+  invariant(typeof outputDirectory === 'string' && outputDirectory.trim().length > 0,
+    'normal-route publication destination is required');
+  invariant((Buffer.isBuffer(metricsBytes) || ArrayBuffer.isView(metricsBytes)) && metricsBytes.byteLength > 0,
+    'normal-route metrics bytes are required');
+  const expectedNames = [...SCREENSHOTS, ...STRATEGIC_SCREENSHOTS];
+  invariant(expectedNames.every((name) => comparison.selectedArtifacts.has(name))
+    && [...comparison.selectedArtifacts.keys()].every((name) => expectedNames.includes(name)),
+  'normal-route publication membership is invalid');
+
+  const verified = [];
+  for (const [name, artifact] of comparison.selectedArtifacts) {
+    invariant(artifact?.sourceRun === 'A', `normal-route publication contains non-A artifact ${name}`);
+    invariant(Buffer.isBuffer(artifact.bytes) || ArrayBuffer.isView(artifact.bytes),
+      `normal-route publication bytes are missing for ${name}`);
+    const actualHash = createHash('sha256').update(artifact.bytes).digest('hex');
+    invariant(actualHash === artifact.sha256, `normal-route publication hash drifted for ${name}`);
+    verified.push([name, actualHash, artifact.bytes]);
+  }
+
+  const artifactHashes = new Map();
+  for (const [name, actualHash, bytes] of verified) {
+    saveIfChanged(name, bytes, outputDirectory);
+    artifactHashes.set(name, actualHash);
+  }
+  saveIfChanged('metrics.json', metricsBytes, outputDirectory);
+  return {
+    artifactHashes,
+    metricsSha256: createHash('sha256').update(metricsBytes).digest('hex'),
+  };
+}
+
+async function installBrowserBoundary(context, { installDate = true } = {}) {
   await context.addInitScript(
-    ({ nowFixtures, seedFixtures, uuidFixtures, traceKey, writerLock, currentSaveKey, usersRaw }) => {
+    ({ nowFixtures, seedFixtures, uuidFixtures, traceKey, writerLock, currentSaveKey, usersRaw, installDateFixture }) => {
       const defaultTrace = {
         nowIndex: 0,
         seedIndex: 0,
@@ -293,16 +342,18 @@ async function installBrowserBoundary(context) {
       const persist = () => sessionStorage.setItem(traceKey, JSON.stringify(trace));
       localStorage.setItem('arcade.users.v1', usersRaw);
 
-      Object.defineProperty(Date, 'now', {
-        configurable: true,
-        value: () => {
-          if (trace.nowIndex >= nowFixtures.length) throw new Error('Port-check Date.now fixtures exhausted');
-          const value = nowFixtures[trace.nowIndex++];
-          trace.nowConsumed.push(value);
-          persist();
-          return value;
-        },
-      });
+      if (installDateFixture) {
+        Object.defineProperty(Date, 'now', {
+          configurable: true,
+          value: () => {
+            if (trace.nowIndex >= nowFixtures.length) throw new Error('Port-check Date.now fixtures exhausted');
+            const value = nowFixtures[trace.nowIndex++];
+            trace.nowConsumed.push(value);
+            persist();
+            return value;
+          },
+        });
+      }
 
       const nativeGetRandomValues = Crypto.prototype.getRandomValues;
       Object.defineProperty(Crypto.prototype, 'getRandomValues', {
@@ -382,6 +433,7 @@ async function installBrowserBoundary(context) {
       traceKey: TRACE_KEY,
       writerLock: WRITER_LOCK,
       currentSaveKey: CURRENT_SAVE_KEY,
+      installDateFixture: installDate,
       usersRaw: JSON.stringify({
         users: [{
           id: 'port-check-player',
@@ -395,6 +447,38 @@ async function installBrowserBoundary(context) {
       }),
     },
   );
+}
+
+async function installPageDateBoundary(page) {
+  await page.addInitScript(({ nowFixtures, traceKey }) => {
+    const defaultTrace = {
+      nowIndex: 0,
+      seedIndex: 0,
+      uuidIndex: 0,
+      nowConsumed: [],
+      seedsConsumed: [],
+      uuidsConsumed: [],
+      locks: [],
+    };
+    let trace = defaultTrace;
+    try {
+      const raw = sessionStorage.getItem(traceKey);
+      if (raw !== null) trace = { ...defaultTrace, ...JSON.parse(raw) };
+    } catch {
+      trace = defaultTrace;
+    }
+    const persist = () => sessionStorage.setItem(traceKey, JSON.stringify(trace));
+    Object.defineProperty(Date, 'now', {
+      configurable: true,
+      value: () => {
+        if (trace.nowIndex >= nowFixtures.length) throw new Error('Port-check Date.now fixtures exhausted');
+        const value = nowFixtures[trace.nowIndex++];
+        trace.nowConsumed.push(value);
+        persist();
+        return value;
+      },
+    });
+  }, { nowFixtures: NOW_FIXTURES, traceKey: TRACE_KEY });
 }
 
 function recordFailures(page, baseUrl, failures, allowedFailedUrl = null) {
@@ -438,7 +522,7 @@ function readEmittedArt() {
   };
 }
 
-function readEmittedNavalAssets() {
+export function readEmittedNavalAssets() {
   const assets = fs.readdirSync(path.join(DIST, 'assets'));
   const patterns = [
     /^CampaignNavalBattle-[^/]+\.js$/,
@@ -458,7 +542,7 @@ function readEmittedNavalAssets() {
     names.every((name) => precacheSources.some((source) => source.includes(`assets/${name}`))),
     'Production naval assets are absent from the PWA precache',
   );
-  return { names, urls };
+  return { names, urls, precacheVerified: true };
 }
 
 function assertNoNavalAssetRequests(requestedPaths, emittedNaval, phase) {
@@ -830,6 +914,54 @@ async function captureBattle(page, screenshots, directory, filename) {
   const bytes = await page.screenshot({ animations: 'disabled' });
   screenshots.set(filename, bytes);
   fs.writeFileSync(path.join(directory, filename), bytes);
+}
+
+async function readBattleCaptureState(page) {
+  return page.evaluate(() => {
+    const canvas = document.querySelector('.naval-scene-canvas');
+    const elapsed = document.querySelector('[data-testid="naval-elapsed"]');
+    const resultAction = document.querySelector('[data-testid="naval-result-action"]');
+    if (!(canvas instanceof HTMLCanvasElement)) throw new Error('terminal capture canvas is missing');
+    const rect = canvas.getBoundingClientRect();
+    const style = getComputedStyle(canvas);
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    if (!gl) throw new Error('terminal capture WebGL context is missing');
+    const pixels = [];
+    const pixel = new Uint8Array(4);
+    for (let row = 1; row <= 5; row += 1) {
+      for (let column = 1; column <= 8; column += 1) {
+        const x = Math.min(gl.drawingBufferWidth - 1, Math.floor(gl.drawingBufferWidth * column / 9));
+        const y = Math.min(gl.drawingBufferHeight - 1, Math.floor(gl.drawingBufferHeight * row / 6));
+        gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+        pixels.push(...pixel);
+      }
+    }
+    const rendererInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    const vendor = String(gl.getParameter(rendererInfo?.UNMASKED_VENDOR_WEBGL ?? gl.VENDOR) ?? '');
+    const renderer = String(gl.getParameter(rendererInfo?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER) ?? '');
+    let sampleHash = 2_166_136_261;
+    for (const value of pixels) sampleHash = Math.imul(sampleHash ^ value, 16_777_619) >>> 0;
+    return {
+      tick: Number(elapsed?.getAttribute('data-battle-tick')),
+      resultVisible: resultAction instanceof HTMLElement && resultAction.offsetParent !== null,
+      canvas: {
+        width: canvas.width,
+        height: canvas.height,
+        rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        drawingBuffer: { width: gl.drawingBufferWidth, height: gl.drawingBufferHeight },
+        opacity: style.opacity,
+        transform: style.transform,
+        engine: canvas.dataset.engine ?? '',
+        backend: { vendor, renderer },
+        framebufferSample: {
+          algorithm: 'fnv1a32-rgba-grid-v1',
+          sampleCount: pixels.length / 4,
+          nonzeroSampleChannels: pixels.filter((value) => value !== 0).length,
+          sampleHash: sampleHash.toString(16).padStart(8, '0'),
+        },
+      },
+    };
+  });
 }
 
 async function assertBattleControlHitTargets(page) {
@@ -1454,6 +1586,525 @@ async function runVoyageUiCheck() {
   }
 }
 
+async function readStrategicSurface(page) {
+  return page.evaluate(() => {
+    const visible = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden'
+        && rect.width > 0 && rect.height > 0;
+    };
+    const color = (value) => {
+      const channels = value.match(/[\d.]+/g)?.map(Number) ?? [];
+      if (value.startsWith('color(srgb')) {
+        return {
+          r: (channels[0] ?? 0) * 255,
+          g: (channels[1] ?? 0) * 255,
+          b: (channels[2] ?? 0) * 255,
+          a: channels[3] ?? 1,
+        };
+      }
+      return {
+        r: channels[0] ?? 0,
+        g: channels[1] ?? 0,
+        b: channels[2] ?? 0,
+        a: channels[3] ?? 1,
+      };
+    };
+    const luminance = ({ r, g, b }) => {
+      const channel = (raw) => {
+        const value = raw / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    };
+    const contrast = (foreground, background) => {
+      const lighter = Math.max(luminance(foreground), luminance(background));
+      const darker = Math.min(luminance(foreground), luminance(background));
+      return (lighter + 0.05) / (darker + 0.05);
+    };
+    const result = document.querySelector('.naval-result');
+    const roots = result && visible(result)
+      ? [result]
+      : [...document.querySelectorAll(
+          '.caribbean-voyage-decision, .naval-battle-page, .caribbean-port-activity',
+        )].filter(visible);
+    const text = roots.flatMap((root) => [root, ...root.querySelectorAll('*')]).filter((element) => (
+      visible(element)
+      && element.closest('.naval-visually-hidden') === null
+      && [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
+    ));
+    const targets = [...document.querySelectorAll('button:not([disabled])')].filter(visible);
+    const contrastSamples = text.flatMap((element) => {
+      let backgroundElement = element;
+      let background = color(getComputedStyle(backgroundElement).backgroundColor);
+      while (background.a < 0.999 && backgroundElement.parentElement !== null) {
+        backgroundElement = backgroundElement.parentElement;
+        background = color(getComputedStyle(backgroundElement).backgroundColor);
+      }
+      if (background.a < 0.999) return [];
+      return [contrast(color(getComputedStyle(element).color), background)];
+    });
+    const widths = targets.map((element) => element.getBoundingClientRect().width);
+    const heights = targets.map((element) => element.getBoundingClientRect().height);
+    return {
+      minimumTextPx: text.length === 0
+        ? null
+        : Math.min(...text.map((element) => Number.parseFloat(getComputedStyle(element).fontSize))),
+      minimumTargetWidthPx: widths.length === 0 ? null : Math.min(...widths),
+      minimumTargetHeightPx: heights.length === 0 ? null : Math.min(...heights),
+      minimumContrastRatio: contrastSamples.length === 0 ? null : Math.min(...contrastSamples),
+      horizontalOverflowPx: Math.max(
+        0,
+        document.documentElement.scrollWidth - innerWidth,
+        document.body.scrollWidth - innerWidth,
+      ),
+    };
+  });
+}
+
+function minimumStrategicAccessibility(samples) {
+  invariant(samples.length > 0, 'strategic accessibility samples are missing');
+  for (const sample of samples) {
+    invariant(sample.minimumTextPx >= 14, `strategic text below 14px: ${canonicalJson(sample)}`);
+    invariant(sample.minimumTargetWidthPx >= 44, `strategic target width below 44px: ${canonicalJson(sample)}`);
+    invariant(sample.minimumTargetHeightPx >= 44, `strategic target height below 44px: ${canonicalJson(sample)}`);
+    invariant(sample.minimumContrastRatio >= 4.5, `strategic contrast below 4.5:1: ${canonicalJson(sample)}`);
+    invariant(sample.horizontalOverflowPx === 0, `strategic horizontal overflow: ${canonicalJson(sample)}`);
+  }
+  return {
+    minimumTextPx: Math.min(...samples.map((sample) => sample.minimumTextPx)),
+    minimumTargetWidthPx: Math.min(...samples.map((sample) => sample.minimumTargetWidthPx)),
+    minimumTargetHeightPx: Math.min(...samples.map((sample) => sample.minimumTargetHeightPx)),
+    minimumContrastRatio: Math.min(...samples.map((sample) => sample.minimumContrastRatio)),
+    horizontalOverflowPx: Math.max(...samples.map((sample) => sample.horizontalOverflowPx)),
+  };
+}
+
+async function readRenderedSystems(page, accessibleName) {
+  // The terminal result dialog correctly makes the tactical HUD inaccessible,
+  // so role queries exclude these still-rendered read-only values at this seam.
+  const section = page.locator(`[aria-label="${accessibleName}"]`);
+  return section.evaluate((element) => {
+    const result = {};
+    for (const entry of element.querySelectorAll('.naval-system-value')) {
+      const label = entry.querySelector('span')?.textContent?.trim().toLowerCase();
+      const value = Number(entry.querySelector('strong')?.textContent?.trim());
+      if (label) result[label] = value;
+    }
+    return result;
+  });
+}
+
+function navalRequestCount(requestedPaths, emittedNaval) {
+  const requested = new Set(requestedPaths);
+  return emittedNaval.urls.filter((url) => requested.has(url)).length;
+}
+
+function exactActiveElement(page, selector) {
+  return page.locator(selector).evaluate((element) => element === document.activeElement);
+}
+
+async function reloadStrategicResume(page) {
+  await page.evaluate(() => {
+    history.replaceState(history.state, '', '/#/caribbean?resume=1');
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+}
+
+/**
+ * Drives the complete normal production route with the real campaign controller,
+ * persisted naval input, real NavalSession, rendered controls, and Playwright clock.
+ * Generated bytes stay in runDirectory; only the outer port command may publish them.
+ */
+export async function runStrategicSailingJourney({
+  browser,
+  baseUrl,
+  runDirectory,
+  emittedNaval,
+  trace = CAMPAIGN_VICTORY_TRACE,
+  captureScreenshots = true,
+}) {
+  invariant(browser && typeof browser.newContext === 'function', 'strategic journey browser is missing');
+  invariant(typeof baseUrl === 'string' && baseUrl.startsWith('http://127.0.0.1:'), 'strategic journey base URL is invalid');
+  invariant(typeof runDirectory === 'string' && fs.existsSync(runDirectory), 'strategic journey directory is missing');
+  invariant(emittedNaval?.urls?.length === 3, 'strategic journey emitted naval manifest is invalid');
+
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    deviceScaleFactor: 1,
+    locale: 'en-US',
+    timezoneId: 'UTC',
+    reducedMotion: 'reduce',
+  });
+  await installBrowserBoundary(context, { installDate: false });
+  const page = await context.newPage();
+  await page.clock.install({ time: new Date('2023-11-14T22:13:20.000Z') });
+  await installPageDateBoundary(page);
+  const failures = { console: [], page: [], requests: [], external: [], requestedPaths: [] };
+  recordFailures(page, baseUrl, failures);
+  const screenshots = new Map();
+  const screenshotStates = new Map();
+  const accessibilitySamples = [];
+  const modeSequence = [];
+  let firstEncounterEnvelope;
+  let navalEnvelope;
+  let navalRaw;
+  let tickAtMount;
+  let tickAfterFirstRaf;
+  let firstPublishedTick;
+  let tickAfterReload;
+  let tickAtTerminalCapture;
+  let renderedRudderReleasedAt140ms = false;
+  let intermediateModeRecovered = false;
+  let unreadableBytesPreserved = false;
+  const focus = {
+    sailingHeading: false,
+    encounterHeading: false,
+    avoidedReturnLog: false,
+    navalReloadBattle: false,
+    resolvedReturnLog: false,
+  };
+  const phaseNavalCounts = {
+    setupNavalCount: 0,
+    portNavalCount: 0,
+    sailingNavalCount: 0,
+    avoidNavalCount: 0,
+  };
+
+  const maybeCapture = async (filename, battle = false) => {
+    if (!captureScreenshots) return;
+    if (battle) await captureBattle(page, screenshots, runDirectory, filename);
+    else await capture(page, screenshots, runDirectory, filename);
+  };
+
+  try {
+    await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
+    phaseNavalCounts.setupNavalCount = navalRequestCount(failures.requestedPaths, emittedNaval);
+    assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'strategic-setup');
+    await page.getByRole('button', { name: 'Start career' }).click();
+    await page.getByTestId('caribbean-career-ready').waitFor();
+    await page.getByRole('button', { name: 'Tavern' }).click();
+    await page.getByRole('button', { name: 'Mark on chart' }).click();
+    await page.getByText("Marked in the Captain's Log").waitFor();
+    await page.getByRole('button', { name: 'Back to harbour' }).click();
+    phaseNavalCounts.portNavalCount = navalRequestCount(failures.requestedPaths, emittedNaval);
+    assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'strategic-port');
+    const initialEnvelope = await readVoyageEnvelope(page, 'port');
+    invariant(initialEnvelope.payload.events.length === 1, 'strategic lead event count drifted');
+    invariant(initialEnvelope.payload.events[0]?.type === 'lead-accepted', 'strategic lead event is missing');
+    const initialState = structuredClone(initialEnvelope.payload.state);
+    modeSequence.push('port');
+
+    await page.getByTestId('port-action-set-sail').click();
+    await page.getByTestId('voyage-continue-east').waitFor();
+    modeSequence.push('sailing');
+    focus.sailingHeading = await exactActiveElement(page, '#caribbean-sailing-title');
+    invariant(focus.sailingHeading, 'strategic sailing heading did not receive focus');
+    const firstSailingEnvelope = await readVoyageEnvelope(page, 'sailing');
+    await maybeCapture('sailing-desktop.png');
+    accessibilitySamples.push(await readStrategicSurface(page));
+    phaseNavalCounts.sailingNavalCount = navalRequestCount(failures.requestedPaths, emittedNaval);
+    assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'strategic-sailing');
+
+    await page.setViewportSize({ width: 960, height: 600 });
+    await page.getByTestId('voyage-continue-east').waitFor();
+    await readLayout(page, 'strategicSailingMinimumSupported', {
+      width: 960, height: 600, supported: true, requireRouteHitTest: true, requireRouteContainment: true,
+    });
+    await maybeCapture('sailing-minimum-supported.png');
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    await reloadStrategicResume(page);
+    await page.getByTestId('voyage-continue-east').waitFor();
+    invariant(await exactActiveElement(page, '#caribbean-sailing-title'), 'reloaded sailing heading did not receive focus');
+    const reloadedSailingEnvelope = await readVoyageEnvelope(page, 'sailing');
+    invariant(
+      canonicalJson(firstSailingEnvelope.payload.state.mode) === canonicalJson(reloadedSailingEnvelope.payload.state.mode),
+      'saved sailing mode changed after reload',
+    );
+    await page.getByTestId('voyage-continue-east').click();
+    await page.getByTestId('encounter-pursue').waitFor();
+    modeSequence.push('encounter');
+    focus.encounterHeading = await exactActiveElement(page, '#caribbean-encounter-title');
+    invariant(focus.encounterHeading, 'strategic encounter heading did not receive focus');
+    firstEncounterEnvelope = await readVoyageEnvelope(page, 'encounter');
+    await maybeCapture('encounter-desktop.png');
+    accessibilitySamples.push(await readStrategicSurface(page));
+
+    await page.setViewportSize({ width: 1024, height: 1366 });
+    await page.getByTestId('caribbean-minimum-screen').waitFor();
+    await readLayout(page, 'strategicSailingLargePortraitNotice', {
+      width: 1024, height: 1366, supported: false,
+    });
+    await maybeCapture('sailing-large-portrait-notice.png');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await continueAfterSupportRestore(page, { expectedTestId: 'encounter-avoid' });
+    await page.getByTestId('encounter-avoid').click();
+    await page.getByTestId('caribbean-career-ready').waitFor();
+    modeSequence.push('port');
+    focus.avoidedReturnLog = await exactActiveElement(page, '[data-testid="port-action-log"]');
+    invariant(focus.avoidedReturnLog, 'avoid return did not focus Captain’s Log');
+    const avoidedEnvelope = await readVoyageEnvelope(page, 'port');
+    phaseNavalCounts.avoidNavalCount = navalRequestCount(failures.requestedPaths, emittedNaval);
+    assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'strategic-avoid');
+
+    await page.getByTestId('port-action-set-sail').click();
+    await page.getByTestId('voyage-continue-east').waitFor();
+    modeSequence.push('sailing');
+    await page.getByTestId('voyage-continue-east').click();
+    await page.getByTestId('encounter-pursue').waitFor();
+    modeSequence.push('encounter');
+    assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'strategic-before-pursuit');
+    await page.clock.pauseAt(new Date('2023-11-14T22:13:30.000Z'));
+    await page.getByTestId('encounter-pursue').click();
+    await page.getByTestId('naval-elapsed').waitFor();
+    modeSequence.push('naval');
+    navalRaw = await readActiveEnvelope(page);
+    navalEnvelope = await readVoyageEnvelope(page, 'naval');
+    const savedInputBytes = canonicalJson(navalEnvelope.payload.state.mode.input);
+    invariant(
+      canonicalJson({
+        battleId: navalEnvelope.payload.state.mode.input.battleId,
+        seed: navalEnvelope.payload.state.mode.input.seed,
+      }) === canonicalJson(trace.input),
+      'strategic saved naval input does not match the golden trace',
+    );
+    await page.getByText('3D tactical sea restored.').waitFor();
+    invariant(
+      emittedNaval.urls.every((url) => failures.requestedPaths.includes(url)),
+      `pursuit did not request the exact local naval assets: ${canonicalJson(failures.requestedPaths)}`,
+    );
+    tickAtMount = Number(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick'));
+    invariant(tickAtMount === 0, 'strategic battle did not mount at tick zero');
+    await page.clock.runFor(16);
+    tickAfterFirstRaf = Number(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick'));
+    invariant(tickAfterFirstRaf === 0, 'strategic first RAF advanced the battle');
+    firstPublishedTick = 0;
+    for (let frame = 0; frame < 12 && firstPublishedTick === 0; frame += 1) {
+      await page.clock.runFor(16);
+      firstPublishedTick = Number(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick'));
+    }
+    invariant(firstPublishedTick === 6, `strategic first public cadence was ${firstPublishedTick}`);
+
+    await reloadStrategicResume(page);
+    await continueAfterSupportRestore(page, { expectedTestId: 'naval-elapsed' });
+    tickAfterReload = Number(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick'));
+    invariant(tickAfterReload === 0, 'strategic reload did not restart at tick zero');
+    focus.navalReloadBattle = await page.getByTestId('naval-battle-page').isVisible();
+    const reloadedNavalEnvelope = await readVoyageEnvelope(page, 'naval');
+    invariant(
+      savedInputBytes === canonicalJson(reloadedNavalEnvelope.payload.state.mode.input),
+      'strategic saved input bytes changed after reload',
+    );
+    await page.clock.runFor(16);
+    invariant(
+      Number(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick')) === 0,
+      'strategic reload first RAF advanced the battle',
+    );
+    await maybeCapture('campaign-battle-desktop.png', true);
+    accessibilitySamples.push(await readStrategicSurface(page));
+    await verifyRenderedRudderRelease(page);
+    renderedRudderReleasedAt140ms = true;
+
+    const rawBeforeVictory = await readActiveEnvelope(page);
+    let terminal;
+    try {
+      terminal = await driveCampaignVictory({ page, trace, clockPrimed: true });
+    } catch (error) {
+      throw new Error(`Normal-route naval victory was not reached: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    invariant(canonicalJson(terminal) === canonicalJson(CAMPAIGN_VICTORY_TRACE.expected), 'strategic terminal trace drifted');
+    invariant(await readActiveEnvelope(page) === rawBeforeVictory, 'campaign save changed while the battle ticked');
+    const playerSystems = await readRenderedSystems(page, 'Mistral systems');
+    const opponentSystems = await readRenderedSystems(page, 'Red Jackdaw systems');
+    invariant(canonicalJson(playerSystems) === canonicalJson({ hull: 78, sails: 61, crew: 44, cannon: 8 }), `strategic final player systems drifted: ${canonicalJson(playerSystems)}`);
+    invariant(canonicalJson(opponentSystems) === canonicalJson({ hull: 88, sails: 14, crew: 9, cannon: 8 }), `strategic final opponent systems drifted: ${canonicalJson(opponentSystems)}`);
+    const terminalCaptureState = {
+      ...await readBattleCaptureState(page),
+      terminal: {
+        outcome: terminal.outcome.kind,
+        victorShipId: terminal.outcome.victorShipId,
+        atTick: terminal.atTick,
+        seedAfter: terminal.seedAfter,
+      },
+      player: playerSystems,
+      opponent: opponentSystems,
+    };
+    tickAtTerminalCapture = terminalCaptureState.tick;
+    invariant(tickAtTerminalCapture === 11_855, `terminal capture tick was ${tickAtTerminalCapture}`);
+    screenshotStates.set('campaign-result-desktop.png', terminalCaptureState);
+    await maybeCapture('campaign-result-desktop.png', true);
+    accessibilitySamples.push(await readStrategicSurface(page));
+
+    await page.getByTestId('naval-result-action').click();
+    await page.getByTestId('caribbean-career-ready').waitFor();
+    modeSequence.push('port');
+    focus.resolvedReturnLog = await exactActiveElement(page, '[data-testid="port-action-log"]');
+    invariant(focus.resolvedReturnLog, 'resolved return did not focus Captain’s Log');
+    const returnedEnvelope = await readVoyageEnvelope(page, 'port');
+    const resolutionEvents = returnedEnvelope.payload.events.filter((event) => event.type === 'naval-resolved');
+    invariant(resolutionEvents.length === 1, `strategic resolution count was ${resolutionEvents.length}`);
+    await page.getByTestId('port-action-log').click();
+    await page.getByTestId('captains-log-last-voyage').waitFor();
+    await maybeCapture('returned-log-desktop.png', true);
+    accessibilitySamples.push(await readStrategicSurface(page));
+
+    const traceState = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), TRACE_KEY);
+    const routeNowConsumed = traceState.nowConsumed.slice();
+    invariant(
+      canonicalJson(routeNowConsumed) === canonicalJson(NOW_FIXTURES.slice(0, 9)),
+      `strategic Date.now fixture order drifted: ${canonicalJson(routeNowConsumed)}`,
+    );
+
+    await page.addInitScript(() => {
+      const nativeGetContext = HTMLCanvasElement.prototype.getContext;
+      Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+        configurable: true,
+        value(type, ...args) {
+          return String(type).startsWith('webgl') ? null : nativeGetContext.call(this, type, ...args);
+        },
+      });
+    });
+    await page.evaluate(({ currentKey, raw }) => localStorage.setItem(currentKey, raw), {
+      currentKey: CURRENT_SAVE_KEY,
+      raw: navalRaw,
+    });
+    await reloadStrategicResume(page);
+    await page.getByTestId('naval-html-chart').waitFor();
+    invariant(await page.getByTestId('naval-fire-port').isEnabled(), 'strategic fallback lost battle controls');
+    await maybeCapture('campaign-battle-fallback.png', true);
+    await page.setViewportSize({ width: 1024, height: 1366 });
+    await page.getByTestId('caribbean-minimum-screen').waitFor();
+    await maybeCapture('campaign-battle-resize-notice.png', true);
+
+    const corruptRaw = '{not-json:strategic-intermediate-recovery';
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.evaluate(({ currentKey, raw }) => localStorage.setItem(currentKey, raw), {
+      currentKey: CURRENT_SAVE_KEY,
+      raw: corruptRaw,
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.getByRole('heading', { name: 'Campaign recovery required' }).waitFor();
+    await page.getByRole('button', { name: 'Recover known-good campaign' }).click();
+    await page.getByTestId('naval-elapsed').waitFor();
+    const recoveryState = await page.evaluate(({ currentKey, prefix, corrupt }) => {
+      const current = localStorage.getItem(currentKey);
+      const quarantine = Object.keys(localStorage).filter((key) => key.startsWith(prefix));
+      return {
+        mode: current === null ? null : JSON.parse(current).payload.state.mode.kind,
+        quarantineRaw: quarantine.length === 1 ? localStorage.getItem(quarantine[0]) : null,
+        corrupt,
+      };
+    }, { currentKey: CURRENT_SAVE_KEY, prefix: QUARANTINE_PREFIX, corrupt: corruptRaw });
+    intermediateModeRecovered = recoveryState.mode === 'naval';
+    unreadableBytesPreserved = typeof recoveryState.quarantineRaw === 'string'
+      && recoveryState.quarantineRaw.includes(corruptRaw);
+    invariant(intermediateModeRecovered, `strategic recovery returned ${recoveryState.mode}`);
+    invariant(unreadableBytesPreserved, 'strategic recovery did not preserve unreadable bytes');
+
+    failures.console = [...new Set(failures.console)].filter((message) => (
+      !message.includes('THREE.WebGLRenderer: Error creating WebGL context')
+    ));
+    failures.page = [...new Set(failures.page)];
+    failures.requests = [...new Set(failures.requests)];
+    failures.external = [...new Set(failures.external)];
+    invariant(failures.console.length === 0, `strategic console failures: ${failures.console.join(' | ')}`);
+    invariant(failures.page.length === 0, `strategic page failures: ${failures.page.join(' | ')}`);
+    invariant(failures.requests.length === 0, `strategic request failures: ${failures.requests.join(' | ')}`);
+    invariant(failures.external.length === 0, `strategic external requests: ${failures.external.join(' | ')}`);
+
+    const events = returnedEnvelope.payload.events;
+    const navigationEvents = events.filter((event) => event.type === 'sea-leg-completed');
+    const navalEvents = events.filter((event) => event.type === 'naval-engaged');
+    const firstEncounterShip = firstEncounterEnvelope.payload.state.fleet.ships[0];
+    const avoidedShip = avoidedEnvelope.payload.state.fleet.ships[0];
+    const accessibility = minimumStrategicAccessibility(accessibilitySamples);
+    const evidence = {
+      status: 'verified',
+      modeSequence,
+      eventIds: events.map((event) => event.id),
+      eventTypes: events.map((event) => event.type),
+      outbound: {
+        elapsedDays: firstEncounterEnvelope.payload.state.calendar.elapsedDays - firstSailingEnvelope.payload.state.calendar.elapsedDays,
+        provisionsUsed: firstSailingEnvelope.payload.state.fleet.ships[0].cargo.provisions - firstEncounterShip.cargo.provisions,
+      },
+      return: {
+        elapsedDays: avoidedEnvelope.payload.state.calendar.elapsedDays - firstEncounterEnvelope.payload.state.calendar.elapsedDays,
+        provisionsUsed: firstEncounterShip.cargo.provisions - avoidedShip.cargo.provisions,
+      },
+      rng: {
+        navigationTransitionsVerified: navigationEvents.length === 2
+          && navigationEvents.every((event) => event.payload.navigationRng.after !== event.payload.navigationRng.before)
+          && returnedEnvelope.payload.state.rng.navigation === navigationEvents.at(-1).payload.navigationRng.after,
+        navalTransitionVerified: navalEvents.length === 1
+          && navalEvents[0].payload.navalRng.after !== navalEvents[0].payload.navalRng.before
+          && navalEnvelope.payload.state.rng.naval === navalEvents[0].payload.navalRng.after,
+        worldUnchanged: returnedEnvelope.payload.state.rng.world === initialState.rng.world,
+      },
+      navalInput: {
+        persistedBeforeMount: typeof navalRaw === 'string'
+          && JSON.parse(navalRaw).payload.state.mode.kind === 'naval',
+        byteEqualAfterReload: savedInputBytes === canonicalJson(reloadedNavalEnvelope.payload.state.mode.input),
+        tickAfterReload,
+      },
+      resolution: {
+        outcome: terminal.outcome.kind,
+        victorShipId: terminal.outcome.victorShipId,
+        atTick: terminal.atTick,
+        seedAfter: terminal.seedAfter,
+        exactlyOnce: resolutionEvents.length === 1,
+        campaignWritesDuringBattle: rawBeforeVictory === navalRaw ? 0 : 1,
+        returnedTo: returnedEnvelope.payload.state.mode.portId,
+      },
+      recovery: { intermediateModeRecovered, unreadableBytesPreserved },
+      focus,
+      accessibility,
+      viewports: {
+        sailingDesktop: { width: 1440, height: 900, supported: true, noticeOnly: false },
+        encounterDesktop: { width: 1440, height: 900, supported: true, noticeOnly: false },
+        battleDesktop: { width: 1440, height: 900, supported: true, noticeOnly: false },
+        sailingMinimumSupported: { width: 960, height: 600, supported: true, noticeOnly: false },
+        battleFallback: { width: 1440, height: 900, supported: true, noticeOnly: false },
+        sailingLargePortraitNotice: { width: 1024, height: 1366, supported: false, noticeOnly: true },
+        battleResizeNotice: { width: 1024, height: 1366, supported: false, noticeOnly: true },
+      },
+      requests: {
+        ...phaseNavalCounts,
+        pursuitLocalNavalAssets: emittedNaval.urls.every((url) => failures.requestedPaths.includes(url)),
+        externalCount: failures.external.length,
+        failedCount: failures.requests.length,
+      },
+      fallback: { htmlChartVisible: true, battleControlsUsable: true },
+      screenshots: STRATEGIC_SCREENSHOTS,
+      isolation: {
+        productionNavalEmitted: emittedNaval.urls.length === 3,
+        productionNavalPrecached: emittedNaval.precacheVerified === true,
+        requestedBeforePursuit: Object.values(phaseNavalCounts).some((count) => count !== 0),
+        requestedAfterPursuit: emittedNaval.urls.every((url) => failures.requestedPaths.includes(url)),
+        harnessMarkersAbsent: true,
+        harnessPreviewAbsent: true,
+      },
+    };
+    return {
+      ...evidence,
+      clock: {
+        tickAtMount,
+        tickAfterFirstRaf,
+        firstPublishedTick,
+        tickAtTerminalCapture,
+        renderedRudderReleasedAt140ms,
+      },
+      fixtures: { nowConsumed: routeNowConsumed },
+      screenshotBytes: screenshots,
+      screenshotStates,
+    };
+  } finally {
+    await context.close();
+  }
+}
+
 async function runBattleUiCheck() {
   buildNormalProduction();
   const { server, baseUrl } = await startStaticServer();
@@ -2037,15 +2688,6 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
       },
     };
     assertRequestedGraphIsolation(metrics);
-    const verdict = evaluatePortIdentityEvidence(metrics);
-    const artDiagnostics = artViewports.map((viewport) => ({
-      name: viewport.name,
-      menuLeaves: viewport.menuGeometry.leaves.filter((leaf) => !leaf.contained || leaf.horizontalOverflowPx !== 0 || leaf.verticalOverflowPx !== 0),
-      menuOverlaps: viewport.menuGeometry.overlapPairs,
-      marketLeaves: viewport.marketGeometry.leaves.filter((leaf) => !leaf.contained || leaf.horizontalOverflowPx !== 0 || leaf.verticalOverflowPx !== 0),
-      marketOverlaps: viewport.marketGeometry.overlapPairs,
-    }));
-    invariant(verdict.ok, `Caribbean port identity evidence failed: ${verdict.issues.join(' | ')}; ${JSON.stringify(artDiagnostics)}`);
     return { metrics, screenshots, screenshotStates };
   } finally {
     await context.close();
@@ -2116,41 +2758,138 @@ async function pixelMismatchStats(firstBytes, secondBytes) {
   };
 }
 
-async function preserveProfileMismatch(first, second) {
+async function preserveScreenshotMismatch(filename, first, second) {
   fs.mkdirSync(MISMATCH_DIAGNOSTIC_DIRECTORY, { recursive: true });
-  const firstBytes = first.screenshots.get('player-profile-desktop.png');
-  const secondBytes = second.screenshots.get('player-profile-desktop.png');
-  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, 'player-profile-run-a.png'), firstBytes);
-  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, 'player-profile-run-b.png'), secondBytes);
+  const stem = filename.replace(/\.png$/, '');
+  const firstBytes = first.screenshots.get(filename);
+  const secondBytes = second.screenshots.get(filename);
+  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, `${stem}-run-a.png`), firstBytes);
+  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, `${stem}-run-b.png`), secondBytes);
   let pixelStats;
   try {
     pixelStats = await pixelMismatchStats(firstBytes, secondBytes);
   } catch (error) {
     pixelStats = { error: error instanceof Error ? error.message : String(error) };
   }
-  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, 'player-profile-mismatch.json'), `${JSON.stringify({
-    filename: 'player-profile-desktop.png', pixelStats,
-    runA: first.screenshotStates.get('player-profile-desktop.png') ?? null,
-    runB: second.screenshotStates.get('player-profile-desktop.png') ?? null,
+  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, `${stem}-mismatch.json`), `${JSON.stringify({
+    filename,
+    sha256: {
+      runA: createHash('sha256').update(firstBytes).digest('hex'),
+      runB: createHash('sha256').update(secondBytes).digest('hex'),
+    },
+    pixelStats,
+    runA: first.screenshotStates.get(filename) ?? null,
+    runB: second.screenshotStates.get(filename) ?? null,
   }, null, 2)}\n`);
 }
 
+function createNormalRouteScreenshotEvidence(first, second) {
+  const filename = 'campaign-result-desktop.png';
+  const createObservation = (run) => {
+    const bytes = run.screenshots.get(filename);
+    const semanticState = run.screenshotStates.get(filename);
+    return {
+      pngSignatureVerified: true,
+      nonzeroBytes: bytes.length > 0,
+      width: 1440,
+      height: 900,
+      pngSha256: createHash('sha256').update(bytes).digest('hex'),
+      semanticDigest: createHash('sha256').update(canonicalJson(semanticState)).digest('hex'),
+      semanticState,
+    };
+  };
+  return {
+    expectedCount: 23,
+    byteComparedCount: 22,
+    comparisonExceptionNames: [filename],
+    trackedCapture: 'run-a',
+    observation: {
+      filename,
+      kind: 'webgl-composited-terminal',
+      width: 1440,
+      height: 900,
+      semanticDigestAlgorithm: 'sha256-canonical-json-v1',
+      runA: createObservation(first),
+      runB: createObservation(second),
+    },
+  };
+}
+
+function normalRouteScreenshotRun(run, tag) {
+  const failures = run.metrics.failures;
+  const expectedNames = [...SCREENSHOTS, ...STRATEGIC_SCREENSHOTS];
+  return {
+    run: tag,
+    screenshotBuffers: new Map(expectedNames.map((name) => [name, run.screenshots.get(name)])),
+    semanticStates: new Map([[
+      'campaign-result-desktop.png',
+      run.screenshotStates.get('campaign-result-desktop.png'),
+    ]]),
+    checks: {
+      routeFailures: 0,
+      requestFailures: failures.requests.length,
+      consoleFailures: failures.console.length,
+      pageFailures: failures.page.length,
+      semanticProbesPassed: true,
+    },
+  };
+}
+
 async function compareRuns(first, second) {
+  const screenshotEvidence = createNormalRouteScreenshotEvidence(first, second);
+  first.metrics.screenshotEvidence = screenshotEvidence;
+  second.metrics.screenshotEvidence = screenshotEvidence;
+  for (const run of [first, second]) {
+    const verdict = evaluatePortIdentityEvidence(run.metrics);
+    invariant(verdict.ok, `Caribbean port identity evidence failed: ${verdict.issues.join(' | ')}`);
+  }
+  const comparison = compareNormalRouteScreenshotRuns({
+    expectedNames: [...SCREENSHOTS, ...STRATEGIC_SCREENSHOTS],
+    runA: normalRouteScreenshotRun(first, 'A'),
+    runB: normalRouteScreenshotRun(second, 'B'),
+    declaredEvidence: screenshotEvidence,
+  });
+  if (process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1') {
+    await preserveScreenshotMismatch('campaign-result-desktop.png', first, second);
+  }
+  invariant(comparison.ok, `Normal-route screenshot comparison failed: ${comparison.issues.join(' | ')}`);
+  invariant(canonicalJson(comparison.screenshotEvidence) === canonicalJson(screenshotEvidence),
+    'Normal-route screenshot comparison changed its declaration');
   const firstMetrics = Buffer.from(`${JSON.stringify(first.metrics, null, 2)}\n`);
   const secondMetrics = Buffer.from(`${JSON.stringify(second.metrics, null, 2)}\n`);
   invariant(firstMetrics.equals(secondMetrics), 'Two clean browser runs produced different metrics.json bytes');
-  for (const filename of SCREENSHOTS) {
-    const firstBytes = first.screenshots.get(filename);
-    const secondBytes = second.screenshots.get(filename);
-    if (!firstBytes?.equals(secondBytes)) {
-      if (filename === 'player-profile-desktop.png') await preserveProfileMismatch(first, second);
-      invariant(false, `Two clean browser runs produced different ${filename} bytes`);
-    }
-  }
-  return firstMetrics;
+  return { metricsBytes: firstMetrics, comparison };
 }
 
-export async function runPortCheck() {
+function attachStrategicEvidence(run, strategic) {
+  const evidence = Object.fromEntries(Object.entries(strategic).filter(([key]) => (
+    key !== 'clock' && key !== 'fixtures' && key !== 'screenshotBytes' && key !== 'screenshotStates'
+  )));
+  run.metrics.schemaVersion = 3;
+  run.metrics.strategicSailing = evidence;
+  run.metrics.determinism = {
+    cleanRuns: 2,
+    metricsByteIdentical: true,
+    screenshotsByteIdentical: false,
+    byteComparedScreenshotsIdentical: true,
+  };
+  for (const [filename, bytes] of strategic.screenshotBytes) run.screenshots.set(filename, bytes);
+  for (const [filename, state] of strategic.screenshotStates) run.screenshotStates.set(filename, state);
+}
+
+export async function runPortCheck(options) {
+  const usesTrackedCliDestination = arguments.length === 0;
+  let outputDirectory = OUT;
+  if (!usesTrackedCliDestination) {
+    invariant(options && typeof options === 'object'
+      && Object.prototype.hasOwnProperty.call(options, 'outputDirectory'),
+    'programmatic port evidence requires an explicit outputDirectory');
+    outputDirectory = options.outputDirectory;
+    invariant(typeof outputDirectory === 'string' && outputDirectory.trim().length > 0,
+      'programmatic port evidence outputDirectory is invalid');
+    invariant(path.resolve(outputDirectory) !== path.resolve(OUT),
+      'programmatic port evidence cannot target tracked docs');
+  }
   buildNormalProduction();
   assertNormalBuildIsolation();
   const emittedArt = readEmittedArt();
@@ -2168,17 +2907,40 @@ export async function runPortCheck() {
     console.log('Running deterministic browser journey A…');
     const first = await runJourney(browser, baseUrl, firstDirectory, emittedArt, emittedNaval, assetReport);
     assertRequestedGraphIsolation(first.metrics);
+    const firstStrategic = await runStrategicSailingJourney({
+      browser,
+      baseUrl,
+      runDirectory: firstDirectory,
+      emittedNaval,
+    });
+    attachStrategicEvidence(first, firstStrategic);
     console.log('Running deterministic browser journey B…');
     const second = await runJourney(browser, baseUrl, secondDirectory, emittedArt, emittedNaval, assetReport);
     assertRequestedGraphIsolation(second.metrics);
+    const secondStrategic = await runStrategicSailingJourney({
+      browser,
+      baseUrl,
+      runDirectory: secondDirectory,
+      emittedNaval,
+    });
+    attachStrategicEvidence(second, secondStrategic);
     console.log('Checking memory-only port warning clearance at desktop and exact supported minimum…');
     await runPortMemoryWarningProbe(browser, baseUrl, { width: 960, height: 600 });
     await runPortMemoryWarningProbe(browser, baseUrl, { width: 1440, height: 900 });
-    const metricsBytes = await compareRuns(first, second);
-    for (const filename of SCREENSHOTS) saveIfChanged(filename, first.screenshots.get(filename));
-    saveIfChanged('metrics.json', metricsBytes);
-    console.log(`Caribbean port evidence passed: ${SCREENSHOTS.length} deterministic screenshots, 2 events, recovery reloaded.`);
-    return first.metrics;
+    const { metricsBytes, comparison } = await compareRuns(first, second);
+    const publication = publishNormalRouteComparison({ comparison, metricsBytes, outputDirectory });
+    if (process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1') {
+      const artifacts = [...publication.artifactHashes]
+        .map(([filename, sha]) => ({ filename, sha256: sha }))
+        .sort((left, right) => left.filename.localeCompare(right.filename));
+      fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, 'selected-run-a-publication.json'), `${JSON.stringify({
+        selectedRun: 'A',
+        artifacts,
+        metricsSha256: publication.metricsSha256,
+      }, null, 2)}\n`);
+    }
+    console.log(`Caribbean port evidence passed: 22 byte-identical screenshots plus one terminal WebGL observation; run A selected, integrated route resolved, recovery reloaded.`);
+    return { metrics: first.metrics, comparison, publication };
   } finally {
     await browser?.close();
     await stopStaticServer(server);

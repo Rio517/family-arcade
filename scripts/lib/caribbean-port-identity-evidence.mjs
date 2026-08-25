@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 const RETAINED_V1_SECTIONS = [
   'browser',
   'route',
@@ -18,13 +20,44 @@ const RETAINED_V1_SECTIONS = [
   'determinism',
 ];
 
-const V2_FIELDS = [
+const V3_FIELDS = [
   ...RETAINED_V1_SECTIONS,
   'schemaVersion',
   'packagePhase',
   'profileIdentity',
   'marketStability',
+  'strategicSailing',
+  'screenshotEvidence',
 ];
+
+const STRATEGIC_MODE_SEQUENCE = Object.freeze([
+  'port', 'sailing', 'encounter', 'port', 'sailing', 'encounter', 'naval', 'port',
+]);
+const STRATEGIC_EVENT_IDS = Object.freeze([1, 2, 3, 4, 5, 6, 7, 8]);
+const STRATEGIC_EVENT_TYPES = Object.freeze([
+  'lead-accepted', 'voyage-started', 'sea-leg-completed', 'encounter-avoided',
+  'voyage-started', 'sea-leg-completed', 'naval-engaged', 'naval-resolved',
+]);
+const STRATEGIC_SCREENSHOTS = Object.freeze([
+  'sailing-desktop.png',
+  'encounter-desktop.png',
+  'campaign-battle-desktop.png',
+  'campaign-result-desktop.png',
+  'returned-log-desktop.png',
+  'sailing-minimum-supported.png',
+  'campaign-battle-fallback.png',
+  'sailing-large-portrait-notice.png',
+  'campaign-battle-resize-notice.png',
+]);
+const STRATEGIC_VIEWPORTS = Object.freeze({
+  sailingDesktop: Object.freeze({ width: 1440, height: 900, supported: true, noticeOnly: false }),
+  encounterDesktop: Object.freeze({ width: 1440, height: 900, supported: true, noticeOnly: false }),
+  battleDesktop: Object.freeze({ width: 1440, height: 900, supported: true, noticeOnly: false }),
+  sailingMinimumSupported: Object.freeze({ width: 960, height: 600, supported: true, noticeOnly: false }),
+  battleFallback: Object.freeze({ width: 1440, height: 900, supported: true, noticeOnly: false }),
+  sailingLargePortraitNotice: Object.freeze({ width: 1024, height: 1366, supported: false, noticeOnly: true }),
+  battleResizeNotice: Object.freeze({ width: 1024, height: 1366, supported: false, noticeOnly: true }),
+});
 
 const FINAL_VIEWPORTS = Object.freeze({
   setupDesktop: Object.freeze({ width: 1440, height: 900, expectedSupported: true, controllerMounted: true, noticeVisible: false, noticeFocused: false }),
@@ -47,6 +80,9 @@ const FINAL_SCREENSHOTS = Object.freeze([
   'player-profile-desktop.png',
 ]);
 const FINAL_ART_SHA256 = '0c1c99213d2903fb84a027a6f64508548c631b8fdefc6e41031e7954854ec67d';
+const TERMINAL_RESULT_SCREENSHOT = 'campaign-result-desktop.png';
+const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const SAMPLE_HASH_PATTERN = /^[a-f0-9]{8}$/;
 
 export const EVIDENCE_CARGO_IDS = Object.freeze([
   'provisions', 'tools', 'luxuries', 'sugar-molasses', 'tobacco-dyewood', 'powder-arms',
@@ -288,6 +324,122 @@ function exactArray(value, expected) {
   return Array.isArray(value) && value.length === expected.length && value.every((entry, index) => entry === expected[index]);
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (isRecord(value)) {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function semanticDigest(value) {
+  return createHash('sha256').update(canonicalJson(value)).digest('hex');
+}
+
+function validateTerminalSystems(issues, systems, expected, label) {
+  const keys = ['hull', 'sails', 'crew', 'cannon'];
+  if (!exactObject(issues, systems, keys, label)
+    || keys.some((key) => systems[key] !== expected[key])) {
+    issues.push(`${label} is invalid`);
+  }
+}
+
+function validateTerminalSemanticState(issues, state, label) {
+  if (!exactObject(issues, state, ['tick', 'resultVisible', 'canvas', 'terminal', 'player', 'opponent'], label)) return;
+  if (state.tick !== 11_855 || state.resultVisible !== true) issues.push(`${label} terminal visibility is invalid`);
+
+  const canvas = state.canvas;
+  if (!exactObject(issues, canvas, [
+    'width', 'height', 'rect', 'drawingBuffer', 'opacity', 'transform', 'engine',
+    'backend', 'framebufferSample',
+  ], `${label}.canvas`)) return;
+  if (canvas.width !== 1440 || canvas.height !== 900 || canvas.opacity !== '1'
+    || canvas.transform !== 'none' || canvas.engine !== 'three.js r170') {
+    issues.push(`${label}.canvas is invalid`);
+  }
+  if (!exactObject(issues, canvas.rect, ['x', 'y', 'width', 'height'], `${label}.canvas.rect`)
+    || canvas.rect.x !== 0 || canvas.rect.y !== 0 || canvas.rect.width !== 1440 || canvas.rect.height !== 900) {
+    issues.push(`${label}.canvas.rect is invalid`);
+  }
+  if (!exactObject(issues, canvas.drawingBuffer, ['width', 'height'], `${label}.canvas.drawingBuffer`)
+    || canvas.drawingBuffer.width !== 1440 || canvas.drawingBuffer.height !== 900) {
+    issues.push(`${label}.canvas.drawingBuffer is invalid`);
+  }
+  if (!exactObject(issues, canvas.backend, ['vendor', 'renderer'], `${label}.canvas.backend`)
+    || typeof canvas.backend.vendor !== 'string' || canvas.backend.vendor.length === 0
+    || typeof canvas.backend.renderer !== 'string' || canvas.backend.renderer.length === 0) {
+    issues.push(`${label}.canvas.backend is invalid`);
+  }
+  const sample = canvas.framebufferSample;
+  if (!exactObject(issues, sample, [
+    'algorithm', 'sampleCount', 'nonzeroSampleChannels', 'sampleHash',
+  ], `${label}.canvas.framebufferSample`)
+    || sample.algorithm !== 'fnv1a32-rgba-grid-v1'
+    || sample.sampleCount !== 40
+    || !Number.isInteger(sample.nonzeroSampleChannels)
+    || sample.nonzeroSampleChannels < 0
+    || sample.nonzeroSampleChannels > 160
+    || !SAMPLE_HASH_PATTERN.test(sample.sampleHash)) {
+    issues.push(`${label}.canvas.framebufferSample is invalid`);
+  }
+
+  const terminal = state.terminal;
+  if (!exactObject(issues, terminal, ['outcome', 'victorShipId', 'atTick', 'seedAfter'], `${label}.terminal`)
+    || terminal.outcome !== 'boarding-ready' || terminal.victorShipId !== 'player'
+    || terminal.atTick !== 11_855 || terminal.seedAfter !== 1_310_878_278) {
+    issues.push(`${label}.terminal is invalid`);
+  }
+  validateTerminalSystems(issues, state.player, { hull: 78, sails: 61, crew: 44, cannon: 8 }, `${label}.player`);
+  validateTerminalSystems(issues, state.opponent, { hull: 88, sails: 14, crew: 9, cannon: 8 }, `${label}.opponent`);
+}
+
+function validateScreenshotObservationRun(issues, value, label) {
+  const keys = [
+    'pngSignatureVerified', 'nonzeroBytes', 'width', 'height', 'pngSha256',
+    'semanticDigest', 'semanticState',
+  ];
+  if (!exactObject(issues, value, keys, label)) return;
+  if (value.pngSignatureVerified !== true || value.nonzeroBytes !== true
+    || value.width !== 1440 || value.height !== 900 || !SHA256_PATTERN.test(value.pngSha256)
+    || !SHA256_PATTERN.test(value.semanticDigest)) {
+    issues.push(`${label} PNG declaration is invalid`);
+  }
+  validateTerminalSemanticState(issues, value.semanticState, `${label}.semanticState`);
+  if (isRecord(value.semanticState) && value.semanticDigest !== semanticDigest(value.semanticState)) {
+    issues.push(`${label}.semanticDigest does not match canonical state`);
+  }
+}
+
+function validateScreenshotEvidence(issues, evidence) {
+  const keys = [
+    'expectedCount', 'byteComparedCount', 'comparisonExceptionNames',
+    'trackedCapture', 'observation',
+  ];
+  if (!exactObject(issues, evidence, keys, 'screenshotEvidence')) return;
+  if (evidence.expectedCount !== 23 || evidence.byteComparedCount !== 22
+    || !exactArray(evidence.comparisonExceptionNames, [TERMINAL_RESULT_SCREENSHOT])
+    || evidence.trackedCapture !== 'run-a') {
+    issues.push('screenshotEvidence comparison boundary is invalid');
+  }
+  const observation = evidence.observation;
+  if (!exactObject(issues, observation, [
+    'filename', 'kind', 'width', 'height', 'semanticDigestAlgorithm', 'runA', 'runB',
+  ], 'screenshotEvidence.observation')) return;
+  if (observation.filename !== TERMINAL_RESULT_SCREENSHOT
+    || observation.kind !== 'webgl-composited-terminal'
+    || observation.width !== 1440 || observation.height !== 900
+    || observation.semanticDigestAlgorithm !== 'sha256-canonical-json-v1') {
+    issues.push('screenshotEvidence observation is invalid');
+  }
+  validateScreenshotObservationRun(issues, observation.runA, 'screenshotEvidence.observation.runA');
+  validateScreenshotObservationRun(issues, observation.runB, 'screenshotEvidence.observation.runB');
+  if (isRecord(observation.runA) && isRecord(observation.runB)
+    && (canonicalJson(observation.runA.semanticState) !== canonicalJson(observation.runB.semanticState)
+      || observation.runA.semanticDigest !== observation.runB.semanticDigest)) {
+    issues.push('screenshotEvidence semantic observations differ');
+  }
+}
+
 function validStringArray(value) {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
@@ -436,12 +588,131 @@ function marketSummary(samples, verdict) {
   };
 }
 
+function validateExactTrueRecord(issues, value, keys, label) {
+  if (!exactObject(issues, value, keys, label)) return;
+  for (const key of keys) if (value[key] !== true) issues.push(`${label}.${key} must be true`);
+}
+
+function validateStrategicSailing(issues, strategic) {
+  const keys = [
+    'status', 'modeSequence', 'eventIds', 'eventTypes', 'outbound', 'return', 'rng',
+    'navalInput', 'resolution', 'recovery', 'focus', 'accessibility', 'viewports',
+    'requests', 'fallback', 'screenshots', 'isolation',
+  ];
+  if (!exactObject(issues, strategic, keys, 'strategicSailing')) return;
+  if (strategic.status !== 'verified') issues.push('strategicSailing.status must be verified');
+  if (!exactArray(strategic.modeSequence, STRATEGIC_MODE_SEQUENCE)) issues.push('strategicSailing.modeSequence is invalid');
+  if (!exactArray(strategic.eventIds, STRATEGIC_EVENT_IDS)) issues.push('strategicSailing.eventIds are invalid');
+  if (!exactArray(strategic.eventTypes, STRATEGIC_EVENT_TYPES)) issues.push('strategicSailing.eventTypes are invalid');
+
+  for (const label of ['outbound', 'return']) {
+    const value = strategic[label];
+    if (!exactObject(issues, value, ['elapsedDays', 'provisionsUsed'], `strategicSailing.${label}`)
+      || value.elapsedDays !== 1 || value.provisionsUsed !== 1) {
+      issues.push(`strategicSailing.${label} cost is invalid`);
+    }
+  }
+
+  validateExactTrueRecord(
+    issues,
+    strategic.rng,
+    ['navigationTransitionsVerified', 'navalTransitionVerified', 'worldUnchanged'],
+    'strategicSailing.rng',
+  );
+  if (!exactObject(issues, strategic.navalInput, ['persistedBeforeMount', 'byteEqualAfterReload', 'tickAfterReload'], 'strategicSailing.navalInput')
+    || strategic.navalInput.persistedBeforeMount !== true
+    || strategic.navalInput.byteEqualAfterReload !== true
+    || strategic.navalInput.tickAfterReload !== 0) {
+    issues.push('strategicSailing.navalInput is invalid');
+  }
+  const resolutionKeys = [
+    'outcome', 'victorShipId', 'atTick', 'seedAfter', 'exactlyOnce',
+    'campaignWritesDuringBattle', 'returnedTo',
+  ];
+  if (!exactObject(issues, strategic.resolution, resolutionKeys, 'strategicSailing.resolution')
+    || strategic.resolution.outcome !== 'boarding-ready'
+    || strategic.resolution.victorShipId !== 'player'
+    || strategic.resolution.atTick !== 11_855
+    || strategic.resolution.seedAfter !== 1_310_878_278
+    || strategic.resolution.exactlyOnce !== true
+    || strategic.resolution.campaignWritesDuringBattle !== 0
+    || strategic.resolution.returnedTo !== 'bridgetown') {
+    issues.push('strategicSailing.resolution is invalid');
+  }
+  validateExactTrueRecord(
+    issues,
+    strategic.recovery,
+    ['intermediateModeRecovered', 'unreadableBytesPreserved'],
+    'strategicSailing.recovery',
+  );
+  validateExactTrueRecord(
+    issues,
+    strategic.focus,
+    ['sailingHeading', 'encounterHeading', 'avoidedReturnLog', 'navalReloadBattle', 'resolvedReturnLog'],
+    'strategicSailing.focus',
+  );
+
+  const accessibilityKeys = [
+    'minimumTextPx', 'minimumTargetWidthPx', 'minimumTargetHeightPx',
+    'minimumContrastRatio', 'horizontalOverflowPx',
+  ];
+  if (!exactObject(issues, strategic.accessibility, accessibilityKeys, 'strategicSailing.accessibility')
+    || !finiteNonNegative(strategic.accessibility.minimumTextPx) || strategic.accessibility.minimumTextPx < 14
+    || !finiteNonNegative(strategic.accessibility.minimumTargetWidthPx) || strategic.accessibility.minimumTargetWidthPx < 44
+    || !finiteNonNegative(strategic.accessibility.minimumTargetHeightPx) || strategic.accessibility.minimumTargetHeightPx < 44
+    || !finiteNonNegative(strategic.accessibility.minimumContrastRatio) || strategic.accessibility.minimumContrastRatio < 4.5
+    || strategic.accessibility.horizontalOverflowPx !== 0) {
+    issues.push('strategicSailing.accessibility is invalid');
+  }
+
+  if (exactObject(issues, strategic.viewports, Object.keys(STRATEGIC_VIEWPORTS), 'strategicSailing.viewports')) {
+    for (const [name, expected] of Object.entries(STRATEGIC_VIEWPORTS)) {
+      const value = strategic.viewports[name];
+      if (!exactObject(issues, value, ['width', 'height', 'supported', 'noticeOnly'], `strategicSailing.viewports.${name}`)
+        || Object.entries(expected).some(([key, expectedValue]) => value[key] !== expectedValue)) {
+        issues.push(`strategicSailing.viewports.${name} is invalid`);
+      }
+    }
+  }
+
+  const requestKeys = [
+    'setupNavalCount', 'portNavalCount', 'sailingNavalCount', 'avoidNavalCount',
+    'pursuitLocalNavalAssets', 'externalCount', 'failedCount',
+  ];
+  if (!exactObject(issues, strategic.requests, requestKeys, 'strategicSailing.requests')
+    || ['setupNavalCount', 'portNavalCount', 'sailingNavalCount', 'avoidNavalCount', 'externalCount', 'failedCount']
+      .some((key) => strategic.requests[key] !== 0)
+    || strategic.requests.pursuitLocalNavalAssets !== true) {
+    issues.push('strategicSailing.requests are invalid');
+  }
+  validateExactTrueRecord(
+    issues,
+    strategic.fallback,
+    ['htmlChartVisible', 'battleControlsUsable'],
+    'strategicSailing.fallback',
+  );
+  if (!exactArray(strategic.screenshots, STRATEGIC_SCREENSHOTS)) issues.push('strategicSailing.screenshots are not the exact set');
+  const isolationKeys = [
+    'productionNavalEmitted', 'productionNavalPrecached', 'requestedBeforePursuit',
+    'requestedAfterPursuit', 'harnessMarkersAbsent', 'harnessPreviewAbsent',
+  ];
+  if (!exactObject(issues, strategic.isolation, isolationKeys, 'strategicSailing.isolation')
+    || strategic.isolation.productionNavalEmitted !== true
+    || strategic.isolation.productionNavalPrecached !== true
+    || strategic.isolation.requestedBeforePursuit !== false
+    || strategic.isolation.requestedAfterPursuit !== true
+    || strategic.isolation.harnessMarkersAbsent !== true
+    || strategic.isolation.harnessPreviewAbsent !== true) {
+    issues.push('strategicSailing.isolation is invalid');
+  }
+}
+
 /** The pure final gate is intentionally strict: any absent, additional, or malformed channel fails closed. */
 export function evaluatePortIdentityEvidence(evidence) {
   const issues = [];
-  if (!exactObject(issues, evidence, V2_FIELDS, 'evidence')) return { ok: false, issues };
+  if (!exactObject(issues, evidence, V3_FIELDS, 'evidence')) return { ok: false, issues };
   for (const section of RETAINED_V1_SECTIONS) if (!(section in evidence)) issues.push(`retained v1 section ${section} is missing`);
-  if (evidence.schemaVersion !== 2) issues.push('schemaVersion must be 2');
+  if (evidence.schemaVersion !== 3) issues.push('schemaVersion must be 3');
   if (evidence.packagePhase !== 'complete') issues.push('packagePhase must be complete');
   if (!exactObject(issues, evidence.browser, ['name', 'version'], 'browser') || evidence.browser.name !== 'Chromium' || typeof evidence.browser.version !== 'string' || evidence.browser.version.length === 0) issues.push('browser is invalid');
   if (evidence.route !== '/#/caribbean') issues.push('route is invalid');
@@ -473,7 +744,16 @@ export function evaluatePortIdentityEvidence(evidence) {
   if (!exactObject(issues, evidence.recovery, ['quarantineKey', 'quarantineVerified', 'exportedCorruptRawVerified', 'recoveredChecksum', 'recoveryReloaded'], 'recovery')
     || typeof evidence.recovery.quarantineKey !== 'string' || !evidence.recovery.quarantineKey.startsWith('caribbean:campaign:quarantine:') || evidence.recovery.quarantineVerified !== true || evidence.recovery.exportedCorruptRawVerified !== true || !/^[a-f0-9]{8}$/.test(evidence.recovery.recoveredChecksum) || evidence.recovery.recoveryReloaded !== true) issues.push('recovery is invalid');
   if (!exactArray(evidence.screenshots, FINAL_SCREENSHOTS)) issues.push('screenshots are not the exact final set');
-  if (!exactObject(issues, evidence.determinism, ['cleanRuns', 'metricsByteIdentical', 'screenshotsByteIdentical'], 'determinism') || evidence.determinism.cleanRuns !== 2 || evidence.determinism.metricsByteIdentical !== true || evidence.determinism.screenshotsByteIdentical !== true) issues.push('determinism is invalid');
+  if (!exactObject(issues, evidence.determinism, [
+    'cleanRuns', 'metricsByteIdentical', 'screenshotsByteIdentical',
+    'byteComparedScreenshotsIdentical',
+  ], 'determinism') || evidence.determinism.cleanRuns !== 2
+    || evidence.determinism.metricsByteIdentical !== true
+    || evidence.determinism.screenshotsByteIdentical !== false
+    || evidence.determinism.byteComparedScreenshotsIdentical !== true) {
+    issues.push('determinism is invalid');
+  }
+  validateScreenshotEvidence(issues, evidence.screenshotEvidence);
   validateProfileEvidence(issues, evidence.profile);
   if (!exactObject(issues, evidence.profileIdentity, ['status', 'defaultPronouns', 'setupNamePrefilled', 'setupPronounsPrefilled', 'campaignSnapshotPreserved', 'careerLengthControlAbsent', 'newCampaignLength'], 'profileIdentity')) issues.push('profileIdentity is invalid');
   else {
@@ -494,5 +774,107 @@ export function evaluatePortIdentityEvidence(evidence) {
   if (marketVerdict && !marketVerdict.ok) issues.push(...marketVerdict.errors);
   if (!exactObject(issues, evidence.marketStability, ['status', 'sampleCount', 'actionIds', 'maxDrift', 'horizontalOverflow', 'focusPreserved', 'busyStatesVerified', 'statusesVerified'], 'marketStability')) issues.push('marketStability is invalid');
   else if (!marketVerdict?.ok || Object.entries(marketSummary(evidence.market.samples, marketVerdict)).some(([key, value]) => evidence.marketStability[key] !== value && !exactArray(evidence.marketStability[key], value))) issues.push('marketStability disagrees with raw market evidence');
+  validateStrategicSailing(issues, evidence.strategicSailing);
   return { ok: issues.length === 0, issues };
+}
+
+function pngDimensions(bytes) {
+  const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes ?? []);
+  if (buffer.length < 24
+    || !buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    || buffer.subarray(12, 16).toString('ascii') !== 'IHDR') return null;
+  const width = buffer.readUInt32BE(16);
+  const height = buffer.readUInt32BE(20);
+  return width > 0 && height > 0 ? { width, height } : null;
+}
+
+function exactMapNames(map, expectedNames) {
+  if (!(map instanceof Map) || map.size !== expectedNames.length) return false;
+  return [...map.keys()].every((name) => typeof name === 'string' && expectedNames.includes(name))
+    && expectedNames.every((name) => map.has(name));
+}
+
+function validRunChecks(checks) {
+  return isRecord(checks)
+    && exactArray(Object.keys(checks).sort(), [
+      'consoleFailures', 'pageFailures', 'requestFailures', 'routeFailures', 'semanticProbesPassed',
+    ])
+    && checks.routeFailures === 0
+    && checks.requestFailures === 0
+    && checks.consoleFailures === 0
+    && checks.pageFailures === 0
+    && checks.semanticProbesPassed === true;
+}
+
+/**
+ * Owns the actual A/B screenshot bytes. The sole observational row remains
+ * arbitrary pixel data after exact container and semantic validation.
+ */
+export function compareNormalRouteScreenshotRuns({ expectedNames, runA, runB, declaredEvidence } = {}) {
+  const issues = [];
+  const requiredNames = [...FINAL_SCREENSHOTS, ...STRATEGIC_SCREENSHOTS];
+  if (!exactArray(expectedNames, requiredNames) || new Set(expectedNames ?? []).size !== 23) {
+    issues.push('expected screenshot names are not the exact 23-name allowlist');
+  }
+  const evidenceIssues = [];
+  validateScreenshotEvidence(evidenceIssues, declaredEvidence);
+  issues.push(...evidenceIssues);
+  const names = exactArray(expectedNames, requiredNames) ? expectedNames : requiredNames;
+
+  for (const [label, run, tag] of [['runA', runA, 'A'], ['runB', runB, 'B']]) {
+    if (!isRecord(run) || run.run !== tag) {
+      issues.push(`${label} tag is invalid`);
+      continue;
+    }
+    if (!exactMapNames(run.screenshotBuffers, names)) issues.push(`${label} screenshot membership is invalid`);
+    if (!exactMapNames(run.semanticStates, [TERMINAL_RESULT_SCREENSHOT])) issues.push(`${label} semantic-state membership is invalid`);
+    if (!validRunChecks(run.checks)) issues.push(`${label} checks are invalid`);
+  }
+
+  const selectedArtifacts = new Map();
+  if (issues.length === 0) {
+    for (const name of names) {
+      const aBytes = runA.screenshotBuffers.get(name);
+      const bBytes = runB.screenshotBuffers.get(name);
+      const aDimensions = pngDimensions(aBytes);
+      const bDimensions = pngDimensions(bBytes);
+      if (!aDimensions || !bDimensions) {
+        issues.push(`${name} is not a valid nonempty PNG in both runs`);
+        continue;
+      }
+      if (name === TERMINAL_RESULT_SCREENSHOT
+        && (aDimensions.width !== 1440 || aDimensions.height !== 900
+          || bDimensions.width !== 1440 || bDimensions.height !== 900)) {
+        issues.push(`${name} must be 1440x900 in both runs`);
+      }
+      const aHash = createHash('sha256').update(aBytes).digest('hex');
+      const bHash = createHash('sha256').update(bBytes).digest('hex');
+      if (name !== TERMINAL_RESULT_SCREENSHOT && !Buffer.from(aBytes).equals(Buffer.from(bBytes))) {
+        issues.push(`${name} bytes differ outside the observation exception`);
+      }
+      if (name === TERMINAL_RESULT_SCREENSHOT) {
+        if (aHash !== declaredEvidence.observation.runA.pngSha256
+          || bHash !== declaredEvidence.observation.runB.pngSha256) {
+          issues.push(`${name} declared PNG hashes do not match the actual buffers`);
+        }
+        const stateA = runA.semanticStates.get(name);
+        const stateB = runB.semanticStates.get(name);
+        if (canonicalJson(stateA) !== canonicalJson(declaredEvidence.observation.runA.semanticState)
+          || canonicalJson(stateB) !== canonicalJson(declaredEvidence.observation.runB.semanticState)
+          || canonicalJson(stateA) !== canonicalJson(stateB)) {
+          issues.push(`${name} semantic state does not match its declaration`);
+        }
+      }
+      selectedArtifacts.set(name, { sourceRun: 'A', bytes: aBytes, sha256: aHash });
+    }
+  }
+
+  if (issues.length > 0) return { ok: false, issues };
+  return {
+    ok: true,
+    issues: [],
+    selectedRun: 'A',
+    selectedArtifacts,
+    screenshotEvidence: declaredEvidence,
+  };
 }

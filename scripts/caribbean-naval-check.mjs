@@ -9,6 +9,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 
 import { evaluateNavalEvidence } from './lib/caribbean-naval-evidence.mjs';
+import {
+  CARIBBEAN_NAVAL_SOURCE_SEEDS,
+  collectCaribbeanNavalSourceManifest,
+  runNavalEvidenceCli,
+} from './lib/caribbean-naval-verification.mjs';
+
+export { CARIBBEAN_NAVAL_SOURCE_SEEDS };
 
 const MODULE_URL = new URL(import.meta.url);
 const ROOT = MODULE_URL.protocol === 'file:'
@@ -27,32 +34,18 @@ export const VIEWPORTS = {
   phonePortrait: { width: 430, height: 932 },
   phoneLandscape: { width: 844, height: 390 },
 };
-const TASK8_TREE_FILES = [
-  'package.json',
-  'scripts/caribbean-naval-check.mjs',
-  'scripts/lib/caribbean-naval-evidence.mjs',
-  'scripts/lib/caribbean-naval-evidence.test.mjs',
-  'scripts/lib/caribbean-naval-check.test.mjs',
-  'scripts/lib/caribbean-naval-scenario.test.mjs',
-  'src/games/caribbean/components/CaribbeanLab.test.tsx',
-  'src/games/caribbean/components/CaribbeanLab.tsx',
-  'src/games/caribbean/components/battle/BattleHud.tsx',
-  'src/games/caribbean/components/battle/BattleShortcutLegend.tsx',
-  'src/games/caribbean/components/battle/NavalBattlePage.tsx',
-  'src/games/caribbean/components/battle/NavalViewport.tsx',
-  'src/games/caribbean/domain/naval/geometry.test.ts',
-  'src/games/caribbean/domain/naval/geometry.ts',
-  'src/games/caribbean/preview.tsx',
-  'src/games/caribbean/state/naval/debugBridge.test.ts',
-  'src/games/caribbean/state/naval/debugBridge.ts',
-  'src/games/caribbean/state/naval/harnessConfig.test.ts',
-  'src/games/caribbean/state/naval/harnessConfig.ts',
-  'src/games/caribbean/three/naval/NavalScene.ts',
-  'src/games/caribbean/three/naval/bearingLine.test.ts',
-  'src/games/caribbean/three/naval/bearingLine.ts',
-  'src/games/caribbean/three/naval/sceneMath.ts',
-  'src/games/caribbean/styles/battle.css',
-  'src/games/caribbean/styles/caribbean.css',
+const SCREENSHOT_MANIFEST = [
+  { name: 'battle-boundary-supported.png', width: 960, height: 600, state: 'battle-boundary' },
+  { name: 'battle-desktop.png', width: 1440, height: 900, state: 'battle' },
+  { name: 'battle-minimum-supported.png', width: 1024, height: 768, state: 'battle-minimum' },
+  { name: 'battle-tablet-landscape.png', width: 1180, height: 820, state: 'battle-tablet' },
+  { name: 'boarding-ready-result.png', width: 1180, height: 820, state: 'boarding-ready' },
+  { name: 'briefing-tablet.png', width: 1180, height: 820, state: 'briefing' },
+  { name: 'broadside-handedness.png', width: 1180, height: 820, state: 'starboard-broadside' },
+  { name: 'decision-tablet.png', width: 1180, height: 820, state: 'decision' },
+  { name: 'fallback-tablet-landscape.png', width: 1024, height: 768, state: 'fallback' },
+  { name: 'minimum-screen-phone-landscape.png', width: 844, height: 390, state: 'unsupported-landscape' },
+  { name: 'minimum-screen-phone-portrait.png', width: 430, height: 932, state: 'unsupported-portrait' },
 ];
 
 const CANONICAL_INPUT = {
@@ -161,35 +154,35 @@ function findHashedGlb() {
   };
 }
 
-function saveIfChanged(filename, bytes) {
-  const destination = path.join(OUT, filename);
+function saveIfChanged(outputDirectory, filename, bytes) {
+  const destination = path.join(outputDirectory, filename);
   const next = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
   const current = fs.existsSync(destination) ? fs.readFileSync(destination) : null;
-  if (current?.equals(next)) {
-    console.log(`unchanged: ${filename}`);
-    return false;
-  }
+  if (current?.equals(next)) return false;
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.writeFileSync(destination, next);
-  console.log(`${current ? 'updated' : 'new'}: ${filename}`);
   return true;
 }
 
-export function captureSourceProvenance({ root = ROOT, sourceFiles = TASK8_TREE_FILES } = {}) {
-  const digest = createHash('sha256');
-  for (const relativePath of sourceFiles) {
-    digest.update(relativePath);
-    digest.update('\0');
-    digest.update(fs.readFileSync(path.join(root, relativePath)));
-    digest.update('\0');
-  }
+export function captureSourceProvenance({ root = ROOT, sourceFiles = null } = {}) {
+  const manifest = sourceFiles === null
+    ? collectCaribbeanNavalSourceManifest(root)
+    : (() => {
+        const rows = sourceFiles.map((relativePath) => ({
+          path: relativePath,
+          sha256: createHash('sha256').update(fs.readFileSync(path.join(root, relativePath))).digest('hex'),
+        }));
+        return { sourceFiles: rows, sourceHash: createHash('sha256').update(JSON.stringify(rows)).digest('hex') };
+      })();
   return {
     headCommitAtCapture: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
     worktreeDirtyBeforeCapture: execFileSync(
       'git', ['status', '--porcelain', '--untracked-files=all'], { cwd: root, encoding: 'utf8' },
     ).trim().length > 0,
-    sourceTreeSha256: digest.digest('hex'),
-    sourceTreeFiles: sourceFiles,
+    sourceTreeSha256: manifest.sourceHash,
+    sourceTreeFiles: manifest.sourceFiles.map((row) => row.path),
+    sourceFiles: manifest.sourceFiles,
+    sourceHash: manifest.sourceHash,
   };
 }
 
@@ -347,8 +340,8 @@ async function flushUnhandled(page, aggregate) {
   aggregate.unhandledRejections.push(...failures);
 }
 
-async function screenshot(page, filename) {
-  saveIfChanged(filename, await page.screenshot({ animations: 'disabled' }));
+async function screenshot(page, outputDirectory, filename) {
+  saveIfChanged(outputDirectory, filename, await page.screenshot({ animations: 'disabled' }));
 }
 
 async function readSupportedDisplay(page, viewport) {
@@ -490,15 +483,15 @@ async function newEvidencePage(browser, baseUrl, aggregate, viewport, reducedMot
   return page;
 }
 
-async function captureCanonicalJourney(browser, baseUrl, aggregate) {
+async function captureCanonicalJourney(browser, baseUrl, aggregate, outputDirectory) {
   const page = await newEvidencePage(browser, baseUrl, aggregate, VIEWPORTS.tablet);
   await page.goto(`${baseUrl}${HARNESS_PATH}`, { waitUntil: 'networkidle' });
   const decisionDisplay = await readPrebattleDisplay(page, 'decision');
-  await screenshot(page, 'decision-tablet.png');
+  await screenshot(page, outputDirectory, 'decision-tablet.png');
   await page.getByTestId('lab-start-naval').click();
   await page.getByTestId('naval-briefing').waitFor();
   const briefingDisplay = await readPrebattleDisplay(page, 'briefing');
-  await screenshot(page, 'briefing-tablet.png');
+  await screenshot(page, outputDirectory, 'briefing-tablet.png');
   await page.getByTestId('naval-enter-battle').click();
   await page.getByTestId('naval-battle-page').waitFor();
   await page.waitForFunction(() => Boolean(window.__CARIBBEAN_NAVAL_DEBUG__));
@@ -517,7 +510,7 @@ async function captureCanonicalJourney(browser, baseUrl, aggregate) {
   }
   const tabletMetrics = await readSceneMetrics(page);
   const tabletDisplay = await readSupportedDisplay(page, VIEWPORTS.tablet);
-  await screenshot(page, 'battle-tablet-landscape.png');
+  await screenshot(page, outputDirectory, 'battle-tablet-landscape.png');
 
   const headingBeforePort = await page.evaluate(() => window.__CARIBBEAN_NAVAL_DEBUG__.getSnapshot().state.ships.player.heading);
   await page.keyboard.down('KeyA');
@@ -537,18 +530,18 @@ async function captureCanonicalJourney(browser, baseUrl, aggregate) {
   await page.waitForTimeout(1_100);
   const desktopMetrics = await readSceneMetrics(page);
   const desktopDisplay = await readSupportedDisplay(page, VIEWPORTS.desktop);
-  await screenshot(page, 'battle-desktop.png');
+  await screenshot(page, outputDirectory, 'battle-desktop.png');
   await page.setViewportSize(VIEWPORTS.minimum);
   await page.waitForTimeout(1_100);
   const minimumMetrics = await readSceneMetrics(page);
   const minimumDisplay = await readSupportedDisplay(page, VIEWPORTS.minimum);
-  await screenshot(page, 'battle-minimum-supported.png');
+  await screenshot(page, outputDirectory, 'battle-minimum-supported.png');
 
   await page.setViewportSize(VIEWPORTS.boundary);
   await page.waitForTimeout(1_100);
   const boundaryMetrics = await readSceneMetrics(page);
   const boundaryDisplay = await readSupportedDisplay(page, VIEWPORTS.boundary);
-  await screenshot(page, 'battle-boundary-supported.png');
+  await screenshot(page, outputDirectory, 'battle-boundary-supported.png');
 
   await page.evaluate(() => { window.__NAVAL_PRIOR_DEBUG__ = window.__CARIBBEAN_NAVAL_DEBUG__; });
   await page.setViewportSize(VIEWPORTS.phoneLandscape);
@@ -557,12 +550,12 @@ async function captureCanonicalJourney(browser, baseUrl, aggregate) {
   await page.waitForTimeout(450);
   const blockedTickEnd = await page.evaluate(() => window.__NAVAL_PRIOR_DEBUG__.getSnapshot().state.tick);
   const landscapeDisplay = await readUnsupportedDisplay(page, VIEWPORTS.phoneLandscape);
-  await screenshot(page, 'minimum-screen-phone-landscape.png');
+  await screenshot(page, outputDirectory, 'minimum-screen-phone-landscape.png');
 
   await page.setViewportSize(VIEWPORTS.phonePortrait);
   await page.getByTestId('caribbean-display-notice').waitFor();
   const portraitDisplay = await readUnsupportedDisplay(page, VIEWPORTS.phonePortrait);
-  await screenshot(page, 'minimum-screen-phone-portrait.png');
+  await screenshot(page, outputDirectory, 'minimum-screen-phone-portrait.png');
 
   await page.setViewportSize(VIEWPORTS.tablet);
   await page.getByTestId('naval-battle-page').waitFor();
@@ -670,7 +663,7 @@ async function captureBroadside(browser, baseUrl, aggregate, side) {
   return { page, evidence, volleyMetrics };
 }
 
-async function captureHandedness(browser, baseUrl, aggregate) {
+async function captureHandedness(browser, baseUrl, aggregate, outputDirectory) {
   const port = await captureBroadside(browser, baseUrl, aggregate, 'port');
   await flushUnhandled(port.page, aggregate);
   await port.page.close();
@@ -695,7 +688,7 @@ async function captureHandedness(browser, baseUrl, aggregate) {
     panel.append(heading, body);
     document.body.appendChild(panel);
   }, { portEvidence: port.evidence, starboardEvidence: starboard.evidence });
-  await screenshot(starboard.page, 'broadside-handedness.png');
+  await screenshot(starboard.page, outputDirectory, 'broadside-handedness.png');
   await flushUnhandled(starboard.page, aggregate);
   await starboard.page.close();
   return {
@@ -706,7 +699,7 @@ async function captureHandedness(browser, baseUrl, aggregate) {
   };
 }
 
-async function captureBoardingReady(browser, baseUrl, aggregate) {
+async function captureBoardingReady(browser, baseUrl, aggregate, outputDirectory) {
   const input = boardingScenario();
   const initialDistance = Math.hypot(
     input.opponent.position.x - input.player.position.x,
@@ -719,7 +712,7 @@ async function captureBoardingReady(browser, baseUrl, aggregate) {
   await page.getByTestId('naval-result-restart').waitFor({ timeout: 15_000 });
   const elapsedBrowserSeconds = (performance.now() - started) / 1_000;
   const snapshot = await page.evaluate(() => window.__CARIBBEAN_NAVAL_DEBUG__.getSnapshot());
-  await screenshot(page, 'boarding-ready-result.png');
+  await screenshot(page, outputDirectory, 'boarding-ready-result.png');
   await flushUnhandled(page, aggregate);
   await page.close();
   return {
@@ -745,7 +738,7 @@ async function captureBoardingReady(browser, baseUrl, aggregate) {
   };
 }
 
-async function captureFallback(browser, baseUrl, aggregate) {
+async function captureFallback(browser, baseUrl, aggregate, outputDirectory) {
   const page = await newEvidencePage(browser, baseUrl, aggregate, VIEWPORTS.minimum);
   await page.goto(serializedHarnessUrl(baseUrl, CANONICAL_INPUT, { forceWebglFailure: '1' }), { waitUntil: 'networkidle' });
   await enterBattle(page);
@@ -762,7 +755,7 @@ async function captureFallback(browser, baseUrl, aggregate) {
     beforeRestart,
   );
   const afterRestart = await page.evaluate(() => window.__CARIBBEAN_NAVAL_DEBUG__.getSnapshot().battleGeneration);
-  await screenshot(page, 'fallback-tablet-landscape.png');
+  await screenshot(page, outputDirectory, 'fallback-tablet-landscape.png');
   const chart = await page.getByTestId('naval-html-chart').isVisible();
   const battleControls = await page.getByTestId('naval-fire-port').isEnabled();
   const retry = await page.getByTestId('naval-scene-retry').isEnabled();
@@ -806,10 +799,89 @@ export function plateauEvidence(samples) {
   };
 }
 
-export async function runNavalCheck() {
-  const source = captureSourceProvenance();
-  console.log('Building production bundle with the harness enabled…');
-  await run('npm', ['run', 'build'], { env: { ...process.env, BUILD_HARNESS: '1' } });
+function stableDisplay(display) {
+  const supported = {};
+  for (const name of ['boundary', 'desktop', 'minimum', 'tablet']) {
+    const sample = display.supported[name];
+    supported[name] = Object.fromEntries([
+      'battle', 'notice', 'fullBleed', 'centerClear', 'controlsVisible', 'touchSized',
+      'labelsContained', 'shortcutKeys', 'sailControl', 'noOuterScroll',
+    ].map((field) => [field, sample[field]]));
+  }
+  const unsupported = {};
+  for (const name of ['landscape', 'portrait']) {
+    const sample = display.unsupported[name];
+    unsupported[name] = Object.fromEntries(
+      ['notice', 'battle', 'liveFrame', 'focused'].map((field) => [field, sample[field]]),
+    );
+  }
+  return {
+    supported,
+    unsupported,
+    resize: Object.fromEntries(
+      ['notice', 'noticeFocused', 'battleUnmounted', 'tickStopped', 'restoredWithNewSession']
+        .map((field) => [field, display.resize[field]]),
+    ),
+    prebattle: {
+      decision: Object.fromEntries(['legendComplete', 'ctaVisible', 'noOuterScroll'].map((field) => [field, display.prebattle.decision[field]])),
+      briefing: Object.fromEntries(['legendComplete', 'ctaVisible', 'noOuterScroll'].map((field) => [field, display.prebattle.briefing[field]])),
+    },
+  };
+}
+
+function stableNavalManifest(source, canonical, glb, handedness, scenario, fallback, motion) {
+  return {
+    version: 1,
+    sourceFiles: source.sourceFiles,
+    sourceHash: source.sourceHash,
+    canonicalInput: canonical.canonicalInput,
+    viewports: VIEWPORTS,
+    screenshots: SCREENSHOT_MANIFEST,
+    asset: { path: glb.requestPath, sha256: glb.sha256 },
+    handedness: {
+      portVectorPositiveX: handedness.portVectorX > 0,
+      starboardVectorNegativeX: handedness.starboardVectorX < 0,
+      portMuzzlePositiveX: handedness.portMuzzleOriginX > 0,
+      starboardMuzzleNegativeX: handedness.starboardMuzzleOriginX < 0,
+      steeringPortPositive: handedness.steeringPortHeadingDelta > 0,
+      steeringStarboardNegative: handedness.steeringStarboardHeadingDelta < 0,
+      rudderReleased: handedness.staleRudder === false,
+    },
+    outcome: { ok: scenario.ok, outcome: scenario.outcome, initial: scenario.initial },
+    fallback,
+    motion: {
+      normal: { preference: motion.normal.preference, reducedMotion: motion.normal.reducedMotion },
+      reduced: { preference: motion.reduced.preference, reducedMotion: motion.reduced.reducedMotion },
+    },
+    display: stableDisplay(canonical.display),
+  };
+}
+
+function navalObservations(evidence) {
+  return {
+    fpsSamples: evidence.performance.fpsSamples,
+    sustainedFps: evidence.performance.sustainedFps,
+    maxDrawCalls: evidence.performance.maxDrawCalls,
+    maxTriangles: evidence.performance.maxTriangles,
+    boardingDuration: evidence.scenario.elapsedBrowserSeconds,
+    samples: evidence.resources.samples,
+    growthAfterWarmup: evidence.resources.growthAfterWarmup,
+    failures: {
+      console: evidence.consoleErrors,
+      page: evidence.pageErrors,
+      requests: evidence.requestFailures,
+      unhandledRejections: evidence.unhandledRejections,
+      allocation: evidence.resources.allocationErrors,
+      capacity: evidence.resources.capacityErrors,
+      pool: evidence.resources.poolErrors,
+    },
+  };
+}
+
+export async function runNavalCheck({ destination, source, captureHead }) {
+  if (typeof destination !== 'string') throw new Error('Naval evidence destination is required');
+  const resolvedSource = source ?? collectCaribbeanNavalSourceManifest(ROOT);
+  await run('npm', ['run', 'build'], { env: { ...process.env, BUILD_HARNESS: '1' }, stdio: 'ignore' });
   const glb = findHashedGlb();
   const { server, baseUrl } = await startStaticServer();
   let browser;
@@ -822,12 +894,12 @@ export async function runNavalCheck() {
       consoleErrors: [], pageErrors: [], requestFailures: [], unhandledRejections: [],
       requestedPaths: [], remoteDependencies: [],
     };
-    const canonical = await captureCanonicalJourney(browser, baseUrl, aggregate);
+    const canonical = await captureCanonicalJourney(browser, baseUrl, aggregate, destination);
     const reducedMotion = await captureReducedMotion(browser, baseUrl, aggregate);
     const activePlateauSamples = await captureActivePlateau(browser, baseUrl, aggregate);
-    const handednessEvents = await captureHandedness(browser, baseUrl, aggregate);
-    const scenario = await captureBoardingReady(browser, baseUrl, aggregate);
-    const fallback = await captureFallback(browser, baseUrl, aggregate);
+    const handednessEvents = await captureHandedness(browser, baseUrl, aggregate, destination);
+    const scenario = await captureBoardingReady(browser, baseUrl, aggregate, destination);
+    const fallback = await captureFallback(browser, baseUrl, aggregate, destination);
     const performanceSamples = [
       canonical.viewportMetrics.tablet,
       canonical.viewportMetrics.desktop,
@@ -881,8 +953,36 @@ export async function runNavalCheck() {
       display: canonical.display,
     };
     const verdict = evaluateNavalEvidence(evidence);
+    const motion = {
+      normal: {
+        preference: 'no-preference',
+        reducedMotion: canonical.viewportMetrics.tablet.reducedMotion,
+        shipIntermediateFrames: canonical.viewportMetrics.tablet.shipIntermediateFrames,
+        cameraIntermediateFrames: canonical.viewportMetrics.tablet.cameraIntermediateFrames,
+      },
+      reduced: reducedMotion,
+    };
+    const stableManifest = stableNavalManifest(resolvedSource, canonical, glb, handedness, scenario, fallback, motion);
+    const observations = navalObservations(evidence);
     const metrics = {
-      source,
+      capture: {
+        headCommitAtCapture: captureHead ?? execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(),
+        worktreeDirtyBeforeCapture: execFileSync(
+          'git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ROOT, encoding: 'utf8' },
+        ).trim().length > 0,
+      },
+      stableManifest,
+      observations,
+      source: {
+        headCommitAtCapture: captureHead ?? execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(),
+        worktreeDirtyBeforeCapture: execFileSync(
+          'git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ROOT, encoding: 'utf8' },
+        ).trim().length > 0,
+        sourceTreeSha256: resolvedSource.sourceHash,
+        sourceTreeFiles: resolvedSource.sourceFiles.map((row) => row.path),
+        sourceFiles: resolvedSource.sourceFiles,
+        sourceHash: resolvedSource.sourceHash,
+      },
       canonicalInput: canonical.canonicalInput,
       seed: canonical.canonicalInput.seed,
       browser: { name: 'Chromium', version: browser.version(), angleArgs: ANGLE_ARGS },
@@ -926,23 +1026,45 @@ export async function runNavalCheck() {
       outcome: scenario,
       handedness,
       fallback,
-      motion: evidence.motion,
+      motion,
       display: canonical.display,
       verdict,
     };
-    saveIfChanged('metrics.json', `${JSON.stringify(metrics, null, 2)}\n`);
+    saveIfChanged(destination, 'metrics.json', `${JSON.stringify(metrics, null, 2)}\n`);
     if (!verdict.ok) throw new Error(`Naval evidence failed:\n- ${verdict.issues.join('\n- ')}`);
-    console.log(`Naval evidence passed: ${fpsSamples.length} FPS samples, ${evidence.performance.maxDrawCalls} max calls, ${evidence.performance.maxTriangles} max triangles.`);
-    return metrics;
+    const artifacts = SCREENSHOT_MANIFEST.map((row) => ({
+      ...row,
+      bytes: fs.readFileSync(path.join(destination, row.name)),
+    }));
+    return { ...metrics, artifacts };
   } finally {
     await browser?.close();
     await stopStaticServer(server);
   }
 }
 
+export async function runNavalCli(argv = process.argv.slice(2), overrides = {}) {
+  const modes = { '--semantic-probe': 'semantic-probe', '--capture': 'capture', '--verify': 'verify' };
+  const mode = argv.length === 1 ? modes[argv[0]] : undefined;
+  return runNavalEvidenceCli({
+    mode,
+    root: overrides.root ?? ROOT,
+    docsDirectory: overrides.docsDirectory ?? OUT,
+    tempParent: overrides.tempParent,
+    generate: overrides.generate ?? ((options) => runNavalCheck({
+      destination: options.destination,
+      source: options.source,
+      captureHead: options.captureHead,
+    })),
+    writeLine: overrides.writeLine,
+  });
+}
+
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
 if (import.meta.url === invokedPath) {
-  runNavalCheck().catch((error) => {
+  runNavalCli().then((code) => {
+    process.exitCode = code;
+  }).catch((error) => {
     console.error(error instanceof Error ? error.stack ?? error.message : error);
     process.exitCode = 1;
   });

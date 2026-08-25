@@ -4,6 +4,26 @@ import { describe, expect, it } from 'vitest';
 
 import * as navalCheck from '../caribbean-naval-check.mjs';
 
+const SOURCE_SEEDS = [
+  'package.json',
+  'package-lock.json',
+  'vite.config.ts',
+  'tsconfig.json',
+  'tsconfig.app.json',
+  'tsconfig.node.json',
+  'knip.json',
+  'index.html',
+  'preview-caribbean-game.html',
+  'scripts/caribbean-port-check.mjs',
+  'scripts/caribbean-naval-check.mjs',
+  'scripts/fixtures/caribbean-campaign-victory.json',
+  ':(glob)scripts/lib/caribbean-naval-*.mjs',
+  ':(glob)scripts/lib/caribbean-port-identity-*.mjs',
+  ':(glob)scripts/lib/caribbean-campaign-*.mjs',
+  ':(glob)src/games/caribbean/**',
+  ':(glob)public/**',
+];
+
 function activeSamples() {
   return Array.from({ length: 20 }, (_, index) => ({
     tick: (index + 1) * 60,
@@ -20,6 +40,11 @@ function activeSamples() {
 }
 
 describe('naval browser evidence helpers', () => {
+  it('requires explicit safe CLI modes and the dependency-closure seeds', () => {
+    expect(navalCheck.CARIBBEAN_NAVAL_SOURCE_SEEDS).toEqual(SOURCE_SEEDS);
+    expect(navalCheck.runNavalCli).toEqual(expect.any(Function));
+  });
+
   it('locks the playable and warning-only viewport matrix', () => {
     expect(navalCheck.VIEWPORTS).toEqual({
       tablet: { width: 1180, height: 820 },

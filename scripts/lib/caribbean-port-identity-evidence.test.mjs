@@ -1,3 +1,8 @@
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { deflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { CARGO_IDS } from '../../src/games/caribbean/content/campaign';
 import { MARKET_PROBE_MINIMUM_NOW_FIXTURES, NOW_FIXTURES, profileScreenshotReadinessErrors } from '../caribbean-port-check.mjs';
@@ -17,6 +22,187 @@ const SCREENSHOTS = [
   'port-tablet-landscape.png', 'port-compact-landscape.png', 'port-art-fallback.png',
   'player-profile-desktop.png',
 ];
+
+const STRATEGIC_SCREENSHOTS = [
+  'sailing-desktop.png',
+  'encounter-desktop.png',
+  'campaign-battle-desktop.png',
+  'campaign-result-desktop.png',
+  'returned-log-desktop.png',
+  'sailing-minimum-supported.png',
+  'campaign-battle-fallback.png',
+  'sailing-large-portrait-notice.png',
+  'campaign-battle-resize-notice.png',
+];
+
+const NORMAL_ROUTE_SCREENSHOTS = [...SCREENSHOTS, ...STRATEGIC_SCREENSHOTS];
+const RESULT_SCREENSHOT = 'campaign-result-desktop.png';
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256(value) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const typeBytes = Buffer.from(type, 'ascii');
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])));
+  return Buffer.concat([length, typeBytes, data, checksum]);
+}
+
+function solidPng(width, height, [red, green, blue]) {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr.set([8, 2, 0, 0, 0], 8);
+  const row = Buffer.alloc(1 + width * 3);
+  for (let x = 0; x < width; x += 1) row.set([red, green, blue], 1 + x * 3);
+  const pixels = Buffer.concat(Array.from({ length: height }, () => row));
+  return Buffer.concat([
+    Buffer.from('89504e470d0a1a0a', 'hex'),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', deflateSync(pixels)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+const EXACT_PNG = solidPng(1440, 900, [8, 24, 48]);
+const RESULT_RUN_A_PNG = solidPng(1440, 900, [64, 96, 128]);
+const RESULT_RUN_B_PNG = solidPng(1440, 900, [65, 96, 128]);
+
+function terminalSemanticState() {
+  return {
+    tick: 11_855,
+    resultVisible: true,
+    canvas: {
+      width: 1440,
+      height: 900,
+      rect: { x: 0, y: 0, width: 1440, height: 900 },
+      drawingBuffer: { width: 1440, height: 900 },
+      opacity: '1',
+      transform: 'none',
+      engine: 'three.js r170',
+      backend: { vendor: 'Google Inc. (Google)', renderer: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))' },
+      framebufferSample: {
+        algorithm: 'fnv1a32-rgba-grid-v1',
+        sampleCount: 40,
+        nonzeroSampleChannels: 0,
+        sampleHash: '02187e45',
+      },
+    },
+    terminal: {
+      outcome: 'boarding-ready',
+      victorShipId: 'player',
+      atTick: 11_855,
+      seedAfter: 1_310_878_278,
+    },
+    player: { hull: 78, sails: 61, crew: 44, cannon: 8 },
+    opponent: { hull: 88, sails: 14, crew: 9, cannon: 8 },
+  };
+}
+
+function screenshotEvidence({
+  runABytes = RESULT_RUN_A_PNG,
+  runBBytes = RESULT_RUN_B_PNG,
+  runAState = terminalSemanticState(),
+  runBState = terminalSemanticState(),
+} = {}) {
+  return {
+    expectedCount: 23,
+    byteComparedCount: 22,
+    comparisonExceptionNames: [RESULT_SCREENSHOT],
+    trackedCapture: 'run-a',
+    observation: {
+      filename: RESULT_SCREENSHOT,
+      kind: 'webgl-composited-terminal',
+      width: 1440,
+      height: 900,
+      semanticDigestAlgorithm: 'sha256-canonical-json-v1',
+      runA: {
+        pngSignatureVerified: true,
+        nonzeroBytes: true,
+        width: 1440,
+        height: 900,
+        pngSha256: sha256(runABytes),
+        semanticDigest: sha256(canonicalJson(runAState)),
+        semanticState: runAState,
+      },
+      runB: {
+        pngSignatureVerified: true,
+        nonzeroBytes: true,
+        width: 1440,
+        height: 900,
+        pngSha256: sha256(runBBytes),
+        semanticDigest: sha256(canonicalJson(runBState)),
+        semanticState: runBState,
+      },
+    },
+  };
+}
+
+function screenshotRun(run, resultBytes = run === 'A' ? RESULT_RUN_A_PNG : RESULT_RUN_B_PNG) {
+  return {
+    run,
+    screenshotBuffers: new Map(NORMAL_ROUTE_SCREENSHOTS.map((name) => [
+      name,
+      name === RESULT_SCREENSHOT ? resultBytes : EXACT_PNG,
+    ])),
+    semanticStates: new Map([[RESULT_SCREENSHOT, terminalSemanticState()]]),
+    checks: {
+      routeFailures: 0,
+      requestFailures: 0,
+      consoleFailures: 0,
+      pageFailures: 0,
+      semanticProbesPassed: true,
+    },
+  };
+}
+
+function comparisonFixture() {
+  return {
+    expectedNames: NORMAL_ROUTE_SCREENSHOTS,
+    runA: screenshotRun('A'),
+    runB: screenshotRun('B'),
+    declaredEvidence: screenshotEvidence(),
+  };
+}
+
+function mutateDeclaredSemanticStates(evidence, mutate) {
+  mutate(evidence.observation.runA.semanticState);
+  mutate(evidence.observation.runB.semanticState);
+  evidence.observation.runA.semanticDigest = sha256(canonicalJson(evidence.observation.runA.semanticState));
+  evidence.observation.runB.semanticDigest = sha256(canonicalJson(evidence.observation.runB.semanticState));
+}
+
+function mutateComparisonSemanticStates(fixture, mutate) {
+  mutateDeclaredSemanticStates(fixture.declaredEvidence, mutate);
+  fixture.runA.semanticStates.set(
+    RESULT_SCREENSHOT,
+    structuredClone(fixture.declaredEvidence.observation.runA.semanticState),
+  );
+  fixture.runB.semanticStates.set(
+    RESULT_SCREENSHOT,
+    structuredClone(fixture.declaredEvidence.observation.runB.semanticState),
+  );
+}
 
 const VIEWPORTS = {
   setupDesktop: [1440, 900, true],
@@ -137,9 +323,56 @@ function marketSamples() {
   })));
 }
 
+function strategicSailingEvidence() {
+  return {
+    status: 'verified',
+    modeSequence: ['port', 'sailing', 'encounter', 'port', 'sailing', 'encounter', 'naval', 'port'],
+    eventIds: [1, 2, 3, 4, 5, 6, 7, 8],
+    eventTypes: ['lead-accepted', 'voyage-started', 'sea-leg-completed', 'encounter-avoided', 'voyage-started', 'sea-leg-completed', 'naval-engaged', 'naval-resolved'],
+    outbound: { elapsedDays: 1, provisionsUsed: 1 },
+    return: { elapsedDays: 1, provisionsUsed: 1 },
+    rng: { navigationTransitionsVerified: true, navalTransitionVerified: true, worldUnchanged: true },
+    navalInput: { persistedBeforeMount: true, byteEqualAfterReload: true, tickAfterReload: 0 },
+    resolution: {
+      outcome: 'boarding-ready', victorShipId: 'player', atTick: 11_855,
+      seedAfter: 1_310_878_278, exactlyOnce: true, campaignWritesDuringBattle: 0,
+      returnedTo: 'bridgetown',
+    },
+    recovery: { intermediateModeRecovered: true, unreadableBytesPreserved: true },
+    focus: {
+      sailingHeading: true, encounterHeading: true, avoidedReturnLog: true,
+      navalReloadBattle: true, resolvedReturnLog: true,
+    },
+    accessibility: {
+      minimumTextPx: 14, minimumTargetWidthPx: 44, minimumTargetHeightPx: 44,
+      minimumContrastRatio: 4.5, horizontalOverflowPx: 0,
+    },
+    viewports: {
+      sailingDesktop: { width: 1440, height: 900, supported: true, noticeOnly: false },
+      encounterDesktop: { width: 1440, height: 900, supported: true, noticeOnly: false },
+      battleDesktop: { width: 1440, height: 900, supported: true, noticeOnly: false },
+      sailingMinimumSupported: { width: 960, height: 600, supported: true, noticeOnly: false },
+      battleFallback: { width: 1440, height: 900, supported: true, noticeOnly: false },
+      sailingLargePortraitNotice: { width: 1024, height: 1366, supported: false, noticeOnly: true },
+      battleResizeNotice: { width: 1024, height: 1366, supported: false, noticeOnly: true },
+    },
+    requests: {
+      setupNavalCount: 0, portNavalCount: 0, sailingNavalCount: 0, avoidNavalCount: 0,
+      pursuitLocalNavalAssets: true, externalCount: 0, failedCount: 0,
+    },
+    fallback: { htmlChartVisible: true, battleControlsUsable: true },
+    screenshots: [...STRATEGIC_SCREENSHOTS],
+    isolation: {
+      productionNavalEmitted: true, productionNavalPrecached: true,
+      requestedBeforePursuit: false, requestedAfterPursuit: true,
+      harnessMarkersAbsent: true, harnessPreviewAbsent: true,
+    },
+  };
+}
+
 function completeEvidence(overrides = {}) {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     packagePhase: 'complete',
     browser: { name: 'Chromium', version: '151.0.7922.34' },
     route: '/#/caribbean',
@@ -163,8 +396,14 @@ function completeEvidence(overrides = {}) {
     failures: { console: [], page: [], requests: [], external: [] },
     isolation: { previewHtmlAbsent: true, caribbeanGlbAbsent: false, glbRequested: false, previewResourceRequested: false, moduleMarkersAbsent: true, battleCssAbsent: true },
     recovery: { quarantineKey: 'caribbean:campaign:quarantine:00000000-0000-4000-8000-000000000001', quarantineVerified: true, exportedCorruptRawVerified: true, recoveredChecksum: '9d36f629', recoveryReloaded: true },
-    screenshots: SCREENSHOTS,
-    determinism: { cleanRuns: 2, metricsByteIdentical: true, screenshotsByteIdentical: true },
+    screenshots: [...SCREENSHOTS],
+    determinism: {
+      cleanRuns: 2,
+      metricsByteIdentical: true,
+      screenshotsByteIdentical: false,
+      byteComparedScreenshotsIdentical: true,
+    },
+    screenshotEvidence: screenshotEvidence(),
     profile: {
       status: 'setup-verified', defaultPronouns: 'he/him', boothProfilePersisted: true,
       setup: {
@@ -184,19 +423,20 @@ function completeEvidence(overrides = {}) {
     },
     market: { status: 'verified', samples: marketSamples() },
     marketStability: { status: 'verified', sampleCount: 108, actionIds: EXPECTED_MARKET_ACTION_IDS, maxDrift: 1, horizontalOverflow: 0, focusPreserved: true, busyStatesVerified: true, statusesVerified: true },
+    strategicSailing: strategicSailingEvidence(),
     ...overrides,
   };
 }
 
-describe('evaluatePortIdentityEvidence', () => {
-  it('accepts only the final complete v2 schema with every v1 channel retained', () => {
+describe('schema-v3 strategic sailing evidence', () => {
+  it('accepts only schema v3 with every prior channel and the exact strategic route retained', () => {
     expect(evaluatePortIdentityEvidence(completeEvidence())).toEqual({ ok: true, issues: [] });
   });
 
   it.each([
     'schemaVersion', 'packagePhase', 'browser', 'route', 'build', 'viewports', 'fixtures', 'webLocks',
     'journey', 'accessibility', 'requests', 'failures', 'isolation', 'recovery', 'screenshots',
-    'determinism', 'profile', 'profileIdentity', 'art', 'market', 'marketStability',
+    'determinism', 'screenshotEvidence', 'profile', 'profileIdentity', 'art', 'market', 'marketStability', 'strategicSailing',
   ])('fails closed when top-level %s is missing', (section) => {
     const evidence = completeEvidence();
     delete evidence[section];
@@ -218,6 +458,7 @@ describe('evaluatePortIdentityEvidence', () => {
     ['recovery', (e) => { e.recovery.quarantineVerified = false; }],
     ['screenshots', (e) => { e.screenshots.pop(); }],
     ['determinism', (e) => { e.determinism.cleanRuns = 1; }],
+    ['screenshot evidence', (e) => { e.screenshotEvidence.expectedCount = 22; }],
     ['profileIdentity', (e) => { e.profileIdentity.defaultPronouns = 'they/them'; }],
     ['art', (e) => { e.art.minimumTextContrast = 4.49; }],
     ['marketStability', (e) => { e.marketStability.actionIds = []; }],
@@ -300,6 +541,207 @@ describe('evaluatePortIdentityEvidence', () => {
     const evidence = completeEvidence();
     mutate(evidence);
     expect(evaluatePortIdentityEvidence(evidence).ok).toBe(false);
+  });
+
+  it.each([
+    ['a duplicated resolution event', (e) => { e.strategicSailing.eventIds.push(8); e.strategicSailing.eventTypes.push('naval-resolved'); }],
+    ['a changed literal event id', (e) => { e.strategicSailing.eventIds[6] = 8; }],
+    ['a changed mode order', (e) => { [e.strategicSailing.modeSequence[2], e.strategicSailing.modeSequence[3]] = [e.strategicSailing.modeSequence[3], e.strategicSailing.modeSequence[2]]; }],
+    ['terminal tick 11856', (e) => { e.strategicSailing.resolution.atTick = 11_856; }],
+    ['the wrong terminal seed', (e) => { e.strategicSailing.resolution.seedAfter = 1_310_878_279; }],
+    ['a nonzero reload tick', (e) => { e.strategicSailing.navalInput.tickAfterReload = 1; }],
+    ['a naval request before pursuit', (e) => { e.strategicSailing.requests.avoidNavalCount = 1; }],
+    ['a missing retained schema-v2 field', (e) => { delete e.marketStability.focusPreserved; }],
+    ['an unknown strategic nested key', (e) => { e.strategicSailing.resolution.debug = true; }],
+    ['false recovery preservation', (e) => { e.strategicSailing.recovery.unreadableBytesPreserved = false; }],
+  ])('fails closed on strategic sailing drift: %s', (_label, mutate) => {
+    const evidence = completeEvidence();
+    mutate(evidence);
+    expect(() => evaluatePortIdentityEvidence(evidence)).not.toThrow();
+    expect(evaluatePortIdentityEvidence(evidence)).toMatchObject({ ok: false, issues: expect.any(Array) });
+  });
+
+  it.each([
+    ['focus', (e) => { e.strategicSailing.focus.resolvedReturnLog = false; }],
+    ['minimum text', (e) => { e.strategicSailing.accessibility.minimumTextPx = 13.99; }],
+    ['minimum target', (e) => { e.strategicSailing.accessibility.minimumTargetHeightPx = 43.99; }],
+    ['contrast', (e) => { e.strategicSailing.accessibility.minimumContrastRatio = 4.49; }],
+    ['overflow', (e) => { e.strategicSailing.accessibility.horizontalOverflowPx = 1; }],
+    ['viewport', (e) => { e.strategicSailing.viewports.sailingMinimumSupported.width = 959; }],
+    ['request locality', (e) => { e.strategicSailing.requests.externalCount = 1; }],
+    ['fallback', (e) => { e.strategicSailing.fallback.battleControlsUsable = false; }],
+    ['screenshot manifest', (e) => { e.strategicSailing.screenshots.reverse(); }],
+    ['lazy isolation', (e) => { e.strategicSailing.isolation.requestedBeforePursuit = true; }],
+  ])('fails closed on the strategic %s contract', (_label, mutate) => {
+    const evidence = completeEvidence();
+    mutate(evidence);
+    expect(evaluatePortIdentityEvidence(evidence).ok).toBe(false);
+  });
+
+  it.each([
+    ['missing exception', (e) => { e.screenshotEvidence.comparisonExceptionNames = []; }],
+    ['unknown exception', (e) => { e.screenshotEvidence.comparisonExceptionNames = ['unknown.png']; }],
+    ['second exception', (e) => { e.screenshotEvidence.comparisonExceptionNames.push('campaign-battle-desktop.png'); }],
+    ['wrong tracked owner', (e) => { e.screenshotEvidence.trackedCapture = 'run-b'; }],
+    ['wrong observation filename', (e) => { e.screenshotEvidence.observation.filename = 'campaign-battle-desktop.png'; }],
+    ['wrong observation kind', (e) => { e.screenshotEvidence.observation.kind = 'pixels-close-enough'; }],
+    ['wrong observation dimensions', (e) => { e.screenshotEvidence.observation.width = 1439; }],
+    ['uppercase PNG hash', (e) => { e.screenshotEvidence.observation.runA.pngSha256 = 'A'.repeat(64); }],
+    ['semantic digest lie', (e) => { e.screenshotEvidence.observation.runB.semanticDigest = '0'.repeat(64); }],
+    ['semantic state drift', (e) => { e.screenshotEvidence.observation.runB.semanticState.player.hull = 77; }],
+    ['empty backend vendor', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.backend.vendor = ''; })],
+    ['sample below range', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = -1; })],
+    ['sample above range', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = 161; })],
+    ['fractional sample channels', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = 1.5; })],
+    ['wrong sample count', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.sampleCount = 39; })],
+    ['uppercase sample hash', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.sampleHash = 'A2187E45'; })],
+    ['nine-hex sample hash', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.sampleHash = '002187e45'; })],
+    ['non-hex sample hash', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.sampleHash = 'zzzzzzzz'; })],
+    ['fingerprint alias', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => {
+      state.canvas.framebufferSample.fingerprint = state.canvas.framebufferSample.sampleHash;
+    })],
+    ['missing sample hash', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { delete state.canvas.framebufferSample.sampleHash; })],
+    ['unknown semantic key', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.debug = true; })],
+    ['false PNG signature declaration', (e) => { e.screenshotEvidence.observation.runA.pngSignatureVerified = false; }],
+    ['zero-byte declaration', (e) => { e.screenshotEvidence.observation.runB.nonzeroBytes = false; }],
+  ])('rejects the exact screenshot boundary mutation: %s', (_label, mutate) => {
+    const evidence = completeEvidence();
+    mutate(evidence);
+    expect(() => evaluatePortIdentityEvidence(evidence)).not.toThrow();
+    expect(evaluatePortIdentityEvidence(evidence)).toMatchObject({ ok: false, issues: expect.any(Array) });
+  });
+
+  it('accepts the measured zero-channel framebuffer sample', () => {
+    const evidence = completeEvidence();
+    expect(evidence.screenshotEvidence.observation.runA.semanticState.canvas.framebufferSample).toEqual({
+      algorithm: 'fnv1a32-rgba-grid-v1',
+      sampleCount: 40,
+      nonzeroSampleChannels: 0,
+      sampleHash: '02187e45',
+    });
+    expect(evaluatePortIdentityEvidence(evidence)).toEqual({ ok: true, issues: [] });
+  });
+});
+
+describe('normal-route screenshot byte comparator', () => {
+  it('selects exactly 23 run-A buffers after 22 exact comparisons and one semantic observation', async () => {
+    const { compareNormalRouteScreenshotRuns } = await import('./caribbean-port-identity-evidence.mjs');
+    expect(compareNormalRouteScreenshotRuns).toBeTypeOf('function');
+    const fixture = comparisonFixture();
+    const comparison = compareNormalRouteScreenshotRuns(fixture);
+    expect(comparison).toMatchObject({ ok: true, issues: [], selectedRun: 'A' });
+    expect(comparison.screenshotEvidence).toEqual(fixture.declaredEvidence);
+    expect(comparison.selectedArtifacts.size).toBe(23);
+    for (const [name, artifact] of comparison.selectedArtifacts) {
+      expect(artifact.sourceRun).toBe('A');
+      expect(Buffer.compare(artifact.bytes, fixture.runA.screenshotBuffers.get(name))).toBe(0);
+      expect(artifact.sha256).toBe(sha256(fixture.runA.screenshotBuffers.get(name)));
+    }
+    expect(comparison.selectedArtifacts.get(RESULT_SCREENSHOT).sha256).not.toBe(
+      sha256(fixture.runB.screenshotBuffers.get(RESULT_SCREENSHOT)),
+    );
+  });
+
+  it('publishes only selected run-A bytes and returns their exact hashes', async () => {
+    const { compareNormalRouteScreenshotRuns } = await import('./caribbean-port-identity-evidence.mjs');
+    const { publishNormalRouteComparison } = await import('../caribbean-port-check.mjs');
+    expect(compareNormalRouteScreenshotRuns).toBeTypeOf('function');
+    expect(publishNormalRouteComparison).toBeTypeOf('function');
+    const fixture = comparisonFixture();
+    const comparison = compareNormalRouteScreenshotRuns(fixture);
+    const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-comparator-'));
+    const metricsBytes = Buffer.from('{"schemaVersion":3}\n');
+    try {
+      const publication = publishNormalRouteComparison({ comparison, metricsBytes, outputDirectory });
+      expect([...publication.artifactHashes]).toHaveLength(23);
+      for (const [name, artifact] of comparison.selectedArtifacts) {
+        const written = fs.readFileSync(path.join(outputDirectory, name));
+        expect(sha256(written)).toBe(artifact.sha256);
+        expect(sha256(written)).toBe(sha256(fixture.runA.screenshotBuffers.get(name)));
+      }
+      expect(publication.metricsSha256).toBe(sha256(metricsBytes));
+      expect(sha256(fs.readFileSync(path.join(outputDirectory, 'metrics.json')))).toBe(sha256(metricsBytes));
+    } finally {
+      fs.rmSync(outputDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['non-exempt byte drift', (fixture) => { fixture.runB.screenshotBuffers.set('setup-desktop.png', RESULT_RUN_B_PNG); }],
+    ['missing expected name', (fixture) => { fixture.runB.screenshotBuffers.delete('setup-desktop.png'); }],
+    ['unknown buffer name', (fixture) => { fixture.runA.screenshotBuffers.set('unknown.png', EXACT_PNG); }],
+    ['renamed exception', (fixture) => { fixture.declaredEvidence.comparisonExceptionNames = ['campaign-result-renamed.png']; }],
+    ['second exception', (fixture) => { fixture.declaredEvidence.comparisonExceptionNames.push('campaign-battle-desktop.png'); }],
+    ['wrong tracked owner', (fixture) => { fixture.declaredEvidence.trackedCapture = 'run-b'; }],
+    ['corrupt PNG signature', (fixture) => {
+      const bytes = Buffer.from('not a png');
+      fixture.runA.screenshotBuffers.set(RESULT_SCREENSHOT, bytes);
+      fixture.declaredEvidence.observation.runA.pngSha256 = sha256(bytes);
+    }],
+    ['zero PNG bytes', (fixture) => {
+      const bytes = Buffer.alloc(0);
+      fixture.runB.screenshotBuffers.set(RESULT_SCREENSHOT, bytes);
+      fixture.declaredEvidence.observation.runB.pngSha256 = sha256(bytes);
+    }],
+    ['wrong PNG dimensions', (fixture) => {
+      const bytes = solidPng(1439, 900, [65, 96, 128]);
+      fixture.runB.screenshotBuffers.set(RESULT_SCREENSHOT, bytes);
+      fixture.declaredEvidence.observation.runB.pngSha256 = sha256(bytes);
+    }],
+    ['run-A PNG hash lie', (fixture) => { fixture.declaredEvidence.observation.runA.pngSha256 = '0'.repeat(64); }],
+    ['run-B PNG hash lie', (fixture) => { fixture.declaredEvidence.observation.runB.pngSha256 = '0'.repeat(64); }],
+    ['route check failure', (fixture) => { fixture.runA.checks.routeFailures = 1; }],
+    ['request check failure', (fixture) => { fixture.runB.checks.requestFailures = 1; }],
+    ['console check failure', (fixture) => { fixture.runA.checks.consoleFailures = 1; }],
+    ['page check failure', (fixture) => { fixture.runB.checks.pageFailures = 1; }],
+    ['semantic probe failure', (fixture) => { fixture.runB.checks.semanticProbesPassed = false; }],
+    ['semantic-state map drift', (fixture) => { fixture.runB.semanticStates.get(RESULT_SCREENSHOT).player.hull = 77; }],
+    ['semantic-state declaration drift', (fixture) => { fixture.declaredEvidence.observation.runB.semanticState.player.hull = 77; }],
+    ['sample below range', (fixture) => mutateComparisonSemanticStates(fixture, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = -1; })],
+    ['sample above range', (fixture) => mutateComparisonSemanticStates(fixture, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = 161; })],
+    ['fractional sample', (fixture) => mutateComparisonSemanticStates(fixture, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = 1.5; })],
+    ['malformed sample hash', (fixture) => mutateComparisonSemanticStates(fixture, (state) => { state.canvas.framebufferSample.sampleHash = '02187e450'; })],
+  ])('fails closed without selecting artifacts for %s', async (_label, mutate) => {
+    const { compareNormalRouteScreenshotRuns } = await import('./caribbean-port-identity-evidence.mjs');
+    expect(compareNormalRouteScreenshotRuns).toBeTypeOf('function');
+    const fixture = comparisonFixture();
+    mutate(fixture);
+    let comparison;
+    expect(() => { comparison = compareNormalRouteScreenshotRuns(fixture); }).not.toThrow();
+    expect(comparison).toMatchObject({ ok: false, issues: expect.any(Array) });
+    expect(comparison).not.toHaveProperty('selectedArtifacts');
+  });
+
+  it.each([
+    ['selected-run tag', ({ comparison }) => ({ ...comparison, selectedRun: 'B' })],
+    ['selected result artifact', ({ fixture, comparison }) => {
+      const selectedArtifacts = new Map(comparison.selectedArtifacts);
+      selectedArtifacts.set(RESULT_SCREENSHOT, {
+        sourceRun: 'B',
+        bytes: fixture.runB.screenshotBuffers.get(RESULT_SCREENSHOT),
+        sha256: sha256(fixture.runB.screenshotBuffers.get(RESULT_SCREENSHOT)),
+      });
+      return { ...comparison, selectedArtifacts };
+    }],
+  ])('rejects forged B %s without writing artifacts', async (_label, forge) => {
+    const { compareNormalRouteScreenshotRuns } = await import('./caribbean-port-identity-evidence.mjs');
+    const { publishNormalRouteComparison } = await import('../caribbean-port-check.mjs');
+    expect(compareNormalRouteScreenshotRuns).toBeTypeOf('function');
+    expect(publishNormalRouteComparison).toBeTypeOf('function');
+    const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-forged-b-'));
+    const fixture = comparisonFixture();
+    const comparison = compareNormalRouteScreenshotRuns(fixture);
+    const forged = forge({ fixture, comparison });
+    try {
+      expect(() => publishNormalRouteComparison({
+        comparison: forged,
+        metricsBytes: Buffer.from('{}'),
+        outputDirectory,
+      })).toThrow();
+      expect(fs.readdirSync(outputDirectory)).toEqual([]);
+    } finally {
+      fs.rmSync(outputDirectory, { recursive: true, force: true });
+    }
   });
 });
 
