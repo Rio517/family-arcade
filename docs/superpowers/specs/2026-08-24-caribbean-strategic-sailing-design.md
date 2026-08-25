@@ -819,7 +819,7 @@ interface TerminalResultSemanticState {
       algorithm: 'fnv1a32-rgba-grid-v1';
       sampleCount: 40;
       nonzeroSampleChannels: number;
-      fingerprint: string;
+      sampleHash: string;
     };
   };
   terminal: {
@@ -848,6 +848,7 @@ interface NormalRouteScreenshotEvidence {
       nonzeroBytes: true;
       width: 1440;
       height: 900;
+      pngSha256: string;
       semanticDigest: string;
       semanticState: TerminalResultSemanticState;
     };
@@ -856,6 +857,7 @@ interface NormalRouteScreenshotEvidence {
       nonzeroBytes: true;
       width: 1440;
       height: 900;
+      pngSha256: string;
       semanticDigest: string;
       semanticState: TerminalResultSemanticState;
     };
@@ -863,26 +865,47 @@ interface NormalRouteScreenshotEvidence {
 }
 ```
 
-Each run digest is lowercase SHA-256 of canonical JSON for that run's complete
-normalized `semanticState`; both states and digests must equal each other and
-each evaluator-recomputed digest. Backend vendor/renderer and framebuffer fingerprint are
-observed strings, not hard-coded GPU brands, but they must be nonempty and
-exactly equal between A and B. The 40-point post-present framebuffer sample is
-recorded as a rendering-state fingerprint; because a default WebGL buffer may
-already be cleared, it is not a substitute for the terminal facts, PNG
+Each `pngSha256` is the lowercase 64-hex SHA-256 of that run's original PNG
+bytes. Each semantic digest is the lowercase 64-hex SHA-256 of canonical JSON
+for that run's complete normalized `semanticState`; both states and semantic
+digests must equal each other and each evaluator-recomputed digest. Backend
+vendor/renderer are observed, nonempty strings rather than hard-coded GPU
+brands, and must be exactly equal between A and B. `framebufferSample` has an
+exact closed shape: algorithm `fnv1a32-rgba-grid-v1`, integer `sampleCount`
+exactly `40`, integer `nonzeroSampleChannels` in `0..160` and strictly greater
+than zero, and lowercase eight-hex `sampleHash`. The sample is taken at the
+same honest rendered terminal seam used for the full-page capture; a cleared
+all-zero sample fails rather than becoming an accepted baseline. It remains a
+rendering-state fingerprint, not a substitute for terminal facts, PNG
 validity, or visual inspection.
 
 The comparator accepts arbitrary honest pixel bytes only for that exact row,
-after validating both PNG signatures, nonzero byte lengths, embedded
-dimensions, exact A/B semantic state/digest equality, final outcome/systems,
-and zero route/request/console/page failures. It uses no pixel-difference,
-perceptual, colour-delta, or similarity threshold. A missing or unknown name,
-a second exception, a dimension/signature failure, semantic drift, digest
-mismatch, or failure in any non-exempt screenshot remains fatal. The command
-writes run A to the tracked path and identifies that ownership in metrics;
-Task 7 inspects run A, run B, and the tracked run-A output at original
-resolution before committing evidence. Adding any future exception requires
-new measured evidence and a reviewed spec amendment.
+after reading and validating both byte buffers' PNG signatures, nonzero byte
+lengths, embedded dimensions and SHA-256 hashes; exact A/B semantic state/
+digest equality; final outcome/systems; and zero route/request/console/page
+failures. It uses no pixel-difference, perceptual, colour-delta, or similarity
+threshold. The evaluator rejects unknown, missing, mistyped, out-of-range, or
+wrong-shape fields at every screenshot-evidence level. A missing or unknown
+name, a second exception, a dimension/signature failure, malformed sample,
+semantic drift, digest mismatch, or failure in any non-exempt screenshot
+remains fatal. Direct byte-buffer, exact-exemption-set, and schema-shape RED
+tests precede comparator implementation.
+
+The default command writes run A to the tracked path only after A/B validation
+and identifies that ownership, the exact run-A PNG hash, and its complete
+semantic state/digest in metrics. Task 7 has one final pre-commit mutating port
+capture. It clears the known ignored diagnostic destination, explicitly
+enables A/B diagnostic preservation at
+`/private/tmp/caribbean-port-identity-diagnostic`, and treats that command's
+preserved run A as the inspection owner. Before any commit it proves the
+just-published tracked bytes equal preserved run A, pins the hash and complete
+state in metrics and the ignored report, and inspects preserved A, preserved B,
+and tracked A at original resolution after that final mutating command. No
+later command may replace tracked port evidence before commit: later port gates
+write only to a
+unique temporary output directory and reassert the tracked run-A hash, or fail
+if that hash changed. Adding any future exception requires new measured
+evidence and a reviewed spec amendment.
 
 The normal victory is driven through public battle controls by one committed
 golden command trace for the exact second-voyage input produced from campaign
@@ -916,9 +939,16 @@ the tick-zero mount, first-RAF priming, reload/remount at tick zero, a terminal
 tick in the middle of a six-tick cadence, the held-key rudder path, the
 rendered rudder button's existing 140 ms release timer, and exact
 `nowConsumed`. A real Node wall timer—not the installed browser clock—aborts
-each victory run after `330_000ms`; the two-clean-run package budget is eight
-minutes. The suite observes a pure scheduler RED, then a real-browser
-truncated-trace RED, before either implementation turns green.
+each victory run after `330_000ms`; that per-victory fail-closed deadline does
+not change. Completed public-control journeys measured 268–277 seconds, so the
+full default two-clean-run command has an honest `900_000ms` wall-clock budget
+for two victories plus build, base-route journeys, memory probes, warm-up, and
+cleanup. The one-journey plus truncated-trace native test has a separate
+`600_000ms` test timeout; the native test that invokes the full A/B command has
+`1_020_000ms`, which exceeds the complete command budget and runner overhead.
+These are test-runner budgets, not weaker journey deadlines. The suite observes
+a pure scheduler RED, then a real-browser truncated-trace RED, before either
+implementation turns green.
 
 `caribbean:naval-check` has three required, mutually exclusive modes:
 
@@ -1004,15 +1034,30 @@ resolution.
 Execution exposed one plan/source contradiction: the required full Caribbean
 seed already contains deliberate test loaders written as
 `import(/* @vite-ignore */ modulePath)`. The collector accepts such an import
-only when `modulePath` is a same-file immutable `const` whose initializer is a
-pure parenthesized/string-literal `+` concatenation, the resulting local path
-resolves uniquely to one tracked file, and that file is enqueued into the
-closure. The annotation alone grants nothing. An unannotated identifier,
-template substitution, referenced variable, call, mutation, cross-file value,
-unresolved/ambiguous result, nonliteral CommonJS `require`, or any
-`import.meta.glob` still fails with the existing exact diagnostic. Native tests
-cover the accepted const-concatenation form and a truly dynamic annotated
-rejection in addition to the three original unsupported-loader fixtures.
+only when the exact sole identifier argument has `/* @vite-ignore */` in its
+own leading-comment trivia and TypeScript AST symbol/scope resolution binds
+that occurrence to the nearest visible same-file declaration. The bound
+declaration must be a unique, already-declared immutable `const`, and its
+initializer must be a pure parenthesized/string-literal `+` concatenation. The
+resulting local path must resolve uniquely to one tracked file, which is
+enqueued into the closure. A file-wide identifier-name map is forbidden.
+
+The annotation alone grants nothing. A comment elsewhere on the call,
+declaration, or source; an unannotated identifier; parameter, catch, import,
+`let`, or dynamic inner-`const` shadowing; duplicate same-scope declarations;
+use before declaration; use outside declaration scope; reassignment/update of
+the resolved binding; template substitution; referenced variable; call;
+cross-file value; or unresolved/ambiguous result fails
+`nonliteral-dynamic-import`. Same-name consts in disjoint scopes are resolved
+independently only when each import binds its own valid declaration; a valid
+const in an unrelated or outer name map cannot bless a different binding.
+Nonliteral CommonJS `require` and every `import.meta.glob` remain rejected.
+Independent tracked-temporary-repository RED fixtures cover every binding and
+annotation-placement case before collector implementation and propagate every
+rejected dynamic/shadowed case through semantic-probe, capture, and verify with
+the exact diagnostic and cleanup contract. Mutation proof independently kills
+lexical binding resolution, declaration-kind/mutation enforcement, initializer
+purity, declaration ordering, and exact comment placement.
 
 Unsupported loader syntax has an exact, observable contract. The source audit
 throws `CaribbeanNavalSourceAuditError` with `code: 'source-files'`, the
@@ -1098,6 +1143,13 @@ manifest name/dimensions, valid PNG signature, nonzero bytes, and matching DOM
 semantic state at capture. This paragraph applies only to the separate
 `caribbean:naval-check` harness artifacts; it does not broaden the integrated
 normal-route exception beyond `campaign-result-desktop.png`.
+
+The failed deterministic-flag experiments belong only to the normal-route port
+Chromium capture and must be absent from that launch. They do not alter the
+separate approved naval observation environment: `caribbean:naval-check` keeps
+its existing `ANGLE_ARGS` exactly `['--use-gl=angle', '--use-angle=default',
+'--enable-unsafe-swiftshader']` unless a separately measured and reviewed naval
+harness amendment changes that contract.
 
 Fresh performance remains observational, never frozen or normalized. It must
 have 20 advancing, unpaused one-second resource samples; finite FPS samples and
