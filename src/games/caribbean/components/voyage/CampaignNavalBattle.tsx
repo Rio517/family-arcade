@@ -37,7 +37,7 @@ export default function CampaignNavalBattle({ controller }: { controller: Caribb
   const withdraw = useCallback(async () => {
     if (withdrawingRef.current) return;
     withdrawingRef.current = true;
-    session.setPaused(true);
+    session.setPauseHold('campaign-withdrawal', true);
     setWithdrawBusy(true);
     setWithdrawalError(false);
     try {
@@ -139,7 +139,7 @@ export default function CampaignNavalBattle({ controller }: { controller: Caribb
               disabled={withdrawBusy || controller.busy}
               onClick={() => {
                 setWithdrawalError(false);
-                session.setPaused(false);
+                session.setPauseHold('campaign-withdrawal', false);
               }}
             >Resume battle</button>
           </div>

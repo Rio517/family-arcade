@@ -11,6 +11,7 @@ import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { driveCampaignVictory } from './lib/caribbean-campaign-victory-driver.mjs';
 import { normalBuildIsolationFailure } from './lib/caribbean-normal-build-isolation.mjs';
+import { continueAfterSupportRestore } from './lib/caribbean-support-restore.mjs';
 import {
   ART_ACTIVITY_CONTRAST_SPECS,
   ART_CAPTURE_FIXTURE_STATE,
@@ -1426,8 +1427,7 @@ async function runVoyageUiCheck() {
       await capture(page, screenshots, directory, 'sailing-large-portrait-notice.png');
 
       await page.setViewportSize({ width: 1440, height: 900 });
-      await page.getByRole('button', { name: 'Resume career' }).click();
-      await page.getByTestId('encounter-avoid').waitFor();
+      await continueAfterSupportRestore(page, { expectedTestId: 'encounter-avoid' });
       await page.getByTestId('encounter-avoid').click();
       await page.getByTestId('caribbean-career-ready').waitFor();
       const returnedEnvelope = await readVoyageEnvelope(page, 'port');

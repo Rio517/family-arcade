@@ -3,6 +3,8 @@ import { StrictMode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AudioFactory, BattleAudioContext } from '../../audio/BattleAudio';
+import { BATTLE_LAB_INPUT } from '../../content/naval';
+import { NavalSession } from '../../state/naval/NavalSession';
 import { manualNavalSession } from '../../state/naval/testSession';
 import type { NavalEvent, NavalOutcome } from '../../domain/naval/types';
 import { NavalBattlePage } from './NavalBattlePage';
@@ -403,6 +405,52 @@ describe('accessible naval command deck', () => {
       act(() => document.dispatchEvent(new Event('visibilitychange')));
       expect(session.paused).toBe(true);
     } finally {
+      visibilitySpy.mockRestore();
+    }
+  });
+
+  it('holds an initially hidden StrictMode battle at tick zero until a fresh visible-frame prime', () => {
+    const callbacks: FrameRequestCallback[] = [];
+    let nextHandle = 0;
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      callbacks.push(callback);
+      nextHandle += 1;
+      return nextHandle;
+    });
+    const cancelFrame = vi.fn();
+    let visibility: DocumentVisibilityState = 'hidden';
+    const visibilitySpy = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    const session = new NavalSession(BATTLE_LAB_INPUT, { requestFrame, cancelFrame });
+    session.start();
+    try {
+      const view = render(
+        <StrictMode><NavalBattlePage session={session} sceneFactory={null} /></StrictMode>,
+      );
+
+      expect(session.paused).toBe(true);
+      act(() => callbacks.shift()?.(1_000));
+      expect(session.state.tick).toBe(0);
+
+      visibility = 'visible';
+      act(() => document.dispatchEvent(new Event('visibilitychange')));
+      expect(session.paused).toBe(true);
+
+      fireEvent.click(screen.getByTestId('naval-pause'));
+      expect(session.paused).toBe(false);
+      act(() => callbacks.shift()?.(61_000));
+      expect(session.state.tick).toBe(0);
+      act(() => callbacks.shift()?.(61_016.667));
+      expect(session.state.tick).toBe(1);
+
+      visibility = 'hidden';
+      act(() => document.dispatchEvent(new Event('visibilitychange')));
+      expect(session.paused).toBe(true);
+      view.unmount();
+      session.setPaused(false);
+      expect(session.paused).toBe(false);
+    } finally {
+      session.dispose();
+      expect(cancelFrame).toHaveBeenCalled();
       visibilitySpy.mockRestore();
     }
   });

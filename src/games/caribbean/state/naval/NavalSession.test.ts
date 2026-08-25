@@ -82,6 +82,43 @@ describe('transient naval session', () => {
     expect(session.state.tick).toBe(7);
   });
 
+  it('keeps named pause owners independent from ordinary pause controls', () => {
+    const session = new NavalSession(BATTLE_LAB_INPUT);
+
+    session.setPauseHold('visibility', true);
+    session.setPauseHold('campaign-withdrawal', true);
+    expect(session.paused).toBe(true);
+
+    session.togglePause();
+    session.setPaused(false);
+    session.setPauseHold('visibility', false);
+    expect(session.paused).toBe(true);
+    session.deliverFrameMicros(1_000_000);
+    expect(session.state.tick).toBe(0);
+
+    session.setPauseHold('campaign-withdrawal', false);
+    expect(session.paused).toBe(false);
+  });
+
+  it('primes a fresh RAF after the final pause owner releases instead of consuming paused wall time', () => {
+    const callbacks: FrameRequestCallback[] = [];
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+    const session = new NavalSession(BATTLE_LAB_INPUT, { requestFrame });
+    session.start();
+    callbacks.shift()?.(1_000);
+
+    session.setPauseHold('visibility', true);
+    session.setPauseHold('visibility', false);
+    callbacks.shift()?.(61_000);
+    expect(session.state.tick).toBe(0);
+
+    callbacks.shift()?.(61_016.667);
+    expect(session.state.tick).toBe(1);
+  });
+
   it('does not explicitly resume a diagnostic or terminal session', () => {
     const diagnostic = new NavalSession(BATTLE_LAB_INPUT, {
       validator: () => ({ ok: false, issues: ['fixture:drift'] }),

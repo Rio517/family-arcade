@@ -171,9 +171,43 @@ describe('<CampaignNavalBattle>', () => {
     expect(screen.getByTestId('naval-withdrawal-retry')).toBeVisible();
     expect(screen.getByTestId('naval-withdrawal-resume')).toBeVisible();
 
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' });
+    expect(session.paused).toBe(true);
+    expect(screen.getByTestId('naval-withdrawal-error')).toBeVisible();
+    act(() => session.deliverFrame(1));
+    expect(session.state.tick).toBe(0);
+
     fireEvent.click(screen.getByTestId('naval-withdrawal-resume'));
     expect(session.paused).toBe(false);
     expect(screen.queryByTestId('naval-withdrawal-error')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['HUD Resume', () => fireEvent.click(screen.getByTestId('naval-pause'))],
+    ['Space', () => fireEvent.keyDown(window, { key: ' ', code: 'Space' })],
+    ['Escape', () => fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' })],
+  ])('keeps a pending withdrawal paused when ordinary %s is requested', async (_label, requestResume) => {
+    const controller = navalController();
+    let settleWithdrawal: ((result: { kind: 'not-applied' }) => void) | null = null;
+    vi.mocked(controller.withdrawBattle).mockReturnValueOnce(new Promise((resolve) => {
+      settleWithdrawal = resolve;
+    }));
+    const session = manualNavalSession({ input: savedInput(controller) });
+    useNavalSession.mockReturnValue(session);
+    const CampaignNavalBattle = await component();
+    render(<CampaignNavalBattle controller={controller} />);
+
+    fireEvent.click(screen.getByTestId('naval-options-toggle'));
+    fireEvent.click(screen.getByTestId('naval-exit-action'));
+    expect(session.paused).toBe(true);
+
+    requestResume();
+    expect(session.paused).toBe(true);
+    act(() => session.deliverFrame(1));
+    expect(session.state.tick).toBe(0);
+
+    await act(async () => settleWithdrawal?.({ kind: 'not-applied' }));
+    expect(session.paused).toBe(true);
   });
 
   it('keeps a not-applied withdrawal paused for controller-owned consent or conflict', async () => {

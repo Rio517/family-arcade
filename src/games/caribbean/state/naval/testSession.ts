@@ -50,7 +50,8 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
     state.nextEventId = 2;
   }
   let currentCommand = command();
-  let paused = false;
+  let userPaused = false;
+  const pauseHolds = new Set<'visibility' | 'campaign-withdrawal'>();
   let diagnostic: NavalDiagnostic | null = null;
   let restartCount = 0;
   let battleGeneration = 0;
@@ -61,12 +62,13 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
   const listeners = new Set<() => void>();
   const validator = options.validator ?? validateNavalState;
 
+  const isPaused = () => userPaused || pauseHolds.size > 0;
   const makeSnapshot = (): NavalSessionSnapshot => ({
     state: structuredClone(state),
     battleGeneration,
     opponentMemory: { ...opponentController.memory },
     currentCommand: { ...currentCommand },
-    paused,
+    paused: isPaused(),
     diagnostic: diagnostic ? { issues: [...diagnostic.issues] } : null,
   });
   const publish = () => {
@@ -85,7 +87,7 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
     get opponentMemory() { return { ...opponentController.memory }; },
     get battleGeneration() { return battleGeneration; },
     get currentCommand() { return { ...currentCommand }; },
-    get paused() { return paused; },
+    get paused() { return isPaused(); },
     get diagnostic() { return diagnostic ? { issues: [...diagnostic.issues] } : null; },
     get restartCount() { return restartCount; },
     setRudder(value: Rudder) { record({ ...currentCommand, rudder: value }); },
@@ -93,18 +95,27 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
     setAmmunition(value: Ammunition) { record({ ...currentCommand, ammunition: value }); },
     requestFire(side: Broadside) { record({ ...currentCommand, fire: side }); },
     setPaused(value: boolean) {
-      if (diagnostic || state.outcome || paused === value) return;
-      paused = value;
+      if (diagnostic || state.outcome || userPaused === value) return;
+      if (!value && pauseHolds.size > 0) return;
+      userPaused = value;
+      runner.reset();
+      publish();
+    },
+    setPauseHold(owner, active) {
+      if (pauseHolds.has(owner) === active) return;
+      if (active) pauseHolds.add(owner);
+      else pauseHolds.delete(owner);
       runner.reset();
       publish();
     },
     togglePause() {
-      this.setPaused(!paused);
+      if (pauseHolds.size > 0) return;
+      this.setPaused(!userPaused);
     },
     restart() {
       state = createNavalBattle(input);
       currentCommand = command();
-      paused = false;
+      userPaused = false;
       diagnostic = null;
       restartCount += 1;
       battleGeneration += 1;
@@ -122,7 +133,7 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
       return state.events.filter((event) => event.id > afterId).map((event) => structuredClone(event));
     },
     deliverFrame(seconds: number) {
-      if (paused || diagnostic || state.outcome) return;
+      if (isPaused() || diagnostic || state.outcome) return;
       const ticks = runner.deliverMicros(Math.round(seconds * 1_000_000));
       for (let index = 0; index < ticks && !state.outcome; index += 1) {
         const opponent = advanceOpponentController(state, opponentController);
@@ -132,7 +143,7 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
       }
       const validation = validator(state);
       if (!validation.ok) {
-        paused = true;
+        userPaused = true;
         diagnostic = { issues: [...validation.issues] };
       }
       publish();

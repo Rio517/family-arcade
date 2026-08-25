@@ -36,12 +36,15 @@ export interface NavalSessionSnapshot {
   diagnostic: NavalDiagnostic | null;
 }
 
+export type NavalPauseOwner = 'visibility' | 'campaign-withdrawal';
+
 export interface NavalSessionView extends NavalSessionSnapshot {
   setRudder(value: Rudder): void;
   setSail(value: SailSetting): void;
   setAmmunition(value: Ammunition): void;
   requestFire(side: Broadside): void;
   setPaused(value: boolean): void;
+  setPauseHold(owner: NavalPauseOwner, active: boolean): void;
   togglePause(): void;
   restart(): void;
   subscribe(listener: () => void): () => void;
@@ -73,6 +76,7 @@ export class NavalSession implements NavalSessionView {
   #playerCommand = defaultCommand();
   #opponentController: OpponentControllerState = initialOpponentController();
   #paused = false;
+  readonly #pauseHolds = new Set<NavalPauseOwner>();
   #diagnostic: NavalDiagnostic | null = null;
   #snapshot: NavalSessionSnapshot;
   #animationHandle: number | null = null;
@@ -108,7 +112,7 @@ export class NavalSession implements NavalSessionView {
   }
 
   get paused(): boolean {
-    return this.#paused;
+    return this.#paused || this.#pauseHolds.size > 0;
   }
 
   get diagnostic(): NavalDiagnostic | null {
@@ -137,12 +141,24 @@ export class NavalSession implements NavalSessionView {
 
   setPaused(value: boolean): void {
     if (this.#diagnostic || this.#state.outcome || this.#paused === value) return;
+    if (!value && this.#pauseHolds.size > 0) return;
+    const wasPaused = this.paused;
     this.#paused = value;
-    this.#runner.reset();
+    if (wasPaused !== this.paused) this.#resetFrameWork();
+    this.#publish(true);
+  }
+
+  setPauseHold(owner: NavalPauseOwner, active: boolean): void {
+    if (this.#pauseHolds.has(owner) === active) return;
+    const wasPaused = this.paused;
+    if (active) this.#pauseHolds.add(owner);
+    else this.#pauseHolds.delete(owner);
+    if (wasPaused !== this.paused) this.#resetFrameWork();
     this.#publish(true);
   }
 
   togglePause(): void {
+    if (this.#pauseHolds.size > 0) return;
     this.setPaused(!this.#paused);
   }
 
@@ -173,7 +189,7 @@ export class NavalSession implements NavalSessionView {
   }
 
   deliverFrameMicros(micros: number): void {
-    if (this.#paused || this.#diagnostic || this.#state.outcome) return;
+    if (this.paused || this.#diagnostic || this.#state.outcome) return;
 
     const ticks = this.#runner.deliverMicros(micros);
     for (let index = 0; index < ticks && !this.#state.outcome; index += 1) {
@@ -192,7 +208,7 @@ export class NavalSession implements NavalSessionView {
     if (!validation.ok) {
       this.#paused = true;
       this.#diagnostic = { issues: [...validation.issues] };
-      this.#runner.reset();
+      this.#resetFrameWork();
     }
 
     this.#publish(Boolean(this.#diagnostic || this.#state.outcome));
@@ -226,7 +242,7 @@ export class NavalSession implements NavalSessionView {
       battleGeneration: this.#battleGeneration,
       opponentMemory: { ...this.#opponentController.memory },
       currentCommand: { ...this.#playerCommand },
-      paused: this.#paused,
+      paused: this.paused,
       diagnostic: this.#diagnostic ? { issues: [...this.#diagnostic.issues] } : null,
     };
   }
@@ -236,5 +252,10 @@ export class NavalSession implements NavalSessionView {
     this.#lastPublishedTick = this.#state.tick;
     this.#snapshot = this.#makeSnapshot();
     for (const listener of this.#listeners) listener();
+  }
+
+  #resetFrameWork(): void {
+    this.#runner.reset();
+    this.#lastFrameMicros = null;
   }
 }

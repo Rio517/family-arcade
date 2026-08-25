@@ -173,10 +173,19 @@ export function NavalBattlePage({
     const onVisibility = () => {
       const nextVisible = document.visibilityState !== 'hidden';
       setVisible(nextVisible);
-      if (!nextVisible) session.setPaused(true);
+      if (!nextVisible) {
+        session.setPaused(true);
+        session.setPauseHold('visibility', true);
+      } else {
+        session.setPauseHold('visibility', false);
+      }
     };
+    onVisibility();
     document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      session.setPauseHold('visibility', false);
+    };
   }, [session]);
 
   useEffect(() => {
