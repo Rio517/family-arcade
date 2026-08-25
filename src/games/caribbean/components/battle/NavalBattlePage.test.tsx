@@ -147,6 +147,27 @@ describe('accessible naval command deck', () => {
     expect(session.currentCommand.rudder).toBe(0);
   });
 
+  it('exposes rendered keyboard rudder state through the exact 140ms release boundary', () => {
+    vi.useFakeTimers();
+    try {
+      const session = manualNavalSession();
+      render(<NavalBattlePage session={session} sceneFactory={null} />);
+      const turnPort = screen.getByTestId('naval-rudder-port');
+
+      fireEvent.click(turnPort, { detail: 0 });
+      expect(turnPort).toHaveAttribute('aria-pressed', 'true');
+      expect(session.currentCommand.rudder).toBe(-1);
+      act(() => vi.advanceTimersByTime(139));
+      expect(turnPort).toHaveAttribute('aria-pressed', 'true');
+      expect(session.currentCommand.rudder).toBe(-1);
+      act(() => vi.advanceTimersByTime(1));
+      expect(turnPort).toHaveAttribute('aria-pressed', 'false');
+      expect(session.currentCommand.rudder).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows the complete compact command strip without side-paddle duplication', () => {
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} />);

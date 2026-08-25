@@ -45,6 +45,7 @@ export interface NavalSessionView extends NavalSessionSnapshot {
   requestFire(side: Broadside): void;
   setPaused(value: boolean): void;
   setPauseHold(owner: NavalPauseOwner, active: boolean): void;
+  resumeFromPauseHold(owner: NavalPauseOwner): void;
   togglePause(): void;
   restart(): void;
   subscribe(listener: () => void): () => void;
@@ -153,6 +154,15 @@ export class NavalSession implements NavalSessionView {
     const wasPaused = this.paused;
     if (active) this.#pauseHolds.add(owner);
     else this.#pauseHolds.delete(owner);
+    if (wasPaused !== this.paused) this.#resetFrameWork();
+    this.#publish(true);
+  }
+
+  resumeFromPauseHold(owner: NavalPauseOwner): void {
+    if (this.#diagnostic || this.#state.outcome || !this.#pauseHolds.has(owner)) return;
+    const wasPaused = this.paused;
+    this.#pauseHolds.delete(owner);
+    this.#paused = false;
     if (wasPaused !== this.paused) this.#resetFrameWork();
     this.#publish(true);
   }

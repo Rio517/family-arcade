@@ -100,6 +100,19 @@ describe('transient naval session', () => {
     expect(session.paused).toBe(false);
   });
 
+  it('recovers one named owner and the user latch without releasing another owner', () => {
+    const session = new NavalSession(BATTLE_LAB_INPUT);
+
+    session.setPaused(true);
+    session.setPauseHold('campaign-withdrawal', true);
+    session.setPauseHold('visibility', true);
+    session.resumeFromPauseHold('campaign-withdrawal');
+    expect(session.paused).toBe(true);
+
+    session.setPauseHold('visibility', false);
+    expect(session.paused).toBe(false);
+  });
+
   it('primes a fresh RAF after the final pause owner releases instead of consuming paused wall time', () => {
     const callbacks: FrameRequestCallback[] = [];
     const requestFrame = vi.fn((callback: FrameRequestCallback) => {

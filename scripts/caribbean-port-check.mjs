@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from 'playwright';
 import sharp from 'sharp';
-import { driveCampaignVictory } from './lib/caribbean-campaign-victory-driver.mjs';
+import { driveCampaignVictory, verifyRenderedRudderRelease } from './lib/caribbean-campaign-victory-driver.mjs';
 import { normalBuildIsolationFailure } from './lib/caribbean-normal-build-isolation.mjs';
 import { continueAfterSupportRestore } from './lib/caribbean-support-restore.mjs';
 import {
@@ -1513,6 +1513,7 @@ async function runBattleUiCheck() {
       invariant(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick') === '0', 'visual-prime-advanced-campaign-battle');
       await captureBattle(page, screenshots, directory, 'campaign-battle-desktop.png');
       await assertBattleControlHitTargets(page);
+      await verifyRenderedRudderRelease(page);
 
       const terminal = await driveCampaignVictory({
         page,

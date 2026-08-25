@@ -1,5 +1,3 @@
-export const RUDDER_RELEASE_MS = 140;
-
 const CURRENT_SAVE_KEY = 'caribbean:campaign:current';
 const EXACT_INPUT = { battleId: 'voyage-5-battle', seed: 1_971_161_494 };
 const EXACT_EXPECTED = {
@@ -68,6 +66,31 @@ async function resultVisible(page) {
   } catch {
     return false;
   }
+}
+
+export async function verifyRenderedRudderRelease(page) {
+  invariant(page && typeof page === 'object', 'missing rendered page adapter');
+  const pause = page.getByTestId('naval-pause');
+  const rudder = page.getByTestId('naval-rudder-port');
+  const beforeTick = await readTick(page);
+  invariant(await pause.getAttribute('aria-pressed') === 'false', 'rudder probe requires an active battle');
+
+  await pause.click();
+  invariant(await pause.getAttribute('aria-pressed') === 'true', 'rudder probe did not pause through the rendered control');
+  await rudder.press('Enter');
+  invariant(await rudder.getAttribute('aria-pressed') === 'true', 'rendered rudder did not engage');
+
+  await page.clock.runFor(139);
+  invariant(await rudder.getAttribute('aria-pressed') === 'true', 'rendered rudder released before 140ms');
+  invariant(await readTick(page) === beforeTick, 'rudder probe advanced the paused battle');
+  await page.clock.runFor(1);
+  invariant(await rudder.getAttribute('aria-pressed') === 'false', 'rendered rudder did not release at 140ms');
+  invariant(await readTick(page) === beforeTick, 'rudder release advanced the paused battle');
+
+  await pause.click();
+  invariant(await pause.getAttribute('aria-pressed') === 'false', 'rudder probe did not resume through the rendered control');
+  await page.clock.runFor(16);
+  invariant(await readTick(page) === beforeTick, 'rudder probe resume consumed paused wall time');
 }
 
 async function drive(page, trace, clockPrimed) {

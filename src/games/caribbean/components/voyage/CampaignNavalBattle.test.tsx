@@ -6,6 +6,7 @@ import { appendJournal, createJournal } from '../../domain/replay';
 import { summarizeNavalResolution } from '../../domain/naval/resolution';
 import type { NavalBattleInput } from '../../domain/naval/types';
 import { navalEngagedDraft, seaLegCompletedDraft, voyageStartedDraft } from '../../domain/voyage';
+import { NavalSession } from '../../state/naval/NavalSession';
 import { manualNavalSession, type ManualNavalSession } from '../../state/naval/testSession';
 import type { CaribbeanController } from '../../state/useCaribbean';
 
@@ -171,15 +172,144 @@ describe('<CampaignNavalBattle>', () => {
     expect(screen.getByTestId('naval-withdrawal-retry')).toBeVisible();
     expect(screen.getByTestId('naval-withdrawal-resume')).toBeVisible();
 
+    const retry = screen.getByTestId('naval-withdrawal-retry');
+    const resume = screen.getByTestId('naval-withdrawal-resume');
+    expect(retry).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Tab', code: 'Tab', shiftKey: true });
+    expect(resume).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Tab', code: 'Tab' });
+    expect(retry).toHaveFocus();
+
+    const historyBeforeShortcuts = session.commandHistory();
+    for (const [key, code] of [
+      ['a', 'KeyA'],
+      ['q', 'KeyQ'],
+      ['2', 'Digit2'],
+      ['r', 'KeyR'],
+    ]) {
+      fireEvent.keyDown(window, { key, code });
+      fireEvent.keyUp(window, { key, code });
+    }
+    expect(session.commandHistory()).toEqual(historyBeforeShortcuts);
+
     fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' });
     expect(session.paused).toBe(true);
     expect(screen.getByTestId('naval-withdrawal-error')).toBeVisible();
+    expect(retry).toHaveFocus();
     act(() => session.deliverFrame(1));
     expect(session.state.tick).toBe(0);
 
-    fireEvent.click(screen.getByTestId('naval-withdrawal-resume'));
+    fireEvent.click(resume);
     expect(session.paused).toBe(false);
     expect(screen.queryByTestId('naval-withdrawal-error')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'd', code: 'KeyD' });
+    expect(session.currentCommand.rudder).toBe(1);
+    fireEvent.keyUp(window, { key: 'd', code: 'KeyD' });
+  });
+
+  it('restores tactical shortcuts when withdrawal retry explicitly closes recovery', async () => {
+    const controller = navalController();
+    vi.mocked(controller.withdrawBattle)
+      .mockRejectedValueOnce(new Error('writer exploded'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    const session = manualNavalSession({ input: savedInput(controller) });
+    useNavalSession.mockReturnValue(session);
+    const CampaignNavalBattle = await component();
+    render(<CampaignNavalBattle controller={controller} />);
+
+    fireEvent.click(screen.getByTestId('naval-options-toggle'));
+    fireEvent.click(screen.getByTestId('naval-exit-action'));
+    await screen.findByTestId('naval-withdrawal-error');
+    fireEvent.click(screen.getByTestId('naval-withdrawal-retry'));
+
+    expect(screen.queryByTestId('naval-withdrawal-error')).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'a', code: 'KeyA' });
+    expect(session.currentCommand.rudder).toBe(-1);
+    fireEvent.keyUp(window, { key: 'a', code: 'KeyA' });
+    expect(session.paused).toBe(true);
+  });
+
+  it('makes recovery Resume the sole composed release and primes RAF after hidden withdrawal wall time', async () => {
+    const controller = navalController();
+    let rejectWithdrawal: ((error: Error) => void) | null = null;
+    vi.mocked(controller.withdrawBattle).mockReturnValueOnce(new Promise((_resolve, reject) => {
+      rejectWithdrawal = reject;
+    }));
+    const callbacks: FrameRequestCallback[] = [];
+    const session = new NavalSession(savedInput(controller), {
+      requestFrame: (callback) => {
+        callbacks.push(callback);
+        return callbacks.length;
+      },
+    });
+    let visibility: DocumentVisibilityState = 'visible';
+    const visibilityState = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    useNavalSession.mockReturnValue(session);
+    const CampaignNavalBattle = await component();
+    const rendered = render(<CampaignNavalBattle controller={controller} />);
+
+    try {
+      session.start();
+      callbacks.shift()?.(1_000);
+      fireEvent.click(screen.getByTestId('naval-options-toggle'));
+      fireEvent.click(screen.getByTestId('naval-exit-action'));
+
+      visibility = 'hidden';
+      fireEvent(document, new Event('visibilitychange'));
+      callbacks.shift()?.(61_000);
+      visibility = 'visible';
+      fireEvent(document, new Event('visibilitychange'));
+      await act(async () => rejectWithdrawal?.(new Error('writer exploded')));
+
+      fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' });
+      expect(session.paused).toBe(true);
+      expect(screen.getByTestId('naval-withdrawal-error')).toBeVisible();
+
+      fireEvent.click(screen.getByTestId('naval-withdrawal-resume'));
+      expect(session.paused).toBe(false);
+      expect(screen.queryByTestId('naval-withdrawal-error')).not.toBeInTheDocument();
+
+      callbacks.shift()?.(121_000);
+      expect(session.state.tick).toBe(0);
+      callbacks.shift()?.(121_016.667);
+      expect(session.state.tick).toBe(1);
+    } finally {
+      rendered.unmount();
+      session.dispose();
+      visibilityState.mockRestore();
+    }
+  });
+
+  it('keeps visibility ownership when recovery Resume is activated while still hidden', async () => {
+    const controller = navalController();
+    vi.mocked(controller.withdrawBattle).mockRejectedValueOnce(new Error('writer exploded'));
+    const session = manualNavalSession({ input: savedInput(controller) });
+    let visibility: DocumentVisibilityState = 'visible';
+    const visibilityState = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    useNavalSession.mockReturnValue(session);
+    const CampaignNavalBattle = await component();
+    const rendered = render(<CampaignNavalBattle controller={controller} />);
+
+    try {
+      fireEvent.click(screen.getByTestId('naval-options-toggle'));
+      fireEvent.click(screen.getByTestId('naval-exit-action'));
+      visibility = 'hidden';
+      fireEvent(document, new Event('visibilitychange'));
+      await screen.findByTestId('naval-withdrawal-error');
+
+      fireEvent.click(screen.getByTestId('naval-withdrawal-resume'));
+      expect(session.paused).toBe(true);
+      act(() => session.deliverFrame(1));
+      expect(session.state.tick).toBe(0);
+
+      visibility = 'visible';
+      fireEvent(document, new Event('visibilitychange'));
+      expect(session.paused).toBe(false);
+    } finally {
+      rendered.unmount();
+      visibilityState.mockRestore();
+    }
   });
 
   it.each([

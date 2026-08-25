@@ -108,6 +108,13 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
       runner.reset();
       publish();
     },
+    resumeFromPauseHold(owner) {
+      if (diagnostic || state.outcome || !pauseHolds.has(owner)) return;
+      pauseHolds.delete(owner);
+      userPaused = false;
+      runner.reset();
+      publish();
+    },
     togglePause() {
       if (pauseHolds.size > 0) return;
       this.setPaused(!userPaused);

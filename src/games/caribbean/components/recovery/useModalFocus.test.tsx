@@ -54,6 +54,9 @@ describe('useModalFocus', () => {
     fireEvent.keyDown(window, { key: 'Tab' });
     expect(cancel).toHaveFocus();
 
+    opener.focus();
+    expect(cancel).toHaveFocus();
+
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(background).not.toHaveAttribute('inert');

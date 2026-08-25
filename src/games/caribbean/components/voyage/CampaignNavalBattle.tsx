@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { summarizeNavalResolution, validateNavalResolution } from '../../domain/naval/resolution';
 import type { NavalState } from '../../domain/naval/types';
 import { useNavalSession } from '../../state/naval/useNavalSession';
 import type { CaribbeanController } from '../../state/useCaribbean';
 import { NavalBattlePage } from '../battle/NavalBattlePage';
+import { useModalFocus } from '../recovery/useModalFocus';
 import '../../styles/battle.css';
 
 export default function CampaignNavalBattle({ controller }: { controller: CaribbeanController }) {
@@ -28,15 +29,27 @@ export default function CampaignNavalBattle({ controller }: { controller: Caribb
   const [withdrawalError, setWithdrawalError] = useState(false);
   const resolvingRef = useRef(false);
   const withdrawingRef = useRef(false);
+  const engagementRef = useRef<HTMLDivElement>(null);
   const withdrawalDialogRef = useRef<HTMLDivElement>(null);
+  const withdrawalRetryRef = useRef<HTMLButtonElement>(null);
+  const withdrawalReturnFocusRef = useRef<HTMLElement | null>(null);
+  const keepWithdrawalRecoveryOpen = useCallback(() => {}, []);
 
-  useEffect(() => {
-    if (withdrawalError) withdrawalDialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
-  }, [withdrawalError]);
+  useModalFocus({
+    active: withdrawalError,
+    dialogRef: withdrawalDialogRef,
+    initialFocusRef: withdrawalRetryRef,
+    returnFocusRef: withdrawalReturnFocusRef,
+    backgroundRef: engagementRef,
+    onDismiss: keepWithdrawalRecoveryOpen,
+  });
 
   const withdraw = useCallback(async () => {
     if (withdrawingRef.current) return;
     withdrawingRef.current = true;
+    if (!withdrawalError && document.activeElement instanceof HTMLElement) {
+      withdrawalReturnFocusRef.current = document.activeElement;
+    }
     session.setPauseHold('campaign-withdrawal', true);
     setWithdrawBusy(true);
     setWithdrawalError(false);
@@ -48,7 +61,7 @@ export default function CampaignNavalBattle({ controller }: { controller: Caribb
       withdrawingRef.current = false;
       setWithdrawBusy(false);
     }
-  }, [controller, session]);
+  }, [controller, session, withdrawalError]);
 
   const resolve = useCallback(async (state: NavalState) => {
     if (resolvingRef.current) return;
@@ -98,15 +111,16 @@ export default function CampaignNavalBattle({ controller }: { controller: Caribb
   return (
     <div className="campaign-naval-battle">
       <div
+        ref={engagementRef}
         className="campaign-naval-battle__engagement"
         aria-hidden={withdrawalError ? true : undefined}
-        {...(withdrawalError ? { inert: '' } : {})}
       >
         <NavalBattlePage
           session={session}
           resultAction={resultAction}
           exitAction={exitAction}
           resolutionErrorAction={resolutionErrorAction}
+          interactionBlocked={withdrawalError}
         />
         <p className="campaign-naval-battle__restart-note">Reloading restarts this engagement from first contact.</p>
         {resultStatus && <p className="campaign-naval-battle__status" role="status">{resultStatus}</p>}
@@ -126,6 +140,7 @@ export default function CampaignNavalBattle({ controller }: { controller: Caribb
           <p>Withdrawal was not completed.</p>
           <div className="naval-result-actions">
             <button
+              ref={withdrawalRetryRef}
               type="button"
               className="naval-control naval-hit-target"
               data-testid="naval-withdrawal-retry"
@@ -139,7 +154,7 @@ export default function CampaignNavalBattle({ controller }: { controller: Caribb
               disabled={withdrawBusy || controller.busy}
               onClick={() => {
                 setWithdrawalError(false);
-                session.setPauseHold('campaign-withdrawal', false);
+                session.resumeFromPauseHold('campaign-withdrawal');
               }}
             >Resume battle</button>
           </div>

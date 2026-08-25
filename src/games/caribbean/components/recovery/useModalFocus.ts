@@ -87,9 +87,16 @@ export function useModalFocus({
       }
     };
 
+    const onFocusIn = (event: FocusEvent) => {
+      if (dialog === null || !(event.target instanceof Node) || dialog.contains(event.target)) return;
+      initialFocusRef.current?.focus();
+    };
+
     window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('focusin', onFocusIn, { capture: true });
     return () => {
       window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('focusin', onFocusIn, { capture: true });
       for (const { element, priorInert } of inertSnapshots) {
         if (priorInert === null) element.removeAttribute('inert');
         else element.setAttribute('inert', priorInert);

@@ -25,6 +25,7 @@ export function useNavalSession(input: NavalBattleInput): NavalSessionView {
     requestFire: (side) => session.requestFire(side),
     setPaused: (value) => session.setPaused(value),
     setPauseHold: (owner, active) => session.setPauseHold(owner, active),
+    resumeFromPauseHold: (owner) => session.resumeFromPauseHold(owner),
     togglePause: () => session.togglePause(),
     restart: () => session.restart(),
     subscribe: (listener) => session.subscribe(listener),

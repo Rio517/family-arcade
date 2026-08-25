@@ -14,6 +14,7 @@ import { BattleAudio, type AudioFactory } from '../../audio/BattleAudio';
 import { BattleHud } from './BattleHud';
 import { NavalViewport, type NavalSceneFactory } from './NavalViewport';
 import { selectAimCue } from './aimCue';
+import { pulseRudder } from './rudderPulse.mjs';
 
 export type { NavalSceneFactory } from './NavalViewport';
 
@@ -46,6 +47,7 @@ export interface NavalBattlePageProps {
   resultAction?: NavalResultAction;
   exitAction?: NavalExitAction;
   resolutionErrorAction?: NavalResolutionErrorAction;
+  interactionBlocked?: boolean;
 }
 
 function useSessionSnapshot(session: NavalSessionView) {
@@ -124,6 +126,7 @@ export function NavalBattlePage({
   resultAction,
   exitAction,
   resolutionErrorAction,
+  interactionBlocked = false,
 }: NavalBattlePageProps) {
   const snapshot = useSessionSnapshot(session);
   const { state, battleGeneration, currentCommand, paused, diagnostic } = snapshot;
@@ -145,6 +148,7 @@ export function NavalBattlePage({
   const [sensory, setSensory] = useState({ aim: true, steeringHint: true, shake: true, reducedFlashes: false, effects: 0.9, muted: false });
   const reducedMotion = useReducedMotionPreference();
   const terminal = Boolean(state.outcome || diagnostic || resolutionErrorAction);
+  const controlsBlocked = terminal || interactionBlocked;
   const effectiveShake = sensory.shake && !reducedMotion;
   const aimCue = sensory.aim ? selectAimCue(state, 'player') : null;
   const latestReload = [...state.events].reverse().find(isPlayerReloadReady);
@@ -285,23 +289,26 @@ export function NavalBattlePage({
   }, [diagnostic, resolutionErrorAction, state.outcome]);
 
   useEffect(() => {
-    if (terminal) clearHeldRudder();
-  }, [clearHeldRudder, terminal]);
+    if (!controlsBlocked) return;
+    const wasHeld = held.current.port || held.current.starboard;
+    clearHeldRudder();
+    if (wasHeld && interactionBlocked && !terminal) session.setRudder(0);
+  }, [clearHeldRudder, controlsBlocked, interactionBlocked, session, terminal]);
 
   useEffect(() => {
     const releaseOnBlur = () => {
       const wasHeld = held.current.port || held.current.starboard;
       clearHeldRudder();
-      if (wasHeld && !terminal) session.setRudder(0);
+      if (wasHeld && !controlsBlocked) session.setRudder(0);
     };
     window.addEventListener('blur', releaseOnBlur);
     return () => {
       window.removeEventListener('blur', releaseOnBlur);
       clearHeldRudder();
     };
-  }, [clearHeldRudder, session, terminal]);
+  }, [clearHeldRudder, controlsBlocked, session]);
 
-  useDismissOnEscape(paused && !diagnostic, () => session.togglePause());
+  useDismissOnEscape(paused && !diagnostic && !interactionBlocked, () => session.togglePause());
 
   useEffect(() => {
     const rudderFromHeld = (): Rudder => {
@@ -309,7 +316,7 @@ export function NavalBattlePage({
       return held.current.port ? -1 : 1;
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (terminal) return;
+      if (controlsBlocked) return;
       activateAudio();
       if (event.code === 'Escape' && event.repeat) {
         event.stopImmediatePropagation();
@@ -334,7 +341,7 @@ export function NavalBattlePage({
       if (event.code === 'Escape' && !paused && !diagnostic) session.togglePause();
     };
     const onKeyUp = (event: KeyboardEvent) => {
-      if (terminal) return;
+      if (controlsBlocked) return;
       if (event.code === 'KeyA' || event.code === 'ArrowLeft') held.current.port = false;
       if (event.code === 'KeyD' || event.code === 'ArrowRight') held.current.starboard = false;
       if (event.code === 'KeyA' || event.code === 'ArrowLeft' || event.code === 'KeyD' || event.code === 'ArrowRight') {
@@ -347,10 +354,10 @@ export function NavalBattlePage({
       window.removeEventListener('keydown', onKeyDown, { capture: true });
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [activateAudio, currentCommand.sail, diagnostic, paused, session, state.outcome, terminal]);
+  }, [activateAudio, controlsBlocked, currentCommand.sail, diagnostic, paused, session]);
 
   const holdRudder = (side: 'port' | 'starboard', active: boolean) => {
-    if (terminal) {
+    if (controlsBlocked) {
       clearHeldRudder();
       return;
     }
@@ -389,7 +396,7 @@ export function NavalBattlePage({
 
           <div className="naval-command-dock">
             <div className="naval-command-strip" role="group" aria-label="Battle commands">
-              <RudderControl side="port" shortcut="A" onHold={holdRudder} onActivate={activateAudio} />
+              <RudderControl side="port" shortcut="A" active={currentCommand.rudder === -1} onHold={holdRudder} onActivate={activateAudio} />
               <FireControl buttonRef={portFireRef} side="port" onFire={() => { activateAudio(); session.requestFire('port'); }} disabled={Boolean(outcome || diagnostic)} />
               <div className="naval-ammunition-controls" role="group" aria-label="Ammunition">
                 {(['round', 'chain', 'grape'] as const).map((ammunition, index) => (
@@ -412,7 +419,7 @@ export function NavalBattlePage({
                 onClick={() => { activateAudio(); session.setSail(currentCommand.sail === 'full' ? 'reefed' : 'full'); }}
               ><kbd>R</kbd><span>Sail: {currentCommand.sail === 'full' ? 'Full' : 'Reefed'}</span></button>
               <FireControl side="starboard" onFire={() => { activateAudio(); session.requestFire('starboard'); }} disabled={Boolean(outcome || diagnostic)} />
-              <RudderControl side="starboard" shortcut="D" onHold={holdRudder} onActivate={activateAudio} />
+              <RudderControl side="starboard" shortcut="D" active={currentCommand.rudder === 1} onHold={holdRudder} onActivate={activateAudio} />
               <details className="naval-options" data-testid="naval-options">
                 <summary className="naval-control naval-hit-target" data-testid="naval-options-toggle">Options</summary>
                 <div className="naval-options__panel">
@@ -570,11 +577,11 @@ function FireControl({
   );
 }
 
-function RudderControl({ side, shortcut, onHold, onActivate }: { side: 'port' | 'starboard'; shortcut: 'A' | 'D'; onHold(side: 'port' | 'starboard', active: boolean): void; onActivate(): void }) {
-  const pulse = () => {
-    onHold(side, true);
-    window.setTimeout(() => onHold(side, false), 140);
-  };
+function RudderControl({ side, shortcut, active, onHold, onActivate }: { side: 'port' | 'starboard'; shortcut: 'A' | 'D'; active: boolean; onHold(side: 'port' | 'starboard', active: boolean): void; onActivate(): void }) {
+  const pulse = () => pulseRudder(
+    (held) => onHold(side, held),
+    (callback, delay) => window.setTimeout(callback, delay),
+  );
   return (
     <button
       type="button"
@@ -593,6 +600,7 @@ function RudderControl({ side, shortcut, onHold, onActivate }: { side: 'port' | 
         if (event.detail === 0) pulse();
       }}
       aria-label={`Turn ${side}`}
+      aria-pressed={active}
     >
       <kbd>{shortcut}</kbd>
       <span>Turn {side}</span>

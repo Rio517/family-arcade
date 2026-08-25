@@ -84,6 +84,7 @@ export function BattleHud({ state, paused, onTogglePause }: BattleHudProps) {
           type="button"
           className="naval-control naval-hit-target naval-pause-control"
           data-testid="naval-pause"
+          aria-pressed={paused}
           onClick={onTogglePause}
         >
           <PauseIcon paused={paused} />
