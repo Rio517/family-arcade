@@ -6,6 +6,11 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+const CURRENT_VITE_CONFIG_SOURCE = fs.readFileSync(
+  new URL('../../vite.config.ts', import.meta.url),
+  'utf8',
+);
+
 const SOURCE_SEEDS = [
   'package.json',
   'package-lock.json',
@@ -218,9 +223,14 @@ async function makeTrackedGraph(t, files = {}) {
       '@app/*': ['src/app/*'],
       '@test/*': ['src/test/*'],
     } } }),
-    'vite.config.ts': `import { fileURLToPath, URL } from 'node:url';\nexport default { resolve: { alias: {\n  '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),\n  '@games': fileURLToPath(new URL('./src/games', import.meta.url)),\n  '@app': fileURLToPath(new URL('./src/app', import.meta.url)),\n  '@test': fileURLToPath(new URL('./src/test', import.meta.url)),\n} } };\n`,
+    'vite.config.ts': CURRENT_VITE_CONFIG_SOURCE,
     'knip.json': '{}\n',
     'index.html': '<script type="module" src="/src/app/main.tsx"></script>\n',
+    'preview-b.html': '',
+    'preview-ship.html': '',
+    'preview-carrier.html': '',
+    'preview-battleship.html': '',
+    'preview-caribbean.html': '',
     'preview-caribbean-game.html': '<script type="module" src="/src/games/caribbean/preview.tsx"></script>\n',
     'scripts/caribbean-port-check.mjs': "import './lib/caribbean-campaign-victory-driver.mjs';\n",
     'scripts/caribbean-naval-check.mjs': "import './lib/caribbean-naval-evidence.mjs';\n",
@@ -1146,7 +1156,7 @@ test('accepts only closed Vite alias objects and the authentic vite defineConfig
   }
 
   const authentic = await makeTrackedGraph(t, {
-    'vite.config.ts': `${prelude}\nimport { defineConfig } from 'vite';\nconst alias = ${aliasObject};\nexport default defineConfig({ resolve: { alias } });\n`,
+    'vite.config.ts': CURRENT_VITE_CONFIG_SOURCE,
   });
   assert.ok(auditCaribbeanNavalSourceClosure(authentic).paths.includes('vite.config.ts'));
 });
@@ -1376,9 +1386,101 @@ export default defineConfig({ resolve: { alias }, plugins: ${fixture.plugins} })
   }
 
   const approved = await makeTrackedGraph(t, {
-    'vite.config.ts': approvedConfig(currentPwaOptions),
+    'vite.config.ts': CURRENT_VITE_CONFIG_SOURCE,
   });
   assert.ok(auditCaribbeanNavalSourceClosure(approved).paths.includes('vite.config.ts'));
+});
+
+test('locks the complete parsed Vite config executable module shape', async (t) => {
+  const { auditCaribbeanNavalSourceClosure } = await import('./caribbean-naval-verification.mjs');
+  const beforeDefaultExport = (statement) => CURRENT_VITE_CONFIG_SOURCE.replace(
+    'export default defineConfig({',
+    `${statement}\n\nexport default defineConfig({`,
+  );
+  const afterDefaultExport = (statement) => `${CURRENT_VITE_CONFIG_SOURCE.trimEnd()}\n${statement}\n`;
+  const prototypeHook = `Object.defineProperty(Object.prototype, 'config', {
+  configurable: true,
+  value() {
+    return { resolve: { alias: { '@shared': '/private/tmp/untracked-shared' } } };
+  },
+});`;
+  const cases = [
+    {
+      name: 'Object.prototype config hook from the review exploit',
+      config: beforeDefaultExport(prototypeHook),
+    },
+    {
+      name: 'side-effect import with a prototype hook',
+      config: CURRENT_VITE_CONFIG_SOURCE.replace(
+        "import tidewave from 'tidewave/vite-plugin';",
+        "import tidewave from 'tidewave/vite-plugin';\nimport './src/games/caribbean/vite-prototype-poison';",
+      ),
+      files: { 'src/games/caribbean/vite-prototype-poison.ts': `${prototypeHook}\n` },
+    },
+    {
+      name: 'direct prototype assignment',
+      config: beforeDefaultExport(
+        "Object.prototype.config = () => ({ resolve: { alias: { '@shared': '/private/tmp/untracked-shared' } } });",
+      ),
+    },
+    {
+      name: 'arbitrary expression call',
+      config: beforeDefaultExport(
+        "Reflect.set(Object.prototype, 'config', () => ({ resolve: { alias: { '@shared': '/private/tmp/untracked-shared' } } }));",
+      ),
+    },
+    {
+      name: 'post-config alias write',
+      config: afterDefaultExport("alias['@shared'] = '/private/tmp/untracked-shared';"),
+      diagnostic: /vite\.config\.ts (?:alias object is missing|executable module must match the approved shape)/,
+    },
+    {
+      name: 'extra named export',
+      config: beforeDefaultExport("export const runtimeAlias = '/private/tmp/untracked-shared';"),
+    },
+    {
+      name: 'extra static declaration',
+      config: beforeDefaultExport("const runtimeAlias = '/private/tmp/untracked-shared';"),
+    },
+    {
+      name: 'dynamic declaration initializer',
+      config: beforeDefaultExport("const runtimeAlias = (() => '/private/tmp/untracked-shared')();"),
+    },
+    {
+      name: 'renamed imported binding',
+      config: CURRENT_VITE_CONFIG_SOURCE
+        .replace("import react from '@vitejs/plugin-react';", "import viteReact from '@vitejs/plugin-react';")
+        .replace('    react(),', '    viteReact(),'),
+    },
+    {
+      name: 'reordered imports',
+      config: CURRENT_VITE_CONFIG_SOURCE.replace(
+        "import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';",
+        "import react from '@vitejs/plugin-react';\nimport { defineConfig } from 'vite';",
+      ),
+    },
+  ];
+  for (const fixture of cases) {
+    const root = await makeTrackedGraph(t, {
+      'vite.config.ts': fixture.config,
+      ...fixture.files,
+    });
+    assert.throws(
+      () => auditCaribbeanNavalSourceClosure(root),
+      (error) => error?.code === 'source-files'
+        && (fixture.diagnostic ?? /vite\.config\.ts executable module must match the approved shape/)
+          .test(error.message),
+      fixture.name,
+    );
+  }
+
+  const harmlessComments = await makeTrackedGraph(t, {
+    'vite.config.ts': CURRENT_VITE_CONFIG_SOURCE.replace(
+      'const base =',
+      '// The executable AST is unchanged by this provenance note.\nconst base =',
+    ),
+  });
+  assert.ok(auditCaribbeanNavalSourceClosure(harmlessComments).paths.includes('vite.config.ts'));
 });
 
 test('requires every literal seed and every mandated glob class', async (t) => {

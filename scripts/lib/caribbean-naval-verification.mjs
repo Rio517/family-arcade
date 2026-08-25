@@ -54,6 +54,7 @@ const APPROVED_VITE_PWA_OPTIONS = {
     ],
   },
 };
+const APPROVED_VITE_CONFIG_EXECUTABLE_SHA256 = '3f6f85c6a6d63bc721c71a83411af79f97d5557af40a8e9d9e5f173263252313';
 const RESOLUTION_EXTENSIONS = [
   '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.css',
   '.glb', '.webp', '.svg', '.png', '.woff2',
@@ -380,6 +381,14 @@ function viteConfigObject(source, checker) {
   return null;
 }
 
+function viteConfigExecutableSha256(source) {
+  const printer = ts.createPrinter({ removeComments: true });
+  const statements = source.statements.map((statement) => (
+    printer.printNode(ts.EmitHint.Unspecified, statement, source)
+  ));
+  return sha256(canonicalJson(statements));
+}
+
 function nodeUrlImportBinding(identifier, checker, importedName) {
   const symbol = checker.getSymbolAtLocation(identifier);
   const declarations = symbol?.declarations ?? [];
@@ -452,6 +461,9 @@ function loadAliases(root, universe, scriptProgram) {
     if (!fs.statSync(absolute, { throwIfNoEntry: false })?.isDirectory()) sourceFailure(`vite.config.ts alias ${name} is not a directory`);
     if (!universe.some((relative) => relative.startsWith(`${target}/`))) sourceFailure(`vite.config.ts alias ${name} has no tracked source`);
     directoryUrlNodes.add(`${expression.url.getStart(source)}:${expression.url.end}`);
+  }
+  if (viteConfigExecutableSha256(source) !== APPROVED_VITE_CONFIG_EXECUTABLE_SHA256) {
+    sourceFailure('vite.config.ts executable module must match the approved shape');
   }
   return { aliases, directoryUrlNodes };
 }
