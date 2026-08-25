@@ -34,9 +34,9 @@
 - Every existing evidence `*.test.mjs` that imports `vitest` runs only through `mise exec node@20 -- npx vitest run`. Deliberate native suites use the non-Vitest suffix `.node-test.mjs`, import `node:test`/`node:assert`, run separately through `mise exec node@20 -- node --test`, and dynamically import the missing module inside a named test so the RED is collected before that named contract fails. The full Vitest glob must not collect native suites.
 - Named controller actions acquire a synchronous `{ generation, token }` owner before reading state/drafting and release only when that exact owner still matches after dispatch settles; a stale completion can never release a new-runtime action. Duplicate promises fulfill with at most one `applied` and never reject because of the duplicate.
 - Every task report records the production mutation that each test catches and confirms expected literals are hand-derived rather than computed with the code under test.
-- Every UI task runs a real production browser gate before package completion. Stable evidence is deterministic, honest performance/pixel observations are range-validated, every gate fails closed, and all existing version-2 port evidence channels remain present.
+- Every UI task runs a real production browser gate before package completion. Stable evidence is deterministic, honest performance/pixel observations use their exact approved boundary, every gate fails closed, and all existing version-2 port evidence channels remain present. The integrated normal route byte-compares metrics and 22 of its exact 23 screenshots; only `campaign-result-desktop.png` is observational, with exact A/B semantic digest/state equality, PNG/dimension validity, tracked run-A ownership, and original-resolution inspection instead of a pixel threshold.
 - Before every Task 1–6 source commit, run the task's focused suite, `mise exec node@20 -- npm run check`, full `mise exec node@20 -- npx vitest run`, clean `mise exec node@20 -- npx tsc -b --force`, and real `mise exec node@20 -- npm run build`, then `git diff --check`. The forced solution build is the clean typecheck; the following package build is the required production Vite build. Do not delete caches.
-- Tasks 4 and 5 must run their owned normal-production browser mode, inspect and stage its deterministic screenshots in the same UI commit. Task 7 may recapture them cumulatively but cannot supply missing per-commit browser evidence retroactively.
+- Tasks 4 and 5 must run their owned normal-production browser mode, inspect and stage its gate-owned screenshots in the same UI commit. Task 7 may recapture them cumulatively but cannot supply missing per-commit browser evidence retroactively. The terminal result screenshot never gains an undocumented exact-byte claim merely because one capture happens to repeat.
 - Naval source provenance uses Task 6's deterministic `git ls-files` seed plus transitive tracked-local import/HTML/CSS/build-entry closure, not a hand-maintained final file list; unresolved/omitted local dependencies fail closed, path membership/order and raw-byte hashes are exact, and live performance/PNG pixels remain observational.
 
 ---
@@ -53,7 +53,7 @@
 | Controller | create `state/namedActionGate.ts` and test; modify `state/useCaribbean.ts`, controller tests, `state/selectors.ts` | Token/generation-owned named actions, single candidate-publication effects, port-focus intent, existing atomic dispatch path |
 | Strategic UI | create voyage screens plus `components/setup/PersistenceDecisionOverlay.tsx` and tests; modify port/log/page and normal-route browser code; own voyage screenshots | Port departure, authored leg/contact, active-route consent/conflict overlay, lazy saved-input battle, return/reload focus and log |
 | Battle integration | modify `MinimumScreenGate`, `CampaignNavalBattle`, `CaribbeanPage`, `NavalBattlePage`, `BattleHud`, `NavalSession`, hooks/tests/browser driver; create golden victory JSON and own battle screenshots | Pause/reload/resize lifecycle, valid Return, invalid-resolution restart/withdraw, exactly-once safe return, public tick contract |
-| Evidence | modify integration tests, port browser script/evaluator/tests, naval-check script/tests, package docs, port/naval metrics/screenshots | Deterministic strategic evidence, stable naval manifest plus honest observational ranges, capture ownership, normal/harness isolation |
+| Evidence | modify integration tests, port browser script/evaluator/tests, naval-check script/tests, package docs, port/naval metrics/screenshots | Exact strategic stable/one-terminal-observation evidence, stable naval manifest plus honest observational ranges, capture ownership, normal/harness isolation |
 
 ## Exact Shared Interfaces
 
@@ -1369,7 +1369,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 - Modify: `scripts/caribbean-naval-check.mjs`
 - Modify: `scripts/lib/caribbean-naval-check.test.mjs`
 
-**Interfaces:** Consumes Task 5's literal `CampaignVictoryTrace`, `driveCampaignVictory`, public tick, browser modes/screenshots, and all production interfaces. Produces port evidence schema version 3, `CARIBBEAN_NAVAL_SOURCE_SEEDS`/`auditCaribbeanNavalSourceClosure`/`collectCaribbeanNavalSourceManifest`, the exact `CaribbeanNavalSourceAuditError` syntax diagnostics, real clock integration, revised isolation, exact screenshot/stable-manifest contract, observational range validation, and naval `--semantic-probe`/`--verify`/`--capture` modes. Does not commit generated metrics/PNG bytes.
+**Interfaces:** Consumes Task 5's literal `CampaignVictoryTrace`, `driveCampaignVictory`, public tick, browser modes/screenshots, and all production interfaces. Produces port evidence schema version 3, its exact 22-byte/one-semantic screenshot boundary, `CARIBBEAN_NAVAL_SOURCE_SEEDS`/`auditCaribbeanNavalSourceClosure`/`collectCaribbeanNavalSourceManifest`, the exact `CaribbeanNavalSourceAuditError` syntax diagnostics, real clock integration, revised isolation, exact naval screenshot/stable-manifest contract, observational range validation, and naval `--semantic-probe`/`--verify`/`--capture` modes. Does not commit generated metrics/PNG bytes.
 
 - [ ] **Step 1: Define exact schema-v3 evaluator tests**
 
@@ -1390,7 +1390,22 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   }
   ```
 
-  Add exact fields for focus, min text/target, contrast, overflow, viewport, requests, fallback, screenshot names, and lazy isolation. The evaluator rejects unknown/missing keys, false verification, wrong sequence/count, premature naval requests, harness markers, nondeterminism, and screenshots outside the exact set.
+  Add exact fields for focus, min text/target, contrast, overflow, viewport,
+  requests, fallback, screenshot names, lazy isolation, and the spec's
+  `screenshotEvidence` object. Preserve `determinism.screenshotsByteIdentical`
+  but require its honest v3 value `false`; add exact
+  `byteComparedScreenshotsIdentical: true`. The fixture has 23 exact names,
+  22 byte-compared files, and exactly one exception name:
+  `campaign-result-desktop.png`. Its observation row is exactly 1440x900,
+  `webgl-composited-terminal`, `trackedCapture: 'run-a'`, and contains valid/
+  nonempty run-A/run-B PNG facts plus the normalized semantic state and two
+  lowercase SHA-256 canonical-JSON digests from the spec. The evaluator
+  recomputes the digest, requires the two digests and complete states to be
+  equal, requires nonempty equal backend/fingerprint values, and locks the
+  terminal/player/opponent facts literally. It rejects unknown/missing keys,
+  false verification, wrong sequence/count, premature naval requests, harness
+  markers, names outside the exact screenshot sets, an absent/unknown/second
+  exception, semantic/digest drift, or invalid PNG dimensions/signature/bytes.
 
 - [ ] **Step 2: Capture evaluator RED and implement structure**
 
@@ -1404,7 +1419,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   current schema-2 evaluator. A Vitest internal-state/runner failure is not an
   accepted RED.
 
-  Update the evaluator and script structure. Keep every schema-2 browser/route/build/viewport/fixture/Web-Lock/journey/accessibility/request/failure/profile/art/market/recovery/determinism field. Revise isolation to distinguish emitted/precacheable from requested-before-pursuit.
+  Update the evaluator and script structure. Keep every schema-2 browser/route/build/viewport/fixture/Web-Lock/journey/accessibility/request/failure/profile/art/market/recovery/determinism field; the retained blanket screenshot boolean becomes `false` in schema v3 and the additive byte-compared/observational fields carry the exact replacement meaning. Revise isolation to distinguish emitted/precacheable from requested-before-pursuit.
 
 - [ ] **Step 3: Reverify the Task 5 native scheduler boundary**
 
@@ -1464,7 +1479,20 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   `voyage-5-battle` / `1971161494`; terminal resolution is tick `11855`, seed
   `1310878278`, exact final systems. Expected wall time is under 90 seconds per
   run; set eight minutes for two clean runs and a real Node 330-second deadline
-  per victory. Rerun the Step 4 command to GREEN.
+  per victory.
+
+  At the visible terminal result, read one normalized capture state through
+  public DOM/WebGL APIs: exact HUD tick/result visibility; canvas size/rect,
+  drawing buffer, opacity, transform, Three.js engine marker, WebGL vendor/
+  renderer, and the fixed 40-point framebuffer fingerprint; exact terminal
+  trace; and rendered player/opponent systems. Canonicalize and SHA-256 that
+  complete state. Capture the real full-page PNG without hiding/replacing the
+  canvas or modifying product rendering. Remove the staged two-16ms terminal
+  settle and every falsified experiment: additional relative frames, absolute
+  `performance.now` normalization, explicit final RAF/`gl.finish`, disposable
+  route/renderer warm-up, Chromium `--deterministic-mode`, and explicit
+  SwiftShader/software-compositor flags. None may remain in production,
+  harness, or launch arguments. Rerun the Step 4 command to GREEN.
 
 - [ ] **Step 6: Write and observe CLI destination/cleanup/provenance RED**
 
@@ -1518,7 +1546,13 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   - enqueue every uniquely resolved tracked target. Reject unresolved or
     ambiguous local edges, nonliteral dynamic imports/requires, unsupported
     `import.meta.glob`, duplicates, or any resolved edge target absent from the
-    final closure with `source-files`.
+    final closure with `source-files`. The sole nonliteral-import execution
+    ruling is `import(/* @vite-ignore */ modulePath)` where `modulePath` is a
+    same-file immutable `const` initialized only by parenthesized/string-
+    literal `+` concatenation and resolves uniquely to a tracked local file;
+    enqueue that file. The annotation alone, an unannotated const, template
+    substitution, referenced variable, call, mutation, cross-file value, or
+    unresolved/ambiguous result remains `nonliteral-dynamic-import`.
 
   Sort the final closure paths bytewise. Hash each file's raw bytes as SHA-256
   into `{ path, sha256 }`; compute `sourceHash` as SHA-256 of canonical JSON for
@@ -1666,6 +1700,19 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   }
   ```
 
+  Add one positive native fixture whose seeded importer contains exactly:
+
+  ```js
+  const modulePath = './annotated-' + 'dependency';
+  void import(/* @vite-ignore */ modulePath);
+  ```
+
+  Track `annotated-dependency.ts` and require the edge/target in the closure.
+  Add a negative annotated fixture that concatenates a referenced `suffix`
+  variable; require `nonliteral-dynamic-import` for that importer. Mutating the
+  positive initializer to an unannotated identifier or permitting the negative
+  form must kill its owning test.
+
   Because the absent verification module is imported inside each test body,
   Node collects all three names before RED failure. A fourth test named
   `propagates every unsupported-loader diagnostic through every CLI mode and cleans`
@@ -1710,7 +1757,9 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
 - [ ] **Step 7: Implement semantic-probe, capture, and final verify modes**
 
-  Implement the exact seed/closure collector and remove `TASK8_TREE_FILES`.
+  Implement the exact seed/closure collector, including the approved annotated
+  same-file literal-const exception and its rejected dynamic counterpart, and
+  remove `TASK8_TREE_FILES`.
   `--semantic-probe` generates in temp, runs harness/evaluator, skips tracked
   provenance/artifact equality, reports tracked current when source plus stable
   manifest match (regardless of observation bytes), reports stale otherwise,
@@ -1766,9 +1815,70 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   naval chunk/CSS/GLB; pursue requests hashed local naval assets; normal source
   contains no harness modules; harness build remains isolated.
 
+  Lock the complete normal-route union at 23 exact names. Compare metrics bytes
+  and every PNG except `campaign-result-desktop.png` exactly; there are 22 and
+  no wildcard. For the exception, validate both generated files as nonempty
+  1440x900 PNGs, require the exact normalized terminal state and equal
+  canonical SHA-256 digests from Step 5, and retain arbitrary honest pixels.
+  The normalized state includes backend and framebuffer fingerprint but not
+  `performance.now` or `document.timeline.currentTime`. Record run A as the
+  tracked capture owner. After both runs validate, build one shared
+  `screenshotEvidence` record containing both run states/digests, attach the
+  same canonical value to A and B, and only then perform/finalize the metrics
+  byte comparison. Preserve run-A/run-B variants in the existing ignored
+  diagnostic destination when requested for Task 7 inspection; never add them
+  to source provenance or tracked screenshot membership.
+
 - [ ] **Step 9: Mutation proof, focused verification, review, and commit**
 
-  Mutate raw fixtures for duplicated resolution, changed literal event ID, changed mode order, terminal tick `11856`, wrong seed, `tickAfterReload: 1`, a naval request on avoid, missing prior v2 field, unknown nested key, and false recovery preservation. Each returns a failed verdict without throwing. Mutate first-RAF behavior and clock/Date installation order. In a temporary tracked graph, add a new local import and require automatic closure growth; remove its target and make it ambiguous. Then mutation-kill the three unsupported-loader guards independently: change only nonliteral `import(variable)` handling to ignore/accept, run the native suite and require only the named dynamic-import diagnostic plus its three CLI rows to fail; restore it and require GREEN. Repeat for only CommonJS `require(variable)` and its distinct named diagnostic/three CLI rows, then for literal-pattern `import.meta.glob('./views/*.tsx')` and its distinct named diagnostic/three CLI rows. If one mutation is killed by another syntax fixture, the tests are improperly coupled and Task 6 remains incomplete. Omit each literal `kv.ts`/token-CSS/app-main critical row, add an out-of-closure source, reorder rows, and change a retained source hash; the verification suite must fail with `source-files` or `source-hash` exactly. Mutate stable manifest, observation ranges, artifact manifest, and each CLI destination; the owning browser/naval-verification test must fail. Different valid FPS/duration/resource/PNG observations must continue to pass. After restoring every mutation, rerun the full Step 9 matrix; all three parser fixtures and all nine mode-specific propagation/cleanup rows must be GREEN.
+  Mutate raw fixtures for duplicated resolution, changed literal event ID,
+  changed mode order, terminal tick `11856`, wrong seed,
+  `tickAfterReload: 1`, a naval request on avoid, missing prior v2 field,
+  unknown nested key, and false recovery preservation. Each returns a failed
+  verdict without throwing. Mutate first-RAF behavior and clock/Date
+  installation order.
+
+  Add pure comparator/evaluator fixtures for the normal route. Two valid but
+  byte-different 1440x900 PNGs pass only when their filename is exactly
+  `campaign-result-desktop.png`, both signatures/dimensions/lengths pass, and
+  their complete semantic states/digests match. The same byte difference on
+  any other screenshot fails. Missing/renamed/unknown exception names, a
+  second exemption, swapped tracked owner, bad signature, zero bytes, 1439px
+  width, tick `11856`, hidden result, changed drawing buffer/backend/sample
+  fingerprint, changed outcome/seed/player/opponent system, or recomputed-
+  digest mismatch each fails closed. No test or implementation may introduce
+  a pixel-delta/perceptual threshold. Temporarily bypass the designated-row
+  check; the unknown/second-exception mutations must kill it. Temporarily byte-
+  compare the designated result again; the valid different-pixel fixture must
+  kill it. Restore both.
+
+  In a temporary tracked graph, add a new local import and require automatic
+  closure growth; remove its target and make it ambiguous. Then mutation-kill
+  the three unsupported-loader guards independently: change only nonliteral
+  `import(variable)` handling to ignore/accept, run the native suite and require
+  only the named dynamic-import diagnostic plus its three CLI rows to fail;
+  restore it and require GREEN. Repeat for only CommonJS `require(variable)`
+  and its distinct named diagnostic/three CLI rows, then for literal-pattern
+  `import.meta.glob('./views/*.tsx')` and its distinct named diagnostic/three
+  CLI rows. Separately relax the annotated dynamic fixture or reject the exact
+  annotated literal-const fixture; its owning test must fail. If one mutation
+  is killed by another syntax fixture, the tests are improperly coupled and
+  Task 6 remains incomplete. Omit each literal `kv.ts`/token-CSS/app-main
+  critical row, add an out-of-closure source, reorder rows, and change a
+  retained source hash; the verification suite must fail with `source-files`
+  or `source-hash` exactly. Mutate stable manifest, observation ranges,
+  artifact manifest, and each CLI destination; the owning browser/naval-
+  verification test must fail. Different valid FPS/duration/resource/PNG
+  observations must continue to pass. After restoring every mutation, rerun
+  the full Step 9 matrix; both annotated-loader cases, all three parser
+  fixtures, all nine mode-specific propagation/cleanup rows, and the exact
+  normal-route screenshot boundary must be GREEN.
+
+  The browser-native suite also runs the real exported two-clean-run port gate
+  into a unique temporary output directory, asserts 23 exact artifacts and the
+  amended comparison verdict, removes that directory in `t.after`, and proves
+  `docs/screenshots/caribbean-port` was not mutated. A one-journey GREEN cannot
+  substitute for this integrated A/B gate.
 
   Run:
 
@@ -1817,7 +1927,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 - Refresh only if bytes genuinely change through `--capture`: existing `docs/screenshots/caribbean-naval/*.png`
 - Report only, ignored: `.superpowers/sdd/2026-08-24-caribbean-strategic-sailing/task-7-report.md`
 
-**Interfaces:** Consumes Task 6 gates. Produces deterministic schema-v3 port evidence, refreshed naval provenance/evidence, and package documentation. No production source change belongs here; a browser defect returns to its owning task with a new RED and separate fix commit.
+**Interfaces:** Consumes Task 6 gates. Produces schema-v3 port evidence with exact stable bytes and one named terminal WebGL observation, refreshed naval provenance/evidence, and package documentation. No production source change belongs here; a browser defect returns to its owning task with a new RED and separate fix commit.
 
 - [ ] **Step 1: Run focused and full automated gates fresh**
 
@@ -1854,7 +1964,16 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   mise exec node@20 -- npm run caribbean:port-check
   ```
 
-  Expected: schema version 3 accepted; the command's two internal clean-localStorage runs produce byte-identical screenshots/metrics; exact IDs/modes/RNG/input, public-control victory at tick `11855`, exactly-once resolution, focus, and recovery pass; no console/page/request failure. The command itself compares run A to run B before writing either result, so no separate capture invocation is needed.
+  Expected: schema version 3 accepted; the command's two internal clean-
+  localStorage runs produce byte-identical metrics and 22 byte-identical
+  screenshots. Its only comparison exception is
+  `campaign-result-desktop.png`; both variants are valid nonempty 1440x900 PNGs
+  with exact equal normalized semantic state/digests at tick `11855`, while run
+  A owns the tracked capture. Exact IDs/modes/RNG/input, exactly-once
+  resolution, final systems, focus, recovery, and zero console/page/request
+  failures pass. An identical terminal PNG is allowed but not required. The
+  command compares A/B before publishing run A, so no second mutating capture
+  invocation is needed.
 
 - [ ] **Step 4: Prove non-writing harness verification and normal/harness isolation**
 
@@ -1873,13 +1992,27 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
 - [ ] **Step 5: Inspect every changed screenshot at original resolution**
 
-  Inspect 1440x900, 1180x820, 1024x768, exact 960x600, HTML fallback, and portrait notice. Verify: historical one-mast silhouette; sea-dominant composition; functional brass route line; compact modern controls; exact consequences; no clipping/overlap/scroll; readable focus; full-bleed battle unchanged; result/return action clear; Captain's Log outcome; unsupported notice only.
+  Inspect 1440x900, 1180x820, 1024x768, exact 960x600, HTML fallback,
+  and portrait notice. For `campaign-result-desktop.png`, inspect the preserved
+  run-A and run-B variants plus the tracked run-A output at original 1440x900;
+  record that the modal, HUD, controls, ship composition, text, and result
+  remain fully legible in all three. Do not use a rescaled viewer as evidence.
+  For all captures verify: historical one-mast silhouette; sea-dominant
+  composition; functional brass route line; compact modern controls; exact
+  consequences; no clipping/overlap/scroll; readable focus; full-bleed battle
+  unchanged; result/return action clear; Captain's Log outcome; unsupported
+  notice only. Remove ignored diagnostic copies after recording review if the
+  command did not already clean them.
 
   Record observations as engineering visual review. Do not label human comprehension, touch quality, Safari, or target-iPad performance observed.
 
 - [ ] **Step 6: Update the career evidence ledger**
 
-  In `README.md`, document the new command path, exact screenshots, reload semantics, safe-return/persistent-damage boundary, lazy production naval isolation, and remaining human/iPad evidence. Do not change the governing product dossier or claim the naval milestone is production-ready.
+  In `README.md`, document the new command path, exact screenshot membership,
+  the 22-byte/one-terminal-observation boundary and run-A ownership, reload
+  semantics, safe-return/persistent-damage boundary, lazy production naval
+  isolation, and remaining human/iPad evidence. Do not change the governing
+  product dossier or claim the naval milestone is production-ready.
 
 - [ ] **Step 7: Run fresh pre-commit verification and inspect exact owned changes**
 
@@ -1896,7 +2029,10 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
   Verify every status path is in the Task 7 file list, semantic probe added no
   change, no temporary/raw traces/debug globals/build artifacts remain, and
-  both screenshot trees contain only gate-owned bytes. `--verify` is
+  both screenshot trees contain only gate-owned bytes. Confirm port metrics say
+  `trackedCapture: 'run-a'`, name exactly one observation exception, and retain
+  the exact semantic digest/state boundary; all other screenshots are in the
+  byte-compared set. `--verify` is
   intentionally not run against this dirty pre-commit tree.
 
 - [ ] **Step 8: Commit all owned evidence and documentation**
@@ -1921,6 +2057,11 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   provenance; it does not require FPS/duration/resource/PNG bytes to repeat. Do
   not rerun `--capture` after the evidence commit because that would falsify the
   clean Task 6 capture provenance.
+
+  Reconfirm the normal-route port record still has exactly one observational
+  result screenshot and that the tracked PNG equals the run-A bytes named by
+  its metrics. No final review may summarize all 23 port screenshots as byte-
+  identical; it must state the 22+1 boundary explicitly.
 
   Review from plan execution base through Task 7 HEAD. Required topics: source-of-truth rule reuse; event/validator totality; RNG lineage; old-save compatibility; replay/compaction; writer conflicts/consent/recovery; no mutation during battle; terminal exactly-once; reload restart disclosure; session disposal; safe-return ruling; Set Sail readiness; a11y; lazy isolation; deterministic evidence; scope discipline.
 
@@ -1949,8 +2090,8 @@ The package is complete only when every statement is evidenced:
 15. Landscape `>=960x600` works with 14 px/44 px/focus/contrast/overflow/reduced-motion guarantees; phones and portrait mount only the notice.
 16. Normal setup/port/sailing/avoid does not request naval assets; pursuit loads only local production assets; no harness/debug module ships; Battle Lab remains independently green.
 17. The real-session literal public-control trace mounts at tick zero, primes first RAF without a tick, advances through actual 16 ms RAF quanta to exact six-tick publications/final tick `11855`, preserves ordered clock/Date fixtures and `nowConsumed`, and fails closed on drift, timeout, or non-victory.
-18. Schema-v3 normal-route port metrics and its nine exact-clock/public-tick screenshots are byte-identical across two clean runs and fail closed on malformed/unknown evidence; this does not impose byte identity on the separate live naval-harness observations in criterion 19.
-19. Naval semantic probe is non-writing and tolerates stale tracked provenance; Task 7's clean-Task-6-HEAD capture owns honest observations; final clean `--verify` proves the exact sorted seed-to-fixed-point tracked-local import/HTML/CSS/build-entry closure and raw-byte row/hash manifest—including `kv.ts`, token CSS, and app main—while accepting varied in-range FPS/duration/resource/PNG observations and rejecting unresolved/omitted/new dependencies; nonliteral dynamic imports; nonliteral CommonJS requires; every `import.meta.glob` call including literal patterns; missing/extra/reordered rows; and hash, stable, range, or artifact drift with the exact source diagnostic, mode prefix, and cleanup contract.
+18. Schema-v3 normal-route port metrics and 22 of its exact 23 screenshots are byte-identical across two clean runs. The sole exact exception is the valid nonempty 1440x900 `campaign-result-desktop.png`; it accepts arbitrary honest pixels only after exact A/B equality of the canonical semantic state/digest at tick `11855`, canvas/drawing-buffer/backend/sample facts, terminal outcome, and final systems. Metrics name run A as tracked owner; unknown/missing/additional exceptions, PNG/dimension failure, semantic drift, or any non-exempt byte drift fails closed. No perceptual threshold is used. This does not impose byte identity on the separate live naval-harness observations in criterion 19.
+19. Naval semantic probe is non-writing and tolerates stale tracked provenance; Task 7's clean-Task-6-HEAD capture owns honest observations; final clean `--verify` proves the exact sorted seed-to-fixed-point tracked-local import/HTML/CSS/build-entry closure and raw-byte row/hash manifest—including `kv.ts`, token CSS, and app main—while accepting varied in-range FPS/duration/resource/PNG observations and rejecting unresolved/omitted/new dependencies; nonliteral dynamic imports except the exact annotated same-file immutable literal-concatenation const that resolves uniquely and is enqueued; nonliteral CommonJS requires; every `import.meta.glob` call including literal patterns; missing/extra/reordered rows; and hash, stable, range, or artifact drift with the exact source diagnostic, mode prefix, and cleanup contract.
 20. Every Task 1–6 source commit has fresh focused tests, check, full Vitest, forced clean solution build, real package build, and diff check; Tasks 4–5 also commit inspected normal-production screenshots with their UI source; cumulative gates/review are fresh and zero-finding.
 21. Human first-time and target-iPad Safari/touch/offline/thermal observations remain honestly unobserved unless actually performed.
 22. Worktree is clean; no merge, push, rebase, fetch, or main change occurred.

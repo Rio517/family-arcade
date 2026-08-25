@@ -784,7 +784,105 @@ nine files cumulatively; it does not defer either UI commit's browser proof.
 The gate measures 14 px text, 44 px targets, contrast, focus, clipping,
 horizontal overflow, request/page/console failures, event counts, mode sequence,
 RNG lineage, input checksum, exactly-once resolution, reload restart, recovery,
-and two-run byte identity.
+and the exact two-run stable/observational boundary below.
+
+#### Normal-route screenshot evidence boundary
+
+The integrated normal-route command still requires two clean-localStorage runs
+and byte-identical `metrics.json`. It byte-compares every screenshot except one
+exact named observational artifact: `campaign-result-desktop.png`. That file is
+the real 1440x900 WebGL-composited terminal campaign result. All other 22 files,
+including `campaign-battle-desktop.png`, remain byte-compared. The exact union
+of the existing 14 top-level screenshot names and nine `strategicSailing`
+screenshot names is mandatory; the two sets are disjoint, contain 23 files,
+and may not gain an implicit, wildcard, or auto-discovered exception.
+
+Schema v3 keeps the prior `determinism.screenshotsByteIdentical` field but sets
+it to `false`, rather than giving that blanket name a narrower meaning. It adds
+`determinism.byteComparedScreenshotsIdentical: true` and one exact top-level
+`screenshotEvidence` object:
+
+```ts
+interface TerminalResultSemanticState {
+  tick: 11855;
+  resultVisible: true;
+  canvas: {
+    width: 1440;
+    height: 900;
+    rect: { x: 0; y: 0; width: 1440; height: 900 };
+    drawingBuffer: { width: 1440; height: 900 };
+    opacity: '1';
+    transform: 'none';
+    engine: 'three.js r170';
+    backend: { vendor: string; renderer: string };
+    framebufferSample: {
+      algorithm: 'fnv1a32-rgba-grid-v1';
+      sampleCount: 40;
+      nonzeroSampleChannels: number;
+      fingerprint: string;
+    };
+  };
+  terminal: {
+    outcome: 'boarding-ready';
+    victorShipId: 'player';
+    atTick: 11855;
+    seedAfter: 1310878278;
+  };
+  player: { hull: 78; sails: 61; crew: 44; cannon: 8 };
+  opponent: { hull: 88; sails: 14; crew: 9; cannon: 8 };
+}
+
+interface NormalRouteScreenshotEvidence {
+  expectedCount: 23;
+  byteComparedCount: 22;
+  comparisonExceptionNames: ['campaign-result-desktop.png'];
+  trackedCapture: 'run-a';
+  observation: {
+    filename: 'campaign-result-desktop.png';
+    kind: 'webgl-composited-terminal';
+    width: 1440;
+    height: 900;
+    semanticDigestAlgorithm: 'sha256-canonical-json-v1';
+    runA: {
+      pngSignatureVerified: true;
+      nonzeroBytes: true;
+      width: 1440;
+      height: 900;
+      semanticDigest: string;
+      semanticState: TerminalResultSemanticState;
+    };
+    runB: {
+      pngSignatureVerified: true;
+      nonzeroBytes: true;
+      width: 1440;
+      height: 900;
+      semanticDigest: string;
+      semanticState: TerminalResultSemanticState;
+    };
+  };
+}
+```
+
+Each run digest is lowercase SHA-256 of canonical JSON for that run's complete
+normalized `semanticState`; both states and digests must equal each other and
+each evaluator-recomputed digest. Backend vendor/renderer and framebuffer fingerprint are
+observed strings, not hard-coded GPU brands, but they must be nonempty and
+exactly equal between A and B. The 40-point post-present framebuffer sample is
+recorded as a rendering-state fingerprint; because a default WebGL buffer may
+already be cleared, it is not a substitute for the terminal facts, PNG
+validity, or visual inspection.
+
+The comparator accepts arbitrary honest pixel bytes only for that exact row,
+after validating both PNG signatures, nonzero byte lengths, embedded
+dimensions, exact A/B semantic state/digest equality, final outcome/systems,
+and zero route/request/console/page failures. It uses no pixel-difference,
+perceptual, colour-delta, or similarity threshold. A missing or unknown name,
+a second exception, a dimension/signature failure, semantic drift, digest
+mismatch, or failure in any non-exempt screenshot remains fatal. The command
+writes run A to the tracked path and identifies that ownership in metrics;
+Task 7 inspects run A, run B, and the tracked run-A output at original
+resolution before committing evidence. Adding any future exception requires
+new measured evidence and a reviewed spec amendment.
 
 The normal victory is driven through public battle controls by one committed
 golden command trace for the exact second-voyage input produced from campaign
@@ -894,14 +992,27 @@ not added as file rows; any other local file reference must resolve to a file.
 
 Every extracted local edge must resolve to exactly one tracked path, and every
 resolved target is enqueued and included. An unresolved/ambiguous local edge,
-nonliteral dynamic import/require, any unsupported `import.meta.glob`, duplicate
-path, or local edge whose target is absent from the final set fails
-`source-files`; no audit warning is allowed.
+nonliteral dynamic import/require outside the exact annotated exception below,
+any unsupported `import.meta.glob`, duplicate path, or local edge whose target
+is absent from the final set fails `source-files`; no audit warning is allowed.
 Tests inject a new tracked transitive import and require the closure to grow,
 then delete its target and require fail-closed rejection. They separately
 exercise HTML -> `/src/app/main.tsx`, TypeScript -> CSS, CSS -> asset, alias,
 extension, directory-index, alias-config agreement, and declared-package
 resolution.
+
+Execution exposed one plan/source contradiction: the required full Caribbean
+seed already contains deliberate test loaders written as
+`import(/* @vite-ignore */ modulePath)`. The collector accepts such an import
+only when `modulePath` is a same-file immutable `const` whose initializer is a
+pure parenthesized/string-literal `+` concatenation, the resulting local path
+resolves uniquely to one tracked file, and that file is enqueued into the
+closure. The annotation alone grants nothing. An unannotated identifier,
+template substitution, referenced variable, call, mutation, cross-file value,
+unresolved/ambiguous result, nonliteral CommonJS `require`, or any
+`import.meta.glob` still fails with the existing exact diagnostic. Native tests
+cover the accepted const-concatenation form and a truly dynamic annotated
+rejection in addition to the three original unsupported-loader fixtures.
 
 Unsupported loader syntax has an exact, observable contract. The source audit
 throws `CaribbeanNavalSourceAuditError` with `code: 'source-files'`, the
@@ -984,7 +1095,9 @@ preference labels; and supported/unsupported display booleans. Its canonical
 JSON must equal the tracked capture byte-for-byte. Fresh PNG pixels are honest
 observational artifacts and are not byte-compared: each must have the exact
 manifest name/dimensions, valid PNG signature, nonzero bytes, and matching DOM
-semantic state at capture.
+semantic state at capture. This paragraph applies only to the separate
+`caribbean:naval-check` harness artifacts; it does not broaden the integrated
+normal-route exception beyond `campaign-result-desktop.png`.
 
 Fresh performance remains observational, never frozen or normalized. It must
 have 20 advancing, unpaused one-second resource samples; finite FPS samples and
