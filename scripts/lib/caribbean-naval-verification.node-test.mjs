@@ -388,6 +388,22 @@ const annotatedBindingFailures = [
     source: "const modulePath = './dependency'; modulePath = './other'; void import(/* @vite-ignore */ modulePath);",
   },
   {
+    name: 'non-null wrapped assignment target',
+    source: "const modulePath = './dependency'; modulePath! = './other'; void import(/* @vite-ignore */ modulePath);",
+  },
+  {
+    name: 'as-expression wrapped assignment target',
+    source: "const modulePath = './dependency'; (modulePath as string) = './other'; void import(/* @vite-ignore */ modulePath);",
+  },
+  {
+    name: 'type-assertion wrapped assignment target',
+    source: "const modulePath = './dependency'; (<string>modulePath) = './other'; void import(/* @vite-ignore */ modulePath);",
+  },
+  {
+    name: 'satisfies-expression wrapped assignment target',
+    source: "const modulePath = './dependency'; (modulePath satisfies string) = './other'; void import(/* @vite-ignore */ modulePath);",
+  },
+  {
     name: 'object destructuring assignment target',
     source: "const modulePath = './dependency'; const source = {}; ({ value: modulePath } = source); void import(/* @vite-ignore */ modulePath);",
   },
@@ -558,6 +574,64 @@ test('requires an explicit mode and enforces destination plus exact cleanup outc
   }), 1);
   assert.deepEqual(cleanupLines, ['NAVAL_SEMANTIC_PROBE_FAILED cleanup']);
   for (const entry of fs.readdirSync(tempParent)) fs.rmSync(path.join(tempParent, entry), { recursive: true, force: true });
+});
+
+test('capture rejects symlinked docs destinations and final publication files without outside writes', async (t) => {
+  const { runNavalEvidenceCli } = await import('./caribbean-naval-verification.mjs');
+  const root = await makeTrackedGraph(t);
+  execFileSync('git', ['-c', 'user.name=Task 6', '-c', 'user.email=task6@example.invalid', 'commit', '-qm', 'fixture'], { cwd: root });
+  const expectedDocs = path.join(root, 'docs', 'screenshots', 'caribbean-naval');
+  const outsideDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-naval-outside-'));
+  const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-naval-symlink-parent-'));
+  t.after(() => fs.rmSync(outsideDirectory, { recursive: true, force: true }));
+  t.after(() => fs.rmSync(tempParent, { recursive: true, force: true }));
+  const generate = async ({ destination, source, captureHead }) => {
+    const generation = validGeneration({
+      sourceFiles: source.files,
+      sourceHash: source.sourceHash,
+      captureHead,
+    });
+    writeGeneration(destination, generation);
+    return generation;
+  };
+
+  fs.mkdirSync(path.dirname(expectedDocs), { recursive: true });
+  fs.symlinkSync(outsideDirectory, expectedDocs, 'dir');
+  const destinationLines = [];
+  assert.equal(await runNavalEvidenceCli({
+    mode: 'capture', root, docsDirectory: expectedDocs, tempParent, generate,
+    writeLine: (line) => destinationLines.push(line),
+  }), 1);
+  assert.deepEqual(destinationLines, ['NAVAL_CAPTURE_FAILED destination']);
+  assert.deepEqual(fs.readdirSync(outsideDirectory), []);
+  fs.unlinkSync(expectedDocs);
+
+  fs.rmSync(path.join(root, 'docs'), { recursive: true, force: true });
+  fs.symlinkSync(outsideDirectory, path.join(root, 'docs'), 'dir');
+  const ancestorLines = [];
+  assert.equal(await runNavalEvidenceCli({
+    mode: 'capture', root, docsDirectory: expectedDocs, tempParent, generate,
+    writeLine: (line) => ancestorLines.push(line),
+  }), 1);
+  assert.deepEqual(ancestorLines, ['NAVAL_CAPTURE_FAILED destination']);
+  assert.equal(fs.existsSync(path.join(outsideDirectory, 'screenshots')), false);
+  fs.unlinkSync(path.join(root, 'docs'));
+
+  fs.mkdirSync(expectedDocs, { recursive: true });
+  for (const filename of ['metrics.json', NAVAL_SCREENSHOTS[0].name]) {
+    const outside = path.join(outsideDirectory, `${filename}.outside`);
+    const original = Buffer.from(`outside:${filename}`);
+    fs.writeFileSync(outside, original);
+    fs.symlinkSync(outside, path.join(expectedDocs, filename));
+    const lines = [];
+    assert.equal(await runNavalEvidenceCli({
+      mode: 'capture', root, docsDirectory: expectedDocs, tempParent, generate,
+      writeLine: (line) => lines.push(line),
+    }), 1);
+    assert.deepEqual(lines, ['NAVAL_CAPTURE_FAILED artifact-manifest']);
+    assert.deepEqual(fs.readFileSync(outside), original);
+    fs.unlinkSync(path.join(expectedDocs, filename));
+  }
 });
 
 test('keeps semantic probe temporary while capture and verify honor clean provenance', async (t) => {
@@ -926,6 +1000,49 @@ test('rejects generic directory URLs and ignores Vite alias comments or decoys',
     () => auditCaribbeanNavalSourceClosure(decoyRoot),
     (error) => error?.code === 'source-files' && /alias @shared disagrees/.test(error.message),
   );
+});
+
+test('accepts Vite directory URL exceptions only through exact node:url import bindings', async (t) => {
+  const { auditCaribbeanNavalSourceClosure } = await import('./caribbean-naval-verification.mjs');
+  const aliases = [
+    "  '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),",
+    "  '@games': fileURLToPath(new URL('./src/games', import.meta.url)),",
+    "  '@app': fileURLToPath(new URL('./src/app', import.meta.url)),",
+    "  '@test': fileURLToPath(new URL('./src/test', import.meta.url)),",
+  ];
+  const cases = [
+    {
+      name: 'local fileURLToPath',
+      declarations: ["import { URL } from 'node:url';", 'function fileURLToPath(value) { return value.pathname; }'],
+    },
+    {
+      name: 'local URL',
+      declarations: ["import { fileURLToPath } from 'node:url';", 'class URL { constructor(pathname) { this.pathname = pathname; } }'],
+    },
+    {
+      name: 'foreign fileURLToPath import',
+      declarations: ["import { URL } from 'node:url';", "import { fileURLToPath } from 'react';"],
+    },
+    {
+      name: 'foreign URL import',
+      declarations: ["import { fileURLToPath } from 'node:url';", "import { URL } from 'react';"],
+    },
+  ];
+  for (const fixture of cases) {
+    const root = await makeTrackedGraph(t, {
+      'vite.config.ts': [
+        ...fixture.declarations,
+        'export default { resolve: { alias: {',
+        ...aliases,
+        '} } };',
+      ].join('\n'),
+    });
+    assert.throws(
+      () => auditCaribbeanNavalSourceClosure(root),
+      (error) => error?.code === 'source-files' && /vite\.config\.ts alias @shared is missing/.test(error.message),
+      fixture.name,
+    );
+  }
 });
 
 test('requires every literal seed and every mandated glob class', async (t) => {

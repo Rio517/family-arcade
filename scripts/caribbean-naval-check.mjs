@@ -141,6 +141,21 @@ async function stopStaticServer(server) {
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 }
 
+export async function cleanupNavalHarnessResources({ browser, server, stopServer = stopStaticServer }) {
+  let firstFailure;
+  try {
+    await browser?.close();
+  } catch (error) {
+    firstFailure = error;
+  }
+  try {
+    if (server !== undefined) await stopServer(server);
+  } catch (error) {
+    firstFailure ??= error;
+  }
+  if (firstFailure !== undefined) throw firstFailure;
+}
+
 function findHashedGlb() {
   const assets = path.join(DIST, 'assets');
   const matches = fs.readdirSync(assets).filter((name) => GLB_PATTERN.test(name));
@@ -1038,8 +1053,7 @@ export async function runNavalCheck({ destination, source, captureHead }) {
     }));
     return { ...metrics, artifacts };
   } finally {
-    await browser?.close();
-    await stopStaticServer(server);
+    await cleanupNavalHarnessResources({ browser, server });
   }
 }
 

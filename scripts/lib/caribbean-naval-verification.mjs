@@ -234,23 +234,38 @@ function viteConfigObject(source) {
   return null;
 }
 
-function viteAliasExpression(source, aliasesObject, name) {
+function nodeUrlImportBinding(identifier, checker, importedName) {
+  const symbol = checker.getSymbolAtLocation(identifier);
+  const declarations = symbol?.declarations ?? [];
+  if (declarations.length !== 1 || !ts.isImportSpecifier(declarations[0])) return false;
+  const declaration = declarations[0];
+  const imported = declaration.propertyName?.text ?? declaration.name.text;
+  const importDeclaration = declaration.parent?.parent?.parent;
+  return imported === importedName && declaration.name.text === identifier.text
+    && ts.isImportDeclaration(importDeclaration)
+    && ts.isStringLiteral(importDeclaration.moduleSpecifier)
+    && importDeclaration.moduleSpecifier.text === 'node:url';
+}
+
+function viteAliasExpression(source, aliasesObject, name, checker) {
   const matches = aliasesObject.properties.filter((property) => (
     ts.isPropertyAssignment(property) && propertyName(property.name) === name
   ));
   if (matches.length !== 1) return null;
   const outer = matches[0].initializer;
   if (!ts.isCallExpression(outer) || !ts.isIdentifier(outer.expression)
-    || outer.expression.text !== 'fileURLToPath' || outer.arguments.length !== 1) return null;
+    || outer.expression.text !== 'fileURLToPath' || outer.arguments.length !== 1
+    || !nodeUrlImportBinding(outer.expression, checker, 'fileURLToPath')) return null;
   const url = outer.arguments[0];
-  if (!ts.isNewExpression(url) || !ts.isIdentifier(url.expression) || url.expression.text !== 'URL') return null;
+  if (!ts.isNewExpression(url) || !ts.isIdentifier(url.expression) || url.expression.text !== 'URL'
+    || !nodeUrlImportBinding(url.expression, checker, 'URL')) return null;
   const args = url.arguments ?? [];
   const target = args.length === 2 ? literalText(args[0]) : null;
   if (target === null || !isImportMetaUrl(args[1])) return null;
   return { target, url };
 }
 
-function loadAliases(root, universe) {
+function loadAliases(root, universe, scriptProgram) {
   const config = parseJsonConfig(root, 'tsconfig.app.json');
   const paths = config.compilerOptions?.paths ?? {};
   const aliases = {};
@@ -262,8 +277,9 @@ function loadAliases(root, universe) {
     const target = configured[0].replace(/\/\*$/, '').replace(/^\.\//, '').replaceAll('\\', '/');
     aliases[name] = target;
   }
-  const vite = fs.readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
-  const source = ts.createSourceFile('vite.config.ts', vite, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const vitePath = scriptProgram.absoluteByRelative.get('vite.config.ts');
+  const source = vitePath ? scriptProgram.program.getSourceFile(vitePath) : null;
+  if (!source) sourceFailure('TypeScript program omitted vite.config.ts');
   const configObject = viteConfigObject(source);
   const resolveObject = configObject && objectValue(source, configObject, 'resolve');
   const aliasObject = resolveObject && ts.isObjectLiteralExpression(resolveObject)
@@ -272,7 +288,7 @@ function loadAliases(root, universe) {
   if (!aliasObject || !ts.isObjectLiteralExpression(aliasObject)) sourceFailure('vite.config.ts alias object is missing');
   const directoryUrlNodes = new Set();
   for (const name of ALIAS_NAMES) {
-    const expression = viteAliasExpression(source, aliasObject, name);
+    const expression = viteAliasExpression(source, aliasObject, name, scriptProgram.checker);
     if (!expression) sourceFailure(`vite.config.ts alias ${name} is missing`);
     const target = path.posix.normalize(expression.target.replace(/^\.\//, ''));
     if (target !== aliases[name]) sourceFailure(`vite.config.ts alias ${name} disagrees with tsconfig.app.json`);
@@ -356,6 +372,10 @@ function identifierIsWritten(identifier) {
     }
     if (ts.isForInStatement(parent) || ts.isForOfStatement(parent)) return parent.initializer === child;
     const assignmentPatternParent = ts.isParenthesizedExpression(parent)
+      || ts.isNonNullExpression(parent)
+      || ts.isAsExpression(parent)
+      || ts.isTypeAssertionExpression(parent)
+      || ts.isSatisfiesExpression(parent)
       || ts.isArrayLiteralExpression(parent)
       || ts.isObjectLiteralExpression(parent)
       || ts.isSpreadElement(parent)
@@ -595,9 +615,9 @@ export function auditCaribbeanNavalSourceClosure(root) {
     if (!fs.statSync(path.join(absoluteRoot, relative), { throwIfNoEntry: false })?.isFile()) sourceFailure(`tracked path is not a file: ${relative}`);
   }
   const seeds = validatedSeedPaths(absoluteRoot, universe);
-  const { aliases, directoryUrlNodes } = loadAliases(absoluteRoot, universePaths);
-  const packages = packageRoots(absoluteRoot);
   const scriptProgram = createScriptProgram(absoluteRoot, universePaths);
+  const { aliases, directoryUrlNodes } = loadAliases(absoluteRoot, universePaths, scriptProgram);
+  const packages = packageRoots(absoluteRoot);
   const closure = new Set(seeds);
   const queue = [...seeds];
   const edges = [];
@@ -716,6 +736,33 @@ function containedFile(base, name) {
   return candidate;
 }
 
+function realDirectory(directory, { create = false, code = 'artifact-manifest' } = {}) {
+  const absolute = path.resolve(directory);
+  if (create) fs.mkdirSync(absolute, { recursive: true });
+  const status = fs.lstatSync(absolute, { throwIfNoEntry: false });
+  if (!status?.isDirectory() || status.isSymbolicLink()) {
+    throw new CaribbeanNavalVerificationError(code);
+  }
+  return absolute;
+}
+
+function readContainedBytes(directory, name, { missing = false } = {}) {
+  const base = realDirectory(directory);
+  const candidate = containedFile(base, name);
+  const status = fs.lstatSync(candidate, { throwIfNoEntry: false });
+  if (status === undefined && missing) return null;
+  if (!status?.isFile() || status.isSymbolicLink()
+    || fs.realpathSync(path.dirname(candidate)) !== fs.realpathSync(base)) {
+    throw new CaribbeanNavalVerificationError('artifact-manifest');
+  }
+  const descriptor = fs.openSync(candidate, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  try {
+    return fs.readFileSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
 export function validateStableNavalManifest(manifest) {
   const keys = [
     'version', 'sourceFiles', 'sourceHash', 'canonicalInput', 'viewports', 'screenshots',
@@ -832,39 +879,71 @@ function validateRepositoryUnchanged(root, expectedHead, expectedSource) {
 }
 
 export function readNavalGeneration(directory) {
-  const metricsPath = path.join(directory, 'metrics.json');
-  if (!fs.existsSync(metricsPath)) return null;
-  const metrics = JSON.parse(fs.readFileSync(metricsPath, 'utf8'));
+  if (!fs.existsSync(directory)) return null;
+  const metricsBytes = readContainedBytes(directory, 'metrics.json', { missing: true });
+  if (metricsBytes === null) return null;
+  const metrics = JSON.parse(metricsBytes.toString('utf8'));
   validateStableNavalManifest(metrics.stableManifest);
   const artifacts = (metrics.stableManifest?.screenshots ?? []).map((row) => ({
     ...row,
-    bytes: fs.readFileSync(containedFile(directory, row.name)),
+    bytes: readContainedBytes(directory, row.name),
   }));
   return { ...metrics, artifacts };
 }
 
-function saveBytesIfChanged(destination, bytes) {
+let publicationTemporarySequence = 0;
+
+function saveBytesIfChanged(directory, name, bytes, expectedRealDirectory) {
+  const base = realDirectory(directory, { create: true });
+  if (fs.realpathSync(base) !== expectedRealDirectory) {
+    throw new CaribbeanNavalVerificationError('destination');
+  }
+  const destination = containedFile(base, name);
   const next = Buffer.from(bytes);
-  const current = fs.statSync(destination, { throwIfNoEntry: false })?.isFile() ? fs.readFileSync(destination) : null;
+  const status = fs.lstatSync(destination, { throwIfNoEntry: false });
+  if (status !== undefined && (!status.isFile() || status.isSymbolicLink())) {
+    throw new CaribbeanNavalVerificationError('artifact-manifest');
+  }
+  const current = status?.isFile() ? readContainedBytes(base, name) : null;
   if (current?.equals(next)) return false;
-  fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.writeFileSync(destination, next);
+  const temporary = path.join(base, `.${name}.${process.pid}.${publicationTemporarySequence += 1}.tmp`);
+  let descriptor;
+  try {
+    descriptor = fs.openSync(
+      temporary,
+      fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY | fs.constants.O_NOFOLLOW,
+      0o600,
+    );
+    fs.writeFileSync(descriptor, next);
+    fs.closeSync(descriptor);
+    descriptor = undefined;
+    const finalStatus = fs.lstatSync(destination, { throwIfNoEntry: false });
+    if (finalStatus !== undefined && (!finalStatus.isFile() || finalStatus.isSymbolicLink())) {
+      throw new CaribbeanNavalVerificationError('artifact-manifest');
+    }
+    if (fs.realpathSync(path.dirname(destination)) !== fs.realpathSync(base)) {
+      throw new CaribbeanNavalVerificationError('artifact-manifest');
+    }
+    fs.renameSync(temporary, destination);
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+    fs.rmSync(temporary, { force: true });
+  }
   return true;
 }
 
-function publishGeneration(tempDirectory, docsDirectory, generation) {
+function publishGeneration(tempDirectory, docsDirectory, expectedRealDirectory, generation) {
   validateFreshNavalGeneration(generation);
-  const metricsPath = containedFile(tempDirectory, 'metrics.json');
-  const metricsBytes = fs.readFileSync(metricsPath);
+  const metricsBytes = readContainedBytes(tempDirectory, 'metrics.json');
   const parsedMetrics = JSON.parse(metricsBytes);
   const { artifacts: _artifacts, ...returnedMetrics } = generation;
   if (canonicalJson(parsedMetrics) !== canonicalJson(returnedMetrics)) {
     throw new CaribbeanNavalVerificationError('artifact-manifest');
   }
   let changed = 0;
-  changed += Number(saveBytesIfChanged(containedFile(docsDirectory, 'metrics.json'), metricsBytes));
+  changed += Number(saveBytesIfChanged(docsDirectory, 'metrics.json', metricsBytes, expectedRealDirectory));
   for (const artifact of generation.artifacts) {
-    changed += Number(saveBytesIfChanged(containedFile(docsDirectory, artifact.name), artifact.bytes));
+    changed += Number(saveBytesIfChanged(docsDirectory, artifact.name, artifact.bytes, expectedRealDirectory));
   }
   return changed;
 }
@@ -873,6 +952,28 @@ function modePrefix(mode) {
   if (mode === 'semantic-probe') return 'NAVAL_SEMANTIC_PROBE';
   if (mode === 'capture') return 'NAVAL_CAPTURE';
   return 'NAVAL_VERIFY';
+}
+
+function validateNavalDocsDestination(root, expectedDocs) {
+  const absoluteRoot = path.resolve(root);
+  const relative = path.relative(absoluteRoot, expectedDocs);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new CaribbeanNavalVerificationError('destination');
+  }
+  let current = absoluteRoot;
+  for (const component of relative.split(path.sep).filter(Boolean)) {
+    current = path.join(current, component);
+    const status = fs.lstatSync(current, { throwIfNoEntry: false });
+    if (status === undefined) break;
+    if (!status.isDirectory() || status.isSymbolicLink()) {
+      throw new CaribbeanNavalVerificationError('destination');
+    }
+  }
+  const expectedReal = path.join(fs.realpathSync(absoluteRoot), relative);
+  if (fs.existsSync(expectedDocs) && fs.realpathSync(expectedDocs) !== expectedReal) {
+    throw new CaribbeanNavalVerificationError('destination');
+  }
+  return expectedReal;
 }
 
 export async function runNavalEvidenceCli({
@@ -897,6 +998,7 @@ export async function runNavalEvidenceCli({
     const operationHead = mode === 'semantic-probe' ? null : head(root);
     const expectedDocs = path.join(path.resolve(root), 'docs', 'screenshots', 'caribbean-naval');
     if (path.resolve(docsDirectory) !== expectedDocs) throw new CaribbeanNavalVerificationError('destination');
+    const expectedDocsReal = validateNavalDocsDestination(root, expectedDocs);
     if (mode !== 'semantic-probe' && !cleanTrackedWorktree(root)) throw new CaribbeanNavalVerificationError('dirty-worktree');
     tempDirectory = fs.mkdtempSync(path.join(tempParent, 'caribbean-naval-evidence-'));
     const generation = await generate({
@@ -925,7 +1027,7 @@ export async function runNavalEvidenceCli({
       result = 0;
     } else if (mode === 'capture') {
       validateRepositoryUnchanged(root, operationHead, source);
-      const changed = publishGeneration(tempDirectory, docsDirectory, generation);
+      const changed = publishGeneration(tempDirectory, docsDirectory, expectedDocsReal, generation);
       line = `${prefix}_OK head=${operationHead} changed=${changed}`;
       result = 0;
     } else {

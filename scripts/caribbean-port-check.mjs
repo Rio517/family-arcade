@@ -211,10 +211,16 @@ async function buildNormalProduction(signal) {
   console.log('Building the normal production bundle…');
   await new Promise((resolve, reject) => {
     const child = spawn('npm', ['run', 'build'], { cwd: ROOT, env, stdio: 'inherit' });
-    const abort = () => child.kill('SIGTERM');
+    let forceTimer = null;
+    const abort = () => {
+      child.kill('SIGTERM');
+      forceTimer = setTimeout(() => child.kill('SIGKILL'), 250);
+      forceTimer.unref?.();
+    };
     signal?.addEventListener('abort', abort, { once: true });
     child.once('error', reject);
     child.once('exit', (code) => {
+      if (forceTimer !== null) clearTimeout(forceTimer);
       signal?.removeEventListener('abort', abort);
       if (signal?.aborted) reject(abortReason(signal));
       else if (code === 0) resolve();
@@ -223,22 +229,117 @@ async function buildNormalProduction(signal) {
   });
 }
 
+function portDeadlineError(timeoutMs) {
+  return new Error(`Port evidence command exceeded ${timeoutMs}ms`);
+}
+
+function passivePortDeadline(signal) {
+  return {
+    signal,
+    throwIfExpired() {
+      if (signal.aborted) throw abortReason(signal);
+    },
+    async race(value) {
+      this.throwIfExpired();
+      const result = await value;
+      this.throwIfExpired();
+      return result;
+    },
+    async cleanup(value) {
+      return value;
+    },
+  };
+}
+
 export async function runWithPortCheckDeadline(operation, timeoutMs = PORT_CHECK_DEADLINE_MS) {
   invariant(Number.isFinite(timeoutMs) && timeoutMs > 0, 'port evidence deadline is invalid');
   const controller = new AbortController();
-  const timer = setTimeout(() => {
-    controller.abort(new Error(`Port evidence command exceeded ${timeoutMs}ms`));
+  const startedAt = performance.now();
+  const expiresAt = startedAt + timeoutMs;
+  const cleanupReserveMs = Math.min(5_000, Math.max(5, timeoutMs * 0.05));
+  const abortAfterMs = Math.max(0, timeoutMs - cleanupReserveMs);
+  const reason = portDeadlineError(timeoutMs);
+  const abortTimer = setTimeout(() => controller.abort(reason), abortAfterMs);
+  let rejectHardDeadline;
+  const hardDeadline = new Promise((_, reject) => { rejectHardDeadline = reject; });
+  const hardTimer = setTimeout(() => {
+    controller.abort(reason);
+    rejectHardDeadline(reason);
   }, timeoutMs);
-  timer.unref?.();
+  const throwIfExpired = () => {
+    if (controller.signal.aborted || performance.now() >= expiresAt) {
+      controller.abort(reason);
+      throw reason;
+    }
+  };
+  const deadline = {
+    signal: controller.signal,
+    expiresAt,
+    timeoutMs,
+    throwIfExpired,
+    race(value, { onLateResolve } = {}) {
+      const candidate = Promise.resolve(value);
+      const disposeLate = (result) => {
+        if (onLateResolve) void Promise.resolve(onLateResolve(result)).catch(() => {});
+      };
+      return new Promise((resolve, reject) => {
+        let boundarySettled = false;
+        const abort = () => {
+          boundarySettled = true;
+          reject(reason);
+        };
+        controller.signal.addEventListener('abort', abort, { once: true });
+        candidate.then((result) => {
+          controller.signal.removeEventListener('abort', abort);
+          if (boundarySettled) {
+            disposeLate(result);
+            return;
+          }
+          try {
+            throwIfExpired();
+            resolve(result);
+          } catch (error) {
+            boundarySettled = true;
+            disposeLate(result);
+            reject(error);
+          }
+        }, (error) => {
+          controller.signal.removeEventListener('abort', abort);
+          if (!boundarySettled) reject(error);
+        });
+        try {
+          throwIfExpired();
+        } catch (error) {
+          boundarySettled = true;
+          reject(error);
+        }
+      });
+    },
+    cleanup(value) {
+      const remainingMs = expiresAt - performance.now();
+      if (remainingMs <= 0) return Promise.reject(reason);
+      let cleanupTimer;
+      return Promise.race([
+        Promise.resolve(value),
+        new Promise((_, reject) => {
+          cleanupTimer = setTimeout(() => reject(reason), remainingMs);
+        }),
+      ]).finally(() => clearTimeout(cleanupTimer));
+    },
+  };
   try {
-    const result = await operation(controller.signal);
-    if (controller.signal.aborted) throw abortReason(controller.signal);
+    const result = await Promise.race([
+      Promise.resolve().then(() => operation(controller.signal, deadline)),
+      hardDeadline,
+    ]);
+    throwIfExpired();
     return result;
   } catch (error) {
-    if (controller.signal.aborted) throw abortReason(controller.signal);
+    if (controller.signal.aborted || performance.now() >= expiresAt) throw reason;
     throw error;
   } finally {
-    clearTimeout(timer);
+    clearTimeout(abortTimer);
+    clearTimeout(hardTimer);
   }
 }
 
@@ -261,6 +362,8 @@ export function validateProgrammaticPortDestination(outputDirectory) {
   const trackedResolved = fs.realpathSync(trackedLexical);
   invariant(!insideDirectory(resolved, trackedResolved),
     'programmatic port evidence cannot target tracked evidence');
+  invariant(!fs.lstatSync(lexical).isSymbolicLink(),
+    'programmatic port evidence outputDirectory cannot be a symbolic link');
   return resolved;
 }
 
@@ -268,11 +371,20 @@ function independentNextSeed(seed) {
   return (Math.imul(1_664_525, seed >>> 0) + 1_013_904_223) >>> 0;
 }
 
+function isUint32(value) {
+  return Number.isInteger(value) && value >= 0 && value <= 0xffff_ffff;
+}
+
 export function evaluateStrategicSailingCausality({
   storageWrites,
   lifecycle,
   navigationEvents,
   navalEvents,
+  initialNavigationRng,
+  returnedNavigationRng,
+  initialNavalRng,
+  returnedNavalRng,
+  persistedNavalInputSeed,
   initialWorldRng,
   returnedWorldRng,
 }) {
@@ -296,19 +408,24 @@ export function evaluateStrategicSailingCausality({
   )).length;
   const navigationTransitionsVerified = Array.isArray(navigationEvents)
     && navigationEvents.length === 2
-    && navigationEvents.every((transition) => Number.isSafeInteger(transition?.before)
-      && transition.after === independentNextSeed(transition.before))
-    && navigationEvents[1].before === navigationEvents[0].after;
+    && navigationEvents.every((transition) => isUint32(transition?.before)
+      && isUint32(transition?.after) && transition.after === independentNextSeed(transition.before))
+    && isUint32(initialNavigationRng) && navigationEvents[0].before === initialNavigationRng
+    && navigationEvents[1].before === navigationEvents[0].after
+    && isUint32(returnedNavigationRng) && navigationEvents[1].after === returnedNavigationRng;
   const navalTransitionVerified = Array.isArray(navalEvents)
     && navalEvents.length === 1
-    && Number.isSafeInteger(navalEvents[0]?.before)
-    && navalEvents[0].after === independentNextSeed(navalEvents[0].before);
+    && isUint32(navalEvents[0]?.before) && isUint32(navalEvents[0]?.after)
+    && navalEvents[0].after === independentNextSeed(navalEvents[0].before)
+    && isUint32(initialNavalRng) && navalEvents[0].before === initialNavalRng
+    && isUint32(returnedNavalRng) && navalEvents[0].after === returnedNavalRng
+    && isUint32(persistedNavalInputSeed) && navalEvents[0].after === persistedNavalInputSeed;
   return {
     persistedBeforeMount,
     campaignWritesDuringBattle,
     navigationTransitionsVerified,
     navalTransitionVerified,
-    worldUnchanged: Number.isSafeInteger(initialWorldRng) && returnedWorldRng === initialWorldRng,
+    worldUnchanged: isUint32(initialWorldRng) && returnedWorldRng === initialWorldRng,
   };
 }
 
@@ -377,16 +494,57 @@ export async function stopStaticServer(server) {
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 }
 
+let publicationTemporarySequence = 0;
+
+function safePublicationFile(outputDirectory, filename) {
+  invariant(filename === path.basename(filename) && !filename.includes('/') && !filename.includes('\\'),
+    `publication filename is invalid: ${filename}`);
+  const root = path.resolve(outputDirectory);
+  const rootStatus = fs.lstatSync(root, { throwIfNoEntry: false });
+  invariant(rootStatus?.isDirectory() && !rootStatus.isSymbolicLink(),
+    'publication outputDirectory must be a real directory');
+  const destination = path.join(root, filename);
+  const status = fs.lstatSync(destination, { throwIfNoEntry: false });
+  invariant(status === undefined || (status.isFile() && !status.isSymbolicLink()),
+    `publication destination cannot be a symbolic link: ${filename}`);
+  invariant(fs.realpathSync(path.dirname(destination)) === fs.realpathSync(root),
+    `publication destination parent escaped outputDirectory: ${filename}`);
+  return { destination, status };
+}
+
 function saveIfChanged(filename, bytes, outputDirectory = OUT) {
-  const destination = path.join(outputDirectory, filename);
+  const { destination, status } = safePublicationFile(outputDirectory, filename);
   const next = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
-  const current = fs.existsSync(destination) ? fs.readFileSync(destination) : null;
+  let current = null;
+  if (status?.isFile()) {
+    const descriptor = fs.openSync(destination, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    try {
+      current = fs.readFileSync(descriptor);
+    } finally {
+      fs.closeSync(descriptor);
+    }
+  }
   if (current?.equals(next)) {
     console.log(`unchanged: ${filename}`);
     return;
   }
-  fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.writeFileSync(destination, next);
+  const temporary = path.join(outputDirectory, `.${filename}.${process.pid}.${publicationTemporarySequence += 1}.tmp`);
+  let descriptor;
+  try {
+    descriptor = fs.openSync(
+      temporary,
+      fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY | fs.constants.O_NOFOLLOW,
+      0o600,
+    );
+    fs.writeFileSync(descriptor, next);
+    fs.closeSync(descriptor);
+    descriptor = undefined;
+    safePublicationFile(outputDirectory, filename);
+    fs.renameSync(temporary, destination);
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+    fs.rmSync(temporary, { force: true });
+  }
   console.log(`${current ? 'updated' : 'new'}: ${filename}`);
 }
 
@@ -426,9 +584,17 @@ export function publishNormalRouteComparison({ comparison, metricsBytes, outputD
   };
 }
 
-async function installBrowserBoundary(context, { installDate = true } = {}) {
-  await context.addInitScript(
-    ({ nowFixtures, seedFixtures, uuidFixtures, traceKey, writerLock, currentSaveKey, previousSaveKey, usersRaw, installDateFixture }) => {
+export function browserBoundaryInitScript({
+  nowFixtures,
+  seedFixtures,
+  uuidFixtures,
+  traceKey,
+  writerLock,
+  currentSaveKey,
+  previousSaveKey,
+  usersRaw,
+  installDateFixture,
+}) {
       const defaultTrace = {
         nowIndex: 0,
         seedIndex: 0,
@@ -528,10 +694,28 @@ async function installBrowserBoundary(context, { installDate = true } = {}) {
           control.writerHeld = false;
         },
       };
+      let navalMounted = false;
+      let observer = null;
+      const recordNavalMount = () => {
+        if (navalMounted) return;
+        const visible = document.querySelector('[data-testid="naval-elapsed"]');
+        if (visible === null) return;
+        navalMounted = true;
+        observer?.disconnect();
+        trace.lifecycle.push({
+          sequence: ++trace.sequence,
+          type: 'naval-mount',
+          storageWriteCount: trace.storageWrites.length,
+        });
+        persist();
+      };
       const nativeSetItem = Storage.prototype.setItem;
       Object.defineProperty(Storage.prototype, 'setItem', {
         configurable: true,
         value(key, value) {
+          if (this === localStorage && (key === currentSaveKey || key === previousSaveKey)) {
+            recordNavalMount();
+          }
           if (this === localStorage && key === currentSaveKey && control.failNextStorageWrite) {
             control.failNextStorageWrite = false;
             throw new DOMException('Port-check forced storage failure', 'QuotaExceededError');
@@ -550,21 +734,6 @@ async function installBrowserBoundary(context, { installDate = true } = {}) {
           return result;
         },
       });
-      let navalMounted = false;
-      let observer = null;
-      const recordNavalMount = () => {
-        if (navalMounted) return;
-        const visible = document.querySelector('[data-testid="naval-elapsed"]');
-        if (visible === null) return;
-        navalMounted = true;
-        observer?.disconnect();
-        trace.lifecycle.push({
-          sequence: ++trace.sequence,
-          type: 'naval-mount',
-          storageWriteCount: trace.storageWrites.length,
-        });
-        persist();
-      };
       observer = new MutationObserver(recordNavalMount);
       observer.observe(document, { childList: true, subtree: true });
       recordNavalMount();
@@ -587,7 +756,11 @@ async function installBrowserBoundary(context, { installDate = true } = {}) {
       }
       persist();
       window.__CARIBBEAN_PORT_CHECK__ = control;
-    },
+}
+
+async function installBrowserBoundary(context, { installDate = true } = {}) {
+  await context.addInitScript(
+    browserBoundaryInitScript,
     {
       nowFixtures: NOW_FIXTURES,
       seedFixtures: SEED_FIXTURES,
@@ -2234,6 +2407,11 @@ export async function runStrategicSailingJourney({
       lifecycle: terminalBoundaryTrace.lifecycle,
       navigationEvents: navigationEvents.map((event) => event.payload.navigationRng),
       navalEvents: navalEvents.map((event) => event.payload.navalRng),
+      initialNavigationRng: initialState.rng.navigation,
+      returnedNavigationRng: returnedEnvelope.payload.state.rng.navigation,
+      initialNavalRng: initialState.rng.naval,
+      returnedNavalRng: returnedEnvelope.payload.state.rng.naval,
+      persistedNavalInputSeed: navalEnvelope.payload.state.mode.input.seed,
       initialWorldRng: initialState.rng.world,
       returnedWorldRng: returnedEnvelope.payload.state.rng.world,
     });
@@ -3099,8 +3277,9 @@ function attachStrategicEvidence(run, strategic) {
   for (const [filename, state] of strategic.screenshotStates) run.screenshotStates.set(filename, state);
 }
 
-async function runPortCheckOperationCore({ outputDirectory, signal, dependencies = {} }) {
+async function runPortCheckOperationCore({ outputDirectory, signal, deadline, dependencies = {} }) {
   invariant(signal instanceof AbortSignal, 'port evidence operation signal is invalid');
+  const operationDeadline = deadline ?? passivePortDeadline(signal);
   const services = {
     build: buildNormalProduction,
     assertIsolation: assertNormalBuildIsolation,
@@ -3113,21 +3292,25 @@ async function runPortCheckOperationCore({ outputDirectory, signal, dependencies
     verifyArtResponse: verifyEmittedArtResponse,
     launchBrowser: () => chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined }),
     stopServer: stopStaticServer,
+    makeRunDirectory: () => fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-run-')),
+    removeRunDirectory: (directory) => fs.rmSync(directory, { recursive: true, force: true }),
     afterResourcesStarted: () => {},
     ...dependencies,
   };
-  await services.build(signal);
-  signal.throwIfAborted();
+  await operationDeadline.race(services.build(signal));
+  operationDeadline.throwIfExpired();
   services.assertIsolation();
   const emittedArt = services.readArt();
   const emittedNaval = services.readNaval();
   const assetReport = services.readAssetReport();
-  signal.throwIfAborted();
-  const { server, baseUrl } = await services.startServer(signal);
+  operationDeadline.throwIfExpired();
+  let server;
+  let baseUrl;
   let browser;
   let browserClosePromise;
-  const firstDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-run-a-'));
-  const secondDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-run-b-'));
+  let firstDirectory;
+  let secondDirectory;
+  const runDirectories = [];
   const closeBrowser = () => {
     if (browser === undefined) return Promise.resolve();
     browserClosePromise ??= Promise.resolve().then(() => browser.close());
@@ -3136,47 +3319,65 @@ async function runPortCheckOperationCore({ outputDirectory, signal, dependencies
   const abortBrowser = () => { void closeBrowser(); };
   signal.addEventListener('abort', abortBrowser, { once: true });
   try {
-    await services.verifyArtResponse(baseUrl, emittedArt, signal);
-    signal.throwIfAborted();
-    browser = await services.launchBrowser(signal);
-    signal.throwIfAborted();
-    await services.afterResourcesStarted({
+    const started = await operationDeadline.race(
+      services.startServer(signal),
+      { onLateResolve: (resource) => services.stopServer(resource.server) },
+    );
+    server = started.server;
+    baseUrl = started.baseUrl;
+    operationDeadline.throwIfExpired();
+    firstDirectory = services.makeRunDirectory('A');
+    runDirectories.push(firstDirectory);
+    secondDirectory = services.makeRunDirectory('B');
+    runDirectories.push(secondDirectory);
+    await operationDeadline.race(services.verifyArtResponse(baseUrl, emittedArt, signal));
+    operationDeadline.throwIfExpired();
+    browser = await operationDeadline.race(
+      services.launchBrowser(signal),
+      { onLateResolve: (lateBrowser) => lateBrowser.close() },
+    );
+    operationDeadline.throwIfExpired();
+    await operationDeadline.race(services.afterResourcesStarted({
       browser,
       server,
       baseUrl,
-      runDirectories: [firstDirectory, secondDirectory],
-    });
-    signal.throwIfAborted();
+      runDirectories: [...runDirectories],
+    }));
+    operationDeadline.throwIfExpired();
     console.log('Running deterministic browser journey A…');
-    const first = await runJourney(browser, baseUrl, firstDirectory, emittedArt, emittedNaval, assetReport);
-    signal.throwIfAborted();
+    const first = await operationDeadline.race(
+      runJourney(browser, baseUrl, firstDirectory, emittedArt, emittedNaval, assetReport),
+    );
+    operationDeadline.throwIfExpired();
     assertRequestedGraphIsolation(first.metrics);
-    const firstStrategic = await runStrategicSailingJourney({
+    const firstStrategic = await operationDeadline.race(runStrategicSailingJourney({
       browser,
       baseUrl,
       runDirectory: firstDirectory,
       emittedNaval,
-    });
-    signal.throwIfAborted();
+    }));
+    operationDeadline.throwIfExpired();
     attachStrategicEvidence(first, firstStrategic);
     console.log('Running deterministic browser journey B…');
-    const second = await runJourney(browser, baseUrl, secondDirectory, emittedArt, emittedNaval, assetReport);
-    signal.throwIfAborted();
+    const second = await operationDeadline.race(
+      runJourney(browser, baseUrl, secondDirectory, emittedArt, emittedNaval, assetReport),
+    );
+    operationDeadline.throwIfExpired();
     assertRequestedGraphIsolation(second.metrics);
-    const secondStrategic = await runStrategicSailingJourney({
+    const secondStrategic = await operationDeadline.race(runStrategicSailingJourney({
       browser,
       baseUrl,
       runDirectory: secondDirectory,
       emittedNaval,
-    });
-    signal.throwIfAborted();
+    }));
+    operationDeadline.throwIfExpired();
     attachStrategicEvidence(second, secondStrategic);
     console.log('Checking memory-only port warning clearance at desktop and exact supported minimum…');
-    await runPortMemoryWarningProbe(browser, baseUrl, { width: 960, height: 600 });
-    await runPortMemoryWarningProbe(browser, baseUrl, { width: 1440, height: 900 });
-    signal.throwIfAborted();
-    const { metricsBytes, comparison } = await compareRuns(first, second);
-    signal.throwIfAborted();
+    await operationDeadline.race(runPortMemoryWarningProbe(browser, baseUrl, { width: 960, height: 600 }));
+    await operationDeadline.race(runPortMemoryWarningProbe(browser, baseUrl, { width: 1440, height: 900 }));
+    operationDeadline.throwIfExpired();
+    const { metricsBytes, comparison } = await operationDeadline.race(compareRuns(first, second));
+    operationDeadline.throwIfExpired();
     const publication = publishNormalRouteComparison({ comparison, metricsBytes, outputDirectory });
     if (process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1') {
       const artifacts = [...publication.artifactHashes]
@@ -3193,21 +3394,20 @@ async function runPortCheckOperationCore({ outputDirectory, signal, dependencies
   } finally {
     signal.removeEventListener('abort', abortBrowser);
     try {
-      await closeBrowser();
+      await operationDeadline.cleanup(closeBrowser());
     } finally {
       try {
-        await services.stopServer(server);
+        if (server !== undefined) await operationDeadline.cleanup(services.stopServer(server));
       } finally {
-        fs.rmSync(firstDirectory, { recursive: true, force: true });
-        fs.rmSync(secondDirectory, { recursive: true, force: true });
+        for (const directory of runDirectories) services.removeRunDirectory(directory);
       }
     }
   }
 }
 
-export async function runPortCheckOperation({ outputDirectory, signal, dependencies } = {}) {
+export async function runPortCheckOperation({ outputDirectory, signal, deadline, dependencies } = {}) {
   const safeOutputDirectory = validateProgrammaticPortDestination(outputDirectory);
-  return runPortCheckOperationCore({ outputDirectory: safeOutputDirectory, signal, dependencies });
+  return runPortCheckOperationCore({ outputDirectory: safeOutputDirectory, signal, deadline, dependencies });
 }
 
 export async function runPortCheck(options) {
@@ -3220,7 +3420,7 @@ export async function runPortCheck(options) {
     outputDirectory = validateProgrammaticPortDestination(options.outputDirectory);
   }
   return runWithPortCheckDeadline(
-    (signal) => runPortCheckOperationCore({ outputDirectory, signal }),
+    (signal, deadline) => runPortCheckOperationCore({ outputDirectory, signal, deadline }),
     PORT_CHECK_DEADLINE_MS,
   );
 }
