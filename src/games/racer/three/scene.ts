@@ -1,21 +1,26 @@
 /**
  * The three.js view for Rainbow Racer — a grassy arena, a rainbow sky, one or
- * two karts (each with its chosen character riding on top), spinning coins, and
- * a camera that trails the player's own kart.
+ * two racing bunnies, spinning coins, and a camera that trails the player's
+ * own steed. The animals race by themselves (the lead designer's decree); the
+ * chosen character shows in the HUD, and 3D riders arrive with their models.
  *
  * Framework-free: the page builds one of these, then each frame hands it a plain
- * view (kart positions + coins) to mirror. All geometry is procedural and the
- * driver is an emoji drawn to a canvas texture, so nothing is downloaded and the
- * PWA stays offline.
+ * view (racer positions + coins) to mirror. The scenery is procedural; the
+ * steed is a bundled artist-made GLB, precached so the PWA stays offline.
  */
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { disposeDeep } from '@shared/three/disposeDeep';
 import { ARENA_RADIUS, type Coin } from '../domain/kart';
+import bunnyUrl from '../assets/bunny.glb?url';
 
-/** The rider sprite's resting height, seated in the kart's cockpit. */
-const DRIVER_Y = 7.6;
+/** Nose-to-tail length the steed is scaled to (the old kart was ~9 long). */
+const STEED_LEN = 9.5;
+/** Materials tinted toward the player colour so the two steeds read apart. */
+const STEED_TINT = new Set(['BunnyCoat', 'LavenderFurLocks']);
 
 // Scenery palettes (plain number lists — safe to share; materials are not, so
 // those are always built per scene so one race's teardown can't free another's).
@@ -25,8 +30,9 @@ const RAINBOW = [0xff5a5a, 0xff9f45, 0xffe14a, 0x5fd08a, 0x4aa3ff, 0x9b6bff];
 const BALLOONS = [0xff5d6c, 0x4aa3ff, 0xffd23f, 0x53d08a];
 
 export interface RacerLook {
+  /** Shown in the HUD score pill (the steed itself carries no rider yet). */
   emoji: string;
-  /** Body color of the little kart. */
+  /** The player colour the steed's coat is tinted toward. */
   color: number;
 }
 
@@ -40,20 +46,6 @@ export interface SceneKart {
 export interface SceneView {
   karts: SceneKart[];
   coins: Coin[];
-}
-
-function emojiTexture(emoji: string): THREE.CanvasTexture {
-  const size = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d')!;
-  ctx.font = `${size * 0.78}px serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(emoji, size / 2, size / 2 + size * 0.04);
-  const tex = new THREE.CanvasTexture(c);
-  tex.anisotropy = 4;
-  return tex;
 }
 
 /** Deterministic 0–1 "noise" from an index — no Math.random, so scenery is
@@ -104,8 +96,8 @@ function skyTexture(): THREE.Texture {
 
 interface KartObj {
   group: THREE.Group;
-  wheels: THREE.Object3D[];
-  driver: THREE.Sprite;
+  /** Holds the bunny once its GLB lands; bobbed for the gallop. */
+  steed: THREE.Group;
 }
 
 export class RacerScene {
@@ -454,98 +446,54 @@ export class RacerScene {
   }
 
   /**
-   * A little kart, modelled from rounded parts instead of a raw box: a chassis
-   * pan, a cockpit hump, a tapered nose, fenders over fat rubber tyres, a chrome
-   * bumper and hubs, headlights, and a rear wing. Still 100% procedural — no
-   * assets — and its wheels are groups whose axle is local X, so `sync` rolls
-   * them with `rotation.x`. The chosen character rides on top as before.
+   * A racing steed with its chosen character riding on top. The bunny (the
+   * girls' decree: you race ON an animal, never in a car) arrives async from
+   * its bundled GLB — one fetch, cloned per seat — and is tinted gently
+   * toward the player colour so the two racers read apart at a glance.
    */
   private buildKart(look: RacerLook): KartObj {
     const group = new THREE.Group();
-    const paint = new THREE.MeshStandardMaterial({ color: look.color, roughness: 0.32, metalness: 0.1 });
-    const chrome = new THREE.MeshStandardMaterial({ color: 0xe6ebf2, metalness: 1, roughness: 0.16 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x2a2030, roughness: 0.5 });
-    const tyreMat = new THREE.MeshStandardMaterial({ color: 0x17171f, roughness: 0.85 });
-
-    const pan = new THREE.Mesh(new RoundedBoxGeometry(6.4, 1.5, 9.2, 5, 0.55), paint);
-    pan.position.y = 1.9;
-    pan.castShadow = true;
-    const hood = new THREE.Mesh(new RoundedBoxGeometry(5.0, 2.0, 5.2, 5, 0.7), paint);
-    hood.position.set(0, 3.0, -1.1);
-    hood.castShadow = true;
-    const nose = new THREE.Mesh(new RoundedBoxGeometry(5.4, 1.4, 3.4, 5, 0.55), paint);
-    nose.position.set(0, 2.1, 4.0);
-    nose.scale.set(0.82, 0.85, 1);
-    nose.castShadow = true;
-    const seat = new THREE.Mesh(new RoundedBoxGeometry(3.0, 1.0, 2.6, 4, 0.4), dark);
-    seat.position.set(0, 3.7, -0.4);
-    group.add(pan, hood, nose, seat);
-
-    const bumper = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 5.2, 16), chrome);
-    bumper.rotation.z = Math.PI / 2;
-    bumper.position.set(0, 1.7, 5.4);
-    bumper.castShadow = true;
-    group.add(bumper);
-
-    const lightMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      emissive: 0xfff2c0,
-      emissiveIntensity: 0.35,
-      roughness: 0.2,
-    });
-    for (const hx of [-1.5, 1.5]) {
-      const hl = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 16), lightMat);
-      hl.position.set(hx, 2.2, 5.05);
-      hl.scale.z = 0.6;
-      group.add(hl);
-    }
-
-    // Fat rounded tyre + chrome hub, oriented so the wheel group's local X is
-    // the axle (roll = rotation.x). Geometry is shared across this kart's wheels.
-    const tyreGeo = new THREE.TorusGeometry(1.15, 0.6, 14, 24);
-    const hubGeo = new THREE.CylinderGeometry(0.6, 0.6, 1.5, 18);
-    const fenderGeo = new THREE.TorusGeometry(1.7, 0.42, 10, 20, Math.PI);
-    const wheels: THREE.Object3D[] = [];
-    for (const [wx, wz] of [[-3.3, 3], [3.3, 3], [-3.3, -3], [3.3, -3]] as [number, number][]) {
-      const wheel = new THREE.Group();
-      const tyre = new THREE.Mesh(tyreGeo, tyreMat);
-      tyre.rotation.y = Math.PI / 2;
-      tyre.castShadow = true;
-      const hub = new THREE.Mesh(hubGeo, chrome);
-      hub.rotation.z = Math.PI / 2;
-      hub.castShadow = true;
-      wheel.add(tyre, hub);
-      wheel.position.set(wx, 1.5, wz);
-      wheels.push(wheel);
-      group.add(wheel);
-
-      const fender = new THREE.Mesh(fenderGeo, paint);
-      fender.rotation.y = Math.PI / 2;
-      fender.position.set(wx, 1.9, wz);
-      fender.castShadow = true;
-      group.add(fender);
-    }
-
-    const postGeo = new THREE.CylinderGeometry(0.22, 0.22, 2.2, 10);
-    for (const px of [-1.8, 1.8]) {
-      const post = new THREE.Mesh(postGeo, dark);
-      post.position.set(px, 3.4, -4.2);
-      group.add(post);
-    }
-    const wing = new THREE.Mesh(new RoundedBoxGeometry(5.2, 0.35, 1.6, 3, 0.16), paint);
-    wing.position.set(0, 4.5, -4.3);
-    wing.castShadow = true;
-    group.add(wing);
-
-    const driver = new THREE.Sprite(
-      new THREE.SpriteMaterial({ map: emojiTexture(look.emoji), transparent: true }),
-    );
-    driver.scale.set(9, 9, 1);
-    driver.position.set(0, DRIVER_Y, -0.4);
-    group.add(driver);
+    const steed = new THREE.Group();
+    group.add(steed);
+    this.mountSteed(steed, look);
     this.scene.add(group);
 
-    return { group, wheels, driver };
+    return { group, steed };
+  }
+
+  /** One shared GLB fetch; each seat gets a clone with its own tinted coat. */
+  private steedGltf: Promise<THREE.Group> | null = null;
+
+  private mountSteed(steed: THREE.Group, look: RacerLook): void {
+    this.steedGltf ??= new Promise((resolve, reject) => {
+      new GLTFLoader()
+        .setMeshoptDecoder(MeshoptDecoder)
+        .load(bunnyUrl, (gltf) => resolve(gltf.scene), undefined, reject);
+    });
+    this.steedGltf
+      .then((template) => {
+        if (this.disposed) return;
+        const model = template.clone(true);
+        const tint = new THREE.Color(look.color);
+        model.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          mesh.castShadow = true;
+          const mat = mesh.material as THREE.MeshStandardMaterial;
+          if (mat && STEED_TINT.has(mat.name)) {
+            const own = mat.clone();
+            own.color.lerp(tint, 0.4);
+            mesh.material = own;
+          }
+        });
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const s = STEED_LEN / size.z;
+        model.scale.setScalar(s);
+        model.position.y = -box.min.y * s;
+        steed.add(model);
+      })
+      .catch((err) => console.error('steed failed to load', err));
   }
 
   private buildCoinTemplate(): THREE.Group {
@@ -587,10 +535,11 @@ export class RacerScene {
       if (!obj) return;
       obj.group.position.set(k.x, 0, k.z);
       obj.group.rotation.y = k.heading;
-      const wheelSpin = k.speed * dt * 0.5;
-      for (const w of obj.wheels) w.rotation.x += wheelSpin;
-      // Driving is gameplay; the happy bounce is decoration.
-      if (!this.reducedMotion) obj.driver.position.y = DRIVER_Y + Math.sin(this.spin * 6 + i) * 0.4;
+      // Driving is gameplay; the gallop is decoration.
+      if (!this.reducedMotion) {
+        const gait = Math.min(1, k.speed / 34); // full stride at cruise speed
+        obj.steed.position.y = Math.abs(Math.sin(this.spin * 9 + i * 1.7)) * 0.55 * gait;
+      }
     });
 
     const live = this.liveCoinIds;
