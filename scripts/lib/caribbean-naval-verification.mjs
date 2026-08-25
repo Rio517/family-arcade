@@ -196,40 +196,81 @@ function propertyName(node) {
   return null;
 }
 
-function variableObject(source, identifier) {
-  const matches = [];
+function closedObjectProperties(object) {
+  const properties = new Map();
+  for (const property of object.properties) {
+    if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) return null;
+    const name = propertyName(property.name);
+    if (name === null || properties.has(name)) return null;
+    properties.set(name, property);
+  }
+  return properties;
+}
+
+function authenticViteDefineConfig(identifier, checker) {
+  if (!ts.isIdentifier(identifier)) return false;
+  const symbol = checker.getSymbolAtLocation(identifier);
+  const declarations = symbol?.declarations ?? [];
+  if (declarations.length !== 1 || !ts.isImportSpecifier(declarations[0])) return false;
+  const declaration = declarations[0];
+  const importedName = declaration.propertyName?.text ?? declaration.name.text;
+  const importDeclaration = declaration.parent?.parent?.parent;
+  return importedName === 'defineConfig' && declaration.name.text === identifier.text
+    && ts.isImportDeclaration(importDeclaration)
+    && ts.isStringLiteral(importDeclaration.moduleSpecifier)
+    && importDeclaration.moduleSpecifier.text === 'vite';
+}
+
+function valueSymbolAtIdentifier(identifier, checker) {
+  if (ts.isShorthandPropertyAssignment(identifier.parent) && identifier.parent.name === identifier) {
+    return checker.getShorthandAssignmentValueSymbol(identifier.parent) ?? checker.getSymbolAtLocation(identifier);
+  }
+  return checker.getSymbolAtLocation(identifier);
+}
+
+function immutableConstObjectAtUse(source, identifier, checker) {
+  const symbol = valueSymbolAtIdentifier(identifier, checker);
+  const declarations = symbol?.declarations ?? [];
+  if (declarations.length !== 1 || !ts.isVariableDeclaration(declarations[0])) return null;
+  const declaration = declarations[0];
+  const declarationList = declaration.parent;
+  if (declaration.getSourceFile() !== source || !ts.isIdentifier(declaration.name)
+    || !ts.isObjectLiteralExpression(declaration.initializer)
+    || !ts.isVariableDeclarationList(declarationList)
+    || (declarationList.flags & ts.NodeFlags.Const) === 0
+    || declaration.getEnd() >= identifier.getStart(source)) return null;
+  const allowed = new Set([declaration.name, identifier]);
+  let safe = true;
   const visit = (node) => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)
-      && node.name.text === identifier && ts.isObjectLiteralExpression(node.initializer)) {
-      matches.push(node.initializer);
+    if (!safe) return;
+    if (ts.isIdentifier(node) && valueSymbolAtIdentifier(node, checker) === symbol && !allowed.has(node)) {
+      safe = false;
+      return;
     }
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return matches.length === 1 ? matches[0] : null;
+  return safe ? declaration.initializer : null;
 }
 
-function objectValue(source, object, key) {
-  const matches = object.properties.filter((property) => (
-    (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property))
-      && propertyName(property.name) === key
-  ));
-  if (matches.length !== 1) return null;
-  const property = matches[0];
-  if (ts.isPropertyAssignment(property)) {
-    if (ts.isObjectLiteralExpression(property.initializer)) return property.initializer;
-    if (ts.isIdentifier(property.initializer)) return variableObject(source, property.initializer.text);
-    return property.initializer;
-  }
-  return variableObject(source, property.name.text);
+function closedObjectValue(source, object, key, checker, { allowBoundObject = false } = {}) {
+  const properties = closedObjectProperties(object);
+  const property = properties?.get(key);
+  if (!property) return null;
+  const value = ts.isPropertyAssignment(property) ? property.initializer : property.name;
+  if (ts.isObjectLiteralExpression(value)) return value;
+  return allowBoundObject && ts.isIdentifier(value)
+    ? immutableConstObjectAtUse(source, value, checker)
+    : null;
 }
 
-function viteConfigObject(source) {
+function viteConfigObject(source, checker) {
   const exports = source.statements.filter((statement) => ts.isExportAssignment(statement) && !statement.isExportEquals);
   if (exports.length !== 1) return null;
   const expression = exports[0].expression;
   if (ts.isObjectLiteralExpression(expression)) return expression;
-  if (ts.isCallExpression(expression) && expression.arguments.length === 1
+  if (ts.isCallExpression(expression) && authenticViteDefineConfig(expression.expression, checker)
+    && expression.arguments.length === 1
     && ts.isObjectLiteralExpression(expression.arguments[0])) return expression.arguments[0];
   return null;
 }
@@ -280,12 +321,19 @@ function loadAliases(root, universe, scriptProgram) {
   const vitePath = scriptProgram.absoluteByRelative.get('vite.config.ts');
   const source = vitePath ? scriptProgram.program.getSourceFile(vitePath) : null;
   if (!source) sourceFailure('TypeScript program omitted vite.config.ts');
-  const configObject = viteConfigObject(source);
-  const resolveObject = configObject && objectValue(source, configObject, 'resolve');
+  const configObject = viteConfigObject(source, scriptProgram.checker);
+  const resolveObject = configObject && closedObjectValue(
+    source, configObject, 'resolve', scriptProgram.checker,
+  );
   const aliasObject = resolveObject && ts.isObjectLiteralExpression(resolveObject)
-    ? objectValue(source, resolveObject, 'alias')
+    ? closedObjectValue(source, resolveObject, 'alias', scriptProgram.checker, { allowBoundObject: true })
     : null;
   if (!aliasObject || !ts.isObjectLiteralExpression(aliasObject)) sourceFailure('vite.config.ts alias object is missing');
+  const aliasProperties = closedObjectProperties(aliasObject);
+  if (!aliasProperties || aliasProperties.size !== ALIAS_NAMES.length
+    || ALIAS_NAMES.some((name) => !aliasProperties.has(name))) {
+    sourceFailure('vite.config.ts alias object must contain exactly the four approved aliases');
+  }
   const directoryUrlNodes = new Set();
   for (const name of ALIAS_NAMES) {
     const expression = viteAliasExpression(source, aliasObject, name, scriptProgram.checker);
@@ -628,6 +676,9 @@ export function auditCaribbeanNavalSourceClosure(root) {
       const target = resolveLocal(absoluteRoot, importer, edge, aliases, universe, directoryUrlNodes);
       if (target === DIRECTORY_REFERENCE) continue;
       if (target === null) {
+        if (edge.kind === 'script' && edge.specifier.startsWith('#')) {
+          sourceFailure(`unknown bare edge importer=${importer} specifier=${edge.specifier}`);
+        }
         if (isRemoteOrEmbedded(edge.specifier) || externalAllowed(edge.specifier, edge.typeOnly, packages)) continue;
         sourceFailure(`unknown bare edge importer=${importer} specifier=${edge.specifier}`);
       }

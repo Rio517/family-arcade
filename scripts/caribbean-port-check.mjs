@@ -348,6 +348,31 @@ function insideDirectory(candidate, parent) {
   return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
 }
 
+function publicationTrustedAnchor(candidate) {
+  const candidates = [ROOT, os.tmpdir()]
+    .map((directory) => ({ lexical: path.resolve(directory), real: fs.realpathSync(directory) }))
+    .filter(({ lexical }) => insideDirectory(candidate, lexical))
+    .sort((left, right) => right.lexical.length - left.lexical.length);
+  return candidates[0] ?? { lexical: path.parse(candidate).root, real: path.parse(candidate).root };
+}
+
+function pinPublicationDirectory(outputDirectory) {
+  const lexical = path.resolve(outputDirectory);
+  const anchor = publicationTrustedAnchor(lexical);
+  let cursor = anchor.real;
+  for (const component of path.relative(anchor.lexical, lexical).split(path.sep).filter(Boolean)) {
+    cursor = path.join(cursor, component);
+    const status = fs.lstatSync(cursor, { throwIfNoEntry: false });
+    invariant(status !== undefined, 'publication outputDirectory must be an existing directory');
+    invariant(!status.isSymbolicLink(),
+      `publication outputDirectory ancestor cannot be a symbolic link: ${component}`);
+  }
+  const status = fs.lstatSync(cursor, { throwIfNoEntry: false });
+  invariant(status?.isDirectory() && !status.isSymbolicLink(),
+    'publication outputDirectory must be a real directory');
+  return { lexical, real: fs.realpathSync(cursor) };
+}
+
 export function validateProgrammaticPortDestination(outputDirectory) {
   invariant(typeof outputDirectory === 'string' && outputDirectory.trim().length > 0,
     'programmatic port evidence outputDirectory is invalid');
@@ -358,13 +383,25 @@ export function validateProgrammaticPortDestination(outputDirectory) {
     'programmatic port evidence cannot target tracked evidence');
   invariant(fs.statSync(lexical, { throwIfNoEntry: false })?.isDirectory(),
     'programmatic port evidence outputDirectory must be an existing directory');
-  const resolved = fs.realpathSync(lexical);
   const trackedResolved = fs.realpathSync(trackedLexical);
+  invariant(!insideDirectory(fs.realpathSync(lexical), trackedResolved),
+    'programmatic port evidence cannot target tracked evidence');
+  const pinned = pinPublicationDirectory(lexical);
+  const resolved = pinned.real;
   invariant(!insideDirectory(resolved, trackedResolved),
     'programmatic port evidence cannot target tracked evidence');
-  invariant(!fs.lstatSync(lexical).isSymbolicLink(),
-    'programmatic port evidence outputDirectory cannot be a symbolic link');
   return resolved;
+}
+
+export function validateTrackedPortDestination(
+  outputDirectory = OUT,
+  trackedEvidenceRoot = TRACKED_EVIDENCE_ROOT,
+) {
+  const tracked = pinPublicationDirectory(trackedEvidenceRoot);
+  const output = pinPublicationDirectory(outputDirectory);
+  invariant(insideDirectory(output.real, tracked.real),
+    'tracked port evidence outputDirectory escaped tracked docs');
+  return output.real;
 }
 
 function independentNextSeed(seed) {
@@ -496,13 +533,13 @@ export async function stopStaticServer(server) {
 
 let publicationTemporarySequence = 0;
 
-function safePublicationFile(outputDirectory, filename) {
+function safePublicationFile(outputDirectory, filename, expectedRealDirectory) {
   invariant(filename === path.basename(filename) && !filename.includes('/') && !filename.includes('\\'),
     `publication filename is invalid: ${filename}`);
-  const root = path.resolve(outputDirectory);
-  const rootStatus = fs.lstatSync(root, { throwIfNoEntry: false });
-  invariant(rootStatus?.isDirectory() && !rootStatus.isSymbolicLink(),
-    'publication outputDirectory must be a real directory');
+  const pinned = pinPublicationDirectory(outputDirectory);
+  invariant(expectedRealDirectory === undefined || pinned.real === expectedRealDirectory,
+    'publication outputDirectory changed after validation');
+  const root = pinned.real;
   const destination = path.join(root, filename);
   const status = fs.lstatSync(destination, { throwIfNoEntry: false });
   invariant(status === undefined || (status.isFile() && !status.isSymbolicLink()),
@@ -512,43 +549,81 @@ function safePublicationFile(outputDirectory, filename) {
   return { destination, status };
 }
 
-function saveIfChanged(filename, bytes, outputDirectory = OUT) {
-  const { destination, status } = safePublicationFile(outputDirectory, filename);
-  const next = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
-  let current = null;
-  if (status?.isFile()) {
-    const descriptor = fs.openSync(destination, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
-    try {
-      current = fs.readFileSync(descriptor);
-    } finally {
-      fs.closeSync(descriptor);
+const PASSIVE_PUBLICATION_DEADLINE = Object.freeze({ throwIfExpired() {} });
+
+function publishFiles(entries, outputDirectory, deadline = PASSIVE_PUBLICATION_DEADLINE) {
+  const pinned = pinPublicationDirectory(outputDirectory);
+  const root = pinned.real;
+  const staged = [];
+  try {
+    for (const [filename, bytes] of entries) {
+      const { destination, status } = safePublicationFile(root, filename, pinned.real);
+      const next = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
+      let current = null;
+      if (status?.isFile()) {
+        const currentDescriptor = fs.openSync(destination, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+        try {
+          current = fs.readFileSync(currentDescriptor);
+        } finally {
+          fs.closeSync(currentDescriptor);
+        }
+      }
+      if (current?.equals(next)) {
+        staged.push({ filename, changed: false });
+        continue;
+      }
+      const temporary = path.join(
+        root,
+        `.${filename}.${process.pid}.${publicationTemporarySequence += 1}.tmp`,
+      );
+      const stagedFile = {
+        filename,
+        destination,
+        temporary,
+        temporaryCreated: false,
+        changed: true,
+        updated: current !== null,
+      };
+      staged.push(stagedFile);
+      let descriptor;
+      try {
+        descriptor = fs.openSync(
+          temporary,
+          fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY | fs.constants.O_NOFOLLOW,
+          0o600,
+        );
+        stagedFile.temporaryCreated = true;
+        fs.writeFileSync(descriptor, next);
+        fs.closeSync(descriptor);
+        descriptor = undefined;
+      } finally {
+        if (descriptor !== undefined) fs.closeSync(descriptor);
+      }
+    }
+
+    deadline.throwIfExpired();
+    for (const file of staged) {
+      if (!file.changed) continue;
+      deadline.throwIfExpired();
+      safePublicationFile(root, file.filename, pinned.real);
+      fs.renameSync(file.temporary, file.destination);
+      file.temporary = undefined;
+    }
+  } finally {
+    for (const file of staged) {
+      if (file.temporaryCreated && file.temporary !== undefined) fs.rmSync(file.temporary, { force: true });
     }
   }
-  if (current?.equals(next)) {
-    console.log(`unchanged: ${filename}`);
-    return;
+  for (const file of staged) {
+    console.log(file.changed ? `${file.updated ? 'updated' : 'new'}: ${file.filename}` : `unchanged: ${file.filename}`);
   }
-  const temporary = path.join(outputDirectory, `.${filename}.${process.pid}.${publicationTemporarySequence += 1}.tmp`);
-  let descriptor;
-  try {
-    descriptor = fs.openSync(
-      temporary,
-      fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY | fs.constants.O_NOFOLLOW,
-      0o600,
-    );
-    fs.writeFileSync(descriptor, next);
-    fs.closeSync(descriptor);
-    descriptor = undefined;
-    safePublicationFile(outputDirectory, filename);
-    fs.renameSync(temporary, destination);
-  } finally {
-    if (descriptor !== undefined) fs.closeSync(descriptor);
-    fs.rmSync(temporary, { force: true });
-  }
-  console.log(`${current ? 'updated' : 'new'}: ${filename}`);
 }
 
-export function publishNormalRouteComparison({ comparison, metricsBytes, outputDirectory } = {}) {
+function saveIfChanged(filename, bytes, outputDirectory = OUT) {
+  publishFiles([[filename, bytes]], outputDirectory);
+}
+
+export function publishNormalRouteComparison({ comparison, metricsBytes, outputDirectory, deadline } = {}) {
   invariant(comparison?.ok === true, 'normal-route comparison did not succeed');
   invariant(comparison.selectedRun === 'A', 'normal-route publication owner must be run A');
   invariant(comparison.selectedArtifacts instanceof Map && comparison.selectedArtifacts.size === 23,
@@ -572,12 +647,11 @@ export function publishNormalRouteComparison({ comparison, metricsBytes, outputD
     verified.push([name, actualHash, artifact.bytes]);
   }
 
-  const artifactHashes = new Map();
-  for (const [name, actualHash, bytes] of verified) {
-    saveIfChanged(name, bytes, outputDirectory);
-    artifactHashes.set(name, actualHash);
-  }
-  saveIfChanged('metrics.json', metricsBytes, outputDirectory);
+  const artifactHashes = new Map(verified.map(([name, actualHash]) => [name, actualHash]));
+  publishFiles([
+    ...verified.map(([name, , bytes]) => [name, bytes]),
+    ['metrics.json', metricsBytes],
+  ], outputDirectory, deadline);
   return {
     artifactHashes,
     metricsSha256: createHash('sha256').update(metricsBytes).digest('hex'),
@@ -3157,29 +3231,32 @@ async function pixelMismatchStats(firstBytes, secondBytes) {
   };
 }
 
-async function preserveScreenshotMismatch(filename, first, second) {
+async function preserveScreenshotMismatch(filename, first, second, deadline) {
+  deadline.throwIfExpired();
   fs.mkdirSync(MISMATCH_DIAGNOSTIC_DIRECTORY, { recursive: true });
   const stem = filename.replace(/\.png$/, '');
   const firstBytes = first.screenshots.get(filename);
   const secondBytes = second.screenshots.get(filename);
-  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, `${stem}-run-a.png`), firstBytes);
-  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, `${stem}-run-b.png`), secondBytes);
   let pixelStats;
   try {
     pixelStats = await pixelMismatchStats(firstBytes, secondBytes);
   } catch (error) {
     pixelStats = { error: error instanceof Error ? error.message : String(error) };
   }
-  fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, `${stem}-mismatch.json`), `${JSON.stringify({
-    filename,
-    sha256: {
-      runA: createHash('sha256').update(firstBytes).digest('hex'),
-      runB: createHash('sha256').update(secondBytes).digest('hex'),
-    },
-    pixelStats,
-    runA: first.screenshotStates.get(filename) ?? null,
-    runB: second.screenshotStates.get(filename) ?? null,
-  }, null, 2)}\n`);
+  publishFiles([
+    [`${stem}-run-a.png`, firstBytes],
+    [`${stem}-run-b.png`, secondBytes],
+    [`${stem}-mismatch.json`, `${JSON.stringify({
+      filename,
+      sha256: {
+        runA: createHash('sha256').update(firstBytes).digest('hex'),
+        runB: createHash('sha256').update(secondBytes).digest('hex'),
+      },
+      pixelStats,
+      runA: first.screenshotStates.get(filename) ?? null,
+      runB: second.screenshotStates.get(filename) ?? null,
+    }, null, 2)}\n`],
+  ], MISMATCH_DIAGNOSTIC_DIRECTORY, deadline);
 }
 
 function createNormalRouteScreenshotEvidence(first, second) {
@@ -3234,7 +3311,7 @@ function normalRouteScreenshotRun(run, tag) {
   };
 }
 
-async function compareRuns(first, second) {
+async function compareRuns(first, second, deadline) {
   const screenshotEvidence = createNormalRouteScreenshotEvidence(first, second);
   first.metrics.screenshotEvidence = screenshotEvidence;
   second.metrics.screenshotEvidence = screenshotEvidence;
@@ -3249,7 +3326,7 @@ async function compareRuns(first, second) {
     declaredEvidence: screenshotEvidence,
   });
   if (process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1') {
-    await preserveScreenshotMismatch('campaign-result-desktop.png', first, second);
+    await preserveScreenshotMismatch('campaign-result-desktop.png', first, second, deadline);
   }
   invariant(comparison.ok, `Normal-route screenshot comparison failed: ${comparison.issues.join(' | ')}`);
   invariant(canonicalJson(comparison.screenshotEvidence) === canonicalJson(screenshotEvidence),
@@ -3376,18 +3453,23 @@ async function runPortCheckOperationCore({ outputDirectory, signal, deadline, de
     await operationDeadline.race(runPortMemoryWarningProbe(browser, baseUrl, { width: 960, height: 600 }));
     await operationDeadline.race(runPortMemoryWarningProbe(browser, baseUrl, { width: 1440, height: 900 }));
     operationDeadline.throwIfExpired();
-    const { metricsBytes, comparison } = await operationDeadline.race(compareRuns(first, second));
+    const { metricsBytes, comparison } = await operationDeadline.race(compareRuns(first, second, operationDeadline));
     operationDeadline.throwIfExpired();
-    const publication = publishNormalRouteComparison({ comparison, metricsBytes, outputDirectory });
+    const publication = publishNormalRouteComparison({
+      comparison,
+      metricsBytes,
+      outputDirectory,
+      deadline: operationDeadline,
+    });
     if (process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1') {
       const artifacts = [...publication.artifactHashes]
         .map(([filename, sha]) => ({ filename, sha256: sha }))
         .sort((left, right) => left.filename.localeCompare(right.filename));
-      fs.writeFileSync(path.join(MISMATCH_DIAGNOSTIC_DIRECTORY, 'selected-run-a-publication.json'), `${JSON.stringify({
+      publishFiles([['selected-run-a-publication.json', `${JSON.stringify({
         selectedRun: 'A',
         artifacts,
         metricsSha256: publication.metricsSha256,
-      }, null, 2)}\n`);
+      }, null, 2)}\n`]], MISMATCH_DIAGNOSTIC_DIRECTORY, operationDeadline);
     }
     console.log(`Caribbean port evidence passed: 22 byte-identical screenshots plus one terminal WebGL observation; run A selected, integrated route resolved, recovery reloaded.`);
     return { metrics: first.metrics, comparison, publication };
@@ -3412,7 +3494,7 @@ export async function runPortCheckOperation({ outputDirectory, signal, deadline,
 
 export async function runPortCheck(options) {
   const usesTrackedCliDestination = arguments.length === 0;
-  let outputDirectory = OUT;
+  let outputDirectory = usesTrackedCliDestination ? validateTrackedPortDestination() : OUT;
   if (!usesTrackedCliDestination) {
     invariant(options && typeof options === 'object'
       && Object.prototype.hasOwnProperty.call(options, 'outputDirectory'),

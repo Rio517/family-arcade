@@ -312,6 +312,45 @@ test('deadline cancels a noncooperative phase cleans resources and prevents late
   }
 });
 
+test('publication rechecks the monotonic deadline before committing any selected bytes', async () => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-publication-deadline-'));
+  const originalBytes = new Map([
+    ...NORMAL_ROUTE_SCREENSHOTS.map((name) => [name, Buffer.from(`original:${name}`)]),
+    ['metrics.json', Buffer.from('{"original":true}\n')],
+  ]);
+  try {
+    for (const [name, bytes] of originalBytes) fs.writeFileSync(path.join(outputDirectory, name), bytes);
+    const selectedBytes = Buffer.alloc(4 * 1024 * 1024, 0x5a);
+    const selectedHash = sha256(selectedBytes);
+    const comparison = {
+      ok: true,
+      selectedRun: 'A',
+      selectedArtifacts: new Map(NORMAL_ROUTE_SCREENSHOTS.map((name) => [name, {
+        sourceRun: 'A',
+        bytes: selectedBytes,
+        sha256: selectedHash,
+      }])),
+    };
+    await assert.rejects(
+      portCommand.runWithPortCheckDeadline((_signal, deadline) => Promise.resolve(
+        portCommand.publishNormalRouteComparison({
+          comparison,
+          metricsBytes: Buffer.from('{"selected":true}\n'),
+          outputDirectory,
+          deadline,
+        }),
+      ), 10),
+      /Port evidence command exceeded 10ms/,
+    );
+    for (const [name, bytes] of originalBytes) {
+      assert.equal(sha256(fs.readFileSync(path.join(outputDirectory, name))), sha256(bytes), name);
+    }
+  } finally {
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
 test('port operation cleans started browser server and run directories after injected failure', async () => {
   const portCommand = await import('../caribbean-port-check.mjs');
   assert.equal(typeof portCommand.runPortCheckOperation, 'function');
@@ -582,6 +621,37 @@ test('programmatic port evidence rejects descendants and symlink aliases of trac
       assert.deepEqual(fs.readFileSync(outside), original);
       fs.rmSync(outputDirectory, { recursive: true, force: true });
     }
+
+    const ancestorRoot = path.join(temporary, 'ancestor-root');
+    const outsideParent = path.join(temporary, 'outside-parent');
+    const outsidePublication = path.join(outsideParent, 'publication');
+    fs.mkdirSync(ancestorRoot);
+    fs.mkdirSync(outsidePublication, { recursive: true });
+    fs.symlinkSync(outsideParent, path.join(ancestorRoot, 'linked-parent'), 'dir');
+    const outsideBefore = fileHashes(outsidePublication);
+    assert.throws(
+      () => portCommand.publishNormalRouteComparison({
+        comparison: selectedComparison(),
+        metricsBytes: Buffer.from('{"fixture":true}\n'),
+        outputDirectory: path.join(ancestorRoot, 'linked-parent', 'publication'),
+      }),
+      /symbolic link/,
+    );
+    assert.deepEqual(fileHashes(outsidePublication), outsideBefore);
+
+    assert.equal(typeof portCommand.validateTrackedPortDestination, 'function');
+    const syntheticDocs = path.join(temporary, 'synthetic-repo', 'docs');
+    const trackedOutside = path.join(temporary, 'tracked-outside');
+    fs.mkdirSync(path.dirname(syntheticDocs), { recursive: true });
+    fs.mkdirSync(path.join(trackedOutside, 'screenshots', 'caribbean-port'), { recursive: true });
+    fs.symlinkSync(trackedOutside, syntheticDocs, 'dir');
+    assert.throws(
+      () => portCommand.validateTrackedPortDestination(
+        path.join(syntheticDocs, 'screenshots', 'caribbean-port'),
+        syntheticDocs,
+      ),
+      /symbolic link/,
+    );
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
     fs.rmSync(unrelatedDirectory, { recursive: true, force: true });

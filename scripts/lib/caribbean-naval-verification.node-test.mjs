@@ -199,7 +199,12 @@ async function makeTrackedGraph(t, files = {}) {
   const scaffold = {
     'package.json': JSON.stringify({
       dependencies: { react: '1.0.0', '@scope/runtime': '1.0.0' },
-      devDependencies: { '@types/declared': '1.0.0', '@types/scope__typed': '1.0.0', typescript: '1.0.0' },
+      devDependencies: {
+        '@types/declared': '1.0.0',
+        '@types/scope__typed': '1.0.0',
+        typescript: '1.0.0',
+        vite: '1.0.0',
+      },
     }),
     'package-lock.json': '{}\n',
     'tsconfig.json': '{}\n',
@@ -973,6 +978,53 @@ test('rejects unresolved, ambiguous, unknown bare, and alias disagreement edges'
   }
 });
 
+test('rejects package-import script edges instead of silently treating them as fragments', async (t) => {
+  const { auditCaribbeanNavalSourceClosure } = await import('./caribbean-naval-verification.mjs');
+  const packageBase = {
+    dependencies: { react: '1.0.0', '@scope/runtime': '1.0.0' },
+    devDependencies: {
+      '@types/declared': '1.0.0',
+      '@types/scope__typed': '1.0.0',
+      typescript: '1.0.0',
+      vite: '1.0.0',
+    },
+  };
+  const cases = [
+    {
+      name: 'mapped package import',
+      packageJson: { ...packageBase, imports: { '#caribbean-helper': './src/shared/package-import-helper.ts' } },
+      specifier: '#caribbean-helper',
+      extra: { 'src/shared/package-import-helper.ts': 'export const helper = true;\n' },
+    },
+    {
+      name: 'unmapped package import',
+      packageJson: packageBase,
+      specifier: '#unmapped-caribbean-helper',
+      extra: {},
+    },
+  ];
+  for (const fixture of cases) {
+    const root = await makeTrackedGraph(t, {
+      'package.json': JSON.stringify(fixture.packageJson),
+      'src/games/caribbean/package-import.ts': `import '${fixture.specifier}';\n`,
+      ...fixture.extra,
+    });
+    assert.throws(
+      () => auditCaribbeanNavalSourceClosure(root),
+      (error) => error?.code === 'source-files'
+        && new RegExp(`unknown bare edge.*${fixture.specifier}`).test(error.message),
+      fixture.name,
+    );
+  }
+
+  const documentFragment = await makeTrackedGraph(t, {
+    'src/games/caribbean/fragment.css': '.masked { mask: url(#caribbean-mask); }\n',
+  });
+  assert.ok(auditCaribbeanNavalSourceClosure(documentFragment).paths.includes(
+    'src/games/caribbean/fragment.css',
+  ));
+});
+
 test('rejects generic directory URLs and ignores Vite alias comments or decoys', async (t) => {
   const { auditCaribbeanNavalSourceClosure } = await import('./caribbean-naval-verification.mjs');
   const directoryRoot = await makeTrackedGraph(t, {
@@ -1043,6 +1095,57 @@ test('accepts Vite directory URL exceptions only through exact node:url import b
       fixture.name,
     );
   }
+});
+
+test('accepts only closed Vite alias objects and the authentic vite defineConfig binding', async (t) => {
+  const { auditCaribbeanNavalSourceClosure } = await import('./caribbean-naval-verification.mjs');
+  const aliasObject = `{
+    '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),
+    '@games': fileURLToPath(new URL('./src/games', import.meta.url)),
+    '@app': fileURLToPath(new URL('./src/app', import.meta.url)),
+    '@test': fileURLToPath(new URL('./src/test', import.meta.url)),
+  }`;
+  const aliasObjectWithSpread = aliasObject.replace(/\}\s*$/, '  ...overrides,\n  }');
+  const prelude = "import { fileURLToPath, URL } from 'node:url';";
+  const cases = [
+    {
+      name: 'local defineConfig wrapper',
+      config: `${prelude}\nfunction defineConfig(value) { return value; }\nconst alias = ${aliasObject};\nexport default defineConfig({ resolve: { alias } });\n`,
+    },
+    {
+      name: 'foreign defineConfig wrapper',
+      config: `${prelude}\nimport { defineConfig } from 'react';\nconst alias = ${aliasObject};\nexport default defineConfig({ resolve: { alias } });\n`,
+    },
+    {
+      name: 'root spread override',
+      config: `${prelude}\nimport { defineConfig } from 'vite';\nconst alias = ${aliasObject};\nconst base = { resolve: { alias: {} } };\nexport default defineConfig({ ...base, resolve: { alias } });\n`,
+    },
+    {
+      name: 'alias spread override',
+      config: `${prelude}\nimport { defineConfig } from 'vite';\nconst overrides = { '@shared': '/tmp/escape' };\nconst alias = ${aliasObjectWithSpread};\nexport default defineConfig({ resolve: { alias } });\n`,
+    },
+    {
+      name: 'post-declaration assignment override',
+      config: `${prelude}\nimport { defineConfig } from 'vite';\nconst alias = ${aliasObject};\nalias['@shared'] = '/tmp/escape';\nexport default defineConfig({ resolve: { alias } });\n`,
+    },
+    {
+      name: 'Object.assign runtime override',
+      config: `${prelude}\nimport { defineConfig } from 'vite';\nconst alias = ${aliasObject};\nObject.assign(alias, { '@shared': '/tmp/escape' });\nexport default defineConfig({ resolve: { alias } });\n`,
+    },
+  ];
+  for (const fixture of cases) {
+    const root = await makeTrackedGraph(t, { 'vite.config.ts': fixture.config });
+    assert.throws(
+      () => auditCaribbeanNavalSourceClosure(root),
+      (error) => error?.code === 'source-files' && /vite\.config\.ts/.test(error.message),
+      fixture.name,
+    );
+  }
+
+  const authentic = await makeTrackedGraph(t, {
+    'vite.config.ts': `${prelude}\nimport { defineConfig } from 'vite';\nconst alias = ${aliasObject};\nexport default defineConfig({ resolve: { alias } });\n`,
+  });
+  assert.ok(auditCaribbeanNavalSourceClosure(authentic).paths.includes('vite.config.ts'));
 });
 
 test('requires every literal seed and every mandated glob class', async (t) => {
