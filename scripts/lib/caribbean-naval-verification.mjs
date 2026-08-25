@@ -26,6 +26,11 @@ export const CARIBBEAN_NAVAL_SOURCE_SEEDS = [
 ];
 
 const ALIAS_NAMES = ['@shared', '@games', '@app', '@test'];
+const APPROVED_VITE_PLUGIN_CALLS = [
+  { module: 'tidewave/vite-plugin', imported: 'default', arguments: 'none' },
+  { module: '@vitejs/plugin-react', imported: 'default', arguments: 'none' },
+  { module: 'vite-plugin-pwa', imported: 'VitePWA', arguments: 'one-object' },
+];
 const RESOLUTION_EXTENSIONS = [
   '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.css',
   '.glb', '.webp', '.svg', '.png', '.woff2',
@@ -221,6 +226,49 @@ function authenticViteDefineConfig(identifier, checker) {
     && importDeclaration.moduleSpecifier.text === 'vite';
 }
 
+function authenticImportBinding(identifier, checker, expected) {
+  if (!ts.isIdentifier(identifier)) return false;
+  const symbol = checker.getSymbolAtLocation(identifier);
+  const declarations = symbol?.declarations ?? [];
+  if (declarations.length !== 1) return false;
+  const declaration = declarations[0];
+  let imported = null;
+  let local = null;
+  let importDeclaration = null;
+  if (ts.isImportClause(declaration) && declaration.name) {
+    imported = 'default';
+    local = declaration.name.text;
+    importDeclaration = declaration.parent;
+  } else if (ts.isImportSpecifier(declaration)) {
+    imported = declaration.propertyName?.text ?? declaration.name.text;
+    local = declaration.name.text;
+    importDeclaration = declaration.parent?.parent?.parent;
+  }
+  return imported === expected.imported && local === identifier.text
+    && ts.isImportDeclaration(importDeclaration)
+    && ts.isStringLiteral(importDeclaration.moduleSpecifier)
+    && importDeclaration.moduleSpecifier.text === expected.module;
+}
+
+function validApprovedVitePluginCall(node, checker, expected) {
+  if (!ts.isCallExpression(node) || node.questionDotToken || node.typeArguments?.length
+    || !authenticImportBinding(node.expression, checker, expected)) return false;
+  if (expected.arguments === 'none') return node.arguments.length === 0;
+  return expected.arguments === 'one-object' && node.arguments.length === 1
+    && ts.isObjectLiteralExpression(node.arguments[0]);
+}
+
+function vitePluginsAreClosed(configObject, checker) {
+  const properties = closedObjectProperties(configObject);
+  const property = properties?.get('plugins');
+  if (!property) return true;
+  if (!ts.isPropertyAssignment(property) || !ts.isArrayLiteralExpression(property.initializer)
+    || property.initializer.elements.length !== APPROVED_VITE_PLUGIN_CALLS.length) return false;
+  return property.initializer.elements.every((element, index) => (
+    validApprovedVitePluginCall(element, checker, APPROVED_VITE_PLUGIN_CALLS[index])
+  ));
+}
+
 function valueSymbolAtIdentifier(identifier, checker) {
   if (ts.isShorthandPropertyAssignment(identifier.parent) && identifier.parent.name === identifier) {
     return checker.getShorthandAssignmentValueSymbol(identifier.parent) ?? checker.getSymbolAtLocation(identifier);
@@ -322,6 +370,9 @@ function loadAliases(root, universe, scriptProgram) {
   const source = vitePath ? scriptProgram.program.getSourceFile(vitePath) : null;
   if (!source) sourceFailure('TypeScript program omitted vite.config.ts');
   const configObject = viteConfigObject(source, scriptProgram.checker);
+  if (configObject && !vitePluginsAreClosed(configObject, scriptProgram.checker)) {
+    sourceFailure('vite.config.ts plugins must match the approved package plugin calls');
+  }
   const resolveObject = configObject && closedObjectValue(
     source, configObject, 'resolve', scriptProgram.checker,
   );

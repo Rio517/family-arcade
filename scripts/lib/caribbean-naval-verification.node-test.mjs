@@ -200,10 +200,13 @@ async function makeTrackedGraph(t, files = {}) {
     'package.json': JSON.stringify({
       dependencies: { react: '1.0.0', '@scope/runtime': '1.0.0' },
       devDependencies: {
+        '@vitejs/plugin-react': '1.0.0',
         '@types/declared': '1.0.0',
         '@types/scope__typed': '1.0.0',
+        tidewave: '1.0.0',
         typescript: '1.0.0',
         vite: '1.0.0',
+        'vite-plugin-pwa': '1.0.0',
       },
     }),
     'package-lock.json': '{}\n',
@@ -1146,6 +1149,44 @@ test('accepts only closed Vite alias objects and the authentic vite defineConfig
     'vite.config.ts': `${prelude}\nimport { defineConfig } from 'vite';\nconst alias = ${aliasObject};\nexport default defineConfig({ resolve: { alias } });\n`,
   });
   assert.ok(auditCaribbeanNavalSourceClosure(authentic).paths.includes('vite.config.ts'));
+});
+
+test('rejects Vite plugin runtime config mutation surfaces while preserving approved package plugins', async (t) => {
+  const { auditCaribbeanNavalSourceClosure } = await import('./caribbean-naval-verification.mjs');
+  const aliasObject = `{
+    '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),
+    '@games': fileURLToPath(new URL('./src/games', import.meta.url)),
+    '@app': fileURLToPath(new URL('./src/app', import.meta.url)),
+    '@test': fileURLToPath(new URL('./src/test', import.meta.url)),
+  }`;
+  const prelude = [
+    "import { fileURLToPath, URL } from 'node:url';",
+    "import { defineConfig } from 'vite';",
+  ].join('\n');
+  const cases = [
+    {
+      name: 'inline config hook',
+      config: `${prelude}\nconst alias = ${aliasObject};\nexport default defineConfig({\n  resolve: { alias },\n  plugins: [{\n    name: 'runtime-alias-override',\n    config() { return { resolve: { alias: { '@shared': '/private/tmp/untracked-shared' } } }; },\n  }],\n});\n`,
+    },
+    {
+      name: 'local plugin factory',
+      config: `${prelude}\nconst alias = ${aliasObject};\nfunction runtimeAliasPlugin() {\n  return {\n    name: 'runtime-alias-override',\n    config() { return { resolve: { alias: { '@shared': '/private/tmp/untracked-shared' } } }; },\n  };\n}\nexport default defineConfig({ resolve: { alias }, plugins: [runtimeAliasPlugin()] });\n`,
+    },
+  ];
+  for (const fixture of cases) {
+    const root = await makeTrackedGraph(t, { 'vite.config.ts': fixture.config });
+    assert.throws(
+      () => auditCaribbeanNavalSourceClosure(root),
+      (error) => error?.code === 'source-files'
+        && /vite\.config\.ts plugins must match the approved package plugin calls/.test(error.message),
+      fixture.name,
+    );
+  }
+
+  const approved = await makeTrackedGraph(t, {
+    'vite.config.ts': `${prelude}\nimport tidewave from 'tidewave/vite-plugin';\nimport react from '@vitejs/plugin-react';\nimport { VitePWA } from 'vite-plugin-pwa';\nconst alias = ${aliasObject};\nexport default defineConfig({\n  resolve: { alias },\n  plugins: [tidewave(), react(), VitePWA({ registerType: 'autoUpdate' })],\n});\n`,
+  });
+  assert.ok(auditCaribbeanNavalSourceClosure(approved).paths.includes('vite.config.ts'));
 });
 
 test('requires every literal seed and every mandated glob class', async (t) => {
