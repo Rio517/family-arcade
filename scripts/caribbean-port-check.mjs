@@ -3231,12 +3231,69 @@ async function pixelMismatchStats(firstBytes, secondBytes) {
   };
 }
 
-async function preserveScreenshotMismatch(filename, first, second, deadline) {
+function jsonPointerComponent(value) {
+  return String(value).replaceAll('~', '~0').replaceAll('/', '~1');
+}
+
+function firstDifferingJsonPointer(first, second, pointer = '') {
+  if (Object.is(first, second)) return null;
+  if (Array.isArray(first) || Array.isArray(second)) {
+    if (!Array.isArray(first) || !Array.isArray(second)) return pointer;
+    const length = Math.max(first.length, second.length);
+    for (let index = 0; index < length; index += 1) {
+      const nextPointer = `${pointer}/${index}`;
+      if (index >= first.length || index >= second.length) return nextPointer;
+      const difference = firstDifferingJsonPointer(first[index], second[index], nextPointer);
+      if (difference !== null) return difference;
+    }
+    return null;
+  }
+  const firstIsObject = first !== null && typeof first === 'object';
+  const secondIsObject = second !== null && typeof second === 'object';
+  if (!firstIsObject || !secondIsObject) return pointer;
+  const keys = [...new Set([...Object.keys(first), ...Object.keys(second)])].sort();
+  for (const key of keys) {
+    const nextPointer = `${pointer}/${jsonPointerComponent(key)}`;
+    if (!Object.prototype.hasOwnProperty.call(first, key)
+      || !Object.prototype.hasOwnProperty.call(second, key)) return nextPointer;
+    const difference = firstDifferingJsonPointer(first[key], second[key], nextPointer);
+    if (difference !== null) return difference;
+  }
+  return null;
+}
+
+function safeMismatchDiagnosticDirectory(directory) {
+  invariant(typeof directory === 'string' && directory.trim().length > 0,
+    'port mismatch diagnostic directory is invalid');
+  const resolved = path.resolve(directory);
+  const allowedRoots = [path.resolve(os.tmpdir()), path.resolve('/private/tmp')];
+  invariant(allowedRoots.some((root) => resolved !== root && insideDirectory(resolved, root)),
+    'port mismatch diagnostic directory must be a child of a temporary root');
+  return resolved;
+}
+
+function clearMismatchDiagnostics(directory) {
+  fs.rmSync(safeMismatchDiagnosticDirectory(directory), { recursive: true, force: true });
+}
+
+async function preserveScreenshotMismatch(
+  filename,
+  first,
+  second,
+  deadline,
+  { diagnosticDirectory, failure },
+) {
   deadline.throwIfExpired();
-  fs.mkdirSync(MISMATCH_DIAGNOSTIC_DIRECTORY, { recursive: true });
+  const outputDirectory = safeMismatchDiagnosticDirectory(diagnosticDirectory);
+  fs.mkdirSync(outputDirectory, { recursive: true });
   const stem = filename.replace(/\.png$/, '');
   const firstBytes = first.screenshots.get(filename);
   const secondBytes = second.screenshots.get(filename);
+  const firstState = first.screenshotStates.get(filename) ?? null;
+  const secondState = second.screenshotStates.get(filename) ?? null;
+  const firstCanonicalMetrics = Buffer.from(`${canonicalJson(first.metrics)}\n`);
+  const secondCanonicalMetrics = Buffer.from(`${canonicalJson(second.metrics)}\n`);
+  const observation = first.metrics.screenshotEvidence?.observation;
   let pixelStats;
   try {
     pixelStats = await pixelMismatchStats(firstBytes, secondBytes);
@@ -3246,17 +3303,32 @@ async function preserveScreenshotMismatch(filename, first, second, deadline) {
   publishFiles([
     [`${stem}-run-a.png`, firstBytes],
     [`${stem}-run-b.png`, secondBytes],
+    ['metrics-run-a.canonical.json', firstCanonicalMetrics],
+    ['metrics-run-b.canonical.json', secondCanonicalMetrics],
     [`${stem}-mismatch.json`, `${JSON.stringify({
       filename,
+      failure,
       sha256: {
         runA: createHash('sha256').update(firstBytes).digest('hex'),
         runB: createHash('sha256').update(secondBytes).digest('hex'),
       },
+      canonicalMetricsSha256: {
+        runA: createHash('sha256').update(firstCanonicalMetrics).digest('hex'),
+        runB: createHash('sha256').update(secondCanonicalMetrics).digest('hex'),
+      },
+      semanticDigest: {
+        runA: observation?.runA?.semanticDigest ?? createHash('sha256').update(canonicalJson(firstState)).digest('hex'),
+        runB: observation?.runB?.semanticDigest ?? createHash('sha256').update(canonicalJson(secondState)).digest('hex'),
+      },
+      firstDifferingPaths: {
+        semanticState: firstDifferingJsonPointer(firstState, secondState),
+        canonicalMetrics: firstDifferingJsonPointer(first.metrics, second.metrics),
+      },
       pixelStats,
-      runA: first.screenshotStates.get(filename) ?? null,
-      runB: second.screenshotStates.get(filename) ?? null,
+      runA: firstState,
+      runB: secondState,
     }, null, 2)}\n`],
-  ], MISMATCH_DIAGNOSTIC_DIRECTORY, deadline);
+  ], outputDirectory, deadline);
 }
 
 function createNormalRouteScreenshotEvidence(first, second) {
@@ -3311,13 +3383,30 @@ function normalRouteScreenshotRun(run, tag) {
   };
 }
 
-async function compareRuns(first, second, deadline) {
+export async function compareRuns(
+  first,
+  second,
+  deadline,
+  { diagnosticDirectory = MISMATCH_DIAGNOSTIC_DIRECTORY } = {},
+) {
+  const diagnosticOutput = safeMismatchDiagnosticDirectory(diagnosticDirectory);
+  clearMismatchDiagnostics(diagnosticOutput);
+  const diagnosticsEnabled = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1';
   const screenshotEvidence = createNormalRouteScreenshotEvidence(first, second);
   first.metrics.screenshotEvidence = screenshotEvidence;
   second.metrics.screenshotEvidence = screenshotEvidence;
-  for (const run of [first, second]) {
+  const preserveFailure = (failure) => diagnosticsEnabled
+    ? preserveScreenshotMismatch('campaign-result-desktop.png', first, second, deadline, {
+      diagnosticDirectory: diagnosticOutput,
+      failure,
+    })
+    : Promise.resolve();
+  for (const [runName, run] of [['A', first], ['B', second]]) {
     const verdict = evaluatePortIdentityEvidence(run.metrics);
-    invariant(verdict.ok, `Caribbean port identity evidence failed: ${verdict.issues.join(' | ')}`);
+    if (!verdict.ok) {
+      await preserveFailure({ stage: 'evaluator', run: runName, issues: verdict.issues });
+      invariant(false, `Caribbean port identity evidence failed: ${verdict.issues.join(' | ')}`);
+    }
   }
   const comparison = compareNormalRouteScreenshotRuns({
     expectedNames: [...SCREENSHOTS, ...STRATEGIC_SCREENSHOTS],
@@ -3325,15 +3414,22 @@ async function compareRuns(first, second, deadline) {
     runB: normalRouteScreenshotRun(second, 'B'),
     declaredEvidence: screenshotEvidence,
   });
-  if (process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1') {
-    await preserveScreenshotMismatch('campaign-result-desktop.png', first, second, deadline);
+  if (!comparison.ok) {
+    await preserveFailure({ stage: 'comparator', run: null, issues: comparison.issues });
+    invariant(false, `Normal-route screenshot comparison failed: ${comparison.issues.join(' | ')}`);
   }
-  invariant(comparison.ok, `Normal-route screenshot comparison failed: ${comparison.issues.join(' | ')}`);
   invariant(canonicalJson(comparison.screenshotEvidence) === canonicalJson(screenshotEvidence),
     'Normal-route screenshot comparison changed its declaration');
   const firstMetrics = Buffer.from(`${JSON.stringify(first.metrics, null, 2)}\n`);
   const secondMetrics = Buffer.from(`${JSON.stringify(second.metrics, null, 2)}\n`);
-  invariant(firstMetrics.equals(secondMetrics), 'Two clean browser runs produced different metrics.json bytes');
+  if (!firstMetrics.equals(secondMetrics)) {
+    await preserveFailure({
+      stage: 'canonical-metrics',
+      run: null,
+      issues: ['Two clean browser runs produced different metrics.json bytes'],
+    });
+    invariant(false, 'Two clean browser runs produced different metrics.json bytes');
+  }
   return { metricsBytes: firstMetrics, comparison };
 }
 
@@ -3461,16 +3557,6 @@ async function runPortCheckOperationCore({ outputDirectory, signal, deadline, de
       outputDirectory,
       deadline: operationDeadline,
     });
-    if (process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1') {
-      const artifacts = [...publication.artifactHashes]
-        .map(([filename, sha]) => ({ filename, sha256: sha }))
-        .sort((left, right) => left.filename.localeCompare(right.filename));
-      publishFiles([['selected-run-a-publication.json', `${JSON.stringify({
-        selectedRun: 'A',
-        artifacts,
-        metricsSha256: publication.metricsSha256,
-      }, null, 2)}\n`]], MISMATCH_DIAGNOSTIC_DIRECTORY, operationDeadline);
-    }
     console.log(`Caribbean port evidence passed: 22 byte-identical screenshots plus one terminal WebGL observation; run A selected, integrated route resolved, recovery reloaded.`);
     return { metrics: first.metrics, comparison, publication };
   } finally {

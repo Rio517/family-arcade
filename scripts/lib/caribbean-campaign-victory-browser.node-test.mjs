@@ -14,6 +14,16 @@ function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => (
+      `${JSON.stringify(key)}:${canonicalJson(value[key])}`
+    )).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
 function fileHashes(directory) {
   return new Map(fs.readdirSync(directory).sort().map((name) => [
     name,
@@ -62,6 +72,314 @@ function selectedComparison(variant = 'selected-a') {
     })),
   };
 }
+
+const TERMINAL_RESULT_SCREENSHOT = 'campaign-result-desktop.png';
+
+function terminalResultSemanticState() {
+  return {
+    tick: 11_855,
+    resultVisible: true,
+    canvas: {
+      width: 1440,
+      height: 900,
+      rect: { x: 0, y: 0, width: 1440, height: 900 },
+      drawingBuffer: { width: 1440, height: 900 },
+      opacity: '1',
+      transform: 'none',
+      engine: 'three.js r170',
+      backend: {
+        vendor: 'Google Inc. (Google)',
+        renderer: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))',
+      },
+      framebufferSample: {
+        algorithm: 'fnv1a32-rgba-grid-v1',
+        sampleCount: 40,
+        nonzeroSampleChannels: 0,
+        sampleHash: '02187e45',
+      },
+    },
+    terminal: {
+      outcome: 'boarding-ready',
+      victorShipId: 'player',
+      atTick: 11_855,
+      seedAfter: 1_310_878_278,
+    },
+    player: { hull: 78, sails: 61, crew: 44, cannon: 8 },
+    opponent: { hull: 88, sails: 14, crew: 9, cannon: 8 },
+  };
+}
+
+function strategicSailingEvidence() {
+  return {
+    status: 'verified',
+    modeSequence: ['port', 'sailing', 'encounter', 'port', 'sailing', 'encounter', 'naval', 'port'],
+    eventIds: [1, 2, 3, 4, 5, 6, 7, 8],
+    eventTypes: [
+      'lead-accepted', 'voyage-started', 'sea-leg-completed', 'encounter-avoided',
+      'voyage-started', 'sea-leg-completed', 'naval-engaged', 'naval-resolved',
+    ],
+    outbound: { elapsedDays: 1, provisionsUsed: 1 },
+    return: { elapsedDays: 1, provisionsUsed: 1 },
+    rng: {
+      navigationTransitionsVerified: true,
+      navalTransitionVerified: true,
+      worldUnchanged: true,
+    },
+    navalInput: { persistedBeforeMount: true, byteEqualAfterReload: true, tickAfterReload: 0 },
+    resolution: {
+      outcome: 'boarding-ready',
+      victorShipId: 'player',
+      atTick: 11_855,
+      seedAfter: 1_310_878_278,
+      exactlyOnce: true,
+      campaignWritesDuringBattle: 0,
+      returnedTo: 'bridgetown',
+    },
+    recovery: { intermediateModeRecovered: true, unreadableBytesPreserved: true },
+    focus: {
+      sailingHeading: true,
+      encounterHeading: true,
+      avoidedReturnLog: true,
+      navalReloadBattle: true,
+      resolvedReturnLog: true,
+    },
+    accessibility: {
+      minimumTextPx: 14,
+      minimumTargetWidthPx: 44,
+      minimumTargetHeightPx: 44,
+      minimumContrastRatio: 4.5,
+      horizontalOverflowPx: 0,
+    },
+    viewports: {
+      sailingDesktop: { width: 1440, height: 900, supported: true, noticeOnly: false },
+      encounterDesktop: { width: 1440, height: 900, supported: true, noticeOnly: false },
+      battleDesktop: { width: 1440, height: 900, supported: true, noticeOnly: false },
+      sailingMinimumSupported: { width: 960, height: 600, supported: true, noticeOnly: false },
+      battleFallback: { width: 1440, height: 900, supported: true, noticeOnly: false },
+      sailingLargePortraitNotice: { width: 1024, height: 1366, supported: false, noticeOnly: true },
+      battleResizeNotice: { width: 1024, height: 1366, supported: false, noticeOnly: true },
+    },
+    requests: {
+      setupNavalCount: 0,
+      portNavalCount: 0,
+      sailingNavalCount: 0,
+      avoidNavalCount: 0,
+      pursuitLocalNavalAssets: true,
+      externalCount: 0,
+      failedCount: 0,
+    },
+    fallback: { htmlChartVisible: true, battleControlsUsable: true },
+    screenshots: [
+      'sailing-desktop.png',
+      'encounter-desktop.png',
+      'campaign-battle-desktop.png',
+      'campaign-result-desktop.png',
+      'returned-log-desktop.png',
+      'sailing-minimum-supported.png',
+      'campaign-battle-fallback.png',
+      'sailing-large-portrait-notice.png',
+      'campaign-battle-resize-notice.png',
+    ],
+    isolation: {
+      productionNavalEmitted: true,
+      productionNavalPrecached: true,
+      requestedBeforePursuit: false,
+      requestedAfterPursuit: true,
+      harnessMarkersAbsent: true,
+      harnessPreviewAbsent: true,
+    },
+  };
+}
+
+function comparisonRun(semanticState = terminalResultSemanticState()) {
+  const evidenceDirectory = path.resolve('docs/screenshots/caribbean-port');
+  const metrics = JSON.parse(fs.readFileSync(path.join(evidenceDirectory, 'metrics.json'), 'utf8'));
+  metrics.schemaVersion = 3;
+  metrics.determinism = {
+    cleanRuns: 2,
+    metricsByteIdentical: true,
+    screenshotsByteIdentical: false,
+    byteComparedScreenshotsIdentical: true,
+  };
+  metrics.strategicSailing = strategicSailingEvidence();
+  return {
+    metrics,
+    screenshots: new Map(NORMAL_ROUTE_SCREENSHOTS.map((name) => [
+      name,
+      fs.readFileSync(path.join(evidenceDirectory, name)),
+    ])),
+    screenshotStates: new Map([[TERMINAL_RESULT_SCREENSHOT, semanticState]]),
+  };
+}
+
+function passiveComparisonDeadline() {
+  return { throwIfExpired() {} };
+}
+
+function diagnosticManifest(directory) {
+  const report = JSON.parse(fs.readFileSync(
+    path.join(directory, 'campaign-result-desktop-mismatch.json'),
+    'utf8',
+  ));
+  const metricsA = fs.readFileSync(path.join(directory, 'metrics-run-a.canonical.json'));
+  const metricsB = fs.readFileSync(path.join(directory, 'metrics-run-b.canonical.json'));
+  const pngA = fs.readFileSync(path.join(directory, 'campaign-result-desktop-run-a.png'));
+  const pngB = fs.readFileSync(path.join(directory, 'campaign-result-desktop-run-b.png'));
+  return { report, metricsA, metricsB, pngA, pngB };
+}
+
+function withDiagnosticEnvironment(t) {
+  const previous = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
+  process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = '1';
+  t.after(() => {
+    if (previous === undefined) delete process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
+    else process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = previous;
+  });
+}
+
+test('diagnostic comparison preserves semantic drift before the evaluator rejects', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-semantic-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+
+  const first = comparisonRun();
+  const secondState = terminalResultSemanticState();
+  secondState.canvas.backend.renderer = `${secondState.canvas.backend.renderer} drift`;
+  const second = comparisonRun(secondState);
+
+  await assert.rejects(
+    portCommand.compareRuns(first, second, passiveComparisonDeadline(), { diagnosticDirectory }),
+    (error) => {
+      assert.equal(
+        error.message,
+        'Caribbean port identity evidence failed: screenshotEvidence semantic observations differ',
+      );
+      return true;
+    },
+  );
+
+  assert.deepEqual(fs.readdirSync(diagnosticDirectory).sort(), [
+    'campaign-result-desktop-mismatch.json',
+    'campaign-result-desktop-run-a.png',
+    'campaign-result-desktop-run-b.png',
+    'metrics-run-a.canonical.json',
+    'metrics-run-b.canonical.json',
+  ]);
+  const diagnostic = diagnosticManifest(diagnosticDirectory);
+  assert.deepEqual(diagnostic.pngA, first.screenshots.get(TERMINAL_RESULT_SCREENSHOT));
+  assert.deepEqual(diagnostic.pngB, second.screenshots.get(TERMINAL_RESULT_SCREENSHOT));
+  assert.equal(diagnostic.report.sha256.runA, sha256(diagnostic.pngA));
+  assert.equal(diagnostic.report.sha256.runB, sha256(diagnostic.pngB));
+  assert.deepEqual(diagnostic.report.runA, first.screenshotStates.get(TERMINAL_RESULT_SCREENSHOT));
+  assert.deepEqual(diagnostic.report.runB, second.screenshotStates.get(TERMINAL_RESULT_SCREENSHOT));
+  assert.deepEqual(diagnostic.report.failure, {
+    stage: 'evaluator',
+    run: 'A',
+    issues: ['screenshotEvidence semantic observations differ'],
+  });
+  assert.equal(
+    diagnostic.report.semanticDigest.runA,
+    sha256(Buffer.from(canonicalJson(diagnostic.report.runA))),
+  );
+  assert.equal(
+    diagnostic.report.semanticDigest.runB,
+    sha256(Buffer.from(canonicalJson(diagnostic.report.runB))),
+  );
+  assert.notEqual(diagnostic.report.semanticDigest.runA, diagnostic.report.semanticDigest.runB);
+  assert.equal(diagnostic.report.canonicalMetricsSha256.runA, sha256(diagnostic.metricsA));
+  assert.equal(diagnostic.report.canonicalMetricsSha256.runB, sha256(diagnostic.metricsB));
+  assert.deepEqual(diagnostic.report.firstDifferingPaths, {
+    semanticState: '/canvas/backend/renderer',
+    canonicalMetrics: null,
+  });
+  assert.equal(diagnostic.metricsA.toString(), `${canonicalJson(first.metrics)}\n`);
+  assert.equal(diagnostic.metricsB.toString(), `${canonicalJson(second.metrics)}\n`);
+  assert.deepEqual(JSON.parse(diagnostic.metricsA), first.metrics);
+  assert.deepEqual(JSON.parse(diagnostic.metricsB), second.metrics);
+});
+
+test('diagnostic comparison preserves evaluator-valid canonical metrics drift', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-metrics-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+
+  const first = comparisonRun();
+  const second = comparisonRun();
+  second.metrics.browser.version = `${second.metrics.browser.version}-drift`;
+
+  await assert.rejects(
+    portCommand.compareRuns(first, second, passiveComparisonDeadline(), { diagnosticDirectory }),
+    (error) => {
+      assert.equal(error.message, 'Two clean browser runs produced different metrics.json bytes');
+      return true;
+    },
+  );
+
+  const diagnostic = diagnosticManifest(diagnosticDirectory);
+  assert.deepEqual(diagnostic.report.failure, {
+    stage: 'canonical-metrics',
+    run: null,
+    issues: ['Two clean browser runs produced different metrics.json bytes'],
+  });
+  assert.equal(diagnostic.report.semanticDigest.runA, diagnostic.report.semanticDigest.runB);
+  assert.deepEqual(diagnostic.report.firstDifferingPaths, {
+    semanticState: null,
+    canonicalMetrics: '/browser/version',
+  });
+  assert.equal(JSON.parse(diagnostic.metricsA).browser.version, first.metrics.browser.version);
+  assert.equal(JSON.parse(diagnostic.metricsB).browser.version, second.metrics.browser.version);
+  assert.equal(diagnostic.metricsA.toString(), `${canonicalJson(first.metrics)}\n`);
+  assert.equal(diagnostic.metricsB.toString(), `${canonicalJson(second.metrics)}\n`);
+  assert.equal(diagnostic.report.canonicalMetricsSha256.runA, sha256(diagnostic.metricsA));
+  assert.equal(diagnostic.report.canonicalMetricsSha256.runB, sha256(diagnostic.metricsB));
+});
+
+test('diagnostic comparison leaves no artifacts on pass or without diagnostics', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-no-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const previous = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
+  t.after(() => {
+    if (previous === undefined) delete process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
+    else process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = previous;
+  });
+
+  fs.mkdirSync(diagnosticDirectory);
+  fs.writeFileSync(path.join(diagnosticDirectory, 'stale.txt'), 'stale');
+  delete process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
+  const first = comparisonRun();
+  const semanticDrift = terminalResultSemanticState();
+  semanticDrift.canvas.backend.renderer = `${semanticDrift.canvas.backend.renderer} drift`;
+  await assert.rejects(
+    portCommand.compareRuns(
+      first,
+      comparisonRun(semanticDrift),
+      passiveComparisonDeadline(),
+      { diagnosticDirectory },
+    ),
+    /screenshotEvidence semantic observations differ/,
+  );
+  assert.equal(fs.existsSync(diagnosticDirectory), false);
+
+  process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = '1';
+  const comparison = await portCommand.compareRuns(
+    comparisonRun(),
+    comparisonRun(),
+    passiveComparisonDeadline(),
+    { diagnosticDirectory },
+  );
+  assert.equal(comparison.comparison.ok, true);
+  assert.equal(comparison.comparison.selectedRun, 'A');
+  assert.equal(fs.existsSync(diagnosticDirectory), false);
+});
 
 test('strategic causality rejects mount-before-save same-byte writes and wrong RNG lineage', async () => {
   const portCommand = await import('../caribbean-port-check.mjs');
