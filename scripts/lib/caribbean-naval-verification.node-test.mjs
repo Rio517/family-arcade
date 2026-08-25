@@ -1183,8 +1183,200 @@ test('rejects Vite plugin runtime config mutation surfaces while preserving appr
     );
   }
 
+  const approvedImports = [
+    "import tidewave from 'tidewave/vite-plugin';",
+    "import react from '@vitejs/plugin-react';",
+    "import { VitePWA } from 'vite-plugin-pwa';",
+  ].join('\n');
+  const approvedConfig = (pwaOptions, declarations = '') => `${prelude}
+${approvedImports}
+${declarations}
+const alias = ${aliasObject};
+export default defineConfig({
+  resolve: { alias },
+  plugins: [tidewave(), react(), VitePWA(${pwaOptions})],
+});
+`;
+  const currentPwaOptions = `{
+    registerType: 'autoUpdate',
+    includeAssets: ['calculator.html'],
+    workbox: {
+      globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,glb,webp}'],
+      navigateFallbackDenylist: [/calculator\\.html$/],
+    },
+    manifest: {
+      name: 'Kny-Flores Family Arcade',
+      short_name: 'Family Arcade',
+      description: 'The Kny-Flores family arcade — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and Yahtzee.',
+      theme_color: '#0f172a',
+      background_color: '#0f172a',
+      display: 'standalone',
+      icons: [
+        { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+        { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    },
+  }`;
+  const withRootEntry = (entry) => currentPwaOptions.replace('{', `{\n    ${entry},`);
+  const pwaMutationCases = [
+    {
+      name: 'approved VitePWA integration.configureOptions method',
+      options: withRootEntry(`integration: {
+        configureOptions(config) {
+          config.resolve.alias[0].replacement = '/private/tmp/untracked-shared';
+        },
+      }`),
+    },
+    {
+      name: 'function-valued option',
+      options: currentPwaOptions.replace(
+        "description: 'The Kny-Flores family arcade — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and Yahtzee.'",
+        'description: function () {}',
+      ),
+    },
+    {
+      name: 'arrow callback option',
+      options: currentPwaOptions.replace(
+        "description: 'The Kny-Flores family arcade — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and Yahtzee.'",
+        'description: () => {}',
+      ),
+    },
+    {
+      name: 'method option',
+      options: currentPwaOptions.replace(
+        "description: 'The Kny-Flores family arcade — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and Yahtzee.'",
+        "description() { return 'runtime'; }",
+      ),
+    },
+    {
+      name: 'getter option',
+      options: currentPwaOptions.replace(
+        "description: 'The Kny-Flores family arcade — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and Yahtzee.'",
+        "get description() { return 'runtime'; }",
+      ),
+    },
+    {
+      name: 'setter option',
+      options: currentPwaOptions.replace(
+        "description: 'The Kny-Flores family arcade — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and Yahtzee.'",
+        'set description(value) {}',
+      ),
+    },
+    {
+      name: 'computed property',
+      options: currentPwaOptions.replace('description:', "['description']:"),
+    },
+    {
+      name: 'object spread',
+      declarations: "const extraOptions = { integration: {} };",
+      options: currentPwaOptions.replace("registerType: 'autoUpdate'", '...extraOptions'),
+    },
+    {
+      name: 'nested object spread',
+      declarations: "const extraManifest = { integration: {} };",
+      options: currentPwaOptions.replace(
+        "name: 'Kny-Flores Family Arcade'",
+        '...extraManifest',
+      ),
+    },
+    {
+      name: 'shorthand property',
+      declarations: "const description = 'runtime';",
+      options: currentPwaOptions.replace(
+        "description: 'The Kny-Flores family arcade — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and Yahtzee.'",
+        'description',
+      ),
+    },
+    {
+      name: 'bound identifier value',
+      declarations: "const runtimeDescription = 'runtime';",
+      options: currentPwaOptions.replace(
+        "description: 'The Kny-Flores family arcade — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and Yahtzee.'",
+        'description: runtimeDescription',
+      ),
+    },
+    {
+      name: 'call-valued option',
+      declarations: "function makeDescription() { return 'runtime'; }",
+      options: currentPwaOptions.replace(
+        "description: 'The Kny-Flores family arcade — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and Yahtzee.'",
+        'description: makeDescription()',
+      ),
+    },
+    {
+      name: '__proto__ property',
+      options: currentPwaOptions.replace(
+        "registerType: 'autoUpdate'",
+        '__proto__: { configureOptions: null }',
+      ),
+    },
+    {
+      name: 'constructor property',
+      options: currentPwaOptions.replace(
+        "registerType: 'autoUpdate'",
+        'constructor: { configureOptions: null }',
+      ),
+    },
+    {
+      name: 'prototype property',
+      options: currentPwaOptions.replace(
+        "registerType: 'autoUpdate'",
+        'prototype: { configureOptions: null }',
+      ),
+    },
+    {
+      name: 'array spread',
+      declarations: "const extraAssets = ['icon.svg'];",
+      options: currentPwaOptions.replace(
+        "includeAssets: ['calculator.html']",
+        "includeAssets: ['calculator.html', ...extraAssets]",
+      ),
+    },
+  ];
+  for (const fixture of pwaMutationCases) {
+    const root = await makeTrackedGraph(t, {
+      'vite.config.ts': approvedConfig(fixture.options, fixture.declarations),
+    });
+    assert.throws(
+      () => auditCaribbeanNavalSourceClosure(root),
+      (error) => error?.code === 'source-files'
+        && /vite\.config\.ts plugins must match the approved package plugin calls/.test(error.message),
+      fixture.name,
+    );
+  }
+
+  const pluginListCases = [
+    {
+      name: 'plugin-list spread',
+      declarations: 'const otherPlugins = [];',
+      plugins: '[tidewave(), react(), ...otherPlugins]',
+    },
+    {
+      name: 'conditional plugin call',
+      declarations: 'const enabled = true;',
+      plugins: '[tidewave(), react(), enabled ? VitePWA({}) : VitePWA({})]',
+    },
+  ];
+  for (const fixture of pluginListCases) {
+    const config = `${prelude}
+${approvedImports}
+${fixture.declarations}
+const alias = ${aliasObject};
+export default defineConfig({ resolve: { alias }, plugins: ${fixture.plugins} });
+`;
+    const root = await makeTrackedGraph(t, { 'vite.config.ts': config });
+    assert.throws(
+      () => auditCaribbeanNavalSourceClosure(root),
+      (error) => error?.code === 'source-files'
+        && /vite\.config\.ts plugins must match the approved package plugin calls/.test(error.message),
+      fixture.name,
+    );
+  }
+
   const approved = await makeTrackedGraph(t, {
-    'vite.config.ts': `${prelude}\nimport tidewave from 'tidewave/vite-plugin';\nimport react from '@vitejs/plugin-react';\nimport { VitePWA } from 'vite-plugin-pwa';\nconst alias = ${aliasObject};\nexport default defineConfig({\n  resolve: { alias },\n  plugins: [tidewave(), react(), VitePWA({ registerType: 'autoUpdate' })],\n});\n`,
+    'vite.config.ts': approvedConfig(currentPwaOptions),
   });
   assert.ok(auditCaribbeanNavalSourceClosure(approved).paths.includes('vite.config.ts'));
 });

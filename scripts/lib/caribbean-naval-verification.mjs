@@ -31,6 +31,29 @@ const APPROVED_VITE_PLUGIN_CALLS = [
   { module: '@vitejs/plugin-react', imported: 'default', arguments: 'none' },
   { module: 'vite-plugin-pwa', imported: 'VitePWA', arguments: 'one-object' },
 ];
+const VITE_STATIC_REGEXP = Symbol('vite-static-regexp');
+const APPROVED_VITE_PWA_OPTIONS = {
+  registerType: 'autoUpdate',
+  includeAssets: ['calculator.html'],
+  workbox: {
+    globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,glb,webp}'],
+    navigateFallbackDenylist: [{ [VITE_STATIC_REGEXP]: '/calculator\\.html$/' }],
+  },
+  manifest: {
+    name: 'Kny-Flores Family Arcade',
+    short_name: 'Family Arcade',
+    description: 'The Kny-Flores family arcade — Magic Coins, Rainbow Racer, Ship Battle, Chess, Risk, and Yahtzee.',
+    theme_color: '#0f172a',
+    background_color: '#0f172a',
+    display: 'standalone',
+    icons: [
+      { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+      { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
+  },
+};
 const RESOLUTION_EXTENSIONS = [
   '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.css',
   '.glb', '.webp', '.svg', '.png', '.woff2',
@@ -250,12 +273,46 @@ function authenticImportBinding(identifier, checker, expected) {
     && importDeclaration.moduleSpecifier.text === expected.module;
 }
 
+function matchesApprovedStaticViteData(node, expected) {
+  if (typeof expected === 'string') {
+    return ts.isStringLiteral(node) && node.text === expected;
+  }
+  if (Array.isArray(expected)) {
+    return ts.isArrayLiteralExpression(node)
+      && node.elements.length === expected.length
+      && node.elements.every((element, index) => (
+        !ts.isSpreadElement(element)
+        && !ts.isOmittedExpression(element)
+        && matchesApprovedStaticViteData(element, expected[index])
+      ));
+  }
+  if (expected && expected[VITE_STATIC_REGEXP]) {
+    return ts.isRegularExpressionLiteral(node)
+      && node.text === expected[VITE_STATIC_REGEXP];
+  }
+  if (!expected || typeof expected !== 'object' || !ts.isObjectLiteralExpression(node)) {
+    return false;
+  }
+  const entries = Object.entries(expected);
+  return node.properties.length === entries.length
+    && node.properties.every((property, index) => {
+      if (!ts.isPropertyAssignment(property)) return false;
+      const [expectedName, expectedValue] = entries[index];
+      const name = propertyName(property.name);
+      return name === expectedName
+        && name !== '__proto__'
+        && name !== 'constructor'
+        && name !== 'prototype'
+        && matchesApprovedStaticViteData(property.initializer, expectedValue);
+    });
+}
+
 function validApprovedVitePluginCall(node, checker, expected) {
   if (!ts.isCallExpression(node) || node.questionDotToken || node.typeArguments?.length
     || !authenticImportBinding(node.expression, checker, expected)) return false;
   if (expected.arguments === 'none') return node.arguments.length === 0;
   return expected.arguments === 'one-object' && node.arguments.length === 1
-    && ts.isObjectLiteralExpression(node.arguments[0]);
+    && matchesApprovedStaticViteData(node.arguments[0], APPROVED_VITE_PWA_OPTIONS);
 }
 
 function vitePluginsAreClosed(configObject, checker) {
