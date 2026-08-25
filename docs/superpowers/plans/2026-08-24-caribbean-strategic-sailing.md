@@ -1369,7 +1369,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 - Modify: `scripts/caribbean-naval-check.mjs`
 - Modify: `scripts/lib/caribbean-naval-check.test.mjs`
 
-**Interfaces:** Consumes Task 5's literal `CampaignVictoryTrace`, `driveCampaignVictory`, public tick, browser modes/screenshots, and all production interfaces. Produces port evidence schema version 3, pure `compareNormalRouteScreenshotBuffers`, its exact 22-byte/one-semantic screenshot boundary and run-A byte ownership, `CARIBBEAN_NAVAL_SOURCE_SEEDS`/`auditCaribbeanNavalSourceClosure`/`collectCaribbeanNavalSourceManifest`, the exact `CaribbeanNavalSourceAuditError` syntax diagnostics, real clock integration, revised isolation, exact naval screenshot/stable-manifest contract, observational range validation, and naval `--semantic-probe`/`--verify`/`--capture` modes. Does not commit generated metrics/PNG bytes.
+**Interfaces:** Consumes Task 5's literal `CampaignVictoryTrace`, `driveCampaignVictory`, public tick, browser modes/screenshots, and all production interfaces. Produces port evidence schema version 3, pure `compareNormalRouteScreenshotRuns`, `publishNormalRouteComparison`, its exact 22-byte/one-semantic screenshot boundary and tagged run-A byte ownership, `CARIBBEAN_NAVAL_SOURCE_SEEDS`/`auditCaribbeanNavalSourceClosure`/`collectCaribbeanNavalSourceManifest`, the exact `CaribbeanNavalSourceAuditError` syntax diagnostics, real clock integration, revised isolation, exact naval screenshot/stable-manifest contract, observational range validation, and naval `--semantic-probe`/`--verify`/`--capture` modes. Does not commit generated metrics/PNG bytes.
 
 - [ ] **Step 1: Define exact schema-v3 evaluator tests**
 
@@ -1401,38 +1401,81 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   `webgl-composited-terminal`, `trackedCapture: 'run-a'`, and contains valid/
   nonempty run-A/run-B PNG facts, lowercase 64-hex `pngSha256` values, the
   normalized semantic state, and two lowercase 64-hex SHA-256 canonical-JSON
-  digests from the spec. The evaluator recomputes both kinds of digest,
-  requires the two semantic digests and complete states to be equal, and locks
-  the terminal/player/opponent facts literally. Backend vendor and renderer
-  are nonempty equal strings. `framebufferSample` has exactly algorithm
+  digests from the spec. The serialized evaluator validates each declared PNG
+  hash only as lowercase 64-hex because it has no PNG buffers; it never claims
+  to recompute PNG hashes. It recomputes the semantic-state digests, requires
+  the two semantic digests and complete states to be equal, and locks the
+  terminal/player/opponent facts literally. Backend vendor and renderer are
+  nonempty equal strings. `framebufferSample` has exactly algorithm
   `fnv1a32-rgba-grid-v1`, integer sample count `40`, integer nonzero-channel
-  count in `0..160` and `> 0`, and lowercase eight-hex `sampleHash`; no
+  count in inclusive range `0..160`, and lowercase eight-hex `sampleHash`; zero
+  plus measured hash `02187e45` is a valid positive fixture, and no
   `fingerprint` alias is accepted. Add equal-A/B malformed fixtures for `-1`,
-  `0`, `161`, `1.5`, sample count `39`, uppercase/nine-hex/non-hex hashes,
-  empty backend, and every missing/extra/wrong-type nested key. The evaluator
-  rejects those plus false verification, wrong sequence/count, premature naval
+  `161`, `1.5`, sample count `39`, uppercase/nine-hex/non-hex hashes, empty
+  backend, and every missing/extra/wrong-type nested key. The evaluator rejects
+  those plus false verification, wrong sequence/count, premature naval
   requests, harness markers, names outside the exact screenshot sets, an
-  absent/unknown/second exception, semantic/digest drift, or invalid PNG
-  dimensions/signature/bytes.
+  absent/unknown/second exception, or semantic/digest drift.
 
-  Before any comparator source edit, add named pure byte-buffer fixtures for
-  `compareNormalRouteScreenshotBuffers` in the same test file under exact
+  Before any comparator or writer source edit, define and test this exact
+  byte-bearing flow in the same test file under exact
   describe name `normal-route screenshot byte comparator`. Dynamically import
   the module inside each named test so a missing export is an assertion failure
-  after collection, not runner initialization. The input is the exact 23-name
-  allowlist, run-A/run-B `Map<string, Buffer>` values, and the
-  complete screenshot-evidence object; the result is `{ ok: boolean, issues:
-  string[] }`. Use valid generated 1440x900 PNG buffers. The positive fixture
-  keeps 22 pairs byte-exact and gives only `campaign-result-desktop.png`
-  different valid bytes with equal exact semantic state/digests; it must pass.
+  after collection, not runner initialization:
+
+  ```ts
+  interface NormalRouteScreenshotRun {
+    run: 'A' | 'B';
+    screenshotBuffers: ReadonlyMap<string, Buffer>;
+    semanticStates: ReadonlyMap<string, TerminalResultSemanticState>;
+    checks: {
+      routeFailures: 0; requestFailures: 0; consoleFailures: 0;
+      pageFailures: 0; semanticProbesPassed: true;
+    };
+  }
+
+  type NormalRouteScreenshotComparison =
+    | { ok: false; issues: readonly string[] }
+    | {
+        ok: true;
+        issues: readonly [];
+        selectedRun: 'A';
+        selectedArtifacts: ReadonlyMap<string, {
+          sourceRun: 'A'; bytes: Buffer; sha256: string;
+        }>;
+        screenshotEvidence: NormalRouteScreenshotEvidence;
+      };
+
+  compareNormalRouteScreenshotRuns({
+    expectedNames, runA, runB, declaredEvidence,
+  }): NormalRouteScreenshotComparison;
+
+  publishNormalRouteComparison({
+    comparison, metricsBytes, outputDirectory,
+  }): { artifactHashes: ReadonlyMap<string, string>; metricsSha256: string };
+  ```
+
+  Use valid generated 1440x900 PNG buffers. The positive fixture keeps 22 pairs
+  byte-exact and gives only `campaign-result-desktop.png` different valid bytes
+  with equal exact semantic state/digests. Require `ok: true`, literal
+  `selectedRun: 'A'`, exactly 23 selected artifacts, every selected buffer to
+  equal the corresponding run-A buffer, every selected hash to equal a fresh
+  SHA-256 of run A, the result's run-A hash to differ from deliberately
+  different run B, and a temp publication to hash identically to all 23
+  selections. The writer receives only the successful comparison, metrics
+  bytes, and destination; it has no raw run-B input.
+
   The direct negative table changes one non-exempt buffer, omits/adds/renames
-  an exception, adds a second exception, swaps tracked ownership, publishes
-  run B, corrupts the PNG signature, uses zero bytes or 1439x900 bytes, lies
-  about either PNG hash, or applies any malformed semantic/sample fixture
-  above. Every row must fail without throwing. The helper reads signatures and
-  embedded dimensions from the byte buffers and hashes them itself; fixture
-  booleans never substitute for bytes. No fixture or implementation contains a
-  pixel-delta, perceptual, colour, or similarity threshold.
+  an exception, adds a second exception, swaps tracked ownership, forges
+  `selectedRun: 'B'`/B selected bytes before publication, corrupts the PNG
+  signature, uses zero bytes or 1439x900 bytes, lies about either declared PNG
+  hash, sets any run check failure count to one or semantic probe false, or
+  applies any malformed semantic/sample fixture above. Every row must fail
+  without throwing and publish no artifact. The comparator reads
+  signatures and embedded dimensions from the buffers, recomputes both PNG
+  hashes, and cross-checks the declarations; fixture booleans never substitute
+  for bytes. No fixture or implementation contains a pixel-delta, perceptual,
+  colour, or similarity threshold.
 
 - [ ] **Step 2: Capture evaluator RED and implement structure**
 
@@ -1444,13 +1487,14 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
   Expected: Vitest collects the suite and schema 3 fixtures fail against the
   current schema-2 evaluator. The named pure comparator test also reaches its
-  body and fails because `compareNormalRouteScreenshotBuffers` is absent (or,
-  if exposed only as the current blanket comparator, because it rejects the
-  one valid byte-different result pair); the 22 exact-pair characterization
-  stays green. A Vitest internal-state/runner failure is not an accepted RED.
+  body and fails because `compareNormalRouteScreenshotRuns` and
+  `publishNormalRouteComparison` are absent (or, if exposed only as the current
+  blanket comparator, because it rejects the one valid byte-different result
+  pair); the 22 exact-pair characterization stays green. A Vitest internal-
+  state/runner failure is not an accepted RED.
 
   Update only the serialized evaluator and script structure here; do not
-  implement the byte-buffer comparator until Step 8. Keep every schema-2
+  implement the byte-bearing comparator/writer until Step 8. Keep every schema-2
   browser/route/build/viewport/fixture/Web-Lock/journey/accessibility/request/
   failure/profile/art/market/recovery/determinism field; the retained blanket
   screenshot boolean becomes `false` in schema v3 and the additive byte-
@@ -1539,11 +1583,20 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   drawing buffer, opacity, transform, Three.js engine marker, WebGL vendor/
   renderer, and the fixed framebuffer sample with exact algorithm
   `fnv1a32-rgba-grid-v1`, integer count `40`, integer nonzero channels in
-  `1..160`, and lowercase eight-hex `sampleHash`; exact terminal trace; and
-  rendered player/opponent systems. Sample at the honest rendered capture seam
-  so an all-zero cleared buffer fails. Canonicalize and SHA-256 that complete
-  state, and SHA-256 the original PNG bytes separately. Capture the real full-
-  page PNG without hiding/replacing the canvas or modifying product rendering.
+  inclusive range `0..160`, and lowercase eight-hex `sampleHash`; exact
+  terminal trace; and rendered player/opponent systems. Keep the already
+  measured post-present `readPixels` ordering unchanged. Zero channels with
+  hash `02187e45` is valid when honestly observed and exactly repeated in A/B.
+  Do not move sampling to a new render/frame hook, pre-present read,
+  `preserveDrawingBuffer`, composited-PNG sample, added RAF, `gl.finish`, or any
+  other unmeasured seam. The sample is supporting state evidence, not proof of
+  visible pixels. Canonicalize and SHA-256 the complete semantic state, and
+  SHA-256 the original PNG bytes separately. Capture the real full-page PNG
+  without hiding/replacing the canvas or modifying product rendering. Public
+  semantic equality remains exact tick/result, canvas/drawing buffer/backend,
+  outcome/seed, systems, and zero route/request/console/page/semantic-probe
+  failures; Task 7's original-resolution A/B/tracked inspection owns visual
+  truth.
 
   Remove the staged two-16ms terminal settle and the falsified normal-route
   experiments only: additional relative frames, absolute `performance.now`
@@ -1909,17 +1962,32 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
 - [ ] **Step 8: Implement the RED-proven comparator, then lock screenshot and isolation manifest**
 
-  Only after Step 1's direct buffer and schema RED is recorded, implement pure
-  `compareNormalRouteScreenshotBuffers` in
-  `scripts/lib/caribbean-port-identity-evidence.mjs` and make
-  `scripts/caribbean-port-check.mjs` consume its verdict before any publish.
-  The helper takes the exact 23-name allowlist, both byte maps, and the complete
-  schema-v3 screenshot-evidence object; it derives PNG signature, byte length,
-  embedded size, and SHA-256 from each buffer. It byte-compares all 22
-  non-exempt rows, applies arbitrary pixel acceptance only to the literal
-  `campaign-result-desktop.png` after all semantic/schema checks, and selects
-  only run-A bytes for tracked output. It fails closed on an incomplete/extra
-  byte map or exemption set and never computes a pixel similarity value.
+  Only after Step 1's direct run-object/schema RED is recorded, implement pure
+  `compareNormalRouteScreenshotRuns` in
+  `scripts/lib/caribbean-port-identity-evidence.mjs` and exported
+  `publishNormalRouteComparison` in `scripts/caribbean-port-check.mjs`. The comparator takes the
+  exact 23-name allowlist, both complete tagged run objects, and the declarative
+  schema-v3 screenshot-evidence object. It derives PNG signature, byte length,
+  embedded size, and SHA-256 from every actual buffer; cross-checks both
+  declared PNG hashes; byte-compares all 22 non-exempt rows; applies arbitrary
+  pixel acceptance only to literal `campaign-result-desktop.png` after every
+  semantic/schema check; and returns the exact Step-1 tagged union. Success
+  always has `selectedRun: 'A'` and 23 A-only selected artifacts with their
+  recomputed hashes. Failure has issues and no selection. It fails closed on an
+  incomplete/extra buffer/state map or exemption set and never computes a
+  pixel similarity value.
+
+  The writer accepts only a successful comparison, metrics bytes, and concrete
+  output directory. It rejects a forged B tag or missing/empty destination and
+  writes only `comparison.selectedArtifacts`; raw run A/B maps are not writer
+  inputs. Return a publication manifest containing every written artifact hash
+  and the metrics hash. In `caribbean-port-check.mjs`, remove the direct
+  `first.screenshots` publication loop: after comparison, call only this writer
+  and return `{ metrics, comparison, publication }` for programmatic callers.
+  The no-options CLI path may still own tracked docs. If an options object
+  explicitly contains `outputDirectory`, undefined/empty values or the tracked
+  docs path fail before build/capture; a concrete non-docs directory is passed
+  through unchanged, so non-writing callers cannot fall back to `OUT`.
 
   Run immediately after this minimum implementation:
 
@@ -1927,10 +1995,12 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   mise exec node@20 -- npx vitest run scripts/lib/caribbean-port-identity-evidence.test.mjs
   ```
 
-  Expected GREEN: the named valid 22+1 direct-buffer fixture passes; every
-  non-exempt drift, exception-set, ownership, PNG-byte/hash/dimension, semantic,
-  sample-shape, and unknown/missing-key row fails closed; all retained schema-v2
-  and schema-v3 evaluator tests pass.
+  Expected GREEN: the named valid 22+1 direct-run fixture returns the A-tagged
+  artifact set and publishes all 23 A hashes to temp; forged B selection/
+  publication and every non-exempt drift, exception-set, ownership, PNG-byte/
+  declared-hash/dimension, semantic, sample-shape, destination, and unknown/
+  missing-key row fails closed; all retained schema-v2 and schema-v3 evaluator
+  tests pass.
 
   Add exact files:
 
@@ -1959,20 +2029,27 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   normalized terminal state and equal canonical semantic SHA-256 digests from
   Step 5, and retain arbitrary honest pixels. The normalized state includes
   exact nonempty backend strings and the closed framebuffer sample shape
-  (`fnv1a32-rgba-grid-v1`, `40`, integer `1..160`, lowercase eight-hex
+  (`fnv1a32-rgba-grid-v1`, `40`, integer `0..160`, lowercase eight-hex
   `sampleHash`) but not `performance.now` or
   `document.timeline.currentTime`. Record run A as the tracked capture owner.
-  After both runs validate, build one shared `screenshotEvidence` record
-  containing both PNG hashes, states, and semantic digests; attach the same
-  canonical value to A and B; and only then finalize the metrics byte
-  comparison and publish run A.
+  Build one declared `screenshotEvidence` record containing both PNG hashes,
+  states, and semantic digests, and run the serialized evaluator for schema and
+  semantic-digest validation. Then pass that declaration plus the complete A/B
+  run objects to the buffer comparator, require its successful returned
+  `screenshotEvidence` to deep-equal the declaration, and attach that same
+  canonical value to both metrics records. Only then finalize metrics byte
+  comparison. Publish only the successful comparator's selected artifacts;
+  never index the raw first/second screenshot maps in the writer.
 
   When `CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS=1`, preserve run-A/run-B result PNGs
   plus their state/hash record in the exact ignored destination
   `/private/tmp/caribbean-port-identity-diagnostic`, even when their PNG bytes
-  happen to match. The preserved run-A bytes and hash must be the same values
-  selected for tracked output. Never add diagnostic variants to source
-  provenance or tracked screenshot membership.
+  happen to match. Also write `selected-run-a-publication.json` there with
+  literal `selectedRun: 'A'`, the exact sorted 23-row selected filename/SHA-256
+  manifest, and `metricsSha256` returned by the writer. The preserved run-A
+  bytes/hash and every manifest row must be the same selections written to the
+  destination. Never add diagnostic variants to source provenance or tracked
+  screenshot membership.
 
 - [ ] **Step 9: Mutation proof, focused verification, review, and commit**
 
@@ -1985,15 +2062,21 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
   Step 1's pure comparator/evaluator matrix must already be GREEN before this
   mutation phase. Temporarily bypass exact exemption-set membership; the
-  missing/unknown/second-exception rows must kill it. Temporarily publish run B;
-  the tracked-owner/hash row must kill it. Temporarily trust claimed PNG facts
-  instead of reading the buffers; the signature/dimension/hash lies must kill
-  it. Temporarily byte-compare the designated result again; the valid different-
-  pixel fixture must kill it. Temporarily accept `nonzeroSampleChannels: 0` or
-  a non-eight-hex `sampleHash`; their equal-A/B malformed fixtures must kill
-  those mutations. Restore each mutation independently and rerun the focused
-  suite after each. No test or implementation may introduce a pixel-delta,
-  perceptual, colour, or similarity threshold.
+  missing/unknown/second-exception rows must kill it. Temporarily return
+  `selectedRun: 'B'`, substitute one B buffer/hash into the selected A map, then
+  separately bypass the selected-artifact writer and publish raw run B; the
+  direct tag/identity/temp-publication rows and full A/B output-hash test must
+  kill those three mutations independently. Temporarily trust claimed PNG
+  facts instead of reading the buffers; signature/dimension/declared-hash lies
+  must kill it. Temporarily byte-compare the designated result again; the valid
+  different-pixel fixture must kill it. Temporarily accept `-1`, `161`, or a
+  fractional nonzero-channel count, or a non-eight-hex `sampleHash`; their
+  equal-A/B malformed fixtures must kill those mutations. Temporarily require a
+  positive channel count; the valid measured zero/`02187e45` fixture must kill
+  that unmeasured restriction. Restore each mutation independently and rerun
+  the focused suite after each. No test or implementation may introduce a
+  pixel-delta, perceptual, colour, or similarity threshold or move the sample
+  from its measured post-present seam.
 
   In a temporary tracked graph, add a new local import and require automatic
   closure growth; remove its target and make it ambiguous. Then mutation-kill
@@ -2028,11 +2111,20 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   The browser-native suite keeps the one-journey plus truncated-trace test at
   explicit timeout `600_000ms`. A separate test with timeout `1_020_000ms` runs
   the real exported two-clean-run port gate, whose full-command budget is
-  `900_000ms`, into a unique temporary output directory. It asserts 23 exact
-  artifacts and the amended comparison verdict, removes that directory in
-  `t.after`, and proves `docs/screenshots/caribbean-port` was not mutated. Each
-  real victory still has the unchanged `330_000ms` fail-closed deadline. A one-
-  journey GREEN cannot substitute for this integrated A/B gate.
+  `900_000ms`, into a unique temporary output directory. The result must expose
+  `comparison.ok: true`, `selectedRun: 'A'`, 23 selected A artifacts, and the
+  publication manifest; returned screenshot evidence must deep-equal metrics.
+  The test reads and hashes every written screenshot and `metrics.json`; each
+  must equal its returned selected-A/publication hash.
+  `campaign-result-desktop.png` must equal the declared/recomputed run-A hash;
+  a synthetic differing-result integration fixture additionally proves it is
+  unequal to run B. Hash the tracked screenshot tree before and after and prove
+  no tracked candidate changed. Remove the temp directory in `t.after`, and add
+  a forced `runPortCheck` failure fixture that proves cleanup still occurs and
+  no candidate is written to docs. Explicit `outputDirectory: undefined`, `''`,
+  or the tracked docs path fails before build/capture. Each real victory still
+  has the unchanged `330_000ms` fail-closed deadline. A one-journey GREEN cannot
+  substitute for this integrated A/B gate.
 
   Run:
 
@@ -2120,8 +2212,9 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   test -f /private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-run-a.png
   test -f /private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-run-b.png
   test -f /private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-mismatch.json
+  test -f /private/tmp/caribbean-port-identity-diagnostic/selected-run-a-publication.json
   cmp -s /private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-run-a.png docs/screenshots/caribbean-port/campaign-result-desktop.png
-  mise exec node@20 -- node --input-type=module -e "import assert from 'node:assert/strict'; import {createHash} from 'node:crypto'; import fs from 'node:fs'; const metrics=JSON.parse(fs.readFileSync('docs/screenshots/caribbean-port/metrics.json','utf8')); const diagnostic=JSON.parse(fs.readFileSync('/private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-mismatch.json','utf8')); const tracked=fs.readFileSync('docs/screenshots/caribbean-port/campaign-result-desktop.png'); const preservedB=fs.readFileSync('/private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-run-b.png'); const hash=(bytes)=>createHash('sha256').update(bytes).digest('hex'); const {runA,runB}=metrics.screenshotEvidence.observation; assert.equal(runA.pngSha256,hash(tracked)); assert.equal(runB.pngSha256,hash(preservedB)); assert.equal(diagnostic.sha256.runA,runA.pngSha256); assert.equal(diagnostic.sha256.runB,runB.pngSha256); assert.deepEqual(diagnostic.runA,runA.semanticState); assert.deepEqual(diagnostic.runB,runB.semanticState);"
+  mise exec node@20 -- node --input-type=module -e "import assert from 'node:assert/strict'; import {createHash} from 'node:crypto'; import fs from 'node:fs'; import path from 'node:path'; const sha256=(bytes)=>createHash('sha256').update(bytes).digest('hex'); const root='docs/screenshots/caribbean-port'; const metricsBytes=fs.readFileSync(path.join(root,'metrics.json')); const metrics=JSON.parse(metricsBytes); const diagnostic=JSON.parse(fs.readFileSync('/private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-mismatch.json','utf8')); const publication=JSON.parse(fs.readFileSync('/private/tmp/caribbean-port-identity-diagnostic/selected-run-a-publication.json','utf8')); assert.equal(publication.selectedRun,'A'); assert.equal(publication.artifacts.length,23); for (const row of publication.artifacts) assert.equal(sha256(fs.readFileSync(path.join(root,row.filename))),row.sha256); assert.equal(sha256(metricsBytes),publication.metricsSha256); const tracked=fs.readFileSync(path.join(root,'campaign-result-desktop.png')); const preservedB=fs.readFileSync('/private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-run-b.png'); const {runA,runB}=metrics.screenshotEvidence.observation; assert.equal(runA.pngSha256,sha256(tracked)); assert.equal(runB.pngSha256,sha256(preservedB)); assert.equal(diagnostic.sha256.runA,runA.pngSha256); assert.equal(diagnostic.sha256.runB,runB.pngSha256); assert.deepEqual(diagnostic.runA,runA.semanticState); assert.deepEqual(diagnostic.runB,runB.semanticState);"
   ```
 
   Expected: schema version 3 accepted; the command's two internal clean-
@@ -2136,8 +2229,11 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   pre-commit port command allowed to write the tracked destination. Record its
   run-A `pngSha256`, semantic digest, and complete semantic state verbatim in
   `.superpowers/sdd/2026-08-24-caribbean-strategic-sailing/task-7-report.md`;
-  those metrics/report values and the preserved run-A bytes jointly name the
-  inspection owner. No later mutating port invocation is permitted.
+  also record the sorted 23-row A-selected publication manifest and metrics
+  hash after the command has recomputed every tracked candidate and matched it.
+  Those metrics/report values, all tracked hashes, and the preserved run-A
+  bytes jointly name the inspection owner. No later mutating port invocation is
+  permitted.
 
 - [ ] **Step 4: Prove non-writing harness verification and normal/harness isolation**
 
@@ -2169,8 +2265,9 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   consequences; no clipping/overlap/scroll; readable focus; full-bleed battle
   unchanged; result/return action clear; Captain's Log outcome; unsupported
   notice only. Remove the exact ignored diagnostic directory only after its A,
-  B, hash/state record, and tracked A have been inspected and recorded; do not
-  run another tracked-output port capture to recreate it.
+  B, hash/state record, selected-A publication manifest, and tracked A have
+  been inspected and recorded; do not run another tracked-output port capture
+  to recreate it.
 
   ```bash
   rm -rf /private/tmp/caribbean-port-identity-diagnostic
@@ -2194,17 +2291,58 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   mise exec node@20 -- npx vitest run
   mise exec node@20 -- npx tsc -b --force
   mise exec node@20 -- npm run build
-  CARIBBEAN_TRACKED_RESULT_HASH="$(shasum -a 256 docs/screenshots/caribbean-port/campaign-result-desktop.png | awk '{print $1}')"
-  CARIBBEAN_PORT_PRECOMMIT_OUT="$(mktemp -d /private/tmp/caribbean-port-precommit.XXXXXX)"
-  export CARIBBEAN_PORT_PRECOMMIT_OUT
-  mise exec node@20 -- node --input-type=module -e "const {runPortCheck}=await import('./scripts/caribbean-port-check.mjs'); await runPortCheck({outputDirectory:process.env.CARIBBEAN_PORT_PRECOMMIT_OUT});"
-  test "$(find "$CARIBBEAN_PORT_PRECOMMIT_OUT" -type f | wc -l | tr -d ' ')" = "24"
-  test "$CARIBBEAN_TRACKED_RESULT_HASH" = "$(shasum -a 256 docs/screenshots/caribbean-port/campaign-result-desktop.png | awk '{print $1}')"
-  rm -rf "$CARIBBEAN_PORT_PRECOMMIT_OUT"
-  unset CARIBBEAN_PORT_PRECOMMIT_OUT
   mise exec node@20 -- npm run caribbean:naval-check -- --semantic-probe
   git diff --check
   git status --short
+  ```
+
+  Then execute this entire code block as one self-contained Node 20 logical
+  operation. No line inside its quoted `-e` program may be submitted as a
+  separate shell command, and no shell variable or exported environment value
+  carries state:
+
+  ```bash
+  mise exec node@20 -- node --input-type=module -e "
+  import assert from 'node:assert/strict';
+  import { createHash } from 'node:crypto';
+  import fs from 'node:fs';
+  import os from 'node:os';
+  import path from 'node:path';
+  import { runPortCheck } from './scripts/caribbean-port-check.mjs';
+  const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+  const trackedDirectory = path.resolve('docs/screenshots/caribbean-port');
+  const trackedNames = fs.readdirSync(trackedDirectory).filter((name) => fs.statSync(path.join(trackedDirectory, name)).isFile()).sort();
+  const trackedBefore = new Map(trackedNames.map((name) => [name, sha256(fs.readFileSync(path.join(trackedDirectory, name)))]));
+  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-precommit-'));
+  assert.equal(typeof outputDirectory, 'string');
+  assert.notEqual(outputDirectory.length, 0);
+  assert.ok(path.relative(trackedDirectory, outputDirectory).startsWith('..' + path.sep));
+  try {
+    const result = await runPortCheck({ outputDirectory });
+    assert.equal(result.comparison.ok, true);
+    assert.equal(result.comparison.selectedRun, 'A');
+    assert.deepEqual(result.comparison.screenshotEvidence, result.metrics.screenshotEvidence);
+    assert.equal(result.comparison.selectedArtifacts.size, 23);
+    const expectedNames = [...result.comparison.selectedArtifacts.keys(), 'metrics.json'].sort();
+    const writtenNames = fs.readdirSync(outputDirectory).sort();
+    assert.deepEqual(writtenNames, expectedNames);
+    assert.equal(writtenNames.length, 24);
+    for (const [name, artifact] of result.comparison.selectedArtifacts) {
+      assert.equal(artifact.sourceRun, 'A');
+      const writtenHash = sha256(fs.readFileSync(path.join(outputDirectory, name)));
+      assert.equal(writtenHash, artifact.sha256);
+      assert.equal(result.publication.artifactHashes.get(name), artifact.sha256);
+    }
+    assert.equal(sha256(fs.readFileSync(path.join(outputDirectory, 'metrics.json'))), result.publication.metricsSha256);
+    assert.equal(result.comparison.selectedArtifacts.get('campaign-result-desktop.png').sha256, result.metrics.screenshotEvidence.observation.runA.pngSha256);
+    const trackedAfterNames = fs.readdirSync(trackedDirectory).filter((name) => fs.statSync(path.join(trackedDirectory, name)).isFile()).sort();
+    assert.deepEqual(trackedAfterNames, trackedNames);
+    for (const name of trackedNames) assert.equal(sha256(fs.readFileSync(path.join(trackedDirectory, name))), trackedBefore.get(name));
+  } finally {
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+    assert.equal(fs.existsSync(outputDirectory), false);
+  }
+  "
   ```
 
   Verify every status path is in the Task 7 file list, semantic probe added no
@@ -2212,11 +2350,15 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   both screenshot trees contain only gate-owned bytes. Confirm port metrics say
   `trackedCapture: 'run-a'`, name exactly one observation exception, and retain
   the exact run-A PNG hash and semantic digest/state boundary recorded in the
-  Task 7 report; recompute the tracked PNG SHA-256 and require equality. All
-  other screenshots are in the byte-compared set. The temporary port gate may
+  Task 7 report; recompute all 23 tracked PNG hashes plus metrics and require
+  equality with the recorded selected-A publication manifest. All other
+  screenshots are in the byte-compared set. The temporary port gate may
   produce different honest terminal pixels but cannot publish them to docs and
-  runs without diagnostic preservation, so it cannot overwrite the inspected
-  Step-3 A/B files. `--verify` is
+  receives a concrete internally created non-docs destination, so it cannot
+  overwrite the inspected Step-3 A/B files. If the Node operation or gate
+  fails, its `finally` must still remove the exact temporary directory; stop
+  Task 7, confirm the tracked hash map remains unchanged, and fix the owning
+  gate rather than retrying with an absent/empty output destination. `--verify` is
   intentionally not run against this dirty pre-commit tree.
 
 - [ ] **Step 8: Commit all owned evidence and documentation**
@@ -2243,11 +2385,12 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   clean Task 6 capture provenance.
 
   Reconfirm the normal-route port record still has exactly one observational
-  result screenshot and that the tracked PNG's recomputed SHA-256 equals the
-  exact run-A `pngSha256`, semantic digest, and complete state pinned by its
-  metrics and Task 7 report. No later command may have replaced those tracked
-  bytes. No final review may summarize all 23 port screenshots as byte-identical;
-  it must state the 22+1 boundary explicitly.
+  result screenshot; all 23 tracked PNG hashes and metrics still equal the
+  selected-A publication manifest recorded in the Task 7 report; and the result
+  PNG's recomputed SHA-256 equals the exact run-A `pngSha256`, semantic digest,
+  and complete state pinned by metrics/report. No later command may have
+  replaced those tracked bytes. No final review may summarize all 23 port
+  screenshots as byte-identical; it must state the 22+1 boundary explicitly.
 
   Review from plan execution base through Task 7 HEAD. Required topics: source-of-truth rule reuse; event/validator totality; RNG lineage; old-save compatibility; replay/compaction; writer conflicts/consent/recovery; no mutation during battle; terminal exactly-once; reload restart disclosure; session disposal; safe-return ruling; Set Sail readiness; a11y; lazy isolation; deterministic evidence; scope discipline.
 
@@ -2276,7 +2419,7 @@ The package is complete only when every statement is evidenced:
 15. Landscape `>=960x600` works with 14 px/44 px/focus/contrast/overflow/reduced-motion guarantees; phones and portrait mount only the notice.
 16. Normal setup/port/sailing/avoid does not request naval assets; pursuit loads only local production assets; no harness/debug module ships; Battle Lab remains independently green.
 17. The real-session literal public-control trace mounts at tick zero, primes first RAF without a tick, advances through actual 16 ms RAF quanta to exact six-tick publications/final tick `11855`, preserves ordered clock/Date fixtures and `nowConsumed`, and fails closed on drift, timeout, or non-victory.
-18. Schema-v3 normal-route port metrics and 22 of its exact 23 screenshots are byte-identical across two clean runs. The sole exact exception is the valid nonempty 1440x900 `campaign-result-desktop.png`; it accepts arbitrary honest pixels only after exact A/B equality of the canonical semantic state/digest at tick `11855`, canvas/drawing-buffer/nonempty backend, exact `fnv1a32-rgba-grid-v1` 40-sample/nonzero/8-hex sample shape, terminal outcome, and final systems. Metrics pin both PNG hashes and name run A as tracked owner. Task 7's sole final mutating command explicitly preserves A/B, proves tracked bytes equal A, records A's hash/state, and inspects A/B/tracked before only nonwriting temp gates. Unknown/missing/additional exceptions, malformed/zero sample, PNG/hash/dimension failure, semantic drift, tracked-owner drift, or any non-exempt byte drift fails closed. No perceptual threshold is used. This does not impose byte identity on the separate live naval-harness observations in criterion 19.
+18. Schema-v3 normal-route port metrics and 22 of its exact 23 screenshots are byte-identical across two clean runs. The sole exact exception is the valid nonempty 1440x900 `campaign-result-desktop.png`; it accepts arbitrary honest pixels only after exact A/B equality of the canonical semantic state/digest at tick `11855`, canvas/drawing-buffer/nonempty backend, exact post-present `fnv1a32-rgba-grid-v1` count-40/integer-0..160/lowercase-8-hex supporting sample, terminal outcome, and final systems. Zero sample channels are valid and do not prove visible pixels. The buffer comparator recomputes both PNG hashes, returns only tagged A-selected artifacts, and the writer consumes only that selection. Task 6 hashes every temp publication against run A; Task 7's sole final mutating command preserves A/B and hashes all 23 tracked PNGs plus metrics against the selected-A publication manifest before inspecting A/B/tracked. Later port verification is one self-contained Node operation with internal mkdtemp, explicit non-docs destination, full A-hash/tracked-unchanged proof, and `finally` cleanup. Unknown/missing/additional exceptions, sample type/range/hash failure, PNG/hash/dimension failure, semantic drift, selected-owner drift, or any non-exempt byte drift fails closed. No perceptual threshold is used. This does not impose byte identity on the separate live naval-harness observations in criterion 19.
 19. Naval semantic probe is non-writing and tolerates stale tracked provenance; Task 7's clean-Task-6-HEAD capture owns honest observations; final clean `--verify` proves the exact sorted seed-to-fixed-point tracked-local import/HTML/CSS/build-entry closure and raw-byte row/hash manifest—including `kv.ts`, token CSS, and app main—while accepting varied in-range FPS/duration/resource/PNG observations and rejecting unresolved/omitted/new dependencies; nonliteral dynamic imports except the exact annotated same-file immutable literal-concatenation const selected by lexical TypeScript symbol at the import occurrence, already declared, unmutated, and exactly annotated on the identifier argument; shadowed, mis-scoped, duplicate, use-before, reassigned, or name-map-blessed bindings; nonliteral CommonJS requires; every `import.meta.glob` call including literal patterns; missing/extra/reordered rows; and hash, stable, range, or artifact drift with the exact source diagnostic, mode prefix, and cleanup contract. The normal-route deterministic-flag cleanup does not change the naval harness's approved `ANGLE_ARGS`.
 20. Every Task 1–6 source commit has fresh focused tests, check, full Vitest, forced clean solution build, real package build, and diff check; Tasks 4–5 also commit inspected normal-production screenshots with their UI source; cumulative gates/review are fresh and zero-finding.
 21. Human first-time and target-iPad Safari/touch/offline/thermal observations remain honestly unobserved unless actually performed.

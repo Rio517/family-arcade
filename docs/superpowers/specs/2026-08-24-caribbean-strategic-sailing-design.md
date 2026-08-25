@@ -863,49 +863,114 @@ interface NormalRouteScreenshotEvidence {
     };
   };
 }
+
+interface NormalRouteScreenshotRun {
+  run: 'A' | 'B';
+  screenshotBuffers: ReadonlyMap<string, Uint8Array>;
+  semanticStates: ReadonlyMap<string, TerminalResultSemanticState>;
+  checks: {
+    routeFailures: 0;
+    requestFailures: 0;
+    consoleFailures: 0;
+    pageFailures: 0;
+    semanticProbesPassed: true;
+  };
+}
+
+type NormalRouteScreenshotComparison =
+  | { ok: false; issues: readonly string[] }
+  | {
+      ok: true;
+      issues: readonly [];
+      selectedRun: 'A';
+      selectedArtifacts: ReadonlyMap<string, {
+        sourceRun: 'A';
+        bytes: Uint8Array;
+        sha256: string;
+      }>;
+      screenshotEvidence: NormalRouteScreenshotEvidence;
+    };
 ```
 
 Each `pngSha256` is the lowercase 64-hex SHA-256 of that run's original PNG
-bytes. Each semantic digest is the lowercase 64-hex SHA-256 of canonical JSON
-for that run's complete normalized `semanticState`; both states and semantic
-digests must equal each other and each evaluator-recomputed digest. Backend
-vendor/renderer are observed, nonempty strings rather than hard-coded GPU
-brands, and must be exactly equal between A and B. `framebufferSample` has an
-exact closed shape: algorithm `fnv1a32-rgba-grid-v1`, integer `sampleCount`
-exactly `40`, integer `nonzeroSampleChannels` in `0..160` and strictly greater
-than zero, and lowercase eight-hex `sampleHash`. The sample is taken at the
-same honest rendered terminal seam used for the full-page capture; a cleared
-all-zero sample fails rather than becoming an accepted baseline. It remains a
-rendering-state fingerprint, not a substitute for terminal facts, PNG
-validity, or visual inspection.
+bytes. The serialized evaluator has no PNG buffers: it validates each declared
+PNG hash only as lowercase 64-hex and never claims to recompute it. The separate
+byte-bearing comparator recomputes both PNG SHA-256 values from the actual run
+buffers and requires equality with the declarations. Each semantic digest is
+the lowercase 64-hex SHA-256 of canonical JSON for that run's complete
+normalized `semanticState`; the serialized evaluator can and does recompute
+those digests from the embedded states. Both states and semantic digests must
+equal each other and each evaluator-recomputed semantic digest.
 
-The comparator accepts arbitrary honest pixel bytes only for that exact row,
-after reading and validating both byte buffers' PNG signatures, nonzero byte
-lengths, embedded dimensions and SHA-256 hashes; exact A/B semantic state/
-digest equality; final outcome/systems; and zero route/request/console/page
-failures. It uses no pixel-difference, perceptual, colour-delta, or similarity
-threshold. The evaluator rejects unknown, missing, mistyped, out-of-range, or
-wrong-shape fields at every screenshot-evidence level. A missing or unknown
-name, a second exception, a dimension/signature failure, malformed sample,
-semantic drift, digest mismatch, or failure in any non-exempt screenshot
-remains fatal. Direct byte-buffer, exact-exemption-set, and schema-shape RED
-tests precede comparator implementation.
+Backend vendor/renderer are observed, nonempty strings rather than hard-coded
+GPU brands, and must be exactly equal between A and B. `framebufferSample` has
+an exact closed shape: algorithm `fnv1a32-rgba-grid-v1`, integer `sampleCount`
+exactly `40`, integer `nonzeroSampleChannels` in inclusive range `0..160`, and
+lowercase eight-hex `sampleHash`. Zero is valid: the measured post-present
+default WebGL buffer can be cleared. The algorithm, count, nonzero-channel
+count, and hash must nevertheless be exactly equal between A and B. Sampling
+remains at the already measured post-present `readPixels` operation. It may not
+move to a new frame/render hook, `preserveDrawingBuffer`, pre-present read,
+composited-PNG sample, added RAF, `gl.finish`, or any other unmeasured seam.
+This record is supporting render-state evidence only and makes no claim about
+visible pixels.
 
-The default command writes run A to the tracked path only after A/B validation
-and identifies that ownership, the exact run-A PNG hash, and its complete
-semantic state/digest in metrics. Task 7 has one final pre-commit mutating port
-capture. It clears the known ignored diagnostic destination, explicitly
-enables A/B diagnostic preservation at
+The authoritative public semantic equality remains exact tick/result, canvas/
+rect/drawing-buffer/backend, terminal outcome/seed, and player/opponent systems,
+with zero route/request/console/page/semantic-probe failures. Valid original
+PNG containers establish capture integrity. Task 7's original-resolution
+inspection of preserved A, preserved B, and tracked A owns the visual-truth
+claim; neither the framebuffer sample nor its hash can replace that inspection.
+
+`compareNormalRouteScreenshotRuns` accepts the complete tagged A/B run objects
+and declared evidence. It reads and validates both buffer maps' PNG signatures,
+nonzero byte lengths, embedded dimensions and SHA-256 hashes; cross-checks the
+declared A/B PNG hashes against those buffers; requires exact A/B semantic
+state/digest equality, final outcome/systems, and zero route/request/console/
+page/semantic-probe failures; and byte-compares every non-exempt file. It
+accepts arbitrary honest pixel bytes only for the exact result row. Success is
+the tagged union member above with literal `selectedRun: 'A'`; every selected
+artifact contains the exact run-A bytes and recomputed run-A hash. Failure has
+no selected artifacts. It uses no pixel-difference, perceptual, colour-delta,
+or similarity threshold.
+
+`publishNormalRouteComparison` accepts only the successful tagged member,
+metrics bytes, and a concrete destination. It has no run-B parameter and writes
+only `comparison.selectedArtifacts`; it returns the written filename/hash
+manifest plus metrics hash. The command may not publish from its raw A/B maps
+after comparison. The serialized evaluator rejects unknown, missing, mistyped,
+out-of-range, or wrong-shape declarative fields; the buffer comparator owns
+actual PNG/hash cross-checks and output selection. A missing or unknown name, a
+second exception, a dimension/signature failure, malformed sample, semantic
+drift, digest mismatch, selected-run drift, or failure in any non-exempt
+screenshot remains fatal. Direct run-object/selection/publication,
+exact-exemption-set, and schema-shape RED tests precede source implementation.
+
+The default command writes only the comparator-selected run-A artifacts to the
+tracked path after A/B validation and identifies that ownership, the exact
+run-A PNG hash, and its complete semantic state/digest in metrics. Its
+programmatic result exposes the successful comparison and publication manifest
+so integration tests can require its returned screenshot evidence to equal
+metrics and hash every written candidate against run A. Task 7
+has one final pre-commit mutating port capture. It clears the known ignored
+diagnostic destination, explicitly enables A/B diagnostic preservation at
 `/private/tmp/caribbean-port-identity-diagnostic`, and treats that command's
 preserved run A as the inspection owner. Before any commit it proves the
 just-published tracked bytes equal preserved run A, pins the hash and complete
-state in metrics and the ignored report, and inspects preserved A, preserved B,
-and tracked A at original resolution after that final mutating command. No
-later command may replace tracked port evidence before commit: later port gates
-write only to a
-unique temporary output directory and reassert the tracked run-A hash, or fail
-if that hash changed. Adding any future exception requires new measured
-evidence and a reviewed spec amendment.
+state in metrics and the ignored report, hashes all 23 tracked screenshots plus
+metrics against the writer's selected-A publication manifest, and inspects
+preserved A, preserved B, and tracked A at original resolution after that final
+mutating command. No later command may replace tracked port evidence before
+commit: later port gates
+use one self-contained Node 20 operation that creates a unique directory with
+`mkdtempSync`, proves it is outside `docs/screenshots/caribbean-port`, passes
+that concrete nonempty directory to `runPortCheck`, hashes every written file
+against the returned run-A publication manifest, reasserts the tracked run-A
+hash, and removes the directory in `finally`. Explicit `outputDirectory:
+undefined`, empty, or the tracked docs path fails before build/capture; it may
+not fall back to tracked output. A gate failure still executes and verifies
+temporary cleanup, then stops Task 7. Adding any future exception requires new
+measured evidence and a reviewed spec amendment.
 
 The normal victory is driven through public battle controls by one committed
 golden command trace for the exact second-voyage input produced from campaign
