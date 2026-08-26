@@ -54,21 +54,24 @@ offline-capable—not a browser novelty.
 | [bridgetown-visual-reference.md](./bridgetown-visual-reference.md) | Authoritative historical visual basis, limits, and representation gate for the painted harbour |
 | [bridgetown-asset-report.json](./bridgetown-asset-report.json) | Reproducible ImageGen prompt history, production asset identity, crop contract, and review disposition |
 
-## Production Bridgetown evidence
+## Production Bridgetown and strategic-sailing evidence
 
 Run `npm run caribbean:port-check` to build the normal production app, serve it
 on a loopback-only port, and drive the registry route at `/#/caribbean` in
-Chromium. The gate uses the real browser Web Lock and `localStorage`, completes
-setup, trade, rumour acceptance, save recovery, quarantine, republish, reload,
-and resume, and rejects preview/naval resources in the normal bundle. It runs
-the journey twice from clean storage and updates evidence only after the
-metrics and reduced-motion screenshots match byte-for-byte.
+Chromium. The schema-v3 gate uses the real browser Web Lock and `localStorage`.
+It completes setup, trade, rumour acceptance, save recovery, quarantine,
+republish, reload, and resume, then drives the saved Bridgetown -> sailing ->
+encounter -> avoid/return -> sailing -> encounter -> naval battle -> result ->
+safe-return loop through rendered public controls. The final tracked evidence
+refresh uses `CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS=1 npm run
+caribbean:port-check` so the ignored inspection bundle pins both terminal runs
+and the selected-run-A publication before cleanup.
 
-The final complete-v2 package keeps the original channel, storage, recovery,
-and isolation evidence while requiring an exact schema with no unknown fields.
-It runs the real route twice from clean browser storage and accepts the package
-only when metrics and every committed PNG are byte-identical. The current set includes the
-[`technical metrics`](../../screenshots/caribbean-port/metrics.json),
+The command runs twice from clean browser storage and requires byte-identical
+schema-v3 metrics plus exactly 22 byte-identical screenshots. The schema-v3
+record is the [`technical metrics`](../../screenshots/caribbean-port/metrics.json).
+Its exact 23-screenshot membership begins with these original 14 files:
+
 [`setup`](../../screenshots/caribbean-port/setup-desktop.png),
 [`Bridgetown port`](../../screenshots/caribbean-port/port-desktop.png),
 [`market`](../../screenshots/caribbean-port/market-desktop.png),
@@ -80,7 +83,7 @@ only when metrics and every committed PNG are byte-identical. The current set in
 [`960×599 height notice`](../../screenshots/caribbean-port/minimum-screen-height.png),
 and [`1024×1366 portrait notice`](../../screenshots/caribbean-port/minimum-screen-large-portrait.png).
 
-It also records the same opening harbour at
+The original set also includes the same opening harbour at
 [`1180×820`](../../screenshots/caribbean-port/port-tablet-landscape.png) and
 [`1024×768`](../../screenshots/caribbean-port/port-compact-landscape.png), a
 forced local-art failure with working port controls at
@@ -90,6 +93,40 @@ shared-player profile editor at
 The route seeds Mario / `he/him`, changes the shared pronouns during setup,
 then verifies that a later profile edit does not rewrite the campaign snapshot;
 new campaigns are Adventure-only while legacy saves remain loadable.
+
+The other exact nine members are
+[`sailing`](../../screenshots/caribbean-port/sailing-desktop.png),
+[`Red Jackdaw contact`](../../screenshots/caribbean-port/encounter-desktop.png),
+[`campaign battle`](../../screenshots/caribbean-port/campaign-battle-desktop.png),
+[`campaign result`](../../screenshots/caribbean-port/campaign-result-desktop.png),
+[`returned Captain's Log`](../../screenshots/caribbean-port/returned-log-desktop.png),
+[`exact 960×600 sailing`](../../screenshots/caribbean-port/sailing-minimum-supported.png),
+[`campaign battle HTML fallback`](../../screenshots/caribbean-port/campaign-battle-fallback.png),
+[`sailing portrait notice`](../../screenshots/caribbean-port/sailing-large-portrait-notice.png),
+and [`battle-resize portrait notice`](../../screenshots/caribbean-port/campaign-battle-resize-notice.png).
+
+The sole byte-comparison exception is the real 1440×900 WebGL-composited
+`campaign-result-desktop.png`. Both runs must still be valid, nonempty PNGs
+with exact equal canonical semantic state and digest at tick 11,855, including
+canvas/drawing-buffer/backend facts, terminal outcome and seed, final player
+and opponent systems, and the closed framebuffer-sample record. Run A owns the
+tracked screenshot and every selected publication artifact. Honest A/B result
+pixels are observational even when a particular capture happens to produce
+identical bytes; the evidence boundary remains **22 byte-compared + 1 terminal
+observation**, never 23 byte-identical screenshots.
+
+Sailing and encounter reload their exact persisted strategic phase. Reloading
+a saved naval phase constructs a fresh transient session at tick zero from the
+byte-identical saved battle input and discloses that the engagement restarts
+from first contact. An unsupported resize disposes the controller/session;
+restoring support automatically resumes the persisted naval route as another
+fresh tick-zero session. No campaign write occurs while the battle ticks.
+
+Avoid, withdrawal, and every validated terminal outcome spend the guaranteed
+return day and provision before returning to Bridgetown. The tactical outcome
+remains in `world.lastVoyage`, while the pre-battle flagship stays unchanged
+and ready: persistent damage, repair, capture, and prize-fleet systems remain
+explicitly deferred. Victory alone completes the Red Jackdaw lead and target.
 
 The painted-harbour evidence adds normal and forced image-error captures at
 [`1440×900`](../../screenshots/caribbean-port/port-art-desktop.png),
@@ -104,15 +141,33 @@ WebP MIME type, and confirms the hashed asset is in the production PWA
 precache. Its isolated failure run aborts only that emitted WebP while every
 other page, console, or request failure remains fatal.
 
+Normal production intentionally emits and precaches the lazy campaign naval
+JS/CSS and local sloop GLB. Setup, port, sailing, and avoid do not request those
+assets; pursuit requests only the local production assets. Normal output ships
+no `CaribbeanLab`, debug bridge/global, preview HTML, harness config, or
+harness-only failure marker.
+
 This is repeatable desktop-browser engineering evidence, not a claim of human
 comprehension or physical-device approval. A real target iPad, Safari/touch,
-offline installation, and first-time-player observation remain unobserved.
+offline installation, thermal/sustained-performance behavior, and first-time-
+player observation remain unobserved.
 
 ## Production naval evidence
 
-Run `npm run caribbean:naval-check` to build the harness-only production entry,
-serve `dist` on an OS-assigned local port, drive the Battle Lab in Chromium,
-and write changed evidence bytes only. The current evidence set includes the
+The naval command is deliberately mode-explicit:
+
+- `npm run caribbean:naval-check -- --semantic-probe` runs the real harness in
+  a unique temporary directory and is non-writing;
+- `npm run caribbean:naval-check -- --capture` is the sole tracked evidence
+  writer and requires a clean source HEAD; and
+- `npm run caribbean:naval-check -- --verify` regenerates fresh temporary
+  observations after the evidence commit, checks their allowed ranges, and
+  verifies the exact tracked stable manifest/source provenance without
+  requiring live FPS, duration, resource samples, or PNG pixels to repeat.
+
+The capture build serves the harness-only production entry on an OS-assigned
+local port, drives the Battle Lab in Chromium, and writes only genuinely
+changed evidence bytes. The current evidence set includes the
 [`technical metrics`](../../screenshots/caribbean-naval/metrics.json),
 [`tablet decision`](../../screenshots/caribbean-naval/decision-tablet.png),
 [`tablet briefing`](../../screenshots/caribbean-naval/briefing-tablet.png),
