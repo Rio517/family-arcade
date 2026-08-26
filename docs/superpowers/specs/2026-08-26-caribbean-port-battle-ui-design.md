@@ -21,9 +21,11 @@ The finished interface must:
 
 ## Approved Visual Direction
 
-![Caribbean port and battle UI concept](./2026-08-26-caribbean-port-battle-ui-concept.png)
+![Caribbean port and battle UI concept](./2026-08-26-caribbean-port-battle-ui-concept-v2.png)
 
-The concept image is an art-direction reference, not a pixel contract. Its useful ideas are the illustrated Bridgetown backdrop, large icon-led port calls, chart as navigational context, mirrored battery status, and visible keycaps. The extra place names shown on the concept chart are atmosphere only; phase one must not expose them as real destinations.
+The concept image is an art-direction reference, not a pixel or typography contract. Its useful ideas are the illustrated Bridgetown backdrop, large icon-led port calls, chart as navigational context, mirrored **player** battery status, and large keycaps. The exact shortcut diagram and labels below are authoritative; generated letterforms in the raster concept are illustrative. The extra place names shown on the concept chart are atmosphere only; phase one must not expose them as real destinations.
+
+![Exact Caribbean battle keyboard layout](./2026-08-26-caribbean-battle-keyboard-layout.svg)
 
 The distinctive visual signature is a **captain’s working chart laid over the harbor and battle surfaces**: the same brass, signal-red, sailcloth, and ink language connects port decisions to naval commands. This is not a generic dashboard and not a literal imitation of any Pirates release.
 
@@ -55,7 +57,6 @@ This design does **not** add:
 - a free-roaming overworld;
 - additional voyage content or economies;
 - independently loaded cannon simulation or partial broadside firing;
-- new keyboard shortcuts;
 - new ship classes; or
 - remote fonts, artwork, or other runtime downloads.
 
@@ -223,25 +224,33 @@ The scene remains dominant. Status panels frame it rather than covering the ship
 
 ### Keyboard communication
 
-Every implemented shortcut appears beside its written action wherever the action is available:
+The persistent battle controls use one compact left-hand QWERTY cluster. Their visual arrangement mirrors their physical relationship on the keyboard:
 
-| Action | Shortcut |
-|---|---|
-| Turn port | `A` / `←` |
-| Turn starboard | `D` / `→` |
-| Fire port | `Q` |
-| Fire starboard | `E` |
-| Round shot | `1` |
-| Chain shot | `2` |
-| Grape shot | `3` |
-| Toggle sail | `R` |
-| Pause / resume | `Space` / `Esc` |
+```text
+[Q] Fire port              [E] Fire starboard   [R] Change sail
+[A] Turn port   [S] Change shot   [D] Turn starboard
+                         [Space] Pause
+```
 
-Written labels remain primary. Keycaps are adjacent secondary cues, not icon-only controls. Touch users receive the same complete command set through full-size buttons.
+The exact primary bindings are:
+
+| Action | Primary shortcut | Behavior |
+|---|---|---|
+| Turn port | `A` | held steering command |
+| Turn starboard | `D` | held steering command |
+| Fire port | `Q` | fire the loaded port battery |
+| Fire starboard | `E` | fire the loaded starboard battery |
+| Change shot | `S` | cycle `Round → Chain → Grape → Round` |
+| Change sail | `R` | toggle the current sail setting |
+| Pause / resume | `Space` | toggle battle pause |
+
+`S` replaces the `1`/`2`/`3` ammunition bindings; those number keys no longer change ammunition in battle. Pointer and touch users may still select Round, Chain, or Grape directly from the visible ammunition control. Arrow keys and `Esc` may remain accessibility/familiarity alternatives, but they appear in the pause/help legend rather than competing with the persistent left-hand cluster.
+
+Written labels remain primary. Each persistent control uses a large high-contrast keycap paired with its action label; the letter cannot be reduced to tiny corner text. Keycaps are secondary cues, not icon-only controls. Touch users receive the same complete command set through full-size buttons.
 
 ## Cannon Readiness
 
-The current rules track one scalar reload state per broadside. The UI must visualize those actual rules rather than imply independently firing cannon entities.
+The current rules track one scalar reload state per player broadside. The UI must visualize those actual rules rather than imply independently firing cannon entities or reveal hidden enemy timing.
 
 - Port and starboard each receive a mirrored **battery** indicator.
 - Each indicator uses a row of cannon or charge segments to make progress glanceable.
@@ -249,8 +258,10 @@ The current rules track one scalar reload state per broadside. The UI must visua
 - The label always states either **Reloading 62%** or **Ready**.
 - The Fire button remains disabled until the full side is loaded, exactly as it is today.
 - A ready battery uses brass plus a clear **Ready** label; loading uses restrained signal red and a progress fill.
-- The selected ammunition appears between the two batteries and remains identified by name as well as number key.
+- The selected ammunition appears between the two batteries and remains identified by name beside the `S` change-shot control.
 - Screen-reader status announces meaningful transitions such as **Port battery ready**, not every percentage tick.
+
+Exact reload progress belongs only to the player. The enemy panel may show hull, sails, crew, cannon count, and visible damage, but it never shows a reload meter, percentage, battery-ready label, or other exact firing timer. Recent broadside smoke and, where the ship art supports it honestly, animated gunports may act as diegetic clues without exposing the underlying reload value.
 
 Partial individual-cannon fire, crew-assigned reload speeds, or different cannon completion times require a separate gameplay design and are not simulated by this UI.
 
@@ -299,7 +310,8 @@ The implementation plan must add or refresh evidence for:
 - battle with both batteries ready;
 - battle with each side at an intermediate reload state;
 - one side ready while the other reloads;
-- the complete visible keyboard legend;
+- the complete visible `Q/E`, `A/S/D`, `R`, and `Space` command cluster;
+- player battery status with no enemy reload meter or percentage;
 - reduced-motion water and fallback battle views; and
 - the supported desktop, tablet, minimum, and portrait boundaries already owned by the harnesses.
 
@@ -310,6 +322,8 @@ Geometry assertions must prove:
 - Tavern’s action/status slot does not collapse;
 - Market padding remains present next to rows and scrollbars;
 - every visible command has a complete hit target and implemented shortcut cue; and
+- pressing `S` cycles Round, Chain, and Grape in the displayed order while `1`/`2`/`3` do not change ammunition;
+- enemy status contains no exact reload or battery-readiness data; and
 - cannon progress shown in the DOM matches the underlying scalar reload state.
 
 Screenshot writers continue to hash content and leave a tracked PNG untouched when the new bytes are identical. No test may weaken the established 22+1 strategic-sailing evidence boundary, A-only publication rule, provenance checks, or stable-state/render-observation split.
@@ -324,8 +338,8 @@ The redesign is complete when all of the following are true:
 4. Market has balanced padding, stronger red, no redundant success notice, and a bottom **Done** action.
 5. Blocked actions use clear signal-red prerequisite messages and full-tile disabled interaction.
 6. The chart truthfully shows Bridgetown, the player ship, and the authored Red Jackdaw route without fake playable ports.
-7. Every implemented battle shortcut is visible beside its written command.
-8. Both broadside reload states are immediately distinguishable as loading or ready and remain faithful to scalar per-side mechanics.
+7. The persistent battle deck presents the readable left-hand `Q/E`, `A/S/D`, `R`, and `Space` cluster, and `S` cycles Round, Chain, and Grape in order.
+8. Both player broadside reload states are immediately distinguishable as loading or ready and remain faithful to scalar per-side mechanics; enemy reload timing is never exposed as UI data.
 9. Ships read as heavy: low global wave motion, restrained hull bobbing, strong water contact, and localized wake/impact motion.
 10. Browser evidence proves all layout, accessibility, deterministic, performance, provenance, and no-op hash-writing contracts.
 
