@@ -42,6 +42,7 @@ describe('<PortMenu>', () => {
     expect(css).toMatch(/\.caribbean-port-action\s*\{[^}]*height:\s*100%/s);
     expect(css).toMatch(/\.caribbean-port \.caribbean-port-action\s*\{[^}]*font-size:\s*15px/s);
     expect(css).toMatch(/\.caribbean-port-action-reason\s*\{[^}]*font-size:\s*15px/s);
+    expect(css).toMatch(/@media \(max-height:\s*700px\)[\s\S]*body:has\(\.caribbean-port\) \.party-root\s*\{[^}]*bottom:\s*calc\(176px/s);
   });
 
   it('marks the Tavern instead of showing the lead instruction as visible Set Sail copy', () => {

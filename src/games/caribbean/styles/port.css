@@ -899,7 +899,7 @@ body:has(.caribbean-port) .party-root {
   }
 
   body:has(.caribbean-port) .party-root {
-    bottom: calc(148px + env(safe-area-inset-bottom));
+    bottom: calc(176px + env(safe-area-inset-bottom));
   }
 }
 
