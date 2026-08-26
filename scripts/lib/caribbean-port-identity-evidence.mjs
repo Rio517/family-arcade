@@ -112,7 +112,7 @@ export const ART_CONTRAST_SELECTORS = Object.freeze([
 ]);
 
 export const ART_ACTIVITY_CONTRAST_SPECS = Object.freeze([
-  Object.freeze({ selector: '.caribbean-market-status:not(:empty)', text: 'Cargo ledger updated.' }),
+  Object.freeze({ selector: '.caribbean-market-price-cue--expensive', text: 'Expensive' }),
   Object.freeze({
     selector: '.caribbean-tavern-rumour blockquote',
     text: 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.',
@@ -149,7 +149,7 @@ const MARKET_PHASES = ['before', 'pending', 'resolved'];
 const MARKET_STATUS = {
   before: '',
   pending: 'Saving trade.',
-  resolved: 'Cargo ledger updated.',
+  resolved: '',
 };
 
 const MARKET_SAMPLE_KEYS = ['phase', 'actionTestId', 'stage', 'rows', 'actionStrips', 'stageClientWidth', 'stageScrollWidth', 'rowsClientWidth', 'rowsScrollWidth', 'actionStripWidths', 'scrollLeft', 'scrollTop', 'focusedTestId', 'status', 'ariaBusy'];

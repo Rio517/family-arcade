@@ -1,5 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { createCampaign } from '../../domain/createCampaign';
 import { createJournal } from '../../domain/replay';
@@ -94,6 +96,15 @@ describe('<CampaignSetup>', () => {
   });
 
   afterEach(() => vi.restoreAllMocks());
+
+  it('aligns all three commission fields and keeps the manifest rule level', () => {
+    const css = readFileSync(resolve('src/games/caribbean/styles/production.css'), 'utf8');
+
+    expect(css).toMatch(/\.caribbean-form-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s);
+    expect(css).toMatch(/\.caribbean-form-grid (?:input|input,\s*\n\.caribbean-form-grid select)[\s\S]*width:\s*100%/s);
+    expect(css).toMatch(/\.caribbean-course-axis\s*\{[^}]*transform:\s*none/s);
+    expect(css).not.toMatch(/\.caribbean-course-axis\s*\{[^}]*rotate\(/s);
+  });
 
   it('prefills the captain from the active player and submits the shared pronouns with Adventure', () => {
     const view = controller();

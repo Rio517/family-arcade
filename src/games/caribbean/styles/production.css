@@ -58,8 +58,7 @@
   width: 34%;
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--caribbean-brass) 16% 84%, transparent);
-  transform: rotate(-2deg);
-  transform-origin: left;
+  transform: none;
 }
 .caribbean-course-axis::before,
 .caribbean-course-axis::after { content: ""; position: absolute; width: 1px; height: 12px; top: -5px; background: var(--caribbean-brass); }
@@ -112,11 +111,14 @@
 .caribbean-recovery-content > p,
 .caribbean-ready > p { max-width: 620px; color: color-mix(in srgb, var(--caribbean-sailcloth) 72%, transparent); line-height: 1.55; }
 
-.caribbean-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 22px; margin: 28px 0; }
+.caribbean-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin: 28px 0; }
 .caribbean-field { display: grid; gap: 7px; }
 .caribbean-field label { font-size: 14px; font-weight: 700; }
 .caribbean-form-grid input,
 .caribbean-form-grid select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   min-height: 48px;
   padding: 0 13px;
   border: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 35%, transparent);

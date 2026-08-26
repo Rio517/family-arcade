@@ -113,7 +113,7 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
       type="button"
       onClick={closeActivity}
     >
-      Back to harbour
+      {activeActivity === 'market' ? 'Done' : 'Back to harbour'}
     </button>
   );
 
@@ -154,9 +154,8 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
             </p>
           ) : (
             <>
-              {activeActivity === 'market' ? closeControl : null}
               <ActivityContent activity={activeActivity} state={state} controller={controller} />
-              {activeActivity === 'market' ? null : closeControl}
+              {closeControl}
             </>
           )}
         </section>

@@ -176,6 +176,14 @@ describe('<Market>', () => {
     expect(css).toMatch(/\.caribbean-market-action:focus-visible[\s\S]*outline:\s*3px solid var\(--caribbean-trade-wind\)/s);
   });
 
+  it('gives the ledger breathing room and uses a stronger accessible red for warnings', () => {
+    const css = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+
+    expect(css).toMatch(/\.caribbean-market\s*\{[^}]*padding:\s*12px 16px 16px/s);
+    expect(css).toMatch(/\.caribbean-market-price-cue--expensive\s*\{[^}]*var\(--caribbean-signal-red\) 88%/s);
+    expect(css).toMatch(/\.caribbean-market-severity--critical\s*\{[^}]*var\(--caribbean-signal-red\) 88%/s);
+  });
+
   it('disables impossible actions and places the exact reason beside their row', () => {
     const { rerender } = render(
       <Market state={openingState()} busy={false} onTrade={appliedTrade} />,
@@ -274,7 +282,7 @@ describe('<Market>', () => {
     expect(screen.queryByText('Trade is being saved.')).not.toBeInTheDocument();
   });
 
-  it('keeps reason slots and one polite status node stable through saving and resolution', async () => {
+  it('keeps reason slots and one polite status node stable without announcing an obvious successful update', async () => {
     let resolveTrade!: (value: { kind: 'applied'; eventId: number }) => void;
     const onTrade = vi.fn(() => new Promise<{ kind: 'applied'; eventId: number }>((resolve) => {
       resolveTrade = resolve;
@@ -298,7 +306,8 @@ describe('<Market>', () => {
 
     await act(async () => { resolveTrade({ kind: 'applied', eventId: 1 }); });
     expect(screen.getByTestId('caribbean-market-status')).toBe(status);
-    expect(status).toHaveTextContent('Cargo ledger updated.');
+    expect(status).toHaveTextContent('');
+    expect(screen.queryByText('Cargo ledger updated.')).not.toBeInTheDocument();
     expect(screen.getByTestId('caribbean-market')).toHaveAttribute('aria-busy', 'false');
     expect(document.activeElement).toBe(action);
   });
@@ -344,13 +353,13 @@ describe('<Market>', () => {
     const action = screen.getByTestId('market-provisions-sell-all');
     action.focus();
     fireEvent.click(action);
-    await waitFor(() => expect(screen.getByTestId('caribbean-market-status')).toHaveTextContent('Cargo ledger updated.'));
+    await waitFor(() => expect(screen.getByTestId('caribbean-market-status')).toHaveTextContent(''));
     expect(action).toHaveAttribute('aria-disabled', 'true');
     expect(action).toBeEnabled();
     expect(document.activeElement).toBe(action);
     fireEvent.keyDown(action, { key: 'Enter' });
     fireEvent.keyDown(action, { key: ' ' });
-    expect(screen.getByTestId('caribbean-market-status')).toHaveTextContent('Cargo ledger updated.');
+    expect(screen.getByTestId('caribbean-market-status')).toHaveTextContent('');
   });
 
   it.each([

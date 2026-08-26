@@ -302,10 +302,6 @@ export function Market({ state, busy, onTrade }: MarketProps) {
 
   return (
     <section className="caribbean-market" data-testid="caribbean-market" aria-busy={phase === 'saving'}>
-      <p className="caribbean-market-status" data-testid="caribbean-market-status" aria-live="polite">
-        {phase === 'idle' ? '' : phase === 'saving' ? 'Saving trade.'
-          : phase === 'success' ? 'Cargo ledger updated.' : 'Trade was not saved.'}
-      </p>
       <dl className="caribbean-market-summary" role="region" aria-label="Cargo summary">
         <div><dt>Gold</dt><dd>{state.wealth.gold} gold</dd></div>
         <div><dt>Flagship hold</dt><dd>{holdUsed} / {SLOOP_CLASS.hold} hold</dd></div>
@@ -332,6 +328,9 @@ export function Market({ state, busy, onTrade }: MarketProps) {
           />
         ))}
       </ul>
+      <p className="caribbean-market-status" data-testid="caribbean-market-status" aria-live="polite">
+        {phase === 'saving' ? 'Saving trade.' : phase === 'failure' ? 'Trade was not saved.' : ''}
+      </p>
     </section>
   );
 }

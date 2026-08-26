@@ -365,7 +365,7 @@ describe('<PortPage>', () => {
     for (const activity of ['Market', 'Tavern', "Captain's Log"] as const) {
       fireEvent.click(screen.getByRole('button', { name: activity }));
       expect(screen.getAllByTestId('caribbean-port-backdrop')).toHaveLength(1);
-      fireEvent.click(screen.getByRole('button', { name: 'Back to harbour' }));
+      fireEvent.click(screen.getByRole('button', { name: activity === 'Market' ? 'Done' : 'Back to harbour' }));
       expect(screen.getAllByTestId('caribbean-port-backdrop')).toHaveLength(1);
     }
   });
@@ -390,7 +390,7 @@ describe('<PortPage>', () => {
       ['Tavern', 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.'],
       ['Market', '34 owned', '4 gold / unit', 'Cheap'],
       ['Shipyard', 'Sloop', 'Hold 54 / 100', 'Repairs and refits open after a profitable voyage.'],
-      ['Divide Shares', 'Available after a profitable voyage'],
+      ['Divide Shares', 'Not available until after a profitable voyage', 'pay everyone and settle the voyage'],
       ["Captain's Log", 'No leads yet'],
     ] as const;
 
@@ -637,7 +637,7 @@ describe('<PortPage>', () => {
     expect(labelsRule).not.toMatch(/text-overflow:\s*ellipsis/);
   });
 
-  it('fits the complete Market ledger and Back control inside the 1440x900 desktop stage', () => {
+  it('keeps the complete Market ledger and its final Done control in document order at 1440x900', () => {
     setViewport(1440, 900);
     render(<StatefulPort />);
     fireEvent.click(screen.getByRole('button', { name: 'Market' }));
@@ -646,7 +646,7 @@ describe('<PortPage>', () => {
     const status = within(shell).getByRole('region', { name: 'Voyage status' });
     const navigation = within(shell).getByRole('navigation', { name: 'Bridgetown activities' });
     const activity = within(shell).getByRole('region', { name: 'Port activity' });
-    const back = within(activity).getByRole('button', { name: 'Back to harbour' });
+    const done = within(activity).getByRole('button', { name: 'Done' });
     const stage = activity.closest('.caribbean-port-stage');
     const market = activity.querySelector('.caribbean-market');
     const rows = within(activity).getAllByRole('listitem');
@@ -658,7 +658,7 @@ describe('<PortPage>', () => {
     expect(status.parentElement).toBe(shell);
     expect(stage?.parentElement).toBe(shell);
     expect(navigation.parentElement).toBe(shell);
-    expect(activity).toContainElement(back);
+    expect(activity).toContainElement(done);
     expect(rows).toHaveLength(6);
     expect(reasonRows).toHaveLength(6);
 
@@ -682,8 +682,7 @@ describe('<PortPage>', () => {
     const itemRule = ruleBodyContaining(desktopCss, '.caribbean-port-action-item');
     const menuHeight = lengthPixels(splitCssTerms(declaration(actionsRule, 'padding') ?? '')[0] ?? '', viewportWidth)
       + lengthPixels(splitCssTerms(declaration(itemRule, 'padding') ?? '')[0] ?? '', viewportWidth)
-      + lengthPixels(cascadedDeclaration(desktopCss, 'min-height', ['.caribbean-port-action']), viewportWidth)
-      + lengthPixels(cascadedDeclaration(desktopCss, 'min-height', ['.caribbean-port-action-reason']), viewportWidth)
+      + lengthPixels(declaration(itemRule, 'min-height') ?? '', viewportWidth)
       + menuBottom;
     const middleTrack = viewportHeight - statusHeight - menuHeight;
 
@@ -753,81 +752,31 @@ describe('<PortPage>', () => {
       + bearingLine + bearingMargin + activityHeadingLine + activityHeadingMargin;
 
     const summaryFactRule = ruleBodyContaining(desktopCss, '.caribbean-market-summary > div');
-    const summaryLabelLine = lineBoxPixels(
-      desktopCss,
-      ['.caribbean-market-summary dt'],
-      viewportWidth,
-      inheritedLineHeight,
-    );
-    const summaryValueLine = lineBoxPixels(
-      desktopCss,
-      ['.caribbean-market-summary dd'],
-      viewportWidth,
-      inheritedLineHeight,
-    );
+    const summaryLabelLine = lineBoxPixels(desktopCss, ['.caribbean-market-summary dt'], viewportWidth, inheritedLineHeight);
+    const summaryValueLine = lineBoxPixels(desktopCss, ['.caribbean-market-summary dd'], viewportWidth, inheritedLineHeight);
     const summaryValueRule = ruleBodyContaining(desktopCss, '.caribbean-market-summary dd');
     const summaryHeight = shorthandBlockPixels(declaration(summaryFactRule, 'padding') ?? '', viewportWidth)
       + summaryLabelLine
       + lengthPixels(splitCssTerms(declaration(summaryValueRule, 'margin') ?? '')[0] ?? '', viewportWidth)
       + summaryValueLine
       + 2;
-    const marketRule = ruleBodyWithDeclaration(desktopCss, '.caribbean-market', 'gap');
-    const summaryAndGap = summaryHeight + lengthPixels(declaration(marketRule, 'gap') ?? '', viewportWidth);
+    const marketRule = ruleBodyWithDeclaration(desktopCss, '.caribbean-market', 'padding');
+    const marketCloseRule = ruleBodyContaining(desktopCss, '.caribbean-port-stage--market .caribbean-port-close');
+    expect(declaration(marketRule, 'padding')).toBe('12px 16px 16px');
+    expect(declaration(marketCloseRule, 'position')).toBe('static');
+    expect(declaration(marketCloseRule, 'margin')).toBe('14px 0 0 auto');
 
-    const marketActionHeight = lengthPixels(cascadedDeclaration(
-      desktopCss,
-      'min-height',
-      ['.caribbean-market-action'],
-    ), viewportWidth);
+    const marketPadding = shorthandBlockPixels(declaration(marketRule, 'padding') ?? '', viewportWidth);
+    const marketGap = lengthPixels(declaration(marketRule, 'gap') ?? '', viewportWidth);
     const rowRule = ruleBodyContaining(desktopCss, '.caribbean-market-row');
-    const rowMinimum = lengthPixels(declaration(rowRule, 'min-block-size') ?? '', viewportWidth);
-    const rowHeight = rowMinimum;
-    const rowsHeight = rowHeight * rows.length;
-
+    const rowsHeight = lengthPixels(declaration(rowRule, 'min-block-size') ?? '', viewportWidth) * rows.length;
     const closeRule = ruleBodyContaining(desktopCss, '.caribbean-port-close');
-    const closeStyleRule = ruleBodyContaining(desktopCss, '.caribbean-port .caribbean-port-close');
-    const marketCloseRule = optionalRuleBodyWithDeclaration(
-      desktopCss,
-      '.caribbean-port-stage--market .caribbean-port-close',
-      'position',
-    );
-    const closeIsOutOfFlow = declaration(marketCloseRule ?? '', 'position') === 'absolute';
-    const closeFlowHeight = closeIsOutOfFlow
-      ? 0
-      : lengthPixels(declaration(closeRule, 'min-height') ?? '', viewportWidth)
-        + lengthPixels(declaration(closeStyleRule, 'margin-top') ?? '', viewportWidth);
-    const requiredContent = activityChrome + summaryAndGap + rowsHeight + closeFlowHeight;
-    const clearance = stageContent - requiredContent;
+    const closeHeight = lengthPixels(declaration(closeRule, 'min-height') ?? '', viewportWidth)
+      + lengthPixels(splitCssTerms(declaration(marketCloseRule, 'margin') ?? '')[0] ?? '', viewportWidth);
+    const requiredContent = activityChrome + marketPadding + summaryHeight + marketGap + rowsHeight + closeHeight;
+    expect(requiredContent - stageContent).toBeLessThanOrEqual(80);
 
-    expect(clearance).toBeGreaterThanOrEqual(8);
-
-    const marketActivityRule = ruleBodyContaining(
-      desktopCss,
-      '.caribbean-port-stage--market .caribbean-port-activity',
-    );
-    const marketHeadingRule = ruleBodyWithDeclaration(
-      desktopCss,
-      '.caribbean-port-stage--market .caribbean-port-activity h2',
-      'padding-inline-end',
-    );
-    const marketBearingRule = ruleBodyWithDeclaration(
-      desktopCss,
-      '.caribbean-port-stage--market .caribbean-port-bearing',
-      'padding-inline-end',
-    );
-    const closeWidth = lengthPixels(declaration(marketCloseRule ?? '', 'min-width') ?? '', viewportWidth);
-    const headingReserve = lengthPixels(declaration(marketHeadingRule, 'padding-inline-end') ?? '', viewportWidth);
-    const bearingReserve = lengthPixels(declaration(marketBearingRule, 'padding-inline-end') ?? '', viewportWidth);
-    const closeOffset = lengthPixels(declaration(marketCloseRule ?? '', 'inset-block-start') ?? '', viewportWidth);
-    const headerHeight = activityPadding + bearingLine + bearingMargin
-      + activityHeadingLine + activityHeadingMargin;
-
-    expect(declaration(marketActivityRule, 'position')).toBe('relative');
-    expect(closeIsOutOfFlow).toBe(true);
-    expect(headingReserve - closeWidth).toBeGreaterThanOrEqual(8);
-    expect(bearingReserve - closeWidth).toBeGreaterThanOrEqual(8);
-    expect(closeOffset + marketActionHeight).toBeLessThanOrEqual(headerHeight);
-    expect(back.compareDocumentPosition(market) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(market.compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();
   });
 });

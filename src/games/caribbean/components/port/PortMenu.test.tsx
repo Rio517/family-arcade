@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { voyageBlockedCopy, type VoyageBlockedReason } from '../../domain/voyage';
 import { PORT_ACTIONS, PortMenu } from './PortMenu';
@@ -20,9 +22,43 @@ describe('<PortMenu>', () => {
 
     const navigation = screen.getByRole('navigation', { name: 'Bridgetown activities' });
     const actions = within(navigation).getAllByRole('button');
-    expect(actions.map((action) => action.textContent?.trim())).toEqual(EXPECTED_LABELS);
+    expect(actions.map((action) => action.querySelector('.caribbean-port-action-label')?.textContent?.trim())).toEqual(EXPECTED_LABELS);
     expect(PORT_ACTIONS.map((action) => action.label)).toEqual(EXPECTED_LABELS);
     expect(within(navigation).getByRole('list')).toContainElement(actions[0]);
+  });
+
+  it('makes every complete navigation tile interactive and keeps supporting copy readable', () => {
+    render(<PortMenu activeActivity="menu" readiness={{ kind: 'ready', requiredProvisions: 2 }} busy={false} onSetSail={vi.fn()} onSelect={vi.fn()} />);
+
+    for (const button of screen.getAllByRole('button')) {
+      expect(button.parentElement).toHaveClass('caribbean-port-action-item');
+    }
+    const setSail = screen.getByTestId('port-action-set-sail');
+    expect(setSail).toContainElement(screen.getByText('Two provisions cover the outbound leg and guaranteed return.'));
+
+    const css = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+    expect(css).toMatch(/\.caribbean-port-action-item\s*\{[^}]*display:\s*grid/s);
+    expect(css).toMatch(/\.caribbean-port-action-item\s*\{[^}]*padding:\s*0px/s);
+    expect(css).toMatch(/\.caribbean-port-action\s*\{[^}]*height:\s*100%/s);
+    expect(css).toMatch(/\.caribbean-port \.caribbean-port-action\s*\{[^}]*font-size:\s*15px/s);
+    expect(css).toMatch(/\.caribbean-port-action-reason\s*\{[^}]*font-size:\s*15px/s);
+  });
+
+  it('marks the Tavern instead of showing the lead instruction as visible Set Sail copy', () => {
+    render(<PortMenu
+      activeActivity="menu"
+      readiness={{ kind: 'blocked', reason: 'lead-not-active', requiredProvisions: 2 }}
+      busy={false}
+      onSetSail={vi.fn()}
+      onSelect={vi.fn()}
+    />);
+
+    const tavern = screen.getByRole('button', { name: 'Tavern' });
+    expect(tavern).toHaveAttribute('aria-describedby', 'port-tavern-attention-copy');
+    expect(tavern.querySelector('.caribbean-port-action-attention')).not.toBeNull();
+    expect(screen.getByText('Rumour available')).toHaveClass('caribbean-visually-hidden');
+    expect(screen.getByText('Mark the Red Jackdaw rumour in the Tavern first.')).toHaveClass('caribbean-visually-hidden');
+    expect(screen.queryByText('Mark the Red Jackdaw rumour in the Tavern first.', { selector: '.caribbean-port-action-reason' })).not.toBeInTheDocument();
   });
 
   it('marks only the active activity and gives every control a stable unique test id', () => {

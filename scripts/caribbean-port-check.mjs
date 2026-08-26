@@ -1695,7 +1695,6 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
           ['port-bearing', document.querySelector('.caribbean-port-bearing')],
           ['port-activity-heading', document.querySelector('.caribbean-port-activity h2')],
           ...['governor', 'tavern', 'market', 'shipyard', 'shares', 'log', 'set-sail'].map((id) => [`port-action-${id}`, document.querySelector(`[data-testid="port-action-${id}"]`)]),
-          ['port-close-activity', document.querySelector('[data-testid="port-close-activity"]')],
         ];
         const measure = ([id, element]) => {
           if (!(element instanceof HTMLElement) || !visible(element)) throw new Error(`Market geometry leaf is missing: ${id}`);
@@ -1731,8 +1730,23 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
             }
           }
         }
+        const closeActivity = document.querySelector('[data-testid="port-close-activity"]');
+        if (!(closeActivity instanceof HTMLElement)) throw new Error('Market geometry leaf is missing: port-close-activity');
+        closeActivity.scrollIntoView({ block: 'end', inline: 'nearest' });
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        leaves.push(measure(['port-close-activity', closeActivity]));
+        const closeRect = closeActivity.getBoundingClientRect();
+        for (const candidate of [...document.querySelectorAll(interactiveSelector)].filter(visible)) {
+          if (candidate === closeActivity || closeActivity.contains(candidate) || candidate.contains(closeActivity)) continue;
+          const candidateRect = candidate.getBoundingClientRect();
+          if (Math.min(closeRect.right, candidateRect.right) > Math.max(closeRect.left, candidateRect.left)
+            && Math.min(closeRect.bottom, candidateRect.bottom) > Math.max(closeRect.top, candidateRect.top)) {
+            const pair = ['port-close-activity', candidate.getAttribute('data-testid')].sort();
+            overlapKeys.add(JSON.stringify(pair));
+          }
+        }
         const fixedInteractive = baseEntries.filter(([id]) => id === 'party-pill'
-          || id === 'port-close-activity' || id.startsWith('port-action-'));
+          || id.startsWith('port-action-'));
         for (let leftIndex = 0; leftIndex < fixedInteractive.length; leftIndex += 1) {
           for (let rightIndex = leftIndex + 1; rightIndex < fixedInteractive.length; rightIndex += 1) {
             const [leftId, leftElement] = fixedInteractive[leftIndex];
@@ -1748,7 +1762,7 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
         return { leaves, overlapPairs: [...overlapKeys].map(JSON.parse).sort() };
       }, { marketActionIds: EXPECTED_MARKET_ACTION_IDS });
       viewports.push(evidence);
-      await normalPage.getByRole('button', { name: 'Back to harbour' }).click();
+      await normalPage.getByRole('button', { name: 'Done' }).click();
     }
     for (const [index, spec] of ART_VIEWPORT_SPECS.entries()) {
       await normalPage.setViewportSize({ width: spec.width, height: spec.height });
@@ -1757,9 +1771,10 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
       await normalPage.getByRole('button', { name: 'Market' }).click();
       await normalPage.getByRole('heading', { name: 'Market', level: 2 }).waitFor();
       await normalPage.getByTestId('market-provisions-buy-1').click();
-      await normalPage.getByTestId('caribbean-market-status').getByText('Cargo ledger updated.').waitFor();
+      await normalPage.waitForFunction(() => document.querySelector('[data-testid="caribbean-market"]')?.getAttribute('aria-busy') === 'false'
+        && document.querySelector('[data-testid="caribbean-market-status"]')?.textContent === '');
       activityContrasts.push(await readActivityContrast(normalPage, ART_ACTIVITY_CONTRAST_SPECS[0]));
-      await normalPage.getByRole('button', { name: 'Back to harbour' }).click();
+      await normalPage.getByRole('button', { name: 'Done' }).click();
       await normalPage.getByRole('button', { name: 'Tavern' }).click();
       await normalPage.getByRole('heading', { name: 'Tavern', level: 2 }).waitFor();
       activityContrasts.push(await readActivityContrast(normalPage, ART_ACTIVITY_CONTRAST_SPECS[1]));
@@ -1908,7 +1923,8 @@ async function runMarketProbe(browser, baseUrl) {
         samples.push(await readMarketGeometry(page, 'pending', actionTestId));
         await page.evaluate(() => window.__CARIBBEAN_PORT_CHECK__.releaseWriter());
         try {
-          await page.getByTestId('caribbean-market-status').getByText('Cargo ledger updated.').waitFor({ timeout: 5_000 });
+          await page.waitForFunction(() => document.querySelector('[data-testid="caribbean-market"]')?.getAttribute('aria-busy') === 'false'
+            && document.querySelector('[data-testid="caribbean-market-status"]')?.textContent === '', null, { timeout: 5_000 });
         } catch (error) {
           const diagnostic = await page.evaluate(() => ({
             status: document.querySelector('[data-testid="caribbean-market-status"]')?.textContent?.trim(),
@@ -2849,10 +2865,18 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
     };
     console.log('Checking port activities and journal…');
     assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'port');
-    const menuLabels = await page.locator('[aria-label="Bridgetown activities"] button').allTextContents();
+    const menuLabels = await page.locator('[aria-label="Bridgetown activities"] .caribbean-port-action-label').allTextContents();
     invariant(canonicalJson(menuLabels.map((label) => label.trim())) === canonicalJson(PORT_ORDER), `Wrong port order: ${JSON.stringify(menuLabels)}`);
     invariant(await page.getByRole('button', { name: 'Set Sail' }).isDisabled(), 'Set Sail is not visibly unavailable');
-    invariant(await page.getByText('Mark the Red Jackdaw rumour in the Tavern first.').isVisible(), 'Set Sail reason is not visible');
+    const tavernAction = page.getByRole('button', { name: 'Tavern' });
+    invariant(
+      await tavernAction.locator('.caribbean-port-action-attention').isVisible(),
+      'Tavern does not visibly mark the available Red Jackdaw rumour',
+    );
+    invariant(
+      await page.getByText('Mark the Red Jackdaw rumour in the Tavern first.').isHidden(),
+      'Set Sail still renders the verbose Red Jackdaw instruction visibly',
+    );
     layouts.portDesktop = await readLayout(page, 'portDesktop', VIEWPORTS.portDesktop);
     await capture(page, screenshots, runDirectory, 'port-desktop.png');
 
@@ -2871,7 +2895,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
     const marketLayout = await readLayout(page, 'marketDesktop', VIEWPORTS.portDesktop);
     await capture(page, screenshots, runDirectory, 'market-desktop.png');
 
-    await page.getByRole('button', { name: 'Back to harbour' }).click();
+    await page.getByRole('button', { name: 'Done' }).click();
     await page.getByRole('button', { name: 'Tavern' }).click();
     await page.getByRole('heading', { name: 'Tavern', level: 2 }).waitFor();
     const tavernLayout = await readLayout(page, 'tavernDesktop', VIEWPORTS.portDesktop);
@@ -3187,7 +3211,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
         horizontalOverflow: marketHorizontalOverflow,
         focusPreserved: market.samples.every((sample) => sample.focusedTestId === sample.actionTestId),
         busyStatesVerified: market.samples.every((sample) => sample.ariaBusy === (sample.phase === 'pending')),
-        statusesVerified: market.samples.every((sample) => sample.status === (sample.phase === 'before' ? '' : sample.phase === 'pending' ? 'Saving trade.' : 'Cargo ledger updated.')),
+        statusesVerified: market.samples.every((sample) => sample.status === (sample.phase === 'pending' ? 'Saving trade.' : '')),
       },
     };
     assertRequestedGraphIsolation(metrics);

@@ -42,6 +42,7 @@ export function PortMenu({
   const reason = blocked
     ? voyageBlockedCopy(readiness.reason)
     : 'Two provisions cover the outbound leg and guaranteed return.';
+  const rumourAvailable = blocked && readiness.reason === 'lead-not-active';
   const depart = () => {
     if (blocked || busy || setSailInFlight.current) return;
     setSailInFlight.current = true;
@@ -63,28 +64,41 @@ export function PortMenu({
                 className="caribbean-port-action"
                 data-testid={`port-action-${action.activity}`}
                 type="button"
+                aria-label={action.label}
                 aria-current={activeActivity === action.activity ? 'page' : undefined}
+                aria-describedby={action.activity === 'tavern' && rumourAvailable ? 'port-tavern-attention-copy' : undefined}
                 onClick={() => onSelect(action.activity)}
               >
-                {action.label}
+                <span className="caribbean-port-action-label">{action.label}</span>
+                {action.activity === 'tavern' && rumourAvailable && (
+                  <>
+                    <span className="caribbean-port-action-attention" aria-hidden="true">
+                      <svg width="20" height="20" viewBox="0 0 20 20" focusable="false">
+                        <path d="M10 1.8 18.2 10 10 18.2 1.8 10Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                        <path d="M10 5.7v5.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                        <circle cx="10" cy="14.2" r="1" fill="currentColor" />
+                      </svg>
+                    </span>
+                    <span id="port-tavern-attention-copy" className="caribbean-visually-hidden">Rumour available</span>
+                  </>
+                )}
               </button>
             ) : (
-              <>
-                <button
-                  ref={registerSetSailTrigger}
-                  className="caribbean-port-action"
-                  data-testid="port-action-set-sail"
-                  type="button"
-                  disabled={blocked || busy}
-                  aria-describedby="port-set-sail-reason"
-                  onClick={depart}
-                >
-                  {action.label}
-                </button>
-                <span id="port-set-sail-reason" className="caribbean-port-action-reason">
-                  {reason}
-                </span>
-              </>
+              <button
+                ref={registerSetSailTrigger}
+                className="caribbean-port-action"
+                data-testid="port-action-set-sail"
+                type="button"
+                aria-label={action.label}
+                disabled={blocked || busy}
+                aria-describedby="port-set-sail-reason"
+                onClick={depart}
+              >
+                <span className="caribbean-port-action-label">{action.label}</span>
+                {rumourAvailable
+                  ? <span id="port-set-sail-reason" className="caribbean-visually-hidden">{reason}</span>
+                  : <span id="port-set-sail-reason" className="caribbean-port-action-reason">{reason}</span>}
+              </button>
             )}
           </li>
         ))}

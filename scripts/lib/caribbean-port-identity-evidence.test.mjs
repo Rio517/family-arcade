@@ -381,7 +381,7 @@ function rawArtEvidence() {
     '.caribbean-port-arrival', '.caribbean-port-action', '.caribbean-port-action-reason',
   ];
   const activity = [
-    ['.caribbean-market-status:not(:empty)', 'Cargo ledger updated.'],
+    ['.caribbean-market-price-cue--expensive', 'Expensive'],
     ['.caribbean-tavern-rumour blockquote', 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.'],
     ['.caribbean-log-action-label', 'NEXT ACTION'],
     ['.caribbean-log-action-copy', 'Sail east of Bridgetown and identify the Red Jackdaw.'],
@@ -456,7 +456,7 @@ function marketSamples() {
     scrollLeft: 0,
     scrollTop: 0,
     focusedTestId: actionTestId,
-    status: phase === 'before' ? '' : phase === 'pending' ? 'Saving trade.' : 'Cargo ledger updated.',
+    status: phase === 'pending' ? 'Saving trade.' : '',
     ariaBusy: phase === 'pending',
   })));
 }

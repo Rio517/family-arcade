@@ -126,7 +126,8 @@ async function openPortActivity(label: string, root: HTMLElement = document.body
 }
 
 async function closeActivity(root: HTMLElement = document.body): Promise<void> {
-  fireEvent.click(within(root).getByRole('button', { name: 'Back to harbour' }));
+  const done = within(root).queryByRole('button', { name: 'Done' });
+  fireEvent.click(done ?? within(root).getByRole('button', { name: 'Back to harbour' }));
   await within(root).findByRole('heading', { name: 'Choose your next port action' });
 }
 
