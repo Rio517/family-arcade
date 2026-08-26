@@ -109,10 +109,14 @@ The sole byte-comparison exception is the real 1440×900 WebGL-composited
 `campaign-result-desktop.png`. Both runs must still be valid, nonempty PNGs
 with exact equal canonical semantic state and digest at tick 11,855, including
 canvas/drawing-buffer/backend facts, terminal outcome and seed, final player
-and opponent systems, and the closed framebuffer-sample record. Run A owns the
-tracked screenshot and every selected publication artifact. Honest A/B result
-pixels are observational even when a particular capture happens to produce
-identical bytes; the evidence boundary remains **22 byte-compared + 1 terminal
+and opponent systems. Each run separately retains its verbatim, closed
+post-present default-framebuffer render observation; the two validated records
+may match or differ, do not prove visible pixels, and are excluded only from
+stable semantic state, digest, and equality. Metrics, diagnostics, and the
+selected-run-A manifest preserve both records. Run A owns the tracked
+screenshot and every selected publication artifact. Honest A/B result pixels
+are observational even when a particular capture happens to produce identical
+bytes; the evidence boundary remains **22 byte-compared + 1 terminal
 observation**, never 23 byte-identical screenshots.
 
 Sailing and encounter reload their exact persisted strategic phase. Reloading
