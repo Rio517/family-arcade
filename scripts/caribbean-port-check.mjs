@@ -3266,7 +3266,17 @@ function mismatchDiagnosticTrustedAnchors() {
   const anchors = new Map();
   for (const directory of [os.tmpdir(), '/private/tmp']) {
     const lexical = path.resolve(directory);
-    const real = fs.realpathSync(lexical);
+    let real;
+    try {
+      real = fs.realpathSync(lexical);
+    } catch (error) {
+      if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') continue;
+      throw error;
+    }
+    const status = fs.lstatSync(real, { throwIfNoEntry: false });
+    if (status === undefined) continue;
+    invariant(status.isDirectory() && !status.isSymbolicLink(),
+      `port mismatch diagnostic temporary root is not a real directory: ${lexical}`);
     anchors.set(lexical, { lexical, real });
   }
   return [...anchors.values()];
@@ -3542,9 +3552,11 @@ export async function compareRuns(
     diagnosticRename = fs.renameSync,
   } = {},
 ) {
-  const diagnosticPin = pinMismatchDiagnosticDirectory(diagnosticDirectory);
-  clearMismatchDiagnostics(diagnosticPin);
   const diagnosticsEnabled = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1';
+  const diagnosticPin = diagnosticsEnabled
+    ? pinMismatchDiagnosticDirectory(diagnosticDirectory)
+    : null;
+  if (diagnosticPin !== null) clearMismatchDiagnostics(diagnosticPin);
   const preserveFailure = (failure) => diagnosticsEnabled
     ? preserveScreenshotMismatch('campaign-result-desktop.png', first, second, deadline, {
       diagnosticPin,

@@ -247,6 +247,15 @@ function withDiagnosticEnvironment(t) {
   });
 }
 
+function withoutDiagnosticEnvironment(t) {
+  const previous = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
+  delete process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
+  t.after(() => {
+    if (previous === undefined) delete process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
+    else process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = previous;
+  });
+}
+
 test('diagnostic cleanup never follows symlinked ancestors or stale child links', async (t) => {
   const portCommand = await import('../caribbean-port-check.mjs');
   assert.equal(typeof portCommand.compareRuns, 'function');
@@ -256,54 +265,44 @@ test('diagnostic cleanup never follows symlinked ancestors or stale child links'
   fs.mkdirSync(outside);
   fs.symlinkSync(outside, linkedParent, 'dir');
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
-  const previous = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
-  t.after(() => {
-    if (previous === undefined) delete process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
-    else process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = previous;
-  });
+  withDiagnosticEnvironment(t);
+  const outsideDiagnostic = path.join(outside, 'diagnostic');
+  fs.mkdirSync(outsideDiagnostic, { recursive: true });
+  const sentinel = path.join(outsideDiagnostic, 'sentinel.txt');
+  fs.writeFileSync(sentinel, 'must survive');
+  const secondState = terminalResultSemanticState();
+  secondState.canvas.backend.renderer = `${secondState.canvas.backend.renderer} drift`;
 
-  for (const diagnosticsEnabled of [false, true]) {
-    const outsideDiagnostic = path.join(outside, 'diagnostic');
-    fs.mkdirSync(outsideDiagnostic, { recursive: true });
-    const sentinel = path.join(outsideDiagnostic, `sentinel-${diagnosticsEnabled}.txt`);
-    fs.writeFileSync(sentinel, 'must survive');
-    if (diagnosticsEnabled) process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = '1';
-    else delete process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
-    const secondState = terminalResultSemanticState();
-    secondState.canvas.backend.renderer = `${secondState.canvas.backend.renderer} drift`;
+  await assert.rejects(
+    portCommand.compareRuns(
+      comparisonRun(),
+      comparisonRun(secondState),
+      passiveComparisonDeadline(),
+      { diagnosticDirectory: path.join(linkedParent, 'diagnostic') },
+    ),
+    /port mismatch diagnostic directory ancestor cannot be a symbolic link: link/,
+  );
+  assert.equal(fs.readFileSync(sentinel, 'utf8'), 'must survive');
 
-    await assert.rejects(
-      portCommand.compareRuns(
-        comparisonRun(),
-        comparisonRun(secondState),
-        passiveComparisonDeadline(),
-        { diagnosticDirectory: path.join(linkedParent, 'diagnostic') },
-      ),
-      /port mismatch diagnostic directory ancestor cannot be a symbolic link: link/,
-    );
-    assert.equal(fs.readFileSync(sentinel, 'utf8'), 'must survive');
+  const staleDiagnostic = path.join(temporary, 'stale-diagnostic');
+  const staleTarget = path.join(outside, 'stale-target');
+  fs.mkdirSync(staleDiagnostic);
+  fs.mkdirSync(staleTarget);
+  const staleSentinel = path.join(staleTarget, 'sentinel.txt');
+  fs.writeFileSync(staleSentinel, 'must also survive');
+  fs.symlinkSync(staleTarget, path.join(staleDiagnostic, 'linked-child'), 'dir');
 
-    const staleDiagnostic = path.join(temporary, `stale-diagnostic-${diagnosticsEnabled}`);
-    const staleTarget = path.join(outside, `stale-target-${diagnosticsEnabled}`);
-    fs.mkdirSync(staleDiagnostic);
-    fs.mkdirSync(staleTarget);
-    const staleSentinel = path.join(staleTarget, 'sentinel.txt');
-    fs.writeFileSync(staleSentinel, 'must also survive');
-    fs.symlinkSync(staleTarget, path.join(staleDiagnostic, 'linked-child'), 'dir');
-
-    await assert.rejects(
-      portCommand.compareRuns(
-        comparisonRun(),
-        comparisonRun(secondState),
-        passiveComparisonDeadline(),
-        { diagnosticDirectory: staleDiagnostic },
-      ),
-      /screenshotEvidence semantic observations differ/,
-    );
-    assert.equal(fs.readFileSync(staleSentinel, 'utf8'), 'must also survive');
-    if (diagnosticsEnabled) assertCompleteDiagnosticFileSet(staleDiagnostic);
-    else assert.equal(fs.existsSync(staleDiagnostic), false);
-  }
+  await assert.rejects(
+    portCommand.compareRuns(
+      comparisonRun(),
+      comparisonRun(secondState),
+      passiveComparisonDeadline(),
+      { diagnosticDirectory: staleDiagnostic },
+    ),
+    /screenshotEvidence semantic observations differ/,
+  );
+  assert.equal(fs.readFileSync(staleSentinel, 'utf8'), 'must also survive');
+  assertCompleteDiagnosticFileSet(staleDiagnostic);
 });
 
 const SEMANTIC_GATE_ERROR =
@@ -331,6 +330,155 @@ function isPreservationFailureWithOriginalGate(error) {
   assert.equal(error?.cause?.message, SEMANTIC_GATE_ERROR);
   return true;
 }
+
+function simulateMissingPrivateTmp(t) {
+  const originalRealpathSync = fs.realpathSync;
+  let calls = 0;
+  fs.realpathSync = (candidate, ...args) => {
+    if (typeof candidate === 'string' && path.resolve(candidate) === '/private/tmp') {
+      calls += 1;
+      const error = new Error('simulated missing /private/tmp');
+      error.code = 'ENOENT';
+      error.path = '/private/tmp';
+      error.syscall = 'realpath';
+      throw error;
+    }
+    return originalRealpathSync(candidate, ...args);
+  };
+  t.after(() => {
+    fs.realpathSync = originalRealpathSync;
+  });
+  return () => calls;
+}
+
+test('diagnostics-off comparisons never inspect or mutate diagnostic paths', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-disabled-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  const staleFile = path.join(diagnosticDirectory, 'stale.txt');
+  fs.mkdirSync(diagnosticDirectory);
+  fs.writeFileSync(staleFile, 'must remain untouched');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withoutDiagnosticEnvironment(t);
+  const { first, second } = semanticDriftComparisonRuns();
+  const passingFirst = comparisonRun();
+  const passingSecond = comparisonRun();
+  const guardedMethods = [
+    'realpathSync', 'lstatSync', 'readdirSync', 'unlinkSync', 'rmdirSync',
+    'mkdtempSync', 'openSync', 'writeFileSync', 'renameSync',
+  ];
+  const originals = new Map(guardedMethods.map((name) => [name, fs[name]]));
+  const touched = [];
+  for (const name of guardedMethods) {
+    fs[name] = (...args) => {
+      touched.push(name);
+      throw new Error(`diagnostics-off touched fs.${name}`);
+    };
+  }
+
+  try {
+    await assert.rejects(
+      portCommand.compareRuns(first, second, passiveComparisonDeadline(), { diagnosticDirectory }),
+      (error) => {
+        assert.equal(error.message, SEMANTIC_GATE_ERROR);
+        return true;
+      },
+    );
+    const comparison = await portCommand.compareRuns(
+      passingFirst,
+      passingSecond,
+      passiveComparisonDeadline(),
+      { diagnosticDirectory },
+    );
+    assert.equal(comparison.comparison.selectedRun, 'A');
+  } finally {
+    for (const [name, original] of originals) fs[name] = original;
+  }
+
+  assert.deepEqual(touched, []);
+  assert.equal(fs.readFileSync(staleFile, 'utf8'), 'must remain untouched');
+});
+
+test('missing optional private temp anchor permits enabled explicit temp diagnostics', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-linux-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  const outside = path.join(temporary, 'outside');
+  fs.mkdirSync(diagnosticDirectory);
+  fs.mkdirSync(outside);
+  const sentinel = path.join(outside, 'sentinel.txt');
+  fs.writeFileSync(sentinel, 'must survive stale cleanup');
+  fs.symlinkSync(outside, path.join(diagnosticDirectory, 'linked-child'), 'dir');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  const privateTmpCalls = simulateMissingPrivateTmp(t);
+  const { first, second } = semanticDriftComparisonRuns();
+
+  await assert.rejects(
+    portCommand.compareRuns(first, second, passiveComparisonDeadline(), { diagnosticDirectory }),
+    (error) => {
+      assert.equal(error.message, SEMANTIC_GATE_ERROR);
+      return true;
+    },
+  );
+
+  assert.ok(privateTmpCalls() > 0, 'the missing optional anchor simulation must be exercised');
+  assert.equal(fs.readFileSync(sentinel, 'utf8'), 'must survive stale cleanup');
+  assertCompleteDiagnosticFileSet(diagnosticDirectory);
+});
+
+test('diagnostic anchor discovery skips missing private temp and fails closed on unavailable destinations', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  withDiagnosticEnvironment(t);
+  const privateTmpCalls = simulateMissingPrivateTmp(t);
+  const outsideDirectory = path.join(
+    process.cwd(),
+    `.caribbean-port-invalid-diagnostic-${process.pid}`,
+  );
+  t.after(() => fs.rmSync(outsideDirectory, { recursive: true, force: true }));
+
+  for (const options of [
+    {},
+    { diagnosticDirectory: outsideDirectory },
+  ]) {
+    const { first, second } = semanticDriftComparisonRuns();
+    await assert.rejects(
+      portCommand.compareRuns(first, second, passiveComparisonDeadline(), options),
+      /port mismatch diagnostic directory must be a child of a temporary root/,
+    );
+  }
+
+  assert.ok(privateTmpCalls() > 0, 'the missing optional anchor simulation must be exercised');
+  assert.equal(fs.existsSync(outsideDirectory), false);
+});
+
+test('diagnostic-enabled default remains the exact macOS private-temp destination', async (t) => {
+  const privateTmp = fs.lstatSync('/private/tmp', { throwIfNoEntry: false });
+  if (privateTmp === undefined || !privateTmp.isDirectory() || privateTmp.isSymbolicLink()) {
+    t.skip('the fixed macOS private-temp diagnostic destination is unavailable');
+    return;
+  }
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const diagnosticDirectory = '/private/tmp/caribbean-port-identity-diagnostic';
+  fs.rmSync(diagnosticDirectory, { recursive: true, force: true });
+  t.after(() => fs.rmSync(diagnosticDirectory, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  const { first, second } = semanticDriftComparisonRuns();
+
+  await assert.rejects(
+    portCommand.compareRuns(first, second, passiveComparisonDeadline()),
+    (error) => {
+      assert.equal(error.message, SEMANTIC_GATE_ERROR);
+      return true;
+    },
+  );
+
+  assertCompleteDiagnosticFileSet(diagnosticDirectory);
+});
 
 test('diagnostic bundle publication is atomic across injected staging and rename failures', async (t) => {
   const portCommand = await import('../caribbean-port-check.mjs');
@@ -752,36 +900,16 @@ test('diagnostic first-difference paths follow RFC 6901 escaping and edge rules'
   }
 });
 
-test('diagnostic comparison leaves no artifacts on pass or without diagnostics', async (t) => {
+test('diagnostic-enabled success clears stale artifacts without publishing new ones', async (t) => {
   const portCommand = await import('../caribbean-port-check.mjs');
   assert.equal(typeof portCommand.compareRuns, 'function');
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-no-diagnostic-'));
   const diagnosticDirectory = path.join(temporary, 'diagnostic');
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
-  const previous = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
-  t.after(() => {
-    if (previous === undefined) delete process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
-    else process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = previous;
-  });
+  withDiagnosticEnvironment(t);
 
   fs.mkdirSync(diagnosticDirectory);
   fs.writeFileSync(path.join(diagnosticDirectory, 'stale.txt'), 'stale');
-  delete process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
-  const first = comparisonRun();
-  const semanticDrift = terminalResultSemanticState();
-  semanticDrift.canvas.backend.renderer = `${semanticDrift.canvas.backend.renderer} drift`;
-  await assert.rejects(
-    portCommand.compareRuns(
-      first,
-      comparisonRun(semanticDrift),
-      passiveComparisonDeadline(),
-      { diagnosticDirectory },
-    ),
-    /screenshotEvidence semantic observations differ/,
-  );
-  assert.equal(fs.existsSync(diagnosticDirectory), false);
-
-  process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = '1';
   const comparison = await portCommand.compareRuns(
     comparisonRun(),
     comparisonRun(),
