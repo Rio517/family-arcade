@@ -36,7 +36,7 @@ export interface NavalSessionSnapshot {
   diagnostic: NavalDiagnostic | null;
 }
 
-export type NavalPauseOwner = 'visibility' | 'campaign-withdrawal';
+export type NavalPauseOwner = 'visibility' | 'campaign-withdrawal' | 'persistence-decision';
 
 export interface NavalSessionView extends NavalSessionSnapshot {
   setRudder(value: Rudder): void;

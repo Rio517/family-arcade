@@ -107,6 +107,10 @@ const VIEWPORTS = {
 export const MARKET_PROBE_MINIMUM_NOW_FIXTURES = 42;
 export const PORT_CHECK_DEADLINE_MS = 900_000;
 export const NOW_FIXTURES = Array.from({ length: 96 }, (_, index) => 1_700_000_000_000 + index * 1_000);
+export const STRATEGIC_ACCESSIBILITY_SELECTORS = Object.freeze({
+  surfaces: '.caribbean-voyage-decision, .naval-battle-page, .caribbean-port-activity',
+  notices: '.campaign-naval-battle__restart-note, .campaign-naval-battle__status',
+});
 const SEED_FIXTURES = [1702, 2702, 3702, 4702, 5702, 6702, 7702, 8702];
 const UUID_FIXTURES = Array.from(
   { length: 12 },
@@ -2013,8 +2017,8 @@ async function runVoyageUiCheck() {
   }
 }
 
-async function readStrategicSurface(page) {
-  return page.evaluate(() => {
+export async function readStrategicSurface(page) {
+  return page.evaluate((selectors) => {
     const visible = (element) => {
       if (!(element instanceof HTMLElement)) return false;
       const style = getComputedStyle(element);
@@ -2052,11 +2056,13 @@ async function readStrategicSurface(page) {
       return (lighter + 0.05) / (darker + 0.05);
     };
     const result = document.querySelector('.naval-result');
+    const notices = [...document.querySelectorAll(selectors.notices)].filter(visible);
     const roots = result && visible(result)
-      ? [result]
-      : [...document.querySelectorAll(
-          '.caribbean-voyage-decision, .naval-battle-page, .caribbean-port-activity',
-        )].filter(visible);
+      ? [result, ...notices]
+      : [
+          ...document.querySelectorAll(selectors.surfaces),
+          ...notices,
+        ].filter(visible);
     const text = roots.flatMap((root) => [root, ...root.querySelectorAll('*')]).filter((element) => (
       visible(element)
       && element.closest('.naval-visually-hidden') === null
@@ -2088,7 +2094,7 @@ async function readStrategicSurface(page) {
         document.body.scrollWidth - innerWidth,
       ),
     };
-  });
+  }, STRATEGIC_ACCESSIBILITY_SELECTORS);
 }
 
 function minimumStrategicAccessibility(samples) {

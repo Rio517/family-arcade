@@ -299,6 +299,7 @@ describe('validateCampaign', () => {
     (result, battleId, outcome, targetDefeated, leadStatus) => {
       // Kills omission of any durable result member or its target/lead binding.
       const state = strategicBase();
+      state.lastEventId = result === 'avoided' ? 4 : 5;
       state.calendar.elapsedDays = 2;
       state.world.targetDefeated = targetDefeated;
       state.leads[0].status = leadStatus;
@@ -346,6 +347,7 @@ describe('validateCampaign', () => {
   ] as const)('rejects lastVoyage mismatch: %s', (_label, mutate) => {
     // Each row kills one outcome/result/day/exact-key invariant.
     const state = strategicBase();
+    state.lastEventId = 5;
     state.calendar.elapsedDays = 2;
     state.world.lastVoyage = {
       voyageId: 'voyage-2', battleId: null, result: 'avoided', outcome: null, returnedDay: 2,
@@ -355,8 +357,107 @@ describe('validateCampaign', () => {
     expect(validateCampaign(state)).toMatchObject({ ok: false });
   });
 
+  it.each([
+    ['missing Red Jackdaw lead', 'world.lastVoyage', (state: CampaignStateV1) => { state.leads = []; }],
+    ['generic stable voyage ID', 'world.lastVoyage.voyageId', (state: CampaignStateV1) => {
+      state.world.lastVoyage!.voyageId = 'fabricated-voyage';
+    }],
+    ['zero voyage event ID', 'world.lastVoyage.voyageId', (state: CampaignStateV1) => {
+      state.world.lastVoyage!.voyageId = 'voyage-0';
+    }],
+    ['noncanonical leading-zero voyage ID', 'world.lastVoyage.voyageId', (state: CampaignStateV1) => {
+      state.world.lastVoyage!.voyageId = 'voyage-02';
+    }],
+    ['future voyage event ID', 'world.lastVoyage.voyageId', (state: CampaignStateV1) => {
+      state.world.lastVoyage!.voyageId = 'voyage-6';
+    }],
+    ['unrelated battle ID', 'world.lastVoyage.battleId', (state: CampaignStateV1) => {
+      state.world.lastVoyage!.battleId = 'unrelated-battle';
+    }],
+  ] as const)('rejects impossible lastVoyage relation: %s', (_label, path, mutate) => {
+    // Each row kills one fail-closed summary lineage or Red Jackdaw relation.
+    const state = strategicBase();
+    state.lastEventId = 5;
+    state.calendar.elapsedDays = 2;
+    state.world.lastVoyage = {
+      voyageId: 'voyage-2', battleId: 'voyage-2-battle', result: 'withdrew',
+      outcome: null, returnedDay: 2,
+    };
+    mutate(state);
+
+    expect(validateCampaign(state)).toMatchObject({
+      ok: false,
+      issues: expect.arrayContaining([{ path, code: 'invariant' }]),
+    });
+  });
+
+  it.each([
+    [
+      'avoided', 'active', false,
+      { voyageId: 'voyage-4', battleId: null, result: 'avoided', outcome: null, returnedDay: 2 },
+    ],
+    [
+      'withdrew', 'active', false,
+      { voyageId: 'voyage-3', battleId: 'voyage-3-battle', result: 'withdrew', outcome: null, returnedDay: 2 },
+    ],
+    [
+      'victory', 'completed', true,
+      {
+        voyageId: 'voyage-3', battleId: 'voyage-3-battle', result: 'victory',
+        outcome: { kind: 'sunk', victorShipId: 'player' }, returnedDay: 2,
+      },
+    ],
+    [
+      'defeat', 'active', false,
+      {
+        voyageId: 'voyage-3', battleId: 'voyage-3-battle', result: 'defeat',
+        outcome: { kind: 'sunk', victorShipId: 'opponent' }, returnedDay: 2,
+      },
+    ],
+    [
+      'unresolved', 'active', false,
+      {
+        voyageId: 'voyage-3', battleId: 'voyage-3-battle', result: 'unresolved',
+        outcome: { kind: 'escaped', shipId: 'player' }, returnedDay: 2,
+      },
+    ],
+  ] as const)(
+    'rejects %s lastVoyage before its complete authored return tail can exist',
+    (_result, leadStatus, targetDefeated, summary) => {
+      // At event 5, voyage-4 cannot yet avoid-return and voyage-3 cannot yet battle-return.
+      const state = strategicBase();
+      state.lastEventId = 5;
+      state.calendar.elapsedDays = 2;
+      state.leads[0].status = leadStatus;
+      state.world.targetDefeated = targetDefeated;
+      state.world.lastVoyage = structuredClone(summary);
+
+      expect(validateCampaign(state)).toMatchObject({
+        ok: false,
+        issues: expect.arrayContaining([{
+          path: 'world.lastVoyage.voyageId', code: 'invariant',
+        }]),
+      });
+    },
+  );
+
+  it('accepts an expired Red Jackdaw lead for a non-victory lastVoyage', () => {
+    // Kills narrowing the explicit non-completed relation to active-only.
+    const state = strategicBase();
+    state.lastEventId = 5;
+    state.calendar.elapsedDays = 18;
+    state.leads[0].status = 'expired';
+    state.world.lastVoyage = {
+      voyageId: 'voyage-2', battleId: 'voyage-2-battle', result: 'defeat',
+      outcome: { kind: 'sunk', victorShipId: 'opponent' }, returnedDay: 18,
+    };
+
+    expect(validateCampaign(state)).toEqual({ ok: true, value: state });
+  });
+
   it('binds a return day exactly in port and allows only a prior day while en route', () => {
     const state = strategicBase();
+    state.lastEventId = 5;
     state.calendar.elapsedDays = 3;
     state.world.lastVoyage = {
       voyageId: 'voyage-2', battleId: null, result: 'avoided', outcome: null, returnedDay: 2,
@@ -394,6 +495,7 @@ describe('validateCampaign', () => {
   it('binds durable victory summaries to the target and Red Jackdaw lead terminal state', () => {
     // Catches compacted victory states that claim success without completing the strategic lead.
     const state = validCampaign();
+    state.lastEventId = 5;
     state.leads = [{ id: 'red-jackdaw', kind: 'rumour', status: 'active', acceptedDay: 0, expiresDay: 18 }];
     state.world.targetDefeated = true;
     state.world.lastVoyage = {

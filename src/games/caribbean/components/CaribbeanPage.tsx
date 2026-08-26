@@ -24,6 +24,8 @@ export function ActiveCampaign({ controller }: { controller: ReturnType<typeof u
   const routeRef = useRef<HTMLDivElement>(null);
   const mode = controller.journal?.state.mode;
   if (mode === undefined) throw new Error('ActiveCampaign requires an active journal');
+  const decisionRequired = controller.persistence.kind === 'consent-required'
+    || controller.persistence.kind === 'save-conflict';
   const route = (() => {
     switch (mode.kind) {
       case 'port': return <PortPage controller={controller} />;
@@ -31,15 +33,15 @@ export function ActiveCampaign({ controller }: { controller: ReturnType<typeof u
       case 'encounter': return <EncounterPage controller={controller} />;
       case 'naval': return (
         <Suspense fallback={<p className="caribbean-status" role="status">Loading the engagement…</p>}>
-          <CampaignNavalBattle controller={controller} />
+          <CampaignNavalBattle
+            controller={controller}
+            persistenceDecisionRequired={decisionRequired}
+          />
         </Suspense>
       );
       default: throw new Error(`Task 4 has no route for ${mode.kind}`);
     }
   })();
-  const decisionRequired = controller.persistence.kind === 'consent-required'
-    || controller.persistence.kind === 'save-conflict';
-
   return (
     <>
       <div

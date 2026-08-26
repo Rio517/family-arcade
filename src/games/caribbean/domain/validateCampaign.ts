@@ -439,6 +439,29 @@ function voyageInvariant(
   if (!valid) issue(issues, path, 'invariant');
 }
 
+function voyageEventId(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const match = /^voyage-([1-9]\d*)$/.exec(value);
+  if (!match) return null;
+  const eventId = Number(match[1]);
+  return Number.isSafeInteger(eventId) ? eventId : null;
+}
+
+function hasAuthoredEventTail(
+  startEventId: number | null,
+  tailLength: number | null,
+  lastEventId: unknown,
+): boolean {
+  if (
+    startEventId === null
+    || tailLength === null
+    || typeof lastEventId !== 'number'
+    || !Number.isSafeInteger(lastEventId)
+    || startEventId > Number.MAX_SAFE_INTEGER - tailLength
+  ) return false;
+  return startEventId + tailLength <= lastEventId;
+}
+
 function validateMode(root: PlainRecord, problems: JsonProblems, nonEnumerable: Set<string>, issues: ValidationIssue[]): void {
   const path = 'mode';
   const rawMode = required(root, 'mode', '$', problems, nonEnumerable, issues);
@@ -708,12 +731,29 @@ function validateWorld(root: PlainRecord, problems: JsonProblems, nonEnumerable:
     const summaryPath = `${path}.lastVoyage`;
     const summary = recordValue(world.lastVoyage, summaryPath, ['voyageId', 'battleId', 'result', 'outcome', 'returnedDay'], problems, nonEnumerable, issues);
     if (!summary) return;
-    validateStableId(required(summary, 'voyageId', summaryPath, problems, nonEnumerable, issues), `${summaryPath}.voyageId`, issues);
+    const voyageId = required(summary, 'voyageId', summaryPath, problems, nonEnumerable, issues);
+    validateStableId(voyageId, `${summaryPath}.voyageId`, issues);
+    const parsedVoyageEventId = voyageEventId(voyageId);
     const battleId = required(summary, 'battleId', summaryPath, problems, nonEnumerable, issues);
-    if (battleId !== null) validateStableId(battleId, `${summaryPath}.battleId`, issues);
+    if (battleId !== null) {
+      validateStableId(battleId, `${summaryPath}.battleId`, issues);
+      voyageInvariant(
+        `${summaryPath}.battleId`,
+        typeof voyageId === 'string' && battleId === `${voyageId}-battle`,
+        issues,
+      );
+    }
     const result = required(summary, 'result', summaryPath, problems, nonEnumerable, issues);
     const results = ['avoided', 'withdrew', 'victory', 'defeat', 'unresolved'];
     if (validateString(result, `${summaryPath}.result`, issues) && !results.includes(result)) issue(issues, `${summaryPath}.result`, 'unknown-id');
+    const authoredTailLength = result === 'avoided'
+      ? 2
+      : typeof result === 'string' && results.includes(result) ? 3 : null;
+    voyageInvariant(
+      `${summaryPath}.voyageId`,
+      hasAuthoredEventTail(parsedVoyageEventId, authoredTailLength, root.lastEventId),
+      issues,
+    );
     const outcome = required(summary, 'outcome', summaryPath, problems, nonEnumerable, issues);
     const outcomeValid = outcome === null || (isPlainRecord(outcome) && (
       (['surrender', 'sunk', 'boarding-ready'].includes(outcome.kind as string) && Object.keys(outcome).length === 2 && (outcome.victorShipId === 'player' || outcome.victorShipId === 'opponent')) ||
@@ -740,13 +780,17 @@ function validateWorld(root: PlainRecord, problems: JsonProblems, nonEnumerable:
         ? summary.returnedDay === elapsedDays
         : (modeKind === 'sailing' || modeKind === 'encounter' || modeKind === 'naval')
           && summary.returnedDay <= elapsedDays);
+    const leadStatusMatches = result === 'victory'
+      ? leadStatus === 'completed'
+      : leadStatus === 'active' || leadStatus === 'expired';
     voyageInvariant(
       summaryPath,
       matches
         && returnDayMatches
+        && leadStatusMatches
         && (result === 'victory'
-          ? world.targetDefeated === true && leadStatus === 'completed'
-          : world.targetDefeated === false && leadStatus !== 'completed'),
+          ? world.targetDefeated === true
+          : world.targetDefeated === false),
       issues,
     );
   }

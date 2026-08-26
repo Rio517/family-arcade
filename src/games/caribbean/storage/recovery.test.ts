@@ -5,7 +5,12 @@ import { compactJournal } from '../domain/compactJournal';
 import { marketTradeDraft, quoteTrade } from '../domain/economy';
 import type { CampaignJournal } from '../domain/events';
 import { appendJournal, createJournal } from '../domain/replay';
-import { navalEngagedDraft, seaLegCompletedDraft, voyageStartedDraft } from '../domain/voyage';
+import {
+  battleWithdrawnDraft,
+  navalEngagedDraft,
+  seaLegCompletedDraft,
+  voyageStartedDraft,
+} from '../domain/voyage';
 import { canonicalJson, checksumPayload } from './checksum';
 import {
   CURRENT_SAVE_KEY,
@@ -87,6 +92,42 @@ function activeModeJournals(): Record<'sailing' | 'encounter' | 'naval', Campaig
   const encounter = appendJournal(sailing, seaLegCompletedDraft(sailing.state));
   const naval = appendJournal(encounter, navalEngagedDraft(encounter.state));
   return { sailing, encounter, naval };
+}
+
+function returnedJournal(): CampaignJournal {
+  const naval = activeModeJournals().naval;
+  return appendJournal(naval, battleWithdrawnDraft(naval.state));
+}
+
+const LAST_VOYAGE_RECOVERY_MUTATIONS = [
+  ['missing Red Jackdaw lead', (state: CampaignJournal['state']) => { state.leads = []; }],
+  ['generic voyage ID', (state: CampaignJournal['state']) => {
+    state.world.lastVoyage!.voyageId = 'fabricated-voyage';
+  }],
+  ['future voyage ID', (state: CampaignJournal['state']) => {
+    state.world.lastVoyage!.voyageId = 'voyage-6';
+  }],
+  ['unrelated battle ID', (state: CampaignJournal['state']) => {
+    state.world.lastVoyage!.battleId = 'unrelated-battle';
+  }],
+  ['avoided before its authored return tail', (state: CampaignJournal['state']) => {
+    state.world.lastVoyage = {
+      voyageId: 'voyage-4', battleId: null, result: 'avoided', outcome: null, returnedDay: 2,
+    };
+  }],
+  ['battle before its authored return tail', (state: CampaignJournal['state']) => {
+    state.world.lastVoyage!.voyageId = 'voyage-3';
+    state.world.lastVoyage!.battleId = 'voyage-3-battle';
+  }],
+] as const;
+
+function mutatedLastVoyageCompacted(
+  mutate: (state: CampaignJournal['state']) => void,
+): CampaignJournal {
+  const journal = compactJournal(returnedJournal());
+  mutate(journal.initial);
+  mutate(journal.state);
+  return journal;
 }
 
 function oversizedJournal(): CampaignJournal {
@@ -349,6 +390,27 @@ describe('serializeRecoveryExport', () => {
 });
 
 describe('recoverCampaign safe acquisition and publication', () => {
+  it.each(LAST_VOYAGE_RECOVERY_MUTATIONS)(
+    'never exposes previous lastVoyage mutation %s as a recovery source',
+    (label, mutate) => {
+      // Recovery must receive only a semantically validated fallback journal.
+      const journal = mutatedLastVoyageCompacted(mutate);
+      const previousRaw = envelopeRaw(journal, 100, `forged-${label}`);
+      const source = { currentRaw: '{broken-current-exact', previousRaw };
+      const storage = new ScriptedStorage(source);
+
+      expect(loadCampaign(storage)).toEqual({
+        kind: 'unreadable',
+        unreadableSlots: [
+          { slot: 'current', raw: source.currentRaw, code: 'malformed-json' },
+          { slot: 'previous', raw: previousRaw, code: 'invalid-journal' },
+        ],
+        revision: source,
+      });
+      expect(storage.revision()).toEqual(source);
+    },
+  );
+
   it.each(['sailing', 'encounter', 'naval'] as const)(
     'recovers the exact compacted previous %s mode after quarantining corrupt current bytes',
     (kind) => {

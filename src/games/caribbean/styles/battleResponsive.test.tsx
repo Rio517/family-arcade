@@ -38,6 +38,16 @@ describe('full-bleed Battle Lab layout contracts', () => {
     expect(Number(pauseRule?.[1])).toBeGreaterThanOrEqual(14);
   });
 
+  it('keeps the required reload and not-saved notices at least 14px', () => {
+    const noticeRule = battleCss.match(
+      /\.campaign-naval-battle__restart-note,[\s\S]*?\.campaign-naval-battle__status\s*\{[^}]*font-size:\s*([\d.]+)(px|rem)[^}]*\}/s,
+    );
+    expect(noticeRule, 'campaign battle notices must declare a visible font-size').not.toBeNull();
+    const declaredSize = Number(noticeRule?.[1]);
+    const fontPx = noticeRule?.[2] === 'rem' ? declaredSize * 16 : declaredSize;
+    expect(fontPx).toBeGreaterThanOrEqual(14);
+  });
+
   it('keeps semantic wind and the minimum-display notice visible rather than hiding live controls', () => {
     expect(battleCss).not.toMatch(/\.naval-mission-line[^}]*display:\s*none/s);
     expect(battleCss).toMatch(/\.caribbean-display-notice\s*\{/s);

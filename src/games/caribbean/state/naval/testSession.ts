@@ -19,6 +19,7 @@ import type {
 import { validateNavalState, type NavalStateValidation } from '../../domain/naval/validation';
 import type {
   NavalDiagnostic,
+  NavalPauseOwner,
   NavalSessionSnapshot,
   NavalSessionView,
 } from './NavalSession';
@@ -51,7 +52,7 @@ export function manualNavalSession(options: ManualNavalSessionOptions = {}): Man
   }
   let currentCommand = command();
   let userPaused = false;
-  const pauseHolds = new Set<'visibility' | 'campaign-withdrawal'>();
+  const pauseHolds = new Set<NavalPauseOwner>();
   let diagnostic: NavalDiagnostic | null = null;
   let restartCount = 0;
   let battleGeneration = 0;

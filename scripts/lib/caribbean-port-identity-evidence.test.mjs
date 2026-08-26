@@ -5,7 +5,7 @@ import path from 'node:path';
 import { deflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { CARGO_IDS } from '../../src/games/caribbean/content/campaign';
-import { MARKET_PROBE_MINIMUM_NOW_FIXTURES, NOW_FIXTURES, profileScreenshotReadinessErrors } from '../caribbean-port-check.mjs';
+import * as portCheck from '../caribbean-port-check.mjs';
 
 import {
   EVIDENCE_CARGO_IDS,
@@ -14,6 +14,12 @@ import {
   marketStabilityFailure,
   validateMarketStability,
 } from './caribbean-port-identity-evidence.mjs';
+
+const {
+  MARKET_PROBE_MINIMUM_NOW_FIXTURES,
+  NOW_FIXTURES,
+  profileScreenshotReadinessErrors,
+} = portCheck;
 
 const SCREENSHOTS = [
   'setup-desktop.png', 'port-desktop.png', 'market-desktop.png', 'tavern-desktop.png',
@@ -37,6 +43,70 @@ const STRATEGIC_SCREENSHOTS = [
 
 const NORMAL_ROUTE_SCREENSHOTS = [...SCREENSHOTS, ...STRATEGIC_SCREENSHOTS];
 const RESULT_SCREENSHOT = 'campaign-result-desktop.png';
+
+async function strategicAccessibilitySample(
+  resultVisible,
+  { battleTextPx = 18, noticeTextPx = 14 } = {},
+) {
+  document.body.innerHTML = `
+    <section class="campaign-naval-battle__engagement">
+      <div class="naval-battle-page">
+        <p style="font-size: ${battleTextPx}px">Battle command</p>
+        <div class="naval-result" style="display: ${resultVisible ? 'block' : 'none'}">
+          <p style="font-size: 20px">Victory</p>
+        </div>
+      </div>
+      <p class="campaign-naval-battle__restart-note" style="font-size: ${noticeTextPx}px">Reloading restarts this engagement.</p>
+      <p class="campaign-naval-battle__status" style="font-size: ${noticeTextPx}px">Battle result not saved.</p>
+    </section>
+  `;
+  const originalRect = HTMLElement.prototype.getBoundingClientRect;
+  HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
+    const hidden = getComputedStyle(this).display === 'none';
+    // Production's wrapper has no in-flow box because its battle and notices
+    // are positioned surfaces. Evidence must sample those visible descendants.
+    const collapsedWrapper = this.classList.contains('campaign-naval-battle__engagement');
+    return {
+      x: 0, y: 0,
+      width: hidden || collapsedWrapper ? 0 : 100,
+      height: hidden || collapsedWrapper ? 0 : 24,
+    };
+  };
+
+  try {
+    expect(
+      portCheck.readStrategicSurface,
+      'the production evidence reader must be directly mutation-testable',
+    ).toBeTypeOf('function');
+    if (typeof portCheck.readStrategicSurface !== 'function') return null;
+    return await portCheck.readStrategicSurface({
+      evaluate(operation, argument) {
+        return operation(argument);
+      },
+    });
+  } finally {
+    HTMLElement.prototype.getBoundingClientRect = originalRect;
+    document.body.replaceChildren();
+  }
+}
+
+describe('strategic accessibility surface collection', () => {
+  it.each([
+    ['live engagement', false],
+    ['terminal result', true],
+  ])('includes campaign reload/status notices beside the %s', async (_label, resultVisible) => {
+    const sample = await strategicAccessibilitySample(resultVisible);
+    expect(sample?.minimumTextPx).toBe(14);
+  });
+
+  it('includes the live tactical surface when its zero-box wrapper contains positioned children', async () => {
+    const sample = await strategicAccessibilitySample(false, {
+      battleTextPx: 14,
+      noticeTextPx: 16,
+    });
+    expect(sample?.minimumTextPx).toBe(14);
+  });
+});
 
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;

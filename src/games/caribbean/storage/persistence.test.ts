@@ -5,7 +5,12 @@ import { marketTradeDraft, quoteTrade } from '../domain/economy';
 import type { CampaignJournal } from '../domain/events';
 import { appendJournal, createJournal } from '../domain/replay';
 import { compactJournal } from '../domain/compactJournal';
-import { navalEngagedDraft, seaLegCompletedDraft, voyageStartedDraft } from '../domain/voyage';
+import {
+  battleWithdrawnDraft,
+  navalEngagedDraft,
+  seaLegCompletedDraft,
+  voyageStartedDraft,
+} from '../domain/voyage';
 import { canonicalJson, checksumPayload } from './checksum';
 import {
   CURRENT_SAVE_KEY,
@@ -46,6 +51,41 @@ function activeModeJournals(): Record<'sailing' | 'encounter' | 'naval', Campaig
   const encounter = appendJournal(sailing, seaLegCompletedDraft(sailing.state));
   const naval = appendJournal(encounter, navalEngagedDraft(encounter.state));
   return { sailing, encounter, naval };
+}
+
+function returnedJournal(): CampaignJournal {
+  const naval = activeModeJournals().naval;
+  return appendJournal(naval, battleWithdrawnDraft(naval.state));
+}
+
+type LastVoyageMutation = readonly [
+  string,
+  (state: CampaignJournal['state']) => void,
+];
+
+const LAST_VOYAGE_MUTATIONS: readonly LastVoyageMutation[] = [
+  ['missing Red Jackdaw lead', (state) => { state.leads = []; }],
+  ['generic voyage ID', (state) => { state.world.lastVoyage!.voyageId = 'fabricated-voyage'; }],
+  ['future voyage ID', (state) => { state.world.lastVoyage!.voyageId = 'voyage-6'; }],
+  ['unrelated battle ID', (state) => { state.world.lastVoyage!.battleId = 'unrelated-battle'; }],
+  ['avoided before its authored return tail', (state) => {
+    state.world.lastVoyage = {
+      voyageId: 'voyage-4', battleId: null, result: 'avoided', outcome: null, returnedDay: 2,
+    };
+  }],
+  ['battle before its authored return tail', (state) => {
+    state.world.lastVoyage!.voyageId = 'voyage-3';
+    state.world.lastVoyage!.battleId = 'voyage-3-battle';
+  }],
+];
+
+function mutatedLastVoyageCompacted(
+  mutate: LastVoyageMutation[1],
+): CampaignJournal {
+  const journal = compactJournal(returnedJournal());
+  mutate(journal.initial);
+  mutate(journal.state);
+  return journal;
 }
 
 type ActiveModeKind = 'sailing' | 'encounter' | 'naval';
@@ -311,6 +351,47 @@ describe('loadCampaign', () => {
       expect(loadCampaign(storage)).toEqual({
         kind: 'unreadable',
         unreadableSlots: [{ slot: 'current', raw: currentRaw, code: 'invalid-journal' }],
+        revision,
+      });
+      expect(storage.revision()).toEqual(revision);
+      expect(storage.writes).toEqual([]);
+    },
+  );
+
+  it.each(LAST_VOYAGE_MUTATIONS)(
+    'rejects compacted current lastVoyage mutation %s without rewriting raw bytes',
+    (label, mutate) => {
+      // Kills validators that trust a checksum-valid post-return summary without its lineage.
+      const journal = mutatedLastVoyageCompacted(mutate);
+      const currentRaw = envelopeRaw(journal, 90, `mutated-last-voyage-${label}`);
+      const revision = { currentRaw, previousRaw: null };
+      const storage = new MemoryStorage(revision);
+
+      expect(loadCampaign(storage)).toEqual({
+        kind: 'unreadable',
+        unreadableSlots: [{ slot: 'current', raw: currentRaw, code: 'invalid-journal' }],
+        revision,
+      });
+      expect(storage.revision()).toEqual(revision);
+      expect(storage.writes).toEqual([]);
+    },
+  );
+
+  it.each(LAST_VOYAGE_MUTATIONS)(
+    'never promotes compacted previous lastVoyage mutation %s as recovery fallback',
+    (label, mutate) => {
+      // Kills fallback that treats the checksum as sufficient proof of voyage provenance.
+      const journal = mutatedLastVoyageCompacted(mutate);
+      const previousRaw = envelopeRaw(journal, 90, `mutated-last-voyage-${label}`);
+      const revision = { currentRaw: '{corrupt-current-exact', previousRaw };
+      const storage = new MemoryStorage(revision);
+
+      expect(loadCampaign(storage)).toEqual({
+        kind: 'unreadable',
+        unreadableSlots: [
+          { slot: 'current', raw: revision.currentRaw, code: 'malformed-json' },
+          { slot: 'previous', raw: previousRaw, code: 'invalid-journal' },
+        ],
         revision,
       });
       expect(storage.revision()).toEqual(revision);

@@ -90,6 +90,76 @@ describe('<CampaignNavalBattle>', () => {
     expect(controller.resolveBattle).not.toHaveBeenCalled();
   });
 
+  it('freezes time and blocks every tactical shortcut while a persistence decision owns the route', async () => {
+    // Kills dropping either the persistence pause hold or the NavalBattlePage interaction block.
+    const controller = navalController();
+    const session = manualNavalSession({ input: savedInput(controller) });
+    useNavalSession.mockReturnValue(session);
+    const CampaignNavalBattle = await component();
+    render(<CampaignNavalBattle controller={controller} persistenceDecisionRequired />);
+
+    expect(session.paused).toBe(true);
+    act(() => session.deliverFrame(1));
+    expect(session.state.tick).toBe(0);
+    const commandsBefore = session.commandHistory();
+
+    for (const [key, code] of [
+      ['a', 'KeyA'],
+      ['ArrowLeft', 'ArrowLeft'],
+      ['d', 'KeyD'],
+      ['ArrowRight', 'ArrowRight'],
+      ['q', 'KeyQ'],
+      ['e', 'KeyE'],
+      ['1', 'Digit1'],
+      ['2', 'Digit2'],
+      ['3', 'Digit3'],
+      ['r', 'KeyR'],
+      [' ', 'Space'],
+      ['Escape', 'Escape'],
+    ]) {
+      fireEvent.keyDown(window, { key, code });
+      fireEvent.keyUp(window, { key, code });
+    }
+    expect(session.currentCommand).toEqual({
+      rudder: 0,
+      sail: 'full',
+      ammunition: 'round',
+      fire: null,
+    });
+    expect(session.commandHistory()).toEqual(commandsBefore);
+    expect(session.paused).toBe(true);
+  });
+
+  it('releases only persistence ownership and preserves user, visibility, and withdrawal pauses', async () => {
+    // Kills replacing the named release with setPaused(false) or resumeFromPauseHold().
+    const controller = navalController();
+    const session = manualNavalSession({ input: savedInput(controller) });
+    useNavalSession.mockReturnValue(session);
+    const CampaignNavalBattle = await component();
+    const rendered = render(
+      <CampaignNavalBattle controller={controller} persistenceDecisionRequired />,
+    );
+
+    expect(session.paused).toBe(true);
+    act(() => {
+      session.setPaused(true);
+      session.setPauseHold('visibility', true);
+      session.setPauseHold('campaign-withdrawal', true);
+    });
+
+    rendered.rerender(
+      <CampaignNavalBattle controller={controller} persistenceDecisionRequired={false} />,
+    );
+    act(() => {
+      session.setPauseHold('visibility', false);
+      session.setPauseHold('campaign-withdrawal', false);
+    });
+    expect(session.paused).toBe(true);
+
+    act(() => session.setPaused(false));
+    expect(session.paused).toBe(false);
+  });
+
   it('summarizes and validates one terminal state only when Return is activated', async () => {
     const controller = navalController();
     const session = terminalSession(savedInput(controller));

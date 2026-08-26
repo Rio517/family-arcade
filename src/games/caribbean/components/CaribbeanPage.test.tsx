@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createCampaign } from '../domain/createCampaign';
 import { appendJournal, createJournal } from '../domain/replay';
-import { navalEngagedDraft, seaLegCompletedDraft, voyageStartedDraft } from '../domain/voyage';
+import {
+  encounterAvoidedDraft,
+  navalEngagedDraft,
+  seaLegCompletedDraft,
+  voyageStartedDraft,
+} from '../domain/voyage';
 import { loadCampaign, saveCampaign, type StorageLike } from '../storage/persistence';
 import { createCampaignWriter, type LockManagerLike } from '../storage/writer';
 import type { CaribbeanRuntime } from '../state/runtime';
@@ -381,6 +386,77 @@ describe('<CaribbeanPage>', () => {
       'caribbean-production--campaign',
       'caribbean-production--port',
     );
+  });
+
+  it('freezes the real memory-only naval route when Retry saving reaches a conflict', async () => {
+    // Kills the app-overlay seam that leaves the real NavalSession ticking and its window shortcuts live.
+    setViewport(1440, 900);
+    window.location.hash = '#/caribbean?resume=1';
+    const store = storage();
+    seedJournalSave(store, journalForMode('encounter'));
+    const injected = runtime(store);
+    const sessions: NavalSession[] = [];
+    const originalStart = NavalSession.prototype.start;
+    vi.spyOn(NavalSession.prototype, 'start').mockImplementation(function start(this: NavalSession) {
+      sessions.push(this);
+      originalStart.call(this);
+    });
+    const togglePause = vi.spyOn(NavalSession.prototype, 'togglePause');
+    render(<CaribbeanPage runtime={injected} />);
+
+    await screen.findByTestId('encounter-pursue');
+    injected.writer = createCampaignWriter(deniedLocks);
+    fireEvent.click(screen.getByTestId('encounter-pursue'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue without saving' }));
+    expect(await screen.findByTestId('naval-battle-page')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry saving' })).toBeVisible();
+    expect(sessions).toHaveLength(1);
+
+    const externalPredecessor = loadCampaign(store);
+    if (externalPredecessor.kind !== 'loaded') throw new Error('external predecessor must load');
+    const externalReturn = appendJournal(
+      externalPredecessor.journal,
+      encounterAvoidedDraft(externalPredecessor.journal.state),
+    );
+    const externalSave = saveCampaign(store, externalReturn, {
+      build: 'external-fixture',
+      savedAt: 200,
+      expectedRevision: externalPredecessor.revision,
+    });
+    if (!externalSave.ok) throw new Error(`external fixture failed: ${externalSave.reason}`);
+
+    injected.writer = createCampaignWriter(immediateLocks);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry saving' }));
+    expect(await screen.findByTestId('campaign-persistence-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('naval-battle-page')).toBeInTheDocument();
+
+    const session = sessions[0];
+    const tickBefore = session.state.tick;
+    const commandBefore = session.currentCommand;
+    act(() => session.deliverFrameMicros(1_000_000));
+    expect(session.state.tick).toBe(tickBefore);
+    expect(session.paused).toBe(true);
+
+    togglePause.mockClear();
+    for (const [key, code] of [
+      ['a', 'KeyA'],
+      ['ArrowLeft', 'ArrowLeft'],
+      ['d', 'KeyD'],
+      ['ArrowRight', 'ArrowRight'],
+      ['q', 'KeyQ'],
+      ['e', 'KeyE'],
+      ['1', 'Digit1'],
+      ['2', 'Digit2'],
+      ['3', 'Digit3'],
+      ['r', 'KeyR'],
+      [' ', 'Space'],
+      ['Escape', 'Escape'],
+    ]) {
+      fireEvent.keyDown(window, { key, code });
+      fireEvent.keyUp(window, { key, code });
+    }
+    expect(session.currentCommand).toEqual(commandBefore);
+    expect(togglePause).not.toHaveBeenCalled();
   });
 
   it.each(['port', 'sailing', 'encounter', 'naval'] as const)(

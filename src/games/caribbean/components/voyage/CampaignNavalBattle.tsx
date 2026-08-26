@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { summarizeNavalResolution, validateNavalResolution } from '../../domain/naval/resolution';
 import type { NavalState } from '../../domain/naval/types';
@@ -8,7 +8,13 @@ import { NavalBattlePage } from '../battle/NavalBattlePage';
 import { useModalFocus } from '../recovery/useModalFocus';
 import '../../styles/battle.css';
 
-export default function CampaignNavalBattle({ controller }: { controller: CaribbeanController }) {
+export default function CampaignNavalBattle({
+  controller,
+  persistenceDecisionRequired = false,
+}: {
+  controller: CaribbeanController;
+  persistenceDecisionRequired?: boolean;
+}) {
   const mode = controller.journal?.state.mode;
   if (mode === undefined || mode.kind !== 'naval') {
     throw new Error('CampaignNavalBattle requires a saved naval campaign');
@@ -22,6 +28,13 @@ export default function CampaignNavalBattle({ controller }: { controller: Caribb
     [inputKey],
   );
   const session = useNavalSession(savedInput);
+  useLayoutEffect(() => {
+    const ownedSession = session;
+    ownedSession.setPauseHold('persistence-decision', persistenceDecisionRequired);
+    return () => ownedSession.setPauseHold('persistence-decision', false);
+    // A byte-equal snapshot publication changes the view wrapper, not the owned session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputKey, persistenceDecisionRequired]);
   const [resolutionError, setResolutionError] = useState(false);
   const [resultStatus, setResultStatus] = useState<string | null>(null);
   const [resultBusy, setResultBusy] = useState(false);
@@ -120,7 +133,7 @@ export default function CampaignNavalBattle({ controller }: { controller: Caribb
           resultAction={resultAction}
           exitAction={exitAction}
           resolutionErrorAction={resolutionErrorAction}
-          interactionBlocked={withdrawalError}
+          interactionBlocked={withdrawalError || persistenceDecisionRequired}
         />
         <p className="campaign-naval-battle__restart-note">Reloading restarts this engagement from first contact.</p>
         {resultStatus && <p className="campaign-naval-battle__status" role="status">{resultStatus}</p>}
