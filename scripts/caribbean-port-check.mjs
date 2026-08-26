@@ -2873,9 +2873,12 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
       await tavernAction.locator('.caribbean-port-action-attention').isVisible(),
       'Tavern does not visibly mark the available Red Jackdaw rumour',
     );
+    const setSailAction = page.getByRole('button', { name: 'Set Sail' });
     invariant(
-      await page.getByText('Mark the Red Jackdaw rumour in the Tavern first.').isHidden(),
-      'Set Sail still renders the verbose Red Jackdaw instruction visibly',
+      await setSailAction.getAttribute('aria-describedby') === 'port-set-sail-reason'
+        && await page.locator('#port-set-sail-reason').textContent() === 'Mark the Red Jackdaw rumour in the Tavern first.'
+        && await page.locator('#port-set-sail-reason.caribbean-port-action-reason').count() === 0,
+      'Set Sail does not retain the hidden Red Jackdaw instruction without visible supporting-copy styling',
     );
     layouts.portDesktop = await readLayout(page, 'portDesktop', VIEWPORTS.portDesktop);
     await capture(page, screenshots, runDirectory, 'port-desktop.png');
