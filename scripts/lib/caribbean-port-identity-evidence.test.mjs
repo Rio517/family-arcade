@@ -171,12 +171,6 @@ function terminalSemanticState() {
       transform: 'none',
       engine: 'three.js r170',
       backend: { vendor: 'Google Inc. (Google)', renderer: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))' },
-      framebufferSample: {
-        algorithm: 'fnv1a32-rgba-grid-v1',
-        sampleCount: 40,
-        nonzeroSampleChannels: 0,
-        sampleHash: '02187e45',
-      },
     },
     terminal: {
       outcome: 'boarding-ready',
@@ -189,11 +183,25 @@ function terminalSemanticState() {
   };
 }
 
+function terminalRenderObservation(nonzeroSampleChannels, sampleHash) {
+  return {
+    kind: 'post-present-default-framebuffer-readpixels',
+    framebufferSample: {
+      algorithm: 'fnv1a32-rgba-grid-v1',
+      sampleCount: 40,
+      nonzeroSampleChannels,
+      sampleHash,
+    },
+  };
+}
+
 function screenshotEvidence({
   runABytes = RESULT_RUN_A_PNG,
   runBBytes = RESULT_RUN_B_PNG,
   runAState = terminalSemanticState(),
   runBState = terminalSemanticState(),
+  runAObservation = terminalRenderObservation(160, '9df398c6'),
+  runBObservation = terminalRenderObservation(0, '02187e45'),
 } = {}) {
   return {
     expectedCount: 23,
@@ -214,6 +222,7 @@ function screenshotEvidence({
         pngSha256: sha256(runABytes),
         semanticDigest: sha256(canonicalJson(runAState)),
         semanticState: runAState,
+        renderObservation: runAObservation,
       },
       runB: {
         pngSignatureVerified: true,
@@ -223,12 +232,19 @@ function screenshotEvidence({
         pngSha256: sha256(runBBytes),
         semanticDigest: sha256(canonicalJson(runBState)),
         semanticState: runBState,
+        renderObservation: runBObservation,
       },
     },
   };
 }
 
-function screenshotRun(run, resultBytes = run === 'A' ? RESULT_RUN_A_PNG : RESULT_RUN_B_PNG) {
+function screenshotRun(
+  run,
+  resultBytes = run === 'A' ? RESULT_RUN_A_PNG : RESULT_RUN_B_PNG,
+  renderObservation = run === 'A'
+    ? terminalRenderObservation(160, '9df398c6')
+    : terminalRenderObservation(0, '02187e45'),
+) {
   return {
     run,
     screenshotBuffers: new Map(NORMAL_ROUTE_SCREENSHOTS.map((name) => [
@@ -236,6 +252,7 @@ function screenshotRun(run, resultBytes = run === 'A' ? RESULT_RUN_A_PNG : RESUL
       name === RESULT_SCREENSHOT ? resultBytes : EXACT_PNG,
     ])),
     semanticStates: new Map([[RESULT_SCREENSHOT, terminalSemanticState()]]),
+    renderObservations: new Map([[RESULT_SCREENSHOT, renderObservation]]),
     checks: {
       routeFailures: 0,
       requestFailures: 0,
@@ -262,17 +279,68 @@ function mutateDeclaredSemanticStates(evidence, mutate) {
   evidence.observation.runB.semanticDigest = sha256(canonicalJson(evidence.observation.runB.semanticState));
 }
 
-function mutateComparisonSemanticStates(fixture, mutate) {
-  mutateDeclaredSemanticStates(fixture.declaredEvidence, mutate);
-  fixture.runA.semanticStates.set(
-    RESULT_SCREENSHOT,
-    structuredClone(fixture.declaredEvidence.observation.runA.semanticState),
-  );
-  fixture.runB.semanticStates.set(
-    RESULT_SCREENSHOT,
-    structuredClone(fixture.declaredEvidence.observation.runB.semanticState),
-  );
+function mutateDeclaredSemanticState(evidence, runKey, mutate) {
+  mutate(evidence.observation[runKey].semanticState);
+  evidence.observation[runKey].semanticDigest = sha256(canonicalJson(evidence.observation[runKey].semanticState));
 }
+
+function mutateDeclaredRenderObservation(evidence, runKey, mutate) {
+  mutate(evidence.observation[runKey].renderObservation);
+}
+
+function mutateComparisonRenderObservation(fixture, runKey, mutate, { declaration = true, actual = true } = {}) {
+  if (declaration) mutateDeclaredRenderObservation(fixture.declaredEvidence, runKey, mutate);
+  if (actual) {
+    const run = runKey === 'runA' ? fixture.runA : fixture.runB;
+    const observation = structuredClone(run.renderObservations.get(RESULT_SCREENSHOT));
+    mutate(observation);
+    run.renderObservations.set(RESULT_SCREENSHOT, observation);
+  }
+}
+
+const RENDER_OBSERVATION_MUTATIONS = [
+  ['wrong kind', (observation) => { observation.kind = 'presented-frame-fingerprint'; }],
+  ['non-string kind', (observation) => { observation.kind = 1; }],
+  ['missing kind', (observation) => { delete observation.kind; }],
+  ['wrong algorithm', (observation) => { observation.framebufferSample.algorithm = 'sha256-rgba-grid-v1'; }],
+  ['non-string algorithm', (observation) => { observation.framebufferSample.algorithm = 1; }],
+  ['missing algorithm', (observation) => { delete observation.framebufferSample.algorithm; }],
+  ['wrong sample count', (observation) => { observation.framebufferSample.sampleCount = 39; }],
+  ['missing sample count', (observation) => { delete observation.framebufferSample.sampleCount; }],
+  ['string sample count', (observation) => { observation.framebufferSample.sampleCount = '40'; }],
+  ['sample below range', (observation) => { observation.framebufferSample.nonzeroSampleChannels = -1; }],
+  ['sample above range', (observation) => { observation.framebufferSample.nonzeroSampleChannels = 161; }],
+  ['fractional sample channels', (observation) => { observation.framebufferSample.nonzeroSampleChannels = 1.5; }],
+  ['missing sample channels', (observation) => { delete observation.framebufferSample.nonzeroSampleChannels; }],
+  ['string sample channels', (observation) => { observation.framebufferSample.nonzeroSampleChannels = '0'; }],
+  ['uppercase sample hash', (observation) => { observation.framebufferSample.sampleHash = 'A2187E45'; }],
+  ['nine-hex sample hash', (observation) => { observation.framebufferSample.sampleHash = '002187e45'; }],
+  ['non-hex sample hash', (observation) => { observation.framebufferSample.sampleHash = 'zzzzzzzz'; }],
+  ['numeric eight-digit sample hash', (observation) => { observation.framebufferSample.sampleHash = 12345678; }],
+  ['missing sample hash', (observation) => { delete observation.framebufferSample.sampleHash; }],
+  ['fingerprint alias', (observation) => {
+    observation.framebufferSample.fingerprint = observation.framebufferSample.sampleHash;
+  }],
+  ['array framebuffer sample', (observation) => { observation.framebufferSample = []; }],
+  ['extra sample key', (observation) => { observation.framebufferSample.normalized = true; }],
+  ['missing framebuffer sample', (observation) => { delete observation.framebufferSample; }],
+  ['extra observation key', (observation) => { observation.presented = true; }],
+];
+
+const PER_RUN_RENDER_OBSERVATION_MUTATIONS = ['runA', 'runB'].flatMap((runKey) => (
+  [
+    ...RENDER_OBSERVATION_MUTATIONS.map(([label, mutate]) => [
+      `${runKey} ${label}`,
+      (evidence) => mutateDeclaredRenderObservation(evidence.screenshotEvidence, runKey, mutate),
+    ]),
+    [`${runKey} missing render observation`, (evidence) => {
+      delete evidence.screenshotEvidence.observation[runKey].renderObservation;
+    }],
+    [`${runKey} null render observation`, (evidence) => {
+      evidence.screenshotEvidence.observation[runKey].renderObservation = null;
+    }],
+  ]
+));
 
 const VIEWPORTS = {
   setupDesktop: [1440, 900, true],
@@ -660,20 +728,20 @@ describe('schema-v3 strategic sailing evidence', () => {
     ['semantic digest lie', (e) => { e.screenshotEvidence.observation.runB.semanticDigest = '0'.repeat(64); }],
     ['semantic state drift', (e) => { e.screenshotEvidence.observation.runB.semanticState.player.hull = 77; }],
     ['empty backend vendor', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.backend.vendor = ''; })],
-    ['sample below range', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = -1; })],
-    ['sample above range', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = 161; })],
-    ['fractional sample channels', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = 1.5; })],
-    ['wrong sample count', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.sampleCount = 39; })],
-    ['uppercase sample hash', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.sampleHash = 'A2187E45'; })],
-    ['nine-hex sample hash', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.sampleHash = '002187e45'; })],
-    ['non-hex sample hash', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.framebufferSample.sampleHash = 'zzzzzzzz'; })],
-    ['fingerprint alias', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => {
-      state.canvas.framebufferSample.fingerprint = state.canvas.framebufferSample.sampleHash;
+    ['stable tick drift', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.tick = 11_856; })],
+    ['stable result visibility drift', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.resultVisible = false; })],
+    ['stable canvas drift', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.canvas.width = 1439; })],
+    ['stable backend drift', (e) => mutateDeclaredSemanticState(e.screenshotEvidence, 'runB', (state) => { state.canvas.backend.renderer = 'different'; })],
+    ['stable outcome drift', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.terminal.outcome = 'victory'; })],
+    ['stable seed drift', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.terminal.seedAfter += 1; })],
+    ['stable system drift', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.opponent.sails += 1; })],
+    ['framebuffer sample smuggled into stable state', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => {
+      state.canvas.framebufferSample = terminalRenderObservation(160, '9df398c6').framebufferSample;
     })],
-    ['missing sample hash', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { delete state.canvas.framebufferSample.sampleHash; })],
     ['unknown semantic key', (e) => mutateDeclaredSemanticStates(e.screenshotEvidence, (state) => { state.debug = true; })],
     ['false PNG signature declaration', (e) => { e.screenshotEvidence.observation.runA.pngSignatureVerified = false; }],
     ['zero-byte declaration', (e) => { e.screenshotEvidence.observation.runB.nonzeroBytes = false; }],
+    ...PER_RUN_RENDER_OBSERVATION_MUTATIONS,
   ])('rejects the exact screenshot boundary mutation: %s', (_label, mutate) => {
     const evidence = completeEvidence();
     mutate(evidence);
@@ -681,26 +749,102 @@ describe('schema-v3 strategic sailing evidence', () => {
     expect(evaluatePortIdentityEvidence(evidence)).toMatchObject({ ok: false, issues: expect.any(Array) });
   });
 
-  it('accepts the measured zero-channel framebuffer sample', () => {
+  it('accepts and retains the measured divergent per-run render observations outside stable semantics', () => {
     const evidence = completeEvidence();
-    expect(evidence.screenshotEvidence.observation.runA.semanticState.canvas.framebufferSample).toEqual({
-      algorithm: 'fnv1a32-rgba-grid-v1',
-      sampleCount: 40,
-      nonzeroSampleChannels: 0,
-      sampleHash: '02187e45',
+    const { runA, runB } = evidence.screenshotEvidence.observation;
+    expect(evaluatePortIdentityEvidence(evidence)).toEqual({ ok: true, issues: [] });
+    expect(runA.semanticState.canvas).not.toHaveProperty('framebufferSample');
+    expect(runB.semanticState.canvas).not.toHaveProperty('framebufferSample');
+    expect(runA.semanticDigest).toBe(runB.semanticDigest);
+    expect(runA.renderObservation).toEqual({
+      kind: 'post-present-default-framebuffer-readpixels',
+      framebufferSample: {
+        algorithm: 'fnv1a32-rgba-grid-v1',
+        sampleCount: 40,
+        nonzeroSampleChannels: 160,
+        sampleHash: '9df398c6',
+      },
     });
+    expect(runB.renderObservation).toEqual({
+      kind: 'post-present-default-framebuffer-readpixels',
+      framebufferSample: {
+        algorithm: 'fnv1a32-rgba-grid-v1',
+        sampleCount: 40,
+        nonzeroSampleChannels: 0,
+        sampleHash: '02187e45',
+      },
+    });
+    expect(runA.renderObservation).not.toEqual(runB.renderObservation);
+  });
+
+  it('accepts independently constructed equal interior render observations', () => {
+    const evidence = completeEvidence();
+    evidence.screenshotEvidence.observation.runA.renderObservation = {
+      kind: 'post-present-default-framebuffer-readpixels',
+      framebufferSample: {
+        algorithm: 'fnv1a32-rgba-grid-v1',
+        sampleCount: 40,
+        nonzeroSampleChannels: 73,
+        sampleHash: '1234abcd',
+      },
+    };
+    evidence.screenshotEvidence.observation.runB.renderObservation = structuredClone(
+      evidence.screenshotEvidence.observation.runA.renderObservation,
+    );
     expect(evaluatePortIdentityEvidence(evidence)).toEqual({ ok: true, issues: [] });
   });
 });
 
 describe('normal-route screenshot byte comparator', () => {
-  it('selects exactly 23 run-A buffers after 22 exact comparisons and one semantic observation', async () => {
+  it('selects 23 run-A buffers after 22 byte comparisons, stable semantic equality, and two retained render observations', async () => {
     const { compareNormalRouteScreenshotRuns } = await import('./caribbean-port-identity-evidence.mjs');
     expect(compareNormalRouteScreenshotRuns).toBeTypeOf('function');
     const fixture = comparisonFixture();
     const comparison = compareNormalRouteScreenshotRuns(fixture);
     expect(comparison).toMatchObject({ ok: true, issues: [], selectedRun: 'A' });
     expect(comparison.screenshotEvidence).toEqual(fixture.declaredEvidence);
+    expect(comparison.screenshotEvidence.observation.runA.semanticDigest).toBe(
+      comparison.screenshotEvidence.observation.runB.semanticDigest,
+    );
+    expect(comparison.screenshotEvidence.observation.runA.renderObservation).toEqual({
+      kind: 'post-present-default-framebuffer-readpixels',
+      framebufferSample: {
+        algorithm: 'fnv1a32-rgba-grid-v1',
+        sampleCount: 40,
+        nonzeroSampleChannels: 160,
+        sampleHash: '9df398c6',
+      },
+    });
+    expect(comparison.screenshotEvidence.observation.runB.renderObservation).toEqual({
+      kind: 'post-present-default-framebuffer-readpixels',
+      framebufferSample: {
+        algorithm: 'fnv1a32-rgba-grid-v1',
+        sampleCount: 40,
+        nonzeroSampleChannels: 0,
+        sampleHash: '02187e45',
+      },
+    });
+    expect(comparison.screenshotEvidence.observation.runA.renderObservation).not.toEqual(
+      comparison.screenshotEvidence.observation.runB.renderObservation,
+    );
+    expect(fixture.runA.renderObservations.get(RESULT_SCREENSHOT)).toEqual({
+      kind: 'post-present-default-framebuffer-readpixels',
+      framebufferSample: {
+        algorithm: 'fnv1a32-rgba-grid-v1',
+        sampleCount: 40,
+        nonzeroSampleChannels: 160,
+        sampleHash: '9df398c6',
+      },
+    });
+    expect(fixture.runB.renderObservations.get(RESULT_SCREENSHOT)).toEqual({
+      kind: 'post-present-default-framebuffer-readpixels',
+      framebufferSample: {
+        algorithm: 'fnv1a32-rgba-grid-v1',
+        sampleCount: 40,
+        nonzeroSampleChannels: 0,
+        sampleHash: '02187e45',
+      },
+    });
     expect(comparison.selectedArtifacts.size).toBe(23);
     for (const [name, artifact] of comparison.selectedArtifacts) {
       expect(artifact.sourceRun).toBe('A');
@@ -710,6 +854,29 @@ describe('normal-route screenshot byte comparator', () => {
     expect(comparison.selectedArtifacts.get(RESULT_SCREENSHOT).sha256).not.toBe(
       sha256(fixture.runB.screenshotBuffers.get(RESULT_SCREENSHOT)),
     );
+  });
+
+  it('accepts equal valid independently owned render observations', async () => {
+    const { compareNormalRouteScreenshotRuns } = await import('./caribbean-port-identity-evidence.mjs');
+    const fixture = comparisonFixture();
+    const runAObservation = {
+      kind: 'post-present-default-framebuffer-readpixels',
+      framebufferSample: {
+        algorithm: 'fnv1a32-rgba-grid-v1',
+        sampleCount: 40,
+        nonzeroSampleChannels: 73,
+        sampleHash: '1234abcd',
+      },
+    };
+    const runBObservation = structuredClone(runAObservation);
+    fixture.runA.renderObservations.set(RESULT_SCREENSHOT, runAObservation);
+    fixture.runB.renderObservations.set(RESULT_SCREENSHOT, runBObservation);
+    fixture.declaredEvidence.observation.runA.renderObservation = structuredClone(runAObservation);
+    fixture.declaredEvidence.observation.runB.renderObservation = structuredClone(runBObservation);
+    const comparison = compareNormalRouteScreenshotRuns(fixture);
+    expect(comparison).toMatchObject({ ok: true, issues: [], selectedRun: 'A' });
+    expect(comparison.screenshotEvidence.observation.runA.renderObservation).toEqual(runAObservation);
+    expect(comparison.screenshotEvidence.observation.runB.renderObservation).toEqual(runBObservation);
   });
 
   it('publishes only selected run-A bytes and returns their exact hashes', async () => {
@@ -767,10 +934,48 @@ describe('normal-route screenshot byte comparator', () => {
     ['semantic probe failure', (fixture) => { fixture.runB.checks.semanticProbesPassed = false; }],
     ['semantic-state map drift', (fixture) => { fixture.runB.semanticStates.get(RESULT_SCREENSHOT).player.hull = 77; }],
     ['semantic-state declaration drift', (fixture) => { fixture.declaredEvidence.observation.runB.semanticState.player.hull = 77; }],
-    ['sample below range', (fixture) => mutateComparisonSemanticStates(fixture, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = -1; })],
-    ['sample above range', (fixture) => mutateComparisonSemanticStates(fixture, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = 161; })],
-    ['fractional sample', (fixture) => mutateComparisonSemanticStates(fixture, (state) => { state.canvas.framebufferSample.nonzeroSampleChannels = 1.5; })],
-    ['malformed sample hash', (fixture) => mutateComparisonSemanticStates(fixture, (state) => { state.canvas.framebufferSample.sampleHash = '02187e450'; })],
+    ...['runA', 'runB'].flatMap((runKey) => [
+      [`${runKey} missing render-observation map entry`, (fixture) => {
+        fixture[runKey].renderObservations.delete(RESULT_SCREENSHOT);
+      }],
+      [`${runKey} unknown render-observation map entry`, (fixture) => {
+        fixture[runKey].renderObservations.set('unknown.png', terminalRenderObservation(0, '02187e45'));
+      }],
+      [`${runKey} wrong render-observation map type`, (fixture) => {
+        fixture[runKey].renderObservations = {};
+      }],
+      [`${runKey} missing declared render observation`, (fixture) => {
+        delete fixture.declaredEvidence.observation[runKey].renderObservation;
+      }],
+    ]),
+    ['run-A render declaration drift', (fixture) => mutateComparisonRenderObservation(
+      fixture,
+      'runA',
+      (observation) => { observation.framebufferSample.nonzeroSampleChannels = 159; },
+      { declaration: true, actual: false },
+    )],
+    ['run-B render map drift', (fixture) => mutateComparisonRenderObservation(
+      fixture,
+      'runB',
+      (observation) => { observation.framebufferSample.sampleHash = '12187e45'; },
+      { declaration: false, actual: true },
+    )],
+    ['run-A render map drift', (fixture) => mutateComparisonRenderObservation(
+      fixture,
+      'runA',
+      (observation) => { observation.framebufferSample.sampleHash = '12187e45'; },
+      { declaration: false, actual: true },
+    )],
+    ['run-B render declaration drift', (fixture) => mutateComparisonRenderObservation(
+      fixture,
+      'runB',
+      (observation) => { observation.framebufferSample.nonzeroSampleChannels = 1; },
+      { declaration: true, actual: false },
+    )],
+    ...['runA', 'runB'].flatMap((runKey) => RENDER_OBSERVATION_MUTATIONS.map(([label, mutate]) => [
+      `${runKey} actual and declared ${label}`,
+      (fixture) => mutateComparisonRenderObservation(fixture, runKey, mutate),
+    ])),
   ])('fails closed without selecting artifacts for %s', async (_label, mutate) => {
     const { compareNormalRouteScreenshotRuns } = await import('./caribbean-port-identity-evidence.mjs');
     expect(compareNormalRouteScreenshotRuns).toBeTypeOf('function');

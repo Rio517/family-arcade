@@ -351,7 +351,7 @@ function validateTerminalSemanticState(issues, state, label) {
   const canvas = state.canvas;
   if (!exactObject(issues, canvas, [
     'width', 'height', 'rect', 'drawingBuffer', 'opacity', 'transform', 'engine',
-    'backend', 'framebufferSample',
+    'backend',
   ], `${label}.canvas`)) return;
   if (canvas.width !== 1440 || canvas.height !== 900 || canvas.opacity !== '1'
     || canvas.transform !== 'none' || canvas.engine !== 'three.js r170') {
@@ -370,19 +370,6 @@ function validateTerminalSemanticState(issues, state, label) {
     || typeof canvas.backend.renderer !== 'string' || canvas.backend.renderer.length === 0) {
     issues.push(`${label}.canvas.backend is invalid`);
   }
-  const sample = canvas.framebufferSample;
-  if (!exactObject(issues, sample, [
-    'algorithm', 'sampleCount', 'nonzeroSampleChannels', 'sampleHash',
-  ], `${label}.canvas.framebufferSample`)
-    || sample.algorithm !== 'fnv1a32-rgba-grid-v1'
-    || sample.sampleCount !== 40
-    || !Number.isInteger(sample.nonzeroSampleChannels)
-    || sample.nonzeroSampleChannels < 0
-    || sample.nonzeroSampleChannels > 160
-    || !SAMPLE_HASH_PATTERN.test(sample.sampleHash)) {
-    issues.push(`${label}.canvas.framebufferSample is invalid`);
-  }
-
   const terminal = state.terminal;
   if (!exactObject(issues, terminal, ['outcome', 'victorShipId', 'atTick', 'seedAfter'], `${label}.terminal`)
     || terminal.outcome !== 'boarding-ready' || terminal.victorShipId !== 'player'
@@ -393,10 +380,30 @@ function validateTerminalSemanticState(issues, state, label) {
   validateTerminalSystems(issues, state.opponent, { hull: 88, sails: 14, crew: 9, cannon: 8 }, `${label}.opponent`);
 }
 
+function validateTerminalRenderObservation(issues, observation, label) {
+  if (!exactObject(issues, observation, ['kind', 'framebufferSample'], label)) return;
+  if (observation.kind !== 'post-present-default-framebuffer-readpixels') {
+    issues.push(`${label}.kind is invalid`);
+  }
+  const sample = observation.framebufferSample;
+  if (!exactObject(issues, sample, [
+    'algorithm', 'sampleCount', 'nonzeroSampleChannels', 'sampleHash',
+  ], `${label}.framebufferSample`)
+    || sample.algorithm !== 'fnv1a32-rgba-grid-v1'
+    || sample.sampleCount !== 40
+    || !Number.isInteger(sample.nonzeroSampleChannels)
+    || sample.nonzeroSampleChannels < 0
+    || sample.nonzeroSampleChannels > 160
+    || typeof sample.sampleHash !== 'string'
+    || !SAMPLE_HASH_PATTERN.test(sample.sampleHash)) {
+    issues.push(`${label}.framebufferSample is invalid`);
+  }
+}
+
 function validateScreenshotObservationRun(issues, value, label) {
   const keys = [
     'pngSignatureVerified', 'nonzeroBytes', 'width', 'height', 'pngSha256',
-    'semanticDigest', 'semanticState',
+    'semanticDigest', 'semanticState', 'renderObservation',
   ];
   if (!exactObject(issues, value, keys, label)) return;
   if (value.pngSignatureVerified !== true || value.nonzeroBytes !== true
@@ -405,6 +412,7 @@ function validateScreenshotObservationRun(issues, value, label) {
     issues.push(`${label} PNG declaration is invalid`);
   }
   validateTerminalSemanticState(issues, value.semanticState, `${label}.semanticState`);
+  validateTerminalRenderObservation(issues, value.renderObservation, `${label}.renderObservation`);
   if (isRecord(value.semanticState) && value.semanticDigest !== semanticDigest(value.semanticState)) {
     issues.push(`${label}.semanticDigest does not match canonical state`);
   }
@@ -828,6 +836,12 @@ export function compareNormalRouteScreenshotRuns({ expectedNames, runA, runB, de
     }
     if (!exactMapNames(run.screenshotBuffers, names)) issues.push(`${label} screenshot membership is invalid`);
     if (!exactMapNames(run.semanticStates, [TERMINAL_RESULT_SCREENSHOT])) issues.push(`${label} semantic-state membership is invalid`);
+    if (!exactMapNames(run.renderObservations, [TERMINAL_RESULT_SCREENSHOT])) issues.push(`${label} render-observation membership is invalid`);
+    else validateTerminalRenderObservation(
+      issues,
+      run.renderObservations.get(TERMINAL_RESULT_SCREENSHOT),
+      `${label}.renderObservations.${TERMINAL_RESULT_SCREENSHOT}`,
+    );
     if (!validRunChecks(run.checks)) issues.push(`${label} checks are invalid`);
   }
 
@@ -859,10 +873,16 @@ export function compareNormalRouteScreenshotRuns({ expectedNames, runA, runB, de
         }
         const stateA = runA.semanticStates.get(name);
         const stateB = runB.semanticStates.get(name);
+        const renderObservationA = runA.renderObservations.get(name);
+        const renderObservationB = runB.renderObservations.get(name);
         if (canonicalJson(stateA) !== canonicalJson(declaredEvidence.observation.runA.semanticState)
           || canonicalJson(stateB) !== canonicalJson(declaredEvidence.observation.runB.semanticState)
           || canonicalJson(stateA) !== canonicalJson(stateB)) {
           issues.push(`${name} semantic state does not match its declaration`);
+        }
+        if (canonicalJson(renderObservationA) !== canonicalJson(declaredEvidence.observation.runA.renderObservation)
+          || canonicalJson(renderObservationB) !== canonicalJson(declaredEvidence.observation.runB.renderObservation)) {
+          issues.push(`${name} render observation does not match its declaration`);
         }
       }
       selectedArtifacts.set(name, { sourceRun: 'A', bytes: aBytes, sha256: aHash });

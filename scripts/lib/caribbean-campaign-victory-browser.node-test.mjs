@@ -91,12 +91,6 @@ function terminalResultSemanticState() {
         vendor: 'Google Inc. (Google)',
         renderer: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))',
       },
-      framebufferSample: {
-        algorithm: 'fnv1a32-rgba-grid-v1',
-        sampleCount: 40,
-        nonzeroSampleChannels: 0,
-        sampleHash: '02187e45',
-      },
     },
     terminal: {
       outcome: 'boarding-ready',
@@ -106,6 +100,21 @@ function terminalResultSemanticState() {
     },
     player: { hull: 78, sails: 61, crew: 44, cannon: 8 },
     opponent: { hull: 88, sails: 14, crew: 9, cannon: 8 },
+  };
+}
+
+function terminalResultRenderObservation(
+  nonzeroSampleChannels = 160,
+  sampleHash = '9df398c6',
+) {
+  return {
+    kind: 'post-present-default-framebuffer-readpixels',
+    framebufferSample: {
+      algorithm: 'fnv1a32-rgba-grid-v1',
+      sampleCount: 40,
+      nonzeroSampleChannels,
+      sampleHash,
+    },
   };
 }
 
@@ -191,7 +200,10 @@ function strategicSailingEvidence() {
   };
 }
 
-function comparisonRun(semanticState = terminalResultSemanticState()) {
+function comparisonRun(
+  semanticState = terminalResultSemanticState(),
+  renderObservation = terminalResultRenderObservation(),
+) {
   const evidenceDirectory = path.resolve('docs/screenshots/caribbean-port');
   const metrics = JSON.parse(fs.readFileSync(path.join(evidenceDirectory, 'metrics.json'), 'utf8'));
   metrics.schemaVersion = 3;
@@ -209,6 +221,20 @@ function comparisonRun(semanticState = terminalResultSemanticState()) {
       fs.readFileSync(path.join(evidenceDirectory, name)),
     ])),
     screenshotStates: new Map([[TERMINAL_RESULT_SCREENSHOT, semanticState]]),
+    screenshotRenderObservations: new Map([[TERMINAL_RESULT_SCREENSHOT, renderObservation]]),
+  };
+}
+
+function measuredComparisonRuns() {
+  return {
+    first: comparisonRun(
+      terminalResultSemanticState(),
+      terminalResultRenderObservation(160, '9df398c6'),
+    ),
+    second: comparisonRun(
+      terminalResultSemanticState(),
+      terminalResultRenderObservation(0, '02187e45'),
+    ),
   };
 }
 
@@ -382,6 +408,12 @@ test('diagnostics-off comparisons never inspect or mutate diagnostic paths', asy
   const { first, second } = semanticDriftComparisonRuns();
   const passingFirst = comparisonRun();
   const passingSecond = comparisonRun();
+  const rawMetricsFirst = comparisonRun();
+  const rawMetricsSecond = comparisonRun();
+  rawMetricsSecond.metrics.browser = {
+    version: rawMetricsSecond.metrics.browser.version,
+    name: rawMetricsSecond.metrics.browser.name,
+  };
   const guardedMethods = [
     'realpathSync', 'lstatSync', 'readdirSync', 'unlinkSync', 'rmdirSync',
     'mkdtempSync', 'openSync', 'writeFileSync', 'renameSync',
@@ -397,7 +429,7 @@ test('diagnostics-off comparisons never inspect or mutate diagnostic paths', asy
 
   try {
     await assert.rejects(
-      portCommand.compareRuns(first, second, passiveComparisonDeadline(), { diagnosticDirectory }),
+      portCommand.compareRuns(first, second, passiveComparisonDeadline()),
       (error) => {
         assert.equal(error.message, SEMANTIC_GATE_ERROR);
         return true;
@@ -407,9 +439,18 @@ test('diagnostics-off comparisons never inspect or mutate diagnostic paths', asy
       passingFirst,
       passingSecond,
       passiveComparisonDeadline(),
-      { diagnosticDirectory },
     );
     assert.equal(comparison.comparison.selectedRun, 'A');
+    await assert.rejects(
+      portCommand.compareRuns(rawMetricsFirst, rawMetricsSecond, passiveComparisonDeadline()),
+      (error) => {
+        assert.equal(
+          error.message,
+          'Two clean browser runs produced different metrics.json bytes; canonicalJsonEqual=true; firstDifferingPath=null',
+        );
+        return true;
+      },
+    );
   } finally {
     for (const [name, original] of originals) fs[name] = original;
   }
@@ -654,8 +695,14 @@ test('diagnostic comparison preserves semantic drift before the evaluator reject
   assert.notEqual(diagnostic.report.semanticDigest.runA, diagnostic.report.semanticDigest.runB);
   assert.equal(diagnostic.report.canonicalMetricsSha256.runA, sha256(diagnostic.metricsA));
   assert.equal(diagnostic.report.canonicalMetricsSha256.runB, sha256(diagnostic.metricsB));
+  assert.equal(diagnostic.report.canonicalJsonEqual, true);
+  assert.deepEqual(diagnostic.report.renderObservations, {
+    runA: first.screenshotRenderObservations.get(TERMINAL_RESULT_SCREENSHOT),
+    runB: second.screenshotRenderObservations.get(TERMINAL_RESULT_SCREENSHOT),
+  });
   assert.deepEqual(diagnostic.report.firstDifferingPaths, {
     semanticState: '/canvas/backend/renderer',
+    renderObservation: null,
     canonicalMetrics: null,
   });
   assert.equal(diagnostic.metricsA.toString(), `${canonicalJson(first.metrics)}\n`);
@@ -679,7 +726,10 @@ test('diagnostic comparison preserves evaluator-valid canonical metrics drift', 
   await assert.rejects(
     portCommand.compareRuns(first, second, passiveComparisonDeadline(), { diagnosticDirectory }),
     (error) => {
-      assert.equal(error.message, 'Two clean browser runs produced different metrics.json bytes');
+      assert.equal(
+        error.message,
+        'Two clean browser runs produced different metrics.json bytes; canonicalJsonEqual=false; firstDifferingPath=/browser/version',
+      );
       return true;
     },
   );
@@ -691,8 +741,14 @@ test('diagnostic comparison preserves evaluator-valid canonical metrics drift', 
     issues: ['Two clean browser runs produced different metrics.json bytes'],
   });
   assert.equal(diagnostic.report.semanticDigest.runA, diagnostic.report.semanticDigest.runB);
+  assert.equal(diagnostic.report.canonicalJsonEqual, false);
+  assert.deepEqual(diagnostic.report.renderObservations, {
+    runA: first.screenshotRenderObservations.get(TERMINAL_RESULT_SCREENSHOT),
+    runB: second.screenshotRenderObservations.get(TERMINAL_RESULT_SCREENSHOT),
+  });
   assert.deepEqual(diagnostic.report.firstDifferingPaths, {
     semanticState: null,
+    renderObservation: null,
     canonicalMetrics: '/browser/version',
   });
   assert.equal(JSON.parse(diagnostic.metricsA).browser.version, first.metrics.browser.version);
@@ -701,6 +757,108 @@ test('diagnostic comparison preserves evaluator-valid canonical metrics drift', 
   assert.equal(diagnostic.metricsB.toString(), `${canonicalJson(second.metrics)}\n`);
   assert.equal(diagnostic.report.canonicalMetricsSha256.runA, sha256(diagnostic.metricsA));
   assert.equal(diagnostic.report.canonicalMetricsSha256.runB, sha256(diagnostic.metricsB));
+});
+
+test('diagnostic rejection preserves a fractional render observation verbatim', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-fractional-observation-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withoutDiagnosticEnvironment(t);
+  const first = comparisonRun(
+    terminalResultSemanticState(),
+    terminalResultRenderObservation(1.5, '9df398c6'),
+  );
+  const second = comparisonRun(
+    terminalResultSemanticState(),
+    terminalResultRenderObservation(0, '02187e45'),
+  );
+
+  await assert.rejects(
+    portCommand.compareRuns(
+      first,
+      second,
+      passiveComparisonDeadline(),
+      { diagnosticDirectory },
+    ),
+    /Caribbean port identity evidence failed/,
+  );
+
+  const diagnostic = diagnosticManifest(diagnosticDirectory);
+  assert.equal(
+    diagnostic.report.renderObservations.runA.framebufferSample.nonzeroSampleChannels,
+    1.5,
+  );
+  assert.equal(
+    JSON.parse(diagnostic.metricsA).screenshotEvidence.observation
+      .runA.renderObservation.framebufferSample.nonzeroSampleChannels,
+    1.5,
+  );
+  assert.equal(
+    diagnostic.report.firstDifferingPaths.renderObservation,
+    '/framebufferSample/nonzeroSampleChannels',
+  );
+});
+
+test('explicit diagnostic comparison opts in without an environment variable', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-explicit-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withoutDiagnosticEnvironment(t);
+  const { first, second } = semanticDriftComparisonRuns();
+
+  await assert.rejects(
+    portCommand.compareRuns(first, second, passiveComparisonDeadline(), { diagnosticDirectory }),
+    (error) => {
+      assert.equal(error.message, SEMANTIC_GATE_ERROR);
+      return true;
+    },
+  );
+
+  assertCompleteDiagnosticFileSet(diagnosticDirectory);
+  const diagnostic = diagnosticManifest(diagnosticDirectory);
+  assert.equal(diagnostic.report.canonicalJsonEqual, true);
+  assert.deepEqual(diagnostic.report.firstDifferingPaths, {
+    semanticState: '/canvas/backend/renderer',
+    renderObservation: null,
+    canonicalMetrics: null,
+  });
+});
+
+test('diagnostic comparison preserves canonical bytes and a null pointer for insertion-order-only raw metrics drift', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-raw-metrics-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withoutDiagnosticEnvironment(t);
+  const { first, second } = measuredComparisonRuns();
+  second.metrics.browser = {
+    version: second.metrics.browser.version,
+    name: second.metrics.browser.name,
+  };
+
+  await assert.rejects(
+    portCommand.compareRuns(first, second, passiveComparisonDeadline(), { diagnosticDirectory }),
+    (error) => {
+      assert.equal(
+        error.message,
+        'Two clean browser runs produced different metrics.json bytes; canonicalJsonEqual=true; firstDifferingPath=null',
+      );
+      return true;
+    },
+  );
+
+  const diagnostic = diagnosticManifest(diagnosticDirectory);
+  assert.equal(diagnostic.report.canonicalJsonEqual, true);
+  assert.equal(diagnostic.report.firstDifferingPaths.canonicalMetrics, null);
+  assert.deepEqual(diagnostic.metricsA, diagnostic.metricsB);
+  assert.equal(diagnostic.report.canonicalMetricsSha256.runA, sha256(diagnostic.metricsA));
+  assert.equal(diagnostic.report.canonicalMetricsSha256.runB, sha256(diagnostic.metricsB));
+  assert.deepEqual(diagnostic.report.renderObservations, {
+    runA: first.screenshotRenderObservations.get(TERMINAL_RESULT_SCREENSHOT),
+    runB: second.screenshotRenderObservations.get(TERMINAL_RESULT_SCREENSHOT),
+  });
 });
 
 test('diagnostic comparison preserves non-exempt buffer drift before comparator rejection', async (t) => {
@@ -734,8 +892,10 @@ test('diagnostic comparison preserves non-exempt buffer drift before comparator 
   });
   assert.deepEqual(diagnostic.report.firstDifferingPaths, {
     semanticState: null,
+    renderObservation: null,
     canonicalMetrics: null,
   });
+  assert.equal(diagnostic.report.canonicalJsonEqual, true);
   assert.equal(diagnostic.report.sha256.runA, sha256(diagnostic.pngA));
   assert.equal(diagnostic.report.sha256.runB, sha256(diagnostic.pngB));
   assert.deepEqual(diagnostic.pngA, diagnostic.pngB);
@@ -822,8 +982,10 @@ test('diagnostic comparison preserves comparator setup errors when terminal data
   });
   assert.deepEqual(diagnostic.report.firstDifferingPaths, {
     semanticState: null,
+    renderObservation: null,
     canonicalMetrics: null,
   });
+  assert.equal(diagnostic.report.canonicalJsonEqual, true);
 });
 
 test('diagnostic first-difference paths follow RFC 6901 escaping and edge rules', async (t) => {
@@ -915,6 +1077,7 @@ test('diagnostic first-difference paths follow RFC 6901 escaping and edge rules'
       fixture.name,
     );
     assert.equal(diagnostic.report.firstDifferingPaths.canonicalMetrics, null, fixture.name);
+    assert.equal(diagnostic.report.firstDifferingPaths.renderObservation, null, fixture.name);
   }
 });
 
@@ -939,7 +1102,75 @@ test('diagnostic-enabled compare success clears stale artifacts until selected p
   assert.equal(fs.existsSync(diagnosticDirectory), false);
 });
 
-test('diagnostic-enabled successful compare and writer atomically preserve selected run A', async (t) => {
+test('comparison snapshots render declarations independently from the live run maps', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-observation-ownership-'));
+  const outputDirectory = path.join(temporary, 'output');
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  fs.mkdirSync(outputDirectory);
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withoutDiagnosticEnvironment(t);
+  const { first, second } = measuredComparisonRuns();
+  const liveRunA = first.screenshotRenderObservations.get(TERMINAL_RESULT_SCREENSHOT);
+  const liveRunB = second.screenshotRenderObservations.get(TERMINAL_RESULT_SCREENSHOT);
+  const liveStateA = first.screenshotStates.get(TERMINAL_RESULT_SCREENSHOT);
+  const liveStateB = second.screenshotStates.get(TERMINAL_RESULT_SCREENSHOT);
+
+  const comparisonResult = await portCommand.compareRuns(
+    first,
+    second,
+    passiveComparisonDeadline(),
+    { diagnosticDirectory },
+  );
+  const declaredRunA = comparisonResult.comparison.screenshotEvidence
+    .observation.runA.renderObservation;
+  const declaredRunB = comparisonResult.comparison.screenshotEvidence
+    .observation.runB.renderObservation;
+  const declaredStateA = comparisonResult.comparison.screenshotEvidence
+    .observation.runA.semanticState;
+  const declaredStateB = comparisonResult.comparison.screenshotEvidence
+    .observation.runB.semanticState;
+  const serializedMetrics = JSON.parse(comparisonResult.metricsBytes);
+  const serializedRunA = serializedMetrics.screenshotEvidence.observation.runA.renderObservation;
+
+  assert.notEqual(liveRunA, declaredRunA);
+  assert.notEqual(liveRunA.framebufferSample, declaredRunA.framebufferSample);
+  assert.notEqual(liveRunB, declaredRunB);
+  assert.notEqual(liveRunB.framebufferSample, declaredRunB.framebufferSample);
+  assert.notEqual(liveStateA, declaredStateA);
+  assert.notEqual(liveStateA.canvas, declaredStateA.canvas);
+  assert.notEqual(liveStateB, declaredStateB);
+  assert.notEqual(liveStateB.canvas, declaredStateB.canvas);
+  assert.notEqual(declaredRunA, declaredRunB);
+  assert.notEqual(declaredRunA.framebufferSample, declaredRunB.framebufferSample);
+  assert.notEqual(declaredStateA, declaredStateB);
+  assert.notEqual(declaredStateA.canvas, declaredStateB.canvas);
+  assert.deepEqual(declaredRunA, serializedRunA);
+  assert.equal(Object.isFrozen(declaredRunA), true);
+  assert.equal(Object.isFrozen(declaredRunA.framebufferSample), true);
+
+  liveRunA.framebufferSample.sampleHash = 'deadbeef';
+  assert.equal(declaredRunA.framebufferSample.sampleHash, '9df398c6');
+  assert.equal(serializedRunA.framebufferSample.sampleHash, '9df398c6');
+
+  await assert.rejects(
+    portCommand.publishSuccessfulNormalRouteComparison({
+      first,
+      second,
+      comparisonResult,
+      outputDirectory,
+      deadline: passiveComparisonDeadline(),
+    }),
+    /successful diagnostic runA render observation differs from metrics/,
+  );
+  assert.equal(fs.existsSync(diagnosticDirectory), false);
+  assert.deepEqual(
+    fs.readFileSync(path.join(outputDirectory, 'metrics.json')),
+    comparisonResult.metricsBytes,
+  );
+});
+
+test('diagnostic-enabled successful compare and writer atomically preserve selected run A and both render observations', async (t) => {
   const portCommand = await import('../caribbean-port-check.mjs');
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-success-diagnostic-'));
   const outputDirectory = path.join(temporary, 'output');
@@ -947,8 +1178,7 @@ test('diagnostic-enabled successful compare and writer atomically preserve selec
   fs.mkdirSync(outputDirectory);
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
   withDiagnosticEnvironment(t);
-  const first = comparisonRun();
-  const second = comparisonRun();
+  const { first, second } = measuredComparisonRuns();
   const runA = Buffer.from(first.screenshots.get(TERMINAL_RESULT_SCREENSHOT));
   const runB = Buffer.from(second.screenshots.get('port-desktop.png'));
   assert.equal(runA.equals(runB), false, 'the fixture must distinguish A from B');
@@ -960,6 +1190,8 @@ test('diagnostic-enabled successful compare and writer atomically preserve selec
     passiveComparisonDeadline(),
     { diagnosticDirectory },
   );
+  const expectedPrettyMetrics = Buffer.from(`${JSON.stringify(first.metrics, null, 2)}\n`);
+  assert.deepEqual(comparisonResult.metricsBytes, expectedPrettyMetrics);
   assert.equal(comparisonResult.comparison.ok, true);
   assert.equal(comparisonResult.comparison.selectedRun, 'A');
   assert.equal(fs.existsSync(diagnosticDirectory), false,
@@ -982,14 +1214,20 @@ test('diagnostic-enabled successful compare and writer atomically preserve selec
   assert.deepEqual(diagnostic.report.failure, null);
   assert.deepEqual(diagnostic.report.firstDifferingPaths, {
     semanticState: null,
+    renderObservation: '/framebufferSample/nonzeroSampleChannels',
     canonicalMetrics: null,
   });
+  assert.equal(diagnostic.report.canonicalJsonEqual, true);
   assert.equal(diagnostic.report.sha256.runA, observation.runA.pngSha256);
   assert.equal(diagnostic.report.sha256.runB, observation.runB.pngSha256);
   assert.equal(diagnostic.report.semanticDigest.runA, observation.runA.semanticDigest);
   assert.equal(diagnostic.report.semanticDigest.runB, observation.runB.semanticDigest);
   assert.deepEqual(diagnostic.report.runA, observation.runA.semanticState);
   assert.deepEqual(diagnostic.report.runB, observation.runB.semanticState);
+  assert.deepEqual(diagnostic.report.renderObservations, {
+    runA: observation.runA.renderObservation,
+    runB: observation.runB.renderObservation,
+  });
   assert.equal(diagnostic.metricsA.toString(), `${canonicalJson(first.metrics)}\n`);
   assert.equal(diagnostic.metricsB.toString(), `${canonicalJson(second.metrics)}\n`);
 
@@ -1000,7 +1238,11 @@ test('diagnostic-enabled successful compare and writer atomically preserve selec
   assert.deepEqual(manifest, {
     selectedRun: 'A',
     artifacts: expectedArtifacts,
-    metricsSha256: sha256(comparisonResult.metricsBytes),
+    metricsSha256: sha256(expectedPrettyMetrics),
+    renderObservations: {
+      runA: observation.runA.renderObservation,
+      runB: observation.runB.renderObservation,
+    },
   });
   assert.equal(publication.metricsSha256, manifest.metricsSha256);
   assert.equal(publication.artifactHashes.size, 23);
@@ -1019,9 +1261,10 @@ test('diagnostic-enabled successful compare and writer atomically preserve selec
     false,
   );
   assert.equal(
-    sha256(fs.readFileSync(path.join(outputDirectory, 'metrics.json'))),
-    manifest.metricsSha256,
+    fs.readFileSync(path.join(outputDirectory, 'metrics.json')).equals(expectedPrettyMetrics),
+    true,
   );
+  assert.equal(sha256(expectedPrettyMetrics), manifest.metricsSha256);
 });
 
 test('diagnostics-off successful compare and writer leave no diagnostic bundle', async (t) => {
@@ -1038,7 +1281,6 @@ test('diagnostics-off successful compare and writer leave no diagnostic bundle',
     first,
     second,
     passiveComparisonDeadline(),
-    { diagnosticDirectory },
   );
 
   const publication = await portCommand.publishSuccessfulNormalRouteComparison({
@@ -1631,12 +1873,6 @@ test('real NavalSession obeys installed clock boundaries', { timeout: 600_000 },
           vendor: result.screenshotStates.get('campaign-result-desktop.png').canvas.backend.vendor,
           renderer: result.screenshotStates.get('campaign-result-desktop.png').canvas.backend.renderer,
         },
-        framebufferSample: {
-          algorithm: 'fnv1a32-rgba-grid-v1',
-          sampleCount: 40,
-          nonzeroSampleChannels: result.screenshotStates.get('campaign-result-desktop.png').canvas.framebufferSample.nonzeroSampleChannels,
-          sampleHash: result.screenshotStates.get('campaign-result-desktop.png').canvas.framebufferSample.sampleHash,
-        },
       },
       terminal: {
         outcome: 'boarding-ready', victorShipId: 'player', atTick: 11_855, seedAfter: 1_310_878_278,
@@ -1647,7 +1883,36 @@ test('real NavalSession obeys installed clock boundaries', { timeout: 600_000 },
   );
   assert.ok(result.screenshotStates.get('campaign-result-desktop.png').canvas.backend.vendor.length > 0);
   assert.ok(result.screenshotStates.get('campaign-result-desktop.png').canvas.backend.renderer.length > 0);
-  assert.match(result.screenshotStates.get('campaign-result-desktop.png').canvas.framebufferSample.sampleHash, /^[a-f0-9]{8}$/);
+  assert.deepEqual(
+    result.screenshotRenderObservations.get('campaign-result-desktop.png'),
+    {
+      kind: 'post-present-default-framebuffer-readpixels',
+      framebufferSample: {
+        algorithm: 'fnv1a32-rgba-grid-v1',
+        sampleCount: 40,
+        nonzeroSampleChannels: result.screenshotRenderObservations
+          .get('campaign-result-desktop.png').framebufferSample.nonzeroSampleChannels,
+        sampleHash: result.screenshotRenderObservations
+          .get('campaign-result-desktop.png').framebufferSample.sampleHash,
+      },
+    },
+  );
+  assert.ok(Number.isInteger(
+    result.screenshotRenderObservations
+      .get('campaign-result-desktop.png').framebufferSample.nonzeroSampleChannels,
+  ));
+  assert.ok(
+    result.screenshotRenderObservations
+      .get('campaign-result-desktop.png').framebufferSample.nonzeroSampleChannels >= 0,
+  );
+  assert.ok(
+    result.screenshotRenderObservations
+      .get('campaign-result-desktop.png').framebufferSample.nonzeroSampleChannels <= 160,
+  );
+  assert.match(
+    result.screenshotRenderObservations.get('campaign-result-desktop.png').framebufferSample.sampleHash,
+    /^[a-f0-9]{8}$/,
+  );
 
   const truncatedTrace = structuredClone(trace);
   truncatedTrace.segments = truncatedTrace.segments.slice(0, 3);
@@ -1662,6 +1927,153 @@ test('real NavalSession obeys installed clock boundaries', { timeout: 600_000 },
     }),
     /Normal-route naval victory was not reached/,
   );
+});
+
+test('programmatic port evidence validates explicit diagnostic destinations before build', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  const trackedDirectory = path.resolve('docs/screenshots/caribbean-port');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-programmatic-diagnostic-'));
+  const outside = path.join(temporary, 'outside');
+  const symlink = path.join(temporary, 'diagnostic-link');
+  fs.mkdirSync(outside);
+  fs.symlinkSync(outside, symlink, 'dir');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withoutDiagnosticEnvironment(t);
+
+  assert.equal(typeof portCommand.validateProgrammaticPortDiagnosticDestination, 'function');
+  const validDiagnostic = path.join(temporary, 'diagnostic');
+  assert.equal(
+    portCommand.validateProgrammaticPortDiagnosticDestination(validDiagnostic),
+    path.join(fs.realpathSync(temporary), 'diagnostic'),
+  );
+  const canonicalValidDiagnostic = portCommand
+    .validateProgrammaticPortDiagnosticDestination(validDiagnostic);
+  assert.equal(
+    portCommand.validateProgrammaticPortDiagnosticDestination(canonicalValidDiagnostic),
+    canonicalValidDiagnostic,
+  );
+  assert.throws(
+    () => portCommand.validateProgrammaticPortDiagnosticDestination(''),
+    /diagnostic directory is invalid/,
+  );
+  assert.throws(
+    () => portCommand.validateProgrammaticPortDiagnosticDestination(trackedDirectory),
+    /child of a temporary root/,
+  );
+  assert.throws(
+    () => portCommand.validateProgrammaticPortDiagnosticDestination(symlink),
+    /cannot be a symbolic link/,
+  );
+  assert.throws(
+    () => portCommand.validateProgrammaticPortDiagnosticDestination(path.join(temporary, 'missing', 'diagnostic')),
+    /parent does not exist/,
+  );
+
+  await assert.rejects(
+    portCommand.runPortCheck({ outputDirectory: trackedDirectory, diagnosticDirectory: '' }),
+    /diagnostic directory is invalid/,
+  );
+  await assert.rejects(
+    portCommand.runPortCheck({ outputDirectory: trackedDirectory, diagnosticDirectory: symlink }),
+    /cannot be a symbolic link/,
+  );
+  await assert.rejects(
+    portCommand.runPortCheck({ outputDirectory: trackedDirectory, diagnosticDirectory: trackedDirectory }),
+    /child of a temporary root/,
+  );
+  await assert.rejects(
+    portCommand.runPortCheck({ outputDirectory: trackedDirectory }),
+    /tracked docs/,
+  );
+  assert.equal(fs.existsSync(validDiagnostic), false);
+});
+
+test('programmatic output and diagnostic destinations are disjoint before build', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-disjoint-destinations-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withoutDiagnosticEnvironment(t);
+  const previousPath = process.env.PATH;
+  const emptyPath = path.join(temporary, 'empty-path');
+  fs.mkdirSync(emptyPath);
+  process.env.PATH = emptyPath;
+  t.after(() => {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+  });
+
+  const equal = path.join(temporary, 'equal');
+  const diagnosticParent = path.join(temporary, 'diagnostic-parent');
+  const parentOutput = path.join(diagnosticParent, 'output');
+  const childOutput = path.join(temporary, 'child-output');
+  const diagnosticChild = path.join(childOutput, 'diagnostic');
+  for (const directory of [equal, parentOutput, diagnosticChild]) {
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, 'sentinel.txt'), `sentinel:${directory}`);
+  }
+
+  const fixtures = [
+    { name: 'equal', outputDirectory: equal, diagnosticDirectory: equal },
+    {
+      name: 'diagnostic parent',
+      outputDirectory: parentOutput,
+      diagnosticDirectory: diagnosticParent,
+    },
+    {
+      name: 'diagnostic child',
+      outputDirectory: childOutput,
+      diagnosticDirectory: diagnosticChild,
+    },
+  ];
+  const caseAliasOutput = path.join(temporary, 'Case-Alias');
+  const caseAliasDiagnostic = path.join(temporary, 'case-alias');
+  fs.mkdirSync(caseAliasOutput);
+  fs.writeFileSync(path.join(caseAliasOutput, 'sentinel.txt'), `sentinel:${caseAliasOutput}`);
+  if (fs.statSync(caseAliasDiagnostic, { throwIfNoEntry: false })?.isDirectory()
+    && fs.realpathSync(caseAliasDiagnostic) === fs.realpathSync(caseAliasOutput)) {
+    assert.equal(
+      portCommand.validateProgrammaticPortDiagnosticDestination(caseAliasDiagnostic),
+      fs.realpathSync(caseAliasOutput),
+    );
+    fixtures.push({
+      name: 'existing diagnostic case alias',
+      outputDirectory: caseAliasOutput,
+      diagnosticDirectory: caseAliasDiagnostic,
+    });
+  }
+  let buildCalls = 0;
+  for (const fixture of fixtures) {
+    await assert.rejects(
+      portCommand.runPortCheckOperation({
+        outputDirectory: fixture.outputDirectory,
+        diagnosticDirectory: fixture.diagnosticDirectory,
+        signal: new AbortController().signal,
+        dependencies: {
+          build: async () => {
+            buildCalls += 1;
+            throw new Error('build must not run for overlapping destinations');
+          },
+        },
+      }),
+      /programmatic port output and diagnostic directories must be disjoint/,
+      fixture.name,
+    );
+    await assert.rejects(
+      portCommand.runPortCheck({
+        outputDirectory: fixture.outputDirectory,
+        diagnosticDirectory: fixture.diagnosticDirectory,
+      }),
+      /programmatic port output and diagnostic directories must be disjoint/,
+      `public ${fixture.name}`,
+    );
+  }
+  assert.equal(buildCalls, 0);
+  for (const directory of [equal, parentOutput, diagnosticChild, caseAliasOutput]) {
+    assert.equal(
+      fs.readFileSync(path.join(directory, 'sentinel.txt'), 'utf8'),
+      `sentinel:${directory}`,
+    );
+  }
 });
 
 test('programmatic port evidence rejects descendants and symlink aliases of tracked evidence', async () => {
@@ -1753,14 +2165,18 @@ test('programmatic port evidence rejects descendants and symlink aliases of trac
   assert.deepEqual(fileHashes(trackedDirectory), trackedBefore);
 });
 
-test('full two-run port gate publishes only comparator-selected run A into a temporary destination', { timeout: 1_020_000 }, async (t) => {
+test('full two-run port gate forwards explicit diagnostics and publishes only comparator-selected run A', { timeout: 1_020_000 }, async (t) => {
   const portCommand = await import('../caribbean-port-check.mjs');
   const trackedDirectory = path.resolve('docs/screenshots/caribbean-port');
   const trackedBefore = fileHashes(trackedDirectory);
-  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-two-run-'));
-  t.after(() => fs.rmSync(outputDirectory, { recursive: true, force: true }));
+  const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-two-run-'));
+  const outputDirectory = path.join(operationRoot, 'output');
+  const diagnosticDirectory = path.join(operationRoot, 'diagnostic');
+  fs.mkdirSync(outputDirectory);
+  t.after(() => fs.rmSync(operationRoot, { recursive: true, force: true }));
+  withoutDiagnosticEnvironment(t);
 
-  const result = await portCommand.runPortCheck({ outputDirectory });
+  const result = await portCommand.runPortCheck({ outputDirectory, diagnosticDirectory });
   assert.equal(result.comparison.ok, true);
   assert.equal(result.comparison.selectedRun, 'A');
   assert.equal(result.comparison.selectedArtifacts.size, 23);
@@ -1787,5 +2203,20 @@ test('full two-run port gate publishes only comparator-selected run A into a tem
     result.metrics.screenshotEvidence.observation.runA.semanticState,
     result.metrics.screenshotEvidence.observation.runB.semanticState,
   );
+  const expectedPrettyMetrics = Buffer.from(`${JSON.stringify(result.metrics, null, 2)}\n`);
+  assert.deepEqual(fs.readFileSync(path.join(outputDirectory, 'metrics.json')), expectedPrettyMetrics);
+  assertCompleteSuccessDiagnosticFileSet(diagnosticDirectory);
+  const diagnostic = diagnosticManifest(diagnosticDirectory);
+  const manifest = selectedPublicationManifest(diagnosticDirectory);
+  const { runA, runB } = result.metrics.screenshotEvidence.observation;
+  assert.deepEqual(diagnostic.report.renderObservations, {
+    runA: runA.renderObservation,
+    runB: runB.renderObservation,
+  });
+  assert.deepEqual(manifest.renderObservations, diagnostic.report.renderObservations);
+  assert.equal(manifest.metricsSha256, sha256(expectedPrettyMetrics));
+  assert.equal(diagnostic.report.canonicalJsonEqual, true);
+  assert.equal(diagnostic.report.firstDifferingPaths.semanticState, null);
+  assert.equal(diagnostic.report.firstDifferingPaths.canonicalMetrics, null);
   assert.deepEqual(fileHashes(trackedDirectory), trackedBefore);
 });

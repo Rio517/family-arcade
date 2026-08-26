@@ -150,6 +150,18 @@ function canonicalJson(value) {
   return JSON.stringify(visit(value));
 }
 
+function immutableJsonSnapshot(value) {
+  const snapshot = structuredClone(value);
+  const freeze = (candidate) => {
+    if (candidate === null || typeof candidate !== 'object' || Object.isFrozen(candidate)) {
+      return candidate;
+    }
+    for (const child of Object.values(candidate)) freeze(child);
+    return Object.freeze(candidate);
+  };
+  return freeze(snapshot);
+}
+
 function checksumPayload(payload) {
   let hash = 0x811c9dc5;
   for (const byte of new TextEncoder().encode(canonicalJson(payload))) {
@@ -1373,17 +1385,22 @@ async function readBattleCaptureState(page) {
     let sampleHash = 2_166_136_261;
     for (const value of pixels) sampleHash = Math.imul(sampleHash ^ value, 16_777_619) >>> 0;
     return {
-      tick: Number(elapsed?.getAttribute('data-battle-tick')),
-      resultVisible: resultAction instanceof HTMLElement && resultAction.offsetParent !== null,
-      canvas: {
-        width: canvas.width,
-        height: canvas.height,
-        rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-        drawingBuffer: { width: gl.drawingBufferWidth, height: gl.drawingBufferHeight },
-        opacity: style.opacity,
-        transform: style.transform,
-        engine: canvas.dataset.engine ?? '',
-        backend: { vendor, renderer },
+      semanticState: {
+        tick: Number(elapsed?.getAttribute('data-battle-tick')),
+        resultVisible: resultAction instanceof HTMLElement && resultAction.offsetParent !== null,
+        canvas: {
+          width: canvas.width,
+          height: canvas.height,
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          drawingBuffer: { width: gl.drawingBufferWidth, height: gl.drawingBufferHeight },
+          opacity: style.opacity,
+          transform: style.transform,
+          engine: canvas.dataset.engine ?? '',
+          backend: { vendor, renderer },
+        },
+      },
+      renderObservation: {
+        kind: 'post-present-default-framebuffer-readpixels',
         framebufferSample: {
           algorithm: 'fnv1a32-rgba-grid-v1',
           sampleCount: pixels.length / 4,
@@ -2179,6 +2196,7 @@ export async function runStrategicSailingJourney({
   recordFailures(page, baseUrl, failures);
   const screenshots = new Map();
   const screenshotStates = new Map();
+  const screenshotRenderObservations = new Map();
   const accessibilitySamples = [];
   const modeSequence = [];
   let firstEncounterEnvelope;
@@ -2356,8 +2374,9 @@ export async function runStrategicSailingJourney({
     const opponentSystems = await readRenderedSystems(page, 'Red Jackdaw systems');
     invariant(canonicalJson(playerSystems) === canonicalJson({ hull: 78, sails: 61, crew: 44, cannon: 8 }), `strategic final player systems drifted: ${canonicalJson(playerSystems)}`);
     invariant(canonicalJson(opponentSystems) === canonicalJson({ hull: 88, sails: 14, crew: 9, cannon: 8 }), `strategic final opponent systems drifted: ${canonicalJson(opponentSystems)}`);
+    const terminalCapture = await readBattleCaptureState(page);
     const terminalCaptureState = {
-      ...await readBattleCaptureState(page),
+      ...terminalCapture.semanticState,
       terminal: {
         outcome: terminal.outcome.kind,
         victorShipId: terminal.outcome.victorShipId,
@@ -2370,6 +2389,10 @@ export async function runStrategicSailingJourney({
     tickAtTerminalCapture = terminalCaptureState.tick;
     invariant(tickAtTerminalCapture === 11_855, `terminal capture tick was ${tickAtTerminalCapture}`);
     screenshotStates.set('campaign-result-desktop.png', terminalCaptureState);
+    screenshotRenderObservations.set(
+      'campaign-result-desktop.png',
+      terminalCapture.renderObservation,
+    );
     await maybeCapture('campaign-result-desktop.png', true);
     accessibilitySamples.push(await readStrategicSurface(page));
     terminalBoundaryTrace = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), TRACE_KEY);
@@ -2578,6 +2601,7 @@ export async function runStrategicSailingJourney({
       fixtures: { nowConsumed: routeNowConsumed },
       screenshotBytes: screenshots,
       screenshotStates,
+      screenshotRenderObservations,
     };
   } finally {
     await context.close();
@@ -3292,17 +3316,21 @@ function pinMismatchDiagnosticDirectory(directory) {
   invariant(typeof directory === 'string' && directory.trim().length > 0,
     'port mismatch diagnostic directory is invalid');
   const lexical = path.resolve(directory);
-  const anchor = mismatchDiagnosticTrustedAnchors()
-    .filter((candidate) => lexical !== candidate.lexical && insideDirectory(lexical, candidate.lexical))
-    .sort((left, right) => right.lexical.length - left.lexical.length)[0];
-  invariant(anchor !== undefined,
+  const anchorMatch = mismatchDiagnosticTrustedAnchors()
+    .flatMap((anchor) => [...new Set([anchor.lexical, anchor.real])].map((base) => ({
+      anchor,
+      base,
+    })))
+    .filter(({ base }) => lexical !== base && insideDirectory(lexical, base))
+    .sort((left, right) => right.base.length - left.base.length)[0];
+  invariant(anchorMatch !== undefined,
     'port mismatch diagnostic directory must be a child of a temporary root');
-  const components = path.relative(anchor.lexical, lexical).split(path.sep).filter(Boolean);
+  const components = path.relative(anchorMatch.base, lexical).split(path.sep).filter(Boolean);
   invariant(components.length > 0, 'port mismatch diagnostic directory is invalid');
   const basename = components.at(-1);
   invariant(basename === path.basename(basename) && basename !== '.' && basename !== '..',
     'port mismatch diagnostic directory basename is invalid');
-  let parentReal = anchor.real;
+  let parentReal = anchorMatch.anchor.real;
   for (const component of components.slice(0, -1)) {
     const candidate = path.join(parentReal, component);
     const status = fs.lstatSync(candidate, { throwIfNoEntry: false });
@@ -3316,13 +3344,36 @@ function pinMismatchDiagnosticDirectory(directory) {
   }
   invariant(fs.realpathSync(parentReal) === parentReal,
     'port mismatch diagnostic directory parent changed during validation');
-  const outputDirectory = path.join(parentReal, basename);
-  const status = fs.lstatSync(outputDirectory, { throwIfNoEntry: false });
+  const candidateOutputDirectory = path.join(parentReal, basename);
+  const status = fs.lstatSync(candidateOutputDirectory, { throwIfNoEntry: false });
   invariant(status === undefined || !status.isSymbolicLink(),
     'port mismatch diagnostic directory cannot be a symbolic link');
   invariant(status === undefined || status.isDirectory(),
     'port mismatch diagnostic path is not a directory');
-  return { lexical, parentReal, basename, outputDirectory };
+  const outputDirectory = status === undefined
+    ? candidateOutputDirectory
+    : fs.realpathSync(candidateOutputDirectory);
+  invariant(path.dirname(outputDirectory) === parentReal,
+    'port mismatch diagnostic directory escaped its pinned parent');
+  return {
+    lexical: status === undefined ? lexical : outputDirectory,
+    parentReal,
+    basename: path.basename(outputDirectory),
+    outputDirectory,
+  };
+}
+
+export function validateProgrammaticPortDiagnosticDestination(diagnosticDirectory) {
+  return pinMismatchDiagnosticDirectory(diagnosticDirectory).outputDirectory;
+}
+
+function validateDisjointPortDestinations(outputDirectory, diagnosticDirectory) {
+  if (diagnosticDirectory === undefined) return;
+  invariant(
+    !insideDirectory(outputDirectory, diagnosticDirectory)
+      && !insideDirectory(diagnosticDirectory, outputDirectory),
+    'programmatic port output and diagnostic directories must be disjoint',
+  );
 }
 
 function revalidateMismatchDiagnosticDirectory(pin) {
@@ -3448,6 +3499,8 @@ async function createScreenshotDiagnosticBundle(filename, first, second, failure
     'port mismatch diagnostic run-B terminal bytes are unavailable');
   const firstState = first.screenshotStates.get(filename) ?? null;
   const secondState = second.screenshotStates.get(filename) ?? null;
+  const firstRenderObservation = first.screenshotRenderObservations?.get(filename) ?? null;
+  const secondRenderObservation = second.screenshotRenderObservations?.get(filename) ?? null;
   const firstCanonicalMetrics = Buffer.from(`${canonicalJson(first.metrics)}\n`);
   const secondCanonicalMetrics = Buffer.from(`${canonicalJson(second.metrics)}\n`);
   const firstSemanticDigest = createHash('sha256').update(canonicalJson(firstState)).digest('hex');
@@ -3469,13 +3522,22 @@ async function createScreenshotDiagnosticBundle(filename, first, second, failure
       runA: createHash('sha256').update(firstCanonicalMetrics).digest('hex'),
       runB: createHash('sha256').update(secondCanonicalMetrics).digest('hex'),
     },
+    canonicalJsonEqual: firstCanonicalMetrics.equals(secondCanonicalMetrics),
     semanticDigest: {
       runA: firstSemanticDigest,
       runB: secondSemanticDigest,
     },
     firstDifferingPaths: {
       semanticState: firstDifferingJsonPointer(firstState, secondState),
+      renderObservation: firstDifferingJsonPointer(
+        firstRenderObservation,
+        secondRenderObservation,
+      ),
       canonicalMetrics: firstDifferingJsonPointer(first.metrics, second.metrics),
+    },
+    renderObservations: {
+      runA: firstRenderObservation,
+      runB: secondRenderObservation,
     },
     pixelStats,
     runA: firstState,
@@ -3516,7 +3578,8 @@ function createNormalRouteScreenshotEvidence(first, second) {
   const createObservation = (run) => {
     const bytes = run.screenshots.get(filename);
     const semanticState = run.screenshotStates.get(filename);
-    return {
+    const renderObservation = run.screenshotRenderObservations.get(filename);
+    return immutableJsonSnapshot({
       pngSignatureVerified: true,
       nonzeroBytes: bytes.length > 0,
       width: 1440,
@@ -3524,9 +3587,10 @@ function createNormalRouteScreenshotEvidence(first, second) {
       pngSha256: createHash('sha256').update(bytes).digest('hex'),
       semanticDigest: createHash('sha256').update(canonicalJson(semanticState)).digest('hex'),
       semanticState,
-    };
+      renderObservation,
+    });
   };
-  return {
+  return immutableJsonSnapshot({
     expectedCount: 23,
     byteComparedCount: 22,
     comparisonExceptionNames: [filename],
@@ -3540,7 +3604,7 @@ function createNormalRouteScreenshotEvidence(first, second) {
       runA: createObservation(first),
       runB: createObservation(second),
     },
-  };
+  });
 }
 
 function normalRouteScreenshotRun(run, tag) {
@@ -3552,6 +3616,10 @@ function normalRouteScreenshotRun(run, tag) {
     semanticStates: new Map([[
       'campaign-result-desktop.png',
       run.screenshotStates.get('campaign-result-desktop.png'),
+    ]]),
+    renderObservations: new Map([[
+      'campaign-result-desktop.png',
+      run.screenshotRenderObservations.get('campaign-result-desktop.png'),
     ]]),
     checks: {
       routeFailures: 0,
@@ -3567,13 +3635,19 @@ export async function compareRuns(
   first,
   second,
   deadline,
-  {
-    diagnosticDirectory = MISMATCH_DIAGNOSTIC_DIRECTORY,
-    diagnosticCheckpoint = () => {},
-    diagnosticRename = fs.renameSync,
-  } = {},
+  options = {},
 ) {
-  const diagnosticsEnabled = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1';
+  const explicitDiagnosticDirectory = Object.prototype.hasOwnProperty.call(
+    options,
+    'diagnosticDirectory',
+  );
+  const diagnosticDirectory = explicitDiagnosticDirectory
+    ? options.diagnosticDirectory
+    : MISMATCH_DIAGNOSTIC_DIRECTORY;
+  const diagnosticCheckpoint = options.diagnosticCheckpoint ?? (() => {});
+  const diagnosticRename = options.diagnosticRename ?? fs.renameSync;
+  const diagnosticsEnabled = explicitDiagnosticDirectory
+    || process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1';
   const diagnosticPin = diagnosticsEnabled
     ? pinMismatchDiagnosticDirectory(diagnosticDirectory)
     : null;
@@ -3658,13 +3732,18 @@ export async function compareRuns(
     return rejectFailure({ stage: 'canonical-metrics', run: null, issues: failureIssues(error) }, error);
   }
   if (!firstMetrics.equals(secondMetrics)) {
+    const firstCanonicalMetrics = Buffer.from(`${canonicalJson(first.metrics)}\n`);
+    const secondCanonicalMetrics = Buffer.from(`${canonicalJson(second.metrics)}\n`);
+    const canonicalJsonEqual = firstCanonicalMetrics.equals(secondCanonicalMetrics);
+    const firstDifferingPath = firstDifferingJsonPointer(first.metrics, second.metrics);
+    const gateMessage = `Two clean browser runs produced different metrics.json bytes; canonicalJsonEqual=${canonicalJsonEqual}; firstDifferingPath=${String(firstDifferingPath)}`;
     return rejectFailure(
       {
         stage: 'canonical-metrics',
         run: null,
         issues: ['Two clean browser runs produced different metrics.json bytes'],
       },
-      new Error('Two clean browser runs produced different metrics.json bytes'),
+      new Error(gateMessage),
     );
   }
   return {
@@ -3736,11 +3815,42 @@ function verifySelectedRunAPublication({
   const metricsSha256 = createHash('sha256').update(writtenMetrics).digest('hex');
   invariant(metricsSha256 === publication.metricsSha256,
     'successful diagnostic publication metrics hash drifted');
-  return { selectedRun: 'A', artifacts, metricsSha256 };
+  let serializedMetrics;
+  try {
+    serializedMetrics = immutableJsonSnapshot(JSON.parse(writtenMetrics.toString('utf8')));
+  } catch (error) {
+    throw new Error('successful diagnostic publication metrics are not valid JSON', { cause: error });
+  }
+  const serializedEvidence = serializedMetrics.screenshotEvidence;
+  invariant(canonicalJson(serializedEvidence) === canonicalJson(comparison.screenshotEvidence),
+    'successful diagnostic screenshot evidence differs from published metrics');
+  const observation = serializedEvidence?.observation;
+  invariant(observation?.filename === 'campaign-result-desktop.png',
+    'successful diagnostic render observations are unavailable');
+  return {
+    manifest: {
+      selectedRun: 'A',
+      artifacts,
+      metricsSha256,
+      renderObservations: {
+        runA: observation.runA.renderObservation,
+        runB: observation.runB.renderObservation,
+      },
+    },
+    serializedMetrics,
+  };
 }
 
-function assertSuccessDiagnosticMatchesEvidence(diagnostic, comparison, manifest) {
-  const observation = comparison.screenshotEvidence?.observation;
+function assertSuccessDiagnosticMatchesEvidence(
+  diagnostic,
+  comparison,
+  manifest,
+  serializedMetrics,
+) {
+  const serializedEvidence = serializedMetrics?.screenshotEvidence;
+  invariant(canonicalJson(comparison.screenshotEvidence) === canonicalJson(serializedEvidence),
+    'successful diagnostic comparison differs from published metrics');
+  const observation = serializedEvidence?.observation;
   invariant(observation?.filename === 'campaign-result-desktop.png',
     'successful diagnostic observation is unavailable');
   invariant(diagnostic.report.failure === null,
@@ -3748,6 +3858,8 @@ function assertSuccessDiagnosticMatchesEvidence(diagnostic, comparison, manifest
   invariant(diagnostic.report.firstDifferingPaths.semanticState === null
     && diagnostic.report.firstDifferingPaths.canonicalMetrics === null,
   'successful diagnostic record contains differing state or metrics');
+  invariant(diagnostic.report.canonicalJsonEqual === true,
+    'successful diagnostic canonical metrics differ');
   for (const [run, evidence] of [['runA', observation.runA], ['runB', observation.runB]]) {
     invariant(diagnostic.report.sha256[run] === evidence.pngSha256,
       `successful diagnostic ${run} PNG hash differs from metrics`);
@@ -3755,6 +3867,18 @@ function assertSuccessDiagnosticMatchesEvidence(diagnostic, comparison, manifest
       `successful diagnostic ${run} semantic digest differs from metrics`);
     invariant(canonicalJson(diagnostic.report[run]) === canonicalJson(evidence.semanticState),
       `successful diagnostic ${run} semantic state differs from metrics`);
+    invariant(canonicalJson(diagnostic.report.renderObservations?.[run])
+      === canonicalJson(evidence.renderObservation),
+    `successful diagnostic ${run} render observation differs from metrics`);
+    invariant(canonicalJson(manifest.renderObservations?.[run])
+      === canonicalJson(evidence.renderObservation),
+    `successful diagnostic ${run} render observation differs from selected manifest`);
+  }
+  const expectedCanonicalMetrics = Buffer.from(`${canonicalJson(serializedMetrics)}\n`);
+  for (const filename of ['metrics-run-a.canonical.json', 'metrics-run-b.canonical.json']) {
+    const entry = diagnostic.entries.find(([name]) => name === filename);
+    invariant(entry !== undefined && Buffer.from(entry[1]).equals(expectedCanonicalMetrics),
+      `successful diagnostic ${filename} differs from published metrics`);
   }
   const terminal = manifest.artifacts.find(({ filename }) => (
     filename === 'campaign-result-desktop.png'
@@ -3780,7 +3904,7 @@ export async function publishSuccessfulNormalRouteComparison({
   if (successDiagnostic === null) return publication;
   invariant(successDiagnostic?.diagnosticPin !== undefined,
     'successful diagnostic publication context is invalid');
-  const manifest = verifySelectedRunAPublication({
+  const { manifest, serializedMetrics } = verifySelectedRunAPublication({
     first,
     comparison,
     metricsBytes,
@@ -3795,7 +3919,12 @@ export async function publishSuccessfulNormalRouteComparison({
     second,
     null,
   );
-  assertSuccessDiagnosticMatchesEvidence(diagnostic, comparison, manifest);
+  assertSuccessDiagnosticMatchesEvidence(
+    diagnostic,
+    comparison,
+    manifest,
+    serializedMetrics,
+  );
   publishMismatchDiagnosticBundle(
     [
       ...diagnostic.entries,
@@ -3813,6 +3942,7 @@ function attachStrategicEvidence(run, strategic) {
   const evidence = Object.fromEntries(Object.entries(strategic).filter(([key]) => (
     key !== 'clock' && key !== 'completion' && key !== 'fixtures'
       && key !== 'screenshotBytes' && key !== 'screenshotStates'
+      && key !== 'screenshotRenderObservations'
   )));
   run.metrics.schemaVersion = 3;
   run.metrics.strategicSailing = evidence;
@@ -3824,9 +3954,16 @@ function attachStrategicEvidence(run, strategic) {
   };
   for (const [filename, bytes] of strategic.screenshotBytes) run.screenshots.set(filename, bytes);
   for (const [filename, state] of strategic.screenshotStates) run.screenshotStates.set(filename, state);
+  run.screenshotRenderObservations = new Map(strategic.screenshotRenderObservations);
 }
 
-async function runPortCheckOperationCore({ outputDirectory, signal, deadline, dependencies = {} }) {
+async function runPortCheckOperationCore({
+  outputDirectory,
+  diagnosticDirectory,
+  signal,
+  deadline,
+  dependencies = {},
+}) {
   invariant(signal instanceof AbortSignal, 'port evidence operation signal is invalid');
   const operationDeadline = deadline ?? passivePortDeadline(signal);
   const services = {
@@ -3925,7 +4062,12 @@ async function runPortCheckOperationCore({ outputDirectory, signal, deadline, de
     await operationDeadline.race(runPortMemoryWarningProbe(browser, baseUrl, { width: 960, height: 600 }));
     await operationDeadline.race(runPortMemoryWarningProbe(browser, baseUrl, { width: 1440, height: 900 }));
     operationDeadline.throwIfExpired();
-    const comparisonResult = await operationDeadline.race(compareRuns(first, second, operationDeadline));
+    const comparisonResult = await operationDeadline.race(compareRuns(
+      first,
+      second,
+      operationDeadline,
+      diagnosticDirectory === undefined ? undefined : { diagnosticDirectory },
+    ));
     const { comparison } = comparisonResult;
     operationDeadline.throwIfExpired();
     const publication = await operationDeadline.race(publishSuccessfulNormalRouteComparison({
@@ -3951,22 +4093,54 @@ async function runPortCheckOperationCore({ outputDirectory, signal, deadline, de
   }
 }
 
-export async function runPortCheckOperation({ outputDirectory, signal, deadline, dependencies } = {}) {
+export async function runPortCheckOperation({
+  outputDirectory,
+  diagnosticDirectory,
+  signal,
+  deadline,
+  dependencies,
+} = {}) {
+  const safeDiagnosticDirectory = diagnosticDirectory === undefined
+    ? undefined
+    : validateProgrammaticPortDiagnosticDestination(diagnosticDirectory);
   const safeOutputDirectory = validateProgrammaticPortDestination(outputDirectory);
-  return runPortCheckOperationCore({ outputDirectory: safeOutputDirectory, signal, deadline, dependencies });
+  validateDisjointPortDestinations(safeOutputDirectory, safeDiagnosticDirectory);
+  return runPortCheckOperationCore({
+    outputDirectory: safeOutputDirectory,
+    diagnosticDirectory: safeDiagnosticDirectory,
+    signal,
+    deadline,
+    dependencies,
+  });
 }
 
 export async function runPortCheck(options) {
   const usesTrackedCliDestination = arguments.length === 0;
   let outputDirectory = usesTrackedCliDestination ? validateTrackedPortDestination() : OUT;
+  let diagnosticDirectory;
   if (!usesTrackedCliDestination) {
     invariant(options && typeof options === 'object'
       && Object.prototype.hasOwnProperty.call(options, 'outputDirectory'),
     'programmatic port evidence requires an explicit outputDirectory');
-    outputDirectory = validateProgrammaticPortDestination(options.outputDirectory);
+    if (Object.prototype.hasOwnProperty.call(options, 'diagnosticDirectory')) {
+      diagnosticDirectory = options.diagnosticDirectory;
+    }
+    outputDirectory = options.outputDirectory;
   }
   return runWithPortCheckDeadline(
-    (signal, deadline) => runPortCheckOperationCore({ outputDirectory, signal, deadline }),
+    (signal, deadline) => (usesTrackedCliDestination
+      ? runPortCheckOperationCore({
+        outputDirectory,
+        diagnosticDirectory,
+        signal,
+        deadline,
+      })
+      : runPortCheckOperation({
+        outputDirectory,
+        diagnosticDirectory,
+        signal,
+        deadline,
+      })),
     PORT_CHECK_DEADLINE_MS,
   );
 }
