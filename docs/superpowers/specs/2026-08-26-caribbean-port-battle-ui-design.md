@@ -23,7 +23,7 @@ The finished interface must:
 
 ![Caribbean port and battle UI concept](./2026-08-26-caribbean-port-battle-ui-concept-v2.png)
 
-The concept image is an art-direction reference, not a pixel or typography contract. Its useful ideas are the illustrated Bridgetown backdrop, large icon-led port calls, chart as navigational context, mirrored **player** battery status, and large keycaps. The exact shortcut diagram and labels below are authoritative; generated letterforms in the raster concept are illustrative. The extra place names shown on the concept chart are atmosphere only; phase one must not expose them as real destinations.
+The concept image is an art-direction reference, not a pixel or typography contract. Its useful ideas are the illustrated Bridgetown backdrop, large icon-led port calls, chart as navigational context, and mirrored **player** battery status. The exact action-first command deck and labels below are authoritative; generated letterforms in the raster concept are illustrative. The extra place names shown on the concept chart are atmosphere only; phase one must not expose them as real destinations.
 
 ![Exact Caribbean battle keyboard layout](./2026-08-26-caribbean-battle-keyboard-layout.svg)
 
@@ -224,7 +224,7 @@ The scene remains dominant. Status panels frame it rather than covering the ship
 
 ### Keyboard communication
 
-The persistent battle controls use one compact left-hand QWERTY cluster. Their visual arrangement mirrors their physical relationship on the keyboard:
+The bindings use one compact left-hand QWERTY cluster:
 
 ```text
 [Q] Fire port              [E] Fire starboard   [R] Change sail
@@ -246,7 +246,7 @@ The exact primary bindings are:
 
 `S` replaces the `1`/`2`/`3` ammunition bindings; those number keys no longer change ammunition in battle. Pointer and touch users may still select Round, Chain, or Grape directly from the visible ammunition control. Arrow keys and `Esc` may remain accessibility/familiarity alternatives, but they appear in the pause/help legend rather than competing with the persistent left-hand cluster.
 
-Written labels remain primary. Each persistent control uses a large high-contrast keycap paired with its action label; the letter cannot be reduced to tiny corner text. Keycaps are secondary cues, not icon-only controls. Touch users receive the same complete command set through full-size buttons.
+The on-screen deck is organized by ship action, not by the shape of a keyboard. Each persistent control uses a prominent cannon, helm, shot, sail, or pause icon; an equally clear action name; and a small, consistent shortcut badge in the corner. At the standard desktop boundary, action controls target `84–96px` high, icons `36–44px`, and shortcut badges `22–28px`; the badge remains legible but visually secondary. The icon never replaces the written label, and the badge is not a separate hit target. Touch users receive the same complete command set through full-size action buttons.
 
 ## Cannon Readiness
 
@@ -310,7 +310,7 @@ The implementation plan must add or refresh evidence for:
 - battle with both batteries ready;
 - battle with each side at an intermediate reload state;
 - one side ready while the other reloads;
-- the complete visible `Q/E`, `A/S/D`, `R`, and `Space` command cluster;
+- the complete action-first command deck with visible secondary `Q/E`, `A/S/D`, `R`, and `Space` badges;
 - player battery status with no enemy reload meter or percentage;
 - reduced-motion water and fallback battle views; and
 - the supported desktop, tablet, minimum, and portrait boundaries already owned by the harnesses.
@@ -338,7 +338,7 @@ The redesign is complete when all of the following are true:
 4. Market has balanced padding, stronger red, no redundant success notice, and a bottom **Done** action.
 5. Blocked actions use clear signal-red prerequisite messages and full-tile disabled interaction.
 6. The chart truthfully shows Bridgetown, the player ship, and the authored Red Jackdaw route without fake playable ports.
-7. The persistent battle deck presents the readable left-hand `Q/E`, `A/S/D`, `R`, and `Space` cluster, and `S` cycles Round, Chain, and Grape in order.
+7. The persistent battle deck makes ship actions and icons dominant, keeps the `Q/E`, `A/S/D`, `R`, and `Space` badges readable but secondary, and uses `S` to cycle Round, Chain, and Grape in order.
 8. Both player broadside reload states are immediately distinguishable as loading or ready and remain faithful to scalar per-side mechanics; enemy reload timing is never exposed as UI data.
 9. Ships read as heavy: low global wave motion, restrained hull bobbing, strong water contact, and localized wake/impact motion.
 10. Browser evidence proves all layout, accessibility, deterministic, performance, provenance, and no-op hash-writing contracts.
