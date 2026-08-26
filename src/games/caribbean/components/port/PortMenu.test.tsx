@@ -34,7 +34,7 @@ describe('<PortMenu>', () => {
       expect(button.parentElement).toHaveClass('caribbean-port-action-item');
     }
     const setSail = screen.getByTestId('port-action-set-sail');
-    expect(setSail).toContainElement(screen.getByText('Two provisions cover the outbound leg and guaranteed return.'));
+    expect(setSail).toContainElement(screen.getByText('Round trip: 2 provisions.'));
 
     const css = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
     expect(css).toMatch(/\.caribbean-port-action-item\s*\{[^}]*display:\s*grid/s);

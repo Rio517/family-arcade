@@ -41,7 +41,7 @@ export function PortMenu({
   const blocked = readiness.kind === 'blocked';
   const reason = blocked
     ? voyageBlockedCopy(readiness.reason)
-    : 'Two provisions cover the outbound leg and guaranteed return.';
+    : `Round trip: ${readiness.requiredProvisions} provisions.`;
   const rumourAvailable = blocked && readiness.reason === 'lead-not-active';
   const depart = () => {
     if (blocked || busy || setSailInFlight.current) return;
