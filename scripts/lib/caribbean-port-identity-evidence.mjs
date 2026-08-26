@@ -108,7 +108,6 @@ export const ART_CONTRAST_SELECTORS = Object.freeze([
   '.caribbean-port-activity h2',
   '.caribbean-port-arrival',
   '.caribbean-port-action',
-  '.caribbean-port-action-label',
 ]);
 
 export const ART_ACTIVITY_CONTRAST_SPECS = Object.freeze([

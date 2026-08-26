@@ -378,7 +378,7 @@ function rawArtEvidence() {
   const selectors = [
     '.caribbean-port-status-rail dt', '.caribbean-port-status-rail dd', '.caribbean-port-captain',
     '.caribbean-port-stage h1', '.caribbean-port-bearing', '.caribbean-port-activity h2',
-    '.caribbean-port-arrival', '.caribbean-port-action', '.caribbean-port-action-label',
+    '.caribbean-port-arrival', '.caribbean-port-action',
   ];
   const activity = [
     ['.caribbean-market-price-cue--expensive', 'Expensive'],
