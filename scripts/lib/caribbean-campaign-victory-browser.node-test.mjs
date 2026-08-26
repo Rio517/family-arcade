@@ -238,6 +238,24 @@ function assertCompleteDiagnosticFileSet(directory) {
   ]);
 }
 
+function assertCompleteSuccessDiagnosticFileSet(directory) {
+  assert.deepEqual(fs.readdirSync(directory).sort(), [
+    'campaign-result-desktop-mismatch.json',
+    'campaign-result-desktop-run-a.png',
+    'campaign-result-desktop-run-b.png',
+    'metrics-run-a.canonical.json',
+    'metrics-run-b.canonical.json',
+    'selected-run-a-publication.json',
+  ]);
+}
+
+function selectedPublicationManifest(directory) {
+  return JSON.parse(fs.readFileSync(
+    path.join(directory, 'selected-run-a-publication.json'),
+    'utf8',
+  ));
+}
+
 function withDiagnosticEnvironment(t) {
   const previous = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
   process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = '1';
@@ -506,8 +524,8 @@ test('diagnostic bundle publication is atomic across injected staging and rename
     };
     if (fixture.renameFails) {
       options.diagnosticRename = (source, destination) => {
-        assert.equal(path.dirname(source), temporary);
-        assert.equal(path.dirname(destination), temporary);
+        assert.equal(path.dirname(source), fs.realpathSync(temporary));
+        assert.equal(path.dirname(destination), fs.realpathSync(temporary));
         throw new Error('injected directory-rename');
       };
     }
@@ -900,7 +918,7 @@ test('diagnostic first-difference paths follow RFC 6901 escaping and edge rules'
   }
 });
 
-test('diagnostic-enabled success clears stale artifacts without publishing new ones', async (t) => {
+test('diagnostic-enabled compare success clears stale artifacts until selected publication', async (t) => {
   const portCommand = await import('../caribbean-port-check.mjs');
   assert.equal(typeof portCommand.compareRuns, 'function');
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-no-diagnostic-'));
@@ -919,6 +937,223 @@ test('diagnostic-enabled success clears stale artifacts without publishing new o
   assert.equal(comparison.comparison.ok, true);
   assert.equal(comparison.comparison.selectedRun, 'A');
   assert.equal(fs.existsSync(diagnosticDirectory), false);
+});
+
+test('diagnostic-enabled successful compare and writer atomically preserve selected run A', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-success-diagnostic-'));
+  const outputDirectory = path.join(temporary, 'output');
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  fs.mkdirSync(outputDirectory);
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  const first = comparisonRun();
+  const second = comparisonRun();
+  const runA = Buffer.from(first.screenshots.get(TERMINAL_RESULT_SCREENSHOT));
+  const runB = Buffer.from(second.screenshots.get('port-desktop.png'));
+  assert.equal(runA.equals(runB), false, 'the fixture must distinguish A from B');
+  second.screenshots.set(TERMINAL_RESULT_SCREENSHOT, runB);
+
+  const comparisonResult = await portCommand.compareRuns(
+    first,
+    second,
+    passiveComparisonDeadline(),
+    { diagnosticDirectory },
+  );
+  assert.equal(comparisonResult.comparison.ok, true);
+  assert.equal(comparisonResult.comparison.selectedRun, 'A');
+  assert.equal(fs.existsSync(diagnosticDirectory), false,
+    'success diagnostics must wait for selected-A publication');
+
+  const publication = await portCommand.publishSuccessfulNormalRouteComparison({
+    first,
+    second,
+    comparisonResult,
+    outputDirectory,
+    deadline: passiveComparisonDeadline(),
+  });
+
+  assertCompleteSuccessDiagnosticFileSet(diagnosticDirectory);
+  const diagnostic = diagnosticManifest(diagnosticDirectory);
+  const manifest = selectedPublicationManifest(diagnosticDirectory);
+  const observation = first.metrics.screenshotEvidence.observation;
+  assert.deepEqual(diagnostic.pngA, runA);
+  assert.deepEqual(diagnostic.pngB, runB);
+  assert.deepEqual(diagnostic.report.failure, null);
+  assert.deepEqual(diagnostic.report.firstDifferingPaths, {
+    semanticState: null,
+    canonicalMetrics: null,
+  });
+  assert.equal(diagnostic.report.sha256.runA, observation.runA.pngSha256);
+  assert.equal(diagnostic.report.sha256.runB, observation.runB.pngSha256);
+  assert.equal(diagnostic.report.semanticDigest.runA, observation.runA.semanticDigest);
+  assert.equal(diagnostic.report.semanticDigest.runB, observation.runB.semanticDigest);
+  assert.deepEqual(diagnostic.report.runA, observation.runA.semanticState);
+  assert.deepEqual(diagnostic.report.runB, observation.runB.semanticState);
+  assert.equal(diagnostic.metricsA.toString(), `${canonicalJson(first.metrics)}\n`);
+  assert.equal(diagnostic.metricsB.toString(), `${canonicalJson(second.metrics)}\n`);
+
+  const expectedArtifacts = NORMAL_ROUTE_SCREENSHOTS.map((filename) => ({
+    filename,
+    sha256: sha256(first.screenshots.get(filename)),
+  })).sort((left, right) => left.filename.localeCompare(right.filename));
+  assert.deepEqual(manifest, {
+    selectedRun: 'A',
+    artifacts: expectedArtifacts,
+    metricsSha256: sha256(comparisonResult.metricsBytes),
+  });
+  assert.equal(publication.metricsSha256, manifest.metricsSha256);
+  assert.equal(publication.artifactHashes.size, 23);
+  for (const artifact of expectedArtifacts) {
+    const written = fs.readFileSync(path.join(outputDirectory, artifact.filename));
+    assert.deepEqual(written, first.screenshots.get(artifact.filename), artifact.filename);
+    assert.equal(sha256(written), artifact.sha256, artifact.filename);
+    assert.equal(publication.artifactHashes.get(artifact.filename), artifact.sha256);
+  }
+  assert.deepEqual(
+    fs.readFileSync(path.join(outputDirectory, TERMINAL_RESULT_SCREENSHOT)),
+    runA,
+  );
+  assert.equal(
+    fs.readFileSync(path.join(outputDirectory, TERMINAL_RESULT_SCREENSHOT)).equals(runB),
+    false,
+  );
+  assert.equal(
+    sha256(fs.readFileSync(path.join(outputDirectory, 'metrics.json'))),
+    manifest.metricsSha256,
+  );
+});
+
+test('diagnostics-off successful compare and writer leave no diagnostic bundle', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-success-disabled-'));
+  const outputDirectory = path.join(temporary, 'output');
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  fs.mkdirSync(outputDirectory);
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withoutDiagnosticEnvironment(t);
+  const first = comparisonRun();
+  const second = comparisonRun();
+  const comparisonResult = await portCommand.compareRuns(
+    first,
+    second,
+    passiveComparisonDeadline(),
+    { diagnosticDirectory },
+  );
+
+  const publication = await portCommand.publishSuccessfulNormalRouteComparison({
+    first,
+    second,
+    comparisonResult,
+    outputDirectory,
+    deadline: passiveComparisonDeadline(),
+  });
+
+  assert.equal(publication.artifactHashes.size, 23);
+  assert.equal(fs.existsSync(diagnosticDirectory), false);
+});
+
+test('selected-A writer failure never publishes a forged success diagnostic', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-writer-failure-'));
+  const outputDirectory = path.join(temporary, 'output');
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  const outside = path.join(temporary, 'outside.png');
+  fs.mkdirSync(outputDirectory);
+  fs.writeFileSync(outside, 'must survive writer rejection');
+  fs.symlinkSync(outside, path.join(outputDirectory, 'setup-desktop.png'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  const first = comparisonRun();
+  const second = comparisonRun();
+  const comparisonResult = await portCommand.compareRuns(
+    first,
+    second,
+    passiveComparisonDeadline(),
+    { diagnosticDirectory },
+  );
+
+  await assert.rejects(
+    portCommand.publishSuccessfulNormalRouteComparison({
+      first,
+      second,
+      comparisonResult,
+      outputDirectory,
+      deadline: passiveComparisonDeadline(),
+    }),
+    /publication destination cannot be a symbolic link: setup-desktop\.png/,
+  );
+
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'must survive writer rejection');
+  assertNoDiagnosticTransactionArtifacts(temporary, diagnosticDirectory);
+});
+
+test('successful diagnostic transaction commits identical runs atomically or leaves no partial bundle', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-success-atomic-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  const cases = [
+    { phase: 'before-staging', shouldThrow: (phase) => phase === 'before-staging' },
+    {
+      phase: 'during-file-creation',
+      shouldThrow: (phase, detail) => phase === 'after-staged-file' && detail.index === 2,
+    },
+    { phase: 'directory-rename', shouldThrow: () => false, renameFails: true },
+    { phase: 'identical-success', shouldThrow: () => false, succeeds: true },
+  ];
+
+  for (const fixture of cases) {
+    const outputDirectory = path.join(temporary, `output-${fixture.phase}`);
+    const diagnosticDirectory = path.join(temporary, `diagnostic-${fixture.phase}`);
+    fs.mkdirSync(outputDirectory);
+    const first = comparisonRun();
+    const second = comparisonRun();
+    const options = {
+      diagnosticDirectory,
+      diagnosticCheckpoint(phase, detail) {
+        if (fixture.shouldThrow(phase, detail)) throw new Error(`injected ${fixture.phase}`);
+      },
+    };
+    if (fixture.renameFails) {
+      options.diagnosticRename = (source, destination) => {
+        assert.equal(path.dirname(source), fs.realpathSync(temporary));
+        assert.equal(path.dirname(destination), fs.realpathSync(temporary));
+        throw new Error('injected success directory-rename');
+      };
+    }
+    const comparisonResult = await portCommand.compareRuns(
+      first,
+      second,
+      passiveComparisonDeadline(),
+      options,
+    );
+
+    const successPublication = portCommand.publishSuccessfulNormalRouteComparison({
+      first,
+      second,
+      comparisonResult,
+      outputDirectory,
+      deadline: passiveComparisonDeadline(),
+    });
+    if (fixture.succeeds) {
+      await successPublication;
+      assertCompleteSuccessDiagnosticFileSet(diagnosticDirectory);
+      const diagnostic = diagnosticManifest(diagnosticDirectory);
+      assert.deepEqual(diagnostic.pngA, diagnostic.pngB);
+      assert.equal(diagnostic.report.sha256.runA, diagnostic.report.sha256.runB);
+      assert.equal(
+        diagnostic.report.sha256.runA,
+        first.metrics.screenshotEvidence.observation.runA.pngSha256,
+      );
+    } else {
+      await assert.rejects(successPublication, /injected/);
+    }
+
+    assert.equal(fs.existsSync(path.join(outputDirectory, 'metrics.json')), true,
+      'the selected writer must precede diagnostic preservation');
+    if (!fixture.succeeds) assertNoDiagnosticTransactionArtifacts(temporary, diagnosticDirectory);
+  }
 });
 
 test('strategic causality rejects mount-before-save same-byte writes and wrong RNG lineage', async () => {

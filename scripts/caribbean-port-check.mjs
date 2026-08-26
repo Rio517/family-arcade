@@ -3432,14 +3432,7 @@ function publishMismatchDiagnosticBundle(
   }
 }
 
-async function preserveScreenshotMismatch(
-  filename,
-  first,
-  second,
-  deadline,
-  { diagnosticPin, failure, diagnosticCheckpoint, diagnosticRename },
-) {
-  deadline.throwIfExpired();
+async function createScreenshotDiagnosticBundle(filename, first, second, failure) {
   const stem = filename.replace(/\.png$/, '');
   const firstBytes = first.screenshots.get(filename);
   const secondBytes = second.screenshots.get(filename);
@@ -3459,35 +3452,57 @@ async function preserveScreenshotMismatch(
   } catch (error) {
     pixelStats = { error: error instanceof Error ? error.message : String(error) };
   }
-  publishMismatchDiagnosticBundle([
-    [`${stem}-run-a.png`, firstBytes],
-    [`${stem}-run-b.png`, secondBytes],
-    ['metrics-run-a.canonical.json', firstCanonicalMetrics],
-    ['metrics-run-b.canonical.json', secondCanonicalMetrics],
-    [`${stem}-mismatch.json`, `${JSON.stringify({
-      filename,
-      failure,
-      sha256: {
-        runA: createHash('sha256').update(firstBytes).digest('hex'),
-        runB: createHash('sha256').update(secondBytes).digest('hex'),
-      },
-      canonicalMetricsSha256: {
-        runA: createHash('sha256').update(firstCanonicalMetrics).digest('hex'),
-        runB: createHash('sha256').update(secondCanonicalMetrics).digest('hex'),
-      },
-      semanticDigest: {
-        runA: firstSemanticDigest,
-        runB: secondSemanticDigest,
-      },
-      firstDifferingPaths: {
-        semanticState: firstDifferingJsonPointer(firstState, secondState),
-        canonicalMetrics: firstDifferingJsonPointer(first.metrics, second.metrics),
-      },
-      pixelStats,
-      runA: firstState,
-      runB: secondState,
-    }, null, 2)}\n`],
-  ], diagnosticPin, deadline, diagnosticCheckpoint, diagnosticRename);
+  const report = {
+    filename,
+    failure,
+    sha256: {
+      runA: createHash('sha256').update(firstBytes).digest('hex'),
+      runB: createHash('sha256').update(secondBytes).digest('hex'),
+    },
+    canonicalMetricsSha256: {
+      runA: createHash('sha256').update(firstCanonicalMetrics).digest('hex'),
+      runB: createHash('sha256').update(secondCanonicalMetrics).digest('hex'),
+    },
+    semanticDigest: {
+      runA: firstSemanticDigest,
+      runB: secondSemanticDigest,
+    },
+    firstDifferingPaths: {
+      semanticState: firstDifferingJsonPointer(firstState, secondState),
+      canonicalMetrics: firstDifferingJsonPointer(first.metrics, second.metrics),
+    },
+    pixelStats,
+    runA: firstState,
+    runB: secondState,
+  };
+  return {
+    report,
+    entries: [
+      [`${stem}-run-a.png`, firstBytes],
+      [`${stem}-run-b.png`, secondBytes],
+      ['metrics-run-a.canonical.json', firstCanonicalMetrics],
+      ['metrics-run-b.canonical.json', secondCanonicalMetrics],
+      [`${stem}-mismatch.json`, `${JSON.stringify(report, null, 2)}\n`],
+    ],
+  };
+}
+
+async function preserveScreenshotMismatch(
+  filename,
+  first,
+  second,
+  deadline,
+  { diagnosticPin, failure, diagnosticCheckpoint, diagnosticRename },
+) {
+  deadline.throwIfExpired();
+  const diagnostic = await createScreenshotDiagnosticBundle(filename, first, second, failure);
+  publishMismatchDiagnosticBundle(
+    diagnostic.entries,
+    diagnosticPin,
+    deadline,
+    diagnosticCheckpoint,
+    diagnosticRename,
+  );
 }
 
 function createNormalRouteScreenshotEvidence(first, second) {
@@ -3646,7 +3661,146 @@ export async function compareRuns(
       new Error('Two clean browser runs produced different metrics.json bytes'),
     );
   }
-  return { metricsBytes: firstMetrics, comparison };
+  return {
+    metricsBytes: firstMetrics,
+    comparison,
+    successDiagnostic: diagnosticsEnabled ? {
+      diagnosticPin,
+      diagnosticCheckpoint,
+      diagnosticRename,
+    } : null,
+  };
+}
+
+function readVerifiedPublicationFile(outputDirectory, filename, expectedRealDirectory) {
+  const { destination, status } = safePublicationFile(
+    outputDirectory,
+    filename,
+    expectedRealDirectory,
+  );
+  invariant(status?.isFile() && !status.isSymbolicLink(),
+    `normal-route publication is missing ${filename}`);
+  const descriptor = fs.openSync(destination, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  try {
+    return fs.readFileSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
+function verifySelectedRunAPublication({
+  first,
+  comparison,
+  metricsBytes,
+  publication,
+  outputDirectory,
+  deadline,
+}) {
+  invariant(comparison?.ok === true && comparison.selectedRun === 'A',
+    'successful diagnostic publication requires selected run A');
+  invariant(publication?.artifactHashes instanceof Map && publication.artifactHashes.size === 23,
+    'successful diagnostic publication requires 23 writer artifact hashes');
+  invariant(typeof publication.metricsSha256 === 'string',
+    'successful diagnostic publication requires the writer metrics hash');
+  const pinned = pinPublicationDirectory(outputDirectory);
+  const expectedNames = [...SCREENSHOTS, ...STRATEGIC_SCREENSHOTS].sort();
+  const artifacts = expectedNames.map((filename) => {
+    deadline.throwIfExpired();
+    const artifact = comparison.selectedArtifacts.get(filename);
+    const runABytes = first.screenshots.get(filename);
+    invariant(artifact?.sourceRun === 'A',
+      `successful diagnostic publication contains non-A artifact ${filename}`);
+    invariant((Buffer.isBuffer(runABytes) || ArrayBuffer.isView(runABytes))
+      && Buffer.from(artifact.bytes).equals(Buffer.from(runABytes)),
+    `successful diagnostic publication selected bytes outside run A for ${filename}`);
+    const written = readVerifiedPublicationFile(pinned.real, filename, pinned.real);
+    invariant(written.equals(Buffer.from(runABytes)),
+      `successful diagnostic publication bytes differ from run A for ${filename}`);
+    const sha256 = createHash('sha256').update(written).digest('hex');
+    invariant(sha256 === artifact.sha256 && publication.artifactHashes.get(filename) === sha256,
+      `successful diagnostic publication hash drifted for ${filename}`);
+    return { filename, sha256 };
+  });
+  invariant([...publication.artifactHashes.keys()].every((name) => expectedNames.includes(name)),
+    'successful diagnostic publication writer membership drifted');
+  deadline.throwIfExpired();
+  const writtenMetrics = readVerifiedPublicationFile(pinned.real, 'metrics.json', pinned.real);
+  invariant(writtenMetrics.equals(Buffer.from(metricsBytes)),
+    'successful diagnostic publication metrics bytes drifted');
+  const metricsSha256 = createHash('sha256').update(writtenMetrics).digest('hex');
+  invariant(metricsSha256 === publication.metricsSha256,
+    'successful diagnostic publication metrics hash drifted');
+  return { selectedRun: 'A', artifacts, metricsSha256 };
+}
+
+function assertSuccessDiagnosticMatchesEvidence(diagnostic, comparison, manifest) {
+  const observation = comparison.screenshotEvidence?.observation;
+  invariant(observation?.filename === 'campaign-result-desktop.png',
+    'successful diagnostic observation is unavailable');
+  invariant(diagnostic.report.failure === null,
+    'successful diagnostic record contains a failure');
+  invariant(diagnostic.report.firstDifferingPaths.semanticState === null
+    && diagnostic.report.firstDifferingPaths.canonicalMetrics === null,
+  'successful diagnostic record contains differing state or metrics');
+  for (const [run, evidence] of [['runA', observation.runA], ['runB', observation.runB]]) {
+    invariant(diagnostic.report.sha256[run] === evidence.pngSha256,
+      `successful diagnostic ${run} PNG hash differs from metrics`);
+    invariant(diagnostic.report.semanticDigest[run] === evidence.semanticDigest,
+      `successful diagnostic ${run} semantic digest differs from metrics`);
+    invariant(canonicalJson(diagnostic.report[run]) === canonicalJson(evidence.semanticState),
+      `successful diagnostic ${run} semantic state differs from metrics`);
+  }
+  const terminal = manifest.artifacts.find(({ filename }) => (
+    filename === 'campaign-result-desktop.png'
+  ));
+  invariant(terminal?.sha256 === observation.runA.pngSha256,
+    'successful diagnostic selected terminal artifact is not run A');
+}
+
+export async function publishSuccessfulNormalRouteComparison({
+  first,
+  second,
+  comparisonResult,
+  outputDirectory,
+  deadline = PASSIVE_PUBLICATION_DEADLINE,
+} = {}) {
+  const { metricsBytes, comparison, successDiagnostic } = comparisonResult ?? {};
+  const publication = publishNormalRouteComparison({
+    comparison,
+    metricsBytes,
+    outputDirectory,
+    deadline,
+  });
+  if (successDiagnostic === null) return publication;
+  invariant(successDiagnostic?.diagnosticPin !== undefined,
+    'successful diagnostic publication context is invalid');
+  const manifest = verifySelectedRunAPublication({
+    first,
+    comparison,
+    metricsBytes,
+    publication,
+    outputDirectory,
+    deadline,
+  });
+  deadline.throwIfExpired();
+  const diagnostic = await createScreenshotDiagnosticBundle(
+    'campaign-result-desktop.png',
+    first,
+    second,
+    null,
+  );
+  assertSuccessDiagnosticMatchesEvidence(diagnostic, comparison, manifest);
+  publishMismatchDiagnosticBundle(
+    [
+      ...diagnostic.entries,
+      ['selected-run-a-publication.json', `${JSON.stringify(manifest, null, 2)}\n`],
+    ],
+    successDiagnostic.diagnosticPin,
+    deadline,
+    successDiagnostic.diagnosticCheckpoint,
+    successDiagnostic.diagnosticRename,
+  );
+  return publication;
 }
 
 function attachStrategicEvidence(run, strategic) {
@@ -3765,14 +3919,16 @@ async function runPortCheckOperationCore({ outputDirectory, signal, deadline, de
     await operationDeadline.race(runPortMemoryWarningProbe(browser, baseUrl, { width: 960, height: 600 }));
     await operationDeadline.race(runPortMemoryWarningProbe(browser, baseUrl, { width: 1440, height: 900 }));
     operationDeadline.throwIfExpired();
-    const { metricsBytes, comparison } = await operationDeadline.race(compareRuns(first, second, operationDeadline));
+    const comparisonResult = await operationDeadline.race(compareRuns(first, second, operationDeadline));
+    const { comparison } = comparisonResult;
     operationDeadline.throwIfExpired();
-    const publication = publishNormalRouteComparison({
-      comparison,
-      metricsBytes,
+    const publication = await operationDeadline.race(publishSuccessfulNormalRouteComparison({
+      first,
+      second,
+      comparisonResult,
       outputDirectory,
       deadline: operationDeadline,
-    });
+    }));
     console.log(`Caribbean port evidence passed: 22 byte-identical screenshots plus one terminal WebGL observation; run A selected, integrated route resolved, recovery reloaded.`);
     return { metrics: first.metrics, comparison, publication };
   } finally {
