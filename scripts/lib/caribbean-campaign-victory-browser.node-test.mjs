@@ -228,6 +228,16 @@ function diagnosticManifest(directory) {
   return { report, metricsA, metricsB, pngA, pngB };
 }
 
+function assertCompleteDiagnosticFileSet(directory) {
+  assert.deepEqual(fs.readdirSync(directory).sort(), [
+    'campaign-result-desktop-mismatch.json',
+    'campaign-result-desktop-run-a.png',
+    'campaign-result-desktop-run-b.png',
+    'metrics-run-a.canonical.json',
+    'metrics-run-b.canonical.json',
+  ]);
+}
+
 function withDiagnosticEnvironment(t) {
   const previous = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
   process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = '1';
@@ -236,6 +246,193 @@ function withDiagnosticEnvironment(t) {
     else process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = previous;
   });
 }
+
+test('diagnostic cleanup never follows symlinked ancestors or stale child links', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-symlink-diagnostic-'));
+  const outside = path.join(temporary, 'outside');
+  const linkedParent = path.join(temporary, 'link');
+  fs.mkdirSync(outside);
+  fs.symlinkSync(outside, linkedParent, 'dir');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const previous = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
+  t.after(() => {
+    if (previous === undefined) delete process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
+    else process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = previous;
+  });
+
+  for (const diagnosticsEnabled of [false, true]) {
+    const outsideDiagnostic = path.join(outside, 'diagnostic');
+    fs.mkdirSync(outsideDiagnostic, { recursive: true });
+    const sentinel = path.join(outsideDiagnostic, `sentinel-${diagnosticsEnabled}.txt`);
+    fs.writeFileSync(sentinel, 'must survive');
+    if (diagnosticsEnabled) process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS = '1';
+    else delete process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS;
+    const secondState = terminalResultSemanticState();
+    secondState.canvas.backend.renderer = `${secondState.canvas.backend.renderer} drift`;
+
+    await assert.rejects(
+      portCommand.compareRuns(
+        comparisonRun(),
+        comparisonRun(secondState),
+        passiveComparisonDeadline(),
+        { diagnosticDirectory: path.join(linkedParent, 'diagnostic') },
+      ),
+      /port mismatch diagnostic directory ancestor cannot be a symbolic link: link/,
+    );
+    assert.equal(fs.readFileSync(sentinel, 'utf8'), 'must survive');
+
+    const staleDiagnostic = path.join(temporary, `stale-diagnostic-${diagnosticsEnabled}`);
+    const staleTarget = path.join(outside, `stale-target-${diagnosticsEnabled}`);
+    fs.mkdirSync(staleDiagnostic);
+    fs.mkdirSync(staleTarget);
+    const staleSentinel = path.join(staleTarget, 'sentinel.txt');
+    fs.writeFileSync(staleSentinel, 'must also survive');
+    fs.symlinkSync(staleTarget, path.join(staleDiagnostic, 'linked-child'), 'dir');
+
+    await assert.rejects(
+      portCommand.compareRuns(
+        comparisonRun(),
+        comparisonRun(secondState),
+        passiveComparisonDeadline(),
+        { diagnosticDirectory: staleDiagnostic },
+      ),
+      /screenshotEvidence semantic observations differ/,
+    );
+    assert.equal(fs.readFileSync(staleSentinel, 'utf8'), 'must also survive');
+    if (diagnosticsEnabled) assertCompleteDiagnosticFileSet(staleDiagnostic);
+    else assert.equal(fs.existsSync(staleDiagnostic), false);
+  }
+});
+
+const SEMANTIC_GATE_ERROR =
+  'Caribbean port identity evidence failed: screenshotEvidence semantic observations differ';
+const DIAGNOSTIC_PRESERVATION_ERROR =
+  'Caribbean port mismatch diagnostic preservation failed';
+
+function semanticDriftComparisonRuns() {
+  const secondState = terminalResultSemanticState();
+  secondState.canvas.backend.renderer = `${secondState.canvas.backend.renderer} drift`;
+  return { first: comparisonRun(), second: comparisonRun(secondState) };
+}
+
+function assertNoDiagnosticTransactionArtifacts(parent, diagnosticDirectory) {
+  assert.equal(fs.existsSync(diagnosticDirectory), false);
+  const stagingPrefix = `.${path.basename(diagnosticDirectory)}.stage-`;
+  assert.deepEqual(
+    fs.readdirSync(parent).filter((name) => name.startsWith(stagingPrefix)),
+    [],
+  );
+}
+
+function isPreservationFailureWithOriginalGate(error) {
+  assert.equal(error?.message, DIAGNOSTIC_PRESERVATION_ERROR);
+  assert.equal(error?.cause?.message, SEMANTIC_GATE_ERROR);
+  return true;
+}
+
+test('diagnostic bundle publication is atomic across injected staging and rename failures', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-atomic-diagnostic-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  const cases = [
+    { phase: 'before-staging', shouldThrow: (phase) => phase === 'before-staging' },
+    {
+      phase: 'during-file-creation',
+      shouldThrow: (phase, detail) => phase === 'after-staged-file' && detail.index === 1,
+    },
+    { phase: 'directory-rename', shouldThrow: () => false, renameFails: true },
+  ];
+
+  for (const fixture of cases) {
+    const diagnosticDirectory = path.join(temporary, `diagnostic-${fixture.phase}`);
+    const { first, second } = semanticDriftComparisonRuns();
+    const options = {
+      diagnosticDirectory,
+      diagnosticCheckpoint(phase, detail) {
+        if (fixture.shouldThrow(phase, detail)) throw new Error(`injected ${fixture.phase}`);
+      },
+    };
+    if (fixture.renameFails) {
+      options.diagnosticRename = (source, destination) => {
+        assert.equal(path.dirname(source), temporary);
+        assert.equal(path.dirname(destination), temporary);
+        throw new Error('injected directory-rename');
+      };
+    }
+    await assert.rejects(
+      portCommand.compareRuns(first, second, passiveComparisonDeadline(), options),
+      isPreservationFailureWithOriginalGate,
+    );
+    assertNoDiagnosticTransactionArtifacts(temporary, diagnosticDirectory);
+  }
+});
+
+test('diagnostic deadline failure leaves no partial bundle and retains the gate error', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-deadline-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  let checks = 0;
+  const deadline = {
+    throwIfExpired() {
+      checks += 1;
+      if (checks === 8) throw new Error('injected diagnostic deadline');
+    },
+  };
+  const { first, second } = semanticDriftComparisonRuns();
+
+  await assert.rejects(
+    portCommand.compareRuns(first, second, deadline, { diagnosticDirectory }),
+    isPreservationFailureWithOriginalGate,
+  );
+  assert.equal(checks, 8);
+  assertNoDiagnosticTransactionArtifacts(temporary, diagnosticDirectory);
+});
+
+test('diagnostic bundle remains invisible until its complete directory commit', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-visibility-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  const observedBeforeCommit = [];
+  const { first, second } = semanticDriftComparisonRuns();
+
+  await assert.rejects(
+    portCommand.compareRuns(first, second, passiveComparisonDeadline(), {
+      diagnosticDirectory,
+      diagnosticCheckpoint(phase) {
+        if (phase === 'after-staged-file' || phase === 'directory-rename') {
+          observedBeforeCommit.push(fs.existsSync(diagnosticDirectory));
+        }
+      },
+    }),
+    (error) => {
+      assert.equal(error.message, SEMANTIC_GATE_ERROR);
+      return true;
+    },
+  );
+
+  assert.deepEqual(observedBeforeCommit, [false, false, false, false, false, false]);
+  assert.deepEqual(fs.readdirSync(diagnosticDirectory).sort(), [
+    'campaign-result-desktop-mismatch.json',
+    'campaign-result-desktop-run-a.png',
+    'campaign-result-desktop-run-b.png',
+    'metrics-run-a.canonical.json',
+    'metrics-run-b.canonical.json',
+  ]);
+  assert.deepEqual(
+    fs.readdirSync(temporary).filter((name) => name.startsWith('.diagnostic.stage-')),
+    [],
+  );
+});
 
 test('diagnostic comparison preserves semantic drift before the evaluator rejects', async (t) => {
   const portCommand = await import('../caribbean-port-check.mjs');
@@ -338,6 +535,221 @@ test('diagnostic comparison preserves evaluator-valid canonical metrics drift', 
   assert.equal(diagnostic.metricsB.toString(), `${canonicalJson(second.metrics)}\n`);
   assert.equal(diagnostic.report.canonicalMetricsSha256.runA, sha256(diagnostic.metricsA));
   assert.equal(diagnostic.report.canonicalMetricsSha256.runB, sha256(diagnostic.metricsB));
+});
+
+test('diagnostic comparison preserves non-exempt buffer drift before comparator rejection', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-comparator-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  const first = comparisonRun();
+  const second = comparisonRun();
+  second.screenshots.set('setup-desktop.png', second.screenshots.get('port-desktop.png'));
+
+  await assert.rejects(
+    portCommand.compareRuns(first, second, passiveComparisonDeadline(), { diagnosticDirectory }),
+    (error) => {
+      assert.equal(
+        error.message,
+        'Normal-route screenshot comparison failed: setup-desktop.png bytes differ outside the observation exception',
+      );
+      return true;
+    },
+  );
+
+  assertCompleteDiagnosticFileSet(diagnosticDirectory);
+  const diagnostic = diagnosticManifest(diagnosticDirectory);
+  assert.deepEqual(diagnostic.report.failure, {
+    stage: 'comparator',
+    run: null,
+    issues: ['setup-desktop.png bytes differ outside the observation exception'],
+  });
+  assert.deepEqual(diagnostic.report.firstDifferingPaths, {
+    semanticState: null,
+    canonicalMetrics: null,
+  });
+  assert.equal(diagnostic.report.sha256.runA, sha256(diagnostic.pngA));
+  assert.equal(diagnostic.report.sha256.runB, sha256(diagnostic.pngB));
+  assert.deepEqual(diagnostic.pngA, diagnostic.pngB);
+  assert.deepEqual(diagnostic.report.runA, first.screenshotStates.get(TERMINAL_RESULT_SCREENSHOT));
+  assert.deepEqual(diagnostic.report.runB, second.screenshotStates.get(TERMINAL_RESULT_SCREENSHOT));
+  assert.equal(
+    diagnostic.report.semanticDigest.runA,
+    sha256(Buffer.from(canonicalJson(diagnostic.report.runA))),
+  );
+  assert.equal(
+    diagnostic.report.semanticDigest.runB,
+    sha256(Buffer.from(canonicalJson(diagnostic.report.runB))),
+  );
+  assert.equal(diagnostic.report.canonicalMetricsSha256.runA, sha256(diagnostic.metricsA));
+  assert.equal(diagnostic.report.canonicalMetricsSha256.runB, sha256(diagnostic.metricsB));
+});
+
+test('diagnostic comparison preserves an invalid terminal buffer before comparator rejection', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-terminal-buffer-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  const first = comparisonRun();
+  const second = comparisonRun();
+  second.screenshots.set(TERMINAL_RESULT_SCREENSHOT, Buffer.from('invalid terminal PNG'));
+
+  await assert.rejects(
+    portCommand.compareRuns(first, second, passiveComparisonDeadline(), { diagnosticDirectory }),
+    (error) => {
+      assert.equal(
+        error.message,
+        'Normal-route screenshot comparison failed: campaign-result-desktop.png is not a valid nonempty PNG in both runs',
+      );
+      return true;
+    },
+  );
+
+  assertCompleteDiagnosticFileSet(diagnosticDirectory);
+  const diagnostic = diagnosticManifest(diagnosticDirectory);
+  assert.deepEqual(diagnostic.report.failure, {
+    stage: 'comparator',
+    run: null,
+    issues: ['campaign-result-desktop.png is not a valid nonempty PNG in both runs'],
+  });
+  assert.equal(diagnostic.report.sha256.runA, sha256(diagnostic.pngA));
+  assert.equal(diagnostic.report.sha256.runB, sha256(diagnostic.pngB));
+  assert.deepEqual(diagnostic.pngB, Buffer.from('invalid terminal PNG'));
+  assert.match(diagnostic.report.pixelStats.error, /unsupported image format|Input buffer/);
+});
+
+test('diagnostic comparison preserves comparator setup errors when terminal data exists', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-comparator-setup-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  const first = comparisonRun();
+  const second = comparisonRun();
+  const screenshotBuffers = second.screenshots;
+  second.screenshots = {
+    get(filename) {
+      if (filename === 'setup-desktop.png') throw new Error('injected screenshot map failure');
+      return screenshotBuffers.get(filename);
+    },
+  };
+
+  await assert.rejects(
+    portCommand.compareRuns(first, second, passiveComparisonDeadline(), { diagnosticDirectory }),
+    (error) => {
+      assert.equal(error.message, 'injected screenshot map failure');
+      return true;
+    },
+  );
+
+  assertCompleteDiagnosticFileSet(diagnosticDirectory);
+  const diagnostic = diagnosticManifest(diagnosticDirectory);
+  assert.deepEqual(diagnostic.report.failure, {
+    stage: 'comparator',
+    run: null,
+    issues: ['injected screenshot map failure'],
+  });
+  assert.deepEqual(diagnostic.report.firstDifferingPaths, {
+    semanticState: null,
+    canonicalMetrics: null,
+  });
+});
+
+test('diagnostic first-difference paths follow RFC 6901 escaping and edge rules', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.compareRuns, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-pointer-diagnostic-'));
+  const diagnosticDirectory = path.join(temporary, 'diagnostic');
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  withDiagnosticEnvironment(t);
+  const fixtures = [
+    {
+      name: 'escapes tilde and slash tokens',
+      expected: '/~0route~1leg',
+      states() {
+        const first = terminalResultSemanticState();
+        const second = terminalResultSemanticState();
+        first['~route/leg'] = 'east';
+        second['~route/leg'] = 'west';
+        return [first, second];
+      },
+    },
+    {
+      name: 'reports a missing object member',
+      expected: '/canvas/backend/renderer',
+      states() {
+        const first = terminalResultSemanticState();
+        const second = terminalResultSemanticState();
+        delete second.canvas.backend.renderer;
+        return [first, second];
+      },
+    },
+    {
+      name: 'reports an array element',
+      expected: '/samples/1',
+      states() {
+        const first = terminalResultSemanticState();
+        const second = terminalResultSemanticState();
+        first.samples = [10, 20];
+        second.samples = [10, 21];
+        return [first, second];
+      },
+    },
+    {
+      name: 'reports an array length boundary',
+      expected: '/samples/1',
+      states() {
+        const first = terminalResultSemanticState();
+        const second = terminalResultSemanticState();
+        first.samples = [10];
+        second.samples = [10, 20];
+        return [first, second];
+      },
+    },
+    {
+      name: 'reports a container type change',
+      expected: '/canvas/backend',
+      states() {
+        const first = terminalResultSemanticState();
+        const second = terminalResultSemanticState();
+        second.canvas.backend = [];
+        return [first, second];
+      },
+    },
+    {
+      name: 'uses the empty pointer for a root difference',
+      expected: '',
+      states() {
+        return [terminalResultSemanticState(), null];
+      },
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const [firstState, secondState] = fixture.states();
+    await assert.rejects(
+      portCommand.compareRuns(
+        comparisonRun(firstState),
+        comparisonRun(secondState),
+        passiveComparisonDeadline(),
+        { diagnosticDirectory },
+      ),
+      /Caribbean port identity evidence failed/,
+      fixture.name,
+    );
+    const diagnostic = diagnosticManifest(diagnosticDirectory);
+    assert.equal(
+      diagnostic.report.firstDifferingPaths.semanticState,
+      fixture.expected,
+      fixture.name,
+    );
+    assert.equal(diagnostic.report.firstDifferingPaths.canonicalMetrics, null, fixture.name);
+  }
 });
 
 test('diagnostic comparison leaves no artifacts on pass or without diagnostics', async (t) => {

@@ -3262,18 +3262,164 @@ function firstDifferingJsonPointer(first, second, pointer = '') {
   return null;
 }
 
-function safeMismatchDiagnosticDirectory(directory) {
-  invariant(typeof directory === 'string' && directory.trim().length > 0,
-    'port mismatch diagnostic directory is invalid');
-  const resolved = path.resolve(directory);
-  const allowedRoots = [path.resolve(os.tmpdir()), path.resolve('/private/tmp')];
-  invariant(allowedRoots.some((root) => resolved !== root && insideDirectory(resolved, root)),
-    'port mismatch diagnostic directory must be a child of a temporary root');
-  return resolved;
+function mismatchDiagnosticTrustedAnchors() {
+  const anchors = new Map();
+  for (const directory of [os.tmpdir(), '/private/tmp']) {
+    const lexical = path.resolve(directory);
+    const real = fs.realpathSync(lexical);
+    anchors.set(lexical, { lexical, real });
+  }
+  return [...anchors.values()];
 }
 
-function clearMismatchDiagnostics(directory) {
-  fs.rmSync(safeMismatchDiagnosticDirectory(directory), { recursive: true, force: true });
+function pinMismatchDiagnosticDirectory(directory) {
+  invariant(typeof directory === 'string' && directory.trim().length > 0,
+    'port mismatch diagnostic directory is invalid');
+  const lexical = path.resolve(directory);
+  const anchor = mismatchDiagnosticTrustedAnchors()
+    .filter((candidate) => lexical !== candidate.lexical && insideDirectory(lexical, candidate.lexical))
+    .sort((left, right) => right.lexical.length - left.lexical.length)[0];
+  invariant(anchor !== undefined,
+    'port mismatch diagnostic directory must be a child of a temporary root');
+  const components = path.relative(anchor.lexical, lexical).split(path.sep).filter(Boolean);
+  invariant(components.length > 0, 'port mismatch diagnostic directory is invalid');
+  const basename = components.at(-1);
+  invariant(basename === path.basename(basename) && basename !== '.' && basename !== '..',
+    'port mismatch diagnostic directory basename is invalid');
+  let parentReal = anchor.real;
+  for (const component of components.slice(0, -1)) {
+    const candidate = path.join(parentReal, component);
+    const status = fs.lstatSync(candidate, { throwIfNoEntry: false });
+    invariant(status !== undefined,
+      `port mismatch diagnostic directory parent does not exist: ${component}`);
+    invariant(!status.isSymbolicLink(),
+      `port mismatch diagnostic directory ancestor cannot be a symbolic link: ${component}`);
+    invariant(status.isDirectory(),
+      `port mismatch diagnostic directory ancestor is not a directory: ${component}`);
+    parentReal = candidate;
+  }
+  invariant(fs.realpathSync(parentReal) === parentReal,
+    'port mismatch diagnostic directory parent changed during validation');
+  const outputDirectory = path.join(parentReal, basename);
+  const status = fs.lstatSync(outputDirectory, { throwIfNoEntry: false });
+  invariant(status === undefined || !status.isSymbolicLink(),
+    'port mismatch diagnostic directory cannot be a symbolic link');
+  invariant(status === undefined || status.isDirectory(),
+    'port mismatch diagnostic path is not a directory');
+  return { lexical, parentReal, basename, outputDirectory };
+}
+
+function revalidateMismatchDiagnosticDirectory(pin) {
+  const current = pinMismatchDiagnosticDirectory(pin.lexical);
+  invariant(current.parentReal === pin.parentReal && current.outputDirectory === pin.outputDirectory,
+    'port mismatch diagnostic directory changed after validation');
+  return current;
+}
+
+function removeDirectoryTreeNoFollow(directory) {
+  const status = fs.lstatSync(directory, { throwIfNoEntry: false });
+  if (status === undefined) return;
+  invariant(status.isDirectory() && !status.isSymbolicLink(),
+    'port mismatch diagnostic cleanup target is not a real directory');
+  for (const name of fs.readdirSync(directory)) {
+    const child = path.join(directory, name);
+    const childStatus = fs.lstatSync(child);
+    if (childStatus.isDirectory() && !childStatus.isSymbolicLink()) {
+      removeDirectoryTreeNoFollow(child);
+    } else {
+      fs.unlinkSync(child);
+    }
+  }
+  fs.rmdirSync(directory);
+}
+
+function clearMismatchDiagnostics(pin) {
+  const current = revalidateMismatchDiagnosticDirectory(pin);
+  removeDirectoryTreeNoFollow(current.outputDirectory);
+  invariant(fs.lstatSync(current.outputDirectory, { throwIfNoEntry: false }) === undefined,
+    'port mismatch diagnostic cleanup left its target behind');
+}
+
+function writeDiagnosticStageFile(directory, filename, bytes) {
+  invariant(filename === path.basename(filename) && !filename.includes('/') && !filename.includes('\\'),
+    `port mismatch diagnostic filename is invalid: ${filename}`);
+  const destination = path.join(directory, filename);
+  let descriptor;
+  try {
+    descriptor = fs.openSync(
+      destination,
+      fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY | fs.constants.O_NOFOLLOW,
+      0o600,
+    );
+    fs.writeFileSync(descriptor, bytes);
+    fs.closeSync(descriptor);
+    descriptor = undefined;
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+  }
+}
+
+function publishMismatchDiagnosticBundle(
+  entries,
+  pin,
+  deadline,
+  checkpoint = () => {},
+  renameDirectory = fs.renameSync,
+) {
+  invariant(typeof renameDirectory === 'function',
+    'port mismatch diagnostic directory rename is invalid');
+  deadline.throwIfExpired();
+  checkpoint('before-staging', {});
+  let stagingDirectory;
+  try {
+    const current = revalidateMismatchDiagnosticDirectory(pin);
+    invariant(fs.lstatSync(current.outputDirectory, { throwIfNoEntry: false }) === undefined,
+      'port mismatch diagnostic destination exists before publication');
+    stagingDirectory = fs.mkdtempSync(path.join(
+      current.parentReal,
+      `.${current.basename}.stage-`,
+    ));
+    invariant(fs.realpathSync(path.dirname(stagingDirectory)) === current.parentReal,
+      'port mismatch diagnostic staging directory escaped its pinned parent');
+
+    for (const [index, [filename, bytes]] of entries.entries()) {
+      deadline.throwIfExpired();
+      writeDiagnosticStageFile(stagingDirectory, filename, bytes);
+      checkpoint('after-staged-file', { filename, index });
+    }
+
+    const expectedNames = entries.map(([filename]) => filename).sort();
+    invariant(new Set(expectedNames).size === entries.length,
+      'port mismatch diagnostic bundle contains duplicate filenames');
+    invariant(canonicalJson(fs.readdirSync(stagingDirectory).sort()) === canonicalJson(expectedNames),
+      'port mismatch diagnostic staging membership is incomplete');
+    for (const [filename, bytes] of entries) {
+      const destination = path.join(stagingDirectory, filename);
+      const status = fs.lstatSync(destination);
+      invariant(status.isFile() && !status.isSymbolicLink(),
+        `port mismatch diagnostic staged file is invalid: ${filename}`);
+      const descriptor = fs.openSync(destination, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+      try {
+        invariant(fs.readFileSync(descriptor).equals(Buffer.from(bytes)),
+          `port mismatch diagnostic staged bytes changed: ${filename}`);
+      } finally {
+        fs.closeSync(descriptor);
+      }
+    }
+
+    deadline.throwIfExpired();
+    checkpoint('directory-rename', {});
+    const committed = revalidateMismatchDiagnosticDirectory(pin);
+    invariant(fs.lstatSync(committed.outputDirectory, { throwIfNoEntry: false }) === undefined,
+      'port mismatch diagnostic destination appeared before commit');
+    renameDirectory(stagingDirectory, committed.outputDirectory);
+    stagingDirectory = undefined;
+  } catch (error) {
+    if (stagingDirectory !== undefined) removeDirectoryTreeNoFollow(stagingDirectory);
+    const current = revalidateMismatchDiagnosticDirectory(pin);
+    removeDirectoryTreeNoFollow(current.outputDirectory);
+    throw error;
+  }
 }
 
 async function preserveScreenshotMismatch(
@@ -3281,26 +3427,29 @@ async function preserveScreenshotMismatch(
   first,
   second,
   deadline,
-  { diagnosticDirectory, failure },
+  { diagnosticPin, failure, diagnosticCheckpoint, diagnosticRename },
 ) {
   deadline.throwIfExpired();
-  const outputDirectory = safeMismatchDiagnosticDirectory(diagnosticDirectory);
-  fs.mkdirSync(outputDirectory, { recursive: true });
   const stem = filename.replace(/\.png$/, '');
   const firstBytes = first.screenshots.get(filename);
   const secondBytes = second.screenshots.get(filename);
+  invariant(Buffer.isBuffer(firstBytes) || ArrayBuffer.isView(firstBytes),
+    'port mismatch diagnostic run-A terminal bytes are unavailable');
+  invariant(Buffer.isBuffer(secondBytes) || ArrayBuffer.isView(secondBytes),
+    'port mismatch diagnostic run-B terminal bytes are unavailable');
   const firstState = first.screenshotStates.get(filename) ?? null;
   const secondState = second.screenshotStates.get(filename) ?? null;
   const firstCanonicalMetrics = Buffer.from(`${canonicalJson(first.metrics)}\n`);
   const secondCanonicalMetrics = Buffer.from(`${canonicalJson(second.metrics)}\n`);
-  const observation = first.metrics.screenshotEvidence?.observation;
+  const firstSemanticDigest = createHash('sha256').update(canonicalJson(firstState)).digest('hex');
+  const secondSemanticDigest = createHash('sha256').update(canonicalJson(secondState)).digest('hex');
   let pixelStats;
   try {
     pixelStats = await pixelMismatchStats(firstBytes, secondBytes);
   } catch (error) {
     pixelStats = { error: error instanceof Error ? error.message : String(error) };
   }
-  publishFiles([
+  publishMismatchDiagnosticBundle([
     [`${stem}-run-a.png`, firstBytes],
     [`${stem}-run-b.png`, secondBytes],
     ['metrics-run-a.canonical.json', firstCanonicalMetrics],
@@ -3317,8 +3466,8 @@ async function preserveScreenshotMismatch(
         runB: createHash('sha256').update(secondCanonicalMetrics).digest('hex'),
       },
       semanticDigest: {
-        runA: observation?.runA?.semanticDigest ?? createHash('sha256').update(canonicalJson(firstState)).digest('hex'),
-        runB: observation?.runB?.semanticDigest ?? createHash('sha256').update(canonicalJson(secondState)).digest('hex'),
+        runA: firstSemanticDigest,
+        runB: secondSemanticDigest,
       },
       firstDifferingPaths: {
         semanticState: firstDifferingJsonPointer(firstState, secondState),
@@ -3328,7 +3477,7 @@ async function preserveScreenshotMismatch(
       runA: firstState,
       runB: secondState,
     }, null, 2)}\n`],
-  ], outputDirectory, deadline);
+  ], diagnosticPin, deadline, diagnosticCheckpoint, diagnosticRename);
 }
 
 function createNormalRouteScreenshotEvidence(first, second) {
@@ -3387,48 +3536,103 @@ export async function compareRuns(
   first,
   second,
   deadline,
-  { diagnosticDirectory = MISMATCH_DIAGNOSTIC_DIRECTORY } = {},
+  {
+    diagnosticDirectory = MISMATCH_DIAGNOSTIC_DIRECTORY,
+    diagnosticCheckpoint = () => {},
+    diagnosticRename = fs.renameSync,
+  } = {},
 ) {
-  const diagnosticOutput = safeMismatchDiagnosticDirectory(diagnosticDirectory);
-  clearMismatchDiagnostics(diagnosticOutput);
+  const diagnosticPin = pinMismatchDiagnosticDirectory(diagnosticDirectory);
+  clearMismatchDiagnostics(diagnosticPin);
   const diagnosticsEnabled = process.env.CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS === '1';
-  const screenshotEvidence = createNormalRouteScreenshotEvidence(first, second);
-  first.metrics.screenshotEvidence = screenshotEvidence;
-  second.metrics.screenshotEvidence = screenshotEvidence;
   const preserveFailure = (failure) => diagnosticsEnabled
     ? preserveScreenshotMismatch('campaign-result-desktop.png', first, second, deadline, {
-      diagnosticDirectory: diagnosticOutput,
+      diagnosticPin,
       failure,
+      diagnosticCheckpoint,
+      diagnosticRename,
     })
     : Promise.resolve();
+  const rejectFailure = async (failure, gateError) => {
+    try {
+      await preserveFailure(failure);
+    } catch (diagnosticError) {
+      const error = new Error('Caribbean port mismatch diagnostic preservation failed', {
+        cause: gateError,
+      });
+      Object.defineProperty(error, 'diagnosticError', {
+        configurable: false,
+        enumerable: false,
+        value: diagnosticError,
+        writable: false,
+      });
+      throw error;
+    }
+    throw gateError;
+  };
+  const failureIssues = (error) => [error instanceof Error ? error.message : String(error)];
+  let screenshotEvidence;
+  try {
+    screenshotEvidence = createNormalRouteScreenshotEvidence(first, second);
+    first.metrics.screenshotEvidence = screenshotEvidence;
+    second.metrics.screenshotEvidence = screenshotEvidence;
+  } catch (error) {
+    return rejectFailure({ stage: 'comparator', run: null, issues: failureIssues(error) }, error);
+  }
   for (const [runName, run] of [['A', first], ['B', second]]) {
-    const verdict = evaluatePortIdentityEvidence(run.metrics);
+    let verdict;
+    try {
+      verdict = evaluatePortIdentityEvidence(run.metrics);
+    } catch (error) {
+      return rejectFailure({ stage: 'evaluator', run: runName, issues: failureIssues(error) }, error);
+    }
     if (!verdict.ok) {
-      await preserveFailure({ stage: 'evaluator', run: runName, issues: verdict.issues });
-      invariant(false, `Caribbean port identity evidence failed: ${verdict.issues.join(' | ')}`);
+      return rejectFailure(
+        { stage: 'evaluator', run: runName, issues: verdict.issues },
+        new Error(`Caribbean port identity evidence failed: ${verdict.issues.join(' | ')}`),
+      );
     }
   }
-  const comparison = compareNormalRouteScreenshotRuns({
-    expectedNames: [...SCREENSHOTS, ...STRATEGIC_SCREENSHOTS],
-    runA: normalRouteScreenshotRun(first, 'A'),
-    runB: normalRouteScreenshotRun(second, 'B'),
-    declaredEvidence: screenshotEvidence,
-  });
-  if (!comparison.ok) {
-    await preserveFailure({ stage: 'comparator', run: null, issues: comparison.issues });
-    invariant(false, `Normal-route screenshot comparison failed: ${comparison.issues.join(' | ')}`);
-  }
-  invariant(canonicalJson(comparison.screenshotEvidence) === canonicalJson(screenshotEvidence),
-    'Normal-route screenshot comparison changed its declaration');
-  const firstMetrics = Buffer.from(`${JSON.stringify(first.metrics, null, 2)}\n`);
-  const secondMetrics = Buffer.from(`${JSON.stringify(second.metrics, null, 2)}\n`);
-  if (!firstMetrics.equals(secondMetrics)) {
-    await preserveFailure({
-      stage: 'canonical-metrics',
-      run: null,
-      issues: ['Two clean browser runs produced different metrics.json bytes'],
+  let comparison;
+  try {
+    comparison = compareNormalRouteScreenshotRuns({
+      expectedNames: [...SCREENSHOTS, ...STRATEGIC_SCREENSHOTS],
+      runA: normalRouteScreenshotRun(first, 'A'),
+      runB: normalRouteScreenshotRun(second, 'B'),
+      declaredEvidence: screenshotEvidence,
     });
-    invariant(false, 'Two clean browser runs produced different metrics.json bytes');
+  } catch (error) {
+    return rejectFailure({ stage: 'comparator', run: null, issues: failureIssues(error) }, error);
+  }
+  if (!comparison.ok) {
+    return rejectFailure(
+      { stage: 'comparator', run: null, issues: comparison.issues },
+      new Error(`Normal-route screenshot comparison failed: ${comparison.issues.join(' | ')}`),
+    );
+  }
+  try {
+    invariant(canonicalJson(comparison.screenshotEvidence) === canonicalJson(screenshotEvidence),
+      'Normal-route screenshot comparison changed its declaration');
+  } catch (error) {
+    return rejectFailure({ stage: 'comparator', run: null, issues: failureIssues(error) }, error);
+  }
+  let firstMetrics;
+  let secondMetrics;
+  try {
+    firstMetrics = Buffer.from(`${JSON.stringify(first.metrics, null, 2)}\n`);
+    secondMetrics = Buffer.from(`${JSON.stringify(second.metrics, null, 2)}\n`);
+  } catch (error) {
+    return rejectFailure({ stage: 'canonical-metrics', run: null, issues: failureIssues(error) }, error);
+  }
+  if (!firstMetrics.equals(secondMetrics)) {
+    return rejectFailure(
+      {
+        stage: 'canonical-metrics',
+        run: null,
+        issues: ['Two clean browser runs produced different metrics.json bytes'],
+      },
+      new Error('Two clean browser runs produced different metrics.json bytes'),
+    );
   }
   return { metricsBytes: firstMetrics, comparison };
 }
