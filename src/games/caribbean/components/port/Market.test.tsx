@@ -180,6 +180,7 @@ describe('<Market>', () => {
     const css = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
 
     expect(css).toMatch(/\.caribbean-market\s*\{[^}]*padding:\s*12px 16px 16px/s);
+    expect(css).toMatch(/\.caribbean-market-price-cue\s*\{[^}]*background:\s*#07151d/s);
     expect(css).toMatch(/\.caribbean-market-price-cue--expensive\s*\{[^}]*var\(--caribbean-signal-red\) 88%/s);
     expect(css).toMatch(/\.caribbean-market-severity--critical\s*\{[^}]*var\(--caribbean-signal-red\) 88%/s);
   });

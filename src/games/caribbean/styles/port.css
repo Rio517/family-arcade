@@ -719,6 +719,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  background: #07151d;
 }
 
 .caribbean-market-price-cue svg {
