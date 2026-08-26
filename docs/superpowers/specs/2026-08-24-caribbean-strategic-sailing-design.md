@@ -797,6 +797,28 @@ of the existing 14 top-level screenshot names and nine `strategicSailing`
 screenshot names is mandatory; the two sets are disjoint, contain 23 files,
 and may not gain an implicit, wildcard, or auto-discovered exception.
 
+Post-cumulative evidence from clean source HEAD
+`e5230c634a5c1fd7e5756c0b06bc002aeb186b5b` falsified one narrower stability
+assumption without broadening that PNG exception. In the preserved ignored
+reproduction, run A's post-present default-framebuffer sample was
+`160` nonzero channels / `9df398c6`, while run B's was `0` / `02187e45`.
+The two original 1440x900 terminal PNGs were nevertheless byte-identical at
+SHA-256 `9697f1a90da5a5de05132af5ae60fb24a063a5d07c532915e7168cd9433c6442`,
+with zero decoded pixel or channel differences. The first semantic difference
+was `/canvas/framebufferSample/nonzeroSampleChannels`; canonical A/B metrics
+were identical at SHA-256
+`0fdbe9b75f17a08d9bee672e99c5f7e71418183d3c8d4534494a5c9aeb66ca07`.
+This proves that post-present `readPixels` on the default non-preserved drawing
+buffer is a per-run render observation, not stable terminal semantics or a
+fingerprint of the composited PNG.
+
+That reproduction is distinct from the preceding required temp-only gate,
+which reached the later `Two clean browser runs produced different
+metrics.json bytes` invariant with diagnostics disabled. Its run directories
+were correctly removed, so its exact first differing metrics path is
+unrecoverable and remains unresolved. Neither failure permits retry selection,
+field normalization, or weaker metrics equality.
+
 Schema v3 keeps the prior `determinism.screenshotsByteIdentical` field but sets
 it to `false`, rather than giving that blanket name a narrower meaning. It adds
 `determinism.byteComparedScreenshotsIdentical: true` and one exact top-level
@@ -815,12 +837,6 @@ interface TerminalResultSemanticState {
     transform: 'none';
     engine: 'three.js r170';
     backend: { vendor: string; renderer: string };
-    framebufferSample: {
-      algorithm: 'fnv1a32-rgba-grid-v1';
-      sampleCount: 40;
-      nonzeroSampleChannels: number;
-      sampleHash: string;
-    };
   };
   terminal: {
     outcome: 'boarding-ready';
@@ -830,6 +846,16 @@ interface TerminalResultSemanticState {
   };
   player: { hull: 78; sails: 61; crew: 44; cannon: 8 };
   opponent: { hull: 88; sails: 14; crew: 9; cannon: 8 };
+}
+
+interface TerminalResultRenderObservation {
+  kind: 'post-present-default-framebuffer-readpixels';
+  framebufferSample: {
+    algorithm: 'fnv1a32-rgba-grid-v1';
+    sampleCount: 40;
+    nonzeroSampleChannels: number;
+    sampleHash: string;
+  };
 }
 
 interface NormalRouteScreenshotEvidence {
@@ -851,6 +877,7 @@ interface NormalRouteScreenshotEvidence {
       pngSha256: string;
       semanticDigest: string;
       semanticState: TerminalResultSemanticState;
+      renderObservation: TerminalResultRenderObservation;
     };
     runB: {
       pngSignatureVerified: true;
@@ -860,6 +887,7 @@ interface NormalRouteScreenshotEvidence {
       pngSha256: string;
       semanticDigest: string;
       semanticState: TerminalResultSemanticState;
+      renderObservation: TerminalResultRenderObservation;
     };
   };
 }
@@ -868,6 +896,7 @@ interface NormalRouteScreenshotRun {
   run: 'A' | 'B';
   screenshotBuffers: ReadonlyMap<string, Uint8Array>;
   semanticStates: ReadonlyMap<string, TerminalResultSemanticState>;
+  renderObservations: ReadonlyMap<string, TerminalResultRenderObservation>;
   checks: {
     routeFailures: 0;
     requestFailures: 0;
@@ -890,6 +919,16 @@ type NormalRouteScreenshotComparison =
       }>;
       screenshotEvidence: NormalRouteScreenshotEvidence;
     };
+
+interface SelectedRunAPublicationManifest {
+  selectedRun: 'A';
+  artifacts: readonly { filename: string; sha256: string }[];
+  metricsSha256: string;
+  renderObservations: {
+    runA: TerminalResultRenderObservation;
+    runB: TerminalResultRenderObservation;
+  };
+}
 ```
 
 Each `pngSha256` is the lowercase 64-hex SHA-256 of that run's original PNG
@@ -898,38 +937,46 @@ PNG hash only as lowercase 64-hex and never claims to recompute it. The separate
 byte-bearing comparator recomputes both PNG SHA-256 values from the actual run
 buffers and requires equality with the declarations. Each semantic digest is
 the lowercase 64-hex SHA-256 of canonical JSON for that run's complete
-normalized `semanticState`; the serialized evaluator can and does recompute
-those digests from the embedded states. Both states and semantic digests must
-equal each other and each evaluator-recomputed semantic digest.
+stable normalized `semanticState`; the serialized evaluator can and does
+recompute those digests from the embedded states. Both stable states and
+semantic digests must equal each other and each evaluator-recomputed semantic
+digest. `renderObservation` is deliberately excluded from the stable state,
+digest, and A/B semantic equality.
 
 Backend vendor/renderer are observed, nonempty strings rather than hard-coded
-GPU brands, and must be exactly equal between A and B. `framebufferSample` has
-an exact closed shape: algorithm `fnv1a32-rgba-grid-v1`, integer `sampleCount`
-exactly `40`, integer `nonzeroSampleChannels` in inclusive range `0..160`, and
-lowercase eight-hex `sampleHash`. Zero is valid: the measured post-present
-default WebGL buffer can be cleared. The algorithm, count, nonzero-channel
-count, and hash must nevertheless be exactly equal between A and B. Sampling
-remains at the already measured post-present `readPixels` operation. It may not
-move to a new frame/render hook, `preserveDrawingBuffer`, pre-present read,
+GPU brands, and must be exactly equal between A and B. Each run's
+`renderObservation` has an exact closed shape and literal kind
+`post-present-default-framebuffer-readpixels`. Its `framebufferSample` requires
+algorithm `fnv1a32-rgba-grid-v1`, integer `sampleCount` exactly `40`, integer
+`nonzeroSampleChannels` in inclusive range `0..160`, and lowercase eight-hex
+`sampleHash`. Zero is valid. Both independently valid observations are retained
+verbatim and may differ in channel count and hash; neither is copied,
+normalized, rounded, omitted, or substituted for the other. Sampling remains
+at the already measured post-present `readPixels` operation. It may not move to
+a new frame/render hook, `preserveDrawingBuffer`, pre-present read,
 composited-PNG sample, added RAF, `gl.finish`, or any other unmeasured seam.
-This record is supporting render-state evidence only and makes no claim about
-visible pixels.
+The observation is diagnostic render-state evidence only and makes no claim
+about visible pixels.
 
 The authoritative public semantic equality remains exact tick/result, canvas/
 rect/drawing-buffer/backend, terminal outcome/seed, and player/opponent systems,
 with zero route/request/console/page/semantic-probe failures. Valid original
 PNG containers establish capture integrity. Task 7's original-resolution
 inspection of preserved A, preserved B, and tracked A owns the visual-truth
-claim; neither the framebuffer sample nor its hash can replace that inspection.
+claim; neither framebuffer observation nor its hash can replace that
+inspection.
 
 `compareNormalRouteScreenshotRuns` accepts the complete tagged A/B run objects
 and declared evidence. It reads and validates both buffer maps' PNG signatures,
 nonzero byte lengths, embedded dimensions and SHA-256 hashes; cross-checks the
 declared A/B PNG hashes against those buffers; requires exact A/B semantic
 state/digest equality, final outcome/systems, and zero route/request/console/
-page/semantic-probe failures; and byte-compares every non-exempt file. It
-accepts arbitrary honest pixel bytes only for the exact result row. Success is
-the tagged union member above with literal `selectedRun: 'A'`; every selected
+page/semantic-probe failures; independently validates each run's render
+observation and requires its declaration to equal the corresponding actual
+`renderObservations` map entry verbatim; and byte-compares every non-exempt
+file. It does not require the two render observations to equal. It accepts
+arbitrary honest pixel bytes only for the exact result row. Success is the
+tagged union member above with literal `selectedRun: 'A'`; every selected
 artifact contains the exact run-A bytes and recomputed run-A hash. Failure has
 no selected artifacts. It uses no pixel-difference, perceptual, colour-delta,
 or similarity threshold.
@@ -948,7 +995,8 @@ exact-exemption-set, and schema-shape RED tests precede source implementation.
 
 The default command writes only the comparator-selected run-A artifacts to the
 tracked path after A/B validation and identifies that ownership, the exact
-run-A PNG hash, and its complete semantic state/digest in metrics. Its
+run-A PNG hash, complete stable semantic state/digest, and both verbatim render
+observations in metrics. Its
 programmatic result exposes the successful comparison and publication manifest
 so integration tests can require its returned screenshot evidence to equal
 metrics and hash every written candidate against run A. Task 7
@@ -957,20 +1005,32 @@ diagnostic destination, explicitly enables A/B diagnostic preservation at
 `/private/tmp/caribbean-port-identity-diagnostic`, and treats that command's
 preserved run A as the inspection owner. Before any commit it proves the
 just-published tracked bytes equal preserved run A, pins the hash and complete
-state in metrics and the ignored report, hashes all 23 tracked screenshots plus
-metrics against the writer's selected-A publication manifest, and inspects
-preserved A, preserved B, and tracked A at original resolution after that final
-mutating command. No later command may replace tracked port evidence before
-commit: later port gates
+stable state/digest plus both verbatim render observations in metrics, the
+diagnostic report, the selected-run-A success manifest, and the ignored report;
+hashes all 23 tracked screenshots plus metrics against the writer's selected-A
+publication manifest; and inspects preserved A, preserved B, and tracked A at
+original resolution after that final mutating command. The success manifest
+must copy both render observations from the successful comparison without
+normalizing, swapping, or omitting either record. No later command may replace
+tracked port evidence before commit: later port gates
 use one self-contained Node 20 operation that creates a unique directory with
 `mkdtempSync`, proves it is outside `docs/screenshots/caribbean-port`, passes
-that concrete nonempty directory to `runPortCheck`, hashes every written file
-against the returned run-A publication manifest, reasserts the tracked run-A
-hash, and removes the directory in `finally`. Explicit `outputDirectory:
-undefined`, empty, or the tracked docs path fails before build/capture; it may
-not fall back to tracked output. A gate failure still executes and verifies
-temporary cleanup, then stops Task 7. Adding any future exception requires new
-measured evidence and a reviewed spec amendment.
+that concrete nonempty directory and a separate unique sibling diagnostic
+directory to `runPortCheck`, hashes every written file against the returned
+run-A publication manifest, reasserts the tracked run-A hash, and removes the
+output directory in `finally`. On success it also removes the temporary
+diagnostic directory. On failure it preserves canonical A/B metrics, their
+hashes, `canonicalJsonEqual` (literal equality of the two key-sorted canonical
+JSON strings), and the deterministic first differing JSON pointer before
+stopping; `null` plus `canonicalJsonEqual: true` distinguishes insertion-order-
+only pretty-JSON drift. The preserved diagnostic path is reported and may be
+removed only after its evidence is recorded. Explicit
+`outputDirectory: undefined`, empty, or the tracked docs path fails before
+build/capture; an explicit diagnostic destination receives the same pinned,
+non-docs, no-symlink validation and may not fall back to tracked output. The
+raw pretty-JSON metrics-byte equality and A-only publication rules are not
+weakened or replaced by canonical serialization. Adding any future exception
+requires new measured evidence and a reviewed spec amendment.
 
 The normal victory is driven through public battle controls by one committed
 golden command trace for the exact second-voyage input produced from campaign

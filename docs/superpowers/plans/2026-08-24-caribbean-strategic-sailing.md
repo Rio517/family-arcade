@@ -34,7 +34,7 @@
 - Every existing evidence `*.test.mjs` that imports `vitest` runs only through `mise exec node@20 -- npx vitest run`. Deliberate native suites use the non-Vitest suffix `.node-test.mjs`, import `node:test`/`node:assert`, run separately through `mise exec node@20 -- node --test`, and dynamically import the missing module inside a named test so the RED is collected before that named contract fails. The full Vitest glob must not collect native suites.
 - Named controller actions acquire a synchronous `{ generation, token }` owner before reading state/drafting and release only when that exact owner still matches after dispatch settles; a stale completion can never release a new-runtime action. Duplicate promises fulfill with at most one `applied` and never reject because of the duplicate.
 - Every task report records the production mutation that each test catches and confirms expected literals are hand-derived rather than computed with the code under test.
-- Every UI task runs a real production browser gate before package completion. Stable evidence is deterministic, honest performance/pixel observations use their exact approved boundary, every gate fails closed, and all existing version-2 port evidence channels remain present. The integrated normal route byte-compares metrics and 22 of its exact 23 screenshots; only `campaign-result-desktop.png` is observational, with exact A/B semantic digest/state equality, PNG/dimension validity, tracked run-A ownership, and original-resolution inspection instead of a pixel threshold.
+- Every UI task runs a real production browser gate before package completion. Stable evidence is deterministic, honest performance/pixel observations use their exact approved boundary, every gate fails closed, and all existing version-2 port evidence channels remain present. The integrated normal route byte-compares metrics and 22 of its exact 23 screenshots; only `campaign-result-desktop.png` is observational, with exact A/B stable semantic digest/state equality, independently validated and verbatim per-run post-present framebuffer observations, PNG/dimension validity, tracked run-A ownership, and original-resolution inspection instead of a pixel threshold.
 - Before every Task 1–6 source commit, run the task's focused suite, `mise exec node@20 -- npm run check`, full `mise exec node@20 -- npx vitest run`, clean `mise exec node@20 -- npx tsc -b --force`, and real `mise exec node@20 -- npm run build`, then `git diff --check`. The forced solution build is the clean typecheck; the following package build is the required production Vite build. Do not delete caches.
 - Tasks 4 and 5 must run their owned normal-production browser mode, inspect and stage its gate-owned screenshots in the same UI commit. Task 7 may recapture them cumulatively but cannot supply missing per-commit browser evidence retroactively. The terminal result screenshot never gains an undocumented exact-byte claim merely because one capture happens to repeat.
 - Naval source provenance uses Task 6's deterministic `git ls-files` seed plus transitive tracked-local import/HTML/CSS/build-entry closure, not a hand-maintained final file list; unresolved/omitted local dependencies fail closed, path membership/order and raw-byte hashes are exact, and live performance/PNG pixels remain observational.
@@ -1400,22 +1400,29 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   `campaign-result-desktop.png`. Its observation row is exactly 1440x900,
   `webgl-composited-terminal`, `trackedCapture: 'run-a'`, and contains valid/
   nonempty run-A/run-B PNG facts, lowercase 64-hex `pngSha256` values, the
-  normalized semantic state, and two lowercase 64-hex SHA-256 canonical-JSON
-  digests from the spec. The serialized evaluator validates each declared PNG
-  hash only as lowercase 64-hex because it has no PNG buffers; it never claims
-  to recompute PNG hashes. It recomputes the semantic-state digests, requires
-  the two semantic digests and complete states to be equal, and locks the
+  stable normalized semantic state, two lowercase 64-hex SHA-256 canonical-JSON
+  digests from the spec, and one explicit per-run `renderObservation`. The
+  serialized evaluator validates each declared PNG hash only as lowercase
+  64-hex because it has no PNG buffers; it never claims to recompute PNG
+  hashes. It recomputes the stable semantic-state digests, requires the two
+  semantic digests and complete stable states to be equal, and locks the
   terminal/player/opponent facts literally. Backend vendor and renderer are
-  nonempty equal strings. `framebufferSample` has exactly algorithm
-  `fnv1a32-rgba-grid-v1`, integer sample count `40`, integer nonzero-channel
-  count in inclusive range `0..160`, and lowercase eight-hex `sampleHash`; zero
-  plus measured hash `02187e45` is a valid positive fixture, and no
-  `fingerprint` alias is accepted. Add equal-A/B malformed fixtures for `-1`,
-  `161`, `1.5`, sample count `39`, uppercase/nine-hex/non-hex hashes, empty
-  backend, and every missing/extra/wrong-type nested key. The evaluator rejects
-  those plus false verification, wrong sequence/count, premature naval
-  requests, harness markers, names outside the exact screenshot sets, an
-  absent/unknown/second exception, or semantic/digest drift.
+  nonempty equal strings. Each `renderObservation` has literal kind
+  `post-present-default-framebuffer-readpixels`; its `framebufferSample` has
+  exactly algorithm `fnv1a32-rgba-grid-v1`, integer sample count `40`, integer
+  nonzero-channel count in inclusive range `0..160`, and lowercase eight-hex
+  `sampleHash`. The positive fixture uses the measured divergent pair run A
+  `160` / `9df398c6` and run B `0` / `02187e45`, requires equal stable states
+  and digests, and requires both render observations to survive verbatim. No
+  `fingerprint` alias is accepted. Add independent run-A and run-B malformed
+  fixtures for `-1`, `161`, `1.5`, sample count `39`, uppercase/nine-hex/
+  non-hex hashes, wrong kind, and every missing/extra/wrong-type nested key.
+  Add empty/equal-but-wrong backend and stable tick/result/canvas/outcome/seed/
+  system drift rows. The evaluator rejects those plus false verification,
+  wrong sequence/count, premature naval requests, harness markers, names
+  outside the exact screenshot sets, an absent/unknown/second exception, or
+  stable semantic/digest drift. It does not reject two independently valid
+  render observations merely because their counts or hashes differ.
 
   Before any comparator or writer source edit, define and test this exact
   byte-bearing flow in the same test file under exact
@@ -1428,6 +1435,7 @@ No tasks may run in parallel against these shared surfaces. Independent review c
     run: 'A' | 'B';
     screenshotBuffers: ReadonlyMap<string, Buffer>;
     semanticStates: ReadonlyMap<string, TerminalResultSemanticState>;
+    renderObservations: ReadonlyMap<string, TerminalResultRenderObservation>;
     checks: {
       routeFailures: 0; requestFailures: 0; consoleFailures: 0;
       pageFailures: 0; semanticProbesPassed: true;
@@ -1457,21 +1465,27 @@ No tasks may run in parallel against these shared surfaces. Independent review c
 
   Use valid generated 1440x900 PNG buffers. The positive fixture keeps 22 pairs
   byte-exact and gives only `campaign-result-desktop.png` different valid bytes
-  with equal exact semantic state/digests. Require `ok: true`, literal
+  with equal exact stable semantic state/digests and the measured divergent but
+  independently valid render-observation pair. Require `ok: true`, literal
   `selectedRun: 'A'`, exactly 23 selected artifacts, every selected buffer to
   equal the corresponding run-A buffer, every selected hash to equal a fresh
   SHA-256 of run A, the result's run-A hash to differ from deliberately
-  different run B, and a temp publication to hash identically to all 23
-  selections. The writer receives only the successful comparison, metrics
-  bytes, and destination; it has no raw run-B input.
+  different run B, the returned evidence to retain both render observations
+  verbatim, and a temp publication to hash identically to all 23 selections.
+  The writer receives only the successful comparison, metrics bytes, and
+  destination; it has no raw run-B input.
 
   The direct negative table changes one non-exempt buffer, omits/adds/renames
   an exception, adds a second exception, swaps tracked ownership, forges
   `selectedRun: 'B'`/B selected bytes before publication, corrupts the PNG
   signature, uses zero bytes or 1439x900 bytes, lies about either declared PNG
   hash, sets any run check failure count to one or semantic probe false, or
-  applies any malformed semantic/sample fixture above. Every row must fail
-  without throwing and publish no artifact. The comparator reads
+  applies any malformed stable-semantic or per-run render-observation fixture
+  above, copies A's render observation over B, normalizes either valid sample,
+  omits either observation, or puts the sample back inside stable semantic
+  equality/digest input. Every negative row must fail without throwing and
+  publish no artifact; the positive measured 160-vs-0 row kills the old exact
+  sample-equality contract. The comparator reads
   signatures and embedded dimensions from the buffers, recomputes both PNG
   hashes, and cross-checks the declarations; fixture booleans never substitute
   for bytes. No fixture or implementation contains a pixel-delta, perceptual,
@@ -1581,22 +1595,28 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   At the visible terminal result, read one normalized capture state through
   public DOM/WebGL APIs: exact HUD tick/result visibility; canvas size/rect,
   drawing buffer, opacity, transform, Three.js engine marker, WebGL vendor/
-  renderer, and the fixed framebuffer sample with exact algorithm
+  renderer; exact terminal trace; and rendered player/opponent systems.
+  Separately retain one
+  explicit per-run render observation containing the fixed framebuffer sample
+  with literal kind `post-present-default-framebuffer-readpixels`, exact algorithm
   `fnv1a32-rgba-grid-v1`, integer count `40`, integer nonzero channels in
-  inclusive range `0..160`, and lowercase eight-hex `sampleHash`; exact
-  terminal trace; and rendered player/opponent systems. Keep the already
-  measured post-present `readPixels` ordering unchanged. Zero channels with
-  hash `02187e45` is valid when honestly observed and exactly repeated in A/B.
+  inclusive range `0..160`, and lowercase eight-hex `sampleHash`. Keep the
+  already measured post-present `readPixels` ordering unchanged. Zero channels
+  with hash `02187e45` and nonzero channels with another valid hash are both
+  honest observations; retain each run verbatim and do not require them to
+  repeat across A/B.
   Do not move sampling to a new render/frame hook, pre-present read,
   `preserveDrawingBuffer`, composited-PNG sample, added RAF, `gl.finish`, or any
-  other unmeasured seam. The sample is supporting state evidence, not proof of
-  visible pixels. Canonicalize and SHA-256 the complete semantic state, and
-  SHA-256 the original PNG bytes separately. Capture the real full-page PNG
-  without hiding/replacing the canvas or modifying product rendering. Public
-  semantic equality remains exact tick/result, canvas/drawing buffer/backend,
-  outcome/seed, systems, and zero route/request/console/page/semantic-probe
-  failures; Task 7's original-resolution A/B/tracked inspection owns visual
-  truth.
+  other unmeasured seam. Never copy, normalize, round, omit, or overwrite one
+  run's observation with the other, and never introduce a pixel/perceptual
+  threshold. The sample is per-run diagnostic render evidence, not proof of
+  visible pixels. Exclude only the render observation from the stable semantic
+  state and its canonical SHA-256 digest; SHA-256 the original PNG bytes
+  separately. Capture the real full-page PNG without hiding/replacing the
+  canvas or modifying product rendering. Public stable semantic equality
+  remains exact tick/result, canvas/drawing buffer/backend, outcome/seed,
+  systems, and zero route/request/console/page/semantic-probe failures; Task
+  7's original-resolution A/B/tracked inspection owns visual truth.
 
   Remove the staged two-16ms terminal settle and the falsified normal-route
   experiments only: additional relative frames, absolute `performance.now`
@@ -1998,9 +2018,10 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   Expected GREEN: the named valid 22+1 direct-run fixture returns the A-tagged
   artifact set and publishes all 23 A hashes to temp; forged B selection/
   publication and every non-exempt drift, exception-set, ownership, PNG-byte/
-  declared-hash/dimension, semantic, sample-shape, destination, and unknown/
-  missing-key row fails closed; all retained schema-v2 and schema-v3 evaluator
-  tests pass.
+  declared-hash/dimension, stable-semantic, per-run observation-shape,
+  destination, and unknown/missing-key row fails closed; the measured valid
+  160-vs-0 render-observation fixture passes without weakening stable semantic
+  equality; all retained schema-v2 and schema-v3 evaluator tests pass.
 
   Add exact files:
 
@@ -2026,30 +2047,49 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   and every PNG except `campaign-result-desktop.png` exactly; there are 22 and
   no wildcard. For the exception, validate both generated files as nonempty
   1440x900 PNGs, compute each lowercase 64-hex `pngSha256`, require the exact
-  normalized terminal state and equal canonical semantic SHA-256 digests from
-  Step 5, and retain arbitrary honest pixels. The normalized state includes
-  exact nonempty backend strings and the closed framebuffer sample shape
+  stable normalized terminal state and equal canonical semantic SHA-256 digests
+  from Step 5, and retain arbitrary honest pixels. The stable normalized state
+  includes exact nonempty backend strings but not `framebufferSample`,
+  `performance.now`, or `document.timeline.currentTime`. Each run separately
+  supplies one actual render-observation map entry with literal kind
+  `post-present-default-framebuffer-readpixels` and the closed sample shape
   (`fnv1a32-rgba-grid-v1`, `40`, integer `0..160`, lowercase eight-hex
-  `sampleHash`) but not `performance.now` or
-  `document.timeline.currentTime`. Record run A as the tracked capture owner.
-  Build one declared `screenshotEvidence` record containing both PNG hashes,
-  states, and semantic digests, and run the serialized evaluator for schema and
-  semantic-digest validation. Then pass that declaration plus the complete A/B
-  run objects to the buffer comparator, require its successful returned
-  `screenshotEvidence` to deep-equal the declaration, and attach that same
-  canonical value to both metrics records. Only then finalize metrics byte
-  comparison. Publish only the successful comparator's selected artifacts;
-  never index the raw first/second screenshot maps in the writer.
+  `sampleHash`). Independently validate both and cross-check each declaration
+  against its actual run map; retain them verbatim without requiring equality.
+  Record run A as the tracked capture owner. Build one declared
+  `screenshotEvidence` record containing both PNG hashes, stable states/digests,
+  and render observations, and run the serialized evaluator for schema,
+  semantic-digest, and per-run observation validation. Then pass that
+  declaration plus the complete A/B run objects to the buffer comparator,
+  require its successful returned `screenshotEvidence` to deep-equal the
+  declaration, and attach that same canonical value to both metrics records.
+  Only then finalize the unchanged raw pretty-JSON metrics-byte comparison.
+  Publish only the successful comparator's selected artifacts; never index the
+  raw first/second screenshot or observation maps in the writer.
 
   When `CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS=1`, preserve run-A/run-B result PNGs
-  plus their state/hash record in the exact ignored destination
+  plus their stable state/digest, verbatim render observations, and hash record
+  in the exact ignored destination
   `/private/tmp/caribbean-port-identity-diagnostic`, even when their PNG bytes
   happen to match. Also write `selected-run-a-publication.json` there with
   literal `selectedRun: 'A'`, the exact sorted 23-row selected filename/SHA-256
-  manifest, and `metricsSha256` returned by the writer. The preserved run-A
-  bytes/hash and every manifest row must be the same selections written to the
-  destination. Never add diagnostic variants to source provenance or tracked
-  screenshot membership.
+  manifest, `metricsSha256` returned by the writer, and both render observations
+  copied verbatim from the successful comparison. The preserved run-A
+  bytes/hash, both observation records, and every manifest row must be the same
+  values written to metrics/destination. Never add diagnostic variants to
+  source provenance or tracked screenshot membership.
+
+  Independently expose a safe programmatic diagnostic destination for later
+  temp-only gates: `runPortCheck({ outputDirectory, diagnosticDirectory })`.
+  Supplying the second path explicitly enables diagnostics without a global
+  environment mutation; validate and pin it as an existing real parent plus an
+  absent-or-cleanable non-docs leaf before build/capture. Omission keeps the
+  current diagnostics-off no-filesystem-touch behavior. On a metrics-byte
+  mismatch the bundle must preserve key-sorted canonical A/B metrics and hashes,
+  a `canonicalJsonEqual` boolean, and the deterministic first differing JSON
+  pointer. The thrown error includes that pointer (or literal `null`) and the
+  boolean. This diagnostic addition does not canonicalize publication, weaken
+  raw metrics-byte equality, select a run, or write any tracked path.
 
 - [ ] **Step 9: Mutation proof, focused verification, review, and commit**
 
@@ -2071,12 +2111,20 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   must kill it. Temporarily byte-compare the designated result again; the valid
   different-pixel fixture must kill it. Temporarily accept `-1`, `161`, or a
   fractional nonzero-channel count, or a non-eight-hex `sampleHash`; their
-  equal-A/B malformed fixtures must kill those mutations. Temporarily require a
-  positive channel count; the valid measured zero/`02187e45` fixture must kill
-  that unmeasured restriction. Restore each mutation independently and rerun
-  the focused suite after each. No test or implementation may introduce a
-  pixel-delta, perceptual, colour, or similarity threshold or move the sample
-  from its measured post-present seam.
+  independently malformed run-A/run-B fixtures must kill those mutations.
+  Temporarily require a positive channel count; the valid measured run-B zero/
+  `02187e45` observation must kill that unmeasured restriction. Temporarily put
+  the sample back into stable state/digest equality; the positive measured run
+  A `160`/`9df398c6` versus run B `0`/`02187e45` fixture must kill it.
+  Separately copy A over B, normalize/round either sample, omit either record,
+  or stop cross-checking declarations against the actual render-observation
+  maps; verbatim-retention and malformed-row tests must kill each mutation.
+  Mutate the metrics mismatch path to omit canonical A/B, its first pointer, or
+  `canonicalJsonEqual`; the diagnostic fixture must kill each omission while
+  the raw metrics-byte gate remains red. Restore each mutation independently
+  and rerun the focused suite after each. No test or implementation may
+  introduce a pixel-delta, perceptual, colour, or similarity threshold or move
+  the sample from its measured post-present seam.
 
   In a temporary tracked graph, add a new local import and require automatic
   closure growth; remove its target and make it ambiguous. Then mutation-kill
@@ -2212,22 +2260,27 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   test -f /private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-run-a.png
   test -f /private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-run-b.png
   test -f /private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-mismatch.json
+  test -f /private/tmp/caribbean-port-identity-diagnostic/metrics-run-a.canonical.json
+  test -f /private/tmp/caribbean-port-identity-diagnostic/metrics-run-b.canonical.json
   test -f /private/tmp/caribbean-port-identity-diagnostic/selected-run-a-publication.json
   cmp -s /private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-run-a.png docs/screenshots/caribbean-port/campaign-result-desktop.png
-  mise exec node@20 -- node --input-type=module -e "import assert from 'node:assert/strict'; import {createHash} from 'node:crypto'; import fs from 'node:fs'; import path from 'node:path'; const sha256=(bytes)=>createHash('sha256').update(bytes).digest('hex'); const root='docs/screenshots/caribbean-port'; const metricsBytes=fs.readFileSync(path.join(root,'metrics.json')); const metrics=JSON.parse(metricsBytes); const diagnostic=JSON.parse(fs.readFileSync('/private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-mismatch.json','utf8')); const publication=JSON.parse(fs.readFileSync('/private/tmp/caribbean-port-identity-diagnostic/selected-run-a-publication.json','utf8')); assert.equal(publication.selectedRun,'A'); assert.equal(publication.artifacts.length,23); for (const row of publication.artifacts) assert.equal(sha256(fs.readFileSync(path.join(root,row.filename))),row.sha256); assert.equal(sha256(metricsBytes),publication.metricsSha256); const tracked=fs.readFileSync(path.join(root,'campaign-result-desktop.png')); const preservedB=fs.readFileSync('/private/tmp/caribbean-port-identity-diagnostic/campaign-result-desktop-run-b.png'); const {runA,runB}=metrics.screenshotEvidence.observation; assert.equal(runA.pngSha256,sha256(tracked)); assert.equal(runB.pngSha256,sha256(preservedB)); assert.equal(diagnostic.sha256.runA,runA.pngSha256); assert.equal(diagnostic.sha256.runB,runB.pngSha256); assert.deepEqual(diagnostic.runA,runA.semanticState); assert.deepEqual(diagnostic.runB,runB.semanticState);"
+  mise exec node@20 -- node --input-type=module -e "import assert from 'node:assert/strict'; import {createHash} from 'node:crypto'; import fs from 'node:fs'; import path from 'node:path'; const sha256=(bytes)=>createHash('sha256').update(bytes).digest('hex'); const root='docs/screenshots/caribbean-port'; const diagnostics='/private/tmp/caribbean-port-identity-diagnostic'; const metricsBytes=fs.readFileSync(path.join(root,'metrics.json')); const metrics=JSON.parse(metricsBytes); const diagnostic=JSON.parse(fs.readFileSync(path.join(diagnostics,'campaign-result-desktop-mismatch.json'),'utf8')); const publication=JSON.parse(fs.readFileSync(path.join(diagnostics,'selected-run-a-publication.json'),'utf8')); assert.equal(publication.selectedRun,'A'); assert.equal(publication.artifacts.length,23); for (const row of publication.artifacts) assert.equal(sha256(fs.readFileSync(path.join(root,row.filename))),row.sha256); assert.equal(sha256(metricsBytes),publication.metricsSha256); const tracked=fs.readFileSync(path.join(root,'campaign-result-desktop.png')); const preservedB=fs.readFileSync(path.join(diagnostics,'campaign-result-desktop-run-b.png')); const {runA,runB}=metrics.screenshotEvidence.observation; assert.equal(runA.pngSha256,sha256(tracked)); assert.equal(runB.pngSha256,sha256(preservedB)); assert.equal(diagnostic.sha256.runA,runA.pngSha256); assert.equal(diagnostic.sha256.runB,runB.pngSha256); assert.deepEqual(diagnostic.runA,runA.semanticState); assert.deepEqual(diagnostic.runB,runB.semanticState); assert.deepEqual(diagnostic.renderObservations,{runA:runA.renderObservation,runB:runB.renderObservation}); assert.deepEqual(publication.renderObservations,diagnostic.renderObservations);"
   ```
 
   Expected: schema version 3 accepted; the command's two internal clean-
   localStorage runs produce byte-identical metrics and 22 byte-identical
   screenshots. Its only comparison exception is
   `campaign-result-desktop.png`; both variants are valid nonempty 1440x900 PNGs
-  with exact equal normalized semantic state/digests at tick `11855`, while run
-  A owns the tracked capture. Exact IDs/modes/RNG/input, exactly-once
+  with exact equal stable normalized semantic state/digests at tick `11855`,
+  while their independently valid post-present render observations are retained
+  verbatim and may differ, and run A owns the tracked capture. Exact
+  IDs/modes/RNG/input, exactly-once
   resolution, final systems, focus, recovery, and zero console/page/request
   failures pass. An identical terminal PNG is allowed but not required. The
   command compares A/B before publishing run A. This is the final and only
   pre-commit port command allowed to write the tracked destination. Record its
-  run-A `pngSha256`, semantic digest, and complete semantic state verbatim in
+  run-A `pngSha256`, stable semantic digest and complete stable semantic state,
+  plus both per-run render observations verbatim in
   `.superpowers/sdd/2026-08-24-caribbean-strategic-sailing/task-7-report.md`;
   also record the sorted 23-row A-selected publication manifest and metrics
   hash after the command has recomputed every tracked candidate and matched it.
@@ -2259,15 +2312,18 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   three exact PNG hashes and that the modal, HUD, controls, ship composition,
   text, and result remain fully legible in all three. Reconfirm `cmp -s` for
   preserved A versus tracked A immediately after inspection. Do not use a
-  rescaled viewer as evidence.
+  rescaled viewer as evidence. Read and record both per-run framebuffer
+  observations from metrics, the mismatch diagnostic, and the selected-run-A
+  success manifest. Require exact three-way equality for each observation
+  record; do not require run A's observation to equal run B's.
   For all captures verify: historical one-mast silhouette; sea-dominant
   composition; functional brass route line; compact modern controls; exact
   consequences; no clipping/overlap/scroll; readable focus; full-bleed battle
   unchanged; result/return action clear; Captain's Log outcome; unsupported
   notice only. Remove the exact ignored diagnostic directory only after its A,
-  B, hash/state record, selected-A publication manifest, and tracked A have
-  been inspected and recorded; do not run another tracked-output port capture
-  to recreate it.
+  B, hash/stable-state record, both render observations, selected-A publication
+  manifest, and tracked A have been inspected and recorded; do not run another
+  tracked-output port capture to recreate it.
 
   ```bash
   rm -rf /private/tmp/caribbean-port-identity-diagnostic
@@ -2313,12 +2369,17 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   const trackedDirectory = path.resolve('docs/screenshots/caribbean-port');
   const trackedNames = fs.readdirSync(trackedDirectory).filter((name) => fs.statSync(path.join(trackedDirectory, name)).isFile()).sort();
   const trackedBefore = new Map(trackedNames.map((name) => [name, sha256(fs.readFileSync(path.join(trackedDirectory, name)))]));
-  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-precommit-'));
-  assert.equal(typeof outputDirectory, 'string');
-  assert.notEqual(outputDirectory.length, 0);
+  const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-precommit-'));
+  const outputDirectory = path.join(operationRoot, 'output');
+  const diagnosticDirectory = path.join(operationRoot, 'diagnostic');
+  fs.mkdirSync(outputDirectory);
+  assert.equal(typeof operationRoot, 'string');
+  assert.notEqual(operationRoot.length, 0);
   assert.ok(path.relative(trackedDirectory, outputDirectory).startsWith('..' + path.sep));
+  assert.ok(path.relative(trackedDirectory, diagnosticDirectory).startsWith('..' + path.sep));
+  let succeeded = false;
   try {
-    const result = await runPortCheck({ outputDirectory });
+    const result = await runPortCheck({ outputDirectory, diagnosticDirectory });
     assert.equal(result.comparison.ok, true);
     assert.equal(result.comparison.selectedRun, 'A');
     assert.deepEqual(result.comparison.screenshotEvidence, result.metrics.screenshotEvidence);
@@ -2335,12 +2396,42 @@ No tasks may run in parallel against these shared surfaces. Independent review c
     }
     assert.equal(sha256(fs.readFileSync(path.join(outputDirectory, 'metrics.json'))), result.publication.metricsSha256);
     assert.equal(result.comparison.selectedArtifacts.get('campaign-result-desktop.png').sha256, result.metrics.screenshotEvidence.observation.runA.pngSha256);
+    const diagnostic = JSON.parse(fs.readFileSync(path.join(diagnosticDirectory, 'campaign-result-desktop-mismatch.json'), 'utf8'));
+    const manifest = JSON.parse(fs.readFileSync(path.join(diagnosticDirectory, 'selected-run-a-publication.json'), 'utf8'));
+    const { runA, runB } = result.metrics.screenshotEvidence.observation;
+    assert.deepEqual(diagnostic.renderObservations, { runA: runA.renderObservation, runB: runB.renderObservation });
+    assert.deepEqual(manifest.renderObservations, diagnostic.renderObservations);
+    assert.equal(diagnostic.firstDifferingPaths.semanticState, null);
+    assert.equal(diagnostic.firstDifferingPaths.canonicalMetrics, null);
+    assert.equal(diagnostic.canonicalJsonEqual, true);
     const trackedAfterNames = fs.readdirSync(trackedDirectory).filter((name) => fs.statSync(path.join(trackedDirectory, name)).isFile()).sort();
     assert.deepEqual(trackedAfterNames, trackedNames);
     for (const name of trackedNames) assert.equal(sha256(fs.readFileSync(path.join(trackedDirectory, name))), trackedBefore.get(name));
+    succeeded = true;
+  } catch (error) {
+    if (fs.existsSync(diagnosticDirectory)) {
+      const names = fs.readdirSync(diagnosticDirectory).sort();
+      assert.ok(names.includes('metrics-run-a.canonical.json'));
+      assert.ok(names.includes('metrics-run-b.canonical.json'));
+      assert.ok(names.includes('campaign-result-desktop-mismatch.json'));
+      const report = JSON.parse(fs.readFileSync(path.join(diagnosticDirectory, 'campaign-result-desktop-mismatch.json'), 'utf8'));
+      assert.ok(report.firstDifferingPaths.canonicalMetrics === null || typeof report.firstDifferingPaths.canonicalMetrics === 'string');
+      assert.equal(typeof report.canonicalJsonEqual, 'boolean');
+      console.error('PORT_TEMP_DIAGNOSTIC_PRESERVED ' + diagnosticDirectory + ' pointer=' + String(report.firstDifferingPaths.canonicalMetrics) + ' canonicalJsonEqual=' + String(report.canonicalJsonEqual));
+    } else {
+      fs.rmSync(operationRoot, { recursive: true, force: true });
+    }
+    throw error;
   } finally {
     fs.rmSync(outputDirectory, { recursive: true, force: true });
     assert.equal(fs.existsSync(outputDirectory), false);
+    if (succeeded) {
+      fs.rmSync(operationRoot, { recursive: true, force: true });
+      assert.equal(fs.existsSync(operationRoot), false);
+    }
+    const trackedAfterNames = fs.readdirSync(trackedDirectory).filter((name) => fs.statSync(path.join(trackedDirectory, name)).isFile()).sort();
+    assert.deepEqual(trackedAfterNames, trackedNames);
+    for (const name of trackedNames) assert.equal(sha256(fs.readFileSync(path.join(trackedDirectory, name))), trackedBefore.get(name));
   }
   "
   ```
@@ -2349,17 +2440,21 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   change, no temporary/raw traces/debug globals/build artifacts remain, and
   both screenshot trees contain only gate-owned bytes. Confirm port metrics say
   `trackedCapture: 'run-a'`, name exactly one observation exception, and retain
-  the exact run-A PNG hash and semantic digest/state boundary recorded in the
-  Task 7 report; recompute all 23 tracked PNG hashes plus metrics and require
-  equality with the recorded selected-A publication manifest. All other
+  the exact run-A PNG hash, stable semantic digest/state boundary, and both
+  verbatim render observations recorded in the Task 7 report; recompute all 23
+  tracked PNG hashes plus metrics and require equality with the recorded
+  selected-A publication manifest. All other
   screenshots are in the byte-compared set. The temporary port gate may
   produce different honest terminal pixels but cannot publish them to docs and
-  receives a concrete internally created non-docs destination, so it cannot
-  overwrite the inspected Step-3 A/B files. If the Node operation or gate
-  fails, its `finally` must still remove the exact temporary directory; stop
-  Task 7, confirm the tracked hash map remains unchanged, and fix the owning
-  gate rather than retrying with an absent/empty output destination. `--verify` is
-  intentionally not run against this dirty pre-commit tree.
+  receives concrete internally created non-docs output and diagnostic
+  destinations, so it cannot overwrite the inspected Step-3 A/B files. On
+  success, verify both observations and remove the complete temporary root. If
+  the Node operation fails before diagnostics exist, remove the root; if a
+  comparison-stage bundle exists, remove only output, preserve the unique
+  diagnostic directory, print its path/first pointer/`canonicalJsonEqual`, and
+  stop. In every case confirm tracked hashes remain unchanged. Do not retry;
+  diagnose and fix the owning gate from the preserved canonical A/B records.
+  `--verify` is intentionally not run against this dirty pre-commit tree.
 
 - [ ] **Step 8: Commit all owned evidence and documentation**
 
@@ -2387,14 +2482,307 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   Reconfirm the normal-route port record still has exactly one observational
   result screenshot; all 23 tracked PNG hashes and metrics still equal the
   selected-A publication manifest recorded in the Task 7 report; and the result
-  PNG's recomputed SHA-256 equals the exact run-A `pngSha256`, semantic digest,
-  and complete state pinned by metrics/report. No later command may have
-  replaced those tracked bytes. No final review may summarize all 23 port
-  screenshots as byte-identical; it must state the 22+1 boundary explicitly.
+  PNG's recomputed SHA-256 equals the exact run-A `pngSha256`; the exact stable
+  semantic digest/state and both independently valid verbatim render
+  observations equal the metrics/report/success-manifest records. No later
+  command may have replaced those tracked bytes. No final review may summarize
+  all 23 port screenshots as byte-identical or the two render observations as
+  necessarily equal; it must state the 22+1 and stable-versus-observational
+  boundaries explicitly.
 
   Review from plan execution base through Task 7 HEAD. Required topics: source-of-truth rule reuse; event/validator totality; RNG lineage; old-save compatibility; replay/compaction; writer conflicts/consent/recovery; no mutation during battle; terminal exactly-once; reload restart disclosure; session disposal; safe-return ruling; Set Sail readiness; a11y; lazy isolation; deterministic evidence; scope discipline.
 
   Any BLOCKER, MAJOR, or MINOR returns to the owning task with a new failing test and separate fix commit. Repeat fresh focused/full/browser verification after fixes. Package close requires zero findings and clean tracked status.
+
+---
+
+## Post-cumulative Evidence Contract Amendment — default framebuffer observation
+
+This amendment is the only authorized continuation after source-fix commit
+`e5230c634a5c1fd7e5756c0b06bc002aeb186b5b`. It does not reopen product rules,
+add a screenshot exception, or weaken metrics equality. It corrects the
+terminal evidence schema and independently makes any future metrics mismatch
+diagnosable before cleanup.
+
+The preserved ignored reproduction is
+`/private/tmp/caribbean-port-temp-metrics-repro-e5230c6`. Its run-A/run-B PNGs
+are byte-identical at
+`9697f1a90da5a5de05132af5ae60fb24a063a5d07c532915e7168cd9433c6442`;
+canonical A/B metrics are byte-identical at
+`0fdbe9b75f17a08d9bee672e99c5f7e71418183d3c8d4534494a5c9aeb66ca07`;
+and its exact first semantic pointer is
+`/canvas/framebufferSample/nonzeroSampleChannels`, from run A
+`160`/`9df398c6` to run B `0`/`02187e45`. The earlier required temp-only gate's
+separate later metrics-byte mismatch remains unresolved because diagnostics
+were disabled and its cleaned run directories cannot be reconstructed.
+
+**Files:**
+
+- Modify: `docs/superpowers/specs/2026-08-24-caribbean-strategic-sailing-design.md`
+- Modify: `docs/superpowers/plans/2026-08-24-caribbean-strategic-sailing.md`
+- Modify: `scripts/lib/caribbean-port-identity-evidence.mjs`
+- Modify: `scripts/lib/caribbean-port-identity-evidence.test.mjs`
+- Modify: `scripts/caribbean-port-check.mjs`
+- Modify: `scripts/lib/caribbean-campaign-victory-browser.node-test.mjs`
+- Verify unchanged: `src/games/caribbean/**`
+- Refresh only after the new source commit: `docs/screenshots/caribbean-naval/**`
+  and `docs/screenshots/caribbean-port/**`
+
+**Interfaces:** Consumes the existing schema-v3 22+1 comparator, actual A/B
+buffer ownership, hardened diagnostic publisher, and exact post-present
+`readPixels` seam. Produces stable `TerminalResultSemanticState`, explicit
+`TerminalResultRenderObservation`, actual `renderObservations` run maps,
+verbatim observations in metrics/diagnostics/success manifest, and safe
+programmatic diagnostics for temp-only full gates. It leaves raw pretty-JSON
+metrics equality, the sole PNG exception, and A-only publication unchanged.
+
+- [ ] **Amendment Step 1: Approve and commit the docs-only contract**
+
+  Review the two-doc diff against the preserved five-file diagnostic bundle.
+  Require exact mention of both failures and every hash/pointer above; the
+  stable/observational split; independent per-run validation; no equality for
+  the two samples; exact stable equality; 22+1; A-only publication; verbatim
+  diagnostics/manifest/inspection; prohibited normalization/seam/threshold
+  changes; and future metrics diagnostic preservation. Run:
+
+  ```bash
+  git diff --check -- docs/superpowers/specs/2026-08-24-caribbean-strategic-sailing-design.md docs/superpowers/plans/2026-08-24-caribbean-strategic-sailing.md
+  rg -n "framebufferSample|renderObservation|canonicalJsonEqual|9df398c6|02187e45|0fdbe9b7|9697f1a9" docs/superpowers/specs/2026-08-24-caribbean-strategic-sailing-design.md docs/superpowers/plans/2026-08-24-caribbean-strategic-sailing.md
+  git status --short
+  ```
+
+  Expected: independent plan review is APPROVED with zero findings; only the
+  two docs plus the pre-existing twelve generated-evidence paths are modified.
+  Stage and commit only the two docs:
+
+  ```bash
+  git add docs/superpowers/specs/2026-08-24-caribbean-strategic-sailing-design.md docs/superpowers/plans/2026-08-24-caribbean-strategic-sailing.md
+  git commit -m "docs(caribbean): amend terminal render evidence"
+  ```
+
+- [ ] **Amendment Step 2: Write and observe the stable/observation RED**
+
+  In `caribbean-port-identity-evidence.test.mjs`, change the fixture model so
+  `TerminalResultSemanticState.canvas` has no `framebufferSample`; each run row
+  instead has:
+
+  ```js
+  renderObservation: {
+    kind: 'post-present-default-framebuffer-readpixels',
+    framebufferSample: {
+      algorithm: 'fnv1a32-rgba-grid-v1',
+      sampleCount: 40,
+      nonzeroSampleChannels: 160,
+      sampleHash: '9df398c6',
+    },
+  }
+  ```
+
+  Give run B the same shape with `nonzeroSampleChannels: 0` and
+  `sampleHash: '02187e45'`. Add `renderObservations` maps to the byte-bearing run
+  fixtures. The named positive test requires evaluator and comparator success,
+  equal recomputed stable digests, and exact verbatim retention of both
+  different observations. The negative table independently mutates each run's
+  kind, algorithm, count `39`, channel count `-1`/`161`/`1.5`, uppercase/
+  nine-hex/non-hex hash, missing/extra key, declaration-versus-map value, and
+  stable tick/result/canvas/backend/outcome/seed/system field.
+
+  Run before source edits:
+
+  ```bash
+  mise exec node@20 -- npx vitest run scripts/lib/caribbean-port-identity-evidence.test.mjs -t "schema-v3 strategic sailing evidence|normal-route screenshot byte comparator"
+  ```
+
+  Expected RED: the current evaluator rejects the measured divergent pair as
+  `screenshotEvidence semantic observations differ` or rejects the new exact
+  shape; the test runner itself collects normally.
+
+- [ ] **Amendment Step 3: Implement only the stable/observation split**
+
+  In `readBattleCaptureState`, keep the existing post-present public DOM/WebGL
+  read order, but return stable canvas facts separately from:
+
+  ```js
+  {
+    kind: 'post-present-default-framebuffer-readpixels',
+    framebufferSample: {
+      algorithm: 'fnv1a32-rgba-grid-v1',
+      sampleCount: pixels.length / 4,
+      nonzeroSampleChannels: pixels.filter((value) => value !== 0).length,
+      sampleHash: sampleHash.toString(16).padStart(8, '0'),
+    },
+  }
+  ```
+
+  Carry actual render observations in their own screenshot map. Exclude that
+  map from `strategicSailing`, just as screenshot bytes/states are excluded.
+  `createNormalRouteScreenshotEvidence` embeds each observation with its own
+  run; `normalRouteScreenshotRun` supplies both actual maps. The evaluator
+  validates each closed observation independently. The comparator requires
+  each declaration to canonical-deep-equal its corresponding actual map entry,
+  preserves both verbatim, and continues to require exact stable state/digest
+  equality. It never compares render A to render B.
+
+  Run:
+
+  ```bash
+  mise exec node@20 -- npx vitest run scripts/lib/caribbean-port-identity-evidence.test.mjs -t "schema-v3 strategic sailing evidence|normal-route screenshot byte comparator"
+  ```
+
+  Expected GREEN: the measured 160-vs-0 positive row passes; all malformed,
+  forged, omitted, and stable-drift rows fail closed without publication.
+
+- [ ] **Amendment Step 4: Write REDs and harden metrics mismatch diagnostics**
+
+  In `caribbean-campaign-victory-browser.node-test.mjs`, add direct tests for
+  `runPortCheck({ outputDirectory, diagnosticDirectory })`. The explicit
+  diagnostic destination opts in without an environment variable and receives
+  the same pinned-parent/no-symlink/no-tracked-docs validation as existing
+  diagnostics. Omission must preserve the current diagnostics-off zero-path-
+  touch contract. Invalid/empty/tracked/symlink destinations fail before build.
+
+  Extend the mismatch report to contain:
+
+  ```js
+  {
+    canonicalJsonEqual: boolean,
+    firstDifferingPaths: {
+      semanticState: string | null,
+      renderObservation: string | null,
+      canonicalMetrics: string | null,
+    },
+    renderObservations: { runA, runB },
+  }
+  ```
+
+  On final raw metrics-byte drift, always compute the key-sorted canonical A/B
+  buffers, their hashes, `canonicalJsonEqual`, and the first canonical JSON
+  pointer. With an explicit diagnostic destination, atomically preserve them
+  before throwing. Include pointer/boolean in the error message even when
+  diagnostics are off. Do not serialize published metrics with `canonicalJson`,
+  remove a run-local field, round a number, weaken equality, or select/publish
+  either run on failure. Add both render observations to the success mismatch
+  report and `selected-run-a-publication.json` and cross-check them against the
+  comparison before atomic publication.
+
+  Run:
+
+  ```bash
+  mise exec node@20 -- node --test --test-name-pattern="diagnostic comparison preserves|diagnostic-enabled successful compare|programmatic port evidence" scripts/lib/caribbean-campaign-victory-browser.node-test.mjs
+  mise exec node@20 -- node --check scripts/caribbean-port-check.mjs
+  mise exec node@20 -- node --check scripts/lib/caribbean-port-identity-evidence.mjs
+  ```
+
+  Expected GREEN: evaluator, comparator, metrics-byte, success-manifest,
+  diagnostics-off, safe-destination, cleanup, and publication tests pass.
+
+- [ ] **Amendment Step 5: Kill the exact mutations and run source gates**
+
+  Independently apply and restore each mutation: put the sample back inside
+  stable state/digest equality; skip run-A validation; skip run-B validation;
+  accept an out-of-range/fractional/bad-hash sample; copy A over B; normalize or
+  omit either observation; stop checking actual observation maps; relax one
+  stable field; broaden the PNG exception; select/publish B; suppress canonical
+  A/B files, `canonicalJsonEqual`, or the first pointer; canonicalize published
+  metrics; or weaken final byte equality. Each owning RED must fail. Then run:
+
+  ```bash
+  mise exec node@20 -- npx vitest run scripts/lib/caribbean-port-identity-evidence.test.mjs
+  mise exec node@20 -- node --test scripts/lib/caribbean-campaign-victory-browser.node-test.mjs
+  mise exec node@20 -- npm run check
+  mise exec node@20 -- npx vitest run
+  mise exec node@20 -- npx tsc -b --force
+  mise exec node@20 -- npm run build
+  git diff --check
+  ```
+
+  Require fresh independent source review with zero BLOCKER/MAJOR/MINOR. Commit
+  only the four amendment source/test files:
+
+  ```bash
+  git add scripts/lib/caribbean-port-identity-evidence.mjs scripts/lib/caribbean-port-identity-evidence.test.mjs scripts/caribbean-port-check.mjs scripts/lib/caribbean-campaign-victory-browser.node-test.mjs
+  git commit -m "fix(caribbean): separate framebuffer render observation"
+  ```
+
+- [ ] **Amendment Step 6: Restore a clean capture base and recapture once**
+
+  The twelve evidence modifications captured from `e5230c6` failed their later
+  required temp gate and may not be committed as final proof. After recording
+  their hashes and only with explicit execution approval, restore exactly those
+  twelve generated paths to the new HEAD's tracked parents; do not touch any
+  source/doc/report path:
+
+  ```bash
+  shasum -a 256 \
+    docs/screenshots/caribbean-naval/battle-boundary-supported.png \
+    docs/screenshots/caribbean-naval/battle-desktop.png \
+    docs/screenshots/caribbean-naval/battle-minimum-supported.png \
+    docs/screenshots/caribbean-naval/battle-tablet-landscape.png \
+    docs/screenshots/caribbean-naval/boarding-ready-result.png \
+    docs/screenshots/caribbean-naval/broadside-handedness.png \
+    docs/screenshots/caribbean-naval/metrics.json \
+    docs/screenshots/caribbean-port/campaign-battle-desktop.png \
+    docs/screenshots/caribbean-port/campaign-battle-fallback.png \
+    docs/screenshots/caribbean-port/campaign-result-desktop.png \
+    docs/screenshots/caribbean-port/market-desktop.png \
+    docs/screenshots/caribbean-port/metrics.json
+  git restore --source=HEAD -- \
+    docs/screenshots/caribbean-naval/battle-boundary-supported.png \
+    docs/screenshots/caribbean-naval/battle-desktop.png \
+    docs/screenshots/caribbean-naval/battle-minimum-supported.png \
+    docs/screenshots/caribbean-naval/battle-tablet-landscape.png \
+    docs/screenshots/caribbean-naval/boarding-ready-result.png \
+    docs/screenshots/caribbean-naval/broadside-handedness.png \
+    docs/screenshots/caribbean-naval/metrics.json \
+    docs/screenshots/caribbean-port/campaign-battle-desktop.png \
+    docs/screenshots/caribbean-port/campaign-battle-fallback.png \
+    docs/screenshots/caribbean-port/campaign-result-desktop.png \
+    docs/screenshots/caribbean-port/market-desktop.png \
+    docs/screenshots/caribbean-port/metrics.json
+  git status --short
+  ```
+
+  Require empty status, then run fresh serial build/provenance gates. From that
+  exact clean source HEAD run exactly one naval `--capture`, followed by exactly
+  one diagnostics-enabled tracked port capture:
+
+  ```bash
+  mise exec node@20 -- npx tsc -b --force
+  BUILD_HARNESS=1 mise exec node@20 -- npm run build
+  mise exec node@20 -- npm run caribbean:naval-check -- --capture
+  rm -rf /private/tmp/caribbean-port-identity-diagnostic
+  CARIBBEAN_PORT_CAPTURE_DIAGNOSTICS=1 mise exec node@20 -- npm run caribbean:port-check
+  ```
+
+  Do not rerun either failed tracked capture without reporting first.
+
+  Require the six-file port success bundle, A-only 23-artifact publication,
+  exact 22+1 boundary, exact stable A/B state/digest equality, independent
+  valid render observations copied identically through metrics/diagnostic/
+  success manifest, and original-resolution preserved-A/preserved-B/tracked-A
+  inspection. Equal render samples are allowed; unequal valid samples are also
+  allowed. No inspection may call either sample visible-pixel proof.
+
+- [ ] **Amendment Step 7: Run the diagnostic temp gate, verify, and commit evidence**
+
+  Execute Task 7 Step 7's self-contained operation with unique output and
+  diagnostic destinations. On success, remove both after verifying hashes,
+  stable semantics, and both render observations. On failure, remove output,
+  preserve and report the diagnostic bundle/pointer/`canonicalJsonEqual`, prove
+  tracked hashes unchanged, and stop without retry.
+
+  If it passes, run fresh post-capture check/full Vitest/forced TypeScript/build,
+  naval semantic-probe/verify, exact scope and provenance checks, and a final
+  zero-finding cumulative review. Commit only honest refreshed evidence and any
+  strictly required README provenance wording:
+
+  ```bash
+  git add docs/screenshots/caribbean-port docs/screenshots/caribbean-naval docs/games/caribbean-career/README.md
+  git commit -m "test(caribbean): refresh strategic sailing evidence"
+  ```
+
+  Require final clean status. Do not merge, push, rebase, fetch, or touch
+  `main`.
 
 ---
 
@@ -2419,7 +2807,7 @@ The package is complete only when every statement is evidenced:
 15. Landscape `>=960x600` works with 14 px/44 px/focus/contrast/overflow/reduced-motion guarantees; phones and portrait mount only the notice.
 16. Normal setup/port/sailing/avoid does not request naval assets; pursuit loads only local production assets; no harness/debug module ships; Battle Lab remains independently green.
 17. The real-session literal public-control trace mounts at tick zero, primes first RAF without a tick, advances through actual 16 ms RAF quanta to exact six-tick publications/final tick `11855`, preserves ordered clock/Date fixtures and `nowConsumed`, and fails closed on drift, timeout, or non-victory.
-18. Schema-v3 normal-route port metrics and 22 of its exact 23 screenshots are byte-identical across two clean runs. The sole exact exception is the valid nonempty 1440x900 `campaign-result-desktop.png`; it accepts arbitrary honest pixels only after exact A/B equality of the canonical semantic state/digest at tick `11855`, canvas/drawing-buffer/nonempty backend, exact post-present `fnv1a32-rgba-grid-v1` count-40/integer-0..160/lowercase-8-hex supporting sample, terminal outcome, and final systems. Zero sample channels are valid and do not prove visible pixels. The buffer comparator recomputes both PNG hashes, returns only tagged A-selected artifacts, and the writer consumes only that selection. Task 6 hashes every temp publication against run A; Task 7's sole final mutating command preserves A/B and hashes all 23 tracked PNGs plus metrics against the selected-A publication manifest before inspecting A/B/tracked. Later port verification is one self-contained Node operation with internal mkdtemp, explicit non-docs destination, full A-hash/tracked-unchanged proof, and `finally` cleanup. Unknown/missing/additional exceptions, sample type/range/hash failure, PNG/hash/dimension failure, semantic drift, selected-owner drift, or any non-exempt byte drift fails closed. No perceptual threshold is used. This does not impose byte identity on the separate live naval-harness observations in criterion 19.
+18. Schema-v3 normal-route port metrics and 22 of its exact 23 screenshots are byte-identical across two clean runs. The sole exact exception is the valid nonempty 1440x900 `campaign-result-desktop.png`; it accepts arbitrary honest pixels only after exact A/B equality of the canonical stable semantic state/digest at tick `11855`, canvas/drawing-buffer/nonempty equal backend, terminal outcome, and final systems. Each run separately retains one verbatim `post-present-default-framebuffer-readpixels` observation with exact `fnv1a32-rgba-grid-v1`, count `40`, integer `0..160` nonzero channels, and lowercase eight-hex hash. Zero and nonzero samples are valid, the two records may differ, neither proves visible pixels, and neither enters stable state/digest/equality. The buffer comparator cross-checks each declared observation against its actual run map, recomputes both PNG hashes, returns only tagged A-selected artifacts, and the writer consumes only that selection. Diagnostics, the success manifest, Task 7's report, and inspection retain both observations without copying, normalizing, rounding, swapping, or omission. Task 6 hashes every temp publication against run A; Task 7's sole final mutating command preserves A/B and hashes all 23 tracked PNGs plus metrics against the selected-A publication manifest before inspecting A/B/tracked. Later port verification is one self-contained Node operation with internal mkdtemp, explicit non-docs output and diagnostic destinations, full A-hash/tracked-unchanged proof, success cleanup, and failure preservation of canonical A/B metrics, their hashes, `canonicalJsonEqual`, and the first JSON pointer. Raw metrics-byte equality and A-only publication remain unchanged. Unknown/missing/additional exceptions, sample type/range/hash/retention failure, PNG/hash/dimension failure, stable semantic drift, selected-owner drift, or any non-exempt byte drift fails closed. No perceptual threshold or seam/render scheduling change is used. This does not impose byte identity on the separate live naval-harness observations in criterion 19.
 19. Naval semantic probe is non-writing and tolerates stale tracked provenance; Task 7's clean-Task-6-HEAD capture owns honest observations; final clean `--verify` proves the exact sorted seed-to-fixed-point tracked-local import/HTML/CSS/build-entry closure and raw-byte row/hash manifest—including `kv.ts`, token CSS, and app main—while accepting varied in-range FPS/duration/resource/PNG observations and rejecting unresolved/omitted/new dependencies; nonliteral dynamic imports except the exact annotated same-file immutable literal-concatenation const selected by lexical TypeScript symbol at the import occurrence, already declared, unmutated, and exactly annotated on the identifier argument; shadowed, mis-scoped, duplicate, use-before, reassigned, or name-map-blessed bindings; nonliteral CommonJS requires; every `import.meta.glob` call including literal patterns; missing/extra/reordered rows; and hash, stable, range, or artifact drift with the exact source diagnostic, mode prefix, and cleanup contract. The normal-route deterministic-flag cleanup does not change the naval harness's approved `ANGLE_ARGS`.
 20. Every Task 1–6 source commit has fresh focused tests, check, full Vitest, forced clean solution build, real package build, and diff check; Tasks 4–5 also commit inspected normal-production screenshots with their UI source; cumulative gates/review are fresh and zero-finding.
 21. Human first-time and target-iPad Safari/touch/offline/thermal observations remain honestly unobserved unless actually performed.
