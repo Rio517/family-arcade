@@ -110,9 +110,7 @@ describe('<CampaignNavalBattle>', () => {
       ['ArrowRight', 'ArrowRight'],
       ['q', 'KeyQ'],
       ['e', 'KeyE'],
-      ['1', 'Digit1'],
-      ['2', 'Digit2'],
-      ['3', 'Digit3'],
+      ['s', 'KeyS'],
       ['r', 'KeyR'],
       [' ', 'Space'],
       ['Escape', 'Escape'],
@@ -254,7 +252,7 @@ describe('<CampaignNavalBattle>', () => {
     for (const [key, code] of [
       ['a', 'KeyA'],
       ['q', 'KeyQ'],
-      ['2', 'Digit2'],
+      ['s', 'KeyS'],
       ['r', 'KeyR'],
     ]) {
       fireEvent.keyDown(window, { key, code });

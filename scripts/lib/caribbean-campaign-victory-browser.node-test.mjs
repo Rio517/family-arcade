@@ -300,6 +300,101 @@ function withoutDiagnosticEnvironment(t) {
   });
 }
 
+test('hash-aware screenshot publication leaves identical bytes untouched', async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.saveIfChanged, 'function');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-hash-aware-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const destination = path.join(temporary, 'screen.png');
+  fs.writeFileSync(destination, Buffer.from('same screenshot bytes'));
+  const initialInode = fs.statSync(destination).ino;
+
+  portCommand.saveIfChanged('screen.png', Buffer.from('same screenshot bytes'), temporary);
+  assert.equal(fs.statSync(destination).ino, initialInode);
+
+  portCommand.saveIfChanged('screen.png', Buffer.from('different screenshot bytes'), temporary);
+  assert.notEqual(fs.statSync(destination).ino, initialInode);
+  assert.deepEqual(fs.readFileSync(destination), Buffer.from('different screenshot bytes'));
+});
+
+test('port presentation contract locks aligned setup stable tabs truthful chart and inset market', async () => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.portPresentationFailures, 'function');
+  const stage = { x: 24, y: 87, width: 1392, height: 796 };
+  const valid = {
+    setup: {
+      controls: [
+        { top: 526, height: 48, labelFontPx: 16 },
+        { top: 526, height: 48, labelFontPx: 16 },
+        { top: 526, height: 48, labelFontPx: 16 },
+      ],
+      primaryFontPx: 17,
+    },
+    stages: { menu: stage, market: { ...stage }, tavern: { ...stage } },
+    chart: {
+      before: { status: 'No course marked', routeVisible: false, contactVisible: false },
+      after: { status: 'Course marked', routeVisible: true, contactVisible: true },
+    },
+    actions: [
+      'governor', 'tavern', 'market', 'shipyard', 'shares', 'log', 'set-sail',
+    ].map((id) => ({
+      id,
+      itemWidth: 110,
+      buttonWidth: 110,
+      horizontalOverflowPx: 0,
+      verticalOverflowPx: 0,
+    })),
+    market: { paddingInlineStartPx: 22, paddingInlineEndPx: 22, horizontalOverflowPx: 0 },
+  };
+  assert.deepEqual(portCommand.portPresentationFailures(valid), []);
+
+  const drifted = structuredClone(valid);
+  drifted.setup.controls[1].top += 1;
+  drifted.stages.market.y += 1;
+  drifted.chart.before.contactVisible = true;
+  drifted.actions[2].verticalOverflowPx = 1;
+  drifted.market.paddingInlineStartPx = 12;
+  assert.deepEqual(portCommand.portPresentationFailures(drifted), [
+    'commission controls do not share one vertical position',
+    'port activity stage moves between tabs',
+    'unmarked chart exposes route or contact',
+    'port action rail clips or overflows',
+    'market inline padding is below 20px',
+  ]);
+});
+
+test('battle presentation contract locks action order modest shot width and player-only reload', async () => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.battlePresentationFailures, 'function');
+  const valid = {
+    actions: [
+      ['naval-rudder-port', 'A'],
+      ['naval-fire-port', 'Q'],
+      ['naval-shot-cycle', 'S'],
+      ['naval-sail-toggle', 'R'],
+      ['naval-fire-starboard', 'E'],
+      ['naval-rudder-starboard', 'D'],
+    ].map(([id, key]) => ({ id, key, width: 196, height: 58, horizontalOverflowPx: 0, minimumTextPx: 14 })),
+    shotWidth: 228,
+    sailWidth: 196,
+    enemyReloadElements: 0,
+    playerFireStates: ['Ready', 'Reloading 50%'],
+  };
+  assert.deepEqual(portCommand.battlePresentationFailures(valid), []);
+
+  const drifted = structuredClone(valid);
+  drifted.actions[1].key = 'E';
+  drifted.shotWidth = drifted.sailWidth * 1.4;
+  drifted.enemyReloadElements = 2;
+  drifted.actions[0].height = 40;
+  assert.deepEqual(portCommand.battlePresentationFailures(drifted), [
+    'battle command order or shortcut mapping drifted',
+    'Change Shot width is outside the modest 1.1–1.22× range',
+    'enemy reload telemetry is visible',
+    'battle command target is below 44px',
+  ]);
+});
+
 test('diagnostic cleanup never follows symlinked ancestors or stale child links', async (t) => {
   const portCommand = await import('../caribbean-port-check.mjs');
   assert.equal(typeof portCommand.compareRuns, 'function');
@@ -1772,6 +1867,74 @@ test('naval cleanup attempts server shutdown when browser close rejects', async 
     /injected browser close failure/,
   );
   assert.equal(serverStopped, 1);
+});
+
+test('memory-only port warning stays clear of the compact command rail', { timeout: 60_000 }, async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.runPortMemoryWarningProbe, 'function');
+
+  execFileSync('npm', ['run', 'build'], {
+    cwd: process.cwd(),
+    env: Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'BUILD_HARNESS')),
+    stdio: 'inherit',
+  });
+  const { server, baseUrl } = await portCommand.startStaticServer();
+  t.after(async () => portCommand.stopStaticServer(server));
+  const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+  t.after(async () => browser.close());
+
+  const geometry = await portCommand.runPortMemoryWarningProbe(
+    browser,
+    baseUrl,
+    { width: 960, height: 600 },
+  );
+
+  assert.ok(geometry.clearance >= 8);
+  assert.ok(geometry.horizontalClearance >= 8);
+  assert.ok(geometry.verticalClearance < 8);
+});
+
+test('painted port surfaces stay opaque and geometrically contained at every evidence viewport', { timeout: 90_000 }, async (t) => {
+  const portCommand = await import('../caribbean-port-check.mjs');
+  assert.equal(typeof portCommand.captureArtEvidence, 'function');
+  assert.equal(typeof portCommand.readEmittedArt, 'function');
+
+  execFileSync('npm', ['run', 'build'], {
+    cwd: process.cwd(),
+    env: Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'BUILD_HARNESS')),
+    stdio: 'inherit',
+  });
+  const { server, baseUrl } = await portCommand.startStaticServer();
+  t.after(async () => portCommand.stopStaticServer(server));
+  const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+  t.after(async () => browser.close());
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-art-contract-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const report = JSON.parse(fs.readFileSync(
+    path.resolve('docs/games/caribbean-career/bridgetown-asset-report.json'),
+    'utf8',
+  ));
+
+  const evidence = await portCommand.captureArtEvidence(
+    browser,
+    baseUrl,
+    directory,
+    new Map(),
+    portCommand.readEmittedArt(),
+    report.subjectRoi,
+  );
+
+  for (const viewport of evidence.viewports) {
+    assert.ok(viewport.contrasts.every(({ minimumRatio, backgroundAlpha }) => (
+      minimumRatio >= 4.5 && backgroundAlpha === 1
+    )), viewport.name);
+    for (const geometry of [viewport.menuGeometry, viewport.marketGeometry]) {
+      assert.deepEqual(geometry.overlapPairs, [], viewport.name);
+      assert.ok(geometry.leaves.every((leaf) => (
+        leaf.contained && leaf.horizontalOverflowPx === 0 && leaf.verticalOverflowPx === 0
+      )), viewport.name);
+    }
+  }
 });
 
 test('real NavalSession obeys installed clock boundaries', { timeout: 600_000 }, async (t) => {

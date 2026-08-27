@@ -133,6 +133,22 @@ describe('<Tavern>', () => {
     expect(container.querySelectorAll('[aria-live]')).toHaveLength(1);
   });
 
+  it('keeps one reserved action slot when Mark on chart becomes its settled status', () => {
+    const { container, rerender } = render(
+      <Tavern state={availableState()} busy={false} onAccept={appliedDispatch} />,
+    );
+    const slot = container.querySelector('.caribbean-tavern-action-slot');
+
+    expect(slot).not.toBeNull();
+    expect(slot).toContainElement(screen.getByRole('button', { name: 'Mark on chart' }));
+    rerender(<Tavern state={acceptedState()} busy={false} onAccept={appliedDispatch} />);
+    expect(container.querySelector('.caribbean-tavern-action-slot')).toBe(slot);
+    expect(slot).toContainElement(screen.getByRole('status'));
+
+    const css = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+    expect(css).toMatch(/\.caribbean-tavern-action-slot\s*\{[^}]*min-block-size:\s*48px/s);
+  });
+
   it('keeps terminal rumours free of a duplicate acceptance control or stale action', () => {
     const state = acceptedState();
     state.leads[0].status = 'expired';

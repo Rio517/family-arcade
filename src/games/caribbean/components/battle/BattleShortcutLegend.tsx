@@ -1,13 +1,11 @@
 const SHORTCUTS = [
   ['A', 'Turn port'],
   ['Q', 'Fire port'],
-  ['1', 'Round shot'],
-  ['2', 'Chain shot'],
-  ['3', 'Grape shot'],
-  ['R', 'Toggle sail'],
+  ['S', 'Change shot'],
+  ['R', 'Change sail'],
   ['E', 'Fire starboard'],
   ['D', 'Turn starboard'],
-  ['Space / Esc', 'Pause'],
+  ['Space', 'Pause'],
 ] as const;
 
 export function BattleShortcutLegend() {
@@ -20,7 +18,7 @@ export function BattleShortcutLegend() {
         ))}
       </ul>
       <p className="naval-visually-hidden" data-testid="battle-shortcut-summary">
-        A turns port; Q fires port; 1 selects round shot; 2 selects chain shot; 3 selects grape shot; R toggles sail; E fires starboard; D turns starboard; Space or Escape pauses.
+        A turns port; Q fires port; S changes shot; R changes sail; E fires starboard; D turns starboard; Space pauses. Arrow keys steer and Escape also pauses.
       </p>
     </section>
   );

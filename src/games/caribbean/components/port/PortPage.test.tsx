@@ -49,21 +49,6 @@ function declaration(ruleBody: string, property: string): string | null {
   return ruleBody.match(new RegExp(`(?:^|;)\\s*${escaped}:\\s*([^;]+)`))?.[1]?.trim() ?? null;
 }
 
-function optionalRuleBodyWithDeclaration(css: string, selector: string, property: string): string | null {
-  let cursor = 0;
-  while (cursor < css.length) {
-    const selectorIndex = css.indexOf(selector, cursor);
-    if (selectorIndex < 0) return null;
-    const openBrace = css.indexOf('{', selectorIndex);
-    const closeBrace = css.indexOf('}', openBrace);
-    if (openBrace < 0 || closeBrace < 0) return null;
-    const body = css.slice(openBrace + 1, closeBrace);
-    if (declaration(body, property) !== null) return body;
-    cursor = closeBrace + 1;
-  }
-  return null;
-}
-
 function ruleBodyWithDeclaration(css: string, selector: string, property: string, after = 0): string {
   let cursor = after;
   while (cursor < css.length) {
@@ -109,68 +94,6 @@ function lengthPixels(value: string, viewportWidth: number): number {
   if (trimmed.endsWith('px')) return Number.parseFloat(trimmed);
   if (trimmed.endsWith('vw')) return Number.parseFloat(trimmed) * viewportWidth / 100;
   throw new Error(`Unsupported CSS length in layout contract: ${trimmed}`);
-}
-
-function shorthandBlockPixels(value: string, viewportWidth: number): number {
-  const terms = splitCssTerms(value);
-  const start = terms[0] ?? '';
-  const end = terms.length < 3 ? start : terms[2] ?? '';
-  return lengthPixels(start, viewportWidth) + lengthPixels(end, viewportWidth);
-}
-
-function blockEndPixels(value: string, viewportWidth: number): number {
-  const terms = splitCssTerms(value);
-  const end = terms.length < 3 ? terms[0] : terms[2];
-  return lengthPixels(end ?? '', viewportWidth);
-}
-
-function cascadedBlockEndPixels(
-  css: string,
-  selectors: readonly string[],
-  viewportWidth: number,
-): number {
-  let value: number | null = null;
-  for (const selector of selectors) {
-    const shorthandRule = optionalRuleBodyWithDeclaration(css, selector, 'margin');
-    if (shorthandRule !== null) {
-      value = blockEndPixels(declaration(shorthandRule, 'margin') ?? '', viewportWidth);
-    }
-    const longhandRule = optionalRuleBodyWithDeclaration(css, selector, 'margin-bottom');
-    if (longhandRule !== null) {
-      value = lengthPixels(declaration(longhandRule, 'margin-bottom') ?? '', viewportWidth);
-    }
-  }
-  if (value === null) throw new Error(`Missing block-end margin for ${selectors.join(' -> ')}`);
-  return value;
-}
-
-function cascadedDeclaration(
-  css: string,
-  property: string,
-  selectors: readonly string[],
-): string {
-  let value: string | null = null;
-  for (const selector of selectors) {
-    const body = optionalRuleBodyWithDeclaration(css, selector, property);
-    value = body === null ? value : declaration(body, property);
-  }
-  if (value === null) throw new Error(`Missing ${property} declaration for ${selectors.join(' -> ')}`);
-  return value;
-}
-
-function lineBoxPixels(
-  css: string,
-  selectors: readonly string[],
-  viewportWidth: number,
-  inheritedLineHeight: number,
-): number {
-  const fontSize = lengthPixels(cascadedDeclaration(css, 'font-size', selectors), viewportWidth);
-  const lineHeightValue = selectors.reduce<string | null>((value, selector) => {
-    const body = optionalRuleBodyWithDeclaration(css, selector, 'line-height');
-    return body === null ? value : declaration(body, 'line-height');
-  }, null);
-  const lineHeight = lineHeightValue === null ? inheritedLineHeight : Number.parseFloat(lineHeightValue);
-  return fontSize * lineHeight;
 }
 
 function horizontalPaddingPixels(ruleBody: string, viewportWidth: number): number {
@@ -365,9 +288,30 @@ describe('<PortPage>', () => {
     for (const activity of ['Market', 'Tavern', "Captain's Log"] as const) {
       fireEvent.click(screen.getByRole('button', { name: activity }));
       expect(screen.getAllByTestId('caribbean-port-backdrop')).toHaveLength(1);
-      fireEvent.click(screen.getByRole('button', { name: activity === 'Market' ? 'Done' : 'Back to harbour' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
       expect(screen.getAllByTestId('caribbean-port-backdrop')).toHaveLength(1);
     }
+  });
+
+  it('keeps one chart-led stage and one bottom Done action across every port tab', () => {
+    render(<StatefulPort />);
+
+    const stage = screen.getByTestId('caribbean-port-stage');
+    expect(screen.getByRole('region', { name: 'Caribbean chart' })).toBeInTheDocument();
+    for (const activity of ['Market', 'Tavern', "Captain's Log"] as const) {
+      fireEvent.click(screen.getByRole('button', { name: activity }));
+      expect(screen.getByTestId('caribbean-port-stage')).toBe(stage);
+      expect(stage).not.toHaveClass('caribbean-port-stage--market');
+      expect(within(stage).getByRole('button', { name: 'Done' })).toBeInTheDocument();
+      fireEvent.click(within(stage).getByRole('button', { name: 'Done' }));
+    }
+  });
+
+  it('shows activity focus only for keyboard-visible focus, not programmatic focus', () => {
+    const css = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+
+    expect(css).not.toMatch(/\.caribbean-port-activity h2:focus\s*\{/);
+    expect(css).toMatch(/\.caribbean-port-activity h2:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--caribbean-trade-wind\)/s);
   });
 
   it('keeps the gradient fallback and every port control usable when harbour art fails', () => {
@@ -390,7 +334,7 @@ describe('<PortPage>', () => {
       ['Tavern', 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.'],
       ['Market', '34 owned', '4 gold / unit', 'Cheap'],
       ['Shipyard', 'Sloop', 'Hold 54 / 100', 'Repairs and refits open after a profitable voyage.'],
-      ['Divide Shares', 'Not available until after a profitable voyage', 'pay everyone and settle the voyage'],
+      ['Divide Shares', 'Not available until after a profitable voyage', 'approve the crew’s shares and settle the voyage'],
       ["Captain's Log", 'No leads yet'],
     ] as const;
 
@@ -654,127 +598,27 @@ describe('<PortPage>', () => {
 
     expect(stage).not.toBeNull();
     if (market === null) throw new Error('Market ledger must remain inside the activity');
-    expect(stage).toHaveClass('caribbean-port-stage--market');
+    expect(stage).not.toHaveClass('caribbean-port-stage--market');
     expect(status.parentElement).toBe(shell);
     expect(stage?.parentElement).toBe(shell);
-    expect(navigation.parentElement).toBe(shell);
+    expect(stage).toContainElement(navigation);
     expect(activity).toContainElement(done);
     expect(rows).toHaveLength(6);
     expect(reasonRows).toHaveLength(6);
 
-    const viewportWidth = 1440;
-    const viewportHeight = 900;
     const portCss = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
     const desktopCss = portCss.slice(0, portCss.indexOf('@media (max-height: 700px)'));
-    const tokensCss = readFileSync(resolve('src/shared/styles/tokens.css'), 'utf8');
-    const bodyRule = ruleBodyWithDeclaration(tokensCss, 'body', 'line-height');
-    const inheritedLineHeight = Number.parseFloat(declaration(bodyRule, 'line-height') ?? '');
-
-    const portRule = ruleBodyContaining(desktopCss, '.caribbean-port');
-    const statusHeight = lengthPixels(
-      splitCssTerms(declaration(portRule, 'grid-template-rows') ?? '')[0] ?? '',
-      viewportWidth,
-    );
-    const menuRule = ruleBodyContaining(desktopCss, '.caribbean-port-menu');
-    const menuPadding = declaration(menuRule, 'padding') ?? '';
-    const menuBottom = lengthPixels(menuPadding.match(/max\(([^,]+)/)?.[1] ?? '', viewportWidth);
-    const actionsRule = ruleBodyContaining(desktopCss, '.caribbean-port-actions');
-    const itemRule = ruleBodyContaining(desktopCss, '.caribbean-port-action-item');
-    const menuHeight = lengthPixels(splitCssTerms(declaration(actionsRule, 'padding') ?? '')[0] ?? '', viewportWidth)
-      + lengthPixels(splitCssTerms(declaration(itemRule, 'padding') ?? '')[0] ?? '', viewportWidth)
-      + lengthPixels(declaration(itemRule, 'min-height') ?? '', viewportWidth)
-      + menuBottom;
-    const middleTrack = viewportHeight - statusHeight - menuHeight;
-
     const stageRule = ruleBodyContaining(desktopCss, '.caribbean-port-stage');
-    const marketStageRule = ruleBodyContaining(desktopCss, '.caribbean-port-stage--market');
-    const stageMargins = shorthandBlockPixels(declaration(marketStageRule, 'margin-block') ?? '', viewportWidth);
-    const stagePadding = declaration(marketStageRule, 'padding-block') === null
-      ? shorthandBlockPixels(declaration(stageRule, 'padding') ?? '', viewportWidth)
-      : shorthandBlockPixels(declaration(marketStageRule, 'padding-block') ?? '', viewportWidth);
-    const stageContent = middleTrack - stageMargins - stagePadding;
-
-    expect(declaration(stageRule, 'min-height')).toBe('0');
-    expect(declaration(marketStageRule, 'overflow-y')).toBe('auto');
-    expect(declaration(marketStageRule, 'scrollbar-gutter')).toBe('stable');
-
-    const captainLine = lineBoxPixels(
-      desktopCss,
-      ['.caribbean-port-captain', '.caribbean-port-stage--market .caribbean-port-captain'],
-      viewportWidth,
-      inheritedLineHeight,
-    );
-    const captainMargin = cascadedBlockEndPixels(
-      desktopCss,
-      ['.caribbean-port-captain', '.caribbean-port-stage--market .caribbean-port-captain'],
-      viewportWidth,
-    );
-    const placeLine = lineBoxPixels(
-      desktopCss,
-      ['.caribbean-port-stage h1', '.caribbean-port-stage--market h1'],
-      viewportWidth,
-      inheritedLineHeight,
-    );
-    const activityMargin = lengthPixels(cascadedDeclaration(
-      desktopCss,
-      'margin-top',
-      ['.caribbean-port-activity', '.caribbean-port-stage--market .caribbean-port-activity'],
-    ), viewportWidth);
-    const activityPadding = lengthPixels(cascadedDeclaration(
-      desktopCss,
-      'padding-top',
-      ['.caribbean-port-activity', '.caribbean-port-stage--market .caribbean-port-activity'],
-    ), viewportWidth);
-    const bearingLine = lineBoxPixels(
-      desktopCss,
-      ['.caribbean-port-bearing', '.caribbean-port-stage--market .caribbean-port-bearing'],
-      viewportWidth,
-      inheritedLineHeight,
-    );
-    const bearingMargin = cascadedBlockEndPixels(
-      desktopCss,
-      ['.caribbean-port-bearing', '.caribbean-port-stage--market .caribbean-port-bearing'],
-      viewportWidth,
-    );
-    const activityHeadingLine = lineBoxPixels(
-      desktopCss,
-      ['.caribbean-port-activity h2', '.caribbean-port-stage--market .caribbean-port-activity h2'],
-      viewportWidth,
-      inheritedLineHeight,
-    );
-    const activityHeadingMargin = cascadedBlockEndPixels(
-      desktopCss,
-      ['.caribbean-port-activity h2', '.caribbean-port-stage--market .caribbean-port-activity h2'],
-      viewportWidth,
-    );
-    const activityChrome = captainLine + captainMargin + placeLine
-      + activityMargin + activityPadding + 1
-      + bearingLine + bearingMargin + activityHeadingLine + activityHeadingMargin;
-
-    const summaryFactRule = ruleBodyContaining(desktopCss, '.caribbean-market-summary > div');
-    const summaryLabelLine = lineBoxPixels(desktopCss, ['.caribbean-market-summary dt'], viewportWidth, inheritedLineHeight);
-    const summaryValueLine = lineBoxPixels(desktopCss, ['.caribbean-market-summary dd'], viewportWidth, inheritedLineHeight);
-    const summaryValueRule = ruleBodyContaining(desktopCss, '.caribbean-market-summary dd');
-    const summaryHeight = shorthandBlockPixels(declaration(summaryFactRule, 'padding') ?? '', viewportWidth)
-      + summaryLabelLine
-      + lengthPixels(splitCssTerms(declaration(summaryValueRule, 'margin') ?? '')[0] ?? '', viewportWidth)
-      + summaryValueLine
-      + 2;
+    const primaryRule = ruleBodyContaining(desktopCss, '.caribbean-port-primary');
+    const activityRule = ruleBodyContaining(desktopCss, '.caribbean-port-activity');
     const marketRule = ruleBodyWithDeclaration(desktopCss, '.caribbean-market', 'padding');
-    const marketCloseRule = ruleBodyContaining(desktopCss, '.caribbean-port-stage--market .caribbean-port-close');
-    expect(declaration(marketRule, 'padding')).toBe('12px 16px 16px');
-    expect(declaration(marketCloseRule, 'position')).toBe('static');
-    expect(declaration(marketCloseRule, 'margin')).toBe('14px 0 0 auto');
-
-    const marketPadding = shorthandBlockPixels(declaration(marketRule, 'padding') ?? '', viewportWidth);
-    const marketGap = lengthPixels(declaration(marketRule, 'gap') ?? '', viewportWidth);
-    const rowRule = ruleBodyContaining(desktopCss, '.caribbean-market-row');
-    const rowsHeight = lengthPixels(declaration(rowRule, 'min-block-size') ?? '', viewportWidth) * rows.length;
-    const closeRule = ruleBodyContaining(desktopCss, '.caribbean-port-close');
-    const closeHeight = lengthPixels(declaration(closeRule, 'min-height') ?? '', viewportWidth)
-      + lengthPixels(splitCssTerms(declaration(marketCloseRule, 'margin') ?? '')[0] ?? '', viewportWidth);
-    const requiredContent = activityChrome + marketPadding + summaryHeight + marketGap + rowsHeight + closeHeight;
-    expect(requiredContent - stageContent).toBeLessThanOrEqual(80);
+    const closeRule = ruleBodyContaining(desktopCss, '.caribbean-port .caribbean-port-close');
+    expect(declaration(stageRule, 'min-height')).toBe('0');
+    expect(declaration(primaryRule, 'grid-template-rows')).toBe('auto auto auto 96px minmax(0, 1fr)');
+    expect(declaration(activityRule, 'overflow-y')).toBe('auto');
+    expect(declaration(activityRule, 'scrollbar-gutter')).toBe('stable');
+    expect(declaration(marketRule, 'padding')).toBe('20px 22px 22px');
+    expect(declaration(closeRule, 'margin')).toBe('auto 0 0 auto');
 
     expect(market.compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();

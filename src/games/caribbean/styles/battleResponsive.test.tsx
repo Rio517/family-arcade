@@ -15,10 +15,12 @@ describe('full-bleed Battle Lab layout contracts', () => {
   });
 
   it('uses one compact landscape command row with safe-area padding and touch-sized controls', () => {
-    expect(battleCss).toMatch(/\.naval-command-strip\s*\{[^}]*grid-template-columns:[^}]*repeat\(3,/s);
+    expect(battleCss).toMatch(/\.naval-command-strip\s*\{[^}]*grid-template-columns:\s*72px minmax\(128px,\s*1fr\) minmax\(140px,\s*1\.16fr\) minmax\(100px,\s*1fr\) minmax\(128px,\s*1fr\) 72px/s);
+    expect(battleCss).toMatch(/@media \(max-width:\s*1100px\), \(max-height:\s*720px\)[\s\S]*\.naval-command-strip\s*\{[^}]*grid-template-columns:\s*68px minmax\(116px,\s*1fr\) minmax\(132px,\s*1\.16fr\) minmax\(94px,\s*1fr\) minmax\(116px,\s*1fr\) 68px/s);
     expect(battleCss).toMatch(/\.naval-command-strip\s*\{[^}]*padding-bottom:\s*max\([^}]*env\(safe-area-inset-bottom\)/s);
     expect(battleCss).toMatch(/\.naval-hit-target\s*\{[^}]*min-height:\s*44px/s);
     expect(battleCss).toMatch(/\.naval-fire-control\s*\{[^}]*min-height:\s*56px/s);
+    expect(battleCss).toMatch(/\.naval-fire-control__status\s*\{[^}]*font:\s*700 14px\/1/s);
     expect(battleCss).not.toMatch(/\.naval-fire-control\s*\{[^}]*min-height:\s*(?:9[0-9]|1[0-9]{2,})px/s);
     expect(battleCss).not.toMatch(/\.naval-shortcut-key\s*\{[^}]*display:\s*none/s);
     expect(battleCss).toMatch(/\.naval-command-control span,[\s\S]*\.naval-rudder-control span\s*\{[^}]*white-space:\s*normal[^}]*text-align:\s*center/s);

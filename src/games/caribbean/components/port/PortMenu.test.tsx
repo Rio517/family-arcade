@@ -27,6 +27,20 @@ describe('<PortMenu>', () => {
     expect(within(navigation).getByRole('list')).toContainElement(actions[0]);
   });
 
+  it('leads every full-hit action with its own line icon and a compact state line', () => {
+    render(<PortMenu activeActivity="menu" readiness={{ kind: 'ready', requiredProvisions: 2 }} busy={false} onSetSail={vi.fn()} onSelect={vi.fn()} />);
+
+    const names = ['governor', 'tavern', 'market', 'shipyard', 'shares', 'log', 'set-sail'];
+    for (const name of names) {
+      const action = screen.getByTestId(`port-action-${name}`);
+      expect(action.querySelector(`[data-port-icon="${name}"]`)).not.toBeNull();
+      expect(action.querySelector('.caribbean-port-action-state')).toBeVisible();
+    }
+    expect(screen.getByTestId('port-action-set-sail')).toHaveTextContent('2 provisions');
+    expect(screen.getByTestId('port-action-shares')).toHaveTextContent('After voyage');
+    expect(screen.getByTestId('port-action-log')).toHaveTextContent('Review log');
+  });
+
   it('makes every complete navigation tile interactive and keeps supporting copy readable', () => {
     render(<PortMenu activeActivity="menu" readiness={{ kind: 'ready', requiredProvisions: 2 }} busy={false} onSetSail={vi.fn()} onSelect={vi.fn()} />);
 
@@ -34,16 +48,29 @@ describe('<PortMenu>', () => {
       expect(button.parentElement).toHaveClass('caribbean-port-action-item');
     }
     const setSail = screen.getByTestId('port-action-set-sail');
-    expect(setSail).toContainElement(screen.getByText('Round trip: 2 provisions.'));
+    expect(setSail).toContainElement(screen.getByText('2 provisions'));
 
     const css = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
     expect(css).toMatch(/\.caribbean-port-action-item\s*\{[^}]*display:\s*grid/s);
     expect(css).toMatch(/\.caribbean-port-action-item\s*\{[^}]*padding:\s*0px/s);
-    expect(css).toMatch(/\.caribbean-port-actions\s*\{[^}]*grid-auto-rows:\s*78px/s);
+    expect(css).toMatch(/\.caribbean-port-actions\s*\{[^}]*grid-auto-rows:\s*96px/s);
     expect(css).toMatch(/\.caribbean-port-action\s*\{[^}]*height:\s*100%/s);
     expect(css).toMatch(/\.caribbean-port \.caribbean-port-action\s*\{[^}]*font-size:\s*15px/s);
-    expect(css).toMatch(/\.caribbean-port-action-reason\s*\{[^}]*font-size:\s*15px/s);
+    expect(css).toMatch(/\.caribbean-port \.caribbean-port-action\s*\{[^}]*min-width:\s*0/s);
+    expect(css).toMatch(/\.caribbean-port \.caribbean-port-action\s*\{[^}]*padding:\s*7px 5px 6px/s);
+    expect(css).toMatch(/\.caribbean-port \.caribbean-port-action\s*\{[^}]*background:\s*#07151d/s);
+    expect(css).toMatch(/\.caribbean-port-action-label\s*\{[^}]*width:\s*100%/s);
+    expect(css).toMatch(/\.caribbean-port-action-state\s*\{[^}]*width:\s*100%/s);
+    expect(css).toMatch(/\.caribbean-port-action-state\s*\{[^}]*font-size:\s*14px/s);
+    expect(css).toMatch(/\.caribbean-production--port \.caribbean-memory-warning\s*\{[^}]*max-width:\s*340px/s);
+    expect(css).toMatch(/@media \(width <= 1180px\)[\s\S]*\.caribbean-port-primary\s*\{[^}]*grid-template-rows:[^;}]*168px/s);
+    expect(css).toMatch(/@media \(width <= 1180px\)[\s\S]*\.caribbean-port-actions\s*\{[^}]*grid-template-columns:\s*repeat\(4,/s);
+    expect(css).toMatch(/@media \(width <= 1180px\)[\s\S]*\.caribbean-port-action-icon\s*\{[^}]*width:\s*24px[^}]*height:\s*24px/s);
     expect(css).toMatch(/@media \(max-height:\s*700px\)[\s\S]*body:has\(\.caribbean-port\) \.party-root\s*\{[^}]*bottom:\s*calc\(148px/s);
+    expect(css).toMatch(/@media \(max-height:\s*700px\)[\s\S]*body:has\(\.caribbean-port\) \.party-root\s*\{[^}]*left:\s*calc\(50% - 10px\)/s);
+    expect(css).toMatch(/@media \(width <= 1180px\) and \(max-height:\s*700px\)[\s\S]*\.caribbean-port-primary\s*\{[^}]*grid-template-rows:[^;}]*140px/s);
+    expect(css).toMatch(/@media \(width <= 1180px\) and \(max-height:\s*700px\)[\s\S]*\.caribbean-port-actions\s*\{[^}]*grid-auto-rows:\s*70px/s);
+    expect(css).toMatch(/@media \(width <= 1180px\) and \(max-height:\s*700px\)[\s\S]*\.caribbean-port-action-item\s*\{[^}]*min-height:\s*70px/s);
   });
 
   it('marks the Tavern instead of showing the lead instruction as visible Set Sail copy', () => {
@@ -58,9 +85,11 @@ describe('<PortMenu>', () => {
     const tavern = screen.getByRole('button', { name: 'Tavern' });
     expect(tavern).toHaveAttribute('aria-describedby', 'port-tavern-attention-copy');
     expect(tavern.querySelector('.caribbean-port-action-attention')).not.toBeNull();
-    expect(screen.getByText('Rumour available')).toHaveClass('caribbean-visually-hidden');
+    expect(tavern.querySelector('.caribbean-port-action-state')).toHaveTextContent('Rumour');
+    expect(screen.getByText('Rumour available', { selector: '.caribbean-visually-hidden' })).toHaveClass('caribbean-visually-hidden');
     expect(screen.getByText('Mark the Red Jackdaw rumour in the Tavern first.')).toHaveClass('caribbean-visually-hidden');
     expect(screen.queryByText('Mark the Red Jackdaw rumour in the Tavern first.', { selector: '.caribbean-port-action-reason' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('port-action-set-sail').querySelector('.caribbean-port-action-state')).toHaveTextContent('No course');
   });
 
   it('marks only the active activity and gives every control a stable unique test id', () => {

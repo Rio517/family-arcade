@@ -66,6 +66,13 @@ function isPlayerReloadReady(event: NavalEvent): event is Extract<NavalEvent, { 
   return event.kind === 'reload-ready' && event.shipId === 'player';
 }
 
+const AMMUNITION_CYCLE = ['round', 'chain', 'grape'] as const;
+
+function nextAmmunition(current: (typeof AMMUNITION_CYCLE)[number]) {
+  const index = AMMUNITION_CYCLE.indexOf(current);
+  return AMMUNITION_CYCLE[(index + 1) % AMMUNITION_CYCLE.length];
+}
+
 function outcomeCopy(
   outcome: NavalOutcome,
   state: ReturnType<NavalSessionView['getSnapshot']>['state'],
@@ -322,7 +329,7 @@ export function NavalBattlePage({
         event.stopImmediatePropagation();
         return;
       }
-      if (event.repeat && (event.code === 'KeyQ' || event.code === 'KeyE' || event.code === 'Space')) return;
+      if (event.repeat && (event.code === 'KeyQ' || event.code === 'KeyE' || event.code === 'KeyS' || event.code === 'Space')) return;
       if (event.code === 'KeyQ') session.requestFire('port');
       if (event.code === 'KeyE') session.requestFire('starboard');
       if (event.code === 'KeyA' || event.code === 'ArrowLeft') held.current.port = true;
@@ -330,9 +337,7 @@ export function NavalBattlePage({
       if (event.code === 'KeyA' || event.code === 'ArrowLeft' || event.code === 'KeyD' || event.code === 'ArrowRight') {
         session.setRudder(rudderFromHeld());
       }
-      if (event.code === 'Digit1') session.setAmmunition('round');
-      if (event.code === 'Digit2') session.setAmmunition('chain');
-      if (event.code === 'Digit3') session.setAmmunition('grape');
+      if (event.code === 'KeyS') session.setAmmunition(nextAmmunition(currentCommand.ammunition));
       if (event.code === 'KeyR') session.setSail(currentCommand.sail === 'full' ? 'reefed' : 'full');
       if (event.code === 'Space') {
         event.preventDefault();
@@ -354,7 +359,7 @@ export function NavalBattlePage({
       window.removeEventListener('keydown', onKeyDown, { capture: true });
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [activateAudio, controlsBlocked, currentCommand.sail, diagnostic, paused, session]);
+  }, [activateAudio, controlsBlocked, currentCommand.ammunition, currentCommand.sail, diagnostic, paused, session]);
 
   const holdRudder = (side: 'port' | 'starboard', active: boolean) => {
     if (controlsBlocked) {
@@ -397,19 +402,14 @@ export function NavalBattlePage({
           <div className="naval-command-dock">
             <div className="naval-command-strip" role="group" aria-label="Battle commands">
               <RudderControl side="port" shortcut="A" active={currentCommand.rudder === -1} onHold={holdRudder} onActivate={activateAudio} />
-              <FireControl buttonRef={portFireRef} side="port" onFire={() => { activateAudio(); session.requestFire('port'); }} disabled={Boolean(outcome || diagnostic)} />
-              <div className="naval-ammunition-controls" role="group" aria-label="Ammunition">
-                {(['round', 'chain', 'grape'] as const).map((ammunition, index) => (
-                  <button
-                    key={ammunition}
-                    type="button"
-                    className="naval-control naval-hit-target naval-command-control"
-                    data-testid={`naval-ammo-${ammunition}`}
-                    aria-pressed={currentCommand.ammunition === ammunition}
-                    onClick={() => { activateAudio(); session.setAmmunition(ammunition); }}
-                  ><kbd>{index + 1}</kbd><span>{ammunition.charAt(0).toUpperCase() + ammunition.slice(1)}</span></button>
-                ))}
-              </div>
+              <FireControl buttonRef={portFireRef} side="port" reload={state.ships.player.reload.port} onFire={() => { activateAudio(); session.requestFire('port'); }} disabled={Boolean(outcome || diagnostic)} />
+              <button
+                type="button"
+                className="naval-control naval-hit-target naval-command-control naval-shot-control"
+                data-testid="naval-shot-cycle"
+                aria-label={`Change shot — ${currentCommand.ammunition} selected`}
+                onClick={() => { activateAudio(); session.setAmmunition(nextAmmunition(currentCommand.ammunition)); }}
+              ><kbd>S</kbd><strong>Change shot</strong><span>{currentCommand.ammunition}</span></button>
               <button
                 type="button"
                 className="naval-control naval-hit-target naval-command-control naval-sail-control"
@@ -417,10 +417,11 @@ export function NavalBattlePage({
                 aria-pressed={currentCommand.sail === 'reefed'}
                 aria-label={`Sail setting: ${currentCommand.sail}. Press to ${currentCommand.sail === 'full' ? 'reef' : 'set full sail'}`}
                 onClick={() => { activateAudio(); session.setSail(currentCommand.sail === 'full' ? 'reefed' : 'full'); }}
-              ><kbd>R</kbd><span>Sail: {currentCommand.sail === 'full' ? 'Full' : 'Reefed'}</span></button>
-              <FireControl side="starboard" onFire={() => { activateAudio(); session.requestFire('starboard'); }} disabled={Boolean(outcome || diagnostic)} />
+              ><kbd>R</kbd><strong>Change sail</strong><span>{currentCommand.sail === 'full' ? 'Full' : 'Reefed'}</span></button>
+              <FireControl side="starboard" reload={state.ships.player.reload.starboard} onFire={() => { activateAudio(); session.requestFire('starboard'); }} disabled={Boolean(outcome || diagnostic)} />
               <RudderControl side="starboard" shortcut="D" active={currentCommand.rudder === 1} onHold={holdRudder} onActivate={activateAudio} />
-              <details className="naval-options" data-testid="naval-options">
+            </div>
+            <details className="naval-options" data-testid="naval-options">
                 <summary className="naval-control naval-hit-target" data-testid="naval-options-toggle">Options</summary>
                 <div className="naval-options__panel">
                   <button
@@ -452,8 +453,7 @@ export function NavalBattlePage({
                     <SensoryToggle testId="naval-setting-mute" label="Mute" pressed={sensory.muted} onToggle={() => setSensory((value) => ({ ...value, muted: !value.muted }))} />
                   </fieldset>
                 </div>
-              </details>
-            </div>
+            </details>
           </div>
         </div>
         <span data-testid="naval-effective-shake" className="naval-visually-hidden">Camera shake {effectiveShake ? 'enabled' : 'disabled'}</span>
@@ -552,27 +552,36 @@ function SensoryToggle({ testId, label, pressed, onToggle }: { testId: string; l
 
 function FireControl({
   side,
+  reload,
   onFire,
   disabled,
   buttonRef,
 }: {
   side: Broadside;
+  reload: { loaded: boolean; progress: number; required: number };
   onFire(): void;
   disabled: boolean;
   buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
   const isPort = side === 'port';
+  const reloadPercent = reload.required <= 0
+    ? 0
+    : Math.round(Math.max(0, Math.min(1, reload.progress / reload.required)) * 100);
+  const readiness = reload.loaded ? 'ready' : `reloading ${reloadPercent} percent`;
   return (
     <button
       ref={buttonRef}
       type="button"
       className={`naval-control naval-hit-target naval-fire-control naval-fire-control--${side}`}
       data-testid={`naval-fire-${side}`}
+      aria-label={`Fire ${side} — ${readiness}`}
       onClick={onFire}
-      disabled={disabled}
+      disabled={disabled || !reload.loaded}
     >
-      <span className="naval-fire-control__key">{isPort ? 'Q' : 'E'}</span>
+      <kbd className="naval-fire-control__key">{isPort ? 'Q' : 'E'}</kbd>
       <strong>Fire {side}</strong>
+      <span className="naval-fire-control__status">{reload.loaded ? 'Ready' : `Reloading ${reloadPercent}%`}</span>
+      <i className="naval-fire-control__meter" aria-hidden="true"><b style={{ width: `${reload.loaded ? 100 : reloadPercent}%` }} /></i>
     </button>
   );
 }

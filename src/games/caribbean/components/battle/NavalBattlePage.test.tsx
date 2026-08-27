@@ -69,7 +69,7 @@ describe('accessible naval command deck', () => {
       <StrictMode><NavalBattlePage session={session} sceneFactory={null} audioFactory={audio.factory} /></StrictMode>,
     );
 
-    fireEvent.click(screen.getByTestId('naval-ammo-chain'));
+    fireEvent.click(screen.getByTestId('naval-shot-cycle'));
     await waitFor(() => expect(audio.contexts).toHaveLength(1));
     expect(audio.contexts[0].closed).toBe(0);
     unmount();
@@ -120,6 +120,20 @@ describe('accessible naval command deck', () => {
     expect(session.currentCommand.rudder).toBe(0);
   });
 
+  it('cycles shot with S and leaves the removed number shortcuts inert', () => {
+    const session = manualNavalSession();
+    render(<NavalBattlePage session={session} sceneFactory={null} />);
+
+    for (const ammunition of ['chain', 'grape', 'round'] as const) {
+      fireEvent.keyDown(window, { code: 'KeyS', key: 's' });
+      expect(session.currentCommand.ammunition).toBe(ammunition);
+    }
+    for (const [key, code] of [['1', 'Digit1'], ['2', 'Digit2'], ['3', 'Digit3']]) {
+      fireEvent.keyDown(window, { key, code });
+      expect(session.currentCommand.ammunition).toBe('round');
+    }
+  });
+
   it('keeps port and starboard controls physically bracketed with visible labels and touch-safe release', () => {
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} />);
@@ -168,7 +182,7 @@ describe('accessible naval command deck', () => {
     }
   });
 
-  it('shows the complete compact command strip without side-paddle duplication', () => {
+  it('shows the six action-first command modules with compact QWERTY badges', () => {
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} />);
 
@@ -176,10 +190,8 @@ describe('accessible naval command deck', () => {
     for (const [testId, key, action] of [
       ['naval-rudder-port', 'A', 'Turn port'],
       ['naval-fire-port', 'Q', 'Fire port'],
-      ['naval-ammo-round', '1', 'Round'],
-      ['naval-ammo-chain', '2', 'Chain'],
-      ['naval-ammo-grape', '3', 'Grape'],
-      ['naval-sail-toggle', 'R', 'Sail: Full'],
+      ['naval-shot-cycle', 'S', 'Change shot'],
+      ['naval-sail-toggle', 'R', 'Change sail'],
       ['naval-fire-starboard', 'E', 'Fire starboard'],
       ['naval-rudder-starboard', 'D', 'Turn starboard'],
     ]) {
@@ -188,8 +200,25 @@ describe('accessible naval command deck', () => {
       expect(control).toHaveTextContent(action);
       expect(control).toHaveClass('naval-hit-target');
     }
+    expect(within(strip).queryByTestId(/naval-ammo-/)).not.toBeInTheDocument();
     expect(within(strip).getAllByTestId(/naval-fire-(port|starboard)/)).toHaveLength(2);
     expect(screen.getByTestId('naval-pause')).toHaveTextContent('Space / Esc');
+  });
+
+  it('integrates each player battery readiness meter with its fire action', () => {
+    const session = manualNavalSession();
+    session.state.ships.player.reload.port = { loaded: true, progress: 120, required: 120 };
+    session.state.ships.player.reload.starboard = { loaded: false, progress: 60, required: 120 };
+    session.deliverFrame(0);
+    render(<NavalBattlePage session={session} sceneFactory={null} />);
+
+    const port = screen.getByTestId('naval-fire-port');
+    const starboard = screen.getByTestId('naval-fire-starboard');
+    expect(port).toHaveAccessibleName('Fire port — ready');
+    expect(port).toHaveTextContent('Ready');
+    expect(starboard).toHaveAccessibleName('Fire starboard — reloading 50 percent');
+    expect(starboard).toHaveTextContent('Reloading 50%');
+    expect(starboard.querySelector('.naval-fire-control__meter b')).toHaveStyle({ width: '50%' });
   });
 
   it('maps sail, ammunition, pause, and restart actions through stable test ids', () => {
@@ -199,13 +228,15 @@ describe('accessible naval command deck', () => {
     const sail = screen.getByTestId('naval-sail-toggle');
     expect(sail).toHaveAttribute('aria-pressed', 'false');
     expect(sail).toHaveAccessibleName(/sail setting: full.*reef/i);
-    expect(sail).toHaveTextContent('Sail: Full');
+    expect(sail).toHaveTextContent('Change sail');
+    expect(sail).toHaveTextContent('Full');
     fireEvent.click(sail);
     expect(screen.getByTestId('naval-sail-toggle')).toBe(sail);
     expect(sail).toHaveAttribute('aria-pressed', 'true');
     expect(sail).toHaveAccessibleName(/sail setting: reefed.*full/i);
-    expect(sail).toHaveTextContent('Sail: Reefed');
-    fireEvent.click(screen.getByTestId('naval-ammo-chain'));
+    expect(sail).toHaveTextContent('Change sail');
+    expect(sail).toHaveTextContent('Reefed');
+    fireEvent.click(screen.getByTestId('naval-shot-cycle'));
     fireEvent.click(screen.getByTestId('naval-pause'));
 
     expect(session.currentCommand).toMatchObject({ sail: 'reefed', ammunition: 'chain' });
@@ -647,8 +678,7 @@ describe('accessible naval command deck', () => {
     expect(hud).toHaveTextContent(/Sails/);
     expect(hud).toHaveTextContent(/Crew/);
     expect(hud).toHaveTextContent(/Cannon/);
-    expect(hud).toHaveTextContent(/Port reload/);
-    expect(hud).toHaveTextContent(/Starboard reload/);
+    expect(hud).not.toHaveTextContent(/reload|ready/i);
     expect(hud).toHaveTextContent(/Round/);
     expect(hud).toHaveTextContent(/Full sail/);
     expect(hud).toHaveTextContent(/Trade wind/);
@@ -782,7 +812,7 @@ describe('accessible naval command deck', () => {
     const audio = pageAudioFactory();
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} audioFactory={audio.factory} />);
-    fireEvent.click(screen.getByTestId('naval-ammo-chain'));
+    fireEvent.click(screen.getByTestId('naval-shot-cycle'));
     await waitFor(() => expect(audio.contexts).toHaveLength(1));
 
     act(() => {
@@ -797,7 +827,7 @@ describe('accessible naval command deck', () => {
     const audio = pageAudioFactory();
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} audioFactory={audio.factory} />);
-    fireEvent.click(screen.getByTestId('naval-ammo-chain'));
+    fireEvent.click(screen.getByTestId('naval-shot-cycle'));
     await waitFor(() => expect(audio.contexts).toHaveLength(1));
     if (suppression === 'paused') fireEvent.click(screen.getByTestId('naval-pause'));
     else fireEvent.click(screen.getByTestId('naval-setting-mute'));
@@ -816,7 +846,7 @@ describe('accessible naval command deck', () => {
     const audio = pageAudioFactory();
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} audioFactory={audio.factory} />);
-    fireEvent.click(screen.getByTestId('naval-ammo-chain'));
+    fireEvent.click(screen.getByTestId('naval-shot-cycle'));
     await waitFor(() => expect(audio.contexts).toHaveLength(1));
     visibility = 'hidden';
     act(() => document.dispatchEvent(new Event('visibilitychange')));

@@ -143,7 +143,7 @@ export function CaribbeanLab({ sceneFactory, battleInput, onSessionReady }: Cari
           <div className="caribbean-briefing__copy">
             <p className="caribbean-eyebrow"><TargetIcon size={18} /> Red Jackdaw briefing</p>
             <h2 ref={briefingHeading} tabIndex={-1}>Disable. Close. Capture.</h2>
-            <p>Objective: capture the Red Jackdaw. The fresh trade wind comes from 60°. Full sail gives speed; reefed sail turns harder. Steer with A/D and fire port/starboard with Q/E. Round shot breaks hull, chain cuts sails, and grape weakens crew. Disable sails and crew, then close under seven lengths to board.</p>
+            <p>Objective: capture the Red Jackdaw. The fresh trade wind comes from 60°. Full sail gives speed; reefed sail turns harder. Steer with A/D and fire port/starboard with Q/E. Cycle shot with S: round breaks hull, chain cuts sails, and grape weakens crew. Disable sails and crew, then close under seven lengths to board.</p>
             <dl>
               <div><dt>Your sloop</dt><dd>Mistral / 8 cannon / 52 crew</dd></div>
               <div><dt>Prize target</dt><dd>Red Jackdaw / capture intact</dd></div>

@@ -8,6 +8,7 @@ import { voyageReadiness } from '../../domain/voyage';
 import type { CaribbeanController } from '../../state/useCaribbean';
 import '../../styles/port.css';
 import { CaptainsLog } from '../log/CaptainsLog';
+import { CaribbeanChart } from './CaribbeanChart';
 import { DivideShares } from './DivideShares';
 import { GovernorHouse } from './GovernorHouse';
 import { Market } from './Market';
@@ -113,7 +114,7 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
       type="button"
       onClick={closeActivity}
     >
-      {activeActivity === 'market' ? 'Done' : 'Back to harbour'}
+      Done
     </button>
   );
 
@@ -140,13 +141,23 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
 
       <div className="caribbean-port-horizon" aria-hidden="true" />
 
-      <div className={`caribbean-port-stage${activeActivity === 'market' ? ' caribbean-port-stage--market' : ''}`}>
-        <p className="caribbean-port-captain">Captain {state.captain.name}</p>
-        <h1 id="caribbean-port-title">Bridgetown</h1>
-        <section className="caribbean-port-activity" aria-label="Port activity">
+      <div className="caribbean-port-stage" data-testid="caribbean-port-stage">
+        <div className="caribbean-port-primary">
+          <p className="caribbean-port-captain">Captain {state.captain.name}</p>
+          <h1 id="caribbean-port-title">Bridgetown</h1>
           <p className="caribbean-port-bearing">
             {activeActivity === null ? 'Harbour course · seven calls' : `Port call · ${heading}`}
           </p>
+          <PortMenu
+            activeActivity={controller.activity}
+            readiness={readiness}
+            busy={controller.busy}
+            onSetSail={controller.setSail}
+            onSelect={controller.selectActivity}
+            registerTrigger={registerTrigger}
+            registerSetSailTrigger={(element) => { setSailRef.current = element; }}
+          />
+          <section className="caribbean-port-activity" aria-label="Port activity">
           <h2 ref={headingRef} tabIndex={-1}>{heading}</h2>
           {activeActivity === null ? (
             <p className="caribbean-port-arrival">
@@ -158,18 +169,10 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
               {closeControl}
             </>
           )}
-        </section>
+          </section>
+        </div>
+        <CaribbeanChart state={state} />
       </div>
-
-      <PortMenu
-        activeActivity={controller.activity}
-        readiness={readiness}
-        busy={controller.busy}
-        onSetSail={controller.setSail}
-        onSelect={controller.selectActivity}
-        registerTrigger={registerTrigger}
-        registerSetSailTrigger={(element) => { setSailRef.current = element; }}
-      />
     </section>
   );
 }

@@ -111,14 +111,15 @@
 .caribbean-recovery-content > p,
 .caribbean-ready > p { max-width: 620px; color: color-mix(in srgb, var(--caribbean-sailcloth) 72%, transparent); line-height: 1.55; }
 
-.caribbean-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin: 28px 0; }
-.caribbean-field { display: grid; gap: 7px; }
-.caribbean-field label { font-size: 14px; font-weight: 700; }
+.caribbean-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 22px; margin: 28px 0; }
+.caribbean-field { display: grid; grid-template-rows: 20px 48px minmax(20px, auto); gap: 7px; }
+.caribbean-field label { font-size: 16px; font-weight: 700; line-height: 20px; }
 .caribbean-form-grid input,
 .caribbean-form-grid select {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  height: 48px;
   min-height: 48px;
   padding: 0 13px;
   border: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 35%, transparent);
@@ -146,7 +147,7 @@
 .caribbean-form-grid input:focus-visible,
 .caribbean-form-grid select:focus-visible { outline: 3px solid var(--caribbean-trade-wind); outline-offset: 3px; }
 .caribbean-production button:disabled { opacity: .48; cursor: wait; }
-.caribbean-production .caribbean-button-primary { border-color: var(--caribbean-trade-wind); background: var(--caribbean-trade-wind); color: var(--caribbean-deep-keel); }
+.caribbean-production .caribbean-button-primary { border-color: var(--caribbean-trade-wind); background: var(--caribbean-trade-wind); color: var(--caribbean-deep-keel); font-size: 17px; }
 .caribbean-production .caribbean-button-danger { border-color: var(--caribbean-signal-red); color: color-mix(in srgb, var(--caribbean-signal-red) 76%, white); }
 .caribbean-action-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
 

@@ -84,24 +84,19 @@
 .naval-system-grid { display: grid; grid-template-columns: repeat(4, minmax(56px, 1fr)); gap: 8px; }
 .naval-system-value { display: grid; grid-template-columns: 1fr auto; gap: 4px; align-items: center; }
 .naval-system-value span,
-.naval-reload-value span,
 .naval-current-order span { color: color-mix(in srgb, var(--caribbean-sailcloth) 62%, transparent); font: 700 14px/1 ui-monospace, monospace; letter-spacing: .04em; text-transform: uppercase; }
-.naval-system-value strong,
-.naval-reload-value strong { color: var(--caribbean-sailcloth); font: 700 14px/1 ui-monospace, monospace; }
+.naval-system-value strong { color: var(--caribbean-sailcloth); font: 700 14px/1 ui-monospace, monospace; }
 .naval-system-value i { grid-column: 1/-1; height: 3px; background: color-mix(in srgb, var(--caribbean-sailcloth) 15%, transparent); overflow: hidden; }
 .naval-system-value i b { display: block; height: 100%; background: var(--caribbean-trade-wind); }
 .naval-ship-systems--enemy .naval-system-value i b { margin-left: auto; background: color-mix(in srgb, var(--caribbean-signal-red) 76%, var(--caribbean-sailcloth)); }
-.naval-reload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 7px; }
-.naval-reload-value { display: flex; justify-content: space-between; gap: 8px; padding-top: 5px; border-top: 1px solid var(--naval-line); }
-.naval-ship-systems--enemy .naval-reload-value { flex-direction: row-reverse; }
 .naval-current-order { display: grid; grid-template-columns: auto auto; gap: 5px 9px; padding: 8px 12px; border-left: 1px solid color-mix(in srgb, var(--caribbean-brass) 42%, transparent); background: color-mix(in srgb, var(--caribbean-deep-keel) 80%, transparent); }
 .naval-current-order strong { font: 700 14px/1.2 ui-monospace, monospace; text-transform: uppercase; }
 
-.naval-command-dock { position: absolute; z-index: 4; left: 50%; bottom: 0; transform: translateX(-50%); width: min(940px, calc(100% - 28px)); pointer-events: none; }
+.naval-command-dock { position: absolute; z-index: 4; left: 50%; bottom: 0; transform: translateX(-50%); width: min(980px, calc(100% - 28px)); pointer-events: none; }
 .naval-command-strip {
   min-height: 64px;
   display: grid;
-  grid-template-columns: 64px 104px repeat(3, minmax(74px, 1fr)) minmax(92px, 1fr) 122px 72px 84px;
+  grid-template-columns: 72px minmax(128px, 1fr) minmax(140px, 1.16fr) minmax(100px, 1fr) minmax(128px, 1fr) 72px;
   align-items: stretch;
   gap: 5px;
   padding: 4px 5px max(4px, env(safe-area-inset-bottom));
@@ -118,14 +113,21 @@
 .naval-command-control span,
 .naval-fire-control strong,
 .naval-rudder-control span { font: 700 14px/1.05 "Avenir Next Condensed", "Roboto Condensed", sans-serif; letter-spacing: .02em; text-transform: uppercase; white-space: normal; text-align: center; }
+.naval-command-control strong { font: 700 14px/1.05 "Avenir Next Condensed", "Roboto Condensed", sans-serif; letter-spacing: .03em; text-transform: uppercase; }
+.naval-command-control > span { color: color-mix(in srgb, var(--caribbean-sailcloth) 70%, transparent); }
+.naval-shot-control { padding-inline: 14px; }
+.naval-shot-control > span { text-transform: uppercase; }
 .naval-fire-control { min-height: 56px; border-color: color-mix(in srgb, var(--caribbean-brass) 62%, transparent); background: color-mix(in srgb, var(--caribbean-brass) 10%, var(--caribbean-deep-keel)); }
 .naval-fire-control__key { color: var(--caribbean-brass); font: 800 14px/1 ui-monospace, monospace; }
+.naval-fire-control__status { color: color-mix(in srgb, var(--caribbean-sailcloth) 72%, transparent); font: 700 14px/1 ui-monospace, monospace; text-transform: uppercase; }
+.naval-fire-control__meter { display: block; width: min(84px, 84%); height: 3px; overflow: hidden; background: color-mix(in srgb, var(--caribbean-sailcloth) 15%, transparent); }
+.naval-fire-control__meter b { display: block; height: 100%; background: var(--caribbean-brass); }
+.naval-fire-control:disabled { opacity: .7; }
 .naval-fire-control:active:not(:disabled) { background: color-mix(in srgb, var(--caribbean-signal-red) 44%, var(--caribbean-deep-keel)); border-color: var(--caribbean-signal-red); }
 .naval-command-control[aria-pressed="true"] { border-color: var(--caribbean-trade-wind); background: color-mix(in srgb, var(--caribbean-trade-wind) 18%, var(--caribbean-deep-keel)); color: var(--caribbean-trade-wind); }
-.naval-ammunition-controls { display: contents; }
 .naval-rudder-control span { font-size: 14px; }
-.naval-options { position: relative; min-width: 0; }
-.naval-options > summary { height: 100%; display: grid; place-items: center; padding: 0 8px; list-style: none; }
+.naval-options { position: absolute; right: 5px; bottom: calc(100% + 8px); min-width: 0; pointer-events: auto; }
+.naval-options > summary { display: grid; place-items: center; padding: 0 12px; list-style: none; }
 .naval-options > summary::-webkit-details-marker { display: none; }
 .naval-options[open] > summary { border-color: var(--caribbean-trade-wind); color: var(--caribbean-trade-wind); }
 .naval-options__panel { position: absolute; right: 0; bottom: calc(100% + 8px); width: 390px; max-height: calc(100dvh - 160px); overflow: auto; padding: 10px; border: 1px solid color-mix(in srgb, var(--caribbean-brass) 55%, transparent); background: color-mix(in srgb, var(--caribbean-deep-keel) 96%, transparent); box-shadow: 0 18px 60px rgba(0,0,0,.55); }
@@ -228,8 +230,7 @@ body:has(.caribbean-production--campaign .naval-battle-page) .party-root {
   .naval-player-rail { bottom: 72px; }
   .naval-ship-systems { width: min(470px, 47vw); padding-block: 6px 8px; }
   .naval-ship-systems header { margin-bottom: 4px; }
-  .naval-reload-grid { margin-top: 5px; }
   .naval-command-dock { width: calc(100% - 18px); }
-  .naval-command-strip { grid-template-columns: 64px 100px repeat(3, minmax(62px, 1fr)) minmax(98px, 1fr) 116px 72px 72px; }
+  .naval-command-strip { grid-template-columns: 68px minmax(116px, 1fr) minmax(132px, 1.16fr) minmax(94px, 1fr) minmax(116px, 1fr) 68px; }
   .naval-aim-cue { bottom: 139px; }
 }

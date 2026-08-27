@@ -33,24 +33,26 @@ export function Tavern({ state, busy, onAccept }: TavernProps) {
     <div className="caribbean-tavern">
       <article className="caribbean-tavern-rumour" data-testid="tavern-rumour-card">
         <blockquote>{view.sentence}</blockquote>
-        {view.status === 'available' && (
-          <button
-            className="caribbean-tavern-mark"
-            data-testid="tavern-mark-red-jackdaw"
-            type="button"
-            disabled={busy || accepting}
-            onClick={markOnChart}
-          >
-            Mark on chart
-          </button>
-        )}
-        <p className="caribbean-tavern-status" role="status" aria-live="polite" aria-atomic="true">
-          {view.status === 'active'
-            ? "Marked in the Captain's Log"
-            : view.status === 'available'
-              ? ''
-              : view.terminalCopy}
-        </p>
+        <div className="caribbean-tavern-action-slot">
+          {view.status === 'available' && (
+            <button
+              className="caribbean-tavern-mark"
+              data-testid="tavern-mark-red-jackdaw"
+              type="button"
+              disabled={busy || accepting}
+              onClick={markOnChart}
+            >
+              Mark on chart
+            </button>
+          )}
+          <p className="caribbean-tavern-status" role="status" aria-live="polite" aria-atomic="true">
+            {view.status === 'active'
+              ? "Marked in the Captain's Log"
+              : view.status === 'available'
+                ? ''
+                : view.terminalCopy}
+          </p>
+        </div>
       </article>
     </div>
   );

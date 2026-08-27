@@ -37,6 +37,7 @@ import {
   type EngagementCameraInput,
   type NavalRenderPose,
 } from './sceneMath';
+import { NAVAL_WATER_PRESENTATION } from './waterPresentation';
 
 interface ShipVisual {
   root: THREE.Group;
@@ -122,26 +123,22 @@ function waterMaterial(uniforms: { uTime: { value: number } }): THREE.ShaderMate
     vertexShader: `
       uniform float uTime;
       varying float vWave;
-      varying vec2 vWaterUv;
       void main() {
         vec3 p = position;
-        float a = sin(p.x * .075 + uTime * .9) * .24;
-        float b = sin(p.y * .11 - uTime * .72 + p.x * .025) * .16;
+        float a = sin(p.x * .075 + uTime * ${NAVAL_WATER_PRESENTATION.waveASpeed}) * ${NAVAL_WATER_PRESENTATION.waveAAmplitude};
+        float b = sin(p.y * .11 - uTime * ${NAVAL_WATER_PRESENTATION.waveBSpeed} + p.x * .025) * ${NAVAL_WATER_PRESENTATION.waveBAmplitude};
         p.z += a + b;
         vWave = a + b;
-        vWaterUv = uv;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
       }
     `,
     fragmentShader: `
       varying float vWave;
-      varying vec2 vWaterUv;
       void main() {
         vec3 deep = vec3(.018, .20, .28);
         vec3 light = vec3(.09, .48, .52);
-        float glint = smoothstep(.22, .39, vWave) * .32;
-        float bands = sin((vWaterUv.x + vWaterUv.y) * 170.0) * .012;
-        gl_FragColor = vec4(mix(deep, light, .35 + vWave * .35 + glint + bands), 1.0);
+        float glint = smoothstep(.045, .11, vWave) * .18;
+        gl_FragColor = vec4(mix(deep, light, .35 + vWave * .35 + glint), 1.0);
       }
     `,
     side: THREE.DoubleSide,
@@ -230,15 +227,6 @@ export class NavalScene implements NavalSceneAdapter {
     }),
     2,
   );
-  readonly #windLines = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(5.5, 0.025, 0.085),
-    new THREE.MeshBasicMaterial({
-      color: '#c8fff0',
-      transparent: true,
-      opacity: 0.38,
-    }),
-    42,
-  );
   readonly #bearingLine = new THREE.Line(
     createBearingLineGeometry(),
     new THREE.LineDashedMaterial({
@@ -262,7 +250,6 @@ export class NavalScene implements NavalSceneAdapter {
   #fps = 60;
   #disposed = false;
   #contextLost = false;
-  #windFrom: number | null = null;
   #viewportWidth = 960;
   #viewportHeight = 540;
   #hasCameraFit = false;
@@ -354,27 +341,10 @@ export class NavalScene implements NavalSceneAdapter {
     water.receiveShadow = true;
     this.#scene.add(water, islandSilhouettes());
 
-    this.#updateWindLines(0);
     this.#bearingLine.name = 'Live_Bearing_Line';
     this.#aimArc.frustumCulled = false;
-    this.#scene.add(this.#windLines, this.#wakeMatrices, this.#selectionRings, this.#bearingLine, this.#aimArc);
+    this.#scene.add(this.#wakeMatrices, this.#selectionRings, this.#bearingLine, this.#aimArc);
     return sun;
-  }
-
-  #updateWindLines(windFrom: number): void {
-    if (this.#windFrom === windFrom) return;
-    this.#windFrom = windFrom;
-    const dummy = new THREE.Object3D();
-    for (let index = 0; index < 42; index += 1) {
-      const row = Math.floor(index / 7);
-      const column = index % 7;
-      dummy.position.set(-72 + column * 24 + (row % 2) * 6, 0.18, -70 + row * 25);
-      dummy.rotation.y = windFrom - Math.PI / 2;
-      dummy.scale.x = 0.45 + ((index * 37) % 10) / 18;
-      dummy.updateMatrix();
-      this.#windLines.setMatrixAt(index, dummy.matrix);
-    }
-    this.#windLines.instanceMatrix.needsUpdate = true;
   }
 
   #addShip(model: THREE.Group): ShipVisual {
@@ -429,7 +399,6 @@ export class NavalScene implements NavalSceneAdapter {
         entry.material.emissiveIntensity = severity * 0.24;
       }
     }
-    this.#updateWindLines(state.input.windFrom);
     this.#fitCamera(state.ships.player, state.ships.opponent, snap);
     for (const event of events) this.#emitEvent(event, state);
   }
@@ -554,7 +523,7 @@ export class NavalScene implements NavalSceneAdapter {
     if (this.#contextLost) throw new Error('Naval WebGL context lost');
     const elapsed = Math.min(0.1, Math.max(0, frameSeconds));
     this.#time += elapsed;
-    this.#waterUniforms.uTime.value = this.#time;
+    this.#waterUniforms.uTime.value = this.#sensory.reducedMotion ? 0 : this.#time;
     this.#effects.update(elapsed);
 
     for (let index = 0; index < SHIP_IDS.length; index += 1) {
@@ -583,11 +552,11 @@ export class NavalScene implements NavalSceneAdapter {
       visual.root.position.z = visual.renderPose.z;
       visual.root.rotation.y = visual.renderPose.heading;
       const phase = shipId === 'opponent' ? 1.7 : 0;
-      visual.root.position.y = this.#sensory.reducedMotion ? 0 : Math.sin(this.#time * 1.15 + phase) * 0.14;
-      visual.root.rotation.x = this.#sensory.reducedMotion ? 0 : Math.sin(this.#time * 0.72 + 0.8 + phase) * 0.022;
+      visual.root.position.y = this.#sensory.reducedMotion ? 0 : Math.sin(this.#time * 1.15 + phase) * NAVAL_WATER_PRESENTATION.shipHeave;
+      visual.root.rotation.x = this.#sensory.reducedMotion ? 0 : Math.sin(this.#time * 0.72 + 0.8 + phase) * NAVAL_WATER_PRESENTATION.shipPitch;
       visual.root.rotation.z = this.#sensory.reducedMotion
         ? 0
-        : -state.rudder * Math.min(0.09, state.speed * 0.018) + Math.sin(this.#time * 0.9 + phase) * 0.012;
+        : -state.rudder * Math.min(0.09, state.speed * 0.018) + Math.sin(this.#time * 0.9 + phase) * NAVAL_WATER_PRESENTATION.shipAmbientRoll;
       visual.recoil = Math.max(0, visual.recoil - elapsed * 4.8);
       writeShipRecoil(visual.modelRest, visual.recoilX, visual.recoilZ, visual.recoil, visual.model.position);
 

@@ -1,6 +1,6 @@
 import { TargetIcon } from '@shared/ui/icons';
 
-import type { Broadside, NavalShipState, NavalState } from '../../domain/naval/types';
+import type { NavalShipState, NavalState } from '../../domain/naval/types';
 
 export interface BattleHudProps {
   state: NavalState;
@@ -35,16 +35,6 @@ function SystemValue({ label, value, maximum = 100 }: { label: string; value: nu
   );
 }
 
-function ReloadValue({ ship, side }: { ship: NavalShipState; side: Broadside }) {
-  const reload = ship.reload[side];
-  return (
-    <div className="naval-reload-value">
-      <span>{title(side)} reload</span>
-      <strong>{reload.loaded ? 'Ready' : `${percent(reload.progress, reload.required)}%`}</strong>
-    </div>
-  );
-}
-
 function ShipSystems({ ship, enemy }: { ship: NavalShipState; enemy?: boolean }) {
   return (
     <section className={`naval-ship-systems${enemy ? ' naval-ship-systems--enemy' : ''}`} aria-label={`${ship.name} systems`}>
@@ -57,10 +47,6 @@ function ShipSystems({ ship, enemy }: { ship: NavalShipState; enemy?: boolean })
         <SystemValue label="Sails" value={ship.sails} />
         <SystemValue label="Crew" value={ship.crew} maximum={75} />
         <SystemValue label="Cannon" value={ship.cannon} maximum={12} />
-      </div>
-      <div className="naval-reload-grid">
-        <ReloadValue ship={ship} side="port" />
-        <ReloadValue ship={ship} side="starboard" />
       </div>
     </section>
   );

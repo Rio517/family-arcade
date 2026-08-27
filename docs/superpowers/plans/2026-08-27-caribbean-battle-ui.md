@@ -16,7 +16,7 @@
 - Primary QWERTY controls are `A`, `Q`, `S`, `R`, `E`, `D`, and `Space`; arrow keys/Escape may remain documented alternates.
 - `1`, `2`, and `3` must no longer alter ammunition.
 - Show reload readiness only for the player; do not expose opponent reload timing.
-- The Change Shot module is approximately 1.4× the horizontal width of Change Sail.
+- The Change Shot module is approximately 1.16× the horizontal width of Change Sail, adding breathing room without taking meaningful space from sailing.
 - Keep 44px targets, 14px text, reduced-motion behavior, and full keyboard/pointer equivalence.
 - Do not add `preserveDrawingBuffer`, RAF settling, `gl.finish`, perceptual thresholds, or simulation changes.
 
@@ -48,7 +48,7 @@
 - [ ] Wire `S` and pointer activation through one pure `nextAmmunition` helper; retain direct `session.setAmmunition` ownership and no simulation mutation.
 - [ ] Render the command deck in the exact six-module order: turn port, fire port, change shot, change sail, fire starboard, turn starboard. Keep Options outside the primary deck.
 - [ ] Use action label/icon as the visual star and render each shortcut in a smaller subordinate `kbd` badge.
-- [ ] Add CSS/grid contract tests that Change Shot consumes 1.4 fractions while Change Sail consumes 1 fraction, with the two steering modules narrow and the sailing view still dominant.
+- [ ] Add CSS/grid contract tests that Change Shot consumes 1.16 fractions while Change Sail consumes 1 fraction, with the two steering modules narrow and the sailing view still dominant.
 - [ ] Run the focused tests and mutation-check restoring three ammo buttons or changing the shot/sail ratio to equal widths.
 
 ### Task 3: Integrate player battery readiness and remove enemy reload telemetry
@@ -96,7 +96,7 @@
 - Modify only through evidence gates: `docs/screenshots/caribbean-port/metrics.json`
 - Modify only through evidence gates: `docs/screenshots/caribbean-naval/metrics.json`
 
-- [ ] Add failing browser/static assertions for exact six-module order, `S` cycle, absent number-key mutation, player-only reload UI, shot/sail 1.4 ratio, 14px/44px/no-overflow, and absent rendered wind-line layer.
+- [ ] Add failing browser/static assertions for exact six-module order, `S` cycle, absent number-key mutation, player-only reload UI, shot/sail 1.16 ratio, 14px/44px/no-overflow, and absent rendered wind-line layer.
 - [ ] Run focused component/native suites and confirm the assertions own the intended presentation boundaries.
 - [ ] Run `npm run check`, `npx vitest run`, `npx tsc -b --force`, and `npm run build`.
 - [ ] Run the real one-journey battle gate, naval verification harness, semantic probe, and the relevant port/naval capture gates serially.

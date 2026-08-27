@@ -371,8 +371,8 @@ async function readSupportedDisplay(page, viewport) {
     const stage = rect('.naval-battle-stage');
     const commandStrip = document.querySelector('[aria-label="Battle commands"]');
     const controlIds = [
-      'naval-rudder-port', 'naval-fire-port', 'naval-ammo-round', 'naval-ammo-chain',
-      'naval-ammo-grape', 'naval-sail-toggle', 'naval-fire-starboard', 'naval-rudder-starboard', 'naval-options-toggle',
+      'naval-rudder-port', 'naval-fire-port', 'naval-shot-cycle', 'naval-sail-toggle',
+      'naval-fire-starboard', 'naval-rudder-starboard', 'naval-options-toggle',
     ];
     const controls = controlIds.map((id) => document.querySelector(`[data-testid="${id}"]`));
     const pauseControl = document.querySelector('[data-testid="naval-pause"]');
@@ -399,7 +399,7 @@ async function readSupportedDisplay(page, viewport) {
     const sailControl = document.querySelector('[data-testid="naval-sail-toggle"]');
     const commandText = commandStrip?.textContent ?? '';
     const pauseText = document.querySelector('[data-testid="naval-pause"]')?.textContent ?? '';
-    const shortcutKeys = ['A', 'Q', '1', '2', '3', 'R', 'E', 'D'].every((key) => commandText.includes(key))
+    const shortcutKeys = ['A', 'Q', 'S', 'R', 'E', 'D'].every((key) => commandText.includes(key))
       && pauseText.includes('Space') && pauseText.includes('Esc');
     const center = {
       left: innerWidth * 0.35,

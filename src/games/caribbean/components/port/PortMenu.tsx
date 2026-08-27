@@ -2,16 +2,17 @@ import { useRef } from 'react';
 
 import type { PortActivity } from '../../domain/types';
 import { voyageBlockedCopy, type VoyageReadiness } from '../../domain/voyage';
+import { PortActionIcon } from './PortActionIcon';
 
 // This immutable action contract lives beside its only renderer by design.
 // eslint-disable-next-line react-refresh/only-export-components
 export const PORT_ACTIONS = [
-  { kind: 'activity', activity: 'governor', label: "Governor's House" },
-  { kind: 'activity', activity: 'tavern', label: 'Tavern' },
-  { kind: 'activity', activity: 'market', label: 'Market' },
-  { kind: 'activity', activity: 'shipyard', label: 'Shipyard' },
-  { kind: 'activity', activity: 'shares', label: 'Divide Shares' },
-  { kind: 'activity', activity: 'log', label: "Captain's Log" },
+  { kind: 'activity', activity: 'governor', label: "Governor's House", state: 'Audience' },
+  { kind: 'activity', activity: 'tavern', label: 'Tavern', state: 'Harbour talk' },
+  { kind: 'activity', activity: 'market', label: 'Market', state: 'Trade cargo' },
+  { kind: 'activity', activity: 'shipyard', label: 'Shipyard', state: 'Inspect ship' },
+  { kind: 'activity', activity: 'shares', label: 'Divide Shares', state: 'After voyage' },
+  { kind: 'activity', activity: 'log', label: "Captain's Log", state: 'Review log' },
   { kind: 'set-sail', label: 'Set Sail' },
 ] as const;
 
@@ -69,7 +70,11 @@ export function PortMenu({
                 aria-describedby={action.activity === 'tavern' && rumourAvailable ? 'port-tavern-attention-copy' : undefined}
                 onClick={() => onSelect(action.activity)}
               >
+                <PortActionIcon name={action.activity} />
                 <span className="caribbean-port-action-label">{action.label}</span>
+                <span className="caribbean-port-action-state">
+                  {action.activity === 'tavern' && rumourAvailable ? 'Rumour' : action.state}
+                </span>
                 {action.activity === 'tavern' && rumourAvailable && (
                   <>
                     <span className="caribbean-port-action-attention" aria-hidden="true">
@@ -94,10 +99,13 @@ export function PortMenu({
                 aria-describedby="port-set-sail-reason"
                 onClick={depart}
               >
+                <PortActionIcon name="set-sail" />
                 <span className="caribbean-port-action-label">{action.label}</span>
                 {rumourAvailable
-                  ? <span id="port-set-sail-reason" className="caribbean-visually-hidden">{reason}</span>
-                  : <span id="port-set-sail-reason" className="caribbean-port-action-reason">{reason}</span>}
+                  ? <><span className="caribbean-port-action-state">No course</span><span id="port-set-sail-reason" className="caribbean-visually-hidden">{reason}</span></>
+                  : <span id="port-set-sail-reason" className="caribbean-port-action-state caribbean-port-action-reason">
+                      {blocked ? reason : `${readiness.requiredProvisions} provisions`}
+                    </span>}
               </button>
             )}
           </li>

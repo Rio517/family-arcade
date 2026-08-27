@@ -14,7 +14,7 @@ describe('Caribbean Battle Lab flow', () => {
     expect(screen.getByRole('heading', { name: 'Caribbean Career' })).toBeVisible();
     expect(screen.getByTestId('lab-start-naval')).toHaveTextContent('Enter Battle Lab');
     expect(screen.getByText(/port decisions are the next slice/i)).toBeVisible();
-    expect(screen.getByRole('region', { name: 'Battle controls' })).toHaveTextContent(/A.*Q.*1.*2.*3.*R.*E.*D.*Space \/ Esc/s);
+    expect(screen.getByRole('region', { name: 'Battle controls' })).toHaveTextContent(/A.*Q.*S.*R.*E.*D.*Space/s);
     expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 
@@ -29,9 +29,10 @@ describe('Caribbean Battle Lab flow', () => {
     expect(briefing).toHaveTextContent(/reefed/i);
     expect(briefing).toHaveTextContent(/A\/D/i);
     expect(briefing).toHaveTextContent(/Q\/E/i);
+    expect(briefing).toHaveTextContent(/cycle.*S/i);
     expect(briefing).toHaveTextContent(/round.*chain.*grape/i);
     expect(briefing.querySelector('.caribbean-briefing__copy > p')?.textContent?.trim().split(/\s+/).length).toBeLessThan(90);
-    expect(within(briefing).getByRole('region', { name: 'Battle controls' })).toHaveTextContent(/Space \/ Esc/);
+    expect(within(briefing).getByRole('region', { name: 'Battle controls' })).toHaveTextContent(/Space.*Pause/);
     expect(screen.getByTestId('naval-enter-battle')).toHaveTextContent('Enter battle');
     expect(screen.getByRole('heading', { name: 'Disable. Close. Capture.' })).toHaveFocus();
   });

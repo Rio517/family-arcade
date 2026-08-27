@@ -635,8 +635,94 @@ function publishFiles(entries, outputDirectory, deadline = PASSIVE_PUBLICATION_D
   }
 }
 
-function saveIfChanged(filename, bytes, outputDirectory = OUT) {
+export function saveIfChanged(filename, bytes, outputDirectory = OUT) {
   publishFiles([[filename, bytes]], outputDirectory);
+}
+
+export function portPresentationFailures(evidence) {
+  const errors = [];
+  const controls = Array.isArray(evidence?.setup?.controls) ? evidence.setup.controls : [];
+  if (controls.length !== 3 || controls.some(({ height }) => height !== 48)) {
+    errors.push('commission controls are not exactly 48px high');
+  }
+  if (controls.length !== 3 || new Set(controls.map(({ top }) => top)).size !== 1) {
+    errors.push('commission controls do not share one vertical position');
+  }
+  if (controls.length !== 3 || controls.some(({ labelFontPx }) => labelFontPx < 16)
+    || evidence?.setup?.primaryFontPx < 17) {
+    errors.push('commission labels or primary action are undersized');
+  }
+
+  const stages = evidence?.stages;
+  if (!stages?.menu || canonicalJson(stages.menu) !== canonicalJson(stages.market)
+    || canonicalJson(stages.menu) !== canonicalJson(stages.tavern)) {
+    errors.push('port activity stage moves between tabs');
+  }
+
+  const chart = evidence?.chart;
+  if (chart?.before?.status !== 'No course marked'
+    || chart?.before?.routeVisible !== false || chart?.before?.contactVisible !== false) {
+    errors.push('unmarked chart exposes route or contact');
+  }
+  if (chart?.after?.status !== 'Course marked'
+    || chart?.after?.routeVisible !== true || chart?.after?.contactVisible !== true) {
+    errors.push('marked chart omits its truthful route or contact');
+  }
+
+  const expectedActionIds = ['governor', 'tavern', 'market', 'shipyard', 'shares', 'log', 'set-sail'];
+  const actions = Array.isArray(evidence?.actions) ? evidence.actions : [];
+  if (canonicalJson(actions.map(({ id }) => id)) !== canonicalJson(expectedActionIds)) {
+    errors.push('port action order drifted');
+  }
+  if (actions.some(({ horizontalOverflowPx, verticalOverflowPx }) => (
+    horizontalOverflowPx !== 0 || verticalOverflowPx !== 0
+  ))) {
+    errors.push('port action rail clips or overflows');
+  }
+  if (actions.some(({ itemWidth, buttonWidth }) => Math.abs(itemWidth - buttonWidth) > 1)) {
+    errors.push('port action does not fill its complete tile');
+  }
+
+  const market = evidence?.market;
+  if (!market || market.paddingInlineStartPx < 20 || market.paddingInlineEndPx < 20) {
+    errors.push('market inline padding is below 20px');
+  }
+  if (!market || market.horizontalOverflowPx !== 0) {
+    errors.push('market overflows horizontally');
+  }
+  return errors;
+}
+
+export function battlePresentationFailures(evidence) {
+  const errors = [];
+  const expected = [
+    ['naval-rudder-port', 'A'],
+    ['naval-fire-port', 'Q'],
+    ['naval-shot-cycle', 'S'],
+    ['naval-sail-toggle', 'R'],
+    ['naval-fire-starboard', 'E'],
+    ['naval-rudder-starboard', 'D'],
+  ];
+  const actions = Array.isArray(evidence?.actions) ? evidence.actions : [];
+  if (canonicalJson(actions.map(({ id, key }) => [id, key])) !== canonicalJson(expected)) {
+    errors.push('battle command order or shortcut mapping drifted');
+  }
+  const ratio = evidence?.shotWidth / evidence?.sailWidth;
+  if (!Number.isFinite(ratio) || ratio < 1.1 || ratio > 1.22) {
+    errors.push('Change Shot width is outside the modest 1.1–1.22× range');
+  }
+  if (evidence?.enemyReloadElements !== 0) errors.push('enemy reload telemetry is visible');
+  if (actions.some(({ width, height }) => width < 44 || height < 44)) {
+    errors.push('battle command target is below 44px');
+  }
+  if (actions.some(({ horizontalOverflowPx, minimumTextPx }) => horizontalOverflowPx !== 0 || minimumTextPx < 14)) {
+    errors.push('battle command text is clipped or undersized');
+  }
+  if (!Array.isArray(evidence?.playerFireStates) || evidence.playerFireStates.length !== 2
+    || evidence.playerFireStates.some((state) => state !== 'Ready' && !/^Reloading \d+%$/.test(state))) {
+    errors.push('player battery readiness is missing or malformed');
+  }
+  return errors;
 }
 
 export function publishNormalRouteComparison({ comparison, metricsBytes, outputDirectory, deadline } = {}) {
@@ -949,7 +1035,7 @@ function recordFailures(page, baseUrl, failures, allowedFailedUrl = null) {
   });
 }
 
-function readEmittedArt() {
+export function readEmittedArt() {
   const assetsDirectory = path.join(DIST, 'assets');
   const names = fs.readdirSync(assetsDirectory).filter((name) => /^bridgetown-1675-[^/]+\.webp$/.test(name));
   invariant(names.length === 1, `Expected one emitted Bridgetown WebP, found ${names.join(', ')}`);
@@ -1162,6 +1248,138 @@ async function readSetupIdentityEvidence(page, layout) {
       horizontalOverflowPx: layout.horizontalOverflowPx,
     },
   };
+}
+
+async function readSetupPresentationEvidence(page) {
+  return page.evaluate(() => {
+    const controls = [...document.querySelectorAll('.caribbean-form-grid .caribbean-field')].map((field) => {
+      const label = field.querySelector('label');
+      const control = field.querySelector('input, select');
+      if (!(label instanceof HTMLElement) || !(control instanceof HTMLElement)) {
+        throw new Error('Commission presentation probe could not find a label/control pair');
+      }
+      const box = control.getBoundingClientRect();
+      return {
+        top: box.top,
+        height: box.height,
+        labelFontPx: Number.parseFloat(getComputedStyle(label).fontSize),
+      };
+    });
+    const primary = document.querySelector('[data-testid="caribbean-start-career-button"]');
+    if (!(primary instanceof HTMLElement)) throw new Error('Commission presentation probe could not find Start career');
+    return {
+      controls,
+      primaryFontPx: Number.parseFloat(getComputedStyle(primary).fontSize),
+    };
+  });
+}
+
+async function readPortPresentationSnapshot(page) {
+  return page.evaluate(() => {
+    const rect = (element) => {
+      const box = element.getBoundingClientRect();
+      return { x: box.x, y: box.y, width: box.width, height: box.height };
+    };
+    const stage = document.querySelector('[data-testid="caribbean-port-stage"]');
+    const chartStatus = document.querySelector('.caribbean-chart__heading strong');
+    if (!(stage instanceof HTMLElement) || !(chartStatus instanceof HTMLElement)) {
+      throw new Error('Port presentation probe could not find the stable stage or chart');
+    }
+    const actionItems = [...document.querySelectorAll('.caribbean-port-action-item')];
+    const actions = actionItems.map((item) => {
+      const button = item.querySelector(':scope > [data-testid^="port-action-"]');
+      if (!(item instanceof HTMLElement) || !(button instanceof HTMLElement)) {
+        throw new Error('Port presentation probe could not find a complete action tile');
+      }
+      const id = button.dataset.testid?.replace(/^port-action-/, '');
+      if (!id) throw new Error('Port presentation action is missing its identity');
+      return {
+        id,
+        itemWidth: item.getBoundingClientRect().width,
+        buttonWidth: button.getBoundingClientRect().width,
+        horizontalOverflowPx: Math.max(
+          0,
+          item.scrollWidth - item.clientWidth,
+          button.scrollWidth - button.clientWidth,
+        ),
+        verticalOverflowPx: Math.max(
+          0,
+          item.scrollHeight - item.clientHeight,
+          button.scrollHeight - button.clientHeight,
+        ),
+      };
+    });
+    const market = document.querySelector('[data-testid="caribbean-market"]');
+    const marketEvidence = market instanceof HTMLElement
+      ? {
+          paddingInlineStartPx: Number.parseFloat(getComputedStyle(market).paddingInlineStart),
+          paddingInlineEndPx: Number.parseFloat(getComputedStyle(market).paddingInlineEnd),
+          horizontalOverflowPx: Math.max(0, market.scrollWidth - market.clientWidth),
+        }
+      : null;
+    return {
+      stage: rect(stage),
+      chart: {
+        status: chartStatus.textContent?.trim() ?? '',
+        routeVisible: document.querySelector('[data-chart-route="red-jackdaw"]') !== null,
+        contactVisible: document.querySelector('[data-chart-location="red-jackdaw"]') !== null,
+      },
+      actions,
+      market: marketEvidence,
+    };
+  });
+}
+
+export async function readBattlePresentationEvidence(page) {
+  return page.evaluate(() => {
+    const visible = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      const style = getComputedStyle(element);
+      const box = element.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && box.width > 0 && box.height > 0;
+    };
+    const strip = document.querySelector('.naval-command-strip');
+    if (!(strip instanceof HTMLElement)) throw new Error('Battle presentation probe could not find the command strip');
+    const actionElements = [...strip.querySelectorAll(':scope > button')].filter(visible);
+    const actions = actionElements.map((action) => {
+      const key = action.querySelector('kbd')?.textContent?.trim() ?? '';
+      const box = action.getBoundingClientRect();
+      const textElements = [action, ...action.querySelectorAll('*')].filter((element) => (
+        visible(element)
+        && [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
+      ));
+      return {
+        id: action.dataset.testid ?? '',
+        key,
+        width: box.width,
+        height: box.height,
+        horizontalOverflowPx: Math.max(0, action.scrollWidth - action.clientWidth),
+        minimumTextPx: textElements.length === 0
+          ? 0
+          : Math.min(...textElements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize))),
+      };
+    });
+    const shot = document.querySelector('[data-testid="naval-shot-cycle"]');
+    const sail = document.querySelector('[data-testid="naval-sail-toggle"]');
+    const enemy = document.querySelector('.naval-ship-systems--enemy');
+    if (!(shot instanceof HTMLElement) || !(sail instanceof HTMLElement) || !(enemy instanceof HTMLElement)) {
+      throw new Error('Battle presentation probe could not find the shot, sail, or enemy systems');
+    }
+    const explicitEnemyReload = enemy.querySelectorAll(
+      '.naval-reload-grid, .naval-reload-value, .naval-fire-control__status, .naval-fire-control__meter',
+    ).length;
+    const enemyReloadCopy = [...enemy.querySelectorAll('*')].filter((element) => (
+      visible(element) && /reload|ready/i.test(element.textContent ?? '')
+    )).length;
+    return {
+      actions,
+      shotWidth: shot.getBoundingClientRect().width,
+      sailWidth: sail.getBoundingClientRect().width,
+      enemyReloadElements: explicitEnemyReload + enemyReloadCopy,
+      playerFireStates: [...document.querySelectorAll('.naval-command-strip .naval-fire-control__status')]
+        .map((element) => element.textContent?.trim() ?? ''),
+    };
+  });
 }
 
 const BOOTH_CONTROL_IDS = [
@@ -1654,7 +1872,7 @@ async function setupArtPage(page, baseUrl) {
   await page.getByTestId('caribbean-career-ready').waitFor();
 }
 
-async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, emitted, subjectRoi) {
+export async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, emitted, subjectRoi) {
   const normalContext = await browser.newContext({
     viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'en-US', timezoneId: 'UTC', reducedMotion: 'reduce',
   });
@@ -1706,7 +1924,7 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
             verticalOverflowPx: Math.max(0, element.scrollHeight - element.clientHeight),
           };
         };
-        const stage = document.querySelector('.caribbean-port-stage--market');
+        const stage = document.querySelector('.caribbean-port-activity');
         if (!(stage instanceof HTMLElement)) throw new Error('Market geometry stage is missing');
         stage.scrollTop = 0;
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -1783,14 +2001,14 @@ async function captureArtEvidence(browser, baseUrl, runDirectory, screenshots, e
         await markOnChart.click();
         await normalPage.getByText("Marked in the Captain's Log").waitFor();
       }
-      await normalPage.getByRole('button', { name: 'Back to harbour' }).click();
+      await normalPage.getByRole('button', { name: 'Done' }).click();
       await normalPage.getByRole('button', { name: "Captain's Log" }).click();
       await normalPage.getByText('Sail east of Bridgetown and identify the Red Jackdaw.').waitFor();
       for (const activitySpec of ART_ACTIVITY_CONTRAST_SPECS.slice(2)) {
         activityContrasts.push(await readActivityContrast(normalPage, activitySpec));
       }
       viewports[index].activityContrasts = activityContrasts;
-      await normalPage.getByRole('button', { name: 'Back to harbour' }).click();
+      await normalPage.getByRole('button', { name: 'Done' }).click();
     }
     invariant(normalFailures.console.length === 0 && normalFailures.page.length === 0
       && normalFailures.requests.length === 0 && normalFailures.external.length === 0,
@@ -1853,7 +2071,7 @@ async function readMarketGeometry(page, phase, actionTestId) {
       const value = element.getBoundingClientRect();
       return { x: value.x, y: value.y, width: value.width, height: value.height };
     };
-    const stage = document.querySelector('.caribbean-port-stage--market');
+    const stage = document.querySelector('.caribbean-port-activity');
     const rows = [...document.querySelectorAll('.caribbean-market-row')];
     const strips = [...document.querySelectorAll('.caribbean-market-actions')];
     const status = document.querySelector('[data-testid="caribbean-market-status"]');
@@ -2257,7 +2475,7 @@ export async function runStrategicSailingJourney({
     await page.getByRole('button', { name: 'Tavern' }).click();
     await page.getByRole('button', { name: 'Mark on chart' }).click();
     await page.getByText("Marked in the Captain's Log").waitFor();
-    await page.getByRole('button', { name: 'Back to harbour' }).click();
+    await page.getByRole('button', { name: 'Done' }).click();
     phaseNavalCounts.portNavalCount = navalRequestCount(failures.requestedPaths, emittedNaval);
     assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'strategic-port');
     const initialEnvelope = await readVoyageEnvelope(page, 'port');
@@ -2371,6 +2589,12 @@ export async function runStrategicSailingJourney({
     invariant(
       Number(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick')) === 0,
       'strategic reload first RAF advanced the battle',
+    );
+    const battlePresentation = await readBattlePresentationEvidence(page);
+    const battlePresentationErrors = battlePresentationFailures(battlePresentation);
+    invariant(
+      battlePresentationErrors.length === 0,
+      `Battle presentation drifted: ${battlePresentationErrors.join(' | ')}`,
     );
     await maybeCapture('campaign-battle-desktop.png', true);
     accessibilitySamples.push(await readStrategicSurface(page));
@@ -2681,6 +2905,12 @@ async function runBattleUiCheck() {
       await page.getByText('3D tactical sea restored.').waitFor();
       await page.clock.runFor(16);
       invariant(await page.getByTestId('naval-elapsed').getAttribute('data-battle-tick') === '0', 'visual-prime-advanced-campaign-battle');
+      const battlePresentation = await readBattlePresentationEvidence(page);
+      const battlePresentationErrors = battlePresentationFailures(battlePresentation);
+      invariant(
+        battlePresentationErrors.length === 0,
+        `battle-presentation-drift-${battlePresentationErrors.join('|')}`,
+      );
       await captureBattle(page, screenshots, directory, 'campaign-battle-desktop.png');
       await assertBattleControlHitTargets(page);
       await verifyRenderedRudderRelease(page);
@@ -2763,7 +2993,7 @@ async function runBattleUiCheck() {
   }
 }
 
-async function runPortMemoryWarningProbe(browser, baseUrl, viewport) {
+export async function runPortMemoryWarningProbe(browser, baseUrl, viewport) {
   const context = await browser.newContext({
     viewport,
     deviceScaleFactor: 1,
@@ -2796,12 +3026,32 @@ async function runPortMemoryWarningProbe(browser, baseUrl, viewport) {
       }
       const warningRect = warning.getBoundingClientRect();
       const commandRect = commandRail.getBoundingClientRect();
+      const horizontalClearance = Math.max(
+        commandRect.left - warningRect.right,
+        warningRect.left - commandRect.right,
+      );
+      const verticalClearance = Math.max(
+        commandRect.top - warningRect.bottom,
+        warningRect.top - commandRect.bottom,
+      );
       return {
         viewport,
         wrapperClasses: [...wrapper.classList],
-        warning: { top: warningRect.top, bottom: warningRect.bottom },
-        commandRail: { top: commandRect.top, bottom: commandRect.bottom },
-        clearance: commandRect.top - warningRect.bottom,
+        warning: {
+          left: warningRect.left,
+          top: warningRect.top,
+          right: warningRect.right,
+          bottom: warningRect.bottom,
+        },
+        commandRail: {
+          left: commandRect.left,
+          top: commandRect.top,
+          right: commandRect.right,
+          bottom: commandRect.bottom,
+        },
+        horizontalClearance,
+        verticalClearance,
+        clearance: Math.max(horizontalClearance, verticalClearance),
       };
     }, viewport);
     invariant(geometry.wrapperClasses.includes('caribbean-production--port'), 'memory-warning-missing-port-wrapper');
@@ -2844,6 +3094,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
     layouts.setupDesktop = await readLayout(page, 'setupDesktop', VIEWPORTS.setupDesktop);
     await capture(page, screenshots, runDirectory, 'setup-desktop.png');
     const setupIdentity = await readSetupIdentityEvidence(page, layouts.setupDesktop);
+    const setupPresentation = await readSetupPresentationEvidence(page);
 
     await page.getByLabel('Player pronouns').fill('they/them');
     await page.getByRole('button', { name: 'Start career' }).click();
@@ -2881,6 +3132,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
       'Set Sail does not retain the hidden Red Jackdaw instruction without visible supporting-copy styling',
     );
     layouts.portDesktop = await readLayout(page, 'portDesktop', VIEWPORTS.portDesktop);
+    const menuPresentation = await readPortPresentationSnapshot(page);
     await capture(page, screenshots, runDirectory, 'port-desktop.png');
 
     await page.setViewportSize({ width: VIEWPORTS.portTabletLandscape.width, height: VIEWPORTS.portTabletLandscape.height });
@@ -2896,16 +3148,31 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
     await page.getByRole('button', { name: 'Buy 5 Provisions' }).click();
     await page.getByRole('region', { name: 'Cargo summary' }).getByText('3.9 months').waitFor();
     const marketLayout = await readLayout(page, 'marketDesktop', VIEWPORTS.portDesktop);
+    const marketPresentation = await readPortPresentationSnapshot(page);
     await capture(page, screenshots, runDirectory, 'market-desktop.png');
 
     await page.getByRole('button', { name: 'Done' }).click();
     await page.getByRole('button', { name: 'Tavern' }).click();
     await page.getByRole('heading', { name: 'Tavern', level: 2 }).waitFor();
     const tavernLayout = await readLayout(page, 'tavernDesktop', VIEWPORTS.portDesktop);
+    const tavernPresentation = await readPortPresentationSnapshot(page);
     await capture(page, screenshots, runDirectory, 'tavern-desktop.png');
     await page.getByRole('button', { name: 'Mark on chart' }).click();
     await page.getByText("Marked in the Captain's Log").waitFor();
-    await page.getByRole('button', { name: 'Back to harbour' }).click();
+    const markedPresentation = await readPortPresentationSnapshot(page);
+    const presentationErrors = portPresentationFailures({
+      setup: setupPresentation,
+      stages: {
+        menu: menuPresentation.stage,
+        market: marketPresentation.stage,
+        tavern: tavernPresentation.stage,
+      },
+      chart: { before: menuPresentation.chart, after: markedPresentation.chart },
+      actions: menuPresentation.actions,
+      market: marketPresentation.market,
+    });
+    invariant(presentationErrors.length === 0, `Port presentation drifted: ${presentationErrors.join(' | ')}`);
+    await page.getByRole('button', { name: 'Done' }).click();
     await page.getByRole('button', { name: "Captain's Log" }).click();
     await page.getByText('Sail east of Bridgetown and identify the Red Jackdaw.').waitFor();
     const logLayout = await readLayout(page, 'captainsLogDesktop', VIEWPORTS.portDesktop);
@@ -2920,7 +3187,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
       'Resolved journey has missing or duplicate semantic events',
     );
 
-    await page.getByRole('button', { name: 'Back to harbour' }).click();
+    await page.getByRole('button', { name: 'Done' }).click();
     await page.setViewportSize({ width: 960, height: 600 });
     await page.getByTestId('caribbean-career-ready').waitFor();
     layouts.minimumSupported = await readLayout(page, 'minimumSupported', VIEWPORTS.minimumSupported);

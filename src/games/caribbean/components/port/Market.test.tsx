@@ -178,11 +178,13 @@ describe('<Market>', () => {
 
   it('gives the ledger breathing room and uses a stronger accessible red for warnings', () => {
     const css = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+    const theme = readFileSync(resolve('src/games/caribbean/styles/theme.css'), 'utf8');
 
-    expect(css).toMatch(/\.caribbean-market\s*\{[^}]*padding:\s*12px 16px 16px/s);
+    expect(css).toMatch(/\.caribbean-market\s*\{[^}]*padding:\s*20px 22px 22px/s);
     expect(css).toMatch(/\.caribbean-market-price-cue\s*\{[^}]*background:\s*#07151d/s);
-    expect(css).toMatch(/\.caribbean-market-price-cue--expensive\s*\{[^}]*var\(--caribbean-signal-red\) 88%/s);
-    expect(css).toMatch(/\.caribbean-market-severity--critical\s*\{[^}]*var\(--caribbean-signal-red\) 88%/s);
+    expect(theme).toMatch(/--caribbean-signal-red:\s*#e55243/);
+    expect(css).toMatch(/\.caribbean-market-price-cue--expensive\s*\{[^}]*var\(--caribbean-signal-red\) 96%/s);
+    expect(css).toMatch(/\.caribbean-market-severity--critical\s*\{[^}]*var\(--caribbean-signal-red\) 96%/s);
   });
 
   it('disables impossible actions and places the exact reason beside their row', () => {

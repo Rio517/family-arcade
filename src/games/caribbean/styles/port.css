@@ -14,7 +14,7 @@
   min-width: 960px;
   min-height: 600px;
   display: grid;
-  grid-template-rows: 70px minmax(0, 1fr) auto;
+  grid-template-rows: 70px minmax(0, 1fr);
   overflow: hidden;
   background:
     radial-gradient(ellipse at 72% 18%, color-mix(in srgb, var(--caribbean-sailcloth) 45%, transparent), transparent 31%),
@@ -182,13 +182,24 @@
 .caribbean-port-stage {
   position: relative;
   z-index: 2;
-  width: min(1120px, calc(100% - 80px));
+  width: min(1580px, calc(100% - 48px));
+  height: calc(100% - 34px);
   min-height: 0;
   align-self: center;
   justify-self: center;
-  padding: 22px clamp(28px, 5vw, 72px) 26px;
-  border-left: 2px solid var(--caribbean-brass);
+  display: grid;
+  grid-template-columns: minmax(0, 1.82fr) minmax(310px, .78fr);
+  gap: clamp(18px, 2.2vw, 34px);
+  padding: 18px clamp(18px, 2.2vw, 34px) 20px;
   background: transparent;
+}
+
+.caribbean-port-primary {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto auto 96px minmax(0, 1fr);
+  align-content: start;
 }
 
 .caribbean-port-captain {
@@ -214,9 +225,15 @@
 }
 
 .caribbean-port-activity {
-  max-width: 790px;
-  margin-top: 22px;
-  padding-top: 16px;
+  min-width: 0;
+  min-height: 0;
+  margin-top: 12px;
+  padding: 12px 4px 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-color: color-mix(in srgb, var(--caribbean-brass) 65%, transparent) transparent;
   border-top: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 35%, transparent);
 }
 
@@ -241,7 +258,7 @@
   text-transform: uppercase;
 }
 
-.caribbean-port-activity h2:focus {
+.caribbean-port-activity h2:focus-visible {
   outline: 3px solid var(--caribbean-trade-wind);
   outline-offset: 5px;
 }
@@ -317,7 +334,9 @@
 }
 
 .caribbean-port .caribbean-port-close {
-  margin-top: 16px;
+  flex: 0 0 auto;
+  min-width: 132px;
+  margin: auto 0 0 auto;
   padding: 0 16px;
   border-color: color-mix(in srgb, var(--caribbean-trade-wind) 55%, transparent);
   background: #07151d;
@@ -326,9 +345,10 @@
 .caribbean-port-menu {
   position: relative;
   z-index: 4;
-  align-self: end;
-  padding: 0 clamp(10px, 2vw, 30px) max(8px, env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, transparent, rgba(7, 21, 29, .92) 24%);
+  min-width: 0;
+  align-self: stretch;
+  padding: 0;
+  background: transparent;
 }
 
 .caribbean-port-actions {
@@ -336,7 +356,7 @@
   padding: 7px 0 0;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-auto-rows: 78px;
+  grid-auto-rows: 96px;
   list-style: none;
   border-top: 1px solid var(--caribbean-brass);
 }
@@ -344,7 +364,7 @@
 .caribbean-port-action-item {
   position: relative;
   min-width: 0;
-  min-height: 78px;
+  min-height: 96px;
   display: grid;
   padding: 0px;
   border-left: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 18%, transparent);
@@ -368,13 +388,15 @@
 .caribbean-port .caribbean-port-action {
   position: relative;
   width: 100%;
-  padding: 7px 8px;
+  min-width: 0;
+  padding: 7px 5px 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  border: 0;
-  border-top: 2px solid transparent;
+  justify-content: flex-start;
+  gap: 3px;
+  border: 1px solid color-mix(in srgb, var(--caribbean-brass) 48%, transparent);
+  border-top: 2px solid color-mix(in srgb, var(--caribbean-brass) 64%, transparent);
   background: #07151d;
   color: var(--caribbean-sailcloth);
   font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -382,6 +404,42 @@
   font-weight: 750;
   line-height: 1.1;
   text-align: center;
+}
+
+.caribbean-port-action-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  fill: none;
+  stroke: var(--caribbean-brass);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.caribbean-port-action-label {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  min-height: 30px;
+  place-items: center;
+  line-height: 1;
+}
+
+.caribbean-port-action-state {
+  width: 100%;
+  min-width: 0;
+  display: block;
+  max-width: 100%;
+  min-height: 16px;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 66%, var(--caribbean-trade-wind));
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .caribbean-port .caribbean-port-action:hover:not(:disabled) {
@@ -402,12 +460,8 @@
 }
 
 .caribbean-port-action-reason {
-  display: block;
-  min-height: 34px;
-  padding: 5px 5px 0;
+  padding: 0 2px;
   color: color-mix(in srgb, var(--caribbean-sailcloth) 66%, var(--caribbean-deep-keel));
-  font-size: 15px;
-  line-height: 1.15;
   text-align: center;
 }
 
@@ -470,6 +524,13 @@
   min-height: 44px;
 }
 
+.caribbean-tavern-action-slot {
+  min-block-size: 48px;
+  display: grid;
+  align-items: center;
+  justify-items: start;
+}
+
 .caribbean-port .caribbean-tavern-mark {
   padding-inline: 18px;
   border-color: var(--caribbean-trade-wind);
@@ -483,6 +544,21 @@
   font-size: 14px;
   font-weight: 750;
 }
+
+.caribbean-tavern-mark + .caribbean-tavern-status:empty { display: none; }
+
+.caribbean-port-prerequisite {
+  max-width: 720px;
+  padding: 17px 20px;
+  border: 1px solid color-mix(in srgb, var(--caribbean-signal-red) 82%, transparent);
+  border-inline-start: 4px solid var(--caribbean-signal-red);
+  background: color-mix(in srgb, var(--caribbean-signal-red) 13%, #07151d);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 24%);
+}
+
+.caribbean-port-prerequisite p { margin: 0; color: var(--caribbean-sailcloth); font-size: 16px; line-height: 1.45; }
+.caribbean-port-prerequisite .caribbean-port-prerequisite__eyebrow { margin-bottom: 7px; color: var(--caribbean-signal-red); font: 850 14px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.caribbean-port-prerequisite .caribbean-port-prerequisite__title { margin-bottom: 6px; color: color-mix(in srgb, var(--caribbean-signal-red) 82%, white); font: 700 19px/1.2 "Avenir Next Condensed", sans-serif; text-transform: uppercase; }
 
 .caribbean-log-empty {
   margin: 0;
@@ -553,49 +629,78 @@
   color: var(--caribbean-sailcloth);
 }
 
-.caribbean-port-stage--market {
+.caribbean-chart {
+  min-width: 0;
+  min-height: 0;
   align-self: stretch;
-  margin-block: 12px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  scrollbar-color: color-mix(in srgb, var(--caribbean-brass) 65%, transparent) transparent;
+  display: grid;
+  grid-template-rows: 48px minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, var(--caribbean-brass) 82%, #6b441a);
+  background: color-mix(in srgb, #062632 94%, transparent);
+  box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--caribbean-brass) 25%, transparent), 0 18px 54px rgb(0 0 0 / 34%);
 }
 
-.caribbean-port-stage--market .caribbean-port-activity {
-  position: relative;
-  max-width: 1060px;
-  margin-top: 2px;
-  padding-top: 2px;
+.caribbean-chart__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-brass) 44%, transparent);
+  background: #07151d;
+  font: 750 14px/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
 
-.caribbean-port-stage--market .caribbean-port-captain {
-  margin-bottom: 3px;
+.caribbean-chart__heading span { color: var(--caribbean-brass); }
+.caribbean-chart__heading strong { color: var(--caribbean-trade-wind); font-weight: 800; }
+
+.caribbean-chart__drawing { position: relative; min-height: 0; }
+.caribbean-chart__drawing svg { width: 100%; height: 100%; display: block; }
+.caribbean-chart__grid { fill: url(#caribbean-chart-grid); stroke: color-mix(in srgb, var(--caribbean-trade-wind) 10%, transparent); }
+.caribbean-chart__grid + * { color: inherit; }
+.caribbean-chart__drawing pattern path { fill: none; stroke: color-mix(in srgb, var(--caribbean-trade-wind) 13%, transparent); stroke-width: .75; }
+.caribbean-chart__island { fill: color-mix(in srgb, var(--caribbean-trade-wind) 22%, #0a3038); stroke: color-mix(in srgb, var(--caribbean-sailcloth) 45%, transparent); stroke-width: 1.4; }
+.caribbean-chart__shoal { fill: none; stroke: color-mix(in srgb, var(--caribbean-sailcloth) 18%, transparent); stroke-width: 1.2; stroke-dasharray: 2 7; }
+.caribbean-chart__route { fill: none; stroke: var(--caribbean-brass); stroke-width: 2.2; stroke-dasharray: 8 7; }
+.caribbean-chart__route[data-route-status="completed"],
+.caribbean-chart__route[data-route-status="expired"] { opacity: .5; }
+.caribbean-chart__location { fill: #07151d; stroke: var(--caribbean-trade-wind); stroke-width: 2; }
+.caribbean-chart__ship { fill: color-mix(in srgb, var(--caribbean-sailcloth) 20%, #07151d); stroke: var(--caribbean-sailcloth); stroke-width: 1.7; }
+.caribbean-chart__contact { fill: #07151d; stroke: #e55243; stroke-width: 2.5; }
+.caribbean-chart__compass { fill: none; stroke: color-mix(in srgb, var(--caribbean-brass) 64%, transparent); stroke-width: 1.2; }
+
+.caribbean-chart__label {
+  position: absolute;
+  padding: 3px 5px;
+  background: color-mix(in srgb, #07151d 88%, transparent);
+  color: var(--caribbean-sailcloth);
+  font: 750 14px/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  white-space: nowrap;
 }
 
-.caribbean-port-stage--market h1 {
-  font-size: 52px;
+.caribbean-chart__label--port { left: 24%; top: 61%; color: var(--caribbean-trade-wind); }
+.caribbean-chart__label--ship { left: 31%; top: 49%; }
+.caribbean-chart__label--contact { right: 18%; top: 23%; color: #e55243; }
+
+.caribbean-chart__facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  border-top: 1px solid color-mix(in srgb, var(--caribbean-brass) 35%, transparent);
+  background: #07151d;
 }
 
-.caribbean-port-stage--market .caribbean-port-bearing {
-  margin-bottom: 4px;
-}
-
-.caribbean-port-stage--market .caribbean-port-activity h2 {
-  margin-bottom: 6px;
-  font-size: 30px;
-}
-
-.caribbean-port-stage--market .caribbean-port-close {
-  position: static;
-  display: block;
-  min-width: 154px;
-  margin: 14px 0 0 auto;
-}
+.caribbean-chart__facts div { display: grid; grid-template-columns: 72px 1fr; gap: 8px; padding: 7px 12px; border-top: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 12%, transparent); }
+.caribbean-chart__facts dt { color: color-mix(in srgb, var(--caribbean-sailcloth) 55%, var(--caribbean-trade-wind)); font: 750 14px/1.2 ui-monospace, monospace; text-transform: uppercase; }
+.caribbean-chart__facts dd { margin: 0; color: var(--caribbean-sailcloth); font-size: 14px; font-weight: 700; line-height: 1.2; }
 
 .caribbean-market {
   display: grid;
   gap: 0px;
-  padding: 12px 16px 16px;
+  padding: 20px 22px 22px;
   box-sizing: border-box;
   background: color-mix(in srgb, #07151d 92%, transparent);
 }
@@ -662,7 +767,7 @@
 }
 
 .caribbean-market-severity--critical {
-  color: color-mix(in srgb, var(--caribbean-signal-red) 88%, white);
+  color: color-mix(in srgb, var(--caribbean-signal-red) 96%, white);
 }
 
 .caribbean-market-goods {
@@ -735,7 +840,7 @@
 }
 
 .caribbean-market-price-cue--expensive {
-  color: color-mix(in srgb, var(--caribbean-signal-red) 88%, white);
+  color: color-mix(in srgb, var(--caribbean-signal-red) 96%, white);
 }
 
 .caribbean-market-actions {
@@ -796,6 +901,7 @@
 }
 
 .caribbean-production--port .caribbean-memory-warning {
+  max-width: 340px;
   bottom: 112px;
 }
 
@@ -810,6 +916,34 @@ body:has(.caribbean-port) .party-root {
   .caribbean-port {
     --caribbean-port-art-focal-x: 56%;
     --caribbean-port-art-focal-y: 50%;
+  }
+
+  .caribbean-port-primary {
+    grid-template-rows: auto auto auto 168px minmax(0, 1fr);
+  }
+
+  .caribbean-port-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: 84px;
+  }
+
+  .caribbean-port-action-item {
+    min-height: 84px;
+  }
+
+  .caribbean-port .caribbean-port-action {
+    padding: 5px 4px;
+    gap: 1px;
+  }
+
+  .caribbean-port-action-icon {
+    width: 24px;
+    height: 24px;
+    flex-basis: 24px;
+  }
+
+  .caribbean-port-action-label {
+    min-height: 24px;
   }
 }
 
@@ -878,18 +1012,9 @@ body:has(.caribbean-port) .party-root {
     padding-block: 5px;
   }
 
-  .caribbean-port-stage--market {
-    margin-block: 7px;
-    padding-block: 10px 12px;
-  }
-
-  .caribbean-port-stage--market .caribbean-port-activity {
-    margin-top: 8px;
-    padding-top: 8px;
-  }
-
   .caribbean-market {
     gap: 6px;
+    padding: 12px 14px 14px;
   }
 
   .caribbean-market-summary > div {
@@ -901,7 +1026,36 @@ body:has(.caribbean-port) .party-root {
   }
 
   body:has(.caribbean-port) .party-root {
+    left: calc(50% - 10px);
     bottom: calc(148px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (width <= 1180px) and (max-height: 700px) {
+  .caribbean-port-primary {
+    grid-template-rows: auto auto auto 140px minmax(0, 1fr);
+  }
+
+  .caribbean-port-actions {
+    grid-auto-rows: 70px;
+  }
+
+  .caribbean-port-action-item {
+    min-height: 70px;
+  }
+
+  .caribbean-port .caribbean-port-action {
+    padding-block: 3px;
+  }
+
+  .caribbean-port-action-icon {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
+  }
+
+  .caribbean-port-action-label {
+    min-height: 20px;
   }
 }
 

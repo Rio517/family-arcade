@@ -106,6 +106,16 @@ describe('<CampaignSetup>', () => {
     expect(css).not.toMatch(/\.caribbean-course-axis\s*\{[^}]*rotate\(/s);
   });
 
+  it('gives every commission field the same readable label and exact control geometry', () => {
+    const css = readFileSync(resolve('src/games/caribbean/styles/production.css'), 'utf8');
+
+    expect(css).toMatch(/\.caribbean-form-grid\s*\{[^}]*align-items:\s*start/s);
+    expect(css).toMatch(/\.caribbean-field\s*\{[^}]*grid-template-rows:\s*20px 48px minmax\(20px,\s*auto\)/s);
+    expect(css).toMatch(/\.caribbean-field label\s*\{[^}]*font-size:\s*16px[^}]*line-height:\s*20px/s);
+    expect(css).toMatch(/\.caribbean-form-grid input,[\s\S]*?\.caribbean-form-grid select\s*\{[^}]*height:\s*48px/s);
+    expect(css).toMatch(/\.caribbean-production \.caribbean-button-primary\s*\{[^}]*font-size:\s*17px/s);
+  });
+
   it('prefills the captain from the active player and submits the shared pronouns with Adventure', () => {
     const view = controller();
     const savePronouns = vi.fn();

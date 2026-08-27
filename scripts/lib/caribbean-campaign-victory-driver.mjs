@@ -6,6 +6,7 @@ const EXACT_EXPECTED = {
   seedAfter: 1_310_878_278,
 };
 const RUDDER_KEYS = { '-1': 'a', 1: 'd' };
+const AMMUNITION_CYCLE = ['round', 'chain', 'grape'];
 
 function invariant(condition, message) {
   if (!condition) throw new Error(`Campaign victory driver: ${message}`);
@@ -126,8 +127,11 @@ async function drive(page, trace, clockPrimed) {
         current.sail = row.sail;
       }
       if (current.ammunition !== row.ammunition) {
-        await page.getByTestId(`naval-ammo-${row.ammunition}`).click();
-        current.ammunition = row.ammunition;
+        while (current.ammunition !== row.ammunition) {
+          await page.getByTestId('naval-shot-cycle').click();
+          const index = AMMUNITION_CYCLE.indexOf(current.ammunition);
+          current.ammunition = AMMUNITION_CYCLE[(index + 1) % AMMUNITION_CYCLE.length];
+        }
       }
       if (row.fire !== null) await page.getByTestId(`naval-fire-${row.fire}`).click();
 

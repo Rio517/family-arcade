@@ -8,11 +8,12 @@ describe('BattleShortcutLegend', () => {
     render(<BattleShortcutLegend />);
 
     const legend = screen.getByRole('region', { name: 'Battle controls' });
-    for (const key of ['A', 'Q', '1', '2', '3', 'R', 'E', 'D', 'Space / Esc']) {
+    for (const key of ['A', 'Q', 'S', 'R', 'E', 'D', 'Space']) {
       expect(legend).toHaveTextContent(key);
     }
+    expect(legend).not.toHaveTextContent(/Round shot|Chain shot|Grape shot/);
     expect(screen.getByTestId('battle-shortcut-summary')).toHaveTextContent(
-      'A turns port; Q fires port; 1 selects round shot; 2 selects chain shot; 3 selects grape shot; R toggles sail; E fires starboard; D turns starboard; Space or Escape pauses.',
+      'A turns port; Q fires port; S changes shot; R changes sail; E fires starboard; D turns starboard; Space pauses. Arrow keys steer and Escape also pauses.',
     );
   });
 });

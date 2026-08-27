@@ -121,7 +121,8 @@ test('exports and drives the public-control trace', async () => {
   assert.ok(page.keyboardEvents.some(({ kind }) => kind === 'down'), 'rudder key must be held');
   assert.ok(page.keyboardEvents.some(({ kind }) => kind === 'up'), 'rudder key must be released');
   assert.ok(page.clicks.some(({ testId }) => testId === 'naval-sail-toggle'), 'sail uses rendered control');
-  assert.ok(page.clicks.some(({ testId }) => testId.startsWith('naval-ammo-')), 'ammunition uses rendered control');
+  assert.ok(page.clicks.some(({ testId }) => testId === 'naval-shot-cycle'), 'ammunition uses the rendered Change shot control');
+  assert.ok(page.clicks.every(({ testId }) => !testId.startsWith('naval-ammo-')), 'driver never reaches for removed ammunition buttons');
   assert.ok(page.clicks.some(({ testId }) => testId.startsWith('naval-fire-')), 'fire uses rendered control');
 });
 

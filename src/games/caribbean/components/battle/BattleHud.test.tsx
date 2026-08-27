@@ -21,4 +21,13 @@ describe('<BattleHud>', () => {
     expect(screen.getByTestId('naval-elapsed')).toHaveTextContent('Engagement 03:17');
     expect(screen.getByTestId('naval-elapsed')).toHaveAttribute('data-battle-tick', '11855');
   });
+
+  it('keeps enemy telemetry health-only without revealing reload timing', () => {
+    const state = createNavalBattle(BATTLE_LAB_INPUT);
+    render(<BattleHud state={state} paused={false} onTogglePause={vi.fn()} />);
+
+    const opponent = screen.getByRole('region', { name: `${state.ships.opponent.name} systems` });
+    expect(opponent).toHaveTextContent('Hull');
+    expect(opponent).not.toHaveTextContent(/reload|ready|reloading/i);
+  });
 });
