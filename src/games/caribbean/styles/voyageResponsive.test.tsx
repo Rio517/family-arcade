@@ -2,6 +2,19 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+function relativeLuminance(hex: string) {
+  const channels = hex.slice(1).match(/../g)?.map((value) => Number.parseInt(value, 16) / 255) ?? [];
+  const linear = channels.map((value) => (
+    value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  ));
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+function contrastRatio(foreground: string, background: string) {
+  const values = [relativeLuminance(foreground), relativeLuminance(background)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
+
 describe('strategic voyage responsive and accessibility CSS', () => {
   it('removes the production grid before voyage composition', () => {
     const productionCss = readFileSync(resolve('src/games/caribbean/styles/production.css'), 'utf8');
@@ -44,5 +57,20 @@ describe('strategic voyage responsive and accessibility CSS', () => {
     expect(css).toMatch(/\.caribbean-voyage--encounter\s*\{[^}]*height:\s*100dvh/s);
     expect(css).toMatch(/\.caribbean-encounter-decision\s*\{[^}]*overflow:\s*hidden/s);
     expect(css).toMatch(/\.caribbean-voyage-choice > button\s*\{[^}]*min-height:\s*132px/s);
+  });
+
+  it('keeps the encounter alert and map fact labels above 4.5:1 contrast', () => {
+    const css = readFileSync(resolve('src/games/caribbean/styles/voyage.css'), 'utf8');
+    const mapBackground = css.match(/\.caribbean-map\s*\{[^}]*background:\s*(#[\da-f]{6})/s)?.[1];
+    const factColor = css.match(/\.caribbean-map__facts dt\s*\{[^}]*color:\s*(#[\da-f]{6})/s)?.[1];
+    const encounterBackground = css.match(/\.caribbean-voyage--encounter\s*\{[^}]*#[\da-f]{6};\s*\}/s)?.[0].match(/(#[\da-f]{6});\s*\}$/)?.[1];
+    const alertColor = css.match(/\.caribbean-encounter-decision h1 span\s*\{[^}]*color:\s*(#[\da-f]{6})/s)?.[1];
+
+    expect(mapBackground).toBeDefined();
+    expect(factColor).toBeDefined();
+    expect(encounterBackground).toBeDefined();
+    expect(alertColor).toBeDefined();
+    expect(contrastRatio(factColor!, mapBackground!)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(alertColor!, encounterBackground!)).toBeGreaterThanOrEqual(4.5);
   });
 });
