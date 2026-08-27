@@ -34,6 +34,7 @@ export const VIEWPORTS = {
   phonePortrait: { width: 430, height: 932 },
   phoneLandscape: { width: 844, height: 390 },
 };
+export const PREBATTLE_SHORTCUT_KEYS = ['A', 'Q', 'S', 'R', 'E', 'D', 'Space'];
 const SCREENSHOT_MANIFEST = [
   { name: 'battle-boundary-supported.png', width: 960, height: 600, state: 'battle-boundary' },
   { name: 'battle-desktop.png', width: 1440, height: 900, state: 'battle' },
@@ -458,7 +459,7 @@ async function readUnsupportedDisplay(page, viewport) {
 }
 
 async function readPrebattleDisplay(page, phase) {
-  return page.evaluate((currentPhase) => {
+  return page.evaluate(({ currentPhase, expected }) => {
     const viewportContains = (element) => {
       if (!(element instanceof HTMLElement)) return false;
       const bounds = element.getBoundingClientRect();
@@ -468,7 +469,6 @@ async function readPrebattleDisplay(page, phase) {
     };
     const legend = document.querySelector('[aria-label="Battle controls"]');
     const keys = [...(legend?.querySelectorAll('kbd') ?? [])].map((element) => element.textContent?.trim());
-    const expected = ['A', 'Q', '1', '2', '3', 'R', 'E', 'D', 'Space / Esc'];
     const cta = document.querySelector(`[data-testid="${currentPhase === 'decision' ? 'lab-start-naval' : 'naval-enter-battle'}"]`);
     return {
       legendComplete: expected.every((key) => keys.includes(key))
@@ -478,7 +478,7 @@ async function readPrebattleDisplay(page, phase) {
       noOuterScroll: document.documentElement.scrollWidth <= innerWidth
         && document.documentElement.scrollHeight <= innerHeight,
     };
-  }, phase);
+  }, { currentPhase: phase, expected: PREBATTLE_SHORTCUT_KEYS });
 }
 
 async function newEvidencePage(browser, baseUrl, aggregate, viewport, reducedMotion = 'no-preference') {

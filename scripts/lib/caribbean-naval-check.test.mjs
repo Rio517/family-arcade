@@ -56,6 +56,18 @@ describe('naval browser evidence helpers', () => {
     });
   });
 
+  it('audits the action-first QWERTY shortcut legend used by both prebattle screens', () => {
+    expect(navalCheck.PREBATTLE_SHORTCUT_KEYS).toEqual([
+      'A',
+      'Q',
+      'S',
+      'R',
+      'E',
+      'D',
+      'Space',
+    ]);
+  });
+
   it('treats varying active effects as pooled activity and checks every sample capacity', () => {
     const valid = navalCheck.plateauEvidence(activeSamples());
     expect(valid.growthAfterWarmup).toEqual({
