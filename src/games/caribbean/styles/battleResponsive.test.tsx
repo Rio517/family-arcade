@@ -15,7 +15,7 @@ describe('full-bleed Battle Lab layout contracts', () => {
   });
 
   it('uses one equal-height action-first command row with extra room for the shot cycle', () => {
-    expect(battleCss).toMatch(/\.naval-command-strip\s*\{[^}]*--naval-command-height:\s*clamp\(82px,\s*14vh,\s*118px\)[^}]*grid-template-columns:\s*minmax\(96px,\s*1fr\) minmax\(128px,\s*1\.15fr\) minmax\(180px,\s*1\.42fr\) minmax\(130px,\s*1\.08fr\) minmax\(128px,\s*1\.15fr\) minmax\(96px,\s*1fr\)/s);
+    expect(battleCss).toMatch(/\.naval-command-strip\s*\{[^}]*--naval-command-height:\s*clamp\(82px,\s*14vh,\s*118px\)[^}]*grid-template-columns:\s*minmax\(96px,\s*1fr\) minmax\(128px,\s*1\.15fr\) minmax\(180px,\s*1\.28fr\) minmax\(130px,\s*1\.08fr\) minmax\(128px,\s*1\.15fr\) minmax\(96px,\s*1fr\)/s);
     expect(battleCss).toMatch(/\.naval-command-control,[\s\S]*\.naval-rudder-control\s*\{[^}]*height:\s*var\(--naval-command-height\)/s);
     expect(battleCss).toMatch(/\.naval-command-strip\s*\{[^}]*padding-bottom:\s*max\([^}]*env\(safe-area-inset-bottom\)/s);
     expect(battleCss).toMatch(/\.naval-hit-target\s*\{[^}]*min-height:\s*44px/s);

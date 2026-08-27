@@ -131,7 +131,7 @@
   --naval-command-height: clamp(82px, 14vh, 118px);
   min-height: var(--naval-command-height);
   display: grid;
-  grid-template-columns: minmax(96px, 1fr) minmax(128px, 1.15fr) minmax(180px, 1.42fr) minmax(130px, 1.08fr) minmax(128px, 1.15fr) minmax(96px, 1fr);
+  grid-template-columns: minmax(96px, 1fr) minmax(128px, 1.15fr) minmax(180px, 1.28fr) minmax(130px, 1.08fr) minmax(128px, 1.15fr) minmax(96px, 1fr);
   align-items: stretch;
   gap: 7px;
   padding: 6px 7px max(6px, env(safe-area-inset-bottom));
@@ -272,7 +272,7 @@ body:has(.caribbean-production--campaign .naval-battle-page) .party-root {
   .naval-ship-systems { width: min(470px, 47vw); padding-block: 6px 8px; }
   .naval-ship-systems header { margin-bottom: 4px; }
   .naval-command-dock { width: calc(100% - 18px); }
-  .naval-command-strip { grid-template-columns: minmax(76px, 1fr) minmax(104px, 1.12fr) minmax(158px, 1.38fr) minmax(106px, 1.06fr) minmax(104px, 1.12fr) minmax(76px, 1fr); gap: 4px; }
+  .naval-command-strip { grid-template-columns: minmax(76px, 1fr) minmax(104px, 1.12fr) minmax(158px, 1.25fr) minmax(106px, 1.06fr) minmax(104px, 1.12fr) minmax(76px, 1fr); gap: 4px; }
   .naval-player-batteries { grid-template-columns: minmax(210px, 1fr) minmax(210px, 1fr); gap: clamp(60px, 18vw, 220px); }
   .naval-player-battery { padding-block: 5px; }
   .naval-player-battery__bores { gap: 4px; }
