@@ -108,7 +108,7 @@ export const MARKET_PROBE_MINIMUM_NOW_FIXTURES = 42;
 export const PORT_CHECK_DEADLINE_MS = 900_000;
 export const NOW_FIXTURES = Array.from({ length: 96 }, (_, index) => 1_700_000_000_000 + index * 1_000);
 export const STRATEGIC_ACCESSIBILITY_SELECTORS = Object.freeze({
-  surfaces: '.caribbean-voyage-decision, .naval-battle-page, .caribbean-port-activity',
+  surfaces: '.caribbean-voyage-decision, .caribbean-voyage--encounter, .naval-battle-page, .caribbean-port-activity',
   notices: '.campaign-naval-battle__restart-note, .campaign-naval-battle__status',
 });
 const SEED_FIXTURES = [1702, 2702, 3702, 4702, 5702, 6702, 7702, 8702];

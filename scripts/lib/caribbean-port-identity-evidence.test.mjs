@@ -106,6 +106,33 @@ describe('strategic accessibility surface collection', () => {
     });
     expect(sample?.minimumTextPx).toBe(14);
   });
+
+  it('samples the map-led encounter surface after the encounter layout replacement', async () => {
+    document.body.innerHTML = `
+      <section class="caribbean-voyage caribbean-voyage--encounter">
+        <h1 style="font-size: 32px">Red Jackdaw sighted</h1>
+        <p style="font-size: 14px">Contact report</p>
+        <button type="button" style="font-size: 14px">Pursue</button>
+      </section>
+    `;
+    const originalRect = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
+      return { x: 0, y: 0, width: 100, height: 44 };
+    };
+
+    try {
+      const sample = await portCheck.readStrategicSurface({
+        evaluate(operation, argument) {
+          return operation(argument);
+        },
+      });
+      expect(sample.minimumTextPx).toBe(14);
+      expect(sample.minimumTargetHeightPx).toBe(44);
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = originalRect;
+      document.body.replaceChildren();
+    }
+  });
 });
 
 function canonicalJson(value) {
