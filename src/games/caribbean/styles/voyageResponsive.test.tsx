@@ -37,4 +37,12 @@ describe('strategic voyage responsive and accessibility CSS', () => {
     expect(instrument).toMatch(/<svg[^>]*aria-hidden="true"/s);
     expect(instrument).not.toMatch(/<svg[^>]*(?:aria-label|<title)/s);
   });
+
+  it('fits the desktop encounter chart and both full-surface choices in one viewport', () => {
+    const css = readFileSync(resolve('src/games/caribbean/styles/voyage.css'), 'utf8');
+
+    expect(css).toMatch(/\.caribbean-voyage--encounter\s*\{[^}]*height:\s*100dvh/s);
+    expect(css).toMatch(/\.caribbean-encounter-decision\s*\{[^}]*overflow:\s*hidden/s);
+    expect(css).toMatch(/\.caribbean-voyage-choice > button\s*\{[^}]*min-height:\s*132px/s);
+  });
 });

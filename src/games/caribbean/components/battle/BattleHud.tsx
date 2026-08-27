@@ -13,10 +13,6 @@ function percent(value: number, maximum: number): number {
   return Math.round(Math.max(0, Math.min(1, value / maximum)) * 100);
 }
 
-function title(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
 function elapsedEngagement(tick: number): string {
   const elapsedSeconds = Math.floor(tick / 60);
   const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
@@ -83,10 +79,6 @@ export function BattleHud({ state, paused, onTogglePause }: BattleHudProps) {
       </div>
       <div className="naval-player-rail">
         <ShipSystems ship={player} />
-        <div className="naval-current-order" aria-label="Current sailing order">
-          <span>Ammunition</span><strong>{title(player.ammunition)}</strong>
-          <span>Sail</span><strong>{title(player.sail)} sail</strong>
-        </div>
       </div>
     </div>
   );

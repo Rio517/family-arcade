@@ -30,4 +30,13 @@ describe('<BattleHud>', () => {
     expect(opponent).toHaveTextContent('Hull');
     expect(opponent).not.toHaveTextContent(/reload|ready|reloading/i);
   });
+
+  it('leaves ammunition and sail state to the action-first command cards', () => {
+    const state = createNavalBattle(BATTLE_LAB_INPUT);
+    render(<BattleHud state={state} paused={false} onTogglePause={vi.fn()} />);
+
+    expect(screen.queryByRole('region', { name: 'Current sailing order' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Ammunition')).not.toBeInTheDocument();
+    expect(screen.queryByText('Full sail')).not.toBeInTheDocument();
+  });
 });

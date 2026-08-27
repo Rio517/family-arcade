@@ -221,6 +221,29 @@ describe('accessible naval command deck', () => {
     expect(starboard.querySelector('.naval-fire-control__meter b')).toHaveStyle({ width: '50%' });
   });
 
+  it('uses directional action icons and player-only segmented battery reload banks', () => {
+    const session = manualNavalSession();
+    session.state.ships.player.reload.port = { loaded: true, progress: 120, required: 120 };
+    session.state.ships.player.reload.starboard = { loaded: false, progress: 60, required: 120 };
+    session.deliverFrame(0);
+    render(<NavalBattlePage session={session} sceneFactory={null} />);
+
+    const strip = screen.getByRole('group', { name: 'Battle commands' });
+    expect(within(strip).getAllByTestId('naval-action-icon')).toHaveLength(6);
+    expect(within(screen.getByTestId('naval-fire-port')).getByTestId('naval-action-icon')).toHaveAttribute('data-direction', 'left');
+    expect(within(screen.getByTestId('naval-fire-starboard')).getByTestId('naval-action-icon')).toHaveAttribute('data-direction', 'right');
+    expect(screen.getByTestId('naval-shot-cycle')).toHaveTextContent('Round → Chain → Grape');
+    expect(screen.getByTestId('naval-shot-round')).toHaveAttribute('aria-current', 'true');
+
+    const portBank = screen.getByTestId('naval-player-battery-port');
+    const starboardBank = screen.getByTestId('naval-player-battery-starboard');
+    expect(portBank).toHaveAccessibleName('Port battery ready');
+    expect(portBank.querySelectorAll('[data-loaded="true"]')).toHaveLength(8);
+    expect(starboardBank).toHaveAccessibleName('Starboard battery reloading 50 percent');
+    expect(starboardBank.querySelectorAll('[data-loaded="true"]')).toHaveLength(4);
+    expect(screen.queryByTestId(/naval-opponent-battery/)).not.toBeInTheDocument();
+  });
+
   it('maps sail, ammunition, pause, and restart actions through stable test ids', () => {
     const session = manualNavalSession();
     render(<NavalBattlePage session={session} sceneFactory={null} />);
@@ -679,8 +702,11 @@ describe('accessible naval command deck', () => {
     expect(hud).toHaveTextContent(/Crew/);
     expect(hud).toHaveTextContent(/Cannon/);
     expect(hud).not.toHaveTextContent(/reload|ready/i);
-    expect(hud).toHaveTextContent(/Round/);
-    expect(hud).toHaveTextContent(/Full sail/);
+    expect(hud).not.toHaveTextContent(/Round/);
+    expect(hud).not.toHaveTextContent(/Full sail/);
+    const commands = screen.getByRole('group', { name: 'Battle commands' });
+    expect(commands).toHaveTextContent(/Round/);
+    expect(commands).toHaveTextContent(/Full/);
     expect(hud).toHaveTextContent(/Trade wind/);
     expect(hud).toHaveTextContent(/Capture Red Jackdaw/);
     expect(within(hud).getByLabelText('Trade wind 60° / fresh')).toHaveTextContent('60° / fresh');

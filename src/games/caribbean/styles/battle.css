@@ -47,14 +47,16 @@
   top: max(10px, env(safe-area-inset-top));
   left: max(14px, env(safe-area-inset-left));
   right: max(14px, env(safe-area-inset-right));
-  min-height: 46px;
+  min-height: 50px;
   display: grid;
   grid-template-columns: minmax(270px, 1fr) auto auto minmax(175px, 1fr);
   align-items: center;
   gap: 16px;
-  padding: 0 8px 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-brass) 42%, transparent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--caribbean-deep-keel) 76%, transparent), transparent);
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--caribbean-brass) 52%, transparent);
+  background: color-mix(in srgb, var(--caribbean-deep-keel) 91%, transparent);
+  box-shadow: 0 12px 34px rgba(0,0,0,.28);
+  backdrop-filter: blur(10px);
 }
 .naval-mission-line p { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; text-shadow: 0 2px 7px rgba(0,0,0,.8); }
 .naval-mission-line p:nth-child(2) { justify-self: center; }
@@ -66,10 +68,10 @@
 
 .naval-opponent-rail,
 .naval-player-rail { position: absolute; left: max(14px, env(safe-area-inset-left)); right: max(14px, env(safe-area-inset-right)); display: flex; pointer-events: none; }
-.naval-opponent-rail { top: 63px; justify-content: flex-end; }
-.naval-player-rail { bottom: 78px; justify-content: flex-start; align-items: flex-end; gap: 10px; }
+.naval-opponent-rail { top: 68px; justify-content: flex-end; }
+.naval-player-rail { top: 68px; justify-content: flex-start; align-items: flex-start; gap: 10px; }
 .naval-ship-systems {
-  width: min(520px, 48vw);
+  width: min(500px, 42vw);
   min-width: 0;
   padding: 8px 12px 10px;
   border-left: 2px solid var(--caribbean-trade-wind);
@@ -83,50 +85,89 @@
 .naval-ship-systems h2 { margin: 0; color: var(--caribbean-sailcloth); font: 600 18px/1 "Avenir Next Condensed", "Roboto Condensed", sans-serif; letter-spacing: .04em; text-transform: uppercase; }
 .naval-system-grid { display: grid; grid-template-columns: repeat(4, minmax(56px, 1fr)); gap: 8px; }
 .naval-system-value { display: grid; grid-template-columns: 1fr auto; gap: 4px; align-items: center; }
-.naval-system-value span,
-.naval-current-order span { color: color-mix(in srgb, var(--caribbean-sailcloth) 62%, transparent); font: 700 14px/1 ui-monospace, monospace; letter-spacing: .04em; text-transform: uppercase; }
+.naval-system-value span { color: color-mix(in srgb, var(--caribbean-sailcloth) 62%, transparent); font: 700 14px/1 ui-monospace, monospace; letter-spacing: .04em; text-transform: uppercase; }
 .naval-system-value strong { color: var(--caribbean-sailcloth); font: 700 14px/1 ui-monospace, monospace; }
 .naval-system-value i { grid-column: 1/-1; height: 3px; background: color-mix(in srgb, var(--caribbean-sailcloth) 15%, transparent); overflow: hidden; }
 .naval-system-value i b { display: block; height: 100%; background: var(--caribbean-trade-wind); }
 .naval-ship-systems--enemy .naval-system-value i b { margin-left: auto; background: color-mix(in srgb, var(--caribbean-signal-red) 76%, var(--caribbean-sailcloth)); }
-.naval-current-order { display: grid; grid-template-columns: auto auto; gap: 5px 9px; padding: 8px 12px; border-left: 1px solid color-mix(in srgb, var(--caribbean-brass) 42%, transparent); background: color-mix(in srgb, var(--caribbean-deep-keel) 80%, transparent); }
-.naval-current-order strong { font: 700 14px/1.2 ui-monospace, monospace; text-transform: uppercase; }
-
-.naval-command-dock { position: absolute; z-index: 4; left: 50%; bottom: 0; transform: translateX(-50%); width: min(980px, calc(100% - 28px)); pointer-events: none; }
-.naval-command-strip {
-  min-height: 64px;
+.naval-command-dock { position: absolute; z-index: 4; left: 50%; bottom: 0; transform: translateX(-50%); width: min(1280px, calc(100% - 28px)); display: grid; gap: 5px; pointer-events: none; }
+.naval-player-batteries {
   display: grid;
-  grid-template-columns: 72px minmax(128px, 1fr) minmax(140px, 1.16fr) minmax(100px, 1fr) minmax(128px, 1fr) 72px;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+  gap: clamp(100px, 24vw, 360px);
+  align-items: end;
+  padding: 0 12px;
+}
+.naval-player-battery {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 7px 10px 8px;
+  border-top: 1px solid color-mix(in srgb, var(--caribbean-brass) 46%, transparent);
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--caribbean-deep-keel) 78%, transparent));
+  color: var(--caribbean-trade-wind);
+}
+.naval-player-battery--starboard { color: color-mix(in srgb, var(--caribbean-signal-red) 78%, var(--caribbean-sailcloth)); }
+.naval-player-battery strong { font: 800 14px/1 ui-monospace, monospace; letter-spacing: .04em; text-transform: uppercase; text-align: center; }
+.naval-player-battery__bores { display: grid; grid-template-columns: repeat(8, 1fr); gap: 7px; }
+.naval-player-battery__bores i {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 14px;
+  max-width: 27px;
+  justify-self: center;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--caribbean-deep-keel) 88%, transparent);
+  box-shadow: inset 0 0 0 3px rgba(3, 15, 20, .8), 0 2px 8px rgba(0,0,0,.45);
+}
+.naval-player-battery__bores i b { width: 44%; aspect-ratio: 1; border-radius: 50%; background: currentColor; opacity: .18; }
+.naval-player-battery__bores i[data-loaded="true"] { color: var(--caribbean-brass); box-shadow: inset 0 0 0 3px rgba(3, 15, 20, .8), 0 0 12px color-mix(in srgb, var(--caribbean-brass) 46%, transparent); }
+.naval-player-battery__bores i[data-loaded="true"] b { opacity: 1; }
+.naval-command-strip {
+  --naval-command-height: clamp(82px, 14vh, 118px);
+  min-height: var(--naval-command-height);
+  display: grid;
+  grid-template-columns: minmax(96px, 1fr) minmax(128px, 1.15fr) minmax(180px, 1.42fr) minmax(130px, 1.08fr) minmax(128px, 1.15fr) minmax(96px, 1fr);
   align-items: stretch;
-  gap: 5px;
-  padding: 4px 5px max(4px, env(safe-area-inset-bottom));
-  padding-bottom: max(4px, env(safe-area-inset-bottom));
+  gap: 7px;
+  padding: 6px 7px max(6px, env(safe-area-inset-bottom));
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
   border-top: 1px solid color-mix(in srgb, var(--caribbean-brass) 48%, transparent);
-  background: color-mix(in srgb, var(--caribbean-deep-keel) 82%, transparent);
+  background: color-mix(in srgb, var(--caribbean-deep-keel) 90%, transparent);
   box-shadow: 0 -16px 48px rgba(0,0,0,.34);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
   pointer-events: auto;
 }
 .naval-command-control,
 .naval-fire-control,
-.naval-rudder-control { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 4px 6px; }
+.naval-rudder-control { height: var(--naval-command-height); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 7px 9px; border-color: color-mix(in srgb, var(--caribbean-brass) 52%, transparent); box-shadow: inset 0 0 0 2px rgba(204, 161, 66, .07); }
 .naval-command-control span,
 .naval-fire-control strong,
-.naval-rudder-control span { font: 700 14px/1.05 "Avenir Next Condensed", "Roboto Condensed", sans-serif; letter-spacing: .02em; text-transform: uppercase; white-space: normal; text-align: center; }
-.naval-command-control strong { font: 700 14px/1.05 "Avenir Next Condensed", "Roboto Condensed", sans-serif; letter-spacing: .03em; text-transform: uppercase; }
+.naval-rudder-control span { font: 750 15px/1.05 "Avenir Next Condensed", "Roboto Condensed", sans-serif; letter-spacing: .035em; text-transform: uppercase; white-space: normal; text-align: center; }
+.naval-command-control strong { font: 750 15px/1.05 "Avenir Next Condensed", "Roboto Condensed", sans-serif; letter-spacing: .04em; text-transform: uppercase; }
 .naval-command-control > span { color: color-mix(in srgb, var(--caribbean-sailcloth) 70%, transparent); }
+.naval-action-icon { width: clamp(40px, 4.6vw, 60px) !important; height: clamp(32px, 4.4vh, 46px) !important; color: var(--caribbean-brass); stroke-width: 2 !important; }
+.naval-control > kbd { display: grid; place-items: center; min-width: 27px; min-height: 25px; padding: 0 6px; border: 1px solid color-mix(in srgb, var(--caribbean-brass) 62%, transparent); border-radius: 2px; background: rgba(3, 16, 22, .68); font-size: 14px; }
 .naval-shot-control { padding-inline: 14px; }
 .naval-shot-control > span { text-transform: uppercase; }
-.naval-fire-control { min-height: 56px; border-color: color-mix(in srgb, var(--caribbean-brass) 62%, transparent); background: color-mix(in srgb, var(--caribbean-brass) 10%, var(--caribbean-deep-keel)); }
+.naval-shot-cycle__sequence { display: flex; align-items: center; justify-content: center; gap: 4px; color: color-mix(in srgb, var(--caribbean-sailcloth) 55%, transparent) !important; font: 700 14px/1 ui-monospace, monospace !important; white-space: nowrap !important; }
+.naval-shot-cycle__sequence span { color: inherit; }
+.naval-shot-cycle__sequence span[aria-current="true"] { padding: 3px 5px; border: 1px solid var(--caribbean-trade-wind); color: var(--caribbean-trade-wind); }
+.naval-shot-cycle__sequence b { color: var(--caribbean-brass); font-weight: 700; }
+.naval-fire-control { border-color: color-mix(in srgb, var(--caribbean-brass) 62%, transparent); background: color-mix(in srgb, var(--caribbean-brass) 8%, var(--caribbean-deep-keel)); }
 .naval-fire-control__key { color: var(--caribbean-brass); font: 800 14px/1 ui-monospace, monospace; }
 .naval-fire-control__status { color: color-mix(in srgb, var(--caribbean-sailcloth) 72%, transparent); font: 700 14px/1 ui-monospace, monospace; text-transform: uppercase; }
-.naval-fire-control__meter { display: block; width: min(84px, 84%); height: 3px; overflow: hidden; background: color-mix(in srgb, var(--caribbean-sailcloth) 15%, transparent); }
+.naval-fire-control__meter { display: block; width: min(100px, 84%); height: 3px; overflow: hidden; background: color-mix(in srgb, var(--caribbean-sailcloth) 15%, transparent); }
 .naval-fire-control__meter b { display: block; height: 100%; background: var(--caribbean-brass); }
 .naval-fire-control:disabled { opacity: .7; }
 .naval-fire-control:active:not(:disabled) { background: color-mix(in srgb, var(--caribbean-signal-red) 44%, var(--caribbean-deep-keel)); border-color: var(--caribbean-signal-red); }
 .naval-command-control[aria-pressed="true"] { border-color: var(--caribbean-trade-wind); background: color-mix(in srgb, var(--caribbean-trade-wind) 18%, var(--caribbean-deep-keel)); color: var(--caribbean-trade-wind); }
-.naval-rudder-control span { font-size: 14px; }
-.naval-options { position: absolute; right: 5px; bottom: calc(100% + 8px); min-width: 0; pointer-events: auto; }
+.naval-rudder-control span { font-size: 15px; }
+.naval-options { position: absolute; right: 5px; bottom: calc(100% + 8px); min-width: 0; opacity: .82; pointer-events: auto; }
 .naval-options > summary { display: grid; place-items: center; padding: 0 12px; list-style: none; }
 .naval-options > summary::-webkit-details-marker { display: none; }
 .naval-options[open] > summary { border-color: var(--caribbean-trade-wind); color: var(--caribbean-trade-wind); }
@@ -139,7 +180,7 @@
 .naval-sensory-controls .naval-control[aria-pressed="true"] { border-color: var(--caribbean-trade-wind); color: var(--caribbean-trade-wind); }
 .naval-effects-volume { display: inline-flex; align-items: center; min-height: 44px; gap: 7px; padding-inline: 8px; color: color-mix(in srgb, var(--caribbean-sailcloth) 75%, transparent); font: 700 14px/1 ui-monospace, monospace; }
 .naval-effects-volume input { width: 90px; min-block-size: 44px; accent-color: var(--caribbean-trade-wind); }
-.naval-aim-cue { position: absolute; left: 50%; bottom: 147px; transform: translateX(-50%); margin: 0; padding: 6px 10px; background: color-mix(in srgb, var(--caribbean-deep-keel) 75%, transparent); color: var(--caribbean-brass); font: 700 14px/1.2 ui-monospace, monospace; letter-spacing: .04em; text-align: center; }
+.naval-aim-cue { position: absolute; left: 50%; bottom: 206px; transform: translateX(-50%); margin: 0; padding: 6px 10px; background: color-mix(in srgb, var(--caribbean-deep-keel) 75%, transparent); color: var(--caribbean-brass); font: 700 14px/1.2 ui-monospace, monospace; letter-spacing: .04em; text-align: center; }
 
 .naval-chart,
 .naval-scene-frame,
@@ -227,10 +268,13 @@ body:has(.caribbean-production--campaign .naval-battle-page) .party-root {
 @media (max-width: 1100px), (max-height: 720px) {
   .naval-mission-line { top: 7px; min-height: 42px; }
   .naval-opponent-rail { top: 52px; }
-  .naval-player-rail { bottom: 72px; }
+  .naval-player-rail { top: 52px; }
   .naval-ship-systems { width: min(470px, 47vw); padding-block: 6px 8px; }
   .naval-ship-systems header { margin-bottom: 4px; }
   .naval-command-dock { width: calc(100% - 18px); }
-  .naval-command-strip { grid-template-columns: 68px minmax(116px, 1fr) minmax(132px, 1.16fr) minmax(94px, 1fr) minmax(116px, 1fr) 68px; }
-  .naval-aim-cue { bottom: 139px; }
+  .naval-command-strip { grid-template-columns: minmax(76px, 1fr) minmax(104px, 1.12fr) minmax(158px, 1.38fr) minmax(106px, 1.06fr) minmax(104px, 1.12fr) minmax(76px, 1fr); gap: 4px; }
+  .naval-player-batteries { grid-template-columns: minmax(210px, 1fr) minmax(210px, 1fr); gap: clamp(60px, 18vw, 220px); }
+  .naval-player-battery { padding-block: 5px; }
+  .naval-player-battery__bores { gap: 4px; }
+  .naval-aim-cue { bottom: 176px; }
 }

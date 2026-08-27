@@ -33,9 +33,15 @@ describe('<EncounterPage>', () => {
     render(<EncounterPage controller={controller} />);
 
     expect(screen.getByRole('heading', { name: 'Red Jackdaw sighted' })).toHaveFocus();
-    expect(screen.getByText(/Avoid and return spends the guaranteed 1 day and 1 provision/i)).toBeInTheDocument();
-    expect(screen.getByText(/keeps the Red Jackdaw lead active/i)).toBeInTheDocument();
-    expect(screen.getByText(/Pursue enters a two-to-four-minute naval duel/i)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Caribbean encounter chart' })).toBeInTheDocument();
+    expect(screen.getByTestId('encounter-bearing')).toHaveTextContent('East by north');
+    expect(screen.getByTestId('encounter-wind')).toHaveTextContent('Fresh trade wind from ENE');
+    const pursue = screen.getByRole('article', { name: 'Pursue Red Jackdaw' });
+    expect(pursue).toHaveTextContent('Enter naval battle');
+    expect(pursue).toHaveTextContent(/Risk damage and casualties, but retain the prize if victorious/i);
+    const avoid = screen.getByRole('article', { name: 'Avoid and return' });
+    expect(avoid).toHaveTextContent('Spend 1 day + 1 provision');
+    expect(avoid).toHaveTextContent(/keeps the Red Jackdaw lead active/i);
     expect(screen.getByTestId('voyage-status')).toHaveAttribute('aria-live', 'polite');
 
     fireEvent.click(screen.getByTestId('encounter-avoid'));

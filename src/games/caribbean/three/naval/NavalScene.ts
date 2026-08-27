@@ -38,6 +38,12 @@ import {
   type NavalRenderPose,
 } from './sceneMath';
 import { NAVAL_WATER_PRESENTATION } from './waterPresentation';
+import {
+  createNavalWaterUniforms,
+  NAVAL_WATER_FRAGMENT_SHADER,
+  NAVAL_WATER_VERTEX_SHADER,
+  type NavalWaterUniforms,
+} from './waterShader';
 
 interface ShipVisual {
   root: THREE.Group;
@@ -117,30 +123,11 @@ function islandSilhouettes(): THREE.Mesh {
   return islands;
 }
 
-function waterMaterial(uniforms: { uTime: { value: number } }): THREE.ShaderMaterial {
+function waterMaterial(uniforms: NavalWaterUniforms): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms,
-    vertexShader: `
-      uniform float uTime;
-      varying float vWave;
-      void main() {
-        vec3 p = position;
-        float a = sin(p.x * .075 + uTime * ${NAVAL_WATER_PRESENTATION.waveASpeed}) * ${NAVAL_WATER_PRESENTATION.waveAAmplitude};
-        float b = sin(p.y * .11 - uTime * ${NAVAL_WATER_PRESENTATION.waveBSpeed} + p.x * .025) * ${NAVAL_WATER_PRESENTATION.waveBAmplitude};
-        p.z += a + b;
-        vWave = a + b;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-      }
-    `,
-    fragmentShader: `
-      varying float vWave;
-      void main() {
-        vec3 deep = vec3(.018, .20, .28);
-        vec3 light = vec3(.09, .48, .52);
-        float glint = smoothstep(.045, .11, vWave) * .18;
-        gl_FragColor = vec4(mix(deep, light, .35 + vWave * .35 + glint), 1.0);
-      }
-    `,
+    vertexShader: NAVAL_WATER_VERTEX_SHADER,
+    fragmentShader: NAVAL_WATER_FRAGMENT_SHADER,
     side: THREE.DoubleSide,
   });
 }
@@ -179,7 +166,7 @@ export class NavalScene implements NavalSceneAdapter {
   readonly #camera: THREE.PerspectiveCamera;
   readonly #quality: QualityController;
   readonly #sun: THREE.DirectionalLight;
-  readonly #waterUniforms = { uTime: { value: 0 } };
+  readonly #waterUniforms = createNavalWaterUniforms();
   readonly #ships = {} as Record<NavalShipId, ShipVisual>;
   readonly #cameraPosition = new THREE.Vector3(0, 31, 42);
   readonly #cameraTarget = new THREE.Vector3();

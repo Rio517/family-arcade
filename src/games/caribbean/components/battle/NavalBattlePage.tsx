@@ -73,6 +73,10 @@ function nextAmmunition(current: (typeof AMMUNITION_CYCLE)[number]) {
   return AMMUNITION_CYCLE[(index + 1) % AMMUNITION_CYCLE.length];
 }
 
+function commandLabel(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function outcomeCopy(
   outcome: NavalOutcome,
   state: ReturnType<NavalSessionView['getSnapshot']>['state'],
@@ -400,6 +404,10 @@ export function NavalBattlePage({
           {aimCue && <p className="naval-aim-cue" data-testid="naval-aim-cue">{aimCue.message}</p>}
 
           <div className="naval-command-dock">
+            <div className="naval-player-batteries" aria-label="Your battery reload status">
+              <PlayerBatteryStatus side="port" reload={state.ships.player.reload.port} />
+              <PlayerBatteryStatus side="starboard" reload={state.ships.player.reload.starboard} />
+            </div>
             <div className="naval-command-strip" role="group" aria-label="Battle commands">
               <RudderControl side="port" shortcut="A" active={currentCommand.rudder === -1} onHold={holdRudder} onActivate={activateAudio} />
               <FireControl buttonRef={portFireRef} side="port" reload={state.ships.player.reload.port} onFire={() => { activateAudio(); session.requestFire('port'); }} disabled={Boolean(outcome || diagnostic)} />
@@ -409,7 +417,18 @@ export function NavalBattlePage({
                 data-testid="naval-shot-cycle"
                 aria-label={`Change shot — ${currentCommand.ammunition} selected`}
                 onClick={() => { activateAudio(); session.setAmmunition(nextAmmunition(currentCommand.ammunition)); }}
-              ><kbd>S</kbd><strong>Change shot</strong><span>{currentCommand.ammunition}</span></button>
+              >
+                <ShotIcon />
+                <strong>Change shot</strong>
+                <span className="naval-shot-cycle__sequence" aria-hidden="true">
+                  {AMMUNITION_CYCLE.map((ammunition, index) => (
+                    <span key={ammunition} data-testid={`naval-shot-${ammunition}`} aria-current={currentCommand.ammunition === ammunition ? 'true' : undefined}>
+                      {commandLabel(ammunition)}{index < AMMUNITION_CYCLE.length - 1 ? <b> → </b> : null}
+                    </span>
+                  ))}
+                </span>
+                <kbd>S</kbd>
+              </button>
               <button
                 type="button"
                 className="naval-control naval-hit-target naval-command-control naval-sail-control"
@@ -417,7 +436,7 @@ export function NavalBattlePage({
                 aria-pressed={currentCommand.sail === 'reefed'}
                 aria-label={`Sail setting: ${currentCommand.sail}. Press to ${currentCommand.sail === 'full' ? 'reef' : 'set full sail'}`}
                 onClick={() => { activateAudio(); session.setSail(currentCommand.sail === 'full' ? 'reefed' : 'full'); }}
-              ><kbd>R</kbd><strong>Change sail</strong><span>{currentCommand.sail === 'full' ? 'Full' : 'Reefed'}</span></button>
+              ><SailIcon /><strong>Change sail</strong><span>{currentCommand.sail === 'full' ? 'Full' : 'Reefed'}</span><kbd>R</kbd></button>
               <FireControl side="starboard" reload={state.ships.player.reload.starboard} onFire={() => { activateAudio(); session.requestFire('starboard'); }} disabled={Boolean(outcome || diagnostic)} />
               <RudderControl side="starboard" shortcut="D" active={currentCommand.rudder === 1} onHold={holdRudder} onActivate={activateAudio} />
             </div>
@@ -550,6 +569,30 @@ function SensoryToggle({ testId, label, pressed, onToggle }: { testId: string; l
   return <button type="button" className="naval-control naval-hit-target" data-testid={testId} aria-pressed={pressed} onClick={onToggle}>{label}</button>;
 }
 
+const PLAYER_BATTERY_SEGMENTS = 8;
+
+function reloadPercent(reload: { loaded: boolean; progress: number; required: number }): number {
+  if (reload.loaded) return 100;
+  if (reload.required <= 0) return 0;
+  return Math.round(Math.max(0, Math.min(1, reload.progress / reload.required)) * 100);
+}
+
+function PlayerBatteryStatus({ side, reload }: { side: Broadside; reload: { loaded: boolean; progress: number; required: number } }) {
+  const percent = reloadPercent(reload);
+  const loadedSegments = reload.loaded ? PLAYER_BATTERY_SEGMENTS : Math.floor(percent / 100 * PLAYER_BATTERY_SEGMENTS);
+  const label = `${commandLabel(side)} battery ${reload.loaded ? 'ready' : `reloading ${percent} percent`}`;
+  return (
+    <section className={`naval-player-battery naval-player-battery--${side}`} data-testid={`naval-player-battery-${side}`} aria-label={label}>
+      <strong>{commandLabel(side)} battery — {reload.loaded ? 'Ready' : `Reloading ${percent}%`}</strong>
+      <span className="naval-player-battery__bores" aria-hidden="true">
+        {Array.from({ length: PLAYER_BATTERY_SEGMENTS }, (_, index) => (
+          <i key={index} data-loaded={index < loadedSegments ? 'true' : 'false'}><b /></i>
+        ))}
+      </span>
+    </section>
+  );
+}
+
 function FireControl({
   side,
   reload,
@@ -564,10 +607,8 @@ function FireControl({
   buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
   const isPort = side === 'port';
-  const reloadPercent = reload.required <= 0
-    ? 0
-    : Math.round(Math.max(0, Math.min(1, reload.progress / reload.required)) * 100);
-  const readiness = reload.loaded ? 'ready' : `reloading ${reloadPercent} percent`;
+  const percent = reloadPercent(reload);
+  const readiness = reload.loaded ? 'ready' : `reloading ${percent} percent`;
   return (
     <button
       ref={buttonRef}
@@ -578,10 +619,11 @@ function FireControl({
       onClick={onFire}
       disabled={disabled || !reload.loaded}
     >
-      <kbd className="naval-fire-control__key">{isPort ? 'Q' : 'E'}</kbd>
+      <CannonIcon side={side} />
       <strong>Fire {side}</strong>
-      <span className="naval-fire-control__status">{reload.loaded ? 'Ready' : `Reloading ${reloadPercent}%`}</span>
-      <i className="naval-fire-control__meter" aria-hidden="true"><b style={{ width: `${reload.loaded ? 100 : reloadPercent}%` }} /></i>
+      <span className="naval-fire-control__status">{reload.loaded ? 'Ready' : `Reloading ${percent}%`}</span>
+      <i className="naval-fire-control__meter" aria-hidden="true"><b style={{ width: `${percent}%` }} /></i>
+      <kbd className="naval-fire-control__key">{isPort ? 'Q' : 'E'}</kbd>
     </button>
   );
 }
@@ -611,8 +653,45 @@ function RudderControl({ side, shortcut, active, onHold, onActivate }: { side: '
       aria-label={`Turn ${side}`}
       aria-pressed={active}
     >
-      <kbd>{shortcut}</kbd>
+      <RudderIcon side={side} />
       <span>Turn {side}</span>
+      <kbd>{shortcut}</kbd>
     </button>
+  );
+}
+
+function RudderIcon({ side }: { side: Broadside }) {
+  return (
+    <svg className="naval-action-icon" data-testid="naval-action-icon" data-action-icon="rudder" data-direction={side === 'port' ? 'left' : 'right'} viewBox="0 0 64 42" aria-hidden="true">
+      <g transform={side === 'port' ? 'translate(64 0) scale(-1 1)' : undefined}>
+        <path d="M10 34c7-18 20-27 40-24" /><path d="m42 3 10 7-8 11" />
+      </g>
+    </svg>
+  );
+}
+
+function CannonIcon({ side }: { side: Broadside }) {
+  return (
+    <svg className="naval-action-icon" data-testid="naval-action-icon" data-action-icon="cannon" data-direction={side === 'port' ? 'left' : 'right'} viewBox="0 0 64 42" aria-hidden="true">
+      <g transform={side === 'port' ? 'translate(64 0) scale(-1 1)' : undefined}>
+        <path d="M13 14 52 7l3 11-39 7Z" /><path d="M16 25h24l7 10H13Z" /><circle cx="22" cy="34" r="6" /><circle cx="40" cy="34" r="6" />
+      </g>
+    </svg>
+  );
+}
+
+function ShotIcon() {
+  return (
+    <svg className="naval-action-icon" data-testid="naval-action-icon" data-action-icon="shot" viewBox="0 0 64 42" aria-hidden="true">
+      <circle cx="25" cy="27" r="8" /><circle cx="39" cy="27" r="8" /><circle cx="32" cy="13" r="8" />
+    </svg>
+  );
+}
+
+function SailIcon() {
+  return (
+    <svg className="naval-action-icon" data-testid="naval-action-icon" data-action-icon="sail" viewBox="0 0 64 42" aria-hidden="true">
+      <path d="M29 5v31M30 7c12 5 19 13 22 25H31M27 12c-7 5-12 12-15 21h15M9 35h47l-7 5H17Z" />
+    </svg>
   );
 }

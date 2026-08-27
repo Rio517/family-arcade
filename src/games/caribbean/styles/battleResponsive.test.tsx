@@ -14,16 +14,16 @@ describe('full-bleed Battle Lab layout contracts', () => {
     expect(battleCss).not.toMatch(/\.naval-command-deck\s*\{[^}]*grid-template-columns:\s*clamp\(92px/s);
   });
 
-  it('uses one compact landscape command row with safe-area padding and touch-sized controls', () => {
-    expect(battleCss).toMatch(/\.naval-command-strip\s*\{[^}]*grid-template-columns:\s*72px minmax\(128px,\s*1fr\) minmax\(140px,\s*1\.16fr\) minmax\(100px,\s*1fr\) minmax\(128px,\s*1fr\) 72px/s);
-    expect(battleCss).toMatch(/@media \(max-width:\s*1100px\), \(max-height:\s*720px\)[\s\S]*\.naval-command-strip\s*\{[^}]*grid-template-columns:\s*68px minmax\(116px,\s*1fr\) minmax\(132px,\s*1\.16fr\) minmax\(94px,\s*1fr\) minmax\(116px,\s*1fr\) 68px/s);
+  it('uses one equal-height action-first command row with extra room for the shot cycle', () => {
+    expect(battleCss).toMatch(/\.naval-command-strip\s*\{[^}]*--naval-command-height:\s*clamp\(82px,\s*14vh,\s*118px\)[^}]*grid-template-columns:\s*minmax\(96px,\s*1fr\) minmax\(128px,\s*1\.15fr\) minmax\(180px,\s*1\.42fr\) minmax\(130px,\s*1\.08fr\) minmax\(128px,\s*1\.15fr\) minmax\(96px,\s*1fr\)/s);
+    expect(battleCss).toMatch(/\.naval-command-control,[\s\S]*\.naval-rudder-control\s*\{[^}]*height:\s*var\(--naval-command-height\)/s);
     expect(battleCss).toMatch(/\.naval-command-strip\s*\{[^}]*padding-bottom:\s*max\([^}]*env\(safe-area-inset-bottom\)/s);
     expect(battleCss).toMatch(/\.naval-hit-target\s*\{[^}]*min-height:\s*44px/s);
-    expect(battleCss).toMatch(/\.naval-fire-control\s*\{[^}]*min-height:\s*56px/s);
+    expect(battleCss).toMatch(/\.naval-player-battery__bores\s*\{[^}]*grid-template-columns:\s*repeat\(8,\s*1fr\)/s);
     expect(battleCss).toMatch(/\.naval-fire-control__status\s*\{[^}]*font:\s*700 14px\/1/s);
-    expect(battleCss).not.toMatch(/\.naval-fire-control\s*\{[^}]*min-height:\s*(?:9[0-9]|1[0-9]{2,})px/s);
     expect(battleCss).not.toMatch(/\.naval-shortcut-key\s*\{[^}]*display:\s*none/s);
     expect(battleCss).toMatch(/\.naval-command-control span,[\s\S]*\.naval-rudder-control span\s*\{[^}]*white-space:\s*normal[^}]*text-align:\s*center/s);
+    expect(battleCss).not.toMatch(/\.naval-current-order\s*\{/s);
   });
 
   it('docks the app-wide Party control clear of campaign battle controls without hiding it', () => {
