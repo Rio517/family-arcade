@@ -21,11 +21,15 @@ The finished interface must:
 
 ## Approved Visual Direction
 
-![Caribbean port and battle UI concept](./2026-08-26-caribbean-port-battle-ui-concept-v2.png)
+### Port
 
-The concept image is an art-direction reference, not a pixel or typography contract. Its useful ideas are the illustrated Bridgetown backdrop, large icon-led port calls, chart as navigational context, and mirrored **player** battery status. The exact action-first command deck and labels below are authoritative; generated letterforms in the raster concept are illustrative. The extra place names shown on the concept chart are atmosphere only; phase one must not expose them as real destinations.
+![Standalone Caribbean port concept](./2026-08-26-caribbean-port-concept.png)
 
-![Exact Caribbean battle keyboard layout](./2026-08-26-caribbean-battle-keyboard-layout.svg)
+### Battle
+
+![Standalone Caribbean battle concept](./2026-08-26-caribbean-battle-concept.png)
+
+The two concept images are art-direction references, not pixel or typography contracts. Their useful ideas are the illustrated Bridgetown backdrop, large icon-led port calls, chart as navigational context, calm dominant battle scene, mirrored **player** battery status, and compact action-first command deck. The exact labels and interaction rules below are authoritative; generated letterforms in the raster concepts are illustrative. The extra place names shown on the port concept chart are atmosphere only; phase one must not expose them as real destinations.
 
 The distinctive visual signature is a **captain’s working chart laid over the harbor and battle surfaces**: the same brass, signal-red, sailcloth, and ink language connects port decisions to naval commands. This is not a generic dashboard and not a literal imitation of any Pirates release.
 
@@ -246,7 +250,7 @@ The exact primary bindings are:
 
 `S` replaces the `1`/`2`/`3` ammunition bindings; those number keys no longer change ammunition in battle. Pointer and touch users may still select Round, Chain, or Grape directly from the visible ammunition control. Arrow keys and `Esc` may remain accessibility/familiarity alternatives, but they appear in the pause/help legend rather than competing with the persistent left-hand cluster.
 
-The on-screen deck is organized by ship action, not by the shape of a keyboard. Each persistent control uses a prominent cannon, helm, shot, sail, or pause icon; an equally clear action name; and a small, consistent shortcut badge in the corner. At the standard desktop boundary, action controls target `84–96px` high, icons `36–44px`, and shortcut badges `22–28px`; the badge remains legible but visually secondary. The icon never replaces the written label, and the badge is not a separate hit target. Touch users receive the same complete command set through full-size action buttons.
+The on-screen deck is organized by ship action, not by the shape of a keyboard. Each persistent control uses a prominent cannon, helm, shot, sail, or pause icon; an equally clear action name; and a small, consistent shortcut badge in the corner. At the standard desktop boundary, action controls target `84–96px` high, icons `36–44px`, and shortcut badges `22–28px`; the badge remains legible but visually secondary. **Change Shot receives approximately `1.4×` the horizontal space of Change Sail** so its three ammunition choices and current selection never feel cramped. The sail control remains compact because it represents one two-state toggle. The icon never replaces the written label, and the badge is not a separate hit target. Touch users receive the same complete command set through full-size action buttons.
 
 ## Cannon Readiness
 
@@ -322,6 +326,7 @@ Geometry assertions must prove:
 - Tavern’s action/status slot does not collapse;
 - Market padding remains present next to rows and scrollbars;
 - every visible command has a complete hit target and implemented shortcut cue; and
+- the Change Shot control is approximately `1.4×` the width of Change Sail at the standard desktop boundary;
 - pressing `S` cycles Round, Chain, and Grape in the displayed order while `1`/`2`/`3` do not change ammunition;
 - enemy status contains no exact reload or battery-readiness data; and
 - cannon progress shown in the DOM matches the underlying scalar reload state.
@@ -338,7 +343,7 @@ The redesign is complete when all of the following are true:
 4. Market has balanced padding, stronger red, no redundant success notice, and a bottom **Done** action.
 5. Blocked actions use clear signal-red prerequisite messages and full-tile disabled interaction.
 6. The chart truthfully shows Bridgetown, the player ship, and the authored Red Jackdaw route without fake playable ports.
-7. The persistent battle deck makes ship actions and icons dominant, keeps the `Q/E`, `A/S/D`, `R`, and `Space` badges readable but secondary, and uses `S` to cycle Round, Chain, and Grape in order.
+7. The persistent battle deck makes ship actions and icons dominant, keeps the `Q/E`, `A/S/D`, `R`, and `Space` badges readable but secondary, gives Change Shot approximately `1.4×` the width of Change Sail, and uses `S` to cycle Round, Chain, and Grape in order.
 8. Both player broadside reload states are immediately distinguishable as loading or ready and remain faithful to scalar per-side mechanics; enemy reload timing is never exposed as UI data.
 9. Ships read as heavy: low global wave motion, restrained hull bobbing, strong water contact, and localized wake/impact motion.
 10. Browser evidence proves all layout, accessibility, deterministic, performance, provenance, and no-op hash-writing contracts.
