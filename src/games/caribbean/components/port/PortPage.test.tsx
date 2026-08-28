@@ -96,6 +96,20 @@ function lengthPixels(value: string, viewportWidth: number): number {
   throw new Error(`Unsupported CSS length in layout contract: ${trimmed}`);
 }
 
+function verticalLengthPixels(value: string, viewportHeight: number): number {
+  const trimmed = value.trim();
+  const clampMatch = trimmed.match(/^clamp\(([^,]+),\s*([^,]+),\s*([^,]+)\)$/);
+  if (clampMatch) {
+    const minimum = verticalLengthPixels(clampMatch[1] ?? '', viewportHeight);
+    const preferred = verticalLengthPixels(clampMatch[2] ?? '', viewportHeight);
+    const maximum = verticalLengthPixels(clampMatch[3] ?? '', viewportHeight);
+    return Math.min(maximum, Math.max(minimum, preferred));
+  }
+  if (trimmed.endsWith('px')) return Number.parseFloat(trimmed);
+  if (trimmed.endsWith('vh')) return Number.parseFloat(trimmed) * viewportHeight / 100;
+  throw new Error(`Unsupported vertical CSS length in layout contract: ${trimmed}`);
+}
+
 function horizontalPaddingPixels(ruleBody: string, viewportWidth: number): number {
   const padding = declaration(ruleBody, 'padding');
   if (padding === null) throw new Error('Position rule must declare padding');
@@ -647,6 +661,19 @@ describe('<PortPage>', () => {
     expect(positionRule).not.toMatch(/overflow:\s*(?:hidden|clip)/);
     expect(labelsRule).toMatch(/white-space:\s*nowrap/);
     expect(labelsRule).not.toMatch(/text-overflow:\s*ellipsis/);
+  });
+
+  it('caps the tall-desktop gap between the status rail and port stage at 70px', () => {
+    const portCss = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+    const stageRule = ruleBodyContaining(portCss, '.caribbean-port-stage');
+    const margin = declaration(stageRule, 'margin-block-start');
+
+    expect(declaration(stageRule, 'align-self')).toBe('start');
+    expect(margin).not.toBeNull();
+    expect(verticalLengthPixels(margin ?? '', 1_355)).toBeLessThanOrEqual(70);
+    const compactMargin = verticalLengthPixels(margin ?? '', 600);
+    expect(compactMargin).toBeGreaterThanOrEqual(24);
+    expect(compactMargin + 496).toBeLessThanOrEqual(538);
   });
 
   it('keeps the complete Market ledger and its final Done control in document order at 1440x900', () => {

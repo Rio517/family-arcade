@@ -215,8 +215,9 @@
   width: min(1580px, calc(100% - 48px));
   height: min(690px, calc(100% - 42px));
   min-height: 0;
-  align-self: center;
+  align-self: start;
   justify-self: center;
+  margin-block-start: clamp(24px, 5vh, 70px);
   display: grid;
   grid-template-columns: minmax(0, 1.82fr) minmax(310px, .78fr);
   gap: clamp(20px, 2.4vw, 38px);
