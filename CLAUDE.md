@@ -23,10 +23,14 @@ nothing needs a manual. Big visual changes are pitched as **mockups first**
   replaying an ordered log; online peers reconcile by "longer log wins".
   Consequences: undo/rewind are LOCAL-ONLY; custom starting positions are
   LOCAL-ONLY; never make an online feature that rewrites history.
-- **Offline PWA.** No runtime downloads: no CDN fonts, no fetched 3D models,
-  no remote images. 3D is procedural three.js geometry (lathe/extrude/cones/
-  canvas textures generated in code). three.js loads via `React.lazy` so 2D
-  players never download it; chess and battleship share that chunk.
+- **Offline PWA, with one deliberate map exception.** No CDN fonts, fetched 3D
+  models, or remote images. The Caribbean real map intentionally loads
+  approved OpenFreeMap vector tiles/glyphs at runtime, uses a repository-owned
+  style, and shows a clear network-unavailable state. Never bundle PMTiles or
+  add a tile-extraction pipeline. 3D is procedural three.js geometry (lathe/
+  extrude/cones/canvas textures generated in code). three.js loads via
+  `React.lazy` so 2D players never download it; chess and battleship share that
+  chunk.
 - **Determinism.** Seeded LCGs for any generated scenery/randomness that
   affects appearance or tests (starfields, clouds, hull plates, dice bags).
 - **Accessibility floors.** Every animation is gated behind
@@ -166,9 +170,19 @@ Three consequences worth knowing:
   effect until the coding-agent session restarts. The project must be trusted
   for Codex to read `.codex/config.toml`. Start the server first, then
   restart/reconnect the session.
-- **Tidewave complements, rather than replaces, Playwright.** Use Tidewave for
-  source-aware runtime exploration and real player interactions. Use the
-  connected Playwright MCP for repeatable DOM, geometry, console, network, and
+- **Use Tidewave first for application, UI, and TypeScript work.** Confirm the
+  MCP connection, then use Tidewave for source-aware discovery, runtime
+  evaluation, logs, and real-player interactions before reaching for generic
+  inspection tools. If browser control reports that no browser is connected,
+  open `http://127.0.0.1:5178/tidewave` in the user's main Chrome profile and
+  reconnect it. Do not open a different Chrome profile for Tidewave work.
+- **Reuse the server on port 5178.** Do not start another Vite server when the
+  Tidewave server is already running, and do not stop or repurpose unrelated
+  servers on other ports. If Tidewave is unavailable, report that explicitly,
+  preserve the current server state, and continue with source/tests when the
+  task permits.
+- **Tidewave complements, rather than replaces, Playwright.** Use the connected
+  Playwright MCP for repeatable viewport, DOM, geometry, console, network, and
   screenshot review. Committed regression evidence still belongs in the
   Playwright/Vitest harnesses (`npm run shots`, `caribbean:port-check`, and
   `caribbean:naval-check`).
