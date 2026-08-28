@@ -214,6 +214,20 @@ function comparisonRun(
     byteComparedScreenshotsIdentical: true,
   };
   metrics.strategicSailing = strategicSailingEvidence();
+  metrics.mapNetwork = {
+    status: 'verified',
+    provider: 'OpenFreeMap',
+    tileJsonUrl: 'https://tiles.openfreemap.org/planet',
+    providerRequestCount: 9,
+    abortedTileJsonRequestCount: 1,
+    successfulTileJsonResponseCount: 1,
+    unavailableWithoutCanvas: true,
+    fakeGeographyAbsent: true,
+    unavailableScreenshotFilename: 'map-unavailable-desktop.png',
+    unavailableScreenshotSha256: 'a'.repeat(64),
+    retryRecovered: true,
+    renderIdleAfterRetry: true,
+  };
   return {
     metrics,
     screenshots: new Map(NORMAL_ROUTE_SCREENSHOTS.map((name) => [
@@ -242,26 +256,26 @@ function passiveComparisonDeadline() {
   return { throwIfExpired() {} };
 }
 
-function diagnosticManifest(directory) {
+function diagnosticManifest(directory, stem = 'campaign-result-desktop') {
   const report = JSON.parse(fs.readFileSync(
-    path.join(directory, 'campaign-result-desktop-mismatch.json'),
+    path.join(directory, `${stem}-mismatch.json`),
     'utf8',
   ));
   const metricsA = fs.readFileSync(path.join(directory, 'metrics-run-a.canonical.json'));
   const metricsB = fs.readFileSync(path.join(directory, 'metrics-run-b.canonical.json'));
-  const pngA = fs.readFileSync(path.join(directory, 'campaign-result-desktop-run-a.png'));
-  const pngB = fs.readFileSync(path.join(directory, 'campaign-result-desktop-run-b.png'));
+  const pngA = fs.readFileSync(path.join(directory, `${stem}-run-a.png`));
+  const pngB = fs.readFileSync(path.join(directory, `${stem}-run-b.png`));
   return { report, metricsA, metricsB, pngA, pngB };
 }
 
-function assertCompleteDiagnosticFileSet(directory) {
+function assertCompleteDiagnosticFileSet(directory, stem = 'campaign-result-desktop') {
   assert.deepEqual(fs.readdirSync(directory).sort(), [
-    'campaign-result-desktop-mismatch.json',
-    'campaign-result-desktop-run-a.png',
-    'campaign-result-desktop-run-b.png',
+    `${stem}-mismatch.json`,
+    `${stem}-run-a.png`,
+    `${stem}-run-b.png`,
     'metrics-run-a.canonical.json',
     'metrics-run-b.canonical.json',
-  ]);
+  ].sort());
 }
 
 function assertCompleteSuccessDiagnosticFileSet(directory) {
@@ -332,8 +346,8 @@ test('port presentation contract locks aligned setup stable tabs truthful chart 
     },
     stages: { menu: stage, market: { ...stage }, tavern: { ...stage } },
     chart: {
-      before: { status: 'No course marked', routeVisible: false, contactVisible: false },
-      after: { status: 'Course marked', routeVisible: true, contactVisible: true },
+      before: { status: 'Bridgetown harbour', routeVisible: false, contactVisible: false },
+      after: { status: 'Red Jackdaw · 4 days', routeVisible: true, contactVisible: true },
     },
     actions: [
       'governor', 'tavern', 'market', 'shipyard', 'shares', 'log', 'set-sail',
@@ -978,8 +992,8 @@ test('diagnostic comparison preserves non-exempt buffer drift before comparator 
     },
   );
 
-  assertCompleteDiagnosticFileSet(diagnosticDirectory);
-  const diagnostic = diagnosticManifest(diagnosticDirectory);
+  assertCompleteDiagnosticFileSet(diagnosticDirectory, 'setup-desktop');
+  const diagnostic = diagnosticManifest(diagnosticDirectory, 'setup-desktop');
   assert.deepEqual(diagnostic.report.failure, {
     stage: 'comparator',
     run: null,
@@ -993,9 +1007,11 @@ test('diagnostic comparison preserves non-exempt buffer drift before comparator 
   assert.equal(diagnostic.report.canonicalJsonEqual, true);
   assert.equal(diagnostic.report.sha256.runA, sha256(diagnostic.pngA));
   assert.equal(diagnostic.report.sha256.runB, sha256(diagnostic.pngB));
-  assert.deepEqual(diagnostic.pngA, diagnostic.pngB);
-  assert.deepEqual(diagnostic.report.runA, first.screenshotStates.get(TERMINAL_RESULT_SCREENSHOT));
-  assert.deepEqual(diagnostic.report.runB, second.screenshotStates.get(TERMINAL_RESULT_SCREENSHOT));
+  assert.deepEqual(diagnostic.pngA, first.screenshots.get('setup-desktop.png'));
+  assert.deepEqual(diagnostic.pngB, second.screenshots.get('setup-desktop.png'));
+  assert.notDeepEqual(diagnostic.pngA, diagnostic.pngB);
+  assert.equal(diagnostic.report.runA, null);
+  assert.equal(diagnostic.report.runB, null);
   assert.equal(
     diagnostic.report.semanticDigest.runA,
     sha256(Buffer.from(canonicalJson(diagnostic.report.runA))),
@@ -1638,7 +1654,12 @@ test('storage instrumentation records a same-task public mount before its save',
 
 test('whole-command deadline aborts work and awaits cleanup before rejecting', async () => {
   const portCommand = await import('../caribbean-port-check.mjs');
-  assert.equal(portCommand.PORT_CHECK_DEADLINE_MS, 900_000);
+  assert.equal(portCommand.PORT_CHECK_DEADLINE_MS, 1_800_000);
+  assert.ok(
+    portCommand.PORT_CHECK_DEADLINE_MS
+      >= portCommand.NORMAL_ROUTE_VICTORY_TIMEOUT_MS * 2 + 600_000,
+    'the command deadline must cover both naval runs plus build, UI, art, and publication checks',
+  );
   assert.equal(typeof portCommand.runWithPortCheckDeadline, 'function');
   let cleaned = false;
   let latePublication = false;
@@ -2346,6 +2367,7 @@ test('full two-run port gate forwards explicit diagnostics and publishes only co
   assert.deepEqual(result.comparison.screenshotEvidence, result.metrics.screenshotEvidence);
   assert.deepEqual(fs.readdirSync(outputDirectory).sort(), [
     ...result.comparison.selectedArtifacts.keys(),
+    'map-unavailable-desktop.png',
     'metrics.json',
   ].sort());
   for (const [name, artifact] of result.comparison.selectedArtifacts) {
@@ -2357,6 +2379,14 @@ test('full two-run port gate forwards explicit diagnostics and publishes only co
   assert.equal(
     sha256(fs.readFileSync(path.join(outputDirectory, 'metrics.json'))),
     result.publication.metricsSha256,
+  );
+  assert.deepEqual(result.publication.mapUnavailableArtifact, {
+    filename: 'map-unavailable-desktop.png',
+    sha256: result.metrics.mapNetwork.unavailableScreenshotSha256,
+  });
+  assert.equal(
+    sha256(fs.readFileSync(path.join(outputDirectory, 'map-unavailable-desktop.png'))),
+    result.metrics.mapNetwork.unavailableScreenshotSha256,
   );
   assert.equal(
     result.comparison.selectedArtifacts.get('campaign-result-desktop.png').sha256,

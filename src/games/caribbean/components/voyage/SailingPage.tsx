@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RED_JACKDAW_VOYAGE } from '../../content/voyage';
 import type { CaribbeanController } from '../../state/useCaribbean';
 import '../../styles/voyage.css';
-import { VoyageInstrument } from './VoyageInstrument';
+import { CaribbeanMap } from '../map/CaribbeanMap';
 
 export function SailingPage({ controller }: { controller: CaribbeanController }) {
   const state = controller.journal?.state;
@@ -41,7 +41,13 @@ export function SailingPage({ controller }: { controller: CaribbeanController })
         <strong>{flagship?.name ?? 'Flagship'}</strong>
         <span>{flagship?.cargo.provisions ?? 0} provisions aboard</span>
       </header>
-      <VoyageInstrument phase="sailing" />
+      <div className="caribbean-sailing-layout">
+        <CaribbeanMap
+          context="sailing"
+          playerName={flagship?.name ?? 'Flagship'}
+          contactVisible
+          statusLabel={`Departure course · Day ${state.calendar.elapsedDays}`}
+        />
       <section className="caribbean-voyage-decision">
         <p className="caribbean-voyage-bearing">Saved course · {RED_JACKDAW_VOYAGE.bearingLabel}</p>
         <h1 id="caribbean-sailing-title" ref={headingRef} tabIndex={-1}>East by north from Bridgetown</h1>
@@ -57,6 +63,7 @@ export function SailingPage({ controller }: { controller: CaribbeanController })
         </button>
         <p data-testid="voyage-status" className="caribbean-voyage-status" role="status" aria-live="polite">{status}</p>
       </section>
+      </div>
     </section>
   );
 }

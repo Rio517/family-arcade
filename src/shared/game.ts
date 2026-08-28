@@ -36,6 +36,8 @@ export interface GameDescriptor {
   /** Optional pill next to the title for extras like "3D" — player counts and
    * computer support have their own structured badges below. */
   tag?: string;
+  /** Honest release-state signal shown on the menu while keeping the game playable. */
+  releaseStatus?: 'under-construction';
   /** How many people can play — worn as a badge on the landing ticket. */
   players: { min: number; max: number };
   /** True when the game seats computer opponents (ADR 0009). */

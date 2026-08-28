@@ -47,7 +47,7 @@ export function EncounterPage({ controller }: { controller: CaribbeanController 
         <strong>Decision required</strong>
       </header>
       <div className="caribbean-encounter-layout">
-        <CaribbeanMap playerName={flagship?.name ?? 'Flagship'} contactVisible />
+        <CaribbeanMap context="encounter" playerName={flagship?.name ?? 'Flagship'} contactVisible />
         <aside className="caribbean-encounter-decision">
           <p className="caribbean-voyage-bearing">Contact report</p>
           <h1 id="caribbean-encounter-title" ref={headingRef} tabIndex={-1}><span>Red Jackdaw</span> sighted</h1>

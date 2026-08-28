@@ -27,6 +27,11 @@ import { emptyUsersState } from '@shared/profile/users';
 import { getUsersSnapshot, setUsersState } from '@shared/profile/usersStore';
 
 const navalSessionFactory = vi.hoisted(() => vi.fn());
+vi.mock('./components/map/CaribbeanMap', () => ({
+  CaribbeanMap: ({ context }: { context: string }) => (
+    <section aria-label="Caribbean nautical chart" data-map-context={context} />
+  ),
+}));
 vi.mock('./state/naval/useNavalSession', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
   const support = await vi.importActual<typeof import('./state/naval/testSession')>('./state/naval/testSession');

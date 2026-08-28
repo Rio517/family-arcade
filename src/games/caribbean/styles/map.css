@@ -1,0 +1,389 @@
+.caribbean-map--maplibre .caribbean-map__masthead {
+  position: relative;
+  z-index: 10;
+  min-height: 62px;
+  padding: 10px 12px 9px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid #7a5e32;
+  background:
+    linear-gradient(180deg, rgb(229 213 170 / 94%), rgb(193 170 116 / 96%)),
+    var(--caribbean-port-chart-material, none);
+  box-shadow: inset 0 -1px #ead9aa, 0 4px 12px rgb(37 25 13 / 24%);
+}
+
+.caribbean-map--maplibre .caribbean-map__masthead p {
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  gap: 2px;
+  text-transform: uppercase;
+}
+
+.caribbean-map--maplibre .caribbean-map__masthead span {
+  color: #735b37;
+  font: 800 9px/1.1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.2em;
+}
+
+.caribbean-map--maplibre .caribbean-map__masthead strong {
+  overflow: hidden;
+  color: #2f291e;
+  font: 700 clamp(16px, 1.7vw, 21px)/1 "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  letter-spacing: 0.12em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caribbean-map--maplibre.caribbean-map--port .caribbean-map__masthead strong {
+  font-size: clamp(13px, 1.1vw, 16px);
+  letter-spacing: 0.09em;
+}
+
+.caribbean-map--maplibre .caribbean-map__controls {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+
+.caribbean-map--maplibre .caribbean-map__controls button,
+.caribbean-map--maplibre .caribbean-map__unavailable button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid #795a2e;
+  border-radius: 50%;
+  color: #20190f;
+  background: linear-gradient(145deg, #ddbd76, #9f7438);
+  box-shadow: inset 0 1px rgb(255 237 182 / 62%), 0 2px 5px rgb(35 21 7 / 30%);
+  font: 700 21px/1 Georgia, serif;
+  cursor: pointer;
+}
+
+.caribbean-map--maplibre .caribbean-map__controls button:hover,
+.caribbean-map--maplibre .caribbean-map__unavailable button:hover {
+  filter: brightness(1.08);
+}
+
+.caribbean-map--maplibre .caribbean-map__controls button:focus-visible,
+.caribbean-map--maplibre .caribbean-map__unavailable button:focus-visible {
+  outline: 3px solid #faf0ca;
+  outline-offset: 2px;
+}
+
+.caribbean-map--maplibre .caribbean-map__frame {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-height: 260px;
+  overflow: hidden;
+  border: 7px solid #7f6030;
+  border-image: linear-gradient(135deg, #d2aa5a, #5d3f1f 42%, #c99b4b 75%, #473119) 1;
+  background: #1b3940;
+  box-shadow: inset 0 0 0 1px #e4c173, inset 0 0 24px rgb(7 19 20 / 68%);
+}
+
+.caribbean-map--maplibre .maplibregl-canvas:focus-visible {
+  outline: 3px solid #faf0ca;
+  outline-offset: -5px;
+}
+
+.caribbean-map--maplibre .caribbean-map__instructions {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.caribbean-map--maplibre .caribbean-map__frame > .maplibregl-map {
+  position: absolute;
+  inset: 0;
+}
+
+.caribbean-map--maplibre .maplibregl-canvas {
+  filter: sepia(0.14) saturate(0.86) contrast(1.03);
+}
+
+.caribbean-map--maplibre .maplibregl-ctrl-attrib {
+  padding: 2px 5px;
+  color: #ede1bc;
+  background: rgb(8 28 32 / 78%);
+  font-size: 9px;
+}
+
+.caribbean-map--maplibre .maplibregl-ctrl-attrib a { color: #f0cf84; }
+.caribbean-map--maplibre .maplibregl-ctrl-logo { opacity: 0.78; }
+
+.caribbean-map--maplibre .maplibregl-marker {
+  transition: none;
+  will-change: auto;
+}
+
+.caribbean-map--maplibre .caribbean-map__grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.48;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 calc(20% - 1px), rgb(224 205 157 / 18%) 20%),
+    repeating-linear-gradient(90deg, transparent 0 calc(20% - 1px), rgb(224 205 157 / 18%) 20%);
+  box-shadow: inset 0 0 48px rgb(6 19 22 / 52%);
+}
+
+.caribbean-map--maplibre .caribbean-map__corner {
+  position: absolute;
+  z-index: 6;
+  width: 25px;
+  height: 25px;
+  pointer-events: none;
+  border-color: #efd28a;
+}
+
+.caribbean-map__corner--nw { top: 8px; left: 8px; border-top: 1px solid; border-left: 1px solid; }
+.caribbean-map__corner--ne { top: 8px; right: 8px; border-top: 1px solid; border-right: 1px solid; }
+.caribbean-map__corner--sw { bottom: 8px; left: 8px; border-bottom: 1px solid; border-left: 1px solid; }
+.caribbean-map__corner--se { right: 8px; bottom: 8px; border-right: 1px solid; border-bottom: 1px solid; }
+
+.caribbean-map--maplibre .caribbean-map__marker {
+  --marker-color: #e7d2a1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--marker-color);
+  pointer-events: none;
+}
+
+.caribbean-map--maplibre .caribbean-map__marker-pin {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border: 2px solid #162c31;
+  border-radius: 50%;
+  background: var(--marker-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--marker-color) 45%, transparent);
+}
+
+.caribbean-map--maplibre .caribbean-map__marker-label {
+  display: grid;
+  padding: 2px 4px;
+  border-radius: 2px;
+  background: rgb(13 38 42 / 70%);
+  box-shadow: 0 2px 3px rgb(4 14 16 / 70%);
+  text-shadow: 0 2px 2px rgb(4 14 16 / 88%);
+  white-space: nowrap;
+}
+
+.caribbean-map--maplibre .caribbean-map__marker-label strong {
+  color: inherit;
+  font: 800 10px/1.1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.caribbean-map--maplibre .caribbean-map__marker-label small {
+  color: rgb(234 220 180 / 72%);
+  font: 700 8px/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.caribbean-map--maplibre .caribbean-map__marker--place {
+  --marker-color: #e1d1a9;
+  opacity: 0.86;
+}
+
+.caribbean-map--maplibre .caribbean-map__marker--port { --marker-color: #edc468; }
+.caribbean-map--maplibre .caribbean-map__marker--player { --marker-color: #82d3cc; }
+.caribbean-map--maplibre .caribbean-map__marker--contact {
+  --marker-color: #ef6c57;
+  flex-direction: row-reverse;
+}
+
+.caribbean-map--maplibre .caribbean-map__marker--player .caribbean-map__marker-pin {
+  width: 12px;
+  height: 15px;
+  border-radius: 50% 50% 55% 4px;
+  transform: rotate(-45deg);
+}
+
+.caribbean-map--maplibre .caribbean-map__marker--contact .caribbean-map__marker-pin {
+  width: 12px;
+  height: 12px;
+  border-radius: 1px;
+  transform: rotate(45deg);
+  animation: caribbean-contact-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes caribbean-contact-pulse {
+  50% { box-shadow: 0 0 0 8px rgb(239 108 87 / 0%); }
+}
+
+.caribbean-map--maplibre .caribbean-map__compass {
+  position: absolute;
+  z-index: 5;
+  left: 24px;
+  bottom: 24px;
+  width: 58px;
+  height: 58px;
+  border: 1px solid rgb(239 213 151 / 60%);
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 0 4px rgb(10 31 35 / 42%), inset 0 0 0 4px rgb(10 31 35 / 42%);
+}
+
+.caribbean-map--maplibre .caribbean-map__compass::before,
+.caribbean-map--maplibre .caribbean-map__compass::after {
+  content: '';
+  position: absolute;
+  background: rgb(239 213 151 / 60%);
+}
+
+.caribbean-map--maplibre .caribbean-map__compass::before { top: 5px; bottom: 5px; left: 50%; width: 1px; }
+.caribbean-map--maplibre .caribbean-map__compass::after { top: 50%; right: 5px; left: 5px; height: 1px; }
+
+.caribbean-map--maplibre .caribbean-map__compass i {
+  position: absolute;
+  z-index: 1;
+  top: -18px;
+  left: 50%;
+  color: #f0d38f;
+  font: 800 10px/1 ui-monospace, monospace;
+  transform: translateX(-50%);
+}
+
+.caribbean-map--maplibre .caribbean-map__compass span {
+  position: absolute;
+  z-index: 1;
+  inset: 10px 22px;
+  background: linear-gradient(to bottom, #e5c36f 0 45%, #883e31 46% 100%);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.caribbean-map--maplibre .caribbean-map__unavailable {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.caribbean-map--maplibre .caribbean-map__unavailable p {
+  margin: 0;
+  font: 800 10px/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.caribbean-map--maplibre .caribbean-map__unavailable {
+  padding: 30px;
+  color: #2f281c;
+  background:
+    linear-gradient(rgb(218 201 155 / 88%), rgb(196 174 121 / 94%)),
+    var(--caribbean-port-chart-material, none);
+}
+
+.caribbean-map--maplibre .caribbean-map__unavailable h2 {
+  max-width: 440px;
+  margin: 12px 0 8px;
+  font: 700 clamp(23px, 3vw, 34px)/0.98 "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  text-transform: uppercase;
+}
+
+.caribbean-map--maplibre .caribbean-map__unavailable > span:not(.caribbean-map__signal-mark) {
+  max-width: 390px;
+  color: #594a35;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.caribbean-map--maplibre .caribbean-map__unavailable button {
+  min-width: 130px;
+  margin-top: 20px;
+  border-radius: 2px;
+  font: 800 11px/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.caribbean-map--maplibre .caribbean-map__signal-mark {
+  width: 58px;
+  height: 42px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  border-bottom: 2px solid #846231;
+}
+
+.caribbean-map--maplibre .caribbean-map__signal-mark i {
+  width: 6px;
+  height: 12px;
+  display: block;
+  background: #846231;
+}
+
+.caribbean-map--maplibre .caribbean-map__signal-mark i:nth-child(2) { height: 22px; }
+.caribbean-map--maplibre .caribbean-map__signal-mark i:nth-child(3) { height: 34px; opacity: 0.22; }
+
+.caribbean-map--maplibre .caribbean-map__footer {
+  position: relative;
+  z-index: 10;
+  min-height: 54px;
+  padding: 8px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid #846633;
+  background: rgb(210 190 142 / 94%);
+}
+
+.caribbean-map--maplibre .caribbean-map__footer > p {
+  margin: 0;
+  color: #6d5533;
+  font: 800 9px/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.caribbean-map--maplibre .caribbean-map__footer dl {
+  margin: 0;
+  display: flex;
+  gap: clamp(12px, 2vw, 24px);
+}
+
+.caribbean-map--maplibre .caribbean-map__footer dl div { display: grid; gap: 1px; }
+
+.caribbean-map--maplibre .caribbean-map__footer dt {
+  color: #785e38;
+  font: 800 8px/1 ui-monospace, monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.caribbean-map--maplibre .caribbean-map__footer dd {
+  margin: 0;
+  color: #2f281c;
+  font: 700 10px/1.2 "Avenir Next", sans-serif;
+  white-space: nowrap;
+}
+
+@media (max-width: 1080px), (max-height: 700px) {
+  .caribbean-map--maplibre .caribbean-map__masthead { min-height: 54px; padding-block: 6px; }
+  .caribbean-map--maplibre .caribbean-map__controls button { min-width: 44px; min-height: 44px; }
+  .caribbean-map--maplibre .caribbean-map__footer { min-height: 46px; }
+  .caribbean-map--maplibre .caribbean-map__footer dl div:last-child { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caribbean-map--maplibre .caribbean-map__marker--contact .caribbean-map__marker-pin { animation: none; }
+}

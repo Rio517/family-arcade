@@ -11,8 +11,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { driveCampaignVictory, verifyRenderedRudderRelease } from './lib/caribbean-campaign-victory-driver.mjs';
-import { normalBuildIsolationFailure } from './lib/caribbean-normal-build-isolation.mjs';
+import {
+  normalBuildIsolationFailure,
+  normalBuildMapSplitFailure,
+} from './lib/caribbean-normal-build-isolation.mjs';
 import { continueAfterSupportRestore } from './lib/caribbean-support-restore.mjs';
+import {
+  classifyCaribbeanMapRequest,
+  isExpectedOpenFreeMapCancellation,
+} from './lib/caribbean-map-network.mjs';
 import {
   ART_ACTIVITY_CONTRAST_SPECS,
   ART_CAPTURE_FIXTURE_STATE,
@@ -39,6 +46,7 @@ const PREVIOUS_SAVE_KEY = 'caribbean:campaign:previous';
 const QUARANTINE_PREFIX = 'caribbean:campaign:quarantine:';
 const WRITER_LOCK = 'caribbean:campaign:writer';
 const TRACE_KEY = 'caribbean:port-check:trace';
+const MAP_UNAVAILABLE_SCREENSHOT = 'map-unavailable-desktop.png';
 const SCREENSHOTS = [
   'setup-desktop.png',
   'port-desktop.png',
@@ -105,7 +113,8 @@ const VIEWPORTS = {
   largePortrait: { width: 1024, height: 1366, supported: false },
 };
 export const MARKET_PROBE_MINIMUM_NOW_FIXTURES = 42;
-export const PORT_CHECK_DEADLINE_MS = 900_000;
+export const PORT_CHECK_DEADLINE_MS = 1_800_000;
+export const NORMAL_ROUTE_VICTORY_TIMEOUT_MS = 600_000;
 export const NOW_FIXTURES = Array.from({ length: 96 }, (_, index) => 1_700_000_000_000 + index * 1_000);
 export const STRATEGIC_ACCESSIBILITY_SELECTORS = Object.freeze({
   surfaces: '.caribbean-voyage-decision, .caribbean-voyage--encounter, .naval-battle-page, .caribbean-port-activity',
@@ -491,6 +500,17 @@ function assertNormalBuildIsolation() {
     .join('\n');
   const failure = normalBuildIsolationFailure({ entries, shippedText });
   invariant(failure === null, `Normal build shipped ${failure}`);
+  const indexHtml = fs.readFileSync(path.join(DIST, 'index.html'), 'utf8');
+  const entryFilename = path.basename(indexHtml.match(/<script[^>]+src=["']([^"']+\.js)["']/i)?.[1] ?? '');
+  const entry = textualEntries.find((candidate) => path.basename(candidate) === entryFilename);
+  invariant(entry !== undefined, 'Normal build entry chunk could not be identified');
+  const entryText = fs.readFileSync(path.join(DIST, entry), 'utf8');
+  const nonEntryText = textualEntries
+    .filter((candidate) => candidate !== entry)
+    .map((candidate) => fs.readFileSync(path.join(DIST, candidate), 'utf8'))
+    .join('\n');
+  const mapSplitFailure = normalBuildMapSplitFailure({ entryText, nonEntryText });
+  invariant(mapSplitFailure === null, `Normal build shipped ${mapSplitFailure}`);
   readEmittedNavalAssets();
 }
 
@@ -660,11 +680,11 @@ export function portPresentationFailures(evidence) {
   }
 
   const chart = evidence?.chart;
-  if (chart?.before?.status !== 'No course marked'
+  if (chart?.before?.status !== 'Bridgetown harbour'
     || chart?.before?.routeVisible !== false || chart?.before?.contactVisible !== false) {
     errors.push('unmarked chart exposes route or contact');
   }
-  if (chart?.after?.status !== 'Course marked'
+  if (!/^Red Jackdaw · \d+ days$/.test(chart?.after?.status ?? '')
     || chart?.after?.routeVisible !== true || chart?.after?.contactVisible !== true) {
     errors.push('marked chart omits its truthful route or contact');
   }
@@ -818,7 +838,7 @@ export function browserBoundaryInitScript({
       localStorage.setItem('arcade.users.v1', usersRaw);
 
       if (installDateFixture) {
-        Object.defineProperty(Date, 'now', {
+        Object.defineProperty(window, '__ARCADE_TEST_NOW__', {
           configurable: true,
           value: () => {
             if (trace.nowIndex >= nowFixtures.length) throw new Error('Port-check Date.now fixtures exhausted');
@@ -997,7 +1017,7 @@ async function installPageDateBoundary(page) {
       };
       sessionStorage.setItem(traceKey, JSON.stringify(trace));
     };
-    Object.defineProperty(Date, 'now', {
+    Object.defineProperty(window, '__ARCADE_TEST_NOW__', {
       configurable: true,
       value: () => {
         if (trace.nowIndex >= nowFixtures.length) throw new Error('Port-check Date.now fixtures exhausted');
@@ -1012,23 +1032,26 @@ async function installPageDateBoundary(page) {
 
 function recordFailures(page, baseUrl, failures, allowedFailedUrl = null) {
   const localOrigin = new URL(baseUrl).origin;
+  failures.openFreeMap ??= [];
   page.on('console', (message) => {
     if (message.type() === 'error') failures.console.push(message.text());
   });
   page.on('pageerror', (error) => failures.page.push(error.message));
   page.on('request', (request) => {
     const url = new URL(request.url());
-    if ((url.protocol === 'http:' || url.protocol === 'https:') && url.origin !== localOrigin) {
-      failures.external.push(request.url());
-    }
-    if (url.origin === localOrigin) failures.requestedPaths.push(url.pathname);
+    const classification = classifyCaribbeanMapRequest(url.href, localOrigin);
+    if (classification === 'openfreemap') failures.openFreeMap.push(request.url());
+    if (classification === 'unexpected-external' && (url.protocol === 'http:' || url.protocol === 'https:')) failures.external.push(request.url());
+    if (classification === 'local') failures.requestedPaths.push(url.pathname);
   });
   page.on('requestfailed', (request) => {
     if (request.url() === allowedFailedUrl) {
       failures.allowlistedRequests = (failures.allowlistedRequests ?? 0) + 1;
       return;
     }
-    failures.requests.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? 'failed'}`);
+    const failureText = request.failure()?.errorText ?? 'failed';
+    if (isExpectedOpenFreeMapCancellation(request.url(), failureText)) return;
+    failures.requests.push(`${request.method()} ${request.url()}: ${failureText}`);
   });
   page.on('response', (response) => {
     if (response.status() >= 400) failures.requests.push(`${response.status()} ${response.url()}`);
@@ -1094,7 +1117,19 @@ async function settle(page) {
   });
 }
 
+async function waitForMapReadyIfPresent(page) {
+  const map = page.locator('[data-map-context]');
+  if (await map.count() !== 1) return false;
+  await page.waitForFunction(() => {
+    const chart = document.querySelector('[data-map-context]');
+    return chart?.getAttribute('data-map-phase') === 'ready'
+      && chart.getAttribute('data-map-render-state') === 'idle';
+  });
+  return true;
+}
+
 async function readLayout(page, name, expected) {
+  await waitForMapReadyIfPresent(page);
   const result = await page.evaluate(({ viewportName, expectedViewport }) => {
     const visible = (element) => {
       if (!(element instanceof HTMLElement)) return false;
@@ -1106,6 +1141,7 @@ async function readLayout(page, name, expected) {
     const root = document.querySelector('.caribbean-production, .caribbean-minimum-screen');
     const textElements = [document.body, ...document.body.querySelectorAll('*')].filter((element) => (
       visible(element)
+      && element.closest('[data-map-context]') === null
       && [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
     ));
     const activeTargetSelector = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [role="button"]:not([aria-disabled="true"])';
@@ -1113,10 +1149,12 @@ async function readLayout(page, name, expected) {
       ? document
       : document.querySelector(expectedViewport.targetRootSelector);
     if (!(targetRoot instanceof Document) && !(targetRoot instanceof HTMLElement)) throw new Error(`Target scope is missing: ${expectedViewport.targetRootSelector}`);
-    const activeTargets = [...targetRoot.querySelectorAll(activeTargetSelector)].filter(visible);
+    const activeTargets = [...targetRoot.querySelectorAll(activeTargetSelector)].filter((element) => (
+      visible(element) && element.closest('.maplibregl-ctrl-attrib') === null
+    ));
     const routeTargets = root === null ? [] : [...root.querySelectorAll(
       'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [role="button"]:not([aria-disabled="true"])',
-    )].filter(visible);
+    )].filter((element) => visible(element) && element.closest('.maplibregl-ctrl-attrib') === null);
     const targetSizes = activeTargets.map((element) => {
       const rect = element.getBoundingClientRect();
       return { testId: element.getAttribute('data-testid'), width: rect.width, height: rect.height };
@@ -1281,7 +1319,7 @@ async function readPortPresentationSnapshot(page) {
       return { x: box.x, y: box.y, width: box.width, height: box.height };
     };
     const stage = document.querySelector('[data-testid="caribbean-port-stage"]');
-    const chartStatus = document.querySelector('.caribbean-chart__heading strong');
+    const chartStatus = document.querySelector('.caribbean-map__footer > p');
     if (!(stage instanceof HTMLElement) || !(chartStatus instanceof HTMLElement)) {
       throw new Error('Port presentation probe could not find the stable stage or chart');
     }
@@ -1321,8 +1359,8 @@ async function readPortPresentationSnapshot(page) {
       stage: rect(stage),
       chart: {
         status: chartStatus.textContent?.trim() ?? '',
-        routeVisible: document.querySelector('[data-chart-route="red-jackdaw"]') !== null,
-        contactVisible: document.querySelector('[data-chart-location="red-jackdaw"]') !== null,
+        routeVisible: document.querySelector('[data-map-route="red-jackdaw"]') !== null,
+        contactVisible: document.querySelector('[aria-label="Red Jackdaw contact"]') !== null,
       },
       actions,
       market: marketEvidence,
@@ -1547,6 +1585,26 @@ async function preparePlayerProfileScreenshot(page) {
   return state;
 }
 
+async function captureStableDomScreenshot(page) {
+  const candidates = new Map();
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const bytes = await page.screenshot({ animations: 'disabled' });
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    const candidate = candidates.get(hash) ?? { bytes, count: 0 };
+    candidate.count += 1;
+    candidates.set(hash, candidate);
+    await settle(page);
+  }
+  const repeatable = [...candidates.values()].filter((candidate) => candidate.count >= 2);
+  if (repeatable.length === 0) {
+    throw new Error(`DOM screenshot raster did not repeat within six captures: ${JSON.stringify(
+      [...candidates.entries()].map(([hash, candidate]) => ({ hash, count: candidate.count })),
+    )}`);
+  }
+  repeatable.sort((left, right) => Buffer.compare(left.bytes, right.bytes));
+  return repeatable[0].bytes;
+}
+
 async function capture(page, screenshots, directory, filename) {
   const backdrop = page.getByTestId('caribbean-port-backdrop');
   if (await backdrop.count() === 1 && !await backdrop.evaluate((element) => element.classList.contains('caribbean-port-backdrop--fallback'))) {
@@ -1564,8 +1622,42 @@ async function capture(page, screenshots, directory, filename) {
     });
     await page.waitForFunction(() => document.querySelector('[data-testid="caribbean-port-backdrop"]')?.classList.contains('caribbean-port-backdrop--loaded'));
   }
+  const mapReady = await waitForMapReadyIfPresent(page);
+  if (mapReady) {
+    await page.evaluate(() => {
+      const chart = document.querySelector('[data-map-context]');
+      chart?.removeAttribute('data-capture-marker-signature');
+      chart?.removeAttribute('data-capture-marker-stable-frames');
+    });
+    await page.waitForFunction(() => {
+      const chart = document.querySelector('[data-map-context]');
+      if (!(chart instanceof HTMLElement)) return false;
+      const signature = JSON.stringify([...chart.querySelectorAll('[role="img"][aria-label]')].map((marker) => {
+        const rect = marker.getBoundingClientRect();
+        return [
+          marker.getAttribute('aria-label'),
+          getComputedStyle(marker).transform,
+          rect.x, rect.y, rect.width, rect.height,
+        ];
+      }));
+      const previous = chart.getAttribute('data-capture-marker-signature');
+      const stableFrames = previous === signature
+        ? Number(chart.getAttribute('data-capture-marker-stable-frames') ?? '0') + 1
+        : 0;
+      chart.setAttribute('data-capture-marker-signature', signature);
+      chart.setAttribute('data-capture-marker-stable-frames', String(stableFrames));
+      return stableFrames >= 4;
+    });
+    await page.evaluate(() => {
+      const chart = document.querySelector('[data-map-context]');
+      chart?.removeAttribute('data-capture-marker-signature');
+      chart?.removeAttribute('data-capture-marker-stable-frames');
+    });
+  }
   await settle(page);
-  const bytes = await page.screenshot({ animations: 'disabled' });
+  const bytes = mapReady
+    ? await page.screenshot({ animations: 'disabled' })
+    : await captureStableDomScreenshot(page);
   screenshots.set(filename, bytes);
   fs.writeFileSync(path.join(directory, filename), bytes);
 }
@@ -2255,6 +2347,7 @@ async function runVoyageUiCheck() {
       invariant(failures.page.length === 0, `page-errors-${failures.page.join('|')}`);
       invariant(failures.requests.length === 0, `request-errors-${failures.requests.join('|')}`);
       invariant(failures.external.length === 0, `external-requests-${failures.external.join('|')}`);
+      invariant(failures.openFreeMap.length > 0, 'openfreemap-was-not-requested');
       invariant(VOYAGE_SCREENSHOTS.every((filename) => screenshots.has(filename)), 'incomplete-voyage-screenshot-set');
       for (const filename of VOYAGE_SCREENSHOTS) saveIfChanged(filename, screenshots.get(filename));
       console.log(`CARIBBEAN_VOYAGE_UI_OK screenshots=${VOYAGE_SCREENSHOTS.length}`);
@@ -2317,6 +2410,7 @@ export async function readStrategicSurface(page) {
     const text = roots.flatMap((root) => [root, ...root.querySelectorAll('*')]).filter((element) => (
       visible(element)
       && element.closest('.naval-visually-hidden') === null
+      && element.closest('[data-map-context]') === null
       && [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
     ));
     const targets = [...document.querySelectorAll('button:not([disabled])')].filter(visible);
@@ -2424,7 +2518,6 @@ export async function runStrategicSailingJourney({
   });
   await installBrowserBoundary(context, { installDate: false });
   const page = await context.newPage();
-  await page.clock.install({ time: new Date('2023-11-14T22:13:20.000Z') });
   await installPageDateBoundary(page);
   const failures = { console: [], page: [], requests: [], external: [], requestedPaths: [] };
   recordFailures(page, baseUrl, failures);
@@ -2544,6 +2637,7 @@ export async function runStrategicSailingJourney({
     await page.getByTestId('encounter-pursue').waitFor();
     modeSequence.push('encounter');
     assertNoNavalAssetRequests(failures.requestedPaths, emittedNaval, 'strategic-before-pursuit');
+    await page.clock.install({ time: new Date('2023-11-14T22:13:20.000Z') });
     await page.clock.pauseAt(new Date('2023-11-14T22:13:30.000Z'));
     await page.getByTestId('encounter-pursue').click();
     await page.getByTestId('naval-elapsed').waitFor();
@@ -2604,7 +2698,12 @@ export async function runStrategicSailingJourney({
     const rawBeforeVictory = await readActiveEnvelope(page);
     let terminal;
     try {
-      terminal = await driveCampaignVictory({ page, trace, clockPrimed: true });
+      terminal = await driveCampaignVictory({
+        page,
+        trace,
+        clockPrimed: true,
+        timeoutMs: NORMAL_ROUTE_VICTORY_TIMEOUT_MS,
+      });
     } catch (error) {
       throw new Error(`Normal-route naval victory was not reached: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -2741,6 +2840,7 @@ export async function runStrategicSailingJourney({
     invariant(failures.page.length === 0, `strategic page failures: ${failures.page.join(' | ')}`);
     invariant(failures.requests.length === 0, `strategic request failures: ${failures.requests.join(' | ')}`);
     invariant(failures.external.length === 0, `strategic external requests: ${failures.external.join(' | ')}`);
+    invariant(failures.openFreeMap.length > 0, 'strategic journey did not request OpenFreeMap');
 
     const events = returnedEnvelope.payload.events;
     const navigationEvents = events.filter((event) => event.type === 'sea-leg-completed');
@@ -3064,6 +3164,99 @@ export async function runPortMemoryWarningProbe(browser, baseUrl, viewport) {
     invariant(failures.requests.length === 0, `Memory warning failed requests: ${failures.requests.join(' | ')}`);
     invariant(failures.external.length === 0, `Memory warning external requests: ${failures.external.join(' | ')}`);
     return geometry;
+  } finally {
+    await context.close();
+  }
+}
+
+async function runMapNetworkFailureProbe(browser, baseUrl) {
+  const tileJsonUrl = 'https://tiles.openfreemap.org/planet';
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    deviceScaleFactor: 1,
+    locale: 'en-US',
+    timezoneId: 'UTC',
+    reducedMotion: 'reduce',
+  });
+  await installBrowserBoundary(context);
+  let blockTileJson = true;
+  let providerRequestCount = 0;
+  let abortedTileJsonRequestCount = 0;
+  let successfulTileJsonResponseCount = 0;
+  const isTileJsonRequest = (value) => {
+    const url = new URL(value);
+    return url.origin === 'https://tiles.openfreemap.org'
+      && url.pathname.replace(/\/$/, '') === '/planet';
+  };
+  await context.route('https://tiles.openfreemap.org/**', async (route) => {
+    if (blockTileJson) {
+      if (isTileJsonRequest(route.request().url())) abortedTileJsonRequestCount += 1;
+      await route.abort('failed');
+      return;
+    }
+    await route.continue();
+  });
+  const page = await context.newPage();
+  const localOrigin = new URL(baseUrl).origin;
+  page.on('request', (request) => {
+    if (classifyCaribbeanMapRequest(request.url(), localOrigin) === 'openfreemap') {
+      providerRequestCount += 1;
+    }
+  });
+  page.on('response', (response) => {
+    if (isTileJsonRequest(response.url()) && response.status() === 200) {
+      successfulTileJsonResponseCount += 1;
+    }
+  });
+  try {
+    await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Start career' }).click();
+    await page.getByTestId('caribbean-career-ready').waitFor();
+    const chart = page.locator('[data-map-context="port"]');
+    await page.waitForFunction(() => (
+      document.querySelector('[data-map-context="port"]')?.getAttribute('data-map-phase') === 'unavailable'
+    ));
+    const unavailableWithoutCanvas = await chart.locator('canvas').count() === 0;
+    const fakeGeographyAbsent = unavailableWithoutCanvas
+      && await chart.locator('.caribbean-map__grid-overlay').count() === 0
+      && await page.getByText('No substitute chart has been drawn.').isVisible();
+    invariant(unavailableWithoutCanvas, 'Map outage left a map canvas visible');
+    invariant(fakeGeographyAbsent, 'Map outage drew substitute geography');
+    invariant(await page.getByRole('button', { name: 'Retry chart' }).isVisible(), 'Map outage did not expose retry');
+    await settle(page);
+    const unavailableScreenshotBytes = await captureStableDomScreenshot(page);
+    const unavailableScreenshotSha256 = createHash('sha256')
+      .update(unavailableScreenshotBytes)
+      .digest('hex');
+
+    blockTileJson = false;
+    await page.getByRole('button', { name: 'Retry chart' }).click();
+    await page.waitForFunction(() => {
+      const map = document.querySelector('[data-map-context="port"]');
+      return map?.getAttribute('data-map-phase') === 'ready'
+        && map.getAttribute('data-map-render-state') === 'idle';
+    });
+    const retryRecovered = await chart.locator('canvas').count() === 1;
+    invariant(retryRecovered, 'Map retry did not restore the real chart canvas');
+    invariant(abortedTileJsonRequestCount >= 1, 'Map outage did not abort the provider TileJSON request');
+    invariant(successfulTileJsonResponseCount >= 1, 'Map retry did not receive successful provider TileJSON');
+    return {
+      evidence: {
+        status: 'verified',
+        provider: 'OpenFreeMap',
+        tileJsonUrl,
+        providerRequestCount,
+        abortedTileJsonRequestCount,
+        successfulTileJsonResponseCount,
+        unavailableWithoutCanvas,
+        fakeGeographyAbsent,
+        unavailableScreenshotFilename: MAP_UNAVAILABLE_SCREENSHOT,
+        unavailableScreenshotSha256,
+        retryRecovered,
+        renderIdleAfterRetry: true,
+      },
+      unavailableScreenshotBytes,
+    };
   } finally {
     await context.close();
   }
@@ -3867,6 +4060,20 @@ async function preserveScreenshotMismatch(
   );
 }
 
+function diagnosticScreenshotFilename(failure, first, second) {
+  if (!(first.screenshots instanceof Map) || !(second.screenshots instanceof Map)) {
+    return 'campaign-result-desktop.png';
+  }
+  const issues = Array.isArray(failure?.issues) ? failure.issues : [];
+  for (const filename of first.screenshots.keys()) {
+    if (second.screenshots.has(filename)
+      && issues.some((issue) => typeof issue === 'string' && issue.startsWith(`${filename} `))) {
+      return filename;
+    }
+  }
+  return 'campaign-result-desktop.png';
+}
+
 function createNormalRouteScreenshotEvidence(first, second) {
   const filename = 'campaign-result-desktop.png';
   const createObservation = (run) => {
@@ -3947,7 +4154,7 @@ export async function compareRuns(
     : null;
   if (diagnosticPin !== null) clearMismatchDiagnostics(diagnosticPin);
   const preserveFailure = (failure) => diagnosticsEnabled
-    ? preserveScreenshotMismatch('campaign-result-desktop.png', first, second, deadline, {
+    ? preserveScreenshotMismatch(diagnosticScreenshotFilename(failure, first, second), first, second, deadline, {
       diagnosticPin,
       failure,
       diagnosticCheckpoint,
@@ -4271,6 +4478,7 @@ async function runPortCheckOperationCore({
     startServer: startStaticServer,
     verifyArtResponse: verifyEmittedArtResponse,
     launchBrowser: () => chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined }),
+    verifyMapNetwork: runMapNetworkFailureProbe,
     stopServer: stopStaticServer,
     makeRunDirectory: () => fs.mkdtempSync(path.join(os.tmpdir(), 'caribbean-port-run-')),
     removeRunDirectory: (directory) => fs.rmSync(directory, { recursive: true, force: true }),
@@ -4324,10 +4532,18 @@ async function runPortCheckOperationCore({
       runDirectories: [...runDirectories],
     }));
     operationDeadline.throwIfExpired();
+    console.log('Checking honest map-provider failure and retry recovery…');
+    const mapNetworkProbe = await operationDeadline.race(services.verifyMapNetwork(browser, baseUrl));
+    invariant(mapNetworkProbe?.evidence && (Buffer.isBuffer(mapNetworkProbe.unavailableScreenshotBytes)
+      || ArrayBuffer.isView(mapNetworkProbe.unavailableScreenshotBytes)),
+    'Map network probe did not return its unavailable-state evidence');
+    const mapNetworkEvidence = mapNetworkProbe.evidence;
+    operationDeadline.throwIfExpired();
     console.log('Running deterministic browser journey A…');
     const first = await operationDeadline.race(
       runJourney(browser, baseUrl, firstDirectory, emittedArt, emittedNaval, assetReport),
     );
+    first.metrics.mapNetwork = mapNetworkEvidence;
     operationDeadline.throwIfExpired();
     assertRequestedGraphIsolation(first.metrics);
     const firstStrategic = await operationDeadline.race(runStrategicSailingJourney({
@@ -4342,6 +4558,7 @@ async function runPortCheckOperationCore({
     const second = await operationDeadline.race(
       runJourney(browser, baseUrl, secondDirectory, emittedArt, emittedNaval, assetReport),
     );
+    second.metrics.mapNetwork = mapNetworkEvidence;
     operationDeadline.throwIfExpired();
     assertRequestedGraphIsolation(second.metrics);
     const secondStrategic = await operationDeadline.race(runStrategicSailingJourney({
@@ -4364,13 +4581,31 @@ async function runPortCheckOperationCore({
     ));
     const { comparison } = comparisonResult;
     operationDeadline.throwIfExpired();
-    const publication = await operationDeadline.race(publishSuccessfulNormalRouteComparison({
+    const normalPublication = await operationDeadline.race(publishSuccessfulNormalRouteComparison({
       first,
       second,
       comparisonResult,
       outputDirectory,
       deadline: operationDeadline,
     }));
+    operationDeadline.throwIfExpired();
+    const mapUnavailableHash = createHash('sha256')
+      .update(mapNetworkProbe.unavailableScreenshotBytes)
+      .digest('hex');
+    invariant(mapUnavailableHash === mapNetworkEvidence.unavailableScreenshotSha256,
+      'Map unavailable screenshot hash changed before publication');
+    saveIfChanged(
+      mapNetworkEvidence.unavailableScreenshotFilename,
+      mapNetworkProbe.unavailableScreenshotBytes,
+      outputDirectory,
+    );
+    const publication = {
+      ...normalPublication,
+      mapUnavailableArtifact: {
+        filename: mapNetworkEvidence.unavailableScreenshotFilename,
+        sha256: mapUnavailableHash,
+      },
+    };
     console.log(`Caribbean port evidence passed: 22 byte-identical screenshots plus one terminal WebGL observation; run A selected, integrated route resolved, recovery reloaded.`);
     return { metrics: first.metrics, comparison, publication };
   } finally {

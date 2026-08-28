@@ -6,6 +6,23 @@ import { appendJournal, createJournal } from '../../domain/replay';
 import { voyageStartedDraft } from '../../domain/voyage';
 import type { CaribbeanController } from '../../state/useCaribbean';
 
+vi.mock('../map/CaribbeanMap', () => ({
+  CaribbeanMap: ({ context, playerName, contactVisible }: {
+    context: string;
+    playerName: string;
+    contactVisible: boolean;
+  }) => (
+    <section
+      aria-label="Caribbean nautical chart"
+      data-map-context={context}
+      data-map-player={playerName}
+      data-map-contact-visible={String(contactVisible)}
+    >
+      Fresh trade wind from ENE
+    </section>
+  ),
+}));
+
 function sailingController(result: 'applied' | 'not-applied' = 'applied'): CaribbeanController {
   const lead = appendJournal(createJournal(createCampaign({ seed: 1702, name: 'Morgan' })), {
     type: 'lead-accepted', payload: { leadId: 'red-jackdaw' },
@@ -37,6 +54,7 @@ describe('<SailingPage>', () => {
     expect(screen.getByText(/Outbound leg spends 1 day and 1 provision/i)).toBeInTheDocument();
     expect(screen.getByText(/34 provisions aboard/i)).toBeInTheDocument();
     expect(screen.getByTestId('voyage-status')).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByRole('region', { name: 'Caribbean nautical chart' })).toHaveAttribute('data-map-context', 'sailing');
 
     const action = screen.getByTestId('voyage-continue-east');
     fireEvent.click(action);

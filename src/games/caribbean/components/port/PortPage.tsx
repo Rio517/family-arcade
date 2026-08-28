@@ -4,13 +4,14 @@ import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import portChartMaterial from '../../assets/port-chart-paper.webp';
 import portPanelMaterial from '../../assets/port-panel-patina.webp';
 import { BRIDGETOWN } from '../../content/campaign';
+import { redJackdawView } from '../../domain/leadSelectors';
 import { provisionsMonths } from '../../domain/selectors';
 import type { CampaignStateV1, PortActivity } from '../../domain/types';
 import { voyageReadiness } from '../../domain/voyage';
 import type { CaribbeanController } from '../../state/useCaribbean';
 import '../../styles/port.css';
 import { CaptainsLog } from '../log/CaptainsLog';
-import { CaribbeanChart } from './CaribbeanChart';
+import { CaribbeanMap } from '../map/CaribbeanMap';
 import { DivideShares } from './DivideShares';
 import { GovernorHouse } from './GovernorHouse';
 import { Market } from './Market';
@@ -70,6 +71,7 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
   const flagship = state.fleet.ships.find((ship) => ship.id === state.fleet.flagshipId);
   const months = provisionsMonths(state);
   const readiness = voyageReadiness(state);
+  const lead = redJackdawView(state);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const triggerRefs = useRef<Partial<Record<OpenActivity, HTMLButtonElement | null>>>({});
   const setSailRef = useRef<HTMLButtonElement | null>(null);
@@ -183,7 +185,12 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
           )}
           </section>
         </div>
-        <CaribbeanChart state={state} />
+        <CaribbeanMap
+          context="port"
+          playerName={flagship?.name ?? 'Flagship'}
+          contactVisible={lead.status === 'active'}
+          statusLabel={lead.status === 'active' ? `Red Jackdaw · ${lead.daysRemaining} days` : 'Bridgetown harbour'}
+        />
       </div>
     </section>
   );

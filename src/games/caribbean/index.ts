@@ -29,6 +29,7 @@ export const caribbean: GameDescriptor = {
   id: 'caribbean',
   title: 'Caribbean Career',
   tag: '3D battles',
+  releaseStatus: 'under-construction',
   players: { min: 1, max: 1 },
   computer: true,
   path: '/caribbean',

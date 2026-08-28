@@ -20,6 +20,12 @@ import { getUsersSnapshot, setUsersState } from '@shared/profile/usersStore';
 import { CaribbeanPage } from './CaribbeanPage';
 import type { CaribbeanController } from '../state/useCaribbean';
 
+vi.mock('./map/CaribbeanMap', () => ({
+  CaribbeanMap: ({ context }: { context: string }) => (
+    <section aria-label="Caribbean nautical chart" data-map-context={context} />
+  ),
+}));
+
 const originalWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
 const originalHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
 const immediateLocks: LockManagerLike = {

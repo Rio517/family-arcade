@@ -26,10 +26,12 @@
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
+    "maplibre-gl": "^5.20.1",
     "peerjs": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-map-gl": "^8.1.0",
     "react-router-dom": "^6.26.2",
     "three": "^0.170.0",
     "topojson-client": "^3.1.0",

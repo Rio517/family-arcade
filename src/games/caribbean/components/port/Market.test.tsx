@@ -17,6 +17,12 @@ import { useCaribbean } from '../../state/useCaribbean';
 import { CaribbeanPage } from '../CaribbeanPage';
 import { Market } from './Market';
 
+vi.mock('../map/CaribbeanMap', () => ({
+  CaribbeanMap: ({ context }: { context: string }) => (
+    <section aria-label="Caribbean nautical chart" data-map-context={context} />
+  ),
+}));
+
 type MemoryStorage = StorageLike & {
   getItem: ReturnType<typeof vi.fn<(key: string) => string | null>>;
   setItem: ReturnType<typeof vi.fn<(key: string, value: string) => void>>;

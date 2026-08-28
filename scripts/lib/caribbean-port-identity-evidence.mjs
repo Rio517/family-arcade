@@ -28,6 +28,7 @@ const V3_FIELDS = [
   'marketStability',
   'strategicSailing',
   'screenshotEvidence',
+  'mapNetwork',
 ];
 
 const STRATEGIC_MODE_SEQUENCE = Object.freeze([
@@ -745,6 +746,30 @@ export function evaluatePortIdentityEvidence(evidence) {
   }
   if (!exactObject(issues, evidence.requests, ['externalCount', 'failedCount', 'requestedPaths'], 'requests') || evidence.requests.externalCount !== 0 || evidence.requests.failedCount !== 0
     || !validStringArray(evidence.requests.requestedPaths) || evidence.requests.requestedPaths.some((path) => !path.startsWith('/') || path.startsWith('//'))) issues.push('requests are invalid');
+  if (!exactObject(issues, evidence.mapNetwork, [
+    'status', 'provider', 'tileJsonUrl', 'providerRequestCount',
+    'abortedTileJsonRequestCount', 'successfulTileJsonResponseCount',
+    'unavailableWithoutCanvas', 'fakeGeographyAbsent', 'retryRecovered',
+    'renderIdleAfterRetry', 'unavailableScreenshotFilename',
+    'unavailableScreenshotSha256',
+  ], 'mapNetwork')
+    || evidence.mapNetwork.status !== 'verified'
+    || evidence.mapNetwork.provider !== 'OpenFreeMap'
+    || evidence.mapNetwork.tileJsonUrl !== 'https://tiles.openfreemap.org/planet'
+    || !Number.isSafeInteger(evidence.mapNetwork.providerRequestCount)
+    || evidence.mapNetwork.providerRequestCount < 2
+    || !Number.isSafeInteger(evidence.mapNetwork.abortedTileJsonRequestCount)
+    || evidence.mapNetwork.abortedTileJsonRequestCount < 1
+    || !Number.isSafeInteger(evidence.mapNetwork.successfulTileJsonResponseCount)
+    || evidence.mapNetwork.successfulTileJsonResponseCount < 1
+    || evidence.mapNetwork.unavailableWithoutCanvas !== true
+    || evidence.mapNetwork.fakeGeographyAbsent !== true
+    || evidence.mapNetwork.unavailableScreenshotFilename !== 'map-unavailable-desktop.png'
+    || !SHA256_PATTERN.test(evidence.mapNetwork.unavailableScreenshotSha256)
+    || evidence.mapNetwork.retryRecovered !== true
+    || evidence.mapNetwork.renderIdleAfterRetry !== true) {
+    issues.push('mapNetwork must prove an honest provider failure and successful retry');
+  }
   if (!exactObject(issues, evidence.failures, ['console', 'page', 'requests', 'external'], 'failures') || Object.values(evidence.failures).some((value) => !Array.isArray(value) || value.length !== 0)) issues.push('failures are invalid');
   if (!exactObject(issues, evidence.isolation, ['previewHtmlAbsent', 'caribbeanGlbAbsent', 'glbRequested', 'previewResourceRequested', 'moduleMarkersAbsent', 'battleCssAbsent'], 'isolation')
     || evidence.isolation.previewHtmlAbsent !== true || evidence.isolation.caribbeanGlbAbsent !== false || evidence.isolation.glbRequested !== false || evidence.isolation.previewResourceRequested !== false || evidence.isolation.moduleMarkersAbsent !== true || evidence.isolation.battleCssAbsent !== true) issues.push('isolation is invalid');

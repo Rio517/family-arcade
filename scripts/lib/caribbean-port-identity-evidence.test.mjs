@@ -17,9 +17,16 @@ import {
 
 const {
   MARKET_PROBE_MINIMUM_NOW_FIXTURES,
+  NORMAL_ROUTE_VICTORY_TIMEOUT_MS,
   NOW_FIXTURES,
   profileScreenshotReadinessErrors,
 } = portCheck;
+
+describe('normal-route rendered battle budget', () => {
+  it('uses the proven dedicated-browser allowance without changing the driver default', () => {
+    expect(NORMAL_ROUTE_VICTORY_TIMEOUT_MS).toBe(600_000);
+  });
+});
 
 const SCREENSHOTS = [
   'setup-desktop.png', 'port-desktop.png', 'market-desktop.png', 'tavern-desktop.png',
@@ -112,6 +119,9 @@ describe('strategic accessibility surface collection', () => {
       <section class="caribbean-voyage caribbean-voyage--encounter">
         <h1 style="font-size: 32px">Red Jackdaw sighted</h1>
         <p style="font-size: 14px">Contact report</p>
+        <div data-map-context="encounter">
+          <span style="font-size: 8px; color: #777">Cartographic label</span>
+        </div>
         <button type="button" style="font-size: 14px">Pursue</button>
       </section>
     `;
@@ -558,6 +568,20 @@ function completeEvidence(overrides = {}) {
       boothProfile: { desktop: boothViewport(1440, 900), narrow: boothViewport(960, 600) },
     },
     requests: { externalCount: 0, failedCount: 0, requestedPaths: ['/'] },
+    mapNetwork: {
+      status: 'verified',
+      provider: 'OpenFreeMap',
+      tileJsonUrl: 'https://tiles.openfreemap.org/planet',
+      providerRequestCount: 9,
+      abortedTileJsonRequestCount: 1,
+      successfulTileJsonResponseCount: 1,
+      unavailableWithoutCanvas: true,
+      fakeGeographyAbsent: true,
+      unavailableScreenshotFilename: 'map-unavailable-desktop.png',
+      unavailableScreenshotSha256: 'a'.repeat(64),
+      retryRecovered: true,
+      renderIdleAfterRetry: true,
+    },
     failures: { console: [], page: [], requests: [], external: [] },
     isolation: { previewHtmlAbsent: true, caribbeanGlbAbsent: false, glbRequested: false, previewResourceRequested: false, moduleMarkersAbsent: true, battleCssAbsent: true },
     recovery: { quarantineKey: 'caribbean:campaign:quarantine:00000000-0000-4000-8000-000000000001', quarantineVerified: true, exportedCorruptRawVerified: true, recoveredChecksum: '9d36f629', recoveryReloaded: true },
@@ -600,7 +624,7 @@ describe('schema-v3 strategic sailing evidence', () => {
 
   it.each([
     'schemaVersion', 'packagePhase', 'browser', 'route', 'build', 'viewports', 'fixtures', 'webLocks',
-    'journey', 'accessibility', 'requests', 'failures', 'isolation', 'recovery', 'screenshots',
+    'journey', 'accessibility', 'requests', 'mapNetwork', 'failures', 'isolation', 'recovery', 'screenshots',
     'determinism', 'screenshotEvidence', 'profile', 'profileIdentity', 'art', 'market', 'marketStability', 'strategicSailing',
   ])('fails closed when top-level %s is missing', (section) => {
     const evidence = completeEvidence();
@@ -618,6 +642,7 @@ describe('schema-v3 strategic sailing evidence', () => {
     ['journey', (e) => { e.journey.eventTypes = ['lead-accepted', 'market-traded']; }],
     ['accessibility', (e) => { e.accessibility.minimumMeasuredFontPx = 13.99; }],
     ['requests', (e) => { e.requests.externalCount = 1; }],
+    ['map network recovery', (e) => { e.mapNetwork.retryRecovered = false; }],
     ['failures', (e) => { e.failures.console = ['boom']; }],
     ['isolation', (e) => { e.isolation.glbRequested = true; }],
     ['recovery', (e) => { e.recovery.quarantineVerified = false; }],

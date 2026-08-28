@@ -2,9 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 describe('browser Caribbean runtime', () => {
   const originalStorage = Object.getOwnPropertyDescriptor(window, 'localStorage');
+  const originalTestNow = window.__ARCADE_TEST_NOW__;
 
   afterEach(() => {
     if (originalStorage) Object.defineProperty(window, 'localStorage', originalStorage);
+    if (originalTestNow === undefined) delete window.__ARCADE_TEST_NOW__;
+    else window.__ARCADE_TEST_NOW__ = originalTestNow;
     vi.resetModules();
   });
 
@@ -20,6 +23,15 @@ describe('browser Caribbean runtime', () => {
     expect(second.writer).toBe(first.writer);
     // Kills retaining the old port-only build identity after sailing ships.
     expect(first.build).toBe('caribbean-sailing-1');
+  });
+
+  it('keeps deterministic campaign time separate from the browser clock', async () => {
+    window.__ARCADE_TEST_NOW__ = vi.fn(() => 1_700_000_123_000);
+    vi.resetModules();
+    const { getBrowserCaribbeanRuntime } = await import('./runtime');
+
+    expect(getBrowserCaribbeanRuntime().now()).toBe(1_700_000_123_000);
+    expect(window.__ARCADE_TEST_NOW__).toHaveBeenCalledOnce();
   });
 
   it('guards localStorage property access and exposes one captured unavailable capability', async () => {

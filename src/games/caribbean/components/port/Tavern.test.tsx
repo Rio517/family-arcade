@@ -12,6 +12,12 @@ import type { CaribbeanRuntime } from '../../state/runtime';
 import { CaribbeanPage } from '../CaribbeanPage';
 import { Tavern } from './Tavern';
 
+vi.mock('../map/CaribbeanMap', () => ({
+  CaribbeanMap: ({ context }: { context: string }) => (
+    <section aria-label="Caribbean nautical chart" data-map-context={context} />
+  ),
+}));
+
 const SENTENCE = 'The Red Jackdaw was sighted east of Bridgetown, running west with the trade wind.';
 const NEXT_ACTION = 'Sail east of Bridgetown and identify the Red Jackdaw.';
 const originalWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');

@@ -14,6 +14,24 @@ import type { CaribbeanController } from '../../state/useCaribbean';
 import { CaribbeanPage } from '../CaribbeanPage';
 import { PortPage } from './PortPage';
 
+vi.mock('../map/CaribbeanMap', () => ({
+  CaribbeanMap: ({ context, playerName, contactVisible, statusLabel }: {
+    context: string;
+    playerName: string;
+    contactVisible: boolean;
+    statusLabel?: string;
+  }) => (
+    <section
+      aria-label="Caribbean nautical chart"
+      data-map-context={context}
+      data-map-player={playerName}
+      data-map-contact-visible={String(contactVisible)}
+    >
+      {statusLabel}
+    </section>
+  ),
+}));
+
 const originalWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
 const originalHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
 const immediateLocks: LockManagerLike = {
@@ -338,7 +356,7 @@ describe('<PortPage>', () => {
     render(<StatefulPort />);
 
     const stage = screen.getByTestId('caribbean-port-stage');
-    expect(screen.getByRole('region', { name: 'Caribbean chart' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Caribbean nautical chart' })).toHaveAttribute('data-map-context', 'port');
     for (const activity of ['Market', 'Tavern', "Captain's Log"] as const) {
       fireEvent.click(screen.getByRole('button', { name: activity }));
       expect(screen.getByTestId('caribbean-port-stage')).toBe(stage);

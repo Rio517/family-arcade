@@ -56,76 +56,41 @@
 .caribbean-voyage-status-rail strong { color: #f1d6a1; }
 .caribbean-voyage-status-rail span { color: #c79a45; }
 
-.caribbean-voyage-instrument {
-  position: relative;
+.caribbean-voyage--sailing {
+  height: 100dvh;
+  padding: 0;
+  background:
+    radial-gradient(circle at 18% 38%, rgb(55 157 157 / 10%), transparent 34rem),
+    #06141b;
+}
+
+.caribbean-voyage--sailing::before,
+.caribbean-voyage--sailing::after { content: none; }
+
+.caribbean-sailing-layout {
+  min-width: 0;
   min-height: 0;
-  background: #0b3340;
-}
-
-.caribbean-voyage-instrument__facts {
-  position: absolute;
-  z-index: 2;
-  top: clamp(18px, 4vh, 44px);
-  right: clamp(18px, 4vw, 56px);
-  width: min(390px, 42vw);
-  padding: 17px 19px;
-  border-top: 2px solid #c79a45;
-  background: #07151d;
-  font-size: 14px;
-}
-
-.caribbean-voyage-instrument__facts > p {
-  margin: 0 0 13px;
-  color: #f1d6a1;
-  font: 700 16px/1.3 "Avenir Next Condensed", "Arial Narrow", sans-serif;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.caribbean-voyage-instrument__facts dl { margin: 0; }
-.caribbean-voyage-instrument__facts dl div {
   display: grid;
-  grid-template-columns: 82px 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 27vw);
   gap: 12px;
-  padding: 7px 0;
-  border-top: 1px solid #0b3340;
+  padding: 10px 12px 12px;
 }
-.caribbean-voyage-instrument__facts dt {
-  color: #4ec5c1;
-  font: 700 14px/1.25 ui-monospace, "SFMono-Regular", monospace;
-  text-transform: uppercase;
-}
-.caribbean-voyage-instrument__facts dd { margin: 0; font-size: 14px; line-height: 1.35; }
-
-.caribbean-voyage-instrument > svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.caribbean-voyage-sea { fill: none; stroke: #4ec5c1; stroke-width: 2; opacity: .72; }
-.caribbean-voyage-wake {
-  fill: none;
-  stroke: #c79a45;
-  stroke-width: 7;
-  stroke-linecap: square;
-  stroke-dasharray: 220;
-  stroke-dashoffset: 0;
-}
-.caribbean-voyage-sloop path { fill: #07151d; stroke: #f1d6a1; stroke-width: 4; stroke-linejoin: miter; }
-.caribbean-voyage-sloop path:nth-child(3),
-.caribbean-voyage-sloop path:nth-child(4) { fill: #f1d6a1; stroke: #c79a45; }
-.caribbean-voyage-contact { fill: #d94b3d; stroke: #f1d6a1; stroke-width: 3; }
 
 .caribbean-voyage-decision {
-  position: absolute;
+  position: relative;
   z-index: 3;
-  left: calc(22px + env(safe-area-inset-left));
-  bottom: calc(24px + env(safe-area-inset-bottom));
-  width: min(590px, calc(100% - 44px));
-  padding: clamp(20px, 3vw, 34px);
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+  padding: clamp(24px, 4vh, 42px) clamp(20px, 2.4vw, 36px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgb(68 161 161 / 18%);
   border-left: 3px solid #c79a45;
-  background: #07151d;
+  background: linear-gradient(160deg, rgb(10 40 49 / 96%), rgb(4 18 25 / 99%));
+  box-shadow: inset 4px 0 0 rgb(60 169 169 / 8%), 0 18px 48px rgb(0 0 0 / 28%);
 }
 
 .caribbean-voyage-bearing {
@@ -138,10 +103,11 @@
 .caribbean-voyage-decision h1 {
   margin: 0 0 13px;
   color: #f1d6a1;
-  font: 600 clamp(36px, 5vw, 70px)/.9 "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  font: 600 clamp(36px, 4.3vw, 62px)/.9 "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
   letter-spacing: -.02em;
   text-transform: uppercase;
 }
+.caribbean-voyage-decision h1:focus { outline: none; }
 .caribbean-voyage-decision p:not(.caribbean-voyage-bearing) {
   margin: 8px 0;
   max-width: 58ch;
@@ -171,18 +137,8 @@
 }
 
 @media (max-height: 760px) {
-  .caribbean-voyage-instrument__facts { top: 14px; padding-block: 12px; }
-  .caribbean-voyage-decision { bottom: 18px; padding-block: 18px; }
-  .caribbean-voyage-decision h1 { font-size: clamp(34px, 4vw, 56px); }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .caribbean-voyage-wake { animation: caribbean-voyage-wake-reveal 760ms ease-out both; }
-}
-
-@keyframes caribbean-voyage-wake-reveal {
-  from { stroke-dashoffset: 220; }
-  to { stroke-dashoffset: 0; }
+  .caribbean-voyage-decision { padding-block: 18px; }
+  .caribbean-voyage-decision h1 { font-size: clamp(34px, 3.7vw, 52px); }
 }
 
 /* The encounter is a chart-first decision surface rather than a decorative voyage card. */
@@ -210,117 +166,6 @@
   gap: 12px;
   padding: 10px 12px 12px;
 }
-
-.caribbean-map {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  border: 2px solid #a9813e;
-  outline: 1px solid rgba(233, 202, 139, .38);
-  outline-offset: -8px;
-  background: #bca979;
-  color: #102f36;
-  box-shadow: inset 0 0 70px rgba(40, 28, 13, .26), 0 18px 48px rgba(0, 0, 0, .3);
-}
-.caribbean-map::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: .36;
-  background-image:
-    radial-gradient(circle at 20% 30%, transparent 0 2px, rgba(53, 35, 14, .1) 3px, transparent 4px),
-    linear-gradient(104deg, transparent 48%, rgba(82, 57, 24, .1) 49%, transparent 51%);
-  background-size: 31px 29px, 157px 173px;
-  mix-blend-mode: multiply;
-}
-.caribbean-map__masthead {
-  position: relative;
-  z-index: 3;
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 10px 14px 8px 20px;
-  border-bottom: 1px solid rgba(61, 43, 18, .36);
-  background: rgba(226, 206, 157, .64);
-}
-.caribbean-map__masthead p { display: flex; flex-direction: column; gap: 2px; margin: 0; }
-.caribbean-map__masthead span { font: 700 14px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
-.caribbean-map__masthead strong { font: 600 20px/1.1 Georgia, serif; letter-spacing: .05em; text-transform: uppercase; }
-.caribbean-map__controls { display: flex; gap: 7px; }
-.caribbean-map__controls button {
-  position: relative;
-  z-index: 4;
-  width: 44px;
-  min-height: 44px;
-  display: grid;
-  place-items: center;
-  border: 2px solid #7d622e;
-  border-radius: 50%;
-  background: #09242d;
-  color: #d7aa50;
-  box-shadow: inset 0 0 0 3px rgba(215, 170, 80, .14), 0 3px 7px rgba(0, 0, 0, .3);
-  font: 800 25px/1 ui-monospace, monospace;
-  cursor: pointer;
-}
-.caribbean-map__controls button:hover { background: #123b44; color: #f0cf8e; }
-.caribbean-map__controls button:focus-visible { outline: 3px solid #087f83; outline-offset: 2px; }
-.caribbean-map__surface { position: relative; z-index: 1; width: 100%; height: 100%; min-height: 360px; touch-action: none; cursor: grab; }
-.caribbean-map__surface:active { cursor: grabbing; }
-.caribbean-map__surface:focus-visible { outline: 4px solid #087f83; outline-offset: -6px; }
-.caribbean-map__instructions { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-.caribbean-map__ocean { fill: #c9b785; }
-.caribbean-map__grid { fill-opacity: .38; stroke: none; }
-.caribbean-map__grid + .caribbean-map__world { transform-box: fill-box; transform-origin: center; }
-.caribbean-map__grid path,
-.caribbean-map defs pattern path { fill: none; stroke: rgba(55, 39, 18, .24); stroke-width: 1; }
-.caribbean-map__land { fill: #b49a61; stroke: #415f56; stroke-width: 1.6; vector-effect: non-scaling-stroke; }
-.caribbean-map__route { fill: none; stroke: #a52f29; stroke-width: 2.2; stroke-dasharray: 8 7; vector-effect: non-scaling-stroke; }
-.caribbean-map__place circle { fill: #496f66; stroke: #dec47f; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.caribbean-map__place text,
-.caribbean-map__port text,
-.caribbean-map__player text,
-.caribbean-map__contact text {
-  paint-order: stroke;
-  stroke: rgba(206, 187, 139, .92);
-  stroke-width: 4px;
-  stroke-linejoin: round;
-  fill: #143a3b;
-  font: 700 14px/1 Georgia, serif;
-  letter-spacing: .035em;
-  text-transform: uppercase;
-}
-.caribbean-map__place--important text { font-size: 15px; }
-.caribbean-map__port circle { fill: none; stroke: #087f83; stroke-width: 3; vector-effect: non-scaling-stroke; }
-.caribbean-map__port path { fill: none; stroke: #087f83; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.caribbean-map__port text,
-.caribbean-map__player text { fill: #087f83; }
-.caribbean-map__subplace { fill: #423822; font-size: 14px; }
-.caribbean-map__player path { fill: #087f83; stroke: #dec47f; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.caribbean-map__contact > path { fill: rgba(165, 47, 41, .2); stroke: #a52f29; stroke-width: 3; vector-effect: non-scaling-stroke; }
-.caribbean-map__contact circle { fill: #a52f29; }
-.caribbean-map__contact text { fill: #a52f29; }
-.caribbean-map__compass { fill: none; stroke: #534721; stroke-width: 2; }
-.caribbean-map__compass path:first-of-type { fill: rgba(83, 71, 33, .24); }
-.caribbean-map__compass text { fill: #534721; stroke: none; font: 700 15px/1 Georgia, serif; text-anchor: middle; }
-.caribbean-map__facts {
-  position: relative;
-  z-index: 3;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  margin: 0;
-  border-top: 1px solid rgba(61, 43, 18, .35);
-  background: rgba(226, 206, 157, .64);
-}
-.caribbean-map__facts div { display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 9px 16px; }
-.caribbean-map__facts div + div { border-left: 1px solid rgba(61, 43, 18, .28); }
-.caribbean-map__facts dt { color: #0a4347; font: 800 14px/1.3 ui-monospace, monospace; text-transform: uppercase; }
-.caribbean-map__facts dd { margin: 0; color: #2f2a1c; font: 700 14px/1.3 Georgia, serif; }
 
 .caribbean-encounter-decision {
   min-width: 0;
@@ -376,22 +221,35 @@
 .caribbean-voyage-choice__copy > span { color: rgba(240, 213, 158, .8); font: 500 14px/1.35 "Avenir Next", sans-serif; }
 .caribbean-encounter-decision .caribbean-voyage-status { margin: 8px 0 0; min-height: 18px; color: #e9c47d; font-size: 14px; }
 
-@media (width <= 980px) {
-  .caribbean-voyage--encounter { height: auto; overflow: auto; }
-  .caribbean-encounter-layout { grid-template-columns: 1fr; grid-template-rows: minmax(540px, 64vh) auto; }
-  .caribbean-encounter-decision { overflow: visible; }
-  .caribbean-encounter-decision .caribbean-voyage-actions { grid-template-columns: 1fr 1fr; }
-}
+@media (max-width: 1100px), (max-height: 700px) {
+  .caribbean-encounter-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 34vw);
+    gap: 8px;
+    padding: 8px 10px 10px;
+  }
 
-@media (width <= 680px) {
-  .caribbean-voyage--encounter .caribbean-voyage-status-rail { align-items: center; min-height: 64px; }
-  .caribbean-encounter-layout { padding: 8px; grid-template-rows: minmax(470px, 58vh) auto; }
-  .caribbean-map__masthead { align-items: flex-start; }
-  .caribbean-map__masthead strong { font-size: 17px; }
-  .caribbean-map__surface { min-height: 330px; }
-  .caribbean-map__facts { grid-template-columns: 1fr; }
-  .caribbean-map__facts div + div { border-left: 0; border-top: 1px solid rgba(61, 43, 18, .28); }
-  .caribbean-encounter-decision .caribbean-voyage-actions { grid-template-columns: 1fr; }
-  .caribbean-voyage-choice > button { min-height: 132px; grid-template-columns: 58px minmax(0, 1fr); padding: 15px; }
-  .caribbean-voyage-choice__icon { width: 52px; height: 52px; }
+  .caribbean-encounter-decision { padding: 12px 14px 8px; }
+  .caribbean-encounter-decision .caribbean-voyage-bearing { margin-bottom: 4px; }
+  .caribbean-encounter-decision h1 {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    font-size: clamp(32px, 3.6vw, 40px);
+  }
+  .caribbean-encounter-facts { margin-bottom: 8px; }
+  .caribbean-encounter-facts div {
+    grid-template-columns: 82px 1fr;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .caribbean-encounter-decision .caribbean-voyage-actions { gap: 8px; }
+  .caribbean-voyage-choice > button {
+    min-height: 112px;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  .caribbean-voyage-choice__icon { width: 46px; height: 46px; }
+  .caribbean-voyage-choice__copy { gap: 4px; }
+  .caribbean-voyage-choice__copy h2 { font-size: 20px; }
+  .caribbean-encounter-decision .caribbean-voyage-status { margin-top: 4px; }
 }

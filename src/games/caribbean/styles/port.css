@@ -219,7 +219,7 @@
   justify-self: center;
   margin-block-start: clamp(24px, 5vh, 70px);
   display: grid;
-  grid-template-columns: minmax(0, 1.82fr) minmax(310px, .78fr);
+  grid-template-columns: minmax(0, 1.7fr) minmax(340px, .85fr);
   gap: clamp(20px, 2.4vw, 38px);
   padding: 20px clamp(18px, 2.2vw, 34px) 22px;
   background: transparent;
@@ -699,95 +699,6 @@
   background: #07151d;
   color: var(--caribbean-sailcloth);
 }
-
-.caribbean-chart {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-  align-self: stretch;
-  display: grid;
-  grid-template-rows: 48px minmax(0, 1fr) auto;
-  overflow: hidden;
-  border: 2px solid color-mix(in srgb, var(--caribbean-brass) 82%, #6b441a);
-  background:
-    linear-gradient(rgb(4 35 45 / 84%), rgb(4 35 45 / 84%)),
-    var(--caribbean-port-chart-material) center / 384px 384px repeat,
-    #062632;
-  box-shadow:
-    inset 0 0 0 4px color-mix(in srgb, var(--caribbean-brass) 25%, transparent),
-    inset 0 0 52px rgb(0 0 0 / 36%),
-    0 18px 54px rgb(0 0 0 / 34%);
-}
-
-.caribbean-chart::before {
-  content: "";
-  position: absolute;
-  z-index: 3;
-  inset: 6px;
-  border: 1px solid color-mix(in srgb, var(--caribbean-brass) 38%, transparent);
-  background:
-    radial-gradient(circle at 5px 5px, var(--caribbean-brass) 0 2px, transparent 2.5px),
-    radial-gradient(circle at calc(100% - 5px) 5px, var(--caribbean-brass) 0 2px, transparent 2.5px),
-    radial-gradient(circle at 5px calc(100% - 5px), var(--caribbean-brass) 0 2px, transparent 2.5px),
-    radial-gradient(circle at calc(100% - 5px) calc(100% - 5px), var(--caribbean-brass) 0 2px, transparent 2.5px);
-  pointer-events: none;
-}
-
-.caribbean-chart__heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-brass) 44%, transparent);
-  background: #07151d;
-  font: 750 14px/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.caribbean-chart__heading span { color: var(--caribbean-brass); }
-.caribbean-chart__heading strong { color: var(--caribbean-trade-wind); font-weight: 800; }
-
-.caribbean-chart__drawing { position: relative; min-height: 0; }
-.caribbean-chart__drawing svg { width: 100%; height: 100%; display: block; }
-.caribbean-chart__grid { fill: url(#caribbean-chart-grid); stroke: color-mix(in srgb, var(--caribbean-trade-wind) 10%, transparent); }
-.caribbean-chart__grid + * { color: inherit; }
-.caribbean-chart__drawing pattern path { fill: none; stroke: color-mix(in srgb, var(--caribbean-trade-wind) 13%, transparent); stroke-width: .75; }
-.caribbean-chart__island { fill: color-mix(in srgb, var(--caribbean-trade-wind) 22%, #0a3038); stroke: color-mix(in srgb, var(--caribbean-sailcloth) 45%, transparent); stroke-width: 1.4; }
-.caribbean-chart__shoal { fill: none; stroke: color-mix(in srgb, var(--caribbean-sailcloth) 18%, transparent); stroke-width: 1.2; stroke-dasharray: 2 7; }
-.caribbean-chart__route { fill: none; stroke: var(--caribbean-brass); stroke-width: 2.2; stroke-dasharray: 8 7; }
-.caribbean-chart__route[data-route-status="completed"],
-.caribbean-chart__route[data-route-status="expired"] { opacity: .5; }
-.caribbean-chart__location { fill: #07151d; stroke: var(--caribbean-trade-wind); stroke-width: 2; }
-.caribbean-chart__ship { fill: color-mix(in srgb, var(--caribbean-sailcloth) 20%, #07151d); stroke: var(--caribbean-sailcloth); stroke-width: 1.7; }
-.caribbean-chart__contact { fill: #07151d; stroke: #e55243; stroke-width: 2.5; }
-.caribbean-chart__compass { fill: none; stroke: color-mix(in srgb, var(--caribbean-brass) 64%, transparent); stroke-width: 1.2; }
-
-.caribbean-chart__label {
-  position: absolute;
-  padding: 3px 5px;
-  background: color-mix(in srgb, #07151d 88%, transparent);
-  color: var(--caribbean-sailcloth);
-  font: 750 14px/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
-  white-space: nowrap;
-}
-
-.caribbean-chart__label--port { left: 24%; top: 61%; color: var(--caribbean-trade-wind); }
-.caribbean-chart__label--ship { left: 31%; top: 49%; }
-.caribbean-chart__label--contact { right: 18%; top: 23%; color: #e55243; }
-
-.caribbean-chart__facts {
-  margin: 0;
-  display: grid;
-  grid-template-columns: 1fr;
-  border-top: 1px solid color-mix(in srgb, var(--caribbean-brass) 35%, transparent);
-  background: #07151d;
-}
-
-.caribbean-chart__facts div { display: grid; grid-template-columns: 72px 1fr; gap: 8px; padding: 7px 12px; border-top: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 12%, transparent); }
-.caribbean-chart__facts dt { color: color-mix(in srgb, var(--caribbean-sailcloth) 55%, var(--caribbean-trade-wind)); font: 750 14px/1.2 ui-monospace, monospace; text-transform: uppercase; }
-.caribbean-chart__facts dd { margin: 0; color: var(--caribbean-sailcloth); font-size: 14px; font-weight: 700; line-height: 1.2; }
 
 .caribbean-market {
   display: grid;

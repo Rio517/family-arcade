@@ -4,6 +4,7 @@ import {
   type CampaignWriter,
   type LockManagerLike,
 } from '../storage/writer';
+import { arcadeNow } from '@shared/time/clock';
 
 export interface CaribbeanRuntime {
   storage: StorageLike;
@@ -48,7 +49,7 @@ function createBrowserRuntime(): CaribbeanRuntime {
     storageCapability,
     writer: createCampaignWriter(locks),
     build: 'caribbean-sailing-1',
-    now: () => Date.now(),
+    now: arcadeNow,
     makeSeed: () => crypto.getRandomValues(new Uint32Array(1))[0],
     makeQuarantineId: () => crypto.randomUUID(),
   };

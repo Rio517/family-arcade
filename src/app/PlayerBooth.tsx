@@ -10,6 +10,7 @@ import { useProfile } from '@shared/profile/useProfile';
 import { useUsers } from '@shared/profile/useUsers';
 import { playerColor } from '@shared/profile/playerColors';
 import { pronounCodePointLength, type GameHistoryEntry } from '@shared/profile/profile';
+import { arcadeNow } from '@shared/time/clock';
 import { GAMES } from './registry';
 import '@shared/profile/player.css';
 
@@ -59,7 +60,7 @@ export function PlayerBooth() {
   const [pronounsError, setPronounsError] = useState(false);
   // Sampled once per mount — "today" flipping to "yest." mid-visit isn't
   // worth an impure read on every render.
-  const [now] = useState(() => Date.now());
+  const [now] = useState(arcadeNow);
 
   const activeIndex = users.findIndex((u) => u.id === active?.id);
 

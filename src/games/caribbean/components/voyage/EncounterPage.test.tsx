@@ -6,6 +6,21 @@ import { appendJournal, createJournal } from '../../domain/replay';
 import { seaLegCompletedDraft, voyageStartedDraft } from '../../domain/voyage';
 import type { CaribbeanController } from '../../state/useCaribbean';
 
+vi.mock('../map/CaribbeanMap', () => ({
+  CaribbeanMap: ({ context, playerName, contactVisible }: {
+    context?: string;
+    playerName: string;
+    contactVisible: boolean;
+  }) => (
+    <section
+      aria-label="Caribbean nautical chart"
+      data-map-context={context}
+      data-map-player={playerName}
+      data-map-contact-visible={String(contactVisible)}
+    />
+  ),
+}));
+
 function encounterController(): CaribbeanController {
   const lead = appendJournal(createJournal(createCampaign({ seed: 1702, name: 'Morgan' })), {
     type: 'lead-accepted', payload: { leadId: 'red-jackdaw' },
@@ -33,7 +48,7 @@ describe('<EncounterPage>', () => {
     render(<EncounterPage controller={controller} />);
 
     expect(screen.getByRole('heading', { name: 'Red Jackdaw sighted' })).toHaveFocus();
-    expect(screen.getByRole('region', { name: 'Caribbean encounter chart' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Caribbean nautical chart' })).toHaveAttribute('data-map-context', 'encounter');
     expect(screen.getByTestId('encounter-bearing')).toHaveTextContent('East by north');
     expect(screen.getByTestId('encounter-wind')).toHaveTextContent('Fresh trade wind from ENE');
     const pursue = screen.getByRole('article', { name: 'Pursue Red Jackdaw' });

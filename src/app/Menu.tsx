@@ -36,10 +36,11 @@ function BulbString({ count }: { count: number }) {
 }
 
 /** One game ticket: awning strip, glyph, name, blurb. */
-function Ticket({ title, sub, tag, players, computer, children }: {
+function Ticket({ title, sub, tag, releaseStatus, players, computer, children }: {
   title: string;
   sub: string;
   tag?: string;
+  releaseStatus?: 'under-construction';
   players: { min: number; max: number };
   computer?: boolean;
   children: React.ReactNode;
@@ -72,6 +73,9 @@ function Ticket({ title, sub, tag, players, computer, children }: {
             )}
           </span>
           <span className="tk-desc">{sub}</span>
+          {releaseStatus === 'under-construction' && (
+            <span className="tk-status">Under construction · playable</span>
+          )}
         </span>
       </span>
       <span className="tk-go" aria-hidden="true">›</span>
@@ -121,11 +125,18 @@ export function Menu() {
           </a>
 
           {GAMES.map((game) => (
-            <Link key={game.id} className={`tk game-${game.id}`} to={game.path}>
+            <Link
+              key={game.id}
+              className={`tk game-${game.id}`}
+              to={game.path}
+              data-testid={`game-ticket-${game.id}`}
+              data-release-status={game.releaseStatus}
+            >
               <Ticket
                 title={game.title}
                 sub={game.description}
                 tag={game.tag}
+                releaseStatus={game.releaseStatus}
                 players={game.players}
                 computer={game.computer}
               >

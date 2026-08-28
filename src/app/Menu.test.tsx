@@ -111,7 +111,17 @@ describe('<Menu> — the arcade landing page', () => {
       computer: true,
       path: '/caribbean',
       description: 'Trade, chase rumours, and command a growing fleet across the Caribbean.',
+      releaseStatus: 'under-construction',
     });
+  });
+
+  it('marks Caribbean as under construction without disabling play', () => {
+    renderMenu();
+
+    const ticket = screen.getByTestId('game-ticket-caribbean');
+    expect(ticket).toHaveAttribute('href', '/caribbean');
+    expect(ticket).toHaveAttribute('data-release-status', 'under-construction');
+    expect(ticket).toHaveTextContent('Under construction · playable');
   });
 
   it('reads a Caribbean Save Station row without writing and links to clean resume', () => {
