@@ -296,7 +296,7 @@
   margin: 0 0 12px;
   padding: 0 0 9px;
   border-bottom: 1px solid color-mix(in srgb, var(--caribbean-brass) 36%, transparent);
-  background: transparent;
+  background: #07151d;
   color: var(--caribbean-sailcloth);
   font-family: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
   font-size: clamp(27px, 3.2vw, 39px);
@@ -324,7 +324,7 @@
   max-width: 630px;
   margin: 0;
   padding: 5px 0 0;
-  background: transparent;
+  background: #07151d;
 }
 
 .caribbean-port-stub > p {

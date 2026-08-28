@@ -546,6 +546,15 @@ describe('<PortPage>', () => {
     expect(declaration(copyRule, 'color')).toBe('var(--caribbean-sailcloth)');
   });
 
+  it('keeps the measured menu heading and arrival copy on explicit opaque ink', () => {
+    const portCss = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+    const headingRule = ruleBodyContaining(portCss, '.caribbean-port-activity h2');
+    const arrivalRule = ruleBodyWithDeclaration(portCss, '.caribbean-port-arrival', 'background');
+
+    expect(declaration(headingRule, 'background')).toBe('#07151d');
+    expect(declaration(arrivalRule, 'background')).toBe('#07151d');
+  });
+
   it.each([
     { label: 'minimum compact playfield', width: 960, height: 600, placeFont: 19 },
     { label: 'normal desktop playfield', width: 1440, height: 900, placeFont: 21 },
