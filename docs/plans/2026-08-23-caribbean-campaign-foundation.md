@@ -25,7 +25,7 @@ accepted local naval milestone. Keep `main` untouched. Do not merge or push.
 
 **Primary references:**
 
-- [`2026-08-23-caribbean-game-branch-design.md`](../specs/2026-08-23-caribbean-game-branch-design.md)
+- [`2026-08-23-caribbean-game-branch-design.md`](../designs/2026-08-23-caribbean-game-branch-design.md)
 - [`2026-08-23-caribbean-five-minute-vertical-slice.md`](2026-08-23-caribbean-five-minute-vertical-slice.md)
 - [`production-roadmap.md`](../../games/caribbean-career/production-roadmap.md)
 - [`game-design.md`](../../games/caribbean-career/game-design.md)

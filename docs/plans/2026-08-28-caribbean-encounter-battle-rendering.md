@@ -10,8 +10,8 @@
 
 **Approved visual targets:**
 
-- `docs/superpowers/specs/2026-08-27-caribbean-encounter-map-concept-v2.png`
-- `docs/superpowers/specs/2026-08-27-caribbean-battle-concept-v4.png`
+- `docs/designs/2026-08-27-caribbean-encounter-map-concept-v2.png`
+- `docs/designs/2026-08-27-caribbean-battle-concept-v4.png`
 - `docs/games/caribbean-career/visual-references/1732-herman-moll-west-indies.jpg` (geographic/style reference only; not a runtime asset)
 
 ## Global constraints

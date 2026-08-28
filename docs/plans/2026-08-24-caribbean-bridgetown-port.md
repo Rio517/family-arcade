@@ -26,13 +26,13 @@ Playwright, CSS, and the existing canonical JSON/FNV-1a persistence code. No new
 runtime dependency is justified.
 
 **Spec:**
-[`docs/superpowers/specs/2026-08-23-caribbean-game-branch-design.md`](../specs/2026-08-23-caribbean-game-branch-design.md),
+[`docs/designs/2026-08-23-caribbean-game-branch-design.md`](../designs/2026-08-23-caribbean-game-branch-design.md),
 with product rules from
 [`docs/games/caribbean-career/game-design.md`](../../games/caribbean-career/game-design.md),
 execution gates from
 [`docs/games/caribbean-career/production-roadmap.md`](../../games/caribbean-career/production-roadmap.md),
 and the approved foundation contract in
-[`docs/superpowers/plans/2026-08-23-caribbean-campaign-foundation.md`](2026-08-23-caribbean-campaign-foundation.md).
+[`docs/plans/2026-08-23-caribbean-campaign-foundation.md`](2026-08-23-caribbean-campaign-foundation.md).
 
 ## Global Constraints
 

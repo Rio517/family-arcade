@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript 5.6, React 18, Vitest, Testing Library, Three.js 0.170, Vite 5, Playwright, Meshopt-compressed GLB, Web Audio, CSS, and the existing offline PWA toolchain.
 
-**Spec:** [`docs/superpowers/specs/2026-08-23-caribbean-game-branch-design.md`](../specs/2026-08-23-caribbean-game-branch-design.md)
+**Spec:** [`docs/designs/2026-08-23-caribbean-game-branch-design.md`](../designs/2026-08-23-caribbean-game-branch-design.md)
 
 ## Global Constraints
 

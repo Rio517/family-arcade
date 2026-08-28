@@ -8,7 +8,7 @@
 
 **Tech Stack:** React 19, TypeScript, CSS, Vitest + Testing Library, Playwright-backed Caribbean port evidence harness.
 
-**Spec:** `docs/superpowers/specs/2026-08-26-caribbean-port-battle-ui-design.md`
+**Spec:** `docs/designs/2026-08-26-caribbean-port-battle-ui-design.md`
 
 ## Global Constraints
 

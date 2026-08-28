@@ -596,7 +596,7 @@ until the six silhouettes and roles are proven.
 
 The execution-level TDD steps, interfaces, commands, evidence, and stop/go
 criteria for this sprint live in the
-[five-minute vertical-slice implementation plan](../../superpowers/plans/2026-08-23-caribbean-five-minute-vertical-slice.md).
+[five-minute vertical-slice implementation plan](../../plans/2026-08-23-caribbean-five-minute-vertical-slice.md).
 
 The next sprint should contain only these deliverables:
 

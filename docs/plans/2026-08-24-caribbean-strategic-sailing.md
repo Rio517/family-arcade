@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript 5.6, React 18, Vitest 2, Testing Library, React Router 6, Web Locks, localStorage, Three.js 0.170, Vite 5, Playwright, CSS, and the existing canonical JSON/FNV-1a save stack. No new dependency is justified.
 
-**Spec:** `docs/superpowers/specs/2026-08-24-caribbean-strategic-sailing-design.md`
+**Spec:** `docs/designs/2026-08-24-caribbean-strategic-sailing-design.md`
 
 ## Global Constraints
 
@@ -253,8 +253,8 @@ No tasks may run in parallel against these shared surfaces. Independent review c
   pwd
   git branch --show-current
   git rev-parse HEAD
-  git log -1 --format=%H -- docs/superpowers/plans/2026-08-24-caribbean-strategic-sailing.md docs/superpowers/specs/2026-08-24-caribbean-strategic-sailing-design.md
-  test "$(git rev-parse HEAD)" = "$(git log -1 --format=%H -- docs/superpowers/plans/2026-08-24-caribbean-strategic-sailing.md docs/superpowers/specs/2026-08-24-caribbean-strategic-sailing-design.md)"
+  git log -1 --format=%H -- docs/plans/2026-08-24-caribbean-strategic-sailing.md docs/designs/2026-08-24-caribbean-strategic-sailing-design.md
+  test "$(git rev-parse HEAD)" = "$(git log -1 --format=%H -- docs/plans/2026-08-24-caribbean-strategic-sailing.md docs/designs/2026-08-24-caribbean-strategic-sailing-design.md)"
   git merge-base --is-ancestor afdb53c5aa197401313917d65d5d5677aaf8a97a HEAD
   git merge-base --is-ancestor 0508a6227ee90c682f5812e3d9858f5cd20e337f HEAD
   git status --short
@@ -2518,8 +2518,8 @@ were disabled and its cleaned run directories cannot be reconstructed.
 
 **Files:**
 
-- Modify: `docs/superpowers/specs/2026-08-24-caribbean-strategic-sailing-design.md`
-- Modify: `docs/superpowers/plans/2026-08-24-caribbean-strategic-sailing.md`
+- Modify: `docs/designs/2026-08-24-caribbean-strategic-sailing-design.md`
+- Modify: `docs/plans/2026-08-24-caribbean-strategic-sailing.md`
 - Modify: `scripts/lib/caribbean-port-identity-evidence.mjs`
 - Modify: `scripts/lib/caribbean-port-identity-evidence.test.mjs`
 - Modify: `scripts/caribbean-port-check.mjs`
@@ -2546,8 +2546,8 @@ metrics equality, the sole PNG exception, and A-only publication unchanged.
   changes; and future metrics diagnostic preservation. Run:
 
   ```bash
-  git diff --check -- docs/superpowers/specs/2026-08-24-caribbean-strategic-sailing-design.md docs/superpowers/plans/2026-08-24-caribbean-strategic-sailing.md
-  rg -n "framebufferSample|renderObservation|canonicalJsonEqual|9df398c6|02187e45|0fdbe9b7|9697f1a9" docs/superpowers/specs/2026-08-24-caribbean-strategic-sailing-design.md docs/superpowers/plans/2026-08-24-caribbean-strategic-sailing.md
+  git diff --check -- docs/designs/2026-08-24-caribbean-strategic-sailing-design.md docs/plans/2026-08-24-caribbean-strategic-sailing.md
+  rg -n "framebufferSample|renderObservation|canonicalJsonEqual|9df398c6|02187e45|0fdbe9b7|9697f1a9" docs/designs/2026-08-24-caribbean-strategic-sailing-design.md docs/plans/2026-08-24-caribbean-strategic-sailing.md
   git status --short
   ```
 
@@ -2556,7 +2556,7 @@ metrics equality, the sole PNG exception, and A-only publication unchanged.
   Stage and commit only the two docs:
 
   ```bash
-  git add docs/superpowers/specs/2026-08-24-caribbean-strategic-sailing-design.md docs/superpowers/plans/2026-08-24-caribbean-strategic-sailing.md
+  git add docs/designs/2026-08-24-caribbean-strategic-sailing-design.md docs/plans/2026-08-24-caribbean-strategic-sailing.md
   git commit -m "docs(caribbean): amend terminal render evidence"
   ```
 

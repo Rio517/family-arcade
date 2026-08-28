@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript 5.6, React 18, React Router 6, CSS, Vitest, Testing Library, Playwright, Sharp, Vite 5, localStorage-backed profile/campaign persistence, ImageGen-generated local raster art.
 
-**Spec:** `docs/superpowers/specs/2026-08-24-caribbean-port-identity-design.md`
+**Spec:** `docs/designs/2026-08-24-caribbean-port-identity-design.md`
 
 ## Global Constraints
 
@@ -57,8 +57,8 @@ specification and plan with zero BLOCKER/MAJOR/MINOR findings. Then commit the
 immutable execution target:
 
 ```bash
-git add docs/superpowers/specs/2026-08-24-caribbean-port-identity-design.md \
-  docs/superpowers/plans/2026-08-24-caribbean-port-identity.md
+git add docs/designs/2026-08-24-caribbean-port-identity-design.md \
+  docs/plans/2026-08-24-caribbean-port-identity.md
 git commit -m "docs(caribbean): plan port identity polish"
 ```
 

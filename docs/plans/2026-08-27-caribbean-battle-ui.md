@@ -8,7 +8,7 @@
 
 **Tech Stack:** React 19, TypeScript, Three.js/WebGL, CSS, Vitest + Testing Library, Node native tests, Playwright-backed naval/port evidence harnesses.
 
-**Spec:** `docs/superpowers/specs/2026-08-26-caribbean-port-battle-ui-design.md`
+**Spec:** `docs/designs/2026-08-26-caribbean-port-battle-ui-design.md`
 
 ## Global Constraints
 
