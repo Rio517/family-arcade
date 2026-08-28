@@ -557,8 +557,9 @@ describe('<PortPage>', () => {
 
   it.each([
     { label: 'minimum compact playfield', width: 960, height: 600, placeFont: 19 },
+    { label: 'compact landscape playfield', width: 1024, height: 768, placeFont: null },
     { label: 'normal desktop playfield', width: 1440, height: 900, placeFont: 21 },
-  ])('budgets the place/year and all five facts within the rail at the $label', ({ width, height, placeFont }) => {
+  ])('budgets the place/year at its edge cases and all five facts within the rail at the $label', ({ width, height, placeFont }) => {
     const portCss = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
     const railRule = ruleBodyContaining(portCss, '.caribbean-port-status-rail');
     const positionRule = ruleBodyContaining(portCss, '.caribbean-port-position');
@@ -567,15 +568,18 @@ describe('<PortPage>', () => {
     const factsRule = ruleBodyContaining(portCss, '.caribbean-port-status-rail dl');
     const factRule = ruleBodyContaining(portCss, '.caribbean-port-status-rail dl div');
     const iconRule = ruleBodyContaining(portCss, '.caribbean-port-status-icon');
-    const compactMedia = portCss.indexOf('@media (max-height: 700px)');
-    const compactFactRule = height <= 700
-      ? ruleBodyWithDeclaration(portCss, '.caribbean-port-status-rail dl div', 'grid-template-columns', compactMedia)
+    const compactPlaceMedia = portCss.indexOf('@media (max-height: 700px)');
+    const compactStatusMediaStart = portCss.indexOf('@media (width <= 1024px)');
+    const compactStatusMediaEnd = portCss.indexOf('@media (width <= 960px)', compactStatusMediaStart);
+    const compactStatusCss = portCss.slice(compactStatusMediaStart, compactStatusMediaEnd);
+    const compactFactRule = width <= 1024
+      ? ruleBodyWithDeclaration(compactStatusCss, '.caribbean-port-status-rail dl div', 'grid-template-columns')
       : null;
-    const compactIconRule = height <= 700
-      ? ruleBodyWithDeclaration(portCss, '.caribbean-port-status-icon', 'width', compactMedia)
+    const compactIconRule = width <= 1024
+      ? ruleBodyWithDeclaration(compactStatusCss, '.caribbean-port-status-icon', 'width')
       : null;
     const compactPlaceRule = height <= 700
-      ? ruleBodyWithDeclaration(portCss, '.caribbean-port-position span', 'font-size', compactMedia)
+      ? ruleBodyWithDeclaration(portCss, '.caribbean-port-position span', 'font-size', compactPlaceMedia)
       : null;
 
     const firstTrack = splitCssTerms(declaration(railRule, 'grid-template-columns') ?? '')[0];
@@ -603,9 +607,11 @@ describe('<PortPage>', () => {
       yearLetterSpacing,
     ) + gap + inlinePadding;
 
-    expect(declaredPlaceFont).toBe(placeFont);
-    expect(declaredYearFont).toBe(14);
-    expect(firstTrackPixels - placeYearDemand).toBeGreaterThanOrEqual(MIN_INLINE_CLEARANCE_PX);
+    if (placeFont !== null) {
+      expect(declaredPlaceFont).toBe(placeFont);
+      expect(declaredYearFont).toBe(14);
+      expect(firstTrackPixels - placeYearDemand).toBeGreaterThanOrEqual(MIN_INLINE_CLEARANCE_PX);
+    }
 
     const factFractions = splitCssTerms(declaration(factsRule, 'grid-template-columns') ?? '')
       .map((term) => Number.parseFloat(term));

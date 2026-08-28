@@ -1043,6 +1043,17 @@ body:has(.caribbean-port) .party-root {
     --caribbean-port-art-focal-x: 54%;
     --caribbean-port-art-focal-y: 50%;
   }
+
+  .caribbean-port-status-rail dl div {
+    grid-template-columns: 18px minmax(0, 1fr);
+    column-gap: 4px;
+    padding: 7px 4px;
+  }
+
+  .caribbean-port-status-icon {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 @media (width <= 960px) {
@@ -1125,17 +1136,6 @@ body:has(.caribbean-port) .party-root {
 @media (width <= 1180px) and (max-height: 700px) {
   .caribbean-port-primary {
     grid-template-rows: auto auto auto 156px minmax(0, 1fr);
-  }
-
-  .caribbean-port-status-rail dl div {
-    grid-template-columns: 18px minmax(0, 1fr);
-    column-gap: 4px;
-    padding: 7px 4px;
-  }
-
-  .caribbean-port-status-icon {
-    width: 18px;
-    height: 18px;
   }
 
   .caribbean-port-actions {
