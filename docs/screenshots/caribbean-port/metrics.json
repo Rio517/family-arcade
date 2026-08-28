@@ -659,8 +659,8 @@
     "requestedPaths": [
       "/",
       "/assets/bridgetown-1675-CHjsU7Fy.webp",
-      "/assets/index-DC3YLPef.css",
-      "/assets/index-Dro5XzOc.js",
+      "/assets/index-BX423lYE.css",
+      "/assets/index-DdIm7gIo.js",
       "/registerSW.js"
     ]
   },
@@ -16754,9 +16754,9 @@
     },
     "accessibility": {
       "minimumTextPx": 14,
-      "minimumTargetWidthPx": 72,
+      "minimumTargetWidthPx": 44,
       "minimumTargetHeightPx": 44,
-      "minimumContrastRatio": 7.174864174011671,
+      "minimumContrastRatio": 4.7670300310443405,
       "horizontalOverflowPx": 0
     },
     "viewports": {
@@ -16854,7 +16854,7 @@
         "nonzeroBytes": true,
         "width": 1440,
         "height": 900,
-        "pngSha256": "cfef244315e0f6e6be8c6508daa922b68ff4fb7183049d5a3f28d6008b1c87cf",
+        "pngSha256": "01567b25e514f54cf208ec342e24ca652b38149ba1addef737b6bdeca6917f16",
         "semanticDigest": "577c2759d5276b4fb5192500170fd7cdc2e9a1d6920f6f846679ab237f50e749",
         "semanticState": {
           "tick": 11855,
@@ -16914,7 +16914,7 @@
         "nonzeroBytes": true,
         "width": 1440,
         "height": 900,
-        "pngSha256": "cfef244315e0f6e6be8c6508daa922b68ff4fb7183049d5a3f28d6008b1c87cf",
+        "pngSha256": "01567b25e514f54cf208ec342e24ca652b38149ba1addef737b6bdeca6917f16",
         "semanticDigest": "577c2759d5276b4fb5192500170fd7cdc2e9a1d6920f6f846679ab237f50e749",
         "semanticState": {
           "tick": 11855,

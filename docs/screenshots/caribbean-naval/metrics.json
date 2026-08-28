@@ -1,6 +1,6 @@
 {
   "capture": {
-    "headCommitAtCapture": "ad3d58e7d733706a6064294f0e4397565882d9a8",
+    "headCommitAtCapture": "7415da7c24d6c8f4073e9d547a673c69ed08e2d1",
     "worktreeDirtyBeforeCapture": false
   },
   "stableManifest": {
@@ -76,7 +76,7 @@
       },
       {
         "path": "scripts/caribbean-port-check.mjs",
-        "sha256": "b4e81748fee6e63e5af607921a517827f775906742af918ccc0152ccbef162b4"
+        "sha256": "88c6454a3e8e03c5a4ca316e197ee93f14883d18857fc01f97912798d8a893b6"
       },
       {
         "path": "scripts/fixtures/caribbean-campaign-victory.json",
@@ -128,7 +128,7 @@
       },
       {
         "path": "scripts/lib/caribbean-port-identity-evidence.test.mjs",
-        "sha256": "3cd046fb96e333787c296a4e51a98dd40fb42ac13bd5a0fcab8e6928287ef71c"
+        "sha256": "305c9cab39d1a2a9a9067468b53301d0b617343f41c23561d4743daff0cba036"
       },
       {
         "path": "scripts/lib/caribbean-support-restore.mjs",
@@ -416,11 +416,11 @@
       },
       {
         "path": "src/games/caribbean/components/battle/BattleHud.test.tsx",
-        "sha256": "35414bf78facc5b62bda71de02b3c7e17d4800e952efbcbc1386c186b081bacc"
+        "sha256": "4d387c47f0dae4576143356f3a79221a44c5cb1a7d8b2dab815a5206882da804"
       },
       {
         "path": "src/games/caribbean/components/battle/BattleHud.tsx",
-        "sha256": "75cffe063aa478a0341c7e430113ca2879e5251c842efb45075d86da61d79e70"
+        "sha256": "d1a0670fb1299bff8336017f8119f739be1944122e581d334c6e999d794dedef"
       },
       {
         "path": "src/games/caribbean/components/battle/BattleShortcutLegend.test.tsx",
@@ -436,11 +436,11 @@
       },
       {
         "path": "src/games/caribbean/components/battle/NavalBattlePage.test.tsx",
-        "sha256": "80095378ba381c92374c1145fd09cb56916b60423225c6e5d12e59f91606621f"
+        "sha256": "bb718682eee59a603633297924fb7e3c169647229426a87271c675ff9fe1014a"
       },
       {
         "path": "src/games/caribbean/components/battle/NavalBattlePage.tsx",
-        "sha256": "2ab913e752c465faf52f7686e5ef1a6ebcaec964191f735dad06d2ced0f620a3"
+        "sha256": "87acfc32813e79bbab6890cff4eac41be166939f5a3d505e2198477176b7d788"
       },
       {
         "path": "src/games/caribbean/components/battle/NavalViewport.test.tsx",
@@ -473,6 +473,18 @@
       {
         "path": "src/games/caribbean/components/log/CaptainsLog.tsx",
         "sha256": "73c6dfc2dd11c14f18890e9ba42aa04a87fb34dc84474018096a0dbc2d6b7fe6"
+      },
+      {
+        "path": "src/games/caribbean/components/map/CaribbeanMap.test.tsx",
+        "sha256": "3d0a05a5664cd50b0033cdbb5553f3e2ac70ddfdf41b57600961579566d7193e"
+      },
+      {
+        "path": "src/games/caribbean/components/map/CaribbeanMap.tsx",
+        "sha256": "770fa49f7b901964332a71e28e7721be3cce423a79dd574bbc632c45047a95f2"
+      },
+      {
+        "path": "src/games/caribbean/components/map/mapView.ts",
+        "sha256": "826b71ee9278e4d793543f70b29dc0892bf032b6d1dfae65014d23a52600badd"
       },
       {
         "path": "src/games/caribbean/components/port/CaribbeanChart.test.tsx",
@@ -588,11 +600,11 @@
       },
       {
         "path": "src/games/caribbean/components/voyage/EncounterPage.test.tsx",
-        "sha256": "1368d69e0660b263a7c0bc58b8ead3f0bb968cfb621e333b40acdb345efe912a"
+        "sha256": "ba518a0cff42a8da60ab110b579ebbeb549b676b4b99f6dd2471655257c41606"
       },
       {
         "path": "src/games/caribbean/components/voyage/EncounterPage.tsx",
-        "sha256": "406cdd911024ead24687c687565db4a0cd60d3f2dc5d7f85accb23ddecaf743f"
+        "sha256": "0fe205b371341507006ae080a2561d2a9ad9e58e46c191287930a29bf9b033f4"
       },
       {
         "path": "src/games/caribbean/components/voyage/SailingPage.test.tsx",
@@ -1032,11 +1044,11 @@
       },
       {
         "path": "src/games/caribbean/styles/battle.css",
-        "sha256": "f2af899e37960278463ff6f40a8dc13274ccf831ce4e6689cb1bc408c2bbd54e"
+        "sha256": "35e43a8c1b0aed1d268ff030ac07036396ec2e8f422c094d74598f9dbc122202"
       },
       {
         "path": "src/games/caribbean/styles/battleResponsive.test.tsx",
-        "sha256": "5b133248c9e52adea1cd58c65933b56cc564d6fc4d1802e9e2bffaa8fa643cbd"
+        "sha256": "5a77924c23e80987986aefe3667ea9d371a79c9fbd6ea3cb0e2e2d145755adb5"
       },
       {
         "path": "src/games/caribbean/styles/caribbean.css",
@@ -1056,19 +1068,19 @@
       },
       {
         "path": "src/games/caribbean/styles/voyage.css",
-        "sha256": "d9d75aaa748d61837182d02f1f90a3e7ca4b5cb3d0b43e81478c89ebac04aac2"
+        "sha256": "29685eddef31c9a852e8c3fe8f714d4cab54700afff7ff22db7ec63863fcb584"
       },
       {
         "path": "src/games/caribbean/styles/voyageResponsive.test.tsx",
-        "sha256": "85e2aea5b409fc4725cc81ede219e4db025f8192071cb4dc06cef4801c94f852"
+        "sha256": "f8e247310a5c36a3a9c89ae65a1bd4dfcfcbf6163c428d7c1210c3a2c6c3c2e4"
       },
       {
         "path": "src/games/caribbean/three/naval/NavalScene.test.ts",
-        "sha256": "d3c3c01d1cfeacbd35beb1898bf32822bea954d76475ec67becde89708d34a6a"
+        "sha256": "5e6cc714c5b83fe66659b10afd8030a0f65f565f80be42933e048d266fae4ecf"
       },
       {
         "path": "src/games/caribbean/three/naval/NavalScene.ts",
-        "sha256": "85c493ed7a8f3c92ed94994a460776956a2b722529cf8d3b0a6239b00e49a403"
+        "sha256": "52bae7ae478677674408d500617ab96125a2eafb5321000d1d2f2079e44a3372"
       },
       {
         "path": "src/games/caribbean/three/naval/bearingLine.test.ts",
@@ -1109,6 +1121,14 @@
       {
         "path": "src/games/caribbean/three/naval/waterPresentation.ts",
         "sha256": "0d4e5387c402ce8a3855d2aee89eb0aa9b0460121ad5d6dcdb17d1e064b9c893"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterShader.test.ts",
+        "sha256": "9baf568ddee47e46e754927b3f78f07705f5604be745e8f3fa05200646d6fc03"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterShader.ts",
+        "sha256": "8f8f0add5b639e629a5da25aa009418fa63eb96fb6cfa612c6cc3e5b76350e78"
       },
       {
         "path": "src/games/caribbean/three/shared/loadSloop.test.ts",
@@ -1519,7 +1539,7 @@
         "sha256": "98bd8c562cf5cd049bd7ca4861fa8cf8b339cb23c77841a04f53d29136149d22"
       }
     ],
-    "sourceHash": "80e130a1cb3e90187f3db00231e584bbc47a9b664185bd7559e832b52c9f63fd",
+    "sourceHash": "cd4a2e69be451f02da1cda47129cbfc82e17c4c62c1684a14d31dfd936c83332",
     "canonicalInput": {
       "battleId": "battle-lab-red-jackdaw",
       "seed": 1702
@@ -1753,34 +1773,34 @@
   },
   "observations": {
     "fpsSamples": [
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60
+      75,
+      78,
+      79,
+      78,
+      83,
+      81,
+      84,
+      79,
+      78,
+      76,
+      79,
+      84,
+      75,
+      85,
+      79,
+      80,
+      80,
+      78,
+      77,
+      83
     ],
-    "sustainedFps": 60,
+    "sustainedFps": 77.333,
     "maxDrawCalls": 32,
-    "maxTriangles": 7337,
-    "boardingDuration": 0.229,
+    "maxTriangles": 7870,
+    "boardingDuration": 0.209,
     "samples": [
       {
-        "fps": 60,
+        "fps": 75,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 32,
@@ -1796,12 +1816,12 @@
         "cameraIntermediateFrames": 177,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 183,
+        "tick": 185,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 78,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 28,
@@ -1813,37 +1833,16 @@
         "activeEffects": 1,
         "effectCapacity": 96,
         "reducedMotion": false,
-        "shipIntermediateFrames": 474,
-        "cameraIntermediateFrames": 237,
-        "reducedMotionShipSnaps": 0,
-        "reducedMotionCameraSnaps": 0,
-        "tick": 243,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 60,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 6774,
-        "textures": 3,
-        "geometries": 29,
-        "materials": 29,
-        "bufferAttributes": 96,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "reducedMotion": false,
         "shipIntermediateFrames": 594,
         "cameraIntermediateFrames": 297,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 303,
+        "tick": 247,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 79,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -1859,12 +1858,12 @@
         "cameraIntermediateFrames": 357,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 363,
+        "tick": 307,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 78,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -1880,33 +1879,12 @@
         "cameraIntermediateFrames": 417,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 423,
+        "tick": 367,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 6774,
-        "textures": 3,
-        "geometries": 29,
-        "materials": 29,
-        "bufferAttributes": 96,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "reducedMotion": false,
-        "shipIntermediateFrames": 954,
-        "cameraIntermediateFrames": 477,
-        "reducedMotionShipSnaps": 0,
-        "reducedMotionCameraSnaps": 0,
-        "tick": 483,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 60,
+        "fps": 83,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -1922,12 +1900,12 @@
         "cameraIntermediateFrames": 537,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 543,
+        "tick": 428,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 81,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -1943,12 +1921,12 @@
         "cameraIntermediateFrames": 597,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 603,
+        "tick": 488,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 84,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -1964,33 +1942,12 @@
         "cameraIntermediateFrames": 657,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 663,
+        "tick": 542,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 6774,
-        "textures": 3,
-        "geometries": 29,
-        "materials": 29,
-        "bufferAttributes": 96,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "reducedMotion": false,
-        "shipIntermediateFrames": 1434,
-        "cameraIntermediateFrames": 717,
-        "reducedMotionShipSnaps": 0,
-        "reducedMotionCameraSnaps": 0,
-        "tick": 723,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 60,
+        "fps": 79,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -2006,12 +1963,12 @@
         "cameraIntermediateFrames": 777,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 783,
+        "tick": 608,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 78,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -2027,12 +1984,12 @@
         "cameraIntermediateFrames": 837,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 843,
+        "tick": 663,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 76,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -2048,33 +2005,12 @@
         "cameraIntermediateFrames": 897,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 903,
+        "tick": 723,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 6774,
-        "textures": 3,
-        "geometries": 29,
-        "materials": 29,
-        "bufferAttributes": 96,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "reducedMotion": false,
-        "shipIntermediateFrames": 1914,
-        "cameraIntermediateFrames": 957,
-        "reducedMotionShipSnaps": 0,
-        "reducedMotionCameraSnaps": 0,
-        "tick": 963,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 60,
+        "fps": 79,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -2090,12 +2026,12 @@
         "cameraIntermediateFrames": 1017,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 1023,
+        "tick": 783,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 84,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -2111,12 +2047,12 @@
         "cameraIntermediateFrames": 1077,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 1083,
+        "tick": 845,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 75,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -2132,33 +2068,12 @@
         "cameraIntermediateFrames": 1137,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 1143,
+        "tick": 905,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 6774,
-        "textures": 3,
-        "geometries": 29,
-        "materials": 29,
-        "bufferAttributes": 96,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "reducedMotion": false,
-        "shipIntermediateFrames": 2394,
-        "cameraIntermediateFrames": 1197,
-        "reducedMotionShipSnaps": 0,
-        "reducedMotionCameraSnaps": 0,
-        "tick": 1203,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 60,
+        "fps": 85,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -2174,12 +2089,117 @@
         "cameraIntermediateFrames": 1257,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 1263,
+        "tick": 966,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 79,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2634,
+        "cameraIntermediateFrames": 1317,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1027,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 80,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2754,
+        "cameraIntermediateFrames": 1377,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1087,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 80,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2994,
+        "cameraIntermediateFrames": 1497,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1147,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 3114,
+        "cameraIntermediateFrames": 1557,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1208,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 77,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 3234,
+        "cameraIntermediateFrames": 1617,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1268,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 83,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 26,
@@ -2191,8 +2211,8 @@
         "activeEffects": 0,
         "effectCapacity": 96,
         "reducedMotion": false,
-        "shipIntermediateFrames": 2634,
-        "cameraIntermediateFrames": 1317,
+        "shipIntermediateFrames": 3474,
+        "cameraIntermediateFrames": 1737,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
         "tick": 1323,
@@ -2219,9 +2239,9 @@
     }
   },
   "source": {
-    "headCommitAtCapture": "ad3d58e7d733706a6064294f0e4397565882d9a8",
+    "headCommitAtCapture": "7415da7c24d6c8f4073e9d547a673c69ed08e2d1",
     "worktreeDirtyBeforeCapture": false,
-    "sourceTreeSha256": "80e130a1cb3e90187f3db00231e584bbc47a9b664185bd7559e832b52c9f63fd",
+    "sourceTreeSha256": "cd4a2e69be451f02da1cda47129cbfc82e17c4c62c1684a14d31dfd936c83332",
     "sourceTreeFiles": [
       "index.html",
       "knip.json",
@@ -2340,6 +2360,9 @@
       "src/games/caribbean/components/battle/rudderPulse.mjs",
       "src/games/caribbean/components/log/CaptainsLog.test.tsx",
       "src/games/caribbean/components/log/CaptainsLog.tsx",
+      "src/games/caribbean/components/map/CaribbeanMap.test.tsx",
+      "src/games/caribbean/components/map/CaribbeanMap.tsx",
+      "src/games/caribbean/components/map/mapView.ts",
       "src/games/caribbean/components/port/CaribbeanChart.test.tsx",
       "src/games/caribbean/components/port/CaribbeanChart.tsx",
       "src/games/caribbean/components/port/DivideShares.test.tsx",
@@ -2499,6 +2522,8 @@
       "src/games/caribbean/three/naval/sceneMath.ts",
       "src/games/caribbean/three/naval/waterPresentation.test.ts",
       "src/games/caribbean/three/naval/waterPresentation.ts",
+      "src/games/caribbean/three/naval/waterShader.test.ts",
+      "src/games/caribbean/three/naval/waterShader.ts",
       "src/games/caribbean/three/shared/loadSloop.test.ts",
       "src/games/caribbean/three/shared/loadSloop.ts",
       "src/games/chess/assets/galaxy/black-bishop.glb",
@@ -2673,7 +2698,7 @@
       },
       {
         "path": "scripts/caribbean-port-check.mjs",
-        "sha256": "b4e81748fee6e63e5af607921a517827f775906742af918ccc0152ccbef162b4"
+        "sha256": "88c6454a3e8e03c5a4ca316e197ee93f14883d18857fc01f97912798d8a893b6"
       },
       {
         "path": "scripts/fixtures/caribbean-campaign-victory.json",
@@ -2725,7 +2750,7 @@
       },
       {
         "path": "scripts/lib/caribbean-port-identity-evidence.test.mjs",
-        "sha256": "3cd046fb96e333787c296a4e51a98dd40fb42ac13bd5a0fcab8e6928287ef71c"
+        "sha256": "305c9cab39d1a2a9a9067468b53301d0b617343f41c23561d4743daff0cba036"
       },
       {
         "path": "scripts/lib/caribbean-support-restore.mjs",
@@ -3013,11 +3038,11 @@
       },
       {
         "path": "src/games/caribbean/components/battle/BattleHud.test.tsx",
-        "sha256": "35414bf78facc5b62bda71de02b3c7e17d4800e952efbcbc1386c186b081bacc"
+        "sha256": "4d387c47f0dae4576143356f3a79221a44c5cb1a7d8b2dab815a5206882da804"
       },
       {
         "path": "src/games/caribbean/components/battle/BattleHud.tsx",
-        "sha256": "75cffe063aa478a0341c7e430113ca2879e5251c842efb45075d86da61d79e70"
+        "sha256": "d1a0670fb1299bff8336017f8119f739be1944122e581d334c6e999d794dedef"
       },
       {
         "path": "src/games/caribbean/components/battle/BattleShortcutLegend.test.tsx",
@@ -3033,11 +3058,11 @@
       },
       {
         "path": "src/games/caribbean/components/battle/NavalBattlePage.test.tsx",
-        "sha256": "80095378ba381c92374c1145fd09cb56916b60423225c6e5d12e59f91606621f"
+        "sha256": "bb718682eee59a603633297924fb7e3c169647229426a87271c675ff9fe1014a"
       },
       {
         "path": "src/games/caribbean/components/battle/NavalBattlePage.tsx",
-        "sha256": "2ab913e752c465faf52f7686e5ef1a6ebcaec964191f735dad06d2ced0f620a3"
+        "sha256": "87acfc32813e79bbab6890cff4eac41be166939f5a3d505e2198477176b7d788"
       },
       {
         "path": "src/games/caribbean/components/battle/NavalViewport.test.tsx",
@@ -3070,6 +3095,18 @@
       {
         "path": "src/games/caribbean/components/log/CaptainsLog.tsx",
         "sha256": "73c6dfc2dd11c14f18890e9ba42aa04a87fb34dc84474018096a0dbc2d6b7fe6"
+      },
+      {
+        "path": "src/games/caribbean/components/map/CaribbeanMap.test.tsx",
+        "sha256": "3d0a05a5664cd50b0033cdbb5553f3e2ac70ddfdf41b57600961579566d7193e"
+      },
+      {
+        "path": "src/games/caribbean/components/map/CaribbeanMap.tsx",
+        "sha256": "770fa49f7b901964332a71e28e7721be3cce423a79dd574bbc632c45047a95f2"
+      },
+      {
+        "path": "src/games/caribbean/components/map/mapView.ts",
+        "sha256": "826b71ee9278e4d793543f70b29dc0892bf032b6d1dfae65014d23a52600badd"
       },
       {
         "path": "src/games/caribbean/components/port/CaribbeanChart.test.tsx",
@@ -3185,11 +3222,11 @@
       },
       {
         "path": "src/games/caribbean/components/voyage/EncounterPage.test.tsx",
-        "sha256": "1368d69e0660b263a7c0bc58b8ead3f0bb968cfb621e333b40acdb345efe912a"
+        "sha256": "ba518a0cff42a8da60ab110b579ebbeb549b676b4b99f6dd2471655257c41606"
       },
       {
         "path": "src/games/caribbean/components/voyage/EncounterPage.tsx",
-        "sha256": "406cdd911024ead24687c687565db4a0cd60d3f2dc5d7f85accb23ddecaf743f"
+        "sha256": "0fe205b371341507006ae080a2561d2a9ad9e58e46c191287930a29bf9b033f4"
       },
       {
         "path": "src/games/caribbean/components/voyage/SailingPage.test.tsx",
@@ -3629,11 +3666,11 @@
       },
       {
         "path": "src/games/caribbean/styles/battle.css",
-        "sha256": "f2af899e37960278463ff6f40a8dc13274ccf831ce4e6689cb1bc408c2bbd54e"
+        "sha256": "35e43a8c1b0aed1d268ff030ac07036396ec2e8f422c094d74598f9dbc122202"
       },
       {
         "path": "src/games/caribbean/styles/battleResponsive.test.tsx",
-        "sha256": "5b133248c9e52adea1cd58c65933b56cc564d6fc4d1802e9e2bffaa8fa643cbd"
+        "sha256": "5a77924c23e80987986aefe3667ea9d371a79c9fbd6ea3cb0e2e2d145755adb5"
       },
       {
         "path": "src/games/caribbean/styles/caribbean.css",
@@ -3653,19 +3690,19 @@
       },
       {
         "path": "src/games/caribbean/styles/voyage.css",
-        "sha256": "d9d75aaa748d61837182d02f1f90a3e7ca4b5cb3d0b43e81478c89ebac04aac2"
+        "sha256": "29685eddef31c9a852e8c3fe8f714d4cab54700afff7ff22db7ec63863fcb584"
       },
       {
         "path": "src/games/caribbean/styles/voyageResponsive.test.tsx",
-        "sha256": "85e2aea5b409fc4725cc81ede219e4db025f8192071cb4dc06cef4801c94f852"
+        "sha256": "f8e247310a5c36a3a9c89ae65a1bd4dfcfcbf6163c428d7c1210c3a2c6c3c2e4"
       },
       {
         "path": "src/games/caribbean/three/naval/NavalScene.test.ts",
-        "sha256": "d3c3c01d1cfeacbd35beb1898bf32822bea954d76475ec67becde89708d34a6a"
+        "sha256": "5e6cc714c5b83fe66659b10afd8030a0f65f565f80be42933e048d266fae4ecf"
       },
       {
         "path": "src/games/caribbean/three/naval/NavalScene.ts",
-        "sha256": "85c493ed7a8f3c92ed94994a460776956a2b722529cf8d3b0a6239b00e49a403"
+        "sha256": "52bae7ae478677674408d500617ab96125a2eafb5321000d1d2f2079e44a3372"
       },
       {
         "path": "src/games/caribbean/three/naval/bearingLine.test.ts",
@@ -3706,6 +3743,14 @@
       {
         "path": "src/games/caribbean/three/naval/waterPresentation.ts",
         "sha256": "0d4e5387c402ce8a3855d2aee89eb0aa9b0460121ad5d6dcdb17d1e064b9c893"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterShader.test.ts",
+        "sha256": "9baf568ddee47e46e754927b3f78f07705f5604be745e8f3fa05200646d6fc03"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterShader.ts",
+        "sha256": "8f8f0add5b639e629a5da25aa009418fa63eb96fb6cfa612c6cc3e5b76350e78"
       },
       {
         "path": "src/games/caribbean/three/shared/loadSloop.test.ts",
@@ -4116,7 +4161,7 @@
         "sha256": "98bd8c562cf5cd049bd7ca4861fa8cf8b339cb23c77841a04f53d29136149d22"
       }
     ],
-    "sourceHash": "80e130a1cb3e90187f3db00231e584bbc47a9b664185bd7559e832b52c9f63fd"
+    "sourceHash": "cd4a2e69be451f02da1cda47129cbfc82e17c4c62c1684a14d31dfd936c83332"
   },
   "canonicalInput": {
     "battleId": "battle-lab-red-jackdaw",
@@ -4167,38 +4212,38 @@
   },
   "fps": {
     "samples": [
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60,
-      60
+      75,
+      78,
+      79,
+      78,
+      83,
+      81,
+      84,
+      79,
+      78,
+      76,
+      79,
+      84,
+      75,
+      85,
+      79,
+      80,
+      80,
+      78,
+      77,
+      83
     ],
     "sustainedFloorMethod": "minimum 3-sample moving average after warm-up during an unpaused advancing battle with live effects",
-    "sustained": 60
+    "sustained": 77.333
   },
   "maximums": {
     "drawCalls": 32,
-    "triangles": 7337,
+    "triangles": 7870,
     "textures": 3,
     "geometries": 29,
     "materials": 29,
     "bufferAttributes": 96,
-    "effectActive": 16,
+    "effectActive": 26,
     "effectCapacity": 96
   },
   "resourcePlateau": {
@@ -4206,7 +4251,7 @@
     "observedSeconds": 20,
     "samples": [
       {
-        "fps": 60,
+        "fps": 75,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 32,
@@ -4222,12 +4267,12 @@
         "cameraIntermediateFrames": 177,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 183,
+        "tick": 185,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 78,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 28,
@@ -4239,37 +4284,16 @@
         "activeEffects": 1,
         "effectCapacity": 96,
         "reducedMotion": false,
-        "shipIntermediateFrames": 474,
-        "cameraIntermediateFrames": 237,
-        "reducedMotionShipSnaps": 0,
-        "reducedMotionCameraSnaps": 0,
-        "tick": 243,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 60,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 6774,
-        "textures": 3,
-        "geometries": 29,
-        "materials": 29,
-        "bufferAttributes": 96,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "reducedMotion": false,
         "shipIntermediateFrames": 594,
         "cameraIntermediateFrames": 297,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 303,
+        "tick": 247,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 79,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4285,12 +4309,12 @@
         "cameraIntermediateFrames": 357,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 363,
+        "tick": 307,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 78,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4306,33 +4330,12 @@
         "cameraIntermediateFrames": 417,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 423,
+        "tick": 367,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 6774,
-        "textures": 3,
-        "geometries": 29,
-        "materials": 29,
-        "bufferAttributes": 96,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "reducedMotion": false,
-        "shipIntermediateFrames": 954,
-        "cameraIntermediateFrames": 477,
-        "reducedMotionShipSnaps": 0,
-        "reducedMotionCameraSnaps": 0,
-        "tick": 483,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 60,
+        "fps": 83,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4348,12 +4351,12 @@
         "cameraIntermediateFrames": 537,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 543,
+        "tick": 428,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 81,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4369,12 +4372,12 @@
         "cameraIntermediateFrames": 597,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 603,
+        "tick": 488,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 84,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4390,33 +4393,12 @@
         "cameraIntermediateFrames": 657,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 663,
+        "tick": 542,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 6774,
-        "textures": 3,
-        "geometries": 29,
-        "materials": 29,
-        "bufferAttributes": 96,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "reducedMotion": false,
-        "shipIntermediateFrames": 1434,
-        "cameraIntermediateFrames": 717,
-        "reducedMotionShipSnaps": 0,
-        "reducedMotionCameraSnaps": 0,
-        "tick": 723,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 60,
+        "fps": 79,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4432,12 +4414,12 @@
         "cameraIntermediateFrames": 777,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 783,
+        "tick": 608,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 78,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4453,12 +4435,12 @@
         "cameraIntermediateFrames": 837,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 843,
+        "tick": 663,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 76,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4474,33 +4456,12 @@
         "cameraIntermediateFrames": 897,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 903,
+        "tick": 723,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 6774,
-        "textures": 3,
-        "geometries": 29,
-        "materials": 29,
-        "bufferAttributes": 96,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "reducedMotion": false,
-        "shipIntermediateFrames": 1914,
-        "cameraIntermediateFrames": 957,
-        "reducedMotionShipSnaps": 0,
-        "reducedMotionCameraSnaps": 0,
-        "tick": 963,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 60,
+        "fps": 79,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4516,12 +4477,12 @@
         "cameraIntermediateFrames": 1017,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 1023,
+        "tick": 783,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 84,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4537,12 +4498,12 @@
         "cameraIntermediateFrames": 1077,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 1083,
+        "tick": 845,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 75,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4558,33 +4519,12 @@
         "cameraIntermediateFrames": 1137,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 1143,
+        "tick": 905,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
-        "dpr": 1,
-        "tier": "high",
-        "drawCalls": 27,
-        "triangles": 6774,
-        "textures": 3,
-        "geometries": 29,
-        "materials": 29,
-        "bufferAttributes": 96,
-        "activeEffects": 0,
-        "effectCapacity": 96,
-        "reducedMotion": false,
-        "shipIntermediateFrames": 2394,
-        "cameraIntermediateFrames": 1197,
-        "reducedMotionShipSnaps": 0,
-        "reducedMotionCameraSnaps": 0,
-        "tick": 1203,
-        "paused": false,
-        "outcome": null
-      },
-      {
-        "fps": 60,
+        "fps": 85,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 27,
@@ -4600,12 +4540,117 @@
         "cameraIntermediateFrames": 1257,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
-        "tick": 1263,
+        "tick": 966,
         "paused": false,
         "outcome": null
       },
       {
-        "fps": 60,
+        "fps": 79,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2634,
+        "cameraIntermediateFrames": 1317,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1027,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 80,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2754,
+        "cameraIntermediateFrames": 1377,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1087,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 80,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2994,
+        "cameraIntermediateFrames": 1497,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1147,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 3114,
+        "cameraIntermediateFrames": 1557,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1208,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 77,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 3234,
+        "cameraIntermediateFrames": 1617,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1268,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 83,
         "dpr": 1,
         "tier": "high",
         "drawCalls": 26,
@@ -4617,8 +4662,8 @@
         "activeEffects": 0,
         "effectCapacity": 96,
         "reducedMotion": false,
-        "shipIntermediateFrames": 2634,
-        "cameraIntermediateFrames": 1317,
+        "shipIntermediateFrames": 3474,
+        "cameraIntermediateFrames": 1737,
         "reducedMotionShipSnaps": 0,
         "reducedMotionCameraSnaps": 0,
         "tick": 1323,
@@ -4653,7 +4698,7 @@
   "outcome": {
     "ok": true,
     "outcome": "boarding-ready",
-    "elapsedBrowserSeconds": 0.229,
+    "elapsedBrowserSeconds": 0.209,
     "initial": {
       "distance": 7.02,
       "outcomeInjected": false,
@@ -4684,7 +4729,7 @@
       },
       "muzzleOrigin": {
         "x": 3.1,
-        "z": 0.13951146299999975
+        "z": 0.2790229259999995
       }
     },
     "starboard": {
@@ -4696,7 +4741,7 @@
       },
       "muzzleOrigin": {
         "x": -3.1,
-        "z": 0.19845955583999964
+        "z": 0.09922977791999982
       }
     }
   },
@@ -4712,14 +4757,14 @@
     "normal": {
       "preference": "no-preference",
       "reducedMotion": false,
-      "shipIntermediateFrames": 116,
-      "cameraIntermediateFrames": 58
+      "shipIntermediateFrames": 118,
+      "cameraIntermediateFrames": 59
     },
     "reduced": {
       "preference": "reduce",
       "reducedMotion": true,
-      "shipSnaps": 20,
-      "cameraSnaps": 10
+      "shipSnaps": 16,
+      "cameraSnaps": 8
     }
   },
   "display": {
