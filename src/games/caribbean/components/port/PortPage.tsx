@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type CSSProperties } from 'react';
 
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
+import portChartMaterial from '../../assets/port-chart-paper.webp';
+import portPanelMaterial from '../../assets/port-panel-patina.webp';
 import { BRIDGETOWN } from '../../content/campaign';
 import { provisionsMonths } from '../../domain/selectors';
 import type { CampaignStateV1, PortActivity } from '../../domain/types';
@@ -14,6 +16,7 @@ import { GovernorHouse } from './GovernorHouse';
 import { Market } from './Market';
 import { PortBackdrop } from './PortBackdrop';
 import { PortMenu } from './PortMenu';
+import { PortStatusIcon } from './PortStatusIcon';
 import { ShipyardSummary } from './ShipyardSummary';
 import { Tavern } from './Tavern';
 
@@ -117,25 +120,31 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
       Done
     </button>
   );
+  const materialStyle = {
+    '--caribbean-port-panel-material': `url("${portPanelMaterial}")`,
+    '--caribbean-port-chart-material': `url("${portChartMaterial}")`,
+  } as CSSProperties;
 
   return (
     <section
       className="caribbean-port"
       data-testid="caribbean-career-ready"
       aria-labelledby="caribbean-port-title"
+      style={materialStyle}
     >
       <PortBackdrop />
       <header className="caribbean-port-status-rail" role="region" aria-label="Voyage status">
         <p className="caribbean-port-position">
+          <PortStatusIcon name="port" />
           <span>{BRIDGETOWN.name}</span>
           <strong>{state.calendar.startYear}</strong>
         </p>
         <dl>
-          <div><dt>Gold</dt><dd>{state.wealth.gold} gold</dd></div>
-          <div><dt>Crew</dt><dd>{flagship?.crew ?? 0} aboard</dd></div>
-          <div><dt>Morale</dt><dd>{titleCase(state.crew.morale)}</dd></div>
-          <div><dt>{flagship?.name ?? 'Flagship'}</dt><dd>Hull {flagship?.hull ?? 0} · Sails {flagship?.sails ?? 0}</dd></div>
-          <div><dt>Provisions</dt><dd>{months === null ? '—' : months.toFixed(1)} months</dd></div>
+          <div><PortStatusIcon name="gold" /><dt>Gold</dt><dd>{state.wealth.gold} gold</dd></div>
+          <div><PortStatusIcon name="crew" /><dt>Crew</dt><dd>{flagship?.crew ?? 0} aboard</dd></div>
+          <div><PortStatusIcon name="morale" /><dt>Morale</dt><dd>{titleCase(state.crew.morale)}</dd></div>
+          <div><PortStatusIcon name="ship" /><dt>{flagship?.name ?? 'Flagship'}</dt><dd>Hull {flagship?.hull ?? 0} · Sails {flagship?.sails ?? 0}</dd></div>
+          <div><PortStatusIcon name="provisions" /><dt>Provisions</dt><dd>{months === null ? '—' : months.toFixed(1)} months</dd></div>
         </dl>
       </header>
 
@@ -157,7 +166,10 @@ export function PortPage({ controller }: { controller: CaribbeanController }) {
             registerTrigger={registerTrigger}
             registerSetSailTrigger={(element) => { setSailRef.current = element; }}
           />
-          <section className="caribbean-port-activity" aria-label="Port activity">
+          <section
+            className={`caribbean-port-activity caribbean-port-activity--${controller.activity}`}
+            aria-label="Port activity"
+          >
           <h2 ref={headingRef} tabIndex={-1}>{heading}</h2>
           {activeActivity === null ? (
             <p className="caribbean-port-arrival">

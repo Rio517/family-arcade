@@ -281,6 +281,17 @@ describe('<PortPage>', () => {
     expect(screen.getByText('Captain Morgan')).toBeInTheDocument();
   });
 
+  it('pairs the status facts with quiet decorative instrument marks', () => {
+    render(<StatefulPort />);
+
+    const status = screen.getByRole('region', { name: 'Voyage status' });
+    const marks = status.querySelectorAll('[data-port-status-icon]');
+    expect([...marks].map((mark) => mark.getAttribute('data-port-status-icon'))).toEqual([
+      'port', 'gold', 'crew', 'morale', 'ship', 'provisions',
+    ]);
+    expect([...marks].every((mark) => mark.getAttribute('aria-hidden') === 'true')).toBe(true);
+  });
+
   it('keeps exactly one harbour backdrop while menu, Market, Tavern, and Log rerender', () => {
     render(<StatefulPort />);
 
@@ -291,6 +302,22 @@ describe('<PortPage>', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Done' }));
       expect(screen.getAllByTestId('caribbean-port-backdrop')).toHaveLength(1);
     }
+  });
+
+  it('layers compact material assets over the existing Bridgetown backdrop', () => {
+    render(<StatefulPort />);
+
+    const shell = screen.getByTestId('caribbean-career-ready');
+    expect(shell.style.getPropertyValue('--caribbean-port-panel-material')).toMatch(
+      /url\(["']?.*port-panel-patina.*\.webp["']?\)/,
+    );
+    expect(shell.style.getPropertyValue('--caribbean-port-chart-material')).toMatch(
+      /url\(["']?.*port-chart-paper.*\.webp["']?\)/,
+    );
+    expect(screen.getByTestId('caribbean-port-art')).toHaveAttribute(
+      'src',
+      expect.stringMatching(/bridgetown-1675.*\.webp/),
+    );
   });
 
   it('keeps one chart-led stage and one bottom Done action across every port tab', () => {
@@ -305,6 +332,16 @@ describe('<PortPage>', () => {
       expect(within(stage).getByRole('button', { name: 'Done' })).toBeInTheDocument();
       fireEvent.click(within(stage).getByRole('button', { name: 'Done' }));
     }
+  });
+
+  it('collapses the idle prompt but keeps activity-specific surfaces identifiable', () => {
+    render(<StatefulPort />);
+
+    const activity = screen.getByRole('region', { name: 'Port activity' });
+    expect(activity).toHaveClass('caribbean-port-activity--menu');
+    fireEvent.click(screen.getByRole('button', { name: 'Market' }));
+    expect(activity).toHaveClass('caribbean-port-activity--market');
+    expect(activity).not.toHaveClass('caribbean-port-activity--menu');
   });
 
   it('shows activity focus only for keyboard-visible focus, not programmatic focus', () => {
@@ -520,7 +557,14 @@ describe('<PortPage>', () => {
     const yearRule = ruleBodyWithDeclaration(portCss, '.caribbean-port-position strong', 'font-size');
     const factsRule = ruleBodyContaining(portCss, '.caribbean-port-status-rail dl');
     const factRule = ruleBodyContaining(portCss, '.caribbean-port-status-rail dl div');
+    const iconRule = ruleBodyContaining(portCss, '.caribbean-port-status-icon');
     const compactMedia = portCss.indexOf('@media (max-height: 700px)');
+    const compactFactRule = height <= 700
+      ? ruleBodyWithDeclaration(portCss, '.caribbean-port-status-rail dl div', 'grid-template-columns', compactMedia)
+      : null;
+    const compactIconRule = height <= 700
+      ? ruleBodyWithDeclaration(portCss, '.caribbean-port-status-icon', 'width', compactMedia)
+      : null;
     const compactPlaceRule = height <= 700
       ? ruleBodyWithDeclaration(portCss, '.caribbean-port-position span', 'font-size', compactMedia)
       : null;
@@ -557,12 +601,21 @@ describe('<PortPage>', () => {
     const factFractions = splitCssTerms(declaration(factsRule, 'grid-template-columns') ?? '')
       .map((term) => Number.parseFloat(term));
     const fractionTotal = factFractions.reduce((sum, fraction) => sum + fraction, 0);
-    const factInlinePadding = horizontalPaddingPixels(factRule, width);
+    const activeFactRule = compactFactRule ?? factRule;
+    const activeIconRule = compactIconRule ?? iconRule;
+    const factInlinePadding = horizontalPaddingPixels(activeFactRule, width);
+    const factGridTerms = splitCssTerms(declaration(activeFactRule, 'grid-template-columns') ?? '');
+    const iconWidth = lengthPixels(
+      declaration(activeIconRule, 'width') ?? factGridTerms[0] ?? '',
+      width,
+    );
+    const iconGap = lengthPixels(declaration(activeFactRule, 'column-gap') ?? '', width);
     expect(factFractions).toHaveLength(STATUS_CONTENT_BUDGETS_PX.length);
     for (const [index, contentBudget] of STATUS_CONTENT_BUDGETS_PX.entries()) {
       const fraction = factFractions[index] ?? 0;
       const cellTrack = (width - firstTrackPixels) * fraction / fractionTotal;
-      expect(cellTrack - factInlinePadding - contentBudget).toBeGreaterThanOrEqual(MIN_INLINE_CLEARANCE_PX);
+      expect(cellTrack - factInlinePadding - iconWidth - iconGap - contentBudget)
+        .toBeGreaterThanOrEqual(MIN_INLINE_CLEARANCE_PX);
     }
   });
 
@@ -614,7 +667,7 @@ describe('<PortPage>', () => {
     const marketRule = ruleBodyWithDeclaration(desktopCss, '.caribbean-market', 'padding');
     const closeRule = ruleBodyContaining(desktopCss, '.caribbean-port .caribbean-port-close');
     expect(declaration(stageRule, 'min-height')).toBe('0');
-    expect(declaration(primaryRule, 'grid-template-rows')).toBe('auto auto auto 96px minmax(0, 1fr)');
+    expect(declaration(primaryRule, 'grid-template-rows')).toBe('auto auto auto 112px minmax(0, 1fr)');
     expect(declaration(activityRule, 'overflow-y')).toBe('auto');
     expect(declaration(activityRule, 'scrollbar-gutter')).toBe('stable');
     expect(declaration(marketRule, 'padding')).toBe('20px 22px 22px');

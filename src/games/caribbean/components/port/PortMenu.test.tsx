@@ -53,7 +53,7 @@ describe('<PortMenu>', () => {
     const css = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
     expect(css).toMatch(/\.caribbean-port-action-item\s*\{[^}]*display:\s*grid/s);
     expect(css).toMatch(/\.caribbean-port-action-item\s*\{[^}]*padding:\s*0px/s);
-    expect(css).toMatch(/\.caribbean-port-actions\s*\{[^}]*grid-auto-rows:\s*96px/s);
+    expect(css).toMatch(/\.caribbean-port-actions\s*\{[^}]*grid-auto-rows:\s*112px/s);
     expect(css).toMatch(/\.caribbean-port-action\s*\{[^}]*height:\s*100%/s);
     expect(css).toMatch(/\.caribbean-port \.caribbean-port-action\s*\{[^}]*font-size:\s*15px/s);
     expect(css).toMatch(/\.caribbean-port \.caribbean-port-action\s*\{[^}]*min-width:\s*0/s);
@@ -68,9 +68,17 @@ describe('<PortMenu>', () => {
     expect(css).toMatch(/@media \(width <= 1180px\)[\s\S]*\.caribbean-port-action-icon\s*\{[^}]*width:\s*24px[^}]*height:\s*24px/s);
     expect(css).toMatch(/@media \(max-height:\s*700px\)[\s\S]*body:has\(\.caribbean-port\) \.party-root\s*\{[^}]*bottom:\s*calc\(148px/s);
     expect(css).toMatch(/@media \(max-height:\s*700px\)[\s\S]*body:has\(\.caribbean-port\) \.party-root\s*\{[^}]*left:\s*calc\(50% - 10px\)/s);
-    expect(css).toMatch(/@media \(width <= 1180px\) and \(max-height:\s*700px\)[\s\S]*\.caribbean-port-primary\s*\{[^}]*grid-template-rows:[^;}]*140px/s);
+    expect(css).toMatch(/@media \(width <= 1180px\) and \(max-height:\s*700px\)[\s\S]*\.caribbean-port-primary\s*\{[^}]*grid-template-rows:[^;}]*156px/s);
     expect(css).toMatch(/@media \(width <= 1180px\) and \(max-height:\s*700px\)[\s\S]*\.caribbean-port-actions\s*\{[^}]*grid-auto-rows:\s*70px/s);
     expect(css).toMatch(/@media \(width <= 1180px\) and \(max-height:\s*700px\)[\s\S]*\.caribbean-port-action-item\s*\{[^}]*min-height:\s*70px/s);
+  });
+
+  it('gives the icon, label, and state line enough desktop height to remain unclipped', () => {
+    const css = readFileSync(resolve('src/games/caribbean/styles/port.css'), 'utf8');
+    const menuRule = css.match(/\.caribbean-port-actions\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const rowHeight = Number(menuRule.match(/grid-auto-rows:\s*([\d.]+)px/)?.[1]);
+
+    expect(rowHeight).toBeGreaterThanOrEqual(108);
   });
 
   it('marks the Tavern instead of showing the lead instruction as visible Set Sail copy', () => {
