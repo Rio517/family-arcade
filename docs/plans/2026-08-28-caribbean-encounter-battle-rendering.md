@@ -4,15 +4,23 @@
 
 **Goal:** Ship the approved map-led encounter screen and action-led naval battle HUD, validate both against real browser captures and an ImageGen critique, then improve the naval water rendering without making ships feel light or increasing the evidence/runtime risk beyond the current WebGL budget.
 
-**Architecture:** Introduce a reusable offline Caribbean map surface backed by the already-installed `world-atlas`, `topojson-client`, and `d3-geo` packages. Keep voyage decisions and naval commands in their existing controller/session boundaries; the redesign changes presentation and accessibility, not game rules. Isolate water optics in a small, testable shader-definition module while retaining the existing deterministic low-amplitude displacement and ship-motion constants.
+**Architecture:** Migrate the interim `world-atlas` SVG and hand-authored port chart to one reusable offline Caribbean map surface backed by MapLibre and a bundled, pinned eastern-Caribbean PMTiles extract. Keep voyage decisions and naval commands in their existing controller/session boundaries; the redesign changes presentation and accessibility, not game rules. Isolate water optics in a small, testable shader-definition module while retaining the existing deterministic low-amplitude displacement and ship-motion constants.
 
-**Tech Stack:** React 18, TypeScript, SVG, d3-geo, world-atlas, Three.js r170/WebGL, Vitest, Testing Library, Playwright/native evidence harnesses, ImageGen.
+**Tech Stack:** React 18, TypeScript, MapLibre GL, react-map-gl, PMTiles, local vector-map styling, Three.js r170/WebGL, Vitest, Testing Library, Playwright/native evidence harnesses, ImageGen.
 
 **Approved visual targets:**
 
 - `docs/designs/2026-08-27-caribbean-encounter-map-concept-v2.png`
 - `docs/designs/2026-08-27-caribbean-battle-concept-v4.png`
 - `docs/games/caribbean-career/visual-references/1732-herman-moll-west-indies.jpg` (geographic/style reference only; not a runtime asset)
+- `docs/designs/2026-08-28-caribbean-current-port-map-gap.png` (rejected current-state evidence)
+- `docs/designs/2026-08-28-caribbean-current-sailing-gap.png` (rejected current-state evidence)
+
+**Authoritative map amendment:**
+`docs/designs/2026-08-28-caribbean-real-map-direction.md`. Where the task text
+below still describes the already-built Natural Earth prototype, the amendment
+supersedes it: reuse its state/accessibility tests, but replace the renderer
+with the local MapLibre/PMTiles architecture.
 
 ## Global constraints
 
@@ -31,23 +39,46 @@
 
 **Files:**
 
-- Create: `src/games/caribbean/components/map/CaribbeanMap.tsx`
-- Create: `src/games/caribbean/components/map/CaribbeanMap.test.tsx`
-- Create: `src/games/caribbean/components/map/mapView.ts`
+- Modify: `src/games/caribbean/components/map/CaribbeanMap.tsx`
+- Modify: `src/games/caribbean/components/map/CaribbeanMap.test.tsx`
+- Modify: `src/games/caribbean/components/map/mapView.ts`
+- Modify: `src/games/caribbean/components/port/PortPage.tsx`
+- Retire: `src/games/caribbean/components/port/CaribbeanChart.tsx`
+- Create: `scripts/caribbean-map-assets.mjs`
+- Create: `src/games/caribbean/assets/maps/eastern-caribbean.asset.json`
+- Add through the asset pipeline: the measured eastern-Caribbean PMTiles pack
+- Modify: `package.json`, `package-lock.json`, and PWA asset inclusion
 
 1. Add failing tests that require:
    - a labelled Caribbean chart region;
-   - real projected land paths from the bundled world atlas;
+   - a local MapLibre style and PMTiles source with no remote URL;
+   - the same coastline source and geographic coordinates in port, departure,
+     and encounter contexts;
    - Bridgetown, the player ship, and Red Jackdaw markers;
    - a dashed route from Bridgetown to the contact;
    - labelled Barbados, St Lucia, Martinique, Dominica, Guadeloupe, and Trinidad context;
    - accessible Zoom in, Zoom out, and Reset view buttons;
-   - wheel zoom, pointer drag/pan, keyboard reset, bounded scale, and deterministic reset state.
-2. Run the focused test and confirm the component is absent or the required behaviors fail.
-3. Implement a pure map-state reducer/helper with bounded zoom and pan.
-4. Render a responsive SVG using a fixed geographic projection and the bundled Natural Earth/world-atlas land data.
-5. Add screen-reader route facts and deterministic test IDs; keep the dense chart drawing decorative.
-6. Rerun the focused tests to GREEN.
+   - wheel/pinch zoom, pointer drag/pan, keyboard pan/zoom/reset, bounded camera,
+     and deterministic context presets; and
+   - offline operation with zero map-related runtime network requests.
+2. Run the focused tests and confirm the current SVG/drawn-chart implementations
+   fail the shared-renderer and local-vector-source requirements.
+3. Add a deterministic extraction script modeled on KubeCon VPP. Pin the
+   Protomaps source snapshot, bbox, zoom range, licenses, bytes, and SHA-256 in
+   `eastern-caribbean.asset.json`; reject packs above the documented budget.
+4. Add MapLibre/react-map-gl/PMTiles dependencies and an inline local style with
+   coastline, land, water, and restrained boundaries only. Do not add a CDN
+   fallback, remote glyphs, sprites, or general POI labels.
+5. Adapt the existing bounded view model into deterministic MapLibre camera
+   presets and render game routes/markers as application-owned GeoJSON/DOM
+   overlays.
+6. Reuse the component in port and departure as well as encounter, then delete
+   the hand-authored `CaribbeanChart`. Keep screen-reader route facts outside
+   the dense visual map.
+7. Add a build/offline test that fails if the map pack is absent, outside the
+   measured size budget, omitted from the PWA, or causes an external request.
+8. Rerun the focused tests to GREEN and inspect the three contexts against the
+   approved concepts and rejected current-gap screenshots.
 
 ## Task 2: Recompose the encounter decision screen
 

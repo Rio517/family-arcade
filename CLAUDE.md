@@ -141,14 +141,37 @@ shared file.
 
 ## Tidewave (in-browser agent tooling)
 
-`.mcp.json` points at `http://localhost:5173/tidewave/mcp`, served by the
-`tidewave()` Vite plugin. Two consequences worth knowing:
+`.mcp.json` (Claude-compatible clients) and project-scoped
+`.codex/config.toml` (Codex clients) both point at
+`http://127.0.0.1:5178/tidewave/mcp`, served by the `tidewave()` Vite plugin.
+Port 5178 is reserved for this repository's Tidewave-enabled development
+server; a separate Caribbean proof-of-concept may use 5173 and must not be
+stopped or mistaken for this worktree.
 
-- **It only works while `npm run dev` is running.** The MCP server is the dev
-  server. No dev server, no Tidewave tools — the session just shows it
+Start the correctly pinned server with:
+
+```sh
+npm run dev:tidewave
+```
+
+`--strictPort` is intentional: if another process owns 5178, startup fails
+instead of silently moving to a port that no longer matches `.mcp.json`.
+
+Three consequences worth knowing:
+
+- **It only works while `npm run dev:tidewave` is running.** The MCP server is
+  the dev server. No dev server, no Tidewave tools — the session just shows it
   disconnected, which is harmless.
 - **MCP servers are read at session start.** Installing or changing one has no
-  effect until Claude Code restarts.
+  effect until the coding-agent session restarts. The project must be trusted
+  for Codex to read `.codex/config.toml`. Start the server first, then
+  restart/reconnect the session.
+- **Tidewave complements, rather than replaces, Playwright.** Use Tidewave for
+  source-aware runtime exploration and real player interactions. Use the
+  connected Playwright MCP for repeatable DOM, geometry, console, network, and
+  screenshot review. Committed regression evidence still belongs in the
+  Playwright/Vitest harnesses (`npm run shots`, `caribbean:port-check`, and
+  `caribbean:naval-check`).
 
 The plugin self-disables for `vite build`; the string `tidewave` appears nowhere
 in `dist/`, so nothing reaches the installed PWA. Re-check that if the plugin is

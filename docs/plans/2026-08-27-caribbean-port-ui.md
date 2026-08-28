@@ -4,16 +4,24 @@
 
 **Goal:** Build the approved Bridgetown port concept: aligned and legible commission fields, a stable chart-led port stage, icon-led full-hit activity tiles, clearer prerequisite states, a roomier Market, and non-jarring Tavern transitions.
 
-**Architecture:** Keep campaign state and event behavior unchanged. Reshape the existing React presentation layer around a fixed-height stage shell and a deterministic, code-native Caribbean chart whose visible marks derive only from existing Red Jackdaw state. Preserve the existing `caribbean-port-check.mjs` evidence boundary, its hash-aware `saveIfChanged` publication, and its setup/port/market/tavern captures; extend assertions to cover the new geometry and truthful chart states.
+**Architecture:** Keep campaign state and event behavior unchanged. Reshape the existing React presentation layer around a fixed-height stage shell. This plan originally delivered a deterministic hand-authored chart as an interim step; the 2026-08-28 amendment replaces that chart with the shared offline MapLibre/PMTiles surface. Preserve the existing `caribbean-port-check.mjs` evidence boundary, its hash-aware `saveIfChanged` publication, and its setup/port/market/tavern captures; extend assertions to cover the new geometry and truthful chart states.
 
 **Tech Stack:** React 19, TypeScript, CSS, Vitest + Testing Library, Playwright-backed Caribbean port evidence harness.
 
 **Spec:** `docs/designs/2026-08-26-caribbean-port-battle-ui-design.md`
 
+> **2026-08-28 map amendment:** Task 2's hand-authored/code-native chart was an
+> interim delivery and is now superseded by
+> `docs/designs/2026-08-28-caribbean-real-map-direction.md`. Future work must
+> replace it with the shared offline MapLibre/PMTiles surface; do not polish or
+> extend the drawn island geometry.
+
 ## Global Constraints
 
 - Preserve the existing campaign schema, reducer, persistence, and event semantics.
-- Use inline/code-native SVG only; no runtime downloads and no invented playable ports.
+- Bundle all runtime assets and make no runtime downloads. Ordinary icons stay
+  code-native SVG; the superseding real map uses the reviewed local
+  MapLibre/PMTiles boundary. Do not invent playable ports.
 - Keep every interactive target at least 44px and all required text at least 14px.
 - Preserve exact focus restoration, Escape dismissal, and screen-reader descriptions.
 - The same content anchor and stage geometry must survive every port tab.

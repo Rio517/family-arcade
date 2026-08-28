@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-26
 
-**Status:** Draft for user review
+**Status:** Approved, with the map architecture amended on 2026-08-28
 
 **Branch:** `codex/caribbean-game`
 
@@ -20,6 +20,12 @@ The finished interface must:
 - give ships visible mass by calming the ocean and concentrating motion at hulls, wakes, and impacts.
 
 ## Approved Visual Direction
+
+> **Map amendment:** The hand-authored port chart and the interim
+> `world-atlas` SVG map are not the final direction. The approved implementation
+> is the shared offline MapLibre/PMTiles surface in
+> [Caribbean Real-Map and Visual-Parity Direction](./2026-08-28-caribbean-real-map-direction.md).
+> That document also preserves the two current-state screenshots Mario rejected.
 
 ### Port
 
@@ -186,6 +192,10 @@ Copy tells the player why the action matters and what unlocks it.
 ## Caribbean Chart
 
 The chart is a first-class navigational explanation, not a decorative list of fictional destinations.
+
+The final chart uses real vector geography through the shared MapLibre/PMTiles
+surface. The old hand-authored Barbados silhouette is an interim artifact to be
+retired, not a visual target.
 
 ### Phase-one truth
 
