@@ -84,6 +84,12 @@ export default defineConfig({
             'preview-battleship': fileURLToPath(
               new URL('./preview-battleship.html', import.meta.url),
             ),
+            'preview-caribbean': fileURLToPath(
+              new URL('./preview-caribbean.html', import.meta.url),
+            ),
+            'preview-caribbean-game': fileURLToPath(
+              new URL('./preview-caribbean-game.html', import.meta.url),
+            ),
           },
         }
       : {},

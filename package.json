@@ -9,6 +9,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:tidewave": "vite --host 127.0.0.1 --port 5178 --strictPort",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
@@ -18,15 +19,19 @@
     "knip": "knip",
     "check": "npm run typecheck && npm run lint && npm run knip",
     "shots": "node scripts/screenshots.mjs",
+    "caribbean:naval-check": "node scripts/caribbean-naval-check.mjs",
+    "caribbean:port-check": "node scripts/caribbean-port-check.mjs",
     "glb": "node scripts/optimize-glb.mjs",
     "risk:drag": "node scripts/risk-drag-check.mjs"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
+    "maplibre-gl": "^5.20.1",
     "peerjs": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-map-gl": "^8.1.0",
     "react-router-dom": "^6.26.2",
     "three": "^0.170.0",
     "topojson-client": "^3.1.0",

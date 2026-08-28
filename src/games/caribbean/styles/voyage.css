@@ -1,0 +1,255 @@
+@import './theme.css';
+
+[data-testid="campaign-route"] {
+  min-width: 0;
+  min-height: 100dvh;
+}
+
+.caribbean-voyage {
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  min-height: 100dvh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: calc(18px + env(safe-area-inset-top)) calc(22px + env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) calc(22px + env(safe-area-inset-left));
+  background: #07151d;
+  color: #f1d6a1;
+}
+
+.caribbean-voyage::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: 0 0 47%;
+  background: #0b3340;
+}
+
+.caribbean-voyage::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 47%;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: #4ec5c1;
+}
+
+.caribbean-voyage-status-rail {
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 52px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #c79a45;
+  background: #07151d;
+  font: 700 14px/1.25 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.caribbean-voyage-status-rail p { margin: 0; color: #4ec5c1; }
+.caribbean-voyage-status-rail strong { color: #f1d6a1; }
+.caribbean-voyage-status-rail span { color: #c79a45; }
+
+.caribbean-voyage--sailing {
+  height: 100dvh;
+  padding: 0;
+  background:
+    radial-gradient(circle at 18% 38%, rgb(55 157 157 / 10%), transparent 34rem),
+    #06141b;
+}
+
+.caribbean-voyage--sailing::before,
+.caribbean-voyage--sailing::after { content: none; }
+
+.caribbean-sailing-layout {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 27vw);
+  gap: 12px;
+  padding: 10px 12px 12px;
+}
+
+.caribbean-voyage-decision {
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+  padding: clamp(24px, 4vh, 42px) clamp(20px, 2.4vw, 36px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgb(68 161 161 / 18%);
+  border-left: 3px solid #c79a45;
+  background: linear-gradient(160deg, rgb(10 40 49 / 96%), rgb(4 18 25 / 99%));
+  box-shadow: inset 4px 0 0 rgb(60 169 169 / 8%), 0 18px 48px rgb(0 0 0 / 28%);
+}
+
+.caribbean-voyage-bearing {
+  margin: 0 0 9px;
+  color: #4ec5c1;
+  font: 700 14px/1.2 ui-monospace, "SFMono-Regular", monospace;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.caribbean-voyage-decision h1 {
+  margin: 0 0 13px;
+  color: #f1d6a1;
+  font: 600 clamp(36px, 4.3vw, 62px)/.9 "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  letter-spacing: -.02em;
+  text-transform: uppercase;
+}
+.caribbean-voyage-decision h1:focus { outline: none; }
+.caribbean-voyage-decision p:not(.caribbean-voyage-bearing) {
+  margin: 8px 0;
+  max-width: 58ch;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.caribbean-voyage-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.caribbean-voyage-action {
+  min-height: 44px;
+  margin-top: 10px;
+  padding: 0 18px;
+  border: 1px solid #4ec5c1;
+  border-radius: 0;
+  background: #0b3340;
+  color: #f1d6a1;
+  font: 750 14px/1 "Avenir Next", sans-serif;
+  cursor: pointer;
+}
+.caribbean-voyage-action:hover { background: #4ec5c1; color: #07151d; }
+.caribbean-voyage-action:focus-visible { outline: 3px solid var(--caribbean-trade-wind); outline-offset: 3px; }
+.caribbean-voyage-action:disabled { opacity: .55; cursor: wait; }
+.caribbean-voyage-status { min-height: 21px; color: #c79a45; }
+
+.caribbean-persistence-dialog {
+  border-top: 3px solid #d94b3d;
+  box-shadow: 0 0 0 100vmax color-mix(in srgb, #07151d 76%, transparent), 0 28px 100px #07151d;
+}
+
+@media (max-height: 760px) {
+  .caribbean-voyage-decision { padding-block: 18px; }
+  .caribbean-voyage-decision h1 { font-size: clamp(34px, 3.7vw, 52px); }
+}
+
+/* The encounter is a chart-first decision surface rather than a decorative voyage card. */
+.caribbean-voyage--encounter {
+  height: 100dvh;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 0;
+  background:
+    radial-gradient(circle at 24% 42%, rgba(35, 108, 109, .12), transparent 34rem),
+    #06141b;
+}
+.caribbean-voyage--encounter::before,
+.caribbean-voyage--encounter::after { content: none; }
+.caribbean-voyage--encounter .caribbean-voyage-status-rail {
+  min-height: 56px;
+  padding-inline: clamp(20px, 2vw, 34px);
+  border: 1px solid color-mix(in srgb, var(--caribbean-brass) 48%, transparent);
+  background: #06141b;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .22);
+}
+.caribbean-encounter-layout {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 25vw);
+  gap: 12px;
+  padding: 10px 12px 12px;
+}
+
+.caribbean-encounter-decision {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: clamp(18px, 2.3vh, 24px) clamp(18px, 2vw, 28px) 14px;
+  border: 1px solid rgba(68, 161, 161, .18);
+  background: linear-gradient(160deg, rgba(10, 40, 49, .94), rgba(4, 18, 25, .98));
+  box-shadow: inset 4px 0 0 rgba(60, 169, 169, .08);
+}
+.caribbean-encounter-decision .caribbean-voyage-bearing { margin-bottom: 8px; }
+.caribbean-encounter-decision h1 {
+  margin: 0 0 clamp(12px, 2vh, 18px);
+  padding-bottom: clamp(12px, 2vh, 18px);
+  border-bottom: 1px solid rgba(61, 169, 170, .2);
+  color: #f0d59e;
+  font: 700 clamp(38px, 3.8vw, 58px)/.9 "Avenir Next Condensed", "Roboto Condensed", sans-serif;
+  letter-spacing: -.02em;
+  text-transform: uppercase;
+}
+.caribbean-encounter-decision h1 span { display: block; color: #e05a4b; }
+.caribbean-encounter-facts { margin: 0 0 clamp(12px, 2vh, 18px); }
+.caribbean-encounter-facts div { display: grid; grid-template-columns: 90px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(61, 169, 170, .22); }
+.caribbean-encounter-facts dt { color: #42b8b6; font: 800 14px/1.3 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
+.caribbean-encounter-facts dd { margin: 0; color: #f0d59e; font: 700 14px/1.3 ui-monospace, monospace; text-transform: uppercase; }
+.caribbean-encounter-decision .caribbean-voyage-actions { display: grid; gap: 12px; }
+.caribbean-voyage-choice { min-width: 0; }
+.caribbean-voyage-choice > button {
+  width: 100%;
+  min-height: 132px;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 15px 18px;
+  border: 2px solid #3aabaa;
+  border-radius: 3px;
+  background: rgba(7, 29, 37, .82);
+  color: #efd39a;
+  text-align: left;
+  cursor: pointer;
+}
+.caribbean-voyage-choice--pursue > button { border-color: #d64a3c; }
+.caribbean-voyage-choice > button:hover { background: rgba(24, 67, 73, .72); }
+.caribbean-voyage-choice > button:focus-visible { outline: 3px solid #f0d59e; outline-offset: 3px; }
+.caribbean-voyage-choice > button:disabled { opacity: .55; cursor: wait; }
+.caribbean-voyage-choice__icon { width: 58px; height: 58px; fill: none; stroke: #3aabaa; stroke-width: 2.4; }
+.caribbean-voyage-choice--pursue .caribbean-voyage-choice__icon { stroke: #c49339; }
+.caribbean-voyage-choice__copy { min-width: 0; display: grid; gap: 6px; }
+.caribbean-voyage-choice__copy h2 { margin: 0; color: #4fc1bf; font: 750 23px/.95 "Avenir Next Condensed", sans-serif; text-transform: uppercase; }
+.caribbean-voyage-choice--pursue h2 { color: #e05a4b; }
+.caribbean-voyage-choice__copy strong { color: #e9c47d; font: 800 14px/1.2 ui-monospace, monospace; letter-spacing: .05em; text-transform: uppercase; }
+.caribbean-voyage-choice__copy > span { color: rgba(240, 213, 158, .8); font: 500 14px/1.35 "Avenir Next", sans-serif; }
+.caribbean-encounter-decision .caribbean-voyage-status { margin: 8px 0 0; min-height: 18px; color: #e9c47d; font-size: 14px; }
+
+@media (max-width: 1100px), (max-height: 700px) {
+  .caribbean-encounter-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 34vw);
+    gap: 8px;
+    padding: 8px 10px 10px;
+  }
+
+  .caribbean-encounter-decision { padding: 12px 14px 8px; }
+  .caribbean-encounter-decision .caribbean-voyage-bearing { margin-bottom: 4px; }
+  .caribbean-encounter-decision h1 {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    font-size: clamp(32px, 3.6vw, 40px);
+  }
+  .caribbean-encounter-facts { margin-bottom: 8px; }
+  .caribbean-encounter-facts div {
+    grid-template-columns: 82px 1fr;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .caribbean-encounter-decision .caribbean-voyage-actions { gap: 8px; }
+  .caribbean-voyage-choice > button {
+    min-height: 112px;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  .caribbean-voyage-choice__icon { width: 46px; height: 46px; }
+  .caribbean-voyage-choice__copy { gap: 4px; }
+  .caribbean-voyage-choice__copy h2 { font-size: 20px; }
+  .caribbean-encounter-decision .caribbean-voyage-status { margin-top: 4px; }
+}

@@ -27,6 +27,24 @@ describe('normalizeUsersState', () => {
     expect(state.users[0].profile.name).toBe('Rio');
     expect(state.activeId).toBeNull();
   });
+
+  it('keeps pronouns independent when stored players are normalized and switched', () => {
+    let state = normalizeUsersState({
+      users: [
+        { id: 'rio', createdAt: 1, profile: { name: 'Rio', pronouns: 'they/them' } },
+        { id: 'klara', createdAt: 2, profile: { name: 'Klara', pronouns: 'she/her' } },
+      ],
+      activeId: 'rio',
+    });
+
+    expect(activeProfile(state)).toMatchObject({ name: 'Rio', pronouns: 'they/them' });
+    state = setActiveUser(state, 'klara');
+    expect(activeProfile(state)).toMatchObject({ name: 'Klara', pronouns: 'she/her' });
+    expect(state.users).toEqual([
+      expect.objectContaining({ id: 'rio', profile: expect.objectContaining({ pronouns: 'they/them' }) }),
+      expect.objectContaining({ id: 'klara', profile: expect.objectContaining({ pronouns: 'she/her' }) }),
+    ]);
+  });
 });
 
 describe('migrateDeviceProfile', () => {

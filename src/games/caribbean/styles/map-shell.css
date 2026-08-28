@@ -1,0 +1,73 @@
+.caribbean-map.caribbean-map--maplibre {
+  position: relative;
+  min-width: 0;
+  min-height: 390px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--caribbean-brass) 76%, #332413);
+  border-radius: 4px;
+  color: #281e14;
+  background:
+    linear-gradient(104deg, transparent 0 46%, rgb(90 57 29 / 8%) 47%, transparent 49%),
+    var(--caribbean-port-chart-material, #d2c296);
+  box-shadow:
+    0 24px 52px rgb(1 10 15 / 45%),
+    0 0 0 3px #5d4526,
+    0 0 0 5px color-mix(in srgb, var(--caribbean-brass) 70%, #2c1b0d),
+    inset 0 0 34px rgb(45 30 14 / 32%);
+  isolation: isolate;
+}
+
+.caribbean-map--maplibre::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  opacity: 0.24;
+  background:
+    repeating-linear-gradient(9deg, transparent 0 34px, rgb(71 45 21 / 8%) 35px, transparent 36px),
+    radial-gradient(circle at 17% 20%, rgb(255 247 209 / 24%), transparent 20rem);
+  mix-blend-mode: multiply;
+}
+
+.caribbean-map--maplibre .caribbean-map__loading {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  color: #f0dcaa;
+  text-align: center;
+  background: #173a40;
+}
+
+.caribbean-map--maplibre .caribbean-map__loading > span {
+  width: 36px;
+  height: 36px;
+  border: 2px solid rgb(240 220 170 / 28%);
+  border-top-color: #e5c375;
+  border-radius: 50%;
+  animation: caribbean-chart-sounding 900ms linear infinite;
+}
+
+.caribbean-map--maplibre .caribbean-map__loading p {
+  margin: 0;
+  font: 800 10px/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+@keyframes caribbean-chart-sounding { to { transform: rotate(1turn); } }
+
+@media (max-width: 1080px), (max-height: 700px) {
+  .caribbean-map.caribbean-map--maplibre { min-height: 320px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caribbean-map--maplibre .caribbean-map__loading > span { animation: none; }
+}

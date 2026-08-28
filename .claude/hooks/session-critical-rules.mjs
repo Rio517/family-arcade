@@ -21,16 +21,23 @@ const CONTEXT = `Family Arcade — critical session rules (read before any tool 
 3. VERIFY: \`npm run check\` (tsc + eslint + knip), \`npx vitest run\`, and
    \`npm run build\` must all be clean. The real typecheck is the \`tsc -b\` in
    build — delete stray *.tsbuildinfo before trusting it.
-4. PROVE UI IN A BROWSER: \`npm run shots\` builds, serves, and screenshots into
+4. TIDEWAVE FIRST: for application, UI, and TypeScript work, confirm and use
+   the project Tidewave MCP for source-aware inspection, runtime evaluation,
+   logs, and real-player interactions. Reuse port 5178; if browser control is
+   disconnected, connect /tidewave in the user's main Chrome profile. Keep
+   Playwright for repeatable viewport, DOM, network, and screenshot evidence.
+5. PROVE UI IN A BROWSER: \`npm run shots\` builds, serves, and screenshots into
    docs/screenshots/. Screenshots in a PR get committed with the change.
-5. OFFLINE INVARIANT: no runtime downloads — no CDN fonts, no fetched models,
-   no remote images. Bundle assets through Vite so they hash into dist/.
-6. DETERMINISM: seeded LCGs for anything generated that affects appearance or
+6. OFFLINE INVARIANT: no CDN fonts, fetched models, or remote images. The sole
+   exception is the Caribbean map's approved OpenFreeMap vector tiles/glyphs:
+   keep its style local, show an explicit network-unavailable state, and never
+   add PMTiles or a tile-extraction pipeline.
+7. DETERMINISM: seeded LCGs for anything generated that affects appearance or
    tests. No Math.random in scene or game code.
-7. ACCESSIBILITY FLOOR: interactive elements get data-testid and a keyboard
+8. ACCESSIBILITY FLOOR: interactive elements get data-testid and a keyboard
    path; dialogs close on Escape (useDismissOnEscape); animations sit behind
    prefers-reduced-motion; SVG icons, never emoji; pronouns default to they/them.
-8. Big visual changes are pitched as mockups first — the family picks, then
+9. Big visual changes are pitched as mockups first — the family picks, then
    you build.
 
 Canonical references: CLAUDE.md (durable rules) · NEXT_STEP.md (what's queued)

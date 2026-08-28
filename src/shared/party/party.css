@@ -17,6 +17,7 @@
 .party-pill {
   display: inline-flex;
   align-items: center;
+  min-height: 44px;
   gap: 8px;
   border: 1px solid var(--border, #475569);
   background: color-mix(in srgb, var(--surface, #1e293b) 92%, transparent);

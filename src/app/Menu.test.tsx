@@ -1,6 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { createCampaign } from '@games/caribbean/domain/createCampaign';
+import { createJournal } from '@games/caribbean/domain/replay';
+import { saveCampaign } from '@games/caribbean/storage/persistence';
 import { Menu } from './Menu';
 import { GAMES } from './registry';
 
@@ -14,6 +17,7 @@ function renderMenu() {
 
 describe('<Menu> — the arcade landing page', () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
 
   it('lists every registry game (and Yahtzee) as a ticket', () => {
     renderMenu();
@@ -95,5 +99,75 @@ describe('<Menu> — the arcade landing page', () => {
     localStorage.setItem('chess:local:v1', '{not json');
     renderMenu();
     expect(screen.queryByTestId('resume-chess-local')).toBeNull();
+  });
+
+  it('registers Caribbean immediately after Magic Coins with its exact descriptor', () => {
+    const unicornIndex = GAMES.findIndex((game) => game.id === 'unicorn');
+    expect(GAMES[unicornIndex + 1]).toMatchObject({
+      id: 'caribbean',
+      title: 'Caribbean Career',
+      tag: '3D battles',
+      players: { min: 1, max: 1 },
+      computer: true,
+      path: '/caribbean',
+      description: 'Trade, chase rumours, and command a growing fleet across the Caribbean.',
+      releaseStatus: 'under-construction',
+    });
+  });
+
+  it('marks Caribbean as under construction without disabling play', () => {
+    renderMenu();
+
+    const ticket = screen.getByTestId('game-ticket-caribbean');
+    expect(ticket).toHaveAttribute('href', '/caribbean');
+    expect(ticket).toHaveAttribute('data-release-status', 'under-construction');
+    expect(ticket).toHaveTextContent('Under construction · playable');
+  });
+
+  it('reads a Caribbean Save Station row without writing and links to clean resume', () => {
+    const result = saveCampaign(
+      localStorage,
+      createJournal(createCampaign({ seed: 1702, name: 'Morgan', length: 'voyage' })),
+      {
+        build: 'fixture',
+        savedAt: 100,
+        expectedRevision: { currentRaw: null, previousRaw: null },
+      },
+    );
+    if (!result.ok) throw new Error(`fixture save failed: ${result.reason}`);
+    const writes = vi.spyOn(Storage.prototype, 'setItem');
+    const descriptor = GAMES.find((game) => game.id === 'caribbean');
+
+    expect(descriptor?.savedGames?.()).toEqual([expect.objectContaining({
+      key: 'caribbean',
+      to: '/caribbean?resume=1',
+      color: '#4ec5c1',
+      title: 'Caribbean Career — Morgan',
+      meta: 'Voyage · Bridgetown · 3.4 months provisions',
+    })]);
+    expect(writes).not.toHaveBeenCalled();
+
+    renderMenu();
+    const row = screen.getByTestId('resume-caribbean');
+    expect(row).toHaveTextContent('Caribbean Career — Morgan');
+    expect(row).toHaveTextContent('Voyage · Bridgetown · 3.4 months provisions');
+    expect(row.getAttribute('href')).toContain('/caribbean?resume=1');
+    writes.mockRestore();
+  });
+
+  it('returns no Caribbean Save Station row when storage access throws', () => {
+    const property = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    const denied = new DOMException('Storage denied', 'SecurityError');
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() { throw denied; },
+    });
+    try {
+      const descriptor = GAMES.find((game) => game.id === 'caribbean');
+      expect(descriptor?.savedGames?.()).toEqual([]);
+    } finally {
+      if (property) Object.defineProperty(window, 'localStorage', property);
+      else Reflect.deleteProperty(window, 'localStorage');
+    }
   });
 });

@@ -1,0 +1,218 @@
+@import './theme.css';
+
+.caribbean-minimum-screen {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: var(--caribbean-deep-keel);
+  color: var(--caribbean-sailcloth);
+  text-align: center;
+}
+
+.caribbean-minimum-screen:focus { outline: 3px solid var(--caribbean-trade-wind); outline-offset: -8px; }
+.caribbean-minimum-screen p { max-width: 520px; font: 700 16px/1.6 ui-monospace, "SFMono-Regular", monospace; }
+
+.caribbean-production {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 18% 46%, color-mix(in srgb, var(--caribbean-trade-wind) 12%, transparent), transparent 36%),
+    var(--caribbean-deep-keel);
+}
+
+.caribbean-manifest {
+  position: relative;
+  min-height: 94px;
+  margin: 0 clamp(28px, 5vw, 76px);
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-brass) 52%, transparent);
+}
+
+.caribbean-manifest > div { display: flex; align-items: baseline; gap: 16px; }
+.caribbean-manifest strong {
+  font: 600 clamp(25px, 2.4vw, 36px)/1 "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.caribbean-manifest span,
+.caribbean-manifest p,
+.caribbean-place-line,
+.caribbean-diagnostic,
+.caribbean-commission-panel dt {
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 58%, var(--caribbean-trade-wind));
+  font: 700 14px/1.3 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.caribbean-manifest p { margin: 0; color: var(--caribbean-trade-wind); }
+.caribbean-course-axis {
+  position: absolute;
+  left: 11%;
+  bottom: -1px;
+  width: 34%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--caribbean-brass) 16% 84%, transparent);
+  transform: none;
+}
+.caribbean-course-axis::before,
+.caribbean-course-axis::after { content: ""; position: absolute; width: 1px; height: 12px; top: -5px; background: var(--caribbean-brass); }
+.caribbean-course-axis::before { left: 18%; }
+.caribbean-course-axis::after { right: 18%; }
+
+.caribbean-production-main {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(230px, .62fr) minmax(540px, 1.38fr);
+  align-items: stretch;
+  margin: 0 clamp(28px, 5vw, 76px);
+}
+.caribbean-production-main::before {
+  content: "BRG  ·  COMMISSION  /  COURSE 240°";
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding-right: clamp(28px, 5vw, 72px);
+  border-right: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 20%, transparent);
+  color: color-mix(in srgb, var(--caribbean-brass) 74%, transparent);
+  font: 700 14px/1.5 ui-monospace, "SFMono-Regular", monospace;
+  letter-spacing: .16em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+.caribbean-production-main > section { min-width: 0; }
+.caribbean-commission-panel,
+.caribbean-recovery-panel,
+.caribbean-ready {
+  position: relative;
+  align-self: center;
+  padding: clamp(28px, 5vh, 56px) clamp(34px, 6vw, 88px);
+}
+.caribbean-commission-content,
+.caribbean-recovery-content { max-width: 720px; }
+.caribbean-place-line { margin: 0 0 15px; color: var(--caribbean-brass); }
+.caribbean-production h1 {
+  margin: 0 0 16px;
+  font: 500 clamp(42px, 5.8vw, 76px)/.9 "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  letter-spacing: -.025em;
+  text-transform: uppercase;
+}
+.caribbean-production h2 {
+  margin: 0 0 12px;
+  font: 600 28px/1 "Avenir Next Condensed", "Roboto Condensed", sans-serif;
+  text-transform: uppercase;
+}
+.caribbean-intro,
+.caribbean-recovery-content > p,
+.caribbean-ready > p { max-width: 620px; color: color-mix(in srgb, var(--caribbean-sailcloth) 72%, transparent); line-height: 1.55; }
+
+.caribbean-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 22px; margin: 28px 0; }
+.caribbean-field { display: grid; grid-template-rows: 20px 48px minmax(20px, auto); gap: 7px; }
+.caribbean-field label { font-size: 16px; font-weight: 700; line-height: 20px; }
+.caribbean-form-grid input,
+.caribbean-form-grid select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 35%, transparent);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--caribbean-harbor-glass) 58%, transparent);
+  color: var(--caribbean-sailcloth);
+  font: 600 16px/1 "Avenir Next", sans-serif;
+}
+.caribbean-form-grid input[aria-invalid="true"] { border-color: var(--caribbean-signal-red); }
+.caribbean-field-error { color: color-mix(in srgb, var(--caribbean-signal-red) 80%, white); font-size: 14px; }
+.caribbean-field-help { color: color-mix(in srgb, var(--caribbean-sailcloth) 58%, transparent); font-size: 14px; line-height: 1.35; }
+
+.caribbean-production button {
+  min-height: 46px;
+  padding: 0 17px;
+  border: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 48%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--caribbean-sailcloth);
+  font: 750 14px/1 "Avenir Next", sans-serif;
+  cursor: pointer;
+}
+.caribbean-production button:hover { border-color: var(--caribbean-trade-wind); }
+.caribbean-production button:focus-visible,
+.caribbean-form-grid input:focus-visible,
+.caribbean-form-grid select:focus-visible { outline: 3px solid var(--caribbean-trade-wind); outline-offset: 3px; }
+.caribbean-production button:disabled { opacity: .48; cursor: wait; }
+.caribbean-production .caribbean-button-primary { border-color: var(--caribbean-trade-wind); background: var(--caribbean-trade-wind); color: var(--caribbean-deep-keel); font-size: 17px; }
+.caribbean-production .caribbean-button-danger { border-color: var(--caribbean-signal-red); color: color-mix(in srgb, var(--caribbean-signal-red) 76%, white); }
+.caribbean-action-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+
+.caribbean-save-summary dl { margin: 28px 0; border-top: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 22%, transparent); }
+.caribbean-save-summary dl div { display: grid; grid-template-columns: 110px 1fr; gap: 18px; padding: 12px 0; border-bottom: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 15%, transparent); }
+.caribbean-save-summary dd { margin: 0; }
+.caribbean-summary-course { color: var(--caribbean-trade-wind); font-weight: 700; }
+.caribbean-save-time { color: var(--muted); font: 14px/1.4 ui-monospace, monospace; }
+
+.caribbean-alert,
+.caribbean-status {
+  margin-top: 24px;
+  padding: 16px 18px;
+  border-left: 2px solid var(--caribbean-signal-red);
+  background: color-mix(in srgb, var(--caribbean-harbor-glass) 56%, transparent);
+  color: var(--caribbean-sailcloth);
+}
+.caribbean-alert p,
+.caribbean-status p { margin: 0; line-height: 1.5; }
+.caribbean-status { border-left-color: var(--caribbean-brass); }
+.caribbean-diagnostic { color: var(--caribbean-brass); overflow-wrap: anywhere; }
+.caribbean-memory-warning { position: fixed; right: 24px; bottom: 24px; z-index: 3; max-width: 390px; box-shadow: 0 16px 52px rgb(0 0 0 / 38%); }
+
+.caribbean-dialog {
+  position: fixed;
+  z-index: 10;
+  inset: 50% auto auto 50%;
+  width: min(520px, calc(100vw - 48px));
+  padding: 28px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--caribbean-brass);
+  background: var(--caribbean-deep-keel);
+  box-shadow: 0 28px 100px rgb(0 0 0 / 68%);
+}
+.caribbean-dialog p { color: color-mix(in srgb, var(--caribbean-sailcloth) 72%, transparent); line-height: 1.5; }
+.caribbean-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+
+@media (max-height: 700px) {
+  .caribbean-production:not(.caribbean-production--campaign) {
+    height: 100dvh;
+  }
+
+  body:has(.caribbean-production:not(.caribbean-production--campaign)) .party-root {
+    left: max(12px, env(safe-area-inset-left));
+    transform: none;
+  }
+
+  .caribbean-commission-panel,
+  .caribbean-recovery-panel {
+    align-self: stretch;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .caribbean-manifest { min-height: 74px; }
+  .caribbean-commission-panel,
+  .caribbean-recovery-panel,
+  .caribbean-ready { padding-block: 22px; }
+  .caribbean-production h1 { font-size: clamp(36px, 5vw, 58px); }
+  .caribbean-form-grid { margin-block: 18px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .caribbean-course-axis { animation: caribbean-course-reveal 700ms cubic-bezier(.2,.8,.2,1) both; }
+  .caribbean-production button { transition: color 120ms, border-color 120ms, background 120ms; }
+}
+
+@keyframes caribbean-course-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }

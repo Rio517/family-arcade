@@ -23,19 +23,24 @@ nothing needs a manual. Big visual changes are pitched as **mockups first**
   replaying an ordered log; online peers reconcile by "longer log wins".
   Consequences: undo/rewind are LOCAL-ONLY; custom starting positions are
   LOCAL-ONLY; never make an online feature that rewrites history.
-- **Offline PWA.** No runtime downloads: no CDN fonts, no fetched 3D models,
-  no remote images. 3D is procedural three.js geometry (lathe/extrude/cones/
-  canvas textures generated in code). three.js loads via `React.lazy` so 2D
-  players never download it; chess and battleship share that chunk.
+- **Offline PWA, with one deliberate map exception.** No CDN fonts, fetched 3D
+  models, or remote images. The Caribbean real map intentionally loads
+  approved OpenFreeMap vector tiles/glyphs at runtime, uses a repository-owned
+  style, and shows a clear network-unavailable state. Never bundle PMTiles or
+  add a tile-extraction pipeline. 3D is procedural three.js geometry (lathe/
+  extrude/cones/canvas textures generated in code). three.js loads via
+  `React.lazy` so 2D players never download it; chess and battleship share that
+  chunk.
 - **Determinism.** Seeded LCGs for any generated scenery/randomness that
   affects appearance or tests (starfields, clouds, hull plates, dice bags).
 - **Accessibility floors.** Every animation is gated behind
   `prefers-reduced-motion`; interactive elements get `data-testid`, a keyboard
   path, and visible `:focus-visible` states; every dialog closes on Escape via
   `@shared/ui/useDismissOnEscape`; text is 14px or larger; icons are SVG, never
-  emoji; pronouns for people default to they/them. `npm run check` enforces the
-  JSX side of this — if you must silence a jsx-a11y rule, do it per-line with a
-  comment saying why, never globally.
+  emoji. Authored prose about people defaults to they/them, while persisted
+  product profiles default to he/him. `npm run check` enforces the JSX side of
+  this — if you must silence a jsx-a11y rule, do it per-line with a comment
+  saying why, never globally.
 
 ## Git & PR workflow (the #1 source of wasted work)
 
@@ -140,14 +145,47 @@ shared file.
 
 ## Tidewave (in-browser agent tooling)
 
-`.mcp.json` points at `http://localhost:5173/tidewave/mcp`, served by the
-`tidewave()` Vite plugin. Two consequences worth knowing:
+`.mcp.json` (Claude-compatible clients) and project-scoped
+`.codex/config.toml` (Codex clients) both point at
+`http://127.0.0.1:5178/tidewave/mcp`, served by the `tidewave()` Vite plugin.
+Port 5178 is reserved for this repository's Tidewave-enabled development
+server; a separate Caribbean proof-of-concept may use 5173 and must not be
+stopped or mistaken for this worktree.
 
-- **It only works while `npm run dev` is running.** The MCP server is the dev
-  server. No dev server, no Tidewave tools — the session just shows it
+Start the correctly pinned server with:
+
+```sh
+npm run dev:tidewave
+```
+
+`--strictPort` is intentional: if another process owns 5178, startup fails
+instead of silently moving to a port that no longer matches `.mcp.json`.
+
+Three consequences worth knowing:
+
+- **It only works while `npm run dev:tidewave` is running.** The MCP server is
+  the dev server. No dev server, no Tidewave tools — the session just shows it
   disconnected, which is harmless.
 - **MCP servers are read at session start.** Installing or changing one has no
-  effect until Claude Code restarts.
+  effect until the coding-agent session restarts. The project must be trusted
+  for Codex to read `.codex/config.toml`. Start the server first, then
+  restart/reconnect the session.
+- **Use Tidewave first for application, UI, and TypeScript work.** Confirm the
+  MCP connection, then use Tidewave for source-aware discovery, runtime
+  evaluation, logs, and real-player interactions before reaching for generic
+  inspection tools. If browser control reports that no browser is connected,
+  open `http://127.0.0.1:5178/tidewave` in the user's main Chrome profile and
+  reconnect it. Do not open a different Chrome profile for Tidewave work.
+- **Reuse the server on port 5178.** Do not start another Vite server when the
+  Tidewave server is already running, and do not stop or repurpose unrelated
+  servers on other ports. If Tidewave is unavailable, report that explicitly,
+  preserve the current server state, and continue with source/tests when the
+  task permits.
+- **Tidewave complements, rather than replaces, Playwright.** Use the connected
+  Playwright MCP for repeatable viewport, DOM, geometry, console, network, and
+  screenshot review. Committed regression evidence still belongs in the
+  Playwright/Vitest harnesses (`npm run shots`, `caribbean:port-check`, and
+  `caribbean:naval-check`).
 
 The plugin self-disables for `vite build`; the string `tidewave` appears nowhere
 in `dist/`, so nothing reaches the installed PWA. Re-check that if the plugin is

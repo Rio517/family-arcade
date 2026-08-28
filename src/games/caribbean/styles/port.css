@@ -1,0 +1,1094 @@
+@import './theme.css';
+
+.caribbean-production--port {
+  display: block;
+  overflow: hidden;
+}
+
+.caribbean-port {
+  --caribbean-port-art-focal-x: 58%;
+  --caribbean-port-art-focal-y: 50%;
+  position: fixed;
+  inset: 0;
+  isolation: isolate;
+  min-width: 960px;
+  min-height: 600px;
+  display: grid;
+  grid-template-rows: 70px minmax(0, 1fr);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 72% 18%, color-mix(in srgb, var(--caribbean-sailcloth) 45%, transparent), transparent 31%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--caribbean-trade-wind) 58%, var(--caribbean-sailcloth)) 0%,
+      color-mix(in srgb, var(--caribbean-trade-wind) 66%, var(--caribbean-harbor-glass)) 44%,
+      var(--caribbean-harbor-glass) 58%,
+      var(--caribbean-deep-keel) 100%
+    );
+  color: var(--caribbean-sailcloth);
+  font-size: 16px;
+}
+
+.caribbean-port-backdrop {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 72% 18%, color-mix(in srgb, var(--caribbean-sailcloth) 45%, transparent), transparent 31%),
+    linear-gradient(180deg, var(--caribbean-trade-wind), var(--caribbean-harbor-glass) 58%, var(--caribbean-deep-keel));
+}
+
+.caribbean-port-backdrop img {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--caribbean-port-art-focal-x) var(--caribbean-port-art-focal-y);
+  opacity: 0;
+}
+
+.caribbean-port-backdrop--loaded img {
+  opacity: 1;
+}
+
+.caribbean-port-backdrop--fallback img {
+  display: none;
+}
+
+.caribbean-port-backdrop--loaded::before,
+.caribbean-port-backdrop--loaded::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+}
+
+.caribbean-port-backdrop--loaded::before {
+  background: rgba(7, 21, 29, .22);
+}
+
+.caribbean-port-backdrop--loaded::after {
+  background: rgba(244, 224, 184, .04);
+}
+
+.caribbean-port-status-rail {
+  position: relative;
+  z-index: 4;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: clamp(244px, 20vw, 288px) minmax(0, 1fr);
+  align-items: stretch;
+  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-brass) 58%, transparent);
+  background:
+    linear-gradient(rgb(3 15 21 / 94%), rgb(3 15 21 / 94%)),
+    var(--caribbean-port-panel-material) center / 320px 320px repeat,
+    #07151d;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 24%);
+}
+
+.caribbean-port-position {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 36px auto auto;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 10px;
+  padding: 14px 12px;
+  border-right: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 22%, transparent);
+  text-transform: uppercase;
+}
+
+.caribbean-port-status-icon {
+  width: 30px;
+  height: 30px;
+  grid-row: 1 / span 2;
+  align-self: center;
+  fill: color-mix(in srgb, var(--caribbean-brass) 12%, transparent);
+  stroke: var(--caribbean-brass);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 4px rgb(0 0 0 / 45%));
+}
+
+.caribbean-port-position span,
+.caribbean-port-position strong {
+  white-space: nowrap;
+}
+
+.caribbean-port-position span {
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.caribbean-port-position strong,
+.caribbean-port-status-rail dt,
+.caribbean-port-bearing,
+.caribbean-port-captain {
+  color: var(--caribbean-brass);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.caribbean-port-status-rail dl {
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: .75fr .76fr .82fr 1.55fr 1.02fr;
+}
+
+.caribbean-port-status-rail dl div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-content: center;
+  gap: 4px;
+  padding: 9px 14px;
+  border-right: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 15%, transparent);
+}
+
+.caribbean-port-status-rail dl .caribbean-port-status-icon {
+  grid-column: 1;
+}
+
+.caribbean-port-status-rail dt,
+.caribbean-port-status-rail dd {
+  grid-column: 2;
+}
+
+.caribbean-port-status-rail dt {
+  overflow: hidden;
+  background: #07151d;
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 55%, var(--caribbean-trade-wind));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caribbean-port-status-rail dd {
+  margin: 0;
+  overflow: hidden;
+  background: #07151d;
+  color: var(--caribbean-sailcloth);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caribbean-port-horizon {
+  position: absolute;
+  z-index: 1;
+  inset: 70px 0 88px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.caribbean-port-horizon::before {
+  content: "";
+  position: absolute;
+  top: 49%;
+  left: 4vw;
+  right: 4vw;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--caribbean-brass) 78%, transparent) 9% 91%, transparent);
+}
+
+.caribbean-port-stage {
+  position: relative;
+  z-index: 2;
+  width: min(1580px, calc(100% - 48px));
+  height: min(690px, calc(100% - 42px));
+  min-height: 0;
+  align-self: start;
+  justify-self: center;
+  margin-block-start: clamp(24px, 5vh, 70px);
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(340px, .85fr);
+  gap: clamp(20px, 2.4vw, 38px);
+  padding: 20px clamp(18px, 2.2vw, 34px) 22px;
+  background: transparent;
+}
+
+.caribbean-port-primary {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto auto 112px minmax(0, 1fr);
+  align-content: start;
+}
+
+.caribbean-port-captain {
+  width: fit-content;
+  margin: 0 0 8px;
+  padding: 4px 7px;
+  background: #07151d;
+  color: var(--caribbean-trade-wind);
+}
+
+.caribbean-port-stage h1 {
+  width: fit-content;
+  min-block-size: 1.4em;
+  margin: 0;
+  padding: 3px 10px 6px;
+  background:
+    linear-gradient(rgb(3 15 21 / 91%), rgb(3 15 21 / 91%)),
+    var(--caribbean-port-panel-material) center / 320px 320px repeat,
+    #07151d;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 28%);
+  font-family: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  font-size: clamp(48px, 7vw, 82px);
+  font-weight: 570;
+  letter-spacing: -.025em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.caribbean-port-activity {
+  min-width: 0;
+  min-height: 0;
+  margin-top: 12px;
+  padding: 15px 17px 17px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-color: color-mix(in srgb, var(--caribbean-brass) 65%, transparent) transparent;
+  border: 1px solid color-mix(in srgb, var(--caribbean-brass) 48%, transparent);
+  border-top: 2px solid color-mix(in srgb, var(--caribbean-brass) 78%, transparent);
+  background:
+    linear-gradient(rgb(3 15 21 / 91%), rgb(3 15 21 / 91%)),
+    var(--caribbean-port-panel-material) center / 320px 320px repeat,
+    #07151d;
+  box-shadow:
+    inset 0 0 0 3px rgb(241 188 82 / 7%),
+    0 18px 42px rgb(0 0 0 / 30%);
+}
+
+.caribbean-port-activity--menu {
+  min-height: 0;
+  align-self: start;
+}
+
+.caribbean-port-bearing {
+  width: fit-content;
+  margin: 0 0 8px;
+  padding: 4px 7px;
+  background: #07151d;
+}
+
+.caribbean-port-activity h2 {
+  width: fit-content;
+  margin: 0 0 12px;
+  padding: 0 0 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-brass) 36%, transparent);
+  background: #07151d;
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  font-size: clamp(27px, 3.2vw, 39px);
+  font-weight: 650;
+  letter-spacing: .01em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.caribbean-port-activity h2:focus-visible {
+  outline: 3px solid var(--caribbean-trade-wind);
+  outline-offset: 5px;
+}
+
+.caribbean-port-arrival,
+.caribbean-port-stub > p,
+.caribbean-port-facts dd {
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 82%, white 4%);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.caribbean-port-arrival {
+  width: fit-content;
+  max-width: 630px;
+  margin: 0;
+  padding: 5px 0 0;
+  background: #07151d;
+}
+
+.caribbean-port-stub > p {
+  max-width: 650px;
+  margin: 8px 0 0;
+  padding: 6px 9px;
+  background: #07151d;
+}
+
+.caribbean-port-stub .caribbean-port-lede {
+  color: var(--caribbean-sailcloth);
+  font-size: 17px;
+}
+
+.caribbean-port-facts {
+  margin: 16px 0;
+  border-top: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 22%, transparent);
+}
+
+.caribbean-port-facts div {
+  display: grid;
+  grid-template-columns: 118px 1fr;
+  gap: 16px;
+  padding: 8px 0;
+  background: #07151d;
+  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 14%, transparent);
+}
+
+.caribbean-port-facts--ship {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.caribbean-port-facts--ship div {
+  display: block;
+  padding-right: 12px;
+  border-right: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 14%, transparent);
+}
+
+.caribbean-port-facts dt {
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 54%, var(--caribbean-trade-wind));
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.caribbean-port-facts dd {
+  margin: 3px 0 0;
+}
+
+.caribbean-port-close {
+  min-height: 44px;
+}
+
+.caribbean-port .caribbean-port-close {
+  flex: 0 0 auto;
+  min-width: 132px;
+  margin: auto 0 0 auto;
+  padding: 0 16px;
+  border-color: color-mix(in srgb, var(--caribbean-trade-wind) 55%, transparent);
+  background: #07151d;
+}
+
+.caribbean-port-menu {
+  position: relative;
+  z-index: 4;
+  min-width: 0;
+  align-self: stretch;
+  padding: 0;
+  background: transparent;
+}
+
+.caribbean-port-actions {
+  margin: 0;
+  gap: 8px;
+  padding: 8px 0 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: 112px;
+  list-style: none;
+  border-top: 0;
+}
+
+.caribbean-port-action-item {
+  position: relative;
+  min-width: 0;
+  min-height: 112px;
+  display: grid;
+  padding: 0px;
+  border-left: 0;
+}
+
+.caribbean-port-action-item::before {
+  content: "";
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  width: 1px;
+  height: 12px;
+  display: none;
+}
+
+.caribbean-port-action {
+  height: 100%;
+  min-height: 44px;
+}
+
+.caribbean-port .caribbean-port-action {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 5px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--caribbean-brass) 70%, #6b441a);
+  border-top: 2px solid color-mix(in srgb, var(--caribbean-brass) 88%, white 4%);
+  background: #07151d;
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.1;
+  text-align: center;
+  box-shadow:
+    inset 0 0 0 3px rgb(241 188 82 / 7%),
+    0 12px 24px rgb(0 0 0 / 24%);
+}
+
+.caribbean-port .caribbean-port-action::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: var(--caribbean-port-panel-material) center / 320px 320px repeat;
+  opacity: .32;
+  pointer-events: none;
+}
+
+.caribbean-port-action-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  fill: color-mix(in srgb, var(--caribbean-brass) 12%, transparent);
+  stroke: var(--caribbean-brass);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.caribbean-port-action-label {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  min-height: 30px;
+  place-items: center;
+  line-height: 1;
+}
+
+.caribbean-port-action-state {
+  width: 100%;
+  min-width: 0;
+  display: block;
+  max-width: 100%;
+  min-height: 16px;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 66%, var(--caribbean-trade-wind));
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caribbean-port .caribbean-port-action:hover:not(:disabled) {
+  border-top-color: color-mix(in srgb, var(--caribbean-trade-wind) 75%, transparent);
+  background: color-mix(in srgb, var(--caribbean-harbor-glass) 90%, #07151d);
+  box-shadow:
+    inset 0 0 0 3px rgb(88 225 221 / 12%),
+    0 15px 30px rgb(0 0 0 / 34%);
+}
+
+.caribbean-port .caribbean-port-action[aria-current="page"] {
+  border-top-color: var(--caribbean-trade-wind);
+  background: color-mix(in srgb, var(--caribbean-trade-wind) 20%, var(--caribbean-deep-keel));
+  color: var(--caribbean-trade-wind);
+  box-shadow:
+    inset 0 0 0 3px color-mix(in srgb, var(--caribbean-trade-wind) 18%, transparent),
+    0 0 22px color-mix(in srgb, var(--caribbean-trade-wind) 16%, transparent);
+}
+
+.caribbean-port .caribbean-port-action:disabled {
+  border-top-color: color-mix(in srgb, var(--caribbean-brass) 40%, transparent);
+  opacity: .58;
+  cursor: not-allowed;
+}
+
+.caribbean-port-action-reason {
+  padding: 0 2px;
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 66%, var(--caribbean-deep-keel));
+  text-align: center;
+}
+
+.caribbean-port-action-attention {
+  position: absolute;
+  inset-block-start: 7px;
+  inset-inline-end: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--caribbean-brass);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--caribbean-brass) 45%, transparent));
+}
+
+.caribbean-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.caribbean-port-action:focus-visible,
+.caribbean-port-close:focus-visible,
+.caribbean-market-action:focus-visible,
+.caribbean-tavern-mark:focus-visible {
+  outline: 3px solid var(--caribbean-trade-wind);
+  outline-offset: 3px;
+}
+
+.caribbean-tavern,
+.caribbean-captains-log,
+.caribbean-log-empty {
+  max-width: 650px;
+}
+
+.caribbean-tavern-rumour {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+  padding: 18px 20px;
+  border-inline-start: 2px solid var(--caribbean-brass);
+  background: #07151d;
+}
+
+.caribbean-tavern-rumour blockquote {
+  max-width: 610px;
+  margin: 0;
+  background: #07151d;
+  color: var(--caribbean-sailcloth);
+  font-size: 18px;
+  font-weight: 620;
+  line-height: 1.55;
+}
+
+.caribbean-tavern-mark {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.caribbean-tavern-action-slot {
+  min-block-size: 48px;
+  display: grid;
+  align-items: center;
+  justify-items: start;
+}
+
+.caribbean-port .caribbean-tavern-mark {
+  padding-inline: 18px;
+  border-color: var(--caribbean-trade-wind);
+  background: color-mix(in srgb, var(--caribbean-trade-wind) 14%, var(--caribbean-deep-keel));
+}
+
+.caribbean-tavern-status {
+  min-height: 20px;
+  margin: 0;
+  color: var(--caribbean-trade-wind);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.caribbean-tavern-mark + .caribbean-tavern-status:empty { display: none; }
+
+.caribbean-port-prerequisite {
+  max-width: 720px;
+  padding: 17px 20px;
+  border: 1px solid color-mix(in srgb, var(--caribbean-signal-red) 82%, transparent);
+  border-inline-start: 4px solid var(--caribbean-signal-red);
+  background: color-mix(in srgb, var(--caribbean-signal-red) 13%, #07151d);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 24%);
+}
+
+.caribbean-port-prerequisite p { margin: 0; color: var(--caribbean-sailcloth); font-size: 16px; line-height: 1.45; }
+.caribbean-port-prerequisite .caribbean-port-prerequisite__eyebrow { margin-bottom: 7px; color: var(--caribbean-signal-red); font: 850 14px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.caribbean-port-prerequisite .caribbean-port-prerequisite__title { margin-bottom: 6px; color: color-mix(in srgb, var(--caribbean-signal-red) 82%, white); font: 700 19px/1.2 "Avenir Next Condensed", sans-serif; text-transform: uppercase; }
+
+.caribbean-log-empty {
+  margin: 0;
+  padding: 8px 10px;
+  background: #07151d;
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 76%, var(--caribbean-trade-wind));
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.caribbean-captains-log {
+  border-block: 1px solid color-mix(in srgb, var(--caribbean-brass) 46%, transparent);
+  background: #07151d;
+}
+
+.caribbean-captains-log header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 0;
+}
+
+.caribbean-captains-log h3 {
+  margin: 0;
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.caribbean-captains-log header p {
+  margin: 0;
+  color: var(--caribbean-brass);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.caribbean-log-action,
+.caribbean-log-terminal {
+  margin: 0;
+  padding: 16px 0;
+  border-top: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 20%, transparent);
+  background: #07151d;
+  color: var(--caribbean-sailcloth);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.caribbean-log-action-label {
+  display: block;
+  margin-bottom: 5px;
+  background: #07151d;
+  color: var(--caribbean-trade-wind);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.caribbean-log-action-copy {
+  background: #07151d;
+  color: var(--caribbean-sailcloth);
+}
+
+.caribbean-market {
+  display: grid;
+  gap: 0px;
+  padding: 20px 22px 22px;
+  box-sizing: border-box;
+  background: color-mix(in srgb, #07151d 92%, transparent);
+}
+
+.caribbean-market-summary {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-block: 1px solid color-mix(in srgb, var(--caribbean-brass) 46%, transparent);
+  background: #07151d;
+}
+
+.caribbean-market-summary > div {
+  min-width: 0;
+  padding: 7px 12px;
+  border-right: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 18%, transparent);
+}
+
+.caribbean-market-summary > div:last-child {
+  border-right: 0;
+}
+
+.caribbean-market-summary dt,
+.caribbean-market-good > span,
+.caribbean-market-price-cue,
+.caribbean-market-reasons {
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 58%, var(--caribbean-trade-wind));
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.caribbean-market-summary dt {
+  text-transform: uppercase;
+}
+
+.caribbean-market-summary dd {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.caribbean-market-severity {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.caribbean-market-severity svg {
+  flex: 0 0 auto;
+}
+
+.caribbean-market-severity--low {
+  color: var(--caribbean-brass);
+}
+
+.caribbean-market-severity--critical {
+  color: color-mix(in srgb, var(--caribbean-signal-red) 96%, white);
+}
+
+.caribbean-market-goods {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 22%, transparent);
+}
+
+.caribbean-market-row {
+  min-width: 0;
+  min-block-size: 72px;
+  display: grid;
+  grid-template-columns: minmax(174px, 1.15fr) minmax(142px, .8fr) minmax(330px, 1.8fr);
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+  background: #07151d;
+  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 17%, transparent);
+}
+
+.caribbean-market-good,
+.caribbean-market-quote,
+.caribbean-market-command {
+  min-width: 0;
+}
+
+.caribbean-market-good h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caribbean-market-good > span {
+  display: block;
+  margin-top: 3px;
+}
+
+.caribbean-market-quote strong {
+  display: block;
+  color: var(--caribbean-sailcloth);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.caribbean-market-price-cue {
+  margin-top: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #07151d;
+}
+
+.caribbean-market-price-cue svg {
+  flex: 0 0 auto;
+}
+
+.caribbean-market-price-cue--cheap {
+  color: var(--caribbean-trade-wind);
+}
+
+.caribbean-market-price-cue--fair {
+  color: var(--caribbean-sailcloth);
+}
+
+.caribbean-market-price-cue--expensive {
+  color: color-mix(in srgb, var(--caribbean-signal-red) 96%, white);
+}
+
+.caribbean-market-actions {
+  display: grid;
+  grid-template-columns: 1.35fr repeat(4, minmax(44px, .72fr)) 1fr;
+  gap: 4px;
+}
+
+.caribbean-market-action {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.caribbean-port .caribbean-market-action {
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 38%, transparent);
+  background: #07151d;
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.caribbean-port .caribbean-market-action:hover:not(:disabled) {
+  border-color: var(--caribbean-trade-wind);
+  background: color-mix(in srgb, var(--caribbean-trade-wind) 16%, var(--caribbean-deep-keel));
+}
+
+.caribbean-port .caribbean-market-action:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+
+.caribbean-market-reasons {
+  block-size: 32px;
+  overflow: hidden;
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 70%, var(--caribbean-deep-keel));
+  line-height: 1.15;
+}
+
+.caribbean-market-status {
+  margin: 0;
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 80%, var(--caribbean-trade-wind));
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.caribbean-market-status:not(:empty) {
+  width: fit-content;
+  margin-top: 8px;
+  padding-inline: 6px;
+  background: #07151d;
+}
+
+.caribbean-production--port .caribbean-memory-warning {
+  max-width: 340px;
+  bottom: 112px;
+}
+
+/* Keep app chrome clear of the seven primary port commands. */
+body:has(.caribbean-port) .party-root {
+  left: max(12px, env(safe-area-inset-left));
+  bottom: calc(118px + env(safe-area-inset-bottom));
+  transform: none;
+}
+
+@media (width <= 1180px) {
+  .caribbean-port {
+    --caribbean-port-art-focal-x: 56%;
+    --caribbean-port-art-focal-y: 50%;
+  }
+
+  .caribbean-port-primary {
+    grid-template-rows: auto auto auto 168px minmax(0, 1fr);
+  }
+
+  .caribbean-port-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: 84px;
+  }
+
+  .caribbean-port-action-item {
+    min-height: 84px;
+  }
+
+  .caribbean-port .caribbean-port-action {
+    padding: 5px 4px;
+    gap: 1px;
+  }
+
+  .caribbean-port-action-icon {
+    width: 24px;
+    height: 24px;
+    flex-basis: 24px;
+  }
+
+  .caribbean-port-action-label {
+    min-height: 24px;
+  }
+}
+
+@media (width <= 1024px) {
+  .caribbean-port {
+    --caribbean-port-art-focal-x: 54%;
+    --caribbean-port-art-focal-y: 50%;
+  }
+
+  .caribbean-port-status-rail dl div {
+    grid-template-columns: 18px minmax(0, 1fr);
+    column-gap: 4px;
+    padding: 7px 4px;
+  }
+
+  .caribbean-port-status-icon {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@media (width <= 960px) {
+  .caribbean-port {
+    --caribbean-port-art-focal-x: 52%;
+    --caribbean-port-art-focal-y: 50%;
+  }
+}
+
+@media (max-height: 700px) {
+  .caribbean-production--port .caribbean-memory-warning {
+    bottom: 128px;
+  }
+
+  .caribbean-port {
+    grid-template-rows: 62px minmax(0, 1fr) auto;
+  }
+
+  .caribbean-port-position {
+    padding-block: 10px;
+  }
+
+  .caribbean-port-position span {
+    font-size: 19px;
+  }
+
+  .caribbean-port-status-rail dl div {
+    padding-block: 7px;
+  }
+
+  .caribbean-port-horizon {
+    inset-block: 62px 86px;
+  }
+
+  .caribbean-port-stage {
+    padding-block: 14px 16px;
+  }
+
+  .caribbean-port-stage h1 {
+    font-size: clamp(43px, 6vw, 62px);
+  }
+
+  .caribbean-port-activity {
+    margin-top: 14px;
+    padding-top: 11px;
+  }
+
+  .caribbean-port-activity h2 {
+    margin-bottom: 8px;
+    font-size: clamp(25px, 2.8vw, 33px);
+  }
+
+  .caribbean-port-facts {
+    margin-block: 10px;
+  }
+
+  .caribbean-port-facts div {
+    padding-block: 5px;
+  }
+
+  .caribbean-market {
+    gap: 6px;
+    padding: 12px 14px 14px;
+  }
+
+  .caribbean-market-summary > div {
+    padding-block: 5px;
+  }
+
+  .caribbean-market-row {
+    padding-block: 3px;
+  }
+
+  body:has(.caribbean-port) .party-root {
+    left: calc(50% - 10px);
+    bottom: calc(148px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (width <= 1180px) and (max-height: 700px) {
+  .caribbean-port-primary {
+    grid-template-rows: auto auto auto 156px minmax(0, 1fr);
+  }
+
+  .caribbean-port-actions {
+    grid-auto-rows: 70px;
+  }
+
+  .caribbean-port-action-item {
+    min-height: 70px;
+  }
+
+  .caribbean-port .caribbean-port-action {
+    padding-block: 3px;
+  }
+
+  .caribbean-port-action-icon {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
+  }
+
+  .caribbean-port-action-label {
+    min-height: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .caribbean-port-horizon::before {
+    animation: caribbean-port-course-in 700ms cubic-bezier(.2, .8, .2, 1) both;
+  }
+
+  .caribbean-port-backdrop img {
+    transition: opacity 240ms ease-out;
+  }
+
+  .caribbean-port-action,
+  .caribbean-port-close {
+    transition: background 130ms, border-color 130ms, color 130ms;
+  }
+}
+
+@keyframes caribbean-port-course-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0); }
+}

@@ -1,0 +1,4927 @@
+{
+  "capture": {
+    "headCommitAtCapture": "7415da7c24d6c8f4073e9d547a673c69ed08e2d1",
+    "worktreeDirtyBeforeCapture": false
+  },
+  "stableManifest": {
+    "version": 1,
+    "sourceFiles": [
+      {
+        "path": "index.html",
+        "sha256": "9db21d4194c56b5b6922ac1341bfec8f10ce90bee9fa7110843f7a0345bd3898"
+      },
+      {
+        "path": "knip.json",
+        "sha256": "be367233c51dc57072c9f9b0cd0b9f431f7b8c20b223eaa40b133448c87cbffa"
+      },
+      {
+        "path": "package-lock.json",
+        "sha256": "7b5af8fc827bd094a4d744a626f120a12fa71955e6850a259c266d07210c3b7d"
+      },
+      {
+        "path": "package.json",
+        "sha256": "30c23e3b17a33d1e117a373d8ec00b8eb28606529ad0b2f5f9002d8c772d748e"
+      },
+      {
+        "path": "preview-b.html",
+        "sha256": "5918455a874f840c8f03c7f6d2b0dd345c09d9ad6c08761a8f5dbbc5e6431405"
+      },
+      {
+        "path": "preview-battleship.html",
+        "sha256": "57bef2bfec1ffcff98231b0d45508706dfe0be75b75cf0d051ddb7f9d47a80c3"
+      },
+      {
+        "path": "preview-caribbean-game.html",
+        "sha256": "07201795a43d941551edc9de19444b98df66858cb4da7d7b9b77c8a4b1d912d8"
+      },
+      {
+        "path": "preview-caribbean.html",
+        "sha256": "aa0fa81ceee1c95bf9be7fe9a87ef52177cd8555119c2defd429d68340d7320c"
+      },
+      {
+        "path": "preview-carrier.html",
+        "sha256": "eff8f7cd978fef20f152fed3c0e338d6231fc838d190d4f119f690f5e664c2f4"
+      },
+      {
+        "path": "preview-ship.html",
+        "sha256": "275f1a3ba7014b3b75f4e0ce2f0ea473b403c99057e21f28489d3fbe0cea7cc5"
+      },
+      {
+        "path": "public/CNAME",
+        "sha256": "6a75fbf7cc29e831bed0d0c9bceaec6f8b9c2ad05bd09d5c047f3f1cb38afd84"
+      },
+      {
+        "path": "public/apple-touch-icon.png",
+        "sha256": "60f6fb67598c77040548860d29e5933ea87e625df67be053777311715d9f51c4"
+      },
+      {
+        "path": "public/calculator.html",
+        "sha256": "9f48579b6021fc2cc9e867d6de67e70cd7839cefc810d02c349415d8562318f3"
+      },
+      {
+        "path": "public/icon-192.png",
+        "sha256": "e53a1eeb1bec8c6b847be7a3a7f42506569885f0c5c685e88d17d4d32db8a853"
+      },
+      {
+        "path": "public/icon-512.png",
+        "sha256": "5c13b592f0dd093ce82c64a43af899a0147cbdf5025fb8a3d6f6b12ca7a260f0"
+      },
+      {
+        "path": "public/icon.svg",
+        "sha256": "7828615bbd54311ca8e58d05dd110dac993d41cd882445d7f3f18648abd88463"
+      },
+      {
+        "path": "scripts/caribbean-naval-check.mjs",
+        "sha256": "aee0a1db70fd7b98d230d616aa2f8176a490238f4ba1e92df88b708fac29ffaf"
+      },
+      {
+        "path": "scripts/caribbean-port-check.mjs",
+        "sha256": "88c6454a3e8e03c5a4ca316e197ee93f14883d18857fc01f97912798d8a893b6"
+      },
+      {
+        "path": "scripts/fixtures/caribbean-campaign-victory.json",
+        "sha256": "a04c79cf1934997604e34a1572502c59df688c5231c1d1a6ef3c7446594e81e5"
+      },
+      {
+        "path": "scripts/lib/caribbean-campaign-victory-browser.node-test.mjs",
+        "sha256": "1d06a70cdfc97859d6a62bc80256e2321157a43b90317a6063a3421e70865e2f"
+      },
+      {
+        "path": "scripts/lib/caribbean-campaign-victory-driver.mjs",
+        "sha256": "50e4c8ed1971519c043418a5da0b8d8c829608161fb7799095c8db78656ab1c1"
+      },
+      {
+        "path": "scripts/lib/caribbean-campaign-victory-driver.node-test.mjs",
+        "sha256": "7b2b371d357559f2afbc3b492808fa951dc524d319e40cf30cc78acbb61e14c9"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-check.test.mjs",
+        "sha256": "4bdeac0f14503836e290d65446fd20a57fd65d93855f4f231d81007a43e858f2"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-evidence.mjs",
+        "sha256": "ea584ce12174420d2076441f314c4656cb557fef629d382f48a478e4c279186d"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-evidence.test.mjs",
+        "sha256": "387c47dc87f5a11e468f9aa6a369588688bef06ff13534195b8cfc93239ed2fe"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-scenario.test.mjs",
+        "sha256": "c5a58a502ba29fee028f4eb2ba4156dbe69a4c048f2693d7381969cc54d77731"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-verification.mjs",
+        "sha256": "3a9f94b28623e57eb7dc58337feb69a5aa4bfff1d0da856570bf4e6153d12b04"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-verification.node-test.mjs",
+        "sha256": "cc5df41f2ea45e289b07b8c79bf74167206306a8eef1ea82de7dff321e77e265"
+      },
+      {
+        "path": "scripts/lib/caribbean-normal-build-isolation.mjs",
+        "sha256": "164505f157bf8c7b3e80761cc8c71494998d9c11e75bda4ee43cca7713ee931d"
+      },
+      {
+        "path": "scripts/lib/caribbean-port-identity-evidence.mjs",
+        "sha256": "fb251f474d750775fc2692a03a11dbf3442f1952fb0717a4992d385899ae88c7"
+      },
+      {
+        "path": "scripts/lib/caribbean-port-identity-evidence.test.mjs",
+        "sha256": "305c9cab39d1a2a9a9067468b53301d0b617343f41c23561d4743daff0cba036"
+      },
+      {
+        "path": "scripts/lib/caribbean-support-restore.mjs",
+        "sha256": "ea0507c4530d4e8f5b450e79a40588d3066aedff32cdcf23b2c1cc6dcb2330c4"
+      },
+      {
+        "path": "src/app/App.tsx",
+        "sha256": "4d34fa807f559e61583140c4c210d8b95bb0fa18ba80feb68bfa53bc6a3c1505"
+      },
+      {
+        "path": "src/app/Menu.tsx",
+        "sha256": "77481ef4c9e818cecc1584dce50934d1ae0bd84073de518c680295ee51f005df"
+      },
+      {
+        "path": "src/app/PlayerBooth.tsx",
+        "sha256": "e9a02da04b1511071f1e1f99bab020e2bbab686f26279ed8e21815cafd6def50"
+      },
+      {
+        "path": "src/app/Privacy.tsx",
+        "sha256": "a111e5a5c5894924886307837654bea9b2b8572e10094c1cab0f46117e86df49"
+      },
+      {
+        "path": "src/app/main.tsx",
+        "sha256": "0dd917a6dfa3f83b7fe91f3944a58b4fc9ac69a387e51e029c98c2ab01261ed6"
+      },
+      {
+        "path": "src/app/privacy.css",
+        "sha256": "1f73b81889cf6db9c3d65b2b7068d68c1646e0459265b70304845e2274da962a"
+      },
+      {
+        "path": "src/app/registry.ts",
+        "sha256": "05bc01c81b9ea203896b1102865442be91c3bbd92929c48e275220ea010cbaaa"
+      },
+      {
+        "path": "src/app/styles/app.css",
+        "sha256": "bfa7dda110337027eb8202f071446c53e3db20a9208205f35b916eec68cd296d"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/battleship-classic.glb",
+        "sha256": "d596fc80ec11508bc43d3c5b0eafe94053af0640a19e50cf4f98ffa8fc3dc61b"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/battleship-modern.glb",
+        "sha256": "2887a63a09af9e924ab6d403a6128b8b50df30d048f160bc697ededb2414df2b"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/carrier-classic.glb",
+        "sha256": "c07ee8c2f343dfe3dfc3a078b2088c231f624bfdd507f119b020e0d3cfea279f"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/carrier-modern.glb",
+        "sha256": "290e84e452e0ea260e7ddab0e6a9086fd2badb5eecec715f21aec6c67b95d851"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/cruiser-classic.glb",
+        "sha256": "86f2c3cc7371f67a4719b6b22b74deda549765879c75f8973d155151703ad31f"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/cruiser-modern.glb",
+        "sha256": "f7587688ba2540cbe7a6db291127bf2a20c23516225e2702de8b4c5fe70e5058"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/destroyer-classic.glb",
+        "sha256": "daeaffca9cd2f24c77742ab8bff9d9d47fbc72bb71d12113cb8cf92b6c67bf04"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/destroyer-modern.glb",
+        "sha256": "675e5d42f66e3033a5aa514757e1101b387c0b637602ce81444d9653b77bdaa3"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/submarine-classic.glb",
+        "sha256": "e61740c97b583b95c669cd0353defb758b9a093eeab597101d6a735829b24581"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/submarine-modern.glb",
+        "sha256": "57c75adce319127a0ed5e64d22748eeb77022a740530c44328e42f5e58e9787e"
+      },
+      {
+        "path": "src/games/battleship/components/Battle.tsx",
+        "sha256": "b946848c2c9dee8e2b02ce299ab03f410ea0c7deedc6c861701d013ea8925631"
+      },
+      {
+        "path": "src/games/battleship/components/BattleshipPage.tsx",
+        "sha256": "fecfa54db263e078300cdf31e80bf766b82a285b35a3069c5dca5cf3db8e7f36"
+      },
+      {
+        "path": "src/games/battleship/components/Board.tsx",
+        "sha256": "9f2e631a5cf1654b11cd06265b8b4166324c916459cf55447275887aea08e92f"
+      },
+      {
+        "path": "src/games/battleship/components/BoardFX.tsx",
+        "sha256": "184ab21afd9ade0fc67a6876b894bb43a857e09626270b997a3b6dbef839920b"
+      },
+      {
+        "path": "src/games/battleship/components/Fleet3D.tsx",
+        "sha256": "2069d138ba075a1447481c785cf06ebf78eb7348c95e992d9f8310220bbb94f8"
+      },
+      {
+        "path": "src/games/battleship/components/FleetSelect.tsx",
+        "sha256": "2f68ad330c479a4839fc6fb16dfb49ca8e23892815b6b0613a518afe8031b427"
+      },
+      {
+        "path": "src/games/battleship/components/Lobby.tsx",
+        "sha256": "dd50142a8e2a3fdf378c5092b0c9b8ac9ce7ae374b56fb87db5320731f489540"
+      },
+      {
+        "path": "src/games/battleship/components/Placement.tsx",
+        "sha256": "fe675a953d9e32841efb7ebce0e6a2009b792e702262570ed62ab8ffc13a1804"
+      },
+      {
+        "path": "src/games/battleship/components/Result.tsx",
+        "sha256": "367e8eb0507655b4c46599dbe873b0ffaef976e91d0fc8e54a93a93085d0843c"
+      },
+      {
+        "path": "src/games/battleship/components/ships.tsx",
+        "sha256": "ca0d06d67d5c834fe11501aabd556893d44b38f4743ac0dabad25cc3522b19ef"
+      },
+      {
+        "path": "src/games/battleship/components/three/FleetScene.ts",
+        "sha256": "888ce987819e6123b3e6ba81fe56acbfdf54d995c96db553b49e143a6aedf065"
+      },
+      {
+        "path": "src/games/battleship/components/three/shipModels.ts",
+        "sha256": "320b59c6638c9883c00b4ffde7c7641c1130cf4fea6e5356219545d19cc9650d"
+      },
+      {
+        "path": "src/games/battleship/domain/board.ts",
+        "sha256": "97e54a777862b9d376d01f1df1a12d64f6e9ed7184f4f68dc242ad6b28afe810"
+      },
+      {
+        "path": "src/games/battleship/domain/bots/gunner.ts",
+        "sha256": "c7aeede52914ea233dc756327678f29e2d9b766541402da5980155f83b2a7526"
+      },
+      {
+        "path": "src/games/battleship/domain/bots/index.ts",
+        "sha256": "418e9c53b063b7257b1bfda67098f409d567eddffcc9f5fc0c3f8a04d4207d4c"
+      },
+      {
+        "path": "src/games/battleship/domain/bots/personas.ts",
+        "sha256": "fad143be20c418c928923ad3cfc3fad1691a3e20f28ace616f42fd9bf7a9101e"
+      },
+      {
+        "path": "src/games/battleship/domain/constants.ts",
+        "sha256": "609b53e0cc2f621fb30be36ac30887690cef751ccb270720c0c3fc6a25ca812d"
+      },
+      {
+        "path": "src/games/battleship/domain/engine.ts",
+        "sha256": "b0803e883cea51ec84c0116cc73cb1761cc2d9ea2b5a026be387b70d2f82a273"
+      },
+      {
+        "path": "src/games/battleship/domain/protocol.ts",
+        "sha256": "61c2b1594cc151f25ef50036be0dacda4aeb4ff416d8274da9422e1511207338"
+      },
+      {
+        "path": "src/games/battleship/domain/session.ts",
+        "sha256": "f0cc04a4d8ddf4489098ce4ac127505392bc1636222029cf2924feb15af7e8bd"
+      },
+      {
+        "path": "src/games/battleship/domain/skins.ts",
+        "sha256": "855adbadd84ed294d0febfb78a578eac8a930dfcb12d30e6d343745c4f038020"
+      },
+      {
+        "path": "src/games/battleship/domain/types.ts",
+        "sha256": "246a634dc7f276175fbc45ea729ea9e762c3d6c7429e1501f5a348827393a746"
+      },
+      {
+        "path": "src/games/battleship/index.ts",
+        "sha256": "0293cbe061c590d10f3fda8da1f57d1dcebc26f2e14305eaad43d4c01eeb3c39"
+      },
+      {
+        "path": "src/games/battleship/preview-b.tsx",
+        "sha256": "be51599f053801ef862625c13bd3240c0f5720798f03d1d5c672ce6b85906785"
+      },
+      {
+        "path": "src/games/battleship/preview-battleship.tsx",
+        "sha256": "442e123e01791bdde8a93e740530127b8fe99dd8d640f5fa3d2b03842b276a4f"
+      },
+      {
+        "path": "src/games/battleship/preview-carrier.tsx",
+        "sha256": "ad1788f50c01812a26ac7dd9ed2e036183bd283c2b5b3928111eda0f2bd2a30b"
+      },
+      {
+        "path": "src/games/battleship/preview-ship.tsx",
+        "sha256": "8d2625d1f51cd2ebb821a189c0d4a255a1f82a92385ebff0015dd1a8483ccdb2"
+      },
+      {
+        "path": "src/games/battleship/state/loopback.ts",
+        "sha256": "bb0ad6d13abd2a014706fa883476b1ee0db650e58745a8489727ffb02e6397c0"
+      },
+      {
+        "path": "src/games/battleship/state/useBattleship.ts",
+        "sha256": "cac6073ed15b40be4b81fd2129efe91e3f23976fee11848944d3d9edf44b5ea4"
+      },
+      {
+        "path": "src/games/battleship/state/useShipDrag.ts",
+        "sha256": "d4f69301df073b5b90269e8c4321ecea4d6a17f9c720a9084e536d77c688c7ad"
+      },
+      {
+        "path": "src/games/battleship/storage/sessionStore.ts",
+        "sha256": "59d49af75fc2b8e5d2965cea63a67d353ec44e810d980ebaa591b811a75a492b"
+      },
+      {
+        "path": "src/games/battleship/styles/battleship.css",
+        "sha256": "3b118e139ba95463ef347928cf299c2bb61b053213cf87af8e0be20cd6388c82"
+      },
+      {
+        "path": "src/games/caribbean-poc/assets/caribbean-sloop.glb",
+        "sha256": "36c9b53aeebe28706932af7d66d67e3a9a545ac1a4ea00ad5ffd944876270320"
+      },
+      {
+        "path": "src/games/caribbean-poc/components/BattlePoc.tsx",
+        "sha256": "99b40357915fab6e3ba99bada8ca3d7a6bc225993e70fa94beac6d67b92e5966"
+      },
+      {
+        "path": "src/games/caribbean-poc/domain/battle.ts",
+        "sha256": "12f3f2379227268905a336ef859f4dc027bb4b9ec2d3869f78d3a78055f80a70"
+      },
+      {
+        "path": "src/games/caribbean-poc/domain/opponent.ts",
+        "sha256": "9abacb68098209c07cf721ed8c586bcac9bcb2f6466e48f709c2c92e9ccd1302"
+      },
+      {
+        "path": "src/games/caribbean-poc/preview.tsx",
+        "sha256": "894611eee54af48cdd4bf730b74c37156a68344370b49a4599734de969ef1d3f"
+      },
+      {
+        "path": "src/games/caribbean-poc/styles/caribbean-poc.css",
+        "sha256": "8dbd36ba7904629bb19a2708ed1bc4a64736f6d524b83ef30df7a2c57833a4b5"
+      },
+      {
+        "path": "src/games/caribbean-poc/three/BattleScene.ts",
+        "sha256": "d6fc93b1ca85c0762b91514c38dceca615d3a38200af644c23a5d1a9eb490ed3"
+      },
+      {
+        "path": "src/games/caribbean-poc/three/loadSloop.ts",
+        "sha256": "051cc4910d5d998625bb2c3debf0912a5a58c84cdb004ca134974dc5470345fe"
+      },
+      {
+        "path": "src/games/caribbean/assets/bridgetown-1675.webp",
+        "sha256": "0c1c99213d2903fb84a027a6f64508548c631b8fdefc6e41031e7954854ec67d"
+      },
+      {
+        "path": "src/games/caribbean/assets/caribbean-sloop.glb",
+        "sha256": "36c9b53aeebe28706932af7d66d67e3a9a545ac1a4ea00ad5ffd944876270320"
+      },
+      {
+        "path": "src/games/caribbean/audio/BattleAudio.test.ts",
+        "sha256": "b50de148ad07e5e35875d55ff1391985594bb55c69360a324fddcb1580a63aba"
+      },
+      {
+        "path": "src/games/caribbean/audio/BattleAudio.ts",
+        "sha256": "2c20b405d9d41da54efb43a286394658d900824db2fd9cc36652cabf7fbae687"
+      },
+      {
+        "path": "src/games/caribbean/canonicalJson.ts",
+        "sha256": "d06e454ffb008e90c9196bdd85badedaf6a90aea011fd4828997b4f0383dd5c1"
+      },
+      {
+        "path": "src/games/caribbean/caribbean.integration.test.tsx",
+        "sha256": "f88674da3694253b4b1cdf54e73be4f27b3629e21a32f8c47fab78d63231827a"
+      },
+      {
+        "path": "src/games/caribbean/components/CaribbeanLab.test.tsx",
+        "sha256": "b457440e7b2976753effac941b9ef441afa9987eab4d98ade3625b065dd85ccb"
+      },
+      {
+        "path": "src/games/caribbean/components/CaribbeanLab.tsx",
+        "sha256": "2b18016f5364108463940d339322104cea2294b5a23fd2654e4273670ce04713"
+      },
+      {
+        "path": "src/games/caribbean/components/CaribbeanPage.test.tsx",
+        "sha256": "d20de822e10b628e1c1c6833bc3167ea86225427ba0e0279c9f7c085da5d44ed"
+      },
+      {
+        "path": "src/games/caribbean/components/CaribbeanPage.tsx",
+        "sha256": "b00f3b0eeefbb5543c2b2f6e436d53ddd70d35e7d6793af7e7c163598218663a"
+      },
+      {
+        "path": "src/games/caribbean/components/MinimumScreenGate.test.tsx",
+        "sha256": "c4b047293aac8a63491752bf9693a3f1910e7d23ea1d2a406e87ae35a7992db4"
+      },
+      {
+        "path": "src/games/caribbean/components/MinimumScreenGate.tsx",
+        "sha256": "5caca7ee20918c708b10fe549cb550c499adc2fe7b03e306fa4e4ea8c0f37e61"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/BattleHud.test.tsx",
+        "sha256": "4d387c47f0dae4576143356f3a79221a44c5cb1a7d8b2dab815a5206882da804"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/BattleHud.tsx",
+        "sha256": "d1a0670fb1299bff8336017f8119f739be1944122e581d334c6e999d794dedef"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/BattleShortcutLegend.test.tsx",
+        "sha256": "7751944d5d5e18b8a3d256474d93705f2e595ed662f18d8c42d17c2d2ecff48c"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/BattleShortcutLegend.tsx",
+        "sha256": "94c8f86c35f08db8631a16132c0696d99f60a6c8d1c0abfb5ceab7100a3f16a6"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/HtmlTacticalChart.tsx",
+        "sha256": "aca127cd90b756e771b99bd45a510f31af3657f3c8dcc043517b967e6de1a4d7"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/NavalBattlePage.test.tsx",
+        "sha256": "bb718682eee59a603633297924fb7e3c169647229426a87271c675ff9fe1014a"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/NavalBattlePage.tsx",
+        "sha256": "87acfc32813e79bbab6890cff4eac41be166939f5a3d505e2198477176b7d788"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/NavalViewport.test.tsx",
+        "sha256": "cdd38284f6848985866290402d8716322fa4dd1dd7e7b6dbfdde3d04b9db3095"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/NavalViewport.tsx",
+        "sha256": "7e1a5cc1ded0fa52669a2f221b84cd58490479d75ccfa5d42b52fadd688e7497"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/aimCue.test.ts",
+        "sha256": "8b6dd92403f154b7cb14774f944ba29ad8ccd477444333176a0fcff70196afe1"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/aimCue.ts",
+        "sha256": "50efcd882beba3d14175c3cc255c9007ba48db16904ca92fc4565bb5439828b5"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/rudderPulse.d.mts",
+        "sha256": "d42aebb0be7346429a541ff2deff73bc9696b371d75b21183f919184a07f8aa7"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/rudderPulse.mjs",
+        "sha256": "78dbb9a4dceae52b4c3e84e321ea08781d99a1da9d7230151ccac0ab35fbde0e"
+      },
+      {
+        "path": "src/games/caribbean/components/log/CaptainsLog.test.tsx",
+        "sha256": "89e8b10a1dc496b564cb1d9c0c6bc1b4dbfc228459feab719e5d729fc70ce1e6"
+      },
+      {
+        "path": "src/games/caribbean/components/log/CaptainsLog.tsx",
+        "sha256": "73c6dfc2dd11c14f18890e9ba42aa04a87fb34dc84474018096a0dbc2d6b7fe6"
+      },
+      {
+        "path": "src/games/caribbean/components/map/CaribbeanMap.test.tsx",
+        "sha256": "3d0a05a5664cd50b0033cdbb5553f3e2ac70ddfdf41b57600961579566d7193e"
+      },
+      {
+        "path": "src/games/caribbean/components/map/CaribbeanMap.tsx",
+        "sha256": "770fa49f7b901964332a71e28e7721be3cce423a79dd574bbc632c45047a95f2"
+      },
+      {
+        "path": "src/games/caribbean/components/map/mapView.ts",
+        "sha256": "826b71ee9278e4d793543f70b29dc0892bf032b6d1dfae65014d23a52600badd"
+      },
+      {
+        "path": "src/games/caribbean/components/port/CaribbeanChart.test.tsx",
+        "sha256": "23775f38e9e29301792454012a0ce4f564761f6d9909fac4fb48f6b44a90c540"
+      },
+      {
+        "path": "src/games/caribbean/components/port/CaribbeanChart.tsx",
+        "sha256": "1faeca686cd82c40350f1a0ad91238fc69e370cb424bac04432cc86cb2e083c1"
+      },
+      {
+        "path": "src/games/caribbean/components/port/DivideShares.test.tsx",
+        "sha256": "deeeaf5b7cf459e93d99b5773d0f620532b4131315a1b7742037446e50f7695a"
+      },
+      {
+        "path": "src/games/caribbean/components/port/DivideShares.tsx",
+        "sha256": "d3fe206f669788875fa1b10b448f590967e6d7d65f4aa4ab47742ac23302f337"
+      },
+      {
+        "path": "src/games/caribbean/components/port/GovernorHouse.tsx",
+        "sha256": "b29be3c6a559883c032c48ef4055f6a4e03ee12aa52c89f2200a9e236981221e"
+      },
+      {
+        "path": "src/games/caribbean/components/port/Market.test.tsx",
+        "sha256": "635a0c31f941471df0edd7d86ce923ba3d6af7597a140d5feb7bb3f4f5d6abd2"
+      },
+      {
+        "path": "src/games/caribbean/components/port/Market.tsx",
+        "sha256": "f009d797f6219a90fa5dc60b9b66209c522eebe0a454f12b0d30172180866a13"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortActionIcon.test.tsx",
+        "sha256": "08a8f41862229703caa24b9e1ad9f201591ca01ed801461df4d5fe82a5b94533"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortActionIcon.tsx",
+        "sha256": "cd79f918bac96818df0317a2a1b888cc17c2b1cd6f07f60afb427d14030d0730"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortBackdrop.test.tsx",
+        "sha256": "a6db1ed91c53d857e73b929620cb09fc6eb0b127ea92289efdfd2c3efaac07f5"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortBackdrop.tsx",
+        "sha256": "da68c30878d798e461c82083396c2803709d9440ee99adf90ac121747e1f258c"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortMenu.test.tsx",
+        "sha256": "9f409ec60e57b419bf2e1220f7d0ef7ef66f8e2490056a9093ae31938a82cbe2"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortMenu.tsx",
+        "sha256": "76a62efb640bdd801c6c79f6e3fe3204f94b0a77fe6ab2e89343d03e3a985f01"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortPage.test.tsx",
+        "sha256": "e305c8d034334e85f0fe35db1b508e2b931a947044722dca8473ea3466690177"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortPage.tsx",
+        "sha256": "7cc95d36f3588686ba246dd7cdb7dcbef474637c891874fd3a2d090a8e7cf8d8"
+      },
+      {
+        "path": "src/games/caribbean/components/port/ShipyardSummary.tsx",
+        "sha256": "92b92d127f721581ef2a41f8739af2f98637b872305e8ad6c7cb1ccdd7c8b969"
+      },
+      {
+        "path": "src/games/caribbean/components/port/Tavern.test.tsx",
+        "sha256": "3418bb96c10794fc373bd1fa61e18db6677ae64e17067dc198375a797db9fa0d"
+      },
+      {
+        "path": "src/games/caribbean/components/port/Tavern.tsx",
+        "sha256": "cdd66d55ee37157dfe99c153bfa3a79b753c70b0c476223941c51102a586d005"
+      },
+      {
+        "path": "src/games/caribbean/components/recovery/RecoveryPanel.test.tsx",
+        "sha256": "d4001c39ad0a545412b5c74fc7978afd16123e1fdd4b139962c7302da9c01b98"
+      },
+      {
+        "path": "src/games/caribbean/components/recovery/RecoveryPanel.tsx",
+        "sha256": "9df6b45d2d1e4fa20d8a1f6cbe951eb131373b5dab7b67cd80d88f8ede150edd"
+      },
+      {
+        "path": "src/games/caribbean/components/recovery/useModalFocus.test.tsx",
+        "sha256": "f3153fd06c05c8ce32b3f1d98a7a87be66e9f6f7cc4abb7582f5456d8aa69ad9"
+      },
+      {
+        "path": "src/games/caribbean/components/recovery/useModalFocus.ts",
+        "sha256": "fb10fb9950607b74715b048d269d9402259f4e4cf8f301e29013e806f736a71b"
+      },
+      {
+        "path": "src/games/caribbean/components/setup/CampaignSetup.test.tsx",
+        "sha256": "caa46a6cd66ef196d8f1635c6ab24b210417d82008cf9ba51119d4aa8c00bbfd"
+      },
+      {
+        "path": "src/games/caribbean/components/setup/CampaignSetup.tsx",
+        "sha256": "1cddc944a7aeef99a46b0ed6ddc90d3cdfba17a930498beaa0dcb4826fcdb50c"
+      },
+      {
+        "path": "src/games/caribbean/components/setup/PersistenceDecisionOverlay.test.tsx",
+        "sha256": "0d74528eed9713aeccc7c4103e18adcf3594594969f198ad06a3d07188129d00"
+      },
+      {
+        "path": "src/games/caribbean/components/setup/PersistenceDecisionOverlay.tsx",
+        "sha256": "343a6647cd55e3ab3738eb2e1aacf7ab2cd6f5da8c5256886ce33d84277ddb33"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/CampaignNavalBattle.test.tsx",
+        "sha256": "b7228d6f7935bba99b597ac1437d652c475a10210ee8f3982437701287861986"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/CampaignNavalBattle.tsx",
+        "sha256": "7f14274b89c5149ebdf49f927b69db92b82360944a8f1272ca5c97c7ea149694"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/EncounterPage.test.tsx",
+        "sha256": "ba518a0cff42a8da60ab110b579ebbeb549b676b4b99f6dd2471655257c41606"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/EncounterPage.tsx",
+        "sha256": "0fe205b371341507006ae080a2561d2a9ad9e58e46c191287930a29bf9b033f4"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/SailingPage.test.tsx",
+        "sha256": "9a197ead2441b8cd6b7492eee0d4e0b962375f22ee579b980de6a51951a8b2c2"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/SailingPage.tsx",
+        "sha256": "2669f75c1a617c80d473a88d60b4b2407b4365496447e2b45711e6980e38188e"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/VoyageInstrument.test.tsx",
+        "sha256": "be674d1554ed90ce72d3cc750ae8367d968a6688012f6b49a2303bd1fb7b1cd3"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/VoyageInstrument.tsx",
+        "sha256": "e5e3f971c4eaed20d80b9e68501b54df9a53df05f675ee21f00698629ac19dee"
+      },
+      {
+        "path": "src/games/caribbean/content/campaign.test.ts",
+        "sha256": "640fdc39bbb063cc6b603e4b5c69120f8f8e333727a31e02aba06e197cd9f7c3"
+      },
+      {
+        "path": "src/games/caribbean/content/campaign.ts",
+        "sha256": "57fffbe08cef84dff9705b06a37f980fa210a0b6f635b17d0205d70bfe51c5ba"
+      },
+      {
+        "path": "src/games/caribbean/content/content.test.ts",
+        "sha256": "e36b9f27c827e3adad8f8dacb7007830e54212da91e289095b8253435e15ab59"
+      },
+      {
+        "path": "src/games/caribbean/content/market.test.ts",
+        "sha256": "24acb493d5c498ec38832e5b01b7a9907bbeada76383584c99f9178d832a9d32"
+      },
+      {
+        "path": "src/games/caribbean/content/market.ts",
+        "sha256": "740bfe5c3a18ad4754a7c0138a8c244cea77b58e48fa021139d7161587c178c9"
+      },
+      {
+        "path": "src/games/caribbean/content/naval.ts",
+        "sha256": "e975465206187bdf157dc958d7c2e6fb8e934a161eaa71acc76e541c761cde9c"
+      },
+      {
+        "path": "src/games/caribbean/content/types.ts",
+        "sha256": "90cc9c20d7ab33bc504ca2c2158757cafaf9098ca724ceddc500d22e922d27ea"
+      },
+      {
+        "path": "src/games/caribbean/content/voyage.test.ts",
+        "sha256": "517f5419116729dc6533acacb52a862a8237af670f36d866901f689ba1066a91"
+      },
+      {
+        "path": "src/games/caribbean/content/voyage.ts",
+        "sha256": "69e05a98a1736b08547b2e3bf0189dd48c5213ed6e313d12c09979e9e2645981"
+      },
+      {
+        "path": "src/games/caribbean/domain/compactJournal.test.ts",
+        "sha256": "05539b44dffb6e112e1060889a56841d852df78ed0afe4857758ca9533f4e931"
+      },
+      {
+        "path": "src/games/caribbean/domain/compactJournal.ts",
+        "sha256": "88f602683727ee343612d6b786169fd1821b9e85c17f4668f6c9b50a973944f4"
+      },
+      {
+        "path": "src/games/caribbean/domain/createCampaign.test.ts",
+        "sha256": "e3912ae31f31aa2ef856d6b1d4b9a75423d8227101838104fb59e3f30a9bd43b"
+      },
+      {
+        "path": "src/games/caribbean/domain/createCampaign.ts",
+        "sha256": "14370d68341a9153109dda7060ca54ac2decb04a04844c7845c5223ca92b4015"
+      },
+      {
+        "path": "src/games/caribbean/domain/economy.test.ts",
+        "sha256": "0f1375d93e2b77aa470a29b53e8b16f04a1938a298142c923312c05bf47a9a76"
+      },
+      {
+        "path": "src/games/caribbean/domain/economy.ts",
+        "sha256": "e7cbb576cf4f5eb50d032de5e5a600c6b3cc7b74ea26f26ee472bdcbbdbad851"
+      },
+      {
+        "path": "src/games/caribbean/domain/events.ts",
+        "sha256": "ba386e5a9eed82455108c8e310425c06d73b59c2cfefed6e3ce3899e0600bd98"
+      },
+      {
+        "path": "src/games/caribbean/domain/leadSelectors.test.ts",
+        "sha256": "e35449754fb0cced39066e9c77c3e7ed53b9814375799cc34b28f01130e91e8c"
+      },
+      {
+        "path": "src/games/caribbean/domain/leadSelectors.ts",
+        "sha256": "546cbad4299a700c902312d79fea413966cbd0816552c29b28d320f71f35985c"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/balance.ts",
+        "sha256": "503f5678c9cfb9969525e34127f19206ad154eac0c4cc00f08779024387207ab"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/broadsideAgreement.test.ts",
+        "sha256": "42db8a80ac6273d7c1854af8be8df6b880bb5a3d88dbed855de506af6a84fdaf"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/createBattle.test.ts",
+        "sha256": "e21e354fe33b628f2fe4fe8b4ae4be91bb604f389c8873252603208f6916c6e2"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/createBattle.ts",
+        "sha256": "b134e2572467ffb5e90cd5b507265a781736458da509e7a3704bae1500eb3cc5"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/geometry.test.ts",
+        "sha256": "a0b3353bf2df52c83280e629fa676fecd82f91bdaf430c3e0b7f5935af5aa4b3"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/geometry.ts",
+        "sha256": "55ef479d6b99a56a2f6be9a5411d02dbb53d8b32c8f6933edc103b0ac3158af7"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/movement.test.ts",
+        "sha256": "ba633a7b8236bb64b233980053d71ba81d6636e0fa6ccad9773f66a13a113ba9"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/movement.ts",
+        "sha256": "ea384253ed16441f4f0b1d7c9f0cee3953ababcbb50d24a120ef41648bb0d100"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/opponent.test.ts",
+        "sha256": "1acb341ae9f591a22633b1bb9b21d3eae2b234fd101de49abbb4cccfeac5ec29"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/opponent.ts",
+        "sha256": "b7b804fe6a4d0fc19a4473849b03e8dbf185f7da3ef4c7e5df22b4aa49bed129"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/outcomes.test.ts",
+        "sha256": "5cfcda053ec4719a3ad65a5e46f0f02a2fa451ce9b6d13e607dad394e8c91f03"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/outcomes.ts",
+        "sha256": "506a9462ce53bee4aedc1da98a69978081eb68fc697e641f1122253492b00e81"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/pacing.test.ts",
+        "sha256": "7766ca78bb6a1cabe676805831f4661c8fb0fdb7ebf4a15f1a087de1e596cc03"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/replay.test.ts",
+        "sha256": "bf3a6a0980bef61305733d9eb8bcccedbfacc27ce0ade223bf558dbc55866b5a"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/replay.ts",
+        "sha256": "9b0d02bbc3db4fa74ac35d03a538a4db995ccc25f60f3bfc2b1c9109974131fc"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/resolution.test.ts",
+        "sha256": "b2ac2e1220c0e5697b222162027d6b4ee44fcbe0fb25acf9d81bf6f22ad383c2"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/resolution.ts",
+        "sha256": "fe1e62bf62d97a747ba66c0a12096f19577801e6203d0c5733e099fd3b0944d4"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/rng.ts",
+        "sha256": "e54d7e662615023786a8bdbece4e6b6da55dbaa6771942960aa46dfd2202b9ca"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/stepBattle.test.ts",
+        "sha256": "f422a8afc1d6a93b58d5956ac789413e09521ecdf83ed918c51ca0192f16b97e"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/stepBattle.ts",
+        "sha256": "5c05e61c429d5b598e7300cc090105ee17201e870d250656323cf3e3c0323c97"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/testFixtures.ts",
+        "sha256": "72218e63ea745cb9eeca318aa1ab86c9f1e136995d986e814a95bb9f9f37ce6c"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/types.ts",
+        "sha256": "ad4dd96eeed1cee0944c4c605eadb3871dba3961bc44ab3c7fe6196c38861589"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/validation.test.ts",
+        "sha256": "1f8a33f560c3eab72465098641b1b012f8e40435aa375792b555e36a8a083a64"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/validation.ts",
+        "sha256": "69b5fff8efd7e6d01754d7f70b5a5c99772898ea4e2cf337d49d8dff080f4791"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/volley.test.ts",
+        "sha256": "8d097ab19036d74264e1a028806fc9c07d98dd82ea7e7640bdeaacecb9eced1d"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/volley.ts",
+        "sha256": "f4580620da50c27a93e439d2878908ac6946d7739b17fe81e5797153253745a9"
+      },
+      {
+        "path": "src/games/caribbean/domain/reduceCampaign.test.ts",
+        "sha256": "5c9e1fb23b3149a945ddf76d75896be84c3272e21e0585514b412058dadf301f"
+      },
+      {
+        "path": "src/games/caribbean/domain/reduceCampaign.ts",
+        "sha256": "34c5ddf096b65690a734928fa04e0a3f5e157c10c2bfc4462d70f320fd9b880a"
+      },
+      {
+        "path": "src/games/caribbean/domain/replay.test.ts",
+        "sha256": "4b8775b9e7dc963a52222c31fd2616960460658b65cf7cb230eafdc823e524bc"
+      },
+      {
+        "path": "src/games/caribbean/domain/replay.ts",
+        "sha256": "66e160a5789d2169b9a8a63ad13f2017faee7414356ff1abe2f1a110dad8af70"
+      },
+      {
+        "path": "src/games/caribbean/domain/selectors.test.ts",
+        "sha256": "9c18c328f1d3d31e3247e8f91c35e60a809a7a675696830f20a88e1b69cf93e9"
+      },
+      {
+        "path": "src/games/caribbean/domain/selectors.ts",
+        "sha256": "76ddf3bcab712e91118d9db33af440cc852c3f9fdc7cfd5ae971627709be9f4d"
+      },
+      {
+        "path": "src/games/caribbean/domain/types.ts",
+        "sha256": "02834ec9efa36e11d21f1cb10194e7e48d606756e5547b2186d115cbc6986f27"
+      },
+      {
+        "path": "src/games/caribbean/domain/validateCampaign.test.ts",
+        "sha256": "fbb18642006f6da13156c0917cb2b345de8a1694e8d2f34290cfac5e06e1b635"
+      },
+      {
+        "path": "src/games/caribbean/domain/validateCampaign.ts",
+        "sha256": "4be6bed91a169c2a30cc710b937cb7c2eadda2b2022e6ee5aa8cd88e34bdd016"
+      },
+      {
+        "path": "src/games/caribbean/domain/voyage.test.ts",
+        "sha256": "54ecf4dfcb61389998b26e7a0cb916f711113fa858dd577cad93f193c479e7bf"
+      },
+      {
+        "path": "src/games/caribbean/domain/voyage.ts",
+        "sha256": "352f54f4e0a71e5a51862848eab7b1608a833358e2fe6e1184f50b4c53f1255c"
+      },
+      {
+        "path": "src/games/caribbean/index.ts",
+        "sha256": "0c2058533f682d048019c16dffc56f8f416dd338250adff50f1b19a1bbfb17dd"
+      },
+      {
+        "path": "src/games/caribbean/preview.tsx",
+        "sha256": "8f30bcce8cf4fa87ffb6d5a01d75a08205b7a5fc7e33fbb04403d7e9c7a6c35f"
+      },
+      {
+        "path": "src/games/caribbean/state/caribbeanControllerContract.test.ts",
+        "sha256": "30d12952763546b4ab97f29a58f45398d7ae4493e10556ee47e664d525d59f19"
+      },
+      {
+        "path": "src/games/caribbean/state/namedActionGate.test.ts",
+        "sha256": "3a43bf1ddc000aacd91a9ec05056e714e6da47250df3afbdc4a838569ae09413"
+      },
+      {
+        "path": "src/games/caribbean/state/namedActionGate.ts",
+        "sha256": "0e487062d11301d89fd3c49b5944a8f069804c7d0c474d15495a4252993373cd"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/FrameRunner.test.ts",
+        "sha256": "928897a4766e02fc008c4ef97f389fdbe6268008dd131bfb776e829bd8a7fd6f"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/FrameRunner.ts",
+        "sha256": "9d868823878b623abd2e1d7a3616dfdd597d9468c848284a905cbaf2efa0837e"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/NavalSession.test.ts",
+        "sha256": "36007094e9e8cf58c2f282f9ae46ee8c1620d47d4694655abdc3935937c11a93"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/NavalSession.ts",
+        "sha256": "d3932ac85dd68fcdb203904a8b1838533630c5486d21ba350cf085f7da5d6994"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/debugBridge.test.ts",
+        "sha256": "6f56fd0387ed33660a752c7c8d2bceedb1540041fc9c314c35496a6506cff200"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/debugBridge.ts",
+        "sha256": "b6cbab6bf2d69c6c838bcd75595f4c27620ef7a8273387dd7f8f0c03c2759046"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/harnessConfig.test.ts",
+        "sha256": "d7d57e4dfe324ca34404ce6057ecd1748b3897bfe87a8bbb95d072479c7b0720"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/harnessConfig.ts",
+        "sha256": "7f6cad6d395833caa35a90187fc6f73fabdc8b52ade6dcc6d18a56a8657fb66a"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/testSession.ts",
+        "sha256": "fdd14de90b8c749fe6e137b269deae621ff88f60062cc876d9f8778ed4b4cf66"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/useNavalSession.ts",
+        "sha256": "d9cf5c18fd32aa2d41c0eabf31aa205f13faa578e07f1c5d44633f6a7cd3ae0b"
+      },
+      {
+        "path": "src/games/caribbean/state/runtime.test.ts",
+        "sha256": "f1e0c44eea60770052de569312e5c627542fac9bece0fbce26ab242d87cc533e"
+      },
+      {
+        "path": "src/games/caribbean/state/runtime.ts",
+        "sha256": "34fa227e35916f27dd172b5e217cae77bfa850c0b8085740e0d11af16a387e33"
+      },
+      {
+        "path": "src/games/caribbean/state/selectors.test.ts",
+        "sha256": "5db310c50bf3d5a2883fc4a87f14ceefc85da5217453be861cdccdf0d26a8f26"
+      },
+      {
+        "path": "src/games/caribbean/state/selectors.ts",
+        "sha256": "8f526db1409c99b1e0685fbbb456d8a40bf46c8aafb69b35fcc50bd14ed0573a"
+      },
+      {
+        "path": "src/games/caribbean/state/toMemorySaveIntent.test.ts",
+        "sha256": "11c9c1cb3414a45ab8b1e7b2c529719b8669663a995eeb0c3f96d14f8d752fe6"
+      },
+      {
+        "path": "src/games/caribbean/state/toMemorySaveIntent.ts",
+        "sha256": "c3d7232852ebb51abae3d188a60c0b371bd4114ab6861803b7405536fc0eaa3f"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbean.test.tsx",
+        "sha256": "15f47053d54472520ae28cd15cc20f8b6ca0b860fa30b8698c46ff6b8bfe7346"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbean.ts",
+        "sha256": "f9979233d63e2be6e0d359e37cbb32561886877cdede44f132dabea0a5ba606c"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanActionsMemory.test.tsx",
+        "sha256": "6da66eb524d4b07e8ad33fef584203b1cd183565d905fa01665c616f228e4287"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanActionsPersistedCombat.test.tsx",
+        "sha256": "a35aa0d359aed2a1661ff1588874342fca49dffc797013d1a54e211acf61cbfd"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanActionsPersistedTransit.test.tsx",
+        "sha256": "f7bf0b1963a3158f47f97f2044426bd0bcc226bb97c75d78a56a3d0a2e26d898"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanActionsTestSupport.tsx",
+        "sha256": "4c93d1f163d41b80e0a144056fbebf811e1751500f2fccbee794b8f62357e65c"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanActionsWrongPredecessor.test.tsx",
+        "sha256": "8542210162c4cf83f2ba0d61e26a95fb70423f2c3a0300d9c7c42cd93c120fa8"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationAvoidEffects.test.tsx",
+        "sha256": "b279db88ffc22917b301ca6dc34e1777ed0f9b655acc0a2f49e408f72855b8dc"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationEffects.test.tsx",
+        "sha256": "19285b8e27b46c496062c2ff394ab803e1ec7f018eeeb929039c54d2b935ef6e"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationEffectsMore.test.tsx",
+        "sha256": "a7622d06b3ed40f86a7dd0e9f3b24796e1d3b641e509f44410cf14897e9e06e9"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationLifecycle.test.tsx",
+        "sha256": "18db58b1f4a0581837335ca8b57d26ef3bd0c3541659391253aacb71a3d6991c"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationResolveEffects.test.tsx",
+        "sha256": "233b3052201ebf3a557d4245267e5a7c386bba06c8836eb61f85f06582ad8600"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationWithdrawEffects.test.tsx",
+        "sha256": "9fa9b5e78cb27b114c0d8e427445a62a4d27ef33435b767d2364e1870704725d"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanResolveFailure.test.tsx",
+        "sha256": "fafdce3204d4cd5da17c96afdc5d8a01f3e75977eadaf078f41b21c933c15d89"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanSavedNavalResume.test.tsx",
+        "sha256": "9356edfc3e92aa12264f942fa8519d0f4aae96afeb4b405f5624b5dd1f74e7ee"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanThreshold.test.tsx",
+        "sha256": "9e951255d0a531da854588efb8ce0d8c8abfab98b8663ecdad92377debc8afac"
+      },
+      {
+        "path": "src/games/caribbean/storage/checksum.test.ts",
+        "sha256": "c30c400ac2488139622c20c62ed49cc76819d49fb4a0276c55cc7f536471d20b"
+      },
+      {
+        "path": "src/games/caribbean/storage/checksum.ts",
+        "sha256": "072bfe1c33d15722da9127759365f5ac7711c128773ef48ffff8c6e882b64ae2"
+      },
+      {
+        "path": "src/games/caribbean/storage/compactionPolicy.test.ts",
+        "sha256": "c6c9f20f6718eb1e12086572b5a13079df6d573f3fb88ca6e5f1fc7bc334dc1f"
+      },
+      {
+        "path": "src/games/caribbean/storage/compactionPolicy.ts",
+        "sha256": "0e3c8b8b072f57fa5d1ad3a821bf1ae13769d48e78d7f38a3bb2588f45228f9c"
+      },
+      {
+        "path": "src/games/caribbean/storage/migrations.ts",
+        "sha256": "81bbd2f266e8e9130be261b3d3d5bb608b98639b5ddcb02a978c0368a9202eaa"
+      },
+      {
+        "path": "src/games/caribbean/storage/persistence.test.ts",
+        "sha256": "6cb230df61ca7456738ad429d1553031aa703d7eefad372408c00a407f9cdb7c"
+      },
+      {
+        "path": "src/games/caribbean/storage/persistence.ts",
+        "sha256": "283aa86e88656bd15f0dbdb734c3a6e70fec993af324cd0429915a2833845a58"
+      },
+      {
+        "path": "src/games/caribbean/storage/recovery.test.ts",
+        "sha256": "4d1be2f45d377c620fb5ec79372abe7163a2ab76a18b7fb5b9c4a4b2d4d33449"
+      },
+      {
+        "path": "src/games/caribbean/storage/recovery.ts",
+        "sha256": "54b30ab09efb5512a0b2d60a6f2f35f49fea7849a88cd11f5ecb37a8319c4906"
+      },
+      {
+        "path": "src/games/caribbean/storage/schema.test.ts",
+        "sha256": "3a4e7435d6077ee70edada05d659c52e8b021ca9cbc8cb87f48b30eb369069c4"
+      },
+      {
+        "path": "src/games/caribbean/storage/schema.ts",
+        "sha256": "66aa4488ceb349ef1901fd28ed47acfd25e56f6cc75a30a52825008d8e7b9389"
+      },
+      {
+        "path": "src/games/caribbean/storage/writer.test.ts",
+        "sha256": "197fab65322ae90c441fae50459c367b6a51fe36be1e0ba1d32f4edcc6cdfd7d"
+      },
+      {
+        "path": "src/games/caribbean/storage/writer.ts",
+        "sha256": "f4e5af769c98b974c0d3945df2637aaa7898fa0335e574a08728a76d1cf6de81"
+      },
+      {
+        "path": "src/games/caribbean/styles/battle.css",
+        "sha256": "35e43a8c1b0aed1d268ff030ac07036396ec2e8f422c094d74598f9dbc122202"
+      },
+      {
+        "path": "src/games/caribbean/styles/battleResponsive.test.tsx",
+        "sha256": "5a77924c23e80987986aefe3667ea9d371a79c9fbd6ea3cb0e2e2d145755adb5"
+      },
+      {
+        "path": "src/games/caribbean/styles/caribbean.css",
+        "sha256": "0ed3cc775019588d5322fff4adc19947040093ebd634b9daf5a56ba6c1e6857f"
+      },
+      {
+        "path": "src/games/caribbean/styles/port.css",
+        "sha256": "bde3605b79b100207a30754c2455ad48a912c4dd9f31bd32ed41a75d1159a57d"
+      },
+      {
+        "path": "src/games/caribbean/styles/production.css",
+        "sha256": "dcf71d148ca641c4e40225d456bfeee7948de0c8accba5c3ad2854544b012846"
+      },
+      {
+        "path": "src/games/caribbean/styles/theme.css",
+        "sha256": "5a0749ee2b1722e50d8955a9b864893ed20374b137a65c84ac95c1acb24443ea"
+      },
+      {
+        "path": "src/games/caribbean/styles/voyage.css",
+        "sha256": "29685eddef31c9a852e8c3fe8f714d4cab54700afff7ff22db7ec63863fcb584"
+      },
+      {
+        "path": "src/games/caribbean/styles/voyageResponsive.test.tsx",
+        "sha256": "f8e247310a5c36a3a9c89ae65a1bd4dfcfcbf6163c428d7c1210c3a2c6c3c2e4"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/NavalScene.test.ts",
+        "sha256": "5e6cc714c5b83fe66659b10afd8030a0f65f565f80be42933e048d266fae4ecf"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/NavalScene.ts",
+        "sha256": "52bae7ae478677674408d500617ab96125a2eafb5321000d1d2f2079e44a3372"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/bearingLine.test.ts",
+        "sha256": "d0bc4f21a18d6540db9021a843bba00250eb47c2c4426d13ff87cf8147ecc950"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/bearingLine.ts",
+        "sha256": "0a193d391c046df68e26714e5f98b97f2f51313ca63e929de400bb674bf5c17a"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/effects.test.ts",
+        "sha256": "81b11ea0a6a9b9ca24a65014345f0b4e27844b24ac46386a3ecb783052e9aa90"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/effects.ts",
+        "sha256": "34369d3de07c162900632a08db2858a5a4ede9d6e766f2293b19a97a1f26fe12"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/quality.test.ts",
+        "sha256": "be5a849d802758e41bdbd9e7a42726afcb8f74c8a640c1c41ac8b818f304943e"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/quality.ts",
+        "sha256": "24bf2cc447d8e2856032b860bd303968fdeae36d0151a2647a207221ed066e1b"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/sceneMath.test.ts",
+        "sha256": "91ab6e4828f6b9b3e31ac003517798c82fcb1d87f57159d43bb4102c3adc31ad"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/sceneMath.ts",
+        "sha256": "0074a63c299dfd71440bc878bf3b1eb894eb34c23e7bfe9d319e74850370c296"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterPresentation.test.ts",
+        "sha256": "4b5b4ec73d03dcad83357df6dbf64884623db025f299c794ce0f84ca84a483f6"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterPresentation.ts",
+        "sha256": "0d4e5387c402ce8a3855d2aee89eb0aa9b0460121ad5d6dcdb17d1e064b9c893"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterShader.test.ts",
+        "sha256": "9baf568ddee47e46e754927b3f78f07705f5604be745e8f3fa05200646d6fc03"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterShader.ts",
+        "sha256": "8f8f0add5b639e629a5da25aa009418fa63eb96fb6cfa612c6cc3e5b76350e78"
+      },
+      {
+        "path": "src/games/caribbean/three/shared/loadSloop.test.ts",
+        "sha256": "e113bfbe3effa52fee45a5ec6501d73c6a20324b9b70ef7a034092993ca1ab66"
+      },
+      {
+        "path": "src/games/caribbean/three/shared/loadSloop.ts",
+        "sha256": "1143fd52611873b8caaff265b8fcd82cd3ec06eb02c2682283292b0f8dc76f84"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-bishop.glb",
+        "sha256": "b11b80c021edf29d7d9db7774ecdd187b6930595757be1f194616ea6cda85945"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-king.glb",
+        "sha256": "7e89993f979f9d29d3702b3133c1b4776b419e9e406dd28391d4f7b84b59ca7d"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-knight.glb",
+        "sha256": "8505975e0d646062127a4afc3c9a615b4fdcf8260bd9f2de49a0fd993f48e175"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-pawn.glb",
+        "sha256": "ccf04f15f11777ab58ff3cd5295dfe33401249ece3d7d0fc6b1f51554cc2bdcd"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-queen.glb",
+        "sha256": "98b54a79224e04bf45c4cba8542f08360f077ce29091c9a285c6fde5ec9cf0d9"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-rook.glb",
+        "sha256": "20de3e22dae18dd6f2c5d90be7a072b7b28720e39d30474d7164020fe55b44d9"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-bishop.glb",
+        "sha256": "6514849042f570247b556ab27e8babf4eefe6bbf082008e323377c547485712d"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-king.glb",
+        "sha256": "4f4610530d8d7276d11bae555f24b25bce8b2baf9ad34d4c4edff6f18e3ebecd"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-knight.glb",
+        "sha256": "bb6dadce331bd6d610e05e55ef59b568175ff43a6e93776546b8c4b20fe9c45d"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-pawn.glb",
+        "sha256": "16d7ba5f3df96206e5c906732cae61ea627cd92153027f4b0c857b8e2831a1f7"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-queen.glb",
+        "sha256": "9a20c2ec5b7aa05ca644175722da569bbd8847d95ca872bff34061d149dc754f"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-rook.glb",
+        "sha256": "4b9072239bf13322151fa413f3e0c46f44e8b89dfa755a935dbf2a1dea8025b1"
+      },
+      {
+        "path": "src/games/chess/components/Chess3D.tsx",
+        "sha256": "920e6d9335ce636e7aab658f36ab5372ee191e218b4e6b18cb42dbd657e7989b"
+      },
+      {
+        "path": "src/games/chess/components/ChessBoard.tsx",
+        "sha256": "5c7a272e18204a384dbbf8c09d20f99f6beefa8f232a975b9ca2855bde7f69d3"
+      },
+      {
+        "path": "src/games/chess/components/ChessLogModal.tsx",
+        "sha256": "0a82ccba29e2459592c9f8500babcf43634ec53047cd81dc0c0accbd2aed6858"
+      },
+      {
+        "path": "src/games/chess/components/ChessPage.tsx",
+        "sha256": "c788b7d42b7925dc1274c3c44ed17b67185e5996548b3e25ce3f8137416d7580"
+      },
+      {
+        "path": "src/games/chess/components/ChessResult.tsx",
+        "sha256": "f43dd1ddb5fe095b3adee082278e1513c7f8fc454133886cb7c87192f445eee0"
+      },
+      {
+        "path": "src/games/chess/components/FreePlay.tsx",
+        "sha256": "14d8e827ee33a5cba74468c2e241d5860ea9efcae8bef1bab305f0c9a4357589"
+      },
+      {
+        "path": "src/games/chess/components/FreePlay3D.tsx",
+        "sha256": "0273ce0a78e0377fa9ba20a0640db41656efb4a34724b2b023b31f0b98e1962c"
+      },
+      {
+        "path": "src/games/chess/components/chessPieces.tsx",
+        "sha256": "ed3917612ae0837c988a1729cb02fd2dd52114ff0f294fbe5b93058c8bac4a81"
+      },
+      {
+        "path": "src/games/chess/components/chessTheme.tsx",
+        "sha256": "c74af56c9e33508f297db74369fcf1b03abdeb7c2cfb60453bd8b309eaa356e1"
+      },
+      {
+        "path": "src/games/chess/components/three/ChessScene.ts",
+        "sha256": "944640ce90812330e4ef97649a38c48c89685005546aa73801be268a5741ec49"
+      },
+      {
+        "path": "src/games/chess/domain/analysis.ts",
+        "sha256": "69836de316c2ceaf7788d8e6d422370164ab79e25c4c84e8b230d4a21d18ce99"
+      },
+      {
+        "path": "src/games/chess/domain/fen.ts",
+        "sha256": "df380aa7760bb408108ad6cf547f712dddd0c27416b9c9b981438a6c094c0af7"
+      },
+      {
+        "path": "src/games/chess/domain/protocol.ts",
+        "sha256": "6922220767c60a5a3d78715039505fa66b6e71237e354a937acac4a067aa8cb5"
+      },
+      {
+        "path": "src/games/chess/domain/rules.ts",
+        "sha256": "e6c6e254f0c9f12325bacab6ef2a1b403a0ee6a429fcad715893eaec06781a5d"
+      },
+      {
+        "path": "src/games/chess/domain/session.ts",
+        "sha256": "2cbc2fa96739d04f7bacc1df3b36840b8980d140e403f1ce2d3fc68285705592"
+      },
+      {
+        "path": "src/games/chess/domain/types.ts",
+        "sha256": "ba1506b81aa612fbb7bc2e59d30a6aafe1d896d3afec7339faee6b193fa08d98"
+      },
+      {
+        "path": "src/games/chess/index.ts",
+        "sha256": "93b69e2f46eacc6fbcdd9487e185ee78c51f02394608bd2b75a2bddc92bc0938"
+      },
+      {
+        "path": "src/games/chess/state/useChess.ts",
+        "sha256": "fc76a05e8510ca312cea35cbf3401c5fb277ad0a7371a3eb26693081c46f96ea"
+      },
+      {
+        "path": "src/games/chess/storage/chessPersistence.ts",
+        "sha256": "acd7b963b66d9453f9d0c5649243855a0bad8405d53a4851b67729953d7369f9"
+      },
+      {
+        "path": "src/games/chess/styles/chess.css",
+        "sha256": "b103aa2a54e62f16b877246f51c6b3edd5f5b038fec0f1275bf0679876eaf89c"
+      },
+      {
+        "path": "src/games/racer/components/RacerPage.tsx",
+        "sha256": "754b04368bb31272cf034d6371606242437cc1a0b977f118958fd164ed47a7d3"
+      },
+      {
+        "path": "src/games/racer/components/RacerSetup.tsx",
+        "sha256": "57ecc930e52adc6dbe2fe2092bc8ae7532c559e272f194c3de52a68f21a414f7"
+      },
+      {
+        "path": "src/games/racer/components/Track3D.tsx",
+        "sha256": "37e85de69751ffeed3baa740e797f94824772a20a25c659ec38217ed6d0d4d94"
+      },
+      {
+        "path": "src/games/racer/components/WinOverlay.tsx",
+        "sha256": "737c0a2441d008918404c3d7d66d2d3b0ad45f466d87df2d4455bca72fafd8c2"
+      },
+      {
+        "path": "src/games/racer/domain/kart.ts",
+        "sha256": "79d98c2f1a8ce4aa06c53ce97262b213a3d92fc946b16561a3bb2b7b6fd7e797"
+      },
+      {
+        "path": "src/games/racer/domain/race.ts",
+        "sha256": "322707635b8092ff6eec236323fb58e3c40eaa6a9bb13aac068ca74ba8c9808e"
+      },
+      {
+        "path": "src/games/racer/index.ts",
+        "sha256": "16852217619ed18f441cb3800a54aba016769b0ec50fab0a1fa237027dd0a4a6"
+      },
+      {
+        "path": "src/games/racer/net/protocol.ts",
+        "sha256": "be1ab6a301b535b497fff334511590dc2b3927314a853e15a6cd77e376ca56e3"
+      },
+      {
+        "path": "src/games/racer/net/useRacerNet.ts",
+        "sha256": "f2b0f67b6f7f40e3683881d831bd890e32fe36c98892d5644a075bf1a8296c3c"
+      },
+      {
+        "path": "src/games/racer/styles/racer.css",
+        "sha256": "6048f499c4686f8101a2e41e3d50dbf89e7415372299cd3cf83791ec15baab70"
+      },
+      {
+        "path": "src/games/racer/three/scene.ts",
+        "sha256": "f998fc7dc2fa67637eb9fec7aa6b1cb723a264697ff12e861c562b8c5cda6d61"
+      },
+      {
+        "path": "src/games/risk/components/RiskBoard.tsx",
+        "sha256": "9fee4b1a7aa9ad89fea118524c693a7d7ea30a3e08de400ac89fe28cc2e31230"
+      },
+      {
+        "path": "src/games/risk/components/RiskPage.tsx",
+        "sha256": "fca2aaf3fe1ce49b04469728a80de09992098b9a3a72b4c97b1167cc49597bba"
+      },
+      {
+        "path": "src/games/risk/components/paperGrain.ts",
+        "sha256": "c1e6ead2ac7078b18b7d2de33cf54046899cd49fe07882070f37824a8bcf02c1"
+      },
+      {
+        "path": "src/games/risk/components/useMapZoom.ts",
+        "sha256": "5f9000ab9afe165cde181b566a01f8448254e57319357e405bbfb19dd9f8180f"
+      },
+      {
+        "path": "src/games/risk/domain/bots/decide.ts",
+        "sha256": "894924123bfb0caa55e2a1319147239147d8a1488761db1dc8bdd002902fe760"
+      },
+      {
+        "path": "src/games/risk/domain/bots/index.ts",
+        "sha256": "d39c15ff94f9342c53159be86982b59f09c4ad62a6924da7a80b23f955252f05"
+      },
+      {
+        "path": "src/games/risk/domain/bots/personas.ts",
+        "sha256": "75b70af59a808052a323be3db0199a17ecba584610b4a6e03d8277e72c472284"
+      },
+      {
+        "path": "src/games/risk/domain/rules.ts",
+        "sha256": "da9bfeacd1fb87c52a51ebed204519c7ea628035ef42dfe067ed7a0a404b5677"
+      },
+      {
+        "path": "src/games/risk/domain/types.ts",
+        "sha256": "257e2dbacd1405a03c06d315b3908e44ec36f4d6deca0525382ad78ad25755e0"
+      },
+      {
+        "path": "src/games/risk/index.ts",
+        "sha256": "145f7945d4ec8355aae84baab7472ff4c20839b3249e11f710d5e2143f31a2dc"
+      },
+      {
+        "path": "src/games/risk/maps/registry.ts",
+        "sha256": "293f9d74bcd95b3cf1a46504ef5a871a5bb8c727c5b25ff614ef47966cceb459"
+      },
+      {
+        "path": "src/games/risk/maps/types.ts",
+        "sha256": "4408b8a39d168c93abc85526f61cab0ccb690d3dd87361446c3c41b1130a6054"
+      },
+      {
+        "path": "src/games/risk/maps/world.ts",
+        "sha256": "5edddfefc6ef89c10c4fcacc1bbec8cc868dde9234c90d95ea7ae6005dae9c9b"
+      },
+      {
+        "path": "src/games/risk/state/useRisk.ts",
+        "sha256": "e1790b7f5b4138a8c7579858ce48abfa582c2d9b7b998634f638b06225a0eab9"
+      },
+      {
+        "path": "src/games/risk/storage/riskPersistence.ts",
+        "sha256": "7e9ac90a3d9b8df4334c819447285248339ea2d99e9ea8501ce08aefd7192027"
+      },
+      {
+        "path": "src/games/risk/styles/risk.css",
+        "sha256": "97546f24168b2b595b482c6718735ef43b5ab02df61d515555de6c150a05edbb"
+      },
+      {
+        "path": "src/games/unicorn/components/UnicornPage.tsx",
+        "sha256": "00470a7ef68c14ba1fc58243b7dd3c9bd68354b9bce28857e29965e24f59bb3e"
+      },
+      {
+        "path": "src/games/unicorn/components/scene.ts",
+        "sha256": "a7f61b4aa97b39bca5b9dc8d0c112208edd3d206842887022d956ebf243fba31"
+      },
+      {
+        "path": "src/games/unicorn/domain/content.ts",
+        "sha256": "b79dcae5e005403500b2d55bb37b2738af508e218ffa2f28019cf84b95158c59"
+      },
+      {
+        "path": "src/games/unicorn/domain/engine.ts",
+        "sha256": "848182469124f10944729e3c00e19afe268390a2bcb7e9b53dda4540de500e71"
+      },
+      {
+        "path": "src/games/unicorn/domain/input.ts",
+        "sha256": "26689fc798f9416a47f5fceed3fe3b8ca428677c9f28b191541a478c94b0025a"
+      },
+      {
+        "path": "src/games/unicorn/index.ts",
+        "sha256": "becee7d60aa2d47afa910963e209a7000aeb9b74c74b5fc1eb33fcf2be55e554"
+      },
+      {
+        "path": "src/games/unicorn/styles/unicorn.css",
+        "sha256": "e67250ee89d662b8da15788419c49555b3913b174511bd593cf6f362ccf010d3"
+      },
+      {
+        "path": "src/shared/game.ts",
+        "sha256": "deec4995a8fe1bfea23ae25e49eefb3371dfb496b5cd49463f8c9f21a990bd9d"
+      },
+      {
+        "path": "src/shared/net/media.ts",
+        "sha256": "3f70ccf9909a50ebee6f7be4dbfb93b6595a033e72fd1c96ed642cb52fcea8a7"
+      },
+      {
+        "path": "src/shared/net/peer.ts",
+        "sha256": "396bc6139f0a0dfca1aef4febdfc785fe013ea62b26d7a34316fe6603a3d0fba"
+      },
+      {
+        "path": "src/shared/party/FloatingVideo.tsx",
+        "sha256": "3ff05d82b6f4273f5daf628da64062eed895e8706f13157696081d73a86f4640"
+      },
+      {
+        "path": "src/shared/party/PartyBar.tsx",
+        "sha256": "8ca714fc57f5c12ed130cb51d7fa930b64c7ba0a3a3a6208e3233429bb399675"
+      },
+      {
+        "path": "src/shared/party/PartyContext.tsx",
+        "sha256": "edb75b1fd16d5af8b271d34eed7ce2885a2a67394f3a65a2b318d11d50fe1fdd"
+      },
+      {
+        "path": "src/shared/party/party.css",
+        "sha256": "82954f524182b98e44a545f032de6b4a4b3266adeb6c40653aae9e63b3ee08c3"
+      },
+      {
+        "path": "src/shared/party/protocol.ts",
+        "sha256": "e6454fab1f1f228d220d3a61e5b756d396f9900e2a026feed3b256cb3b5d01ea"
+      },
+      {
+        "path": "src/shared/profile/PlayerGate.tsx",
+        "sha256": "64bc8530f36c0f08cd801f64d78d5a0307f4720f7c624ee9ff82456ffdde377c"
+      },
+      {
+        "path": "src/shared/profile/player.css",
+        "sha256": "c7d55ef2b16cae65421ca98f13c61b6c1ccca437919478711cad0ff72a968e62"
+      },
+      {
+        "path": "src/shared/profile/playerColors.ts",
+        "sha256": "63ba0d8a6041bfed8b5b1dbb42b7bef6d036cb2e5fe8aae90536faa1924e7f52"
+      },
+      {
+        "path": "src/shared/profile/profile.ts",
+        "sha256": "c22fb2d8efe525223e3ad62ff95214cc23be297ec117ae0317023a1be7e1536f"
+      },
+      {
+        "path": "src/shared/profile/profileStore.ts",
+        "sha256": "f76c224e1d925fabe2878fa6d11131790d4baeda1ae1ffe0fd218212e8223f7a"
+      },
+      {
+        "path": "src/shared/profile/recentNames.ts",
+        "sha256": "3ba29a25dbd0cc3ef679928a2151b8823eb25de72d20f8fb5f5ffe6da9e0aa84"
+      },
+      {
+        "path": "src/shared/profile/useProfile.ts",
+        "sha256": "a48b8a182e0657a3461da449e523de8089f59cd22701eecee48af992d07c19db"
+      },
+      {
+        "path": "src/shared/profile/useUsers.ts",
+        "sha256": "767480f8a428523177a5bec9727f144d6aa162ab5465e921d8c164c9fc690297"
+      },
+      {
+        "path": "src/shared/profile/users.ts",
+        "sha256": "ee0e837b6b4d3ff8c1b1ecc70b0e60c66aed140942dd5920c5cd49a61b7617e1"
+      },
+      {
+        "path": "src/shared/profile/usersStore.ts",
+        "sha256": "372065f30198b29d5980aa8c262f51703080b97b481f119f8e589121ed0213ea"
+      },
+      {
+        "path": "src/shared/reconcile.ts",
+        "sha256": "2d9f0b6572bc4fc8ece3be52915dc2b193c36bab9c6f623c208f1b0d87d3f844"
+      },
+      {
+        "path": "src/shared/rng.ts",
+        "sha256": "04c55d204b55d01ac75c12198ff9e9619d18280b27024cd29396b816d49e4f02"
+      },
+      {
+        "path": "src/shared/storage/kv.ts",
+        "sha256": "ef6f14737473aff26c5418485c4cdaf515d539b07c9071878cb825a5ce18d88a"
+      },
+      {
+        "path": "src/shared/styles/tokens.css",
+        "sha256": "2aa0dc430eb48cc80d2a5126a6d2d56614b8a278c1094ab849caf1366125684f"
+      },
+      {
+        "path": "src/shared/three/disposeDeep.ts",
+        "sha256": "59388e95caf6611150f30041b486a551c30a0807be71e82a280193d43458e810"
+      },
+      {
+        "path": "src/shared/ui/ConnectionBadge.tsx",
+        "sha256": "a81d1860d479e293ff52465d88d43ea5a4c56609b68c03070da1bc1b3cc68c03"
+      },
+      {
+        "path": "src/shared/ui/ErrorBoundary.tsx",
+        "sha256": "ed971e0c22269f4c1c5de61a734b45a0ff9b38cef9c638d8c79747cae9b6897d"
+      },
+      {
+        "path": "src/shared/ui/FullscreenButton.tsx",
+        "sha256": "23c0adae25fdc0c455e36384e98218de0b21bb417b3d4e31e69f6268cb46de6a"
+      },
+      {
+        "path": "src/shared/ui/NamePicker.tsx",
+        "sha256": "1a465cf0ea28997770db16dfa18a8dba62d80e25a5f817144bcf26a9476e8f07"
+      },
+      {
+        "path": "src/shared/ui/VictoryFX.tsx",
+        "sha256": "a2575c855506d0f9a6f307612ef7bda58abc72036d40e48bf37c357227679a3a"
+      },
+      {
+        "path": "src/shared/ui/icons.tsx",
+        "sha256": "66c78c04e8e39014aa0b10e4aae579c9fdc3f8d2abf42c89643dd05478b226a2"
+      },
+      {
+        "path": "src/shared/ui/useDismissOnEscape.ts",
+        "sha256": "6c2e25e09a666ce80ea939d5a51784939285a8255a91c907ee67aa7f54a1aafa"
+      },
+      {
+        "path": "tsconfig.app.json",
+        "sha256": "a831b954ad548bdd3717062f416ed7ee249152f9fed9350140dbf2c2ebb5a9a3"
+      },
+      {
+        "path": "tsconfig.json",
+        "sha256": "770b4140bbb581e2dfd9ea9946ffc9c75a1d86ba7d2db5f77c83e37cbdf9d808"
+      },
+      {
+        "path": "tsconfig.node.json",
+        "sha256": "ea3a56ad2b1d3c9b012d82a31090c90e508a9300b03d88d11189f4668fcb995b"
+      },
+      {
+        "path": "vite.config.ts",
+        "sha256": "98bd8c562cf5cd049bd7ca4861fa8cf8b339cb23c77841a04f53d29136149d22"
+      }
+    ],
+    "sourceHash": "cd4a2e69be451f02da1cda47129cbfc82e17c4c62c1684a14d31dfd936c83332",
+    "canonicalInput": {
+      "battleId": "battle-lab-red-jackdaw",
+      "seed": 1702
+    },
+    "viewports": {
+      "tablet": {
+        "width": 1180,
+        "height": 820
+      },
+      "desktop": {
+        "width": 1440,
+        "height": 900
+      },
+      "minimum": {
+        "width": 1024,
+        "height": 768
+      },
+      "boundary": {
+        "width": 960,
+        "height": 600
+      },
+      "phonePortrait": {
+        "width": 430,
+        "height": 932
+      },
+      "phoneLandscape": {
+        "width": 844,
+        "height": 390
+      }
+    },
+    "screenshots": [
+      {
+        "name": "battle-boundary-supported.png",
+        "width": 960,
+        "height": 600,
+        "state": "battle-boundary"
+      },
+      {
+        "name": "battle-desktop.png",
+        "width": 1440,
+        "height": 900,
+        "state": "battle"
+      },
+      {
+        "name": "battle-minimum-supported.png",
+        "width": 1024,
+        "height": 768,
+        "state": "battle-minimum"
+      },
+      {
+        "name": "battle-tablet-landscape.png",
+        "width": 1180,
+        "height": 820,
+        "state": "battle-tablet"
+      },
+      {
+        "name": "boarding-ready-result.png",
+        "width": 1180,
+        "height": 820,
+        "state": "boarding-ready"
+      },
+      {
+        "name": "briefing-tablet.png",
+        "width": 1180,
+        "height": 820,
+        "state": "briefing"
+      },
+      {
+        "name": "broadside-handedness.png",
+        "width": 1180,
+        "height": 820,
+        "state": "starboard-broadside"
+      },
+      {
+        "name": "decision-tablet.png",
+        "width": 1180,
+        "height": 820,
+        "state": "decision"
+      },
+      {
+        "name": "fallback-tablet-landscape.png",
+        "width": 1024,
+        "height": 768,
+        "state": "fallback"
+      },
+      {
+        "name": "minimum-screen-phone-landscape.png",
+        "width": 844,
+        "height": 390,
+        "state": "unsupported-landscape"
+      },
+      {
+        "name": "minimum-screen-phone-portrait.png",
+        "width": 430,
+        "height": 932,
+        "state": "unsupported-portrait"
+      }
+    ],
+    "asset": {
+      "path": "/assets/caribbean-sloop-P-mk3eaS.glb",
+      "sha256": "36c9b53aeebe28706932af7d66d67e3a9a545ac1a4ea00ad5ffd944876270320"
+    },
+    "handedness": {
+      "portVectorPositiveX": true,
+      "starboardVectorNegativeX": true,
+      "portMuzzlePositiveX": true,
+      "starboardMuzzleNegativeX": true,
+      "steeringPortPositive": true,
+      "steeringStarboardNegative": true,
+      "rudderReleased": true
+    },
+    "outcome": {
+      "ok": true,
+      "outcome": "boarding-ready",
+      "initial": {
+        "distance": 7.02,
+        "outcomeInjected": false,
+        "damageInjectedAfterStart": false,
+        "timeInjected": false,
+        "opponent": {
+          "hull": 72,
+          "sails": 30,
+          "crew": 18,
+          "cannon": 6
+        }
+      }
+    },
+    "fallback": {
+      "ok": true,
+      "chart": true,
+      "retry": true,
+      "restart": true,
+      "battleControls": true,
+      "labelsClear": true
+    },
+    "motion": {
+      "normal": {
+        "preference": "no-preference",
+        "reducedMotion": false
+      },
+      "reduced": {
+        "preference": "reduce",
+        "reducedMotion": true
+      }
+    },
+    "display": {
+      "supported": {
+        "boundary": {
+          "battle": true,
+          "notice": false,
+          "fullBleed": true,
+          "centerClear": true,
+          "controlsVisible": true,
+          "touchSized": true,
+          "labelsContained": true,
+          "shortcutKeys": true,
+          "sailControl": true,
+          "noOuterScroll": true
+        },
+        "desktop": {
+          "battle": true,
+          "notice": false,
+          "fullBleed": true,
+          "centerClear": true,
+          "controlsVisible": true,
+          "touchSized": true,
+          "labelsContained": true,
+          "shortcutKeys": true,
+          "sailControl": true,
+          "noOuterScroll": true
+        },
+        "minimum": {
+          "battle": true,
+          "notice": false,
+          "fullBleed": true,
+          "centerClear": true,
+          "controlsVisible": true,
+          "touchSized": true,
+          "labelsContained": true,
+          "shortcutKeys": true,
+          "sailControl": true,
+          "noOuterScroll": true
+        },
+        "tablet": {
+          "battle": true,
+          "notice": false,
+          "fullBleed": true,
+          "centerClear": true,
+          "controlsVisible": true,
+          "touchSized": true,
+          "labelsContained": true,
+          "shortcutKeys": true,
+          "sailControl": true,
+          "noOuterScroll": true
+        }
+      },
+      "unsupported": {
+        "landscape": {
+          "notice": true,
+          "battle": false,
+          "liveFrame": false,
+          "focused": true
+        },
+        "portrait": {
+          "notice": true,
+          "battle": false,
+          "liveFrame": false,
+          "focused": true
+        }
+      },
+      "resize": {
+        "notice": true,
+        "noticeFocused": true,
+        "battleUnmounted": true,
+        "tickStopped": true,
+        "restoredWithNewSession": true
+      },
+      "prebattle": {
+        "decision": {
+          "legendComplete": true,
+          "ctaVisible": true,
+          "noOuterScroll": true
+        },
+        "briefing": {
+          "legendComplete": true,
+          "ctaVisible": true,
+          "noOuterScroll": true
+        }
+      }
+    }
+  },
+  "observations": {
+    "fpsSamples": [
+      75,
+      78,
+      79,
+      78,
+      83,
+      81,
+      84,
+      79,
+      78,
+      76,
+      79,
+      84,
+      75,
+      85,
+      79,
+      80,
+      80,
+      78,
+      77,
+      83
+    ],
+    "sustainedFps": 77.333,
+    "maxDrawCalls": 32,
+    "maxTriangles": 7870,
+    "boardingDuration": 0.209,
+    "samples": [
+      {
+        "fps": 75,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 32,
+        "triangles": 7337,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 16,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 354,
+        "cameraIntermediateFrames": 177,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 185,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 28,
+        "triangles": 6854,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 1,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 594,
+        "cameraIntermediateFrames": 297,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 247,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 79,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 714,
+        "cameraIntermediateFrames": 357,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 307,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 834,
+        "cameraIntermediateFrames": 417,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 367,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 83,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1074,
+        "cameraIntermediateFrames": 537,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 428,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 81,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1194,
+        "cameraIntermediateFrames": 597,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 488,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 84,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1314,
+        "cameraIntermediateFrames": 657,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 542,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 79,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1554,
+        "cameraIntermediateFrames": 777,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 608,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1674,
+        "cameraIntermediateFrames": 837,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 663,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 76,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1794,
+        "cameraIntermediateFrames": 897,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 723,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 79,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2034,
+        "cameraIntermediateFrames": 1017,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 783,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 84,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2154,
+        "cameraIntermediateFrames": 1077,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 845,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 75,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2274,
+        "cameraIntermediateFrames": 1137,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 905,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 85,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2514,
+        "cameraIntermediateFrames": 1257,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 966,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 79,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2634,
+        "cameraIntermediateFrames": 1317,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1027,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 80,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2754,
+        "cameraIntermediateFrames": 1377,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1087,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 80,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2994,
+        "cameraIntermediateFrames": 1497,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1147,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 3114,
+        "cameraIntermediateFrames": 1557,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1208,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 77,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 3234,
+        "cameraIntermediateFrames": 1617,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1268,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 83,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 26,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 3474,
+        "cameraIntermediateFrames": 1737,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1323,
+        "paused": false,
+        "outcome": null
+      }
+    ],
+    "growthAfterWarmup": {
+      "textures": 0,
+      "geometries": 0,
+      "materials": 0,
+      "bufferAttributes": 0,
+      "activeEffects": 16,
+      "effectCapacity": 0
+    },
+    "failures": {
+      "console": [],
+      "page": [],
+      "requests": [],
+      "unhandledRejections": [],
+      "allocation": [],
+      "capacity": [],
+      "pool": []
+    }
+  },
+  "source": {
+    "headCommitAtCapture": "7415da7c24d6c8f4073e9d547a673c69ed08e2d1",
+    "worktreeDirtyBeforeCapture": false,
+    "sourceTreeSha256": "cd4a2e69be451f02da1cda47129cbfc82e17c4c62c1684a14d31dfd936c83332",
+    "sourceTreeFiles": [
+      "index.html",
+      "knip.json",
+      "package-lock.json",
+      "package.json",
+      "preview-b.html",
+      "preview-battleship.html",
+      "preview-caribbean-game.html",
+      "preview-caribbean.html",
+      "preview-carrier.html",
+      "preview-ship.html",
+      "public/CNAME",
+      "public/apple-touch-icon.png",
+      "public/calculator.html",
+      "public/icon-192.png",
+      "public/icon-512.png",
+      "public/icon.svg",
+      "scripts/caribbean-naval-check.mjs",
+      "scripts/caribbean-port-check.mjs",
+      "scripts/fixtures/caribbean-campaign-victory.json",
+      "scripts/lib/caribbean-campaign-victory-browser.node-test.mjs",
+      "scripts/lib/caribbean-campaign-victory-driver.mjs",
+      "scripts/lib/caribbean-campaign-victory-driver.node-test.mjs",
+      "scripts/lib/caribbean-naval-check.test.mjs",
+      "scripts/lib/caribbean-naval-evidence.mjs",
+      "scripts/lib/caribbean-naval-evidence.test.mjs",
+      "scripts/lib/caribbean-naval-scenario.test.mjs",
+      "scripts/lib/caribbean-naval-verification.mjs",
+      "scripts/lib/caribbean-naval-verification.node-test.mjs",
+      "scripts/lib/caribbean-normal-build-isolation.mjs",
+      "scripts/lib/caribbean-port-identity-evidence.mjs",
+      "scripts/lib/caribbean-port-identity-evidence.test.mjs",
+      "scripts/lib/caribbean-support-restore.mjs",
+      "src/app/App.tsx",
+      "src/app/Menu.tsx",
+      "src/app/PlayerBooth.tsx",
+      "src/app/Privacy.tsx",
+      "src/app/main.tsx",
+      "src/app/privacy.css",
+      "src/app/registry.ts",
+      "src/app/styles/app.css",
+      "src/games/battleship/assets/ships/battleship-classic.glb",
+      "src/games/battleship/assets/ships/battleship-modern.glb",
+      "src/games/battleship/assets/ships/carrier-classic.glb",
+      "src/games/battleship/assets/ships/carrier-modern.glb",
+      "src/games/battleship/assets/ships/cruiser-classic.glb",
+      "src/games/battleship/assets/ships/cruiser-modern.glb",
+      "src/games/battleship/assets/ships/destroyer-classic.glb",
+      "src/games/battleship/assets/ships/destroyer-modern.glb",
+      "src/games/battleship/assets/ships/submarine-classic.glb",
+      "src/games/battleship/assets/ships/submarine-modern.glb",
+      "src/games/battleship/components/Battle.tsx",
+      "src/games/battleship/components/BattleshipPage.tsx",
+      "src/games/battleship/components/Board.tsx",
+      "src/games/battleship/components/BoardFX.tsx",
+      "src/games/battleship/components/Fleet3D.tsx",
+      "src/games/battleship/components/FleetSelect.tsx",
+      "src/games/battleship/components/Lobby.tsx",
+      "src/games/battleship/components/Placement.tsx",
+      "src/games/battleship/components/Result.tsx",
+      "src/games/battleship/components/ships.tsx",
+      "src/games/battleship/components/three/FleetScene.ts",
+      "src/games/battleship/components/three/shipModels.ts",
+      "src/games/battleship/domain/board.ts",
+      "src/games/battleship/domain/bots/gunner.ts",
+      "src/games/battleship/domain/bots/index.ts",
+      "src/games/battleship/domain/bots/personas.ts",
+      "src/games/battleship/domain/constants.ts",
+      "src/games/battleship/domain/engine.ts",
+      "src/games/battleship/domain/protocol.ts",
+      "src/games/battleship/domain/session.ts",
+      "src/games/battleship/domain/skins.ts",
+      "src/games/battleship/domain/types.ts",
+      "src/games/battleship/index.ts",
+      "src/games/battleship/preview-b.tsx",
+      "src/games/battleship/preview-battleship.tsx",
+      "src/games/battleship/preview-carrier.tsx",
+      "src/games/battleship/preview-ship.tsx",
+      "src/games/battleship/state/loopback.ts",
+      "src/games/battleship/state/useBattleship.ts",
+      "src/games/battleship/state/useShipDrag.ts",
+      "src/games/battleship/storage/sessionStore.ts",
+      "src/games/battleship/styles/battleship.css",
+      "src/games/caribbean-poc/assets/caribbean-sloop.glb",
+      "src/games/caribbean-poc/components/BattlePoc.tsx",
+      "src/games/caribbean-poc/domain/battle.ts",
+      "src/games/caribbean-poc/domain/opponent.ts",
+      "src/games/caribbean-poc/preview.tsx",
+      "src/games/caribbean-poc/styles/caribbean-poc.css",
+      "src/games/caribbean-poc/three/BattleScene.ts",
+      "src/games/caribbean-poc/three/loadSloop.ts",
+      "src/games/caribbean/assets/bridgetown-1675.webp",
+      "src/games/caribbean/assets/caribbean-sloop.glb",
+      "src/games/caribbean/audio/BattleAudio.test.ts",
+      "src/games/caribbean/audio/BattleAudio.ts",
+      "src/games/caribbean/canonicalJson.ts",
+      "src/games/caribbean/caribbean.integration.test.tsx",
+      "src/games/caribbean/components/CaribbeanLab.test.tsx",
+      "src/games/caribbean/components/CaribbeanLab.tsx",
+      "src/games/caribbean/components/CaribbeanPage.test.tsx",
+      "src/games/caribbean/components/CaribbeanPage.tsx",
+      "src/games/caribbean/components/MinimumScreenGate.test.tsx",
+      "src/games/caribbean/components/MinimumScreenGate.tsx",
+      "src/games/caribbean/components/battle/BattleHud.test.tsx",
+      "src/games/caribbean/components/battle/BattleHud.tsx",
+      "src/games/caribbean/components/battle/BattleShortcutLegend.test.tsx",
+      "src/games/caribbean/components/battle/BattleShortcutLegend.tsx",
+      "src/games/caribbean/components/battle/HtmlTacticalChart.tsx",
+      "src/games/caribbean/components/battle/NavalBattlePage.test.tsx",
+      "src/games/caribbean/components/battle/NavalBattlePage.tsx",
+      "src/games/caribbean/components/battle/NavalViewport.test.tsx",
+      "src/games/caribbean/components/battle/NavalViewport.tsx",
+      "src/games/caribbean/components/battle/aimCue.test.ts",
+      "src/games/caribbean/components/battle/aimCue.ts",
+      "src/games/caribbean/components/battle/rudderPulse.d.mts",
+      "src/games/caribbean/components/battle/rudderPulse.mjs",
+      "src/games/caribbean/components/log/CaptainsLog.test.tsx",
+      "src/games/caribbean/components/log/CaptainsLog.tsx",
+      "src/games/caribbean/components/map/CaribbeanMap.test.tsx",
+      "src/games/caribbean/components/map/CaribbeanMap.tsx",
+      "src/games/caribbean/components/map/mapView.ts",
+      "src/games/caribbean/components/port/CaribbeanChart.test.tsx",
+      "src/games/caribbean/components/port/CaribbeanChart.tsx",
+      "src/games/caribbean/components/port/DivideShares.test.tsx",
+      "src/games/caribbean/components/port/DivideShares.tsx",
+      "src/games/caribbean/components/port/GovernorHouse.tsx",
+      "src/games/caribbean/components/port/Market.test.tsx",
+      "src/games/caribbean/components/port/Market.tsx",
+      "src/games/caribbean/components/port/PortActionIcon.test.tsx",
+      "src/games/caribbean/components/port/PortActionIcon.tsx",
+      "src/games/caribbean/components/port/PortBackdrop.test.tsx",
+      "src/games/caribbean/components/port/PortBackdrop.tsx",
+      "src/games/caribbean/components/port/PortMenu.test.tsx",
+      "src/games/caribbean/components/port/PortMenu.tsx",
+      "src/games/caribbean/components/port/PortPage.test.tsx",
+      "src/games/caribbean/components/port/PortPage.tsx",
+      "src/games/caribbean/components/port/ShipyardSummary.tsx",
+      "src/games/caribbean/components/port/Tavern.test.tsx",
+      "src/games/caribbean/components/port/Tavern.tsx",
+      "src/games/caribbean/components/recovery/RecoveryPanel.test.tsx",
+      "src/games/caribbean/components/recovery/RecoveryPanel.tsx",
+      "src/games/caribbean/components/recovery/useModalFocus.test.tsx",
+      "src/games/caribbean/components/recovery/useModalFocus.ts",
+      "src/games/caribbean/components/setup/CampaignSetup.test.tsx",
+      "src/games/caribbean/components/setup/CampaignSetup.tsx",
+      "src/games/caribbean/components/setup/PersistenceDecisionOverlay.test.tsx",
+      "src/games/caribbean/components/setup/PersistenceDecisionOverlay.tsx",
+      "src/games/caribbean/components/voyage/CampaignNavalBattle.test.tsx",
+      "src/games/caribbean/components/voyage/CampaignNavalBattle.tsx",
+      "src/games/caribbean/components/voyage/EncounterPage.test.tsx",
+      "src/games/caribbean/components/voyage/EncounterPage.tsx",
+      "src/games/caribbean/components/voyage/SailingPage.test.tsx",
+      "src/games/caribbean/components/voyage/SailingPage.tsx",
+      "src/games/caribbean/components/voyage/VoyageInstrument.test.tsx",
+      "src/games/caribbean/components/voyage/VoyageInstrument.tsx",
+      "src/games/caribbean/content/campaign.test.ts",
+      "src/games/caribbean/content/campaign.ts",
+      "src/games/caribbean/content/content.test.ts",
+      "src/games/caribbean/content/market.test.ts",
+      "src/games/caribbean/content/market.ts",
+      "src/games/caribbean/content/naval.ts",
+      "src/games/caribbean/content/types.ts",
+      "src/games/caribbean/content/voyage.test.ts",
+      "src/games/caribbean/content/voyage.ts",
+      "src/games/caribbean/domain/compactJournal.test.ts",
+      "src/games/caribbean/domain/compactJournal.ts",
+      "src/games/caribbean/domain/createCampaign.test.ts",
+      "src/games/caribbean/domain/createCampaign.ts",
+      "src/games/caribbean/domain/economy.test.ts",
+      "src/games/caribbean/domain/economy.ts",
+      "src/games/caribbean/domain/events.ts",
+      "src/games/caribbean/domain/leadSelectors.test.ts",
+      "src/games/caribbean/domain/leadSelectors.ts",
+      "src/games/caribbean/domain/naval/balance.ts",
+      "src/games/caribbean/domain/naval/broadsideAgreement.test.ts",
+      "src/games/caribbean/domain/naval/createBattle.test.ts",
+      "src/games/caribbean/domain/naval/createBattle.ts",
+      "src/games/caribbean/domain/naval/geometry.test.ts",
+      "src/games/caribbean/domain/naval/geometry.ts",
+      "src/games/caribbean/domain/naval/movement.test.ts",
+      "src/games/caribbean/domain/naval/movement.ts",
+      "src/games/caribbean/domain/naval/opponent.test.ts",
+      "src/games/caribbean/domain/naval/opponent.ts",
+      "src/games/caribbean/domain/naval/outcomes.test.ts",
+      "src/games/caribbean/domain/naval/outcomes.ts",
+      "src/games/caribbean/domain/naval/pacing.test.ts",
+      "src/games/caribbean/domain/naval/replay.test.ts",
+      "src/games/caribbean/domain/naval/replay.ts",
+      "src/games/caribbean/domain/naval/resolution.test.ts",
+      "src/games/caribbean/domain/naval/resolution.ts",
+      "src/games/caribbean/domain/naval/rng.ts",
+      "src/games/caribbean/domain/naval/stepBattle.test.ts",
+      "src/games/caribbean/domain/naval/stepBattle.ts",
+      "src/games/caribbean/domain/naval/testFixtures.ts",
+      "src/games/caribbean/domain/naval/types.ts",
+      "src/games/caribbean/domain/naval/validation.test.ts",
+      "src/games/caribbean/domain/naval/validation.ts",
+      "src/games/caribbean/domain/naval/volley.test.ts",
+      "src/games/caribbean/domain/naval/volley.ts",
+      "src/games/caribbean/domain/reduceCampaign.test.ts",
+      "src/games/caribbean/domain/reduceCampaign.ts",
+      "src/games/caribbean/domain/replay.test.ts",
+      "src/games/caribbean/domain/replay.ts",
+      "src/games/caribbean/domain/selectors.test.ts",
+      "src/games/caribbean/domain/selectors.ts",
+      "src/games/caribbean/domain/types.ts",
+      "src/games/caribbean/domain/validateCampaign.test.ts",
+      "src/games/caribbean/domain/validateCampaign.ts",
+      "src/games/caribbean/domain/voyage.test.ts",
+      "src/games/caribbean/domain/voyage.ts",
+      "src/games/caribbean/index.ts",
+      "src/games/caribbean/preview.tsx",
+      "src/games/caribbean/state/caribbeanControllerContract.test.ts",
+      "src/games/caribbean/state/namedActionGate.test.ts",
+      "src/games/caribbean/state/namedActionGate.ts",
+      "src/games/caribbean/state/naval/FrameRunner.test.ts",
+      "src/games/caribbean/state/naval/FrameRunner.ts",
+      "src/games/caribbean/state/naval/NavalSession.test.ts",
+      "src/games/caribbean/state/naval/NavalSession.ts",
+      "src/games/caribbean/state/naval/debugBridge.test.ts",
+      "src/games/caribbean/state/naval/debugBridge.ts",
+      "src/games/caribbean/state/naval/harnessConfig.test.ts",
+      "src/games/caribbean/state/naval/harnessConfig.ts",
+      "src/games/caribbean/state/naval/testSession.ts",
+      "src/games/caribbean/state/naval/useNavalSession.ts",
+      "src/games/caribbean/state/runtime.test.ts",
+      "src/games/caribbean/state/runtime.ts",
+      "src/games/caribbean/state/selectors.test.ts",
+      "src/games/caribbean/state/selectors.ts",
+      "src/games/caribbean/state/toMemorySaveIntent.test.ts",
+      "src/games/caribbean/state/toMemorySaveIntent.ts",
+      "src/games/caribbean/state/useCaribbean.test.tsx",
+      "src/games/caribbean/state/useCaribbean.ts",
+      "src/games/caribbean/state/useCaribbeanActionsMemory.test.tsx",
+      "src/games/caribbean/state/useCaribbeanActionsPersistedCombat.test.tsx",
+      "src/games/caribbean/state/useCaribbeanActionsPersistedTransit.test.tsx",
+      "src/games/caribbean/state/useCaribbeanActionsTestSupport.tsx",
+      "src/games/caribbean/state/useCaribbeanActionsWrongPredecessor.test.tsx",
+      "src/games/caribbean/state/useCaribbeanPublicationAvoidEffects.test.tsx",
+      "src/games/caribbean/state/useCaribbeanPublicationEffects.test.tsx",
+      "src/games/caribbean/state/useCaribbeanPublicationEffectsMore.test.tsx",
+      "src/games/caribbean/state/useCaribbeanPublicationLifecycle.test.tsx",
+      "src/games/caribbean/state/useCaribbeanPublicationResolveEffects.test.tsx",
+      "src/games/caribbean/state/useCaribbeanPublicationWithdrawEffects.test.tsx",
+      "src/games/caribbean/state/useCaribbeanResolveFailure.test.tsx",
+      "src/games/caribbean/state/useCaribbeanSavedNavalResume.test.tsx",
+      "src/games/caribbean/state/useCaribbeanThreshold.test.tsx",
+      "src/games/caribbean/storage/checksum.test.ts",
+      "src/games/caribbean/storage/checksum.ts",
+      "src/games/caribbean/storage/compactionPolicy.test.ts",
+      "src/games/caribbean/storage/compactionPolicy.ts",
+      "src/games/caribbean/storage/migrations.ts",
+      "src/games/caribbean/storage/persistence.test.ts",
+      "src/games/caribbean/storage/persistence.ts",
+      "src/games/caribbean/storage/recovery.test.ts",
+      "src/games/caribbean/storage/recovery.ts",
+      "src/games/caribbean/storage/schema.test.ts",
+      "src/games/caribbean/storage/schema.ts",
+      "src/games/caribbean/storage/writer.test.ts",
+      "src/games/caribbean/storage/writer.ts",
+      "src/games/caribbean/styles/battle.css",
+      "src/games/caribbean/styles/battleResponsive.test.tsx",
+      "src/games/caribbean/styles/caribbean.css",
+      "src/games/caribbean/styles/port.css",
+      "src/games/caribbean/styles/production.css",
+      "src/games/caribbean/styles/theme.css",
+      "src/games/caribbean/styles/voyage.css",
+      "src/games/caribbean/styles/voyageResponsive.test.tsx",
+      "src/games/caribbean/three/naval/NavalScene.test.ts",
+      "src/games/caribbean/three/naval/NavalScene.ts",
+      "src/games/caribbean/three/naval/bearingLine.test.ts",
+      "src/games/caribbean/three/naval/bearingLine.ts",
+      "src/games/caribbean/three/naval/effects.test.ts",
+      "src/games/caribbean/three/naval/effects.ts",
+      "src/games/caribbean/three/naval/quality.test.ts",
+      "src/games/caribbean/three/naval/quality.ts",
+      "src/games/caribbean/three/naval/sceneMath.test.ts",
+      "src/games/caribbean/three/naval/sceneMath.ts",
+      "src/games/caribbean/three/naval/waterPresentation.test.ts",
+      "src/games/caribbean/three/naval/waterPresentation.ts",
+      "src/games/caribbean/three/naval/waterShader.test.ts",
+      "src/games/caribbean/three/naval/waterShader.ts",
+      "src/games/caribbean/three/shared/loadSloop.test.ts",
+      "src/games/caribbean/three/shared/loadSloop.ts",
+      "src/games/chess/assets/galaxy/black-bishop.glb",
+      "src/games/chess/assets/galaxy/black-king.glb",
+      "src/games/chess/assets/galaxy/black-knight.glb",
+      "src/games/chess/assets/galaxy/black-pawn.glb",
+      "src/games/chess/assets/galaxy/black-queen.glb",
+      "src/games/chess/assets/galaxy/black-rook.glb",
+      "src/games/chess/assets/galaxy/white-bishop.glb",
+      "src/games/chess/assets/galaxy/white-king.glb",
+      "src/games/chess/assets/galaxy/white-knight.glb",
+      "src/games/chess/assets/galaxy/white-pawn.glb",
+      "src/games/chess/assets/galaxy/white-queen.glb",
+      "src/games/chess/assets/galaxy/white-rook.glb",
+      "src/games/chess/components/Chess3D.tsx",
+      "src/games/chess/components/ChessBoard.tsx",
+      "src/games/chess/components/ChessLogModal.tsx",
+      "src/games/chess/components/ChessPage.tsx",
+      "src/games/chess/components/ChessResult.tsx",
+      "src/games/chess/components/FreePlay.tsx",
+      "src/games/chess/components/FreePlay3D.tsx",
+      "src/games/chess/components/chessPieces.tsx",
+      "src/games/chess/components/chessTheme.tsx",
+      "src/games/chess/components/three/ChessScene.ts",
+      "src/games/chess/domain/analysis.ts",
+      "src/games/chess/domain/fen.ts",
+      "src/games/chess/domain/protocol.ts",
+      "src/games/chess/domain/rules.ts",
+      "src/games/chess/domain/session.ts",
+      "src/games/chess/domain/types.ts",
+      "src/games/chess/index.ts",
+      "src/games/chess/state/useChess.ts",
+      "src/games/chess/storage/chessPersistence.ts",
+      "src/games/chess/styles/chess.css",
+      "src/games/racer/components/RacerPage.tsx",
+      "src/games/racer/components/RacerSetup.tsx",
+      "src/games/racer/components/Track3D.tsx",
+      "src/games/racer/components/WinOverlay.tsx",
+      "src/games/racer/domain/kart.ts",
+      "src/games/racer/domain/race.ts",
+      "src/games/racer/index.ts",
+      "src/games/racer/net/protocol.ts",
+      "src/games/racer/net/useRacerNet.ts",
+      "src/games/racer/styles/racer.css",
+      "src/games/racer/three/scene.ts",
+      "src/games/risk/components/RiskBoard.tsx",
+      "src/games/risk/components/RiskPage.tsx",
+      "src/games/risk/components/paperGrain.ts",
+      "src/games/risk/components/useMapZoom.ts",
+      "src/games/risk/domain/bots/decide.ts",
+      "src/games/risk/domain/bots/index.ts",
+      "src/games/risk/domain/bots/personas.ts",
+      "src/games/risk/domain/rules.ts",
+      "src/games/risk/domain/types.ts",
+      "src/games/risk/index.ts",
+      "src/games/risk/maps/registry.ts",
+      "src/games/risk/maps/types.ts",
+      "src/games/risk/maps/world.ts",
+      "src/games/risk/state/useRisk.ts",
+      "src/games/risk/storage/riskPersistence.ts",
+      "src/games/risk/styles/risk.css",
+      "src/games/unicorn/components/UnicornPage.tsx",
+      "src/games/unicorn/components/scene.ts",
+      "src/games/unicorn/domain/content.ts",
+      "src/games/unicorn/domain/engine.ts",
+      "src/games/unicorn/domain/input.ts",
+      "src/games/unicorn/index.ts",
+      "src/games/unicorn/styles/unicorn.css",
+      "src/shared/game.ts",
+      "src/shared/net/media.ts",
+      "src/shared/net/peer.ts",
+      "src/shared/party/FloatingVideo.tsx",
+      "src/shared/party/PartyBar.tsx",
+      "src/shared/party/PartyContext.tsx",
+      "src/shared/party/party.css",
+      "src/shared/party/protocol.ts",
+      "src/shared/profile/PlayerGate.tsx",
+      "src/shared/profile/player.css",
+      "src/shared/profile/playerColors.ts",
+      "src/shared/profile/profile.ts",
+      "src/shared/profile/profileStore.ts",
+      "src/shared/profile/recentNames.ts",
+      "src/shared/profile/useProfile.ts",
+      "src/shared/profile/useUsers.ts",
+      "src/shared/profile/users.ts",
+      "src/shared/profile/usersStore.ts",
+      "src/shared/reconcile.ts",
+      "src/shared/rng.ts",
+      "src/shared/storage/kv.ts",
+      "src/shared/styles/tokens.css",
+      "src/shared/three/disposeDeep.ts",
+      "src/shared/ui/ConnectionBadge.tsx",
+      "src/shared/ui/ErrorBoundary.tsx",
+      "src/shared/ui/FullscreenButton.tsx",
+      "src/shared/ui/NamePicker.tsx",
+      "src/shared/ui/VictoryFX.tsx",
+      "src/shared/ui/icons.tsx",
+      "src/shared/ui/useDismissOnEscape.ts",
+      "tsconfig.app.json",
+      "tsconfig.json",
+      "tsconfig.node.json",
+      "vite.config.ts"
+    ],
+    "sourceFiles": [
+      {
+        "path": "index.html",
+        "sha256": "9db21d4194c56b5b6922ac1341bfec8f10ce90bee9fa7110843f7a0345bd3898"
+      },
+      {
+        "path": "knip.json",
+        "sha256": "be367233c51dc57072c9f9b0cd0b9f431f7b8c20b223eaa40b133448c87cbffa"
+      },
+      {
+        "path": "package-lock.json",
+        "sha256": "7b5af8fc827bd094a4d744a626f120a12fa71955e6850a259c266d07210c3b7d"
+      },
+      {
+        "path": "package.json",
+        "sha256": "30c23e3b17a33d1e117a373d8ec00b8eb28606529ad0b2f5f9002d8c772d748e"
+      },
+      {
+        "path": "preview-b.html",
+        "sha256": "5918455a874f840c8f03c7f6d2b0dd345c09d9ad6c08761a8f5dbbc5e6431405"
+      },
+      {
+        "path": "preview-battleship.html",
+        "sha256": "57bef2bfec1ffcff98231b0d45508706dfe0be75b75cf0d051ddb7f9d47a80c3"
+      },
+      {
+        "path": "preview-caribbean-game.html",
+        "sha256": "07201795a43d941551edc9de19444b98df66858cb4da7d7b9b77c8a4b1d912d8"
+      },
+      {
+        "path": "preview-caribbean.html",
+        "sha256": "aa0fa81ceee1c95bf9be7fe9a87ef52177cd8555119c2defd429d68340d7320c"
+      },
+      {
+        "path": "preview-carrier.html",
+        "sha256": "eff8f7cd978fef20f152fed3c0e338d6231fc838d190d4f119f690f5e664c2f4"
+      },
+      {
+        "path": "preview-ship.html",
+        "sha256": "275f1a3ba7014b3b75f4e0ce2f0ea473b403c99057e21f28489d3fbe0cea7cc5"
+      },
+      {
+        "path": "public/CNAME",
+        "sha256": "6a75fbf7cc29e831bed0d0c9bceaec6f8b9c2ad05bd09d5c047f3f1cb38afd84"
+      },
+      {
+        "path": "public/apple-touch-icon.png",
+        "sha256": "60f6fb67598c77040548860d29e5933ea87e625df67be053777311715d9f51c4"
+      },
+      {
+        "path": "public/calculator.html",
+        "sha256": "9f48579b6021fc2cc9e867d6de67e70cd7839cefc810d02c349415d8562318f3"
+      },
+      {
+        "path": "public/icon-192.png",
+        "sha256": "e53a1eeb1bec8c6b847be7a3a7f42506569885f0c5c685e88d17d4d32db8a853"
+      },
+      {
+        "path": "public/icon-512.png",
+        "sha256": "5c13b592f0dd093ce82c64a43af899a0147cbdf5025fb8a3d6f6b12ca7a260f0"
+      },
+      {
+        "path": "public/icon.svg",
+        "sha256": "7828615bbd54311ca8e58d05dd110dac993d41cd882445d7f3f18648abd88463"
+      },
+      {
+        "path": "scripts/caribbean-naval-check.mjs",
+        "sha256": "aee0a1db70fd7b98d230d616aa2f8176a490238f4ba1e92df88b708fac29ffaf"
+      },
+      {
+        "path": "scripts/caribbean-port-check.mjs",
+        "sha256": "88c6454a3e8e03c5a4ca316e197ee93f14883d18857fc01f97912798d8a893b6"
+      },
+      {
+        "path": "scripts/fixtures/caribbean-campaign-victory.json",
+        "sha256": "a04c79cf1934997604e34a1572502c59df688c5231c1d1a6ef3c7446594e81e5"
+      },
+      {
+        "path": "scripts/lib/caribbean-campaign-victory-browser.node-test.mjs",
+        "sha256": "1d06a70cdfc97859d6a62bc80256e2321157a43b90317a6063a3421e70865e2f"
+      },
+      {
+        "path": "scripts/lib/caribbean-campaign-victory-driver.mjs",
+        "sha256": "50e4c8ed1971519c043418a5da0b8d8c829608161fb7799095c8db78656ab1c1"
+      },
+      {
+        "path": "scripts/lib/caribbean-campaign-victory-driver.node-test.mjs",
+        "sha256": "7b2b371d357559f2afbc3b492808fa951dc524d319e40cf30cc78acbb61e14c9"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-check.test.mjs",
+        "sha256": "4bdeac0f14503836e290d65446fd20a57fd65d93855f4f231d81007a43e858f2"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-evidence.mjs",
+        "sha256": "ea584ce12174420d2076441f314c4656cb557fef629d382f48a478e4c279186d"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-evidence.test.mjs",
+        "sha256": "387c47dc87f5a11e468f9aa6a369588688bef06ff13534195b8cfc93239ed2fe"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-scenario.test.mjs",
+        "sha256": "c5a58a502ba29fee028f4eb2ba4156dbe69a4c048f2693d7381969cc54d77731"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-verification.mjs",
+        "sha256": "3a9f94b28623e57eb7dc58337feb69a5aa4bfff1d0da856570bf4e6153d12b04"
+      },
+      {
+        "path": "scripts/lib/caribbean-naval-verification.node-test.mjs",
+        "sha256": "cc5df41f2ea45e289b07b8c79bf74167206306a8eef1ea82de7dff321e77e265"
+      },
+      {
+        "path": "scripts/lib/caribbean-normal-build-isolation.mjs",
+        "sha256": "164505f157bf8c7b3e80761cc8c71494998d9c11e75bda4ee43cca7713ee931d"
+      },
+      {
+        "path": "scripts/lib/caribbean-port-identity-evidence.mjs",
+        "sha256": "fb251f474d750775fc2692a03a11dbf3442f1952fb0717a4992d385899ae88c7"
+      },
+      {
+        "path": "scripts/lib/caribbean-port-identity-evidence.test.mjs",
+        "sha256": "305c9cab39d1a2a9a9067468b53301d0b617343f41c23561d4743daff0cba036"
+      },
+      {
+        "path": "scripts/lib/caribbean-support-restore.mjs",
+        "sha256": "ea0507c4530d4e8f5b450e79a40588d3066aedff32cdcf23b2c1cc6dcb2330c4"
+      },
+      {
+        "path": "src/app/App.tsx",
+        "sha256": "4d34fa807f559e61583140c4c210d8b95bb0fa18ba80feb68bfa53bc6a3c1505"
+      },
+      {
+        "path": "src/app/Menu.tsx",
+        "sha256": "77481ef4c9e818cecc1584dce50934d1ae0bd84073de518c680295ee51f005df"
+      },
+      {
+        "path": "src/app/PlayerBooth.tsx",
+        "sha256": "e9a02da04b1511071f1e1f99bab020e2bbab686f26279ed8e21815cafd6def50"
+      },
+      {
+        "path": "src/app/Privacy.tsx",
+        "sha256": "a111e5a5c5894924886307837654bea9b2b8572e10094c1cab0f46117e86df49"
+      },
+      {
+        "path": "src/app/main.tsx",
+        "sha256": "0dd917a6dfa3f83b7fe91f3944a58b4fc9ac69a387e51e029c98c2ab01261ed6"
+      },
+      {
+        "path": "src/app/privacy.css",
+        "sha256": "1f73b81889cf6db9c3d65b2b7068d68c1646e0459265b70304845e2274da962a"
+      },
+      {
+        "path": "src/app/registry.ts",
+        "sha256": "05bc01c81b9ea203896b1102865442be91c3bbd92929c48e275220ea010cbaaa"
+      },
+      {
+        "path": "src/app/styles/app.css",
+        "sha256": "bfa7dda110337027eb8202f071446c53e3db20a9208205f35b916eec68cd296d"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/battleship-classic.glb",
+        "sha256": "d596fc80ec11508bc43d3c5b0eafe94053af0640a19e50cf4f98ffa8fc3dc61b"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/battleship-modern.glb",
+        "sha256": "2887a63a09af9e924ab6d403a6128b8b50df30d048f160bc697ededb2414df2b"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/carrier-classic.glb",
+        "sha256": "c07ee8c2f343dfe3dfc3a078b2088c231f624bfdd507f119b020e0d3cfea279f"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/carrier-modern.glb",
+        "sha256": "290e84e452e0ea260e7ddab0e6a9086fd2badb5eecec715f21aec6c67b95d851"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/cruiser-classic.glb",
+        "sha256": "86f2c3cc7371f67a4719b6b22b74deda549765879c75f8973d155151703ad31f"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/cruiser-modern.glb",
+        "sha256": "f7587688ba2540cbe7a6db291127bf2a20c23516225e2702de8b4c5fe70e5058"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/destroyer-classic.glb",
+        "sha256": "daeaffca9cd2f24c77742ab8bff9d9d47fbc72bb71d12113cb8cf92b6c67bf04"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/destroyer-modern.glb",
+        "sha256": "675e5d42f66e3033a5aa514757e1101b387c0b637602ce81444d9653b77bdaa3"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/submarine-classic.glb",
+        "sha256": "e61740c97b583b95c669cd0353defb758b9a093eeab597101d6a735829b24581"
+      },
+      {
+        "path": "src/games/battleship/assets/ships/submarine-modern.glb",
+        "sha256": "57c75adce319127a0ed5e64d22748eeb77022a740530c44328e42f5e58e9787e"
+      },
+      {
+        "path": "src/games/battleship/components/Battle.tsx",
+        "sha256": "b946848c2c9dee8e2b02ce299ab03f410ea0c7deedc6c861701d013ea8925631"
+      },
+      {
+        "path": "src/games/battleship/components/BattleshipPage.tsx",
+        "sha256": "fecfa54db263e078300cdf31e80bf766b82a285b35a3069c5dca5cf3db8e7f36"
+      },
+      {
+        "path": "src/games/battleship/components/Board.tsx",
+        "sha256": "9f2e631a5cf1654b11cd06265b8b4166324c916459cf55447275887aea08e92f"
+      },
+      {
+        "path": "src/games/battleship/components/BoardFX.tsx",
+        "sha256": "184ab21afd9ade0fc67a6876b894bb43a857e09626270b997a3b6dbef839920b"
+      },
+      {
+        "path": "src/games/battleship/components/Fleet3D.tsx",
+        "sha256": "2069d138ba075a1447481c785cf06ebf78eb7348c95e992d9f8310220bbb94f8"
+      },
+      {
+        "path": "src/games/battleship/components/FleetSelect.tsx",
+        "sha256": "2f68ad330c479a4839fc6fb16dfb49ca8e23892815b6b0613a518afe8031b427"
+      },
+      {
+        "path": "src/games/battleship/components/Lobby.tsx",
+        "sha256": "dd50142a8e2a3fdf378c5092b0c9b8ac9ce7ae374b56fb87db5320731f489540"
+      },
+      {
+        "path": "src/games/battleship/components/Placement.tsx",
+        "sha256": "fe675a953d9e32841efb7ebce0e6a2009b792e702262570ed62ab8ffc13a1804"
+      },
+      {
+        "path": "src/games/battleship/components/Result.tsx",
+        "sha256": "367e8eb0507655b4c46599dbe873b0ffaef976e91d0fc8e54a93a93085d0843c"
+      },
+      {
+        "path": "src/games/battleship/components/ships.tsx",
+        "sha256": "ca0d06d67d5c834fe11501aabd556893d44b38f4743ac0dabad25cc3522b19ef"
+      },
+      {
+        "path": "src/games/battleship/components/three/FleetScene.ts",
+        "sha256": "888ce987819e6123b3e6ba81fe56acbfdf54d995c96db553b49e143a6aedf065"
+      },
+      {
+        "path": "src/games/battleship/components/three/shipModels.ts",
+        "sha256": "320b59c6638c9883c00b4ffde7c7641c1130cf4fea6e5356219545d19cc9650d"
+      },
+      {
+        "path": "src/games/battleship/domain/board.ts",
+        "sha256": "97e54a777862b9d376d01f1df1a12d64f6e9ed7184f4f68dc242ad6b28afe810"
+      },
+      {
+        "path": "src/games/battleship/domain/bots/gunner.ts",
+        "sha256": "c7aeede52914ea233dc756327678f29e2d9b766541402da5980155f83b2a7526"
+      },
+      {
+        "path": "src/games/battleship/domain/bots/index.ts",
+        "sha256": "418e9c53b063b7257b1bfda67098f409d567eddffcc9f5fc0c3f8a04d4207d4c"
+      },
+      {
+        "path": "src/games/battleship/domain/bots/personas.ts",
+        "sha256": "fad143be20c418c928923ad3cfc3fad1691a3e20f28ace616f42fd9bf7a9101e"
+      },
+      {
+        "path": "src/games/battleship/domain/constants.ts",
+        "sha256": "609b53e0cc2f621fb30be36ac30887690cef751ccb270720c0c3fc6a25ca812d"
+      },
+      {
+        "path": "src/games/battleship/domain/engine.ts",
+        "sha256": "b0803e883cea51ec84c0116cc73cb1761cc2d9ea2b5a026be387b70d2f82a273"
+      },
+      {
+        "path": "src/games/battleship/domain/protocol.ts",
+        "sha256": "61c2b1594cc151f25ef50036be0dacda4aeb4ff416d8274da9422e1511207338"
+      },
+      {
+        "path": "src/games/battleship/domain/session.ts",
+        "sha256": "f0cc04a4d8ddf4489098ce4ac127505392bc1636222029cf2924feb15af7e8bd"
+      },
+      {
+        "path": "src/games/battleship/domain/skins.ts",
+        "sha256": "855adbadd84ed294d0febfb78a578eac8a930dfcb12d30e6d343745c4f038020"
+      },
+      {
+        "path": "src/games/battleship/domain/types.ts",
+        "sha256": "246a634dc7f276175fbc45ea729ea9e762c3d6c7429e1501f5a348827393a746"
+      },
+      {
+        "path": "src/games/battleship/index.ts",
+        "sha256": "0293cbe061c590d10f3fda8da1f57d1dcebc26f2e14305eaad43d4c01eeb3c39"
+      },
+      {
+        "path": "src/games/battleship/preview-b.tsx",
+        "sha256": "be51599f053801ef862625c13bd3240c0f5720798f03d1d5c672ce6b85906785"
+      },
+      {
+        "path": "src/games/battleship/preview-battleship.tsx",
+        "sha256": "442e123e01791bdde8a93e740530127b8fe99dd8d640f5fa3d2b03842b276a4f"
+      },
+      {
+        "path": "src/games/battleship/preview-carrier.tsx",
+        "sha256": "ad1788f50c01812a26ac7dd9ed2e036183bd283c2b5b3928111eda0f2bd2a30b"
+      },
+      {
+        "path": "src/games/battleship/preview-ship.tsx",
+        "sha256": "8d2625d1f51cd2ebb821a189c0d4a255a1f82a92385ebff0015dd1a8483ccdb2"
+      },
+      {
+        "path": "src/games/battleship/state/loopback.ts",
+        "sha256": "bb0ad6d13abd2a014706fa883476b1ee0db650e58745a8489727ffb02e6397c0"
+      },
+      {
+        "path": "src/games/battleship/state/useBattleship.ts",
+        "sha256": "cac6073ed15b40be4b81fd2129efe91e3f23976fee11848944d3d9edf44b5ea4"
+      },
+      {
+        "path": "src/games/battleship/state/useShipDrag.ts",
+        "sha256": "d4f69301df073b5b90269e8c4321ecea4d6a17f9c720a9084e536d77c688c7ad"
+      },
+      {
+        "path": "src/games/battleship/storage/sessionStore.ts",
+        "sha256": "59d49af75fc2b8e5d2965cea63a67d353ec44e810d980ebaa591b811a75a492b"
+      },
+      {
+        "path": "src/games/battleship/styles/battleship.css",
+        "sha256": "3b118e139ba95463ef347928cf299c2bb61b053213cf87af8e0be20cd6388c82"
+      },
+      {
+        "path": "src/games/caribbean-poc/assets/caribbean-sloop.glb",
+        "sha256": "36c9b53aeebe28706932af7d66d67e3a9a545ac1a4ea00ad5ffd944876270320"
+      },
+      {
+        "path": "src/games/caribbean-poc/components/BattlePoc.tsx",
+        "sha256": "99b40357915fab6e3ba99bada8ca3d7a6bc225993e70fa94beac6d67b92e5966"
+      },
+      {
+        "path": "src/games/caribbean-poc/domain/battle.ts",
+        "sha256": "12f3f2379227268905a336ef859f4dc027bb4b9ec2d3869f78d3a78055f80a70"
+      },
+      {
+        "path": "src/games/caribbean-poc/domain/opponent.ts",
+        "sha256": "9abacb68098209c07cf721ed8c586bcac9bcb2f6466e48f709c2c92e9ccd1302"
+      },
+      {
+        "path": "src/games/caribbean-poc/preview.tsx",
+        "sha256": "894611eee54af48cdd4bf730b74c37156a68344370b49a4599734de969ef1d3f"
+      },
+      {
+        "path": "src/games/caribbean-poc/styles/caribbean-poc.css",
+        "sha256": "8dbd36ba7904629bb19a2708ed1bc4a64736f6d524b83ef30df7a2c57833a4b5"
+      },
+      {
+        "path": "src/games/caribbean-poc/three/BattleScene.ts",
+        "sha256": "d6fc93b1ca85c0762b91514c38dceca615d3a38200af644c23a5d1a9eb490ed3"
+      },
+      {
+        "path": "src/games/caribbean-poc/three/loadSloop.ts",
+        "sha256": "051cc4910d5d998625bb2c3debf0912a5a58c84cdb004ca134974dc5470345fe"
+      },
+      {
+        "path": "src/games/caribbean/assets/bridgetown-1675.webp",
+        "sha256": "0c1c99213d2903fb84a027a6f64508548c631b8fdefc6e41031e7954854ec67d"
+      },
+      {
+        "path": "src/games/caribbean/assets/caribbean-sloop.glb",
+        "sha256": "36c9b53aeebe28706932af7d66d67e3a9a545ac1a4ea00ad5ffd944876270320"
+      },
+      {
+        "path": "src/games/caribbean/audio/BattleAudio.test.ts",
+        "sha256": "b50de148ad07e5e35875d55ff1391985594bb55c69360a324fddcb1580a63aba"
+      },
+      {
+        "path": "src/games/caribbean/audio/BattleAudio.ts",
+        "sha256": "2c20b405d9d41da54efb43a286394658d900824db2fd9cc36652cabf7fbae687"
+      },
+      {
+        "path": "src/games/caribbean/canonicalJson.ts",
+        "sha256": "d06e454ffb008e90c9196bdd85badedaf6a90aea011fd4828997b4f0383dd5c1"
+      },
+      {
+        "path": "src/games/caribbean/caribbean.integration.test.tsx",
+        "sha256": "f88674da3694253b4b1cdf54e73be4f27b3629e21a32f8c47fab78d63231827a"
+      },
+      {
+        "path": "src/games/caribbean/components/CaribbeanLab.test.tsx",
+        "sha256": "b457440e7b2976753effac941b9ef441afa9987eab4d98ade3625b065dd85ccb"
+      },
+      {
+        "path": "src/games/caribbean/components/CaribbeanLab.tsx",
+        "sha256": "2b18016f5364108463940d339322104cea2294b5a23fd2654e4273670ce04713"
+      },
+      {
+        "path": "src/games/caribbean/components/CaribbeanPage.test.tsx",
+        "sha256": "d20de822e10b628e1c1c6833bc3167ea86225427ba0e0279c9f7c085da5d44ed"
+      },
+      {
+        "path": "src/games/caribbean/components/CaribbeanPage.tsx",
+        "sha256": "b00f3b0eeefbb5543c2b2f6e436d53ddd70d35e7d6793af7e7c163598218663a"
+      },
+      {
+        "path": "src/games/caribbean/components/MinimumScreenGate.test.tsx",
+        "sha256": "c4b047293aac8a63491752bf9693a3f1910e7d23ea1d2a406e87ae35a7992db4"
+      },
+      {
+        "path": "src/games/caribbean/components/MinimumScreenGate.tsx",
+        "sha256": "5caca7ee20918c708b10fe549cb550c499adc2fe7b03e306fa4e4ea8c0f37e61"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/BattleHud.test.tsx",
+        "sha256": "4d387c47f0dae4576143356f3a79221a44c5cb1a7d8b2dab815a5206882da804"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/BattleHud.tsx",
+        "sha256": "d1a0670fb1299bff8336017f8119f739be1944122e581d334c6e999d794dedef"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/BattleShortcutLegend.test.tsx",
+        "sha256": "7751944d5d5e18b8a3d256474d93705f2e595ed662f18d8c42d17c2d2ecff48c"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/BattleShortcutLegend.tsx",
+        "sha256": "94c8f86c35f08db8631a16132c0696d99f60a6c8d1c0abfb5ceab7100a3f16a6"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/HtmlTacticalChart.tsx",
+        "sha256": "aca127cd90b756e771b99bd45a510f31af3657f3c8dcc043517b967e6de1a4d7"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/NavalBattlePage.test.tsx",
+        "sha256": "bb718682eee59a603633297924fb7e3c169647229426a87271c675ff9fe1014a"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/NavalBattlePage.tsx",
+        "sha256": "87acfc32813e79bbab6890cff4eac41be166939f5a3d505e2198477176b7d788"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/NavalViewport.test.tsx",
+        "sha256": "cdd38284f6848985866290402d8716322fa4dd1dd7e7b6dbfdde3d04b9db3095"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/NavalViewport.tsx",
+        "sha256": "7e1a5cc1ded0fa52669a2f221b84cd58490479d75ccfa5d42b52fadd688e7497"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/aimCue.test.ts",
+        "sha256": "8b6dd92403f154b7cb14774f944ba29ad8ccd477444333176a0fcff70196afe1"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/aimCue.ts",
+        "sha256": "50efcd882beba3d14175c3cc255c9007ba48db16904ca92fc4565bb5439828b5"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/rudderPulse.d.mts",
+        "sha256": "d42aebb0be7346429a541ff2deff73bc9696b371d75b21183f919184a07f8aa7"
+      },
+      {
+        "path": "src/games/caribbean/components/battle/rudderPulse.mjs",
+        "sha256": "78dbb9a4dceae52b4c3e84e321ea08781d99a1da9d7230151ccac0ab35fbde0e"
+      },
+      {
+        "path": "src/games/caribbean/components/log/CaptainsLog.test.tsx",
+        "sha256": "89e8b10a1dc496b564cb1d9c0c6bc1b4dbfc228459feab719e5d729fc70ce1e6"
+      },
+      {
+        "path": "src/games/caribbean/components/log/CaptainsLog.tsx",
+        "sha256": "73c6dfc2dd11c14f18890e9ba42aa04a87fb34dc84474018096a0dbc2d6b7fe6"
+      },
+      {
+        "path": "src/games/caribbean/components/map/CaribbeanMap.test.tsx",
+        "sha256": "3d0a05a5664cd50b0033cdbb5553f3e2ac70ddfdf41b57600961579566d7193e"
+      },
+      {
+        "path": "src/games/caribbean/components/map/CaribbeanMap.tsx",
+        "sha256": "770fa49f7b901964332a71e28e7721be3cce423a79dd574bbc632c45047a95f2"
+      },
+      {
+        "path": "src/games/caribbean/components/map/mapView.ts",
+        "sha256": "826b71ee9278e4d793543f70b29dc0892bf032b6d1dfae65014d23a52600badd"
+      },
+      {
+        "path": "src/games/caribbean/components/port/CaribbeanChart.test.tsx",
+        "sha256": "23775f38e9e29301792454012a0ce4f564761f6d9909fac4fb48f6b44a90c540"
+      },
+      {
+        "path": "src/games/caribbean/components/port/CaribbeanChart.tsx",
+        "sha256": "1faeca686cd82c40350f1a0ad91238fc69e370cb424bac04432cc86cb2e083c1"
+      },
+      {
+        "path": "src/games/caribbean/components/port/DivideShares.test.tsx",
+        "sha256": "deeeaf5b7cf459e93d99b5773d0f620532b4131315a1b7742037446e50f7695a"
+      },
+      {
+        "path": "src/games/caribbean/components/port/DivideShares.tsx",
+        "sha256": "d3fe206f669788875fa1b10b448f590967e6d7d65f4aa4ab47742ac23302f337"
+      },
+      {
+        "path": "src/games/caribbean/components/port/GovernorHouse.tsx",
+        "sha256": "b29be3c6a559883c032c48ef4055f6a4e03ee12aa52c89f2200a9e236981221e"
+      },
+      {
+        "path": "src/games/caribbean/components/port/Market.test.tsx",
+        "sha256": "635a0c31f941471df0edd7d86ce923ba3d6af7597a140d5feb7bb3f4f5d6abd2"
+      },
+      {
+        "path": "src/games/caribbean/components/port/Market.tsx",
+        "sha256": "f009d797f6219a90fa5dc60b9b66209c522eebe0a454f12b0d30172180866a13"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortActionIcon.test.tsx",
+        "sha256": "08a8f41862229703caa24b9e1ad9f201591ca01ed801461df4d5fe82a5b94533"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortActionIcon.tsx",
+        "sha256": "cd79f918bac96818df0317a2a1b888cc17c2b1cd6f07f60afb427d14030d0730"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortBackdrop.test.tsx",
+        "sha256": "a6db1ed91c53d857e73b929620cb09fc6eb0b127ea92289efdfd2c3efaac07f5"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortBackdrop.tsx",
+        "sha256": "da68c30878d798e461c82083396c2803709d9440ee99adf90ac121747e1f258c"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortMenu.test.tsx",
+        "sha256": "9f409ec60e57b419bf2e1220f7d0ef7ef66f8e2490056a9093ae31938a82cbe2"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortMenu.tsx",
+        "sha256": "76a62efb640bdd801c6c79f6e3fe3204f94b0a77fe6ab2e89343d03e3a985f01"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortPage.test.tsx",
+        "sha256": "e305c8d034334e85f0fe35db1b508e2b931a947044722dca8473ea3466690177"
+      },
+      {
+        "path": "src/games/caribbean/components/port/PortPage.tsx",
+        "sha256": "7cc95d36f3588686ba246dd7cdb7dcbef474637c891874fd3a2d090a8e7cf8d8"
+      },
+      {
+        "path": "src/games/caribbean/components/port/ShipyardSummary.tsx",
+        "sha256": "92b92d127f721581ef2a41f8739af2f98637b872305e8ad6c7cb1ccdd7c8b969"
+      },
+      {
+        "path": "src/games/caribbean/components/port/Tavern.test.tsx",
+        "sha256": "3418bb96c10794fc373bd1fa61e18db6677ae64e17067dc198375a797db9fa0d"
+      },
+      {
+        "path": "src/games/caribbean/components/port/Tavern.tsx",
+        "sha256": "cdd66d55ee37157dfe99c153bfa3a79b753c70b0c476223941c51102a586d005"
+      },
+      {
+        "path": "src/games/caribbean/components/recovery/RecoveryPanel.test.tsx",
+        "sha256": "d4001c39ad0a545412b5c74fc7978afd16123e1fdd4b139962c7302da9c01b98"
+      },
+      {
+        "path": "src/games/caribbean/components/recovery/RecoveryPanel.tsx",
+        "sha256": "9df6b45d2d1e4fa20d8a1f6cbe951eb131373b5dab7b67cd80d88f8ede150edd"
+      },
+      {
+        "path": "src/games/caribbean/components/recovery/useModalFocus.test.tsx",
+        "sha256": "f3153fd06c05c8ce32b3f1d98a7a87be66e9f6f7cc4abb7582f5456d8aa69ad9"
+      },
+      {
+        "path": "src/games/caribbean/components/recovery/useModalFocus.ts",
+        "sha256": "fb10fb9950607b74715b048d269d9402259f4e4cf8f301e29013e806f736a71b"
+      },
+      {
+        "path": "src/games/caribbean/components/setup/CampaignSetup.test.tsx",
+        "sha256": "caa46a6cd66ef196d8f1635c6ab24b210417d82008cf9ba51119d4aa8c00bbfd"
+      },
+      {
+        "path": "src/games/caribbean/components/setup/CampaignSetup.tsx",
+        "sha256": "1cddc944a7aeef99a46b0ed6ddc90d3cdfba17a930498beaa0dcb4826fcdb50c"
+      },
+      {
+        "path": "src/games/caribbean/components/setup/PersistenceDecisionOverlay.test.tsx",
+        "sha256": "0d74528eed9713aeccc7c4103e18adcf3594594969f198ad06a3d07188129d00"
+      },
+      {
+        "path": "src/games/caribbean/components/setup/PersistenceDecisionOverlay.tsx",
+        "sha256": "343a6647cd55e3ab3738eb2e1aacf7ab2cd6f5da8c5256886ce33d84277ddb33"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/CampaignNavalBattle.test.tsx",
+        "sha256": "b7228d6f7935bba99b597ac1437d652c475a10210ee8f3982437701287861986"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/CampaignNavalBattle.tsx",
+        "sha256": "7f14274b89c5149ebdf49f927b69db92b82360944a8f1272ca5c97c7ea149694"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/EncounterPage.test.tsx",
+        "sha256": "ba518a0cff42a8da60ab110b579ebbeb549b676b4b99f6dd2471655257c41606"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/EncounterPage.tsx",
+        "sha256": "0fe205b371341507006ae080a2561d2a9ad9e58e46c191287930a29bf9b033f4"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/SailingPage.test.tsx",
+        "sha256": "9a197ead2441b8cd6b7492eee0d4e0b962375f22ee579b980de6a51951a8b2c2"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/SailingPage.tsx",
+        "sha256": "2669f75c1a617c80d473a88d60b4b2407b4365496447e2b45711e6980e38188e"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/VoyageInstrument.test.tsx",
+        "sha256": "be674d1554ed90ce72d3cc750ae8367d968a6688012f6b49a2303bd1fb7b1cd3"
+      },
+      {
+        "path": "src/games/caribbean/components/voyage/VoyageInstrument.tsx",
+        "sha256": "e5e3f971c4eaed20d80b9e68501b54df9a53df05f675ee21f00698629ac19dee"
+      },
+      {
+        "path": "src/games/caribbean/content/campaign.test.ts",
+        "sha256": "640fdc39bbb063cc6b603e4b5c69120f8f8e333727a31e02aba06e197cd9f7c3"
+      },
+      {
+        "path": "src/games/caribbean/content/campaign.ts",
+        "sha256": "57fffbe08cef84dff9705b06a37f980fa210a0b6f635b17d0205d70bfe51c5ba"
+      },
+      {
+        "path": "src/games/caribbean/content/content.test.ts",
+        "sha256": "e36b9f27c827e3adad8f8dacb7007830e54212da91e289095b8253435e15ab59"
+      },
+      {
+        "path": "src/games/caribbean/content/market.test.ts",
+        "sha256": "24acb493d5c498ec38832e5b01b7a9907bbeada76383584c99f9178d832a9d32"
+      },
+      {
+        "path": "src/games/caribbean/content/market.ts",
+        "sha256": "740bfe5c3a18ad4754a7c0138a8c244cea77b58e48fa021139d7161587c178c9"
+      },
+      {
+        "path": "src/games/caribbean/content/naval.ts",
+        "sha256": "e975465206187bdf157dc958d7c2e6fb8e934a161eaa71acc76e541c761cde9c"
+      },
+      {
+        "path": "src/games/caribbean/content/types.ts",
+        "sha256": "90cc9c20d7ab33bc504ca2c2158757cafaf9098ca724ceddc500d22e922d27ea"
+      },
+      {
+        "path": "src/games/caribbean/content/voyage.test.ts",
+        "sha256": "517f5419116729dc6533acacb52a862a8237af670f36d866901f689ba1066a91"
+      },
+      {
+        "path": "src/games/caribbean/content/voyage.ts",
+        "sha256": "69e05a98a1736b08547b2e3bf0189dd48c5213ed6e313d12c09979e9e2645981"
+      },
+      {
+        "path": "src/games/caribbean/domain/compactJournal.test.ts",
+        "sha256": "05539b44dffb6e112e1060889a56841d852df78ed0afe4857758ca9533f4e931"
+      },
+      {
+        "path": "src/games/caribbean/domain/compactJournal.ts",
+        "sha256": "88f602683727ee343612d6b786169fd1821b9e85c17f4668f6c9b50a973944f4"
+      },
+      {
+        "path": "src/games/caribbean/domain/createCampaign.test.ts",
+        "sha256": "e3912ae31f31aa2ef856d6b1d4b9a75423d8227101838104fb59e3f30a9bd43b"
+      },
+      {
+        "path": "src/games/caribbean/domain/createCampaign.ts",
+        "sha256": "14370d68341a9153109dda7060ca54ac2decb04a04844c7845c5223ca92b4015"
+      },
+      {
+        "path": "src/games/caribbean/domain/economy.test.ts",
+        "sha256": "0f1375d93e2b77aa470a29b53e8b16f04a1938a298142c923312c05bf47a9a76"
+      },
+      {
+        "path": "src/games/caribbean/domain/economy.ts",
+        "sha256": "e7cbb576cf4f5eb50d032de5e5a600c6b3cc7b74ea26f26ee472bdcbbdbad851"
+      },
+      {
+        "path": "src/games/caribbean/domain/events.ts",
+        "sha256": "ba386e5a9eed82455108c8e310425c06d73b59c2cfefed6e3ce3899e0600bd98"
+      },
+      {
+        "path": "src/games/caribbean/domain/leadSelectors.test.ts",
+        "sha256": "e35449754fb0cced39066e9c77c3e7ed53b9814375799cc34b28f01130e91e8c"
+      },
+      {
+        "path": "src/games/caribbean/domain/leadSelectors.ts",
+        "sha256": "546cbad4299a700c902312d79fea413966cbd0816552c29b28d320f71f35985c"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/balance.ts",
+        "sha256": "503f5678c9cfb9969525e34127f19206ad154eac0c4cc00f08779024387207ab"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/broadsideAgreement.test.ts",
+        "sha256": "42db8a80ac6273d7c1854af8be8df6b880bb5a3d88dbed855de506af6a84fdaf"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/createBattle.test.ts",
+        "sha256": "e21e354fe33b628f2fe4fe8b4ae4be91bb604f389c8873252603208f6916c6e2"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/createBattle.ts",
+        "sha256": "b134e2572467ffb5e90cd5b507265a781736458da509e7a3704bae1500eb3cc5"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/geometry.test.ts",
+        "sha256": "a0b3353bf2df52c83280e629fa676fecd82f91bdaf430c3e0b7f5935af5aa4b3"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/geometry.ts",
+        "sha256": "55ef479d6b99a56a2f6be9a5411d02dbb53d8b32c8f6933edc103b0ac3158af7"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/movement.test.ts",
+        "sha256": "ba633a7b8236bb64b233980053d71ba81d6636e0fa6ccad9773f66a13a113ba9"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/movement.ts",
+        "sha256": "ea384253ed16441f4f0b1d7c9f0cee3953ababcbb50d24a120ef41648bb0d100"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/opponent.test.ts",
+        "sha256": "1acb341ae9f591a22633b1bb9b21d3eae2b234fd101de49abbb4cccfeac5ec29"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/opponent.ts",
+        "sha256": "b7b804fe6a4d0fc19a4473849b03e8dbf185f7da3ef4c7e5df22b4aa49bed129"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/outcomes.test.ts",
+        "sha256": "5cfcda053ec4719a3ad65a5e46f0f02a2fa451ce9b6d13e607dad394e8c91f03"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/outcomes.ts",
+        "sha256": "506a9462ce53bee4aedc1da98a69978081eb68fc697e641f1122253492b00e81"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/pacing.test.ts",
+        "sha256": "7766ca78bb6a1cabe676805831f4661c8fb0fdb7ebf4a15f1a087de1e596cc03"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/replay.test.ts",
+        "sha256": "bf3a6a0980bef61305733d9eb8bcccedbfacc27ce0ade223bf558dbc55866b5a"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/replay.ts",
+        "sha256": "9b0d02bbc3db4fa74ac35d03a538a4db995ccc25f60f3bfc2b1c9109974131fc"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/resolution.test.ts",
+        "sha256": "b2ac2e1220c0e5697b222162027d6b4ee44fcbe0fb25acf9d81bf6f22ad383c2"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/resolution.ts",
+        "sha256": "fe1e62bf62d97a747ba66c0a12096f19577801e6203d0c5733e099fd3b0944d4"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/rng.ts",
+        "sha256": "e54d7e662615023786a8bdbece4e6b6da55dbaa6771942960aa46dfd2202b9ca"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/stepBattle.test.ts",
+        "sha256": "f422a8afc1d6a93b58d5956ac789413e09521ecdf83ed918c51ca0192f16b97e"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/stepBattle.ts",
+        "sha256": "5c05e61c429d5b598e7300cc090105ee17201e870d250656323cf3e3c0323c97"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/testFixtures.ts",
+        "sha256": "72218e63ea745cb9eeca318aa1ab86c9f1e136995d986e814a95bb9f9f37ce6c"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/types.ts",
+        "sha256": "ad4dd96eeed1cee0944c4c605eadb3871dba3961bc44ab3c7fe6196c38861589"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/validation.test.ts",
+        "sha256": "1f8a33f560c3eab72465098641b1b012f8e40435aa375792b555e36a8a083a64"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/validation.ts",
+        "sha256": "69b5fff8efd7e6d01754d7f70b5a5c99772898ea4e2cf337d49d8dff080f4791"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/volley.test.ts",
+        "sha256": "8d097ab19036d74264e1a028806fc9c07d98dd82ea7e7640bdeaacecb9eced1d"
+      },
+      {
+        "path": "src/games/caribbean/domain/naval/volley.ts",
+        "sha256": "f4580620da50c27a93e439d2878908ac6946d7739b17fe81e5797153253745a9"
+      },
+      {
+        "path": "src/games/caribbean/domain/reduceCampaign.test.ts",
+        "sha256": "5c9e1fb23b3149a945ddf76d75896be84c3272e21e0585514b412058dadf301f"
+      },
+      {
+        "path": "src/games/caribbean/domain/reduceCampaign.ts",
+        "sha256": "34c5ddf096b65690a734928fa04e0a3f5e157c10c2bfc4462d70f320fd9b880a"
+      },
+      {
+        "path": "src/games/caribbean/domain/replay.test.ts",
+        "sha256": "4b8775b9e7dc963a52222c31fd2616960460658b65cf7cb230eafdc823e524bc"
+      },
+      {
+        "path": "src/games/caribbean/domain/replay.ts",
+        "sha256": "66e160a5789d2169b9a8a63ad13f2017faee7414356ff1abe2f1a110dad8af70"
+      },
+      {
+        "path": "src/games/caribbean/domain/selectors.test.ts",
+        "sha256": "9c18c328f1d3d31e3247e8f91c35e60a809a7a675696830f20a88e1b69cf93e9"
+      },
+      {
+        "path": "src/games/caribbean/domain/selectors.ts",
+        "sha256": "76ddf3bcab712e91118d9db33af440cc852c3f9fdc7cfd5ae971627709be9f4d"
+      },
+      {
+        "path": "src/games/caribbean/domain/types.ts",
+        "sha256": "02834ec9efa36e11d21f1cb10194e7e48d606756e5547b2186d115cbc6986f27"
+      },
+      {
+        "path": "src/games/caribbean/domain/validateCampaign.test.ts",
+        "sha256": "fbb18642006f6da13156c0917cb2b345de8a1694e8d2f34290cfac5e06e1b635"
+      },
+      {
+        "path": "src/games/caribbean/domain/validateCampaign.ts",
+        "sha256": "4be6bed91a169c2a30cc710b937cb7c2eadda2b2022e6ee5aa8cd88e34bdd016"
+      },
+      {
+        "path": "src/games/caribbean/domain/voyage.test.ts",
+        "sha256": "54ecf4dfcb61389998b26e7a0cb916f711113fa858dd577cad93f193c479e7bf"
+      },
+      {
+        "path": "src/games/caribbean/domain/voyage.ts",
+        "sha256": "352f54f4e0a71e5a51862848eab7b1608a833358e2fe6e1184f50b4c53f1255c"
+      },
+      {
+        "path": "src/games/caribbean/index.ts",
+        "sha256": "0c2058533f682d048019c16dffc56f8f416dd338250adff50f1b19a1bbfb17dd"
+      },
+      {
+        "path": "src/games/caribbean/preview.tsx",
+        "sha256": "8f30bcce8cf4fa87ffb6d5a01d75a08205b7a5fc7e33fbb04403d7e9c7a6c35f"
+      },
+      {
+        "path": "src/games/caribbean/state/caribbeanControllerContract.test.ts",
+        "sha256": "30d12952763546b4ab97f29a58f45398d7ae4493e10556ee47e664d525d59f19"
+      },
+      {
+        "path": "src/games/caribbean/state/namedActionGate.test.ts",
+        "sha256": "3a43bf1ddc000aacd91a9ec05056e714e6da47250df3afbdc4a838569ae09413"
+      },
+      {
+        "path": "src/games/caribbean/state/namedActionGate.ts",
+        "sha256": "0e487062d11301d89fd3c49b5944a8f069804c7d0c474d15495a4252993373cd"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/FrameRunner.test.ts",
+        "sha256": "928897a4766e02fc008c4ef97f389fdbe6268008dd131bfb776e829bd8a7fd6f"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/FrameRunner.ts",
+        "sha256": "9d868823878b623abd2e1d7a3616dfdd597d9468c848284a905cbaf2efa0837e"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/NavalSession.test.ts",
+        "sha256": "36007094e9e8cf58c2f282f9ae46ee8c1620d47d4694655abdc3935937c11a93"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/NavalSession.ts",
+        "sha256": "d3932ac85dd68fcdb203904a8b1838533630c5486d21ba350cf085f7da5d6994"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/debugBridge.test.ts",
+        "sha256": "6f56fd0387ed33660a752c7c8d2bceedb1540041fc9c314c35496a6506cff200"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/debugBridge.ts",
+        "sha256": "b6cbab6bf2d69c6c838bcd75595f4c27620ef7a8273387dd7f8f0c03c2759046"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/harnessConfig.test.ts",
+        "sha256": "d7d57e4dfe324ca34404ce6057ecd1748b3897bfe87a8bbb95d072479c7b0720"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/harnessConfig.ts",
+        "sha256": "7f6cad6d395833caa35a90187fc6f73fabdc8b52ade6dcc6d18a56a8657fb66a"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/testSession.ts",
+        "sha256": "fdd14de90b8c749fe6e137b269deae621ff88f60062cc876d9f8778ed4b4cf66"
+      },
+      {
+        "path": "src/games/caribbean/state/naval/useNavalSession.ts",
+        "sha256": "d9cf5c18fd32aa2d41c0eabf31aa205f13faa578e07f1c5d44633f6a7cd3ae0b"
+      },
+      {
+        "path": "src/games/caribbean/state/runtime.test.ts",
+        "sha256": "f1e0c44eea60770052de569312e5c627542fac9bece0fbce26ab242d87cc533e"
+      },
+      {
+        "path": "src/games/caribbean/state/runtime.ts",
+        "sha256": "34fa227e35916f27dd172b5e217cae77bfa850c0b8085740e0d11af16a387e33"
+      },
+      {
+        "path": "src/games/caribbean/state/selectors.test.ts",
+        "sha256": "5db310c50bf3d5a2883fc4a87f14ceefc85da5217453be861cdccdf0d26a8f26"
+      },
+      {
+        "path": "src/games/caribbean/state/selectors.ts",
+        "sha256": "8f526db1409c99b1e0685fbbb456d8a40bf46c8aafb69b35fcc50bd14ed0573a"
+      },
+      {
+        "path": "src/games/caribbean/state/toMemorySaveIntent.test.ts",
+        "sha256": "11c9c1cb3414a45ab8b1e7b2c529719b8669663a995eeb0c3f96d14f8d752fe6"
+      },
+      {
+        "path": "src/games/caribbean/state/toMemorySaveIntent.ts",
+        "sha256": "c3d7232852ebb51abae3d188a60c0b371bd4114ab6861803b7405536fc0eaa3f"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbean.test.tsx",
+        "sha256": "15f47053d54472520ae28cd15cc20f8b6ca0b860fa30b8698c46ff6b8bfe7346"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbean.ts",
+        "sha256": "f9979233d63e2be6e0d359e37cbb32561886877cdede44f132dabea0a5ba606c"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanActionsMemory.test.tsx",
+        "sha256": "6da66eb524d4b07e8ad33fef584203b1cd183565d905fa01665c616f228e4287"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanActionsPersistedCombat.test.tsx",
+        "sha256": "a35aa0d359aed2a1661ff1588874342fca49dffc797013d1a54e211acf61cbfd"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanActionsPersistedTransit.test.tsx",
+        "sha256": "f7bf0b1963a3158f47f97f2044426bd0bcc226bb97c75d78a56a3d0a2e26d898"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanActionsTestSupport.tsx",
+        "sha256": "4c93d1f163d41b80e0a144056fbebf811e1751500f2fccbee794b8f62357e65c"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanActionsWrongPredecessor.test.tsx",
+        "sha256": "8542210162c4cf83f2ba0d61e26a95fb70423f2c3a0300d9c7c42cd93c120fa8"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationAvoidEffects.test.tsx",
+        "sha256": "b279db88ffc22917b301ca6dc34e1777ed0f9b655acc0a2f49e408f72855b8dc"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationEffects.test.tsx",
+        "sha256": "19285b8e27b46c496062c2ff394ab803e1ec7f018eeeb929039c54d2b935ef6e"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationEffectsMore.test.tsx",
+        "sha256": "a7622d06b3ed40f86a7dd0e9f3b24796e1d3b641e509f44410cf14897e9e06e9"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationLifecycle.test.tsx",
+        "sha256": "18db58b1f4a0581837335ca8b57d26ef3bd0c3541659391253aacb71a3d6991c"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationResolveEffects.test.tsx",
+        "sha256": "233b3052201ebf3a557d4245267e5a7c386bba06c8836eb61f85f06582ad8600"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanPublicationWithdrawEffects.test.tsx",
+        "sha256": "9fa9b5e78cb27b114c0d8e427445a62a4d27ef33435b767d2364e1870704725d"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanResolveFailure.test.tsx",
+        "sha256": "fafdce3204d4cd5da17c96afdc5d8a01f3e75977eadaf078f41b21c933c15d89"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanSavedNavalResume.test.tsx",
+        "sha256": "9356edfc3e92aa12264f942fa8519d0f4aae96afeb4b405f5624b5dd1f74e7ee"
+      },
+      {
+        "path": "src/games/caribbean/state/useCaribbeanThreshold.test.tsx",
+        "sha256": "9e951255d0a531da854588efb8ce0d8c8abfab98b8663ecdad92377debc8afac"
+      },
+      {
+        "path": "src/games/caribbean/storage/checksum.test.ts",
+        "sha256": "c30c400ac2488139622c20c62ed49cc76819d49fb4a0276c55cc7f536471d20b"
+      },
+      {
+        "path": "src/games/caribbean/storage/checksum.ts",
+        "sha256": "072bfe1c33d15722da9127759365f5ac7711c128773ef48ffff8c6e882b64ae2"
+      },
+      {
+        "path": "src/games/caribbean/storage/compactionPolicy.test.ts",
+        "sha256": "c6c9f20f6718eb1e12086572b5a13079df6d573f3fb88ca6e5f1fc7bc334dc1f"
+      },
+      {
+        "path": "src/games/caribbean/storage/compactionPolicy.ts",
+        "sha256": "0e3c8b8b072f57fa5d1ad3a821bf1ae13769d48e78d7f38a3bb2588f45228f9c"
+      },
+      {
+        "path": "src/games/caribbean/storage/migrations.ts",
+        "sha256": "81bbd2f266e8e9130be261b3d3d5bb608b98639b5ddcb02a978c0368a9202eaa"
+      },
+      {
+        "path": "src/games/caribbean/storage/persistence.test.ts",
+        "sha256": "6cb230df61ca7456738ad429d1553031aa703d7eefad372408c00a407f9cdb7c"
+      },
+      {
+        "path": "src/games/caribbean/storage/persistence.ts",
+        "sha256": "283aa86e88656bd15f0dbdb734c3a6e70fec993af324cd0429915a2833845a58"
+      },
+      {
+        "path": "src/games/caribbean/storage/recovery.test.ts",
+        "sha256": "4d1be2f45d377c620fb5ec79372abe7163a2ab76a18b7fb5b9c4a4b2d4d33449"
+      },
+      {
+        "path": "src/games/caribbean/storage/recovery.ts",
+        "sha256": "54b30ab09efb5512a0b2d60a6f2f35f49fea7849a88cd11f5ecb37a8319c4906"
+      },
+      {
+        "path": "src/games/caribbean/storage/schema.test.ts",
+        "sha256": "3a4e7435d6077ee70edada05d659c52e8b021ca9cbc8cb87f48b30eb369069c4"
+      },
+      {
+        "path": "src/games/caribbean/storage/schema.ts",
+        "sha256": "66aa4488ceb349ef1901fd28ed47acfd25e56f6cc75a30a52825008d8e7b9389"
+      },
+      {
+        "path": "src/games/caribbean/storage/writer.test.ts",
+        "sha256": "197fab65322ae90c441fae50459c367b6a51fe36be1e0ba1d32f4edcc6cdfd7d"
+      },
+      {
+        "path": "src/games/caribbean/storage/writer.ts",
+        "sha256": "f4e5af769c98b974c0d3945df2637aaa7898fa0335e574a08728a76d1cf6de81"
+      },
+      {
+        "path": "src/games/caribbean/styles/battle.css",
+        "sha256": "35e43a8c1b0aed1d268ff030ac07036396ec2e8f422c094d74598f9dbc122202"
+      },
+      {
+        "path": "src/games/caribbean/styles/battleResponsive.test.tsx",
+        "sha256": "5a77924c23e80987986aefe3667ea9d371a79c9fbd6ea3cb0e2e2d145755adb5"
+      },
+      {
+        "path": "src/games/caribbean/styles/caribbean.css",
+        "sha256": "0ed3cc775019588d5322fff4adc19947040093ebd634b9daf5a56ba6c1e6857f"
+      },
+      {
+        "path": "src/games/caribbean/styles/port.css",
+        "sha256": "bde3605b79b100207a30754c2455ad48a912c4dd9f31bd32ed41a75d1159a57d"
+      },
+      {
+        "path": "src/games/caribbean/styles/production.css",
+        "sha256": "dcf71d148ca641c4e40225d456bfeee7948de0c8accba5c3ad2854544b012846"
+      },
+      {
+        "path": "src/games/caribbean/styles/theme.css",
+        "sha256": "5a0749ee2b1722e50d8955a9b864893ed20374b137a65c84ac95c1acb24443ea"
+      },
+      {
+        "path": "src/games/caribbean/styles/voyage.css",
+        "sha256": "29685eddef31c9a852e8c3fe8f714d4cab54700afff7ff22db7ec63863fcb584"
+      },
+      {
+        "path": "src/games/caribbean/styles/voyageResponsive.test.tsx",
+        "sha256": "f8e247310a5c36a3a9c89ae65a1bd4dfcfcbf6163c428d7c1210c3a2c6c3c2e4"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/NavalScene.test.ts",
+        "sha256": "5e6cc714c5b83fe66659b10afd8030a0f65f565f80be42933e048d266fae4ecf"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/NavalScene.ts",
+        "sha256": "52bae7ae478677674408d500617ab96125a2eafb5321000d1d2f2079e44a3372"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/bearingLine.test.ts",
+        "sha256": "d0bc4f21a18d6540db9021a843bba00250eb47c2c4426d13ff87cf8147ecc950"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/bearingLine.ts",
+        "sha256": "0a193d391c046df68e26714e5f98b97f2f51313ca63e929de400bb674bf5c17a"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/effects.test.ts",
+        "sha256": "81b11ea0a6a9b9ca24a65014345f0b4e27844b24ac46386a3ecb783052e9aa90"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/effects.ts",
+        "sha256": "34369d3de07c162900632a08db2858a5a4ede9d6e766f2293b19a97a1f26fe12"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/quality.test.ts",
+        "sha256": "be5a849d802758e41bdbd9e7a42726afcb8f74c8a640c1c41ac8b818f304943e"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/quality.ts",
+        "sha256": "24bf2cc447d8e2856032b860bd303968fdeae36d0151a2647a207221ed066e1b"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/sceneMath.test.ts",
+        "sha256": "91ab6e4828f6b9b3e31ac003517798c82fcb1d87f57159d43bb4102c3adc31ad"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/sceneMath.ts",
+        "sha256": "0074a63c299dfd71440bc878bf3b1eb894eb34c23e7bfe9d319e74850370c296"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterPresentation.test.ts",
+        "sha256": "4b5b4ec73d03dcad83357df6dbf64884623db025f299c794ce0f84ca84a483f6"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterPresentation.ts",
+        "sha256": "0d4e5387c402ce8a3855d2aee89eb0aa9b0460121ad5d6dcdb17d1e064b9c893"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterShader.test.ts",
+        "sha256": "9baf568ddee47e46e754927b3f78f07705f5604be745e8f3fa05200646d6fc03"
+      },
+      {
+        "path": "src/games/caribbean/three/naval/waterShader.ts",
+        "sha256": "8f8f0add5b639e629a5da25aa009418fa63eb96fb6cfa612c6cc3e5b76350e78"
+      },
+      {
+        "path": "src/games/caribbean/three/shared/loadSloop.test.ts",
+        "sha256": "e113bfbe3effa52fee45a5ec6501d73c6a20324b9b70ef7a034092993ca1ab66"
+      },
+      {
+        "path": "src/games/caribbean/three/shared/loadSloop.ts",
+        "sha256": "1143fd52611873b8caaff265b8fcd82cd3ec06eb02c2682283292b0f8dc76f84"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-bishop.glb",
+        "sha256": "b11b80c021edf29d7d9db7774ecdd187b6930595757be1f194616ea6cda85945"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-king.glb",
+        "sha256": "7e89993f979f9d29d3702b3133c1b4776b419e9e406dd28391d4f7b84b59ca7d"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-knight.glb",
+        "sha256": "8505975e0d646062127a4afc3c9a615b4fdcf8260bd9f2de49a0fd993f48e175"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-pawn.glb",
+        "sha256": "ccf04f15f11777ab58ff3cd5295dfe33401249ece3d7d0fc6b1f51554cc2bdcd"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-queen.glb",
+        "sha256": "98b54a79224e04bf45c4cba8542f08360f077ce29091c9a285c6fde5ec9cf0d9"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/black-rook.glb",
+        "sha256": "20de3e22dae18dd6f2c5d90be7a072b7b28720e39d30474d7164020fe55b44d9"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-bishop.glb",
+        "sha256": "6514849042f570247b556ab27e8babf4eefe6bbf082008e323377c547485712d"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-king.glb",
+        "sha256": "4f4610530d8d7276d11bae555f24b25bce8b2baf9ad34d4c4edff6f18e3ebecd"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-knight.glb",
+        "sha256": "bb6dadce331bd6d610e05e55ef59b568175ff43a6e93776546b8c4b20fe9c45d"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-pawn.glb",
+        "sha256": "16d7ba5f3df96206e5c906732cae61ea627cd92153027f4b0c857b8e2831a1f7"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-queen.glb",
+        "sha256": "9a20c2ec5b7aa05ca644175722da569bbd8847d95ca872bff34061d149dc754f"
+      },
+      {
+        "path": "src/games/chess/assets/galaxy/white-rook.glb",
+        "sha256": "4b9072239bf13322151fa413f3e0c46f44e8b89dfa755a935dbf2a1dea8025b1"
+      },
+      {
+        "path": "src/games/chess/components/Chess3D.tsx",
+        "sha256": "920e6d9335ce636e7aab658f36ab5372ee191e218b4e6b18cb42dbd657e7989b"
+      },
+      {
+        "path": "src/games/chess/components/ChessBoard.tsx",
+        "sha256": "5c7a272e18204a384dbbf8c09d20f99f6beefa8f232a975b9ca2855bde7f69d3"
+      },
+      {
+        "path": "src/games/chess/components/ChessLogModal.tsx",
+        "sha256": "0a82ccba29e2459592c9f8500babcf43634ec53047cd81dc0c0accbd2aed6858"
+      },
+      {
+        "path": "src/games/chess/components/ChessPage.tsx",
+        "sha256": "c788b7d42b7925dc1274c3c44ed17b67185e5996548b3e25ce3f8137416d7580"
+      },
+      {
+        "path": "src/games/chess/components/ChessResult.tsx",
+        "sha256": "f43dd1ddb5fe095b3adee082278e1513c7f8fc454133886cb7c87192f445eee0"
+      },
+      {
+        "path": "src/games/chess/components/FreePlay.tsx",
+        "sha256": "14d8e827ee33a5cba74468c2e241d5860ea9efcae8bef1bab305f0c9a4357589"
+      },
+      {
+        "path": "src/games/chess/components/FreePlay3D.tsx",
+        "sha256": "0273ce0a78e0377fa9ba20a0640db41656efb4a34724b2b023b31f0b98e1962c"
+      },
+      {
+        "path": "src/games/chess/components/chessPieces.tsx",
+        "sha256": "ed3917612ae0837c988a1729cb02fd2dd52114ff0f294fbe5b93058c8bac4a81"
+      },
+      {
+        "path": "src/games/chess/components/chessTheme.tsx",
+        "sha256": "c74af56c9e33508f297db74369fcf1b03abdeb7c2cfb60453bd8b309eaa356e1"
+      },
+      {
+        "path": "src/games/chess/components/three/ChessScene.ts",
+        "sha256": "944640ce90812330e4ef97649a38c48c89685005546aa73801be268a5741ec49"
+      },
+      {
+        "path": "src/games/chess/domain/analysis.ts",
+        "sha256": "69836de316c2ceaf7788d8e6d422370164ab79e25c4c84e8b230d4a21d18ce99"
+      },
+      {
+        "path": "src/games/chess/domain/fen.ts",
+        "sha256": "df380aa7760bb408108ad6cf547f712dddd0c27416b9c9b981438a6c094c0af7"
+      },
+      {
+        "path": "src/games/chess/domain/protocol.ts",
+        "sha256": "6922220767c60a5a3d78715039505fa66b6e71237e354a937acac4a067aa8cb5"
+      },
+      {
+        "path": "src/games/chess/domain/rules.ts",
+        "sha256": "e6c6e254f0c9f12325bacab6ef2a1b403a0ee6a429fcad715893eaec06781a5d"
+      },
+      {
+        "path": "src/games/chess/domain/session.ts",
+        "sha256": "2cbc2fa96739d04f7bacc1df3b36840b8980d140e403f1ce2d3fc68285705592"
+      },
+      {
+        "path": "src/games/chess/domain/types.ts",
+        "sha256": "ba1506b81aa612fbb7bc2e59d30a6aafe1d896d3afec7339faee6b193fa08d98"
+      },
+      {
+        "path": "src/games/chess/index.ts",
+        "sha256": "93b69e2f46eacc6fbcdd9487e185ee78c51f02394608bd2b75a2bddc92bc0938"
+      },
+      {
+        "path": "src/games/chess/state/useChess.ts",
+        "sha256": "fc76a05e8510ca312cea35cbf3401c5fb277ad0a7371a3eb26693081c46f96ea"
+      },
+      {
+        "path": "src/games/chess/storage/chessPersistence.ts",
+        "sha256": "acd7b963b66d9453f9d0c5649243855a0bad8405d53a4851b67729953d7369f9"
+      },
+      {
+        "path": "src/games/chess/styles/chess.css",
+        "sha256": "b103aa2a54e62f16b877246f51c6b3edd5f5b038fec0f1275bf0679876eaf89c"
+      },
+      {
+        "path": "src/games/racer/components/RacerPage.tsx",
+        "sha256": "754b04368bb31272cf034d6371606242437cc1a0b977f118958fd164ed47a7d3"
+      },
+      {
+        "path": "src/games/racer/components/RacerSetup.tsx",
+        "sha256": "57ecc930e52adc6dbe2fe2092bc8ae7532c559e272f194c3de52a68f21a414f7"
+      },
+      {
+        "path": "src/games/racer/components/Track3D.tsx",
+        "sha256": "37e85de69751ffeed3baa740e797f94824772a20a25c659ec38217ed6d0d4d94"
+      },
+      {
+        "path": "src/games/racer/components/WinOverlay.tsx",
+        "sha256": "737c0a2441d008918404c3d7d66d2d3b0ad45f466d87df2d4455bca72fafd8c2"
+      },
+      {
+        "path": "src/games/racer/domain/kart.ts",
+        "sha256": "79d98c2f1a8ce4aa06c53ce97262b213a3d92fc946b16561a3bb2b7b6fd7e797"
+      },
+      {
+        "path": "src/games/racer/domain/race.ts",
+        "sha256": "322707635b8092ff6eec236323fb58e3c40eaa6a9bb13aac068ca74ba8c9808e"
+      },
+      {
+        "path": "src/games/racer/index.ts",
+        "sha256": "16852217619ed18f441cb3800a54aba016769b0ec50fab0a1fa237027dd0a4a6"
+      },
+      {
+        "path": "src/games/racer/net/protocol.ts",
+        "sha256": "be1ab6a301b535b497fff334511590dc2b3927314a853e15a6cd77e376ca56e3"
+      },
+      {
+        "path": "src/games/racer/net/useRacerNet.ts",
+        "sha256": "f2b0f67b6f7f40e3683881d831bd890e32fe36c98892d5644a075bf1a8296c3c"
+      },
+      {
+        "path": "src/games/racer/styles/racer.css",
+        "sha256": "6048f499c4686f8101a2e41e3d50dbf89e7415372299cd3cf83791ec15baab70"
+      },
+      {
+        "path": "src/games/racer/three/scene.ts",
+        "sha256": "f998fc7dc2fa67637eb9fec7aa6b1cb723a264697ff12e861c562b8c5cda6d61"
+      },
+      {
+        "path": "src/games/risk/components/RiskBoard.tsx",
+        "sha256": "9fee4b1a7aa9ad89fea118524c693a7d7ea30a3e08de400ac89fe28cc2e31230"
+      },
+      {
+        "path": "src/games/risk/components/RiskPage.tsx",
+        "sha256": "fca2aaf3fe1ce49b04469728a80de09992098b9a3a72b4c97b1167cc49597bba"
+      },
+      {
+        "path": "src/games/risk/components/paperGrain.ts",
+        "sha256": "c1e6ead2ac7078b18b7d2de33cf54046899cd49fe07882070f37824a8bcf02c1"
+      },
+      {
+        "path": "src/games/risk/components/useMapZoom.ts",
+        "sha256": "5f9000ab9afe165cde181b566a01f8448254e57319357e405bbfb19dd9f8180f"
+      },
+      {
+        "path": "src/games/risk/domain/bots/decide.ts",
+        "sha256": "894924123bfb0caa55e2a1319147239147d8a1488761db1dc8bdd002902fe760"
+      },
+      {
+        "path": "src/games/risk/domain/bots/index.ts",
+        "sha256": "d39c15ff94f9342c53159be86982b59f09c4ad62a6924da7a80b23f955252f05"
+      },
+      {
+        "path": "src/games/risk/domain/bots/personas.ts",
+        "sha256": "75b70af59a808052a323be3db0199a17ecba584610b4a6e03d8277e72c472284"
+      },
+      {
+        "path": "src/games/risk/domain/rules.ts",
+        "sha256": "da9bfeacd1fb87c52a51ebed204519c7ea628035ef42dfe067ed7a0a404b5677"
+      },
+      {
+        "path": "src/games/risk/domain/types.ts",
+        "sha256": "257e2dbacd1405a03c06d315b3908e44ec36f4d6deca0525382ad78ad25755e0"
+      },
+      {
+        "path": "src/games/risk/index.ts",
+        "sha256": "145f7945d4ec8355aae84baab7472ff4c20839b3249e11f710d5e2143f31a2dc"
+      },
+      {
+        "path": "src/games/risk/maps/registry.ts",
+        "sha256": "293f9d74bcd95b3cf1a46504ef5a871a5bb8c727c5b25ff614ef47966cceb459"
+      },
+      {
+        "path": "src/games/risk/maps/types.ts",
+        "sha256": "4408b8a39d168c93abc85526f61cab0ccb690d3dd87361446c3c41b1130a6054"
+      },
+      {
+        "path": "src/games/risk/maps/world.ts",
+        "sha256": "5edddfefc6ef89c10c4fcacc1bbec8cc868dde9234c90d95ea7ae6005dae9c9b"
+      },
+      {
+        "path": "src/games/risk/state/useRisk.ts",
+        "sha256": "e1790b7f5b4138a8c7579858ce48abfa582c2d9b7b998634f638b06225a0eab9"
+      },
+      {
+        "path": "src/games/risk/storage/riskPersistence.ts",
+        "sha256": "7e9ac90a3d9b8df4334c819447285248339ea2d99e9ea8501ce08aefd7192027"
+      },
+      {
+        "path": "src/games/risk/styles/risk.css",
+        "sha256": "97546f24168b2b595b482c6718735ef43b5ab02df61d515555de6c150a05edbb"
+      },
+      {
+        "path": "src/games/unicorn/components/UnicornPage.tsx",
+        "sha256": "00470a7ef68c14ba1fc58243b7dd3c9bd68354b9bce28857e29965e24f59bb3e"
+      },
+      {
+        "path": "src/games/unicorn/components/scene.ts",
+        "sha256": "a7f61b4aa97b39bca5b9dc8d0c112208edd3d206842887022d956ebf243fba31"
+      },
+      {
+        "path": "src/games/unicorn/domain/content.ts",
+        "sha256": "b79dcae5e005403500b2d55bb37b2738af508e218ffa2f28019cf84b95158c59"
+      },
+      {
+        "path": "src/games/unicorn/domain/engine.ts",
+        "sha256": "848182469124f10944729e3c00e19afe268390a2bcb7e9b53dda4540de500e71"
+      },
+      {
+        "path": "src/games/unicorn/domain/input.ts",
+        "sha256": "26689fc798f9416a47f5fceed3fe3b8ca428677c9f28b191541a478c94b0025a"
+      },
+      {
+        "path": "src/games/unicorn/index.ts",
+        "sha256": "becee7d60aa2d47afa910963e209a7000aeb9b74c74b5fc1eb33fcf2be55e554"
+      },
+      {
+        "path": "src/games/unicorn/styles/unicorn.css",
+        "sha256": "e67250ee89d662b8da15788419c49555b3913b174511bd593cf6f362ccf010d3"
+      },
+      {
+        "path": "src/shared/game.ts",
+        "sha256": "deec4995a8fe1bfea23ae25e49eefb3371dfb496b5cd49463f8c9f21a990bd9d"
+      },
+      {
+        "path": "src/shared/net/media.ts",
+        "sha256": "3f70ccf9909a50ebee6f7be4dbfb93b6595a033e72fd1c96ed642cb52fcea8a7"
+      },
+      {
+        "path": "src/shared/net/peer.ts",
+        "sha256": "396bc6139f0a0dfca1aef4febdfc785fe013ea62b26d7a34316fe6603a3d0fba"
+      },
+      {
+        "path": "src/shared/party/FloatingVideo.tsx",
+        "sha256": "3ff05d82b6f4273f5daf628da64062eed895e8706f13157696081d73a86f4640"
+      },
+      {
+        "path": "src/shared/party/PartyBar.tsx",
+        "sha256": "8ca714fc57f5c12ed130cb51d7fa930b64c7ba0a3a3a6208e3233429bb399675"
+      },
+      {
+        "path": "src/shared/party/PartyContext.tsx",
+        "sha256": "edb75b1fd16d5af8b271d34eed7ce2885a2a67394f3a65a2b318d11d50fe1fdd"
+      },
+      {
+        "path": "src/shared/party/party.css",
+        "sha256": "82954f524182b98e44a545f032de6b4a4b3266adeb6c40653aae9e63b3ee08c3"
+      },
+      {
+        "path": "src/shared/party/protocol.ts",
+        "sha256": "e6454fab1f1f228d220d3a61e5b756d396f9900e2a026feed3b256cb3b5d01ea"
+      },
+      {
+        "path": "src/shared/profile/PlayerGate.tsx",
+        "sha256": "64bc8530f36c0f08cd801f64d78d5a0307f4720f7c624ee9ff82456ffdde377c"
+      },
+      {
+        "path": "src/shared/profile/player.css",
+        "sha256": "c7d55ef2b16cae65421ca98f13c61b6c1ccca437919478711cad0ff72a968e62"
+      },
+      {
+        "path": "src/shared/profile/playerColors.ts",
+        "sha256": "63ba0d8a6041bfed8b5b1dbb42b7bef6d036cb2e5fe8aae90536faa1924e7f52"
+      },
+      {
+        "path": "src/shared/profile/profile.ts",
+        "sha256": "c22fb2d8efe525223e3ad62ff95214cc23be297ec117ae0317023a1be7e1536f"
+      },
+      {
+        "path": "src/shared/profile/profileStore.ts",
+        "sha256": "f76c224e1d925fabe2878fa6d11131790d4baeda1ae1ffe0fd218212e8223f7a"
+      },
+      {
+        "path": "src/shared/profile/recentNames.ts",
+        "sha256": "3ba29a25dbd0cc3ef679928a2151b8823eb25de72d20f8fb5f5ffe6da9e0aa84"
+      },
+      {
+        "path": "src/shared/profile/useProfile.ts",
+        "sha256": "a48b8a182e0657a3461da449e523de8089f59cd22701eecee48af992d07c19db"
+      },
+      {
+        "path": "src/shared/profile/useUsers.ts",
+        "sha256": "767480f8a428523177a5bec9727f144d6aa162ab5465e921d8c164c9fc690297"
+      },
+      {
+        "path": "src/shared/profile/users.ts",
+        "sha256": "ee0e837b6b4d3ff8c1b1ecc70b0e60c66aed140942dd5920c5cd49a61b7617e1"
+      },
+      {
+        "path": "src/shared/profile/usersStore.ts",
+        "sha256": "372065f30198b29d5980aa8c262f51703080b97b481f119f8e589121ed0213ea"
+      },
+      {
+        "path": "src/shared/reconcile.ts",
+        "sha256": "2d9f0b6572bc4fc8ece3be52915dc2b193c36bab9c6f623c208f1b0d87d3f844"
+      },
+      {
+        "path": "src/shared/rng.ts",
+        "sha256": "04c55d204b55d01ac75c12198ff9e9619d18280b27024cd29396b816d49e4f02"
+      },
+      {
+        "path": "src/shared/storage/kv.ts",
+        "sha256": "ef6f14737473aff26c5418485c4cdaf515d539b07c9071878cb825a5ce18d88a"
+      },
+      {
+        "path": "src/shared/styles/tokens.css",
+        "sha256": "2aa0dc430eb48cc80d2a5126a6d2d56614b8a278c1094ab849caf1366125684f"
+      },
+      {
+        "path": "src/shared/three/disposeDeep.ts",
+        "sha256": "59388e95caf6611150f30041b486a551c30a0807be71e82a280193d43458e810"
+      },
+      {
+        "path": "src/shared/ui/ConnectionBadge.tsx",
+        "sha256": "a81d1860d479e293ff52465d88d43ea5a4c56609b68c03070da1bc1b3cc68c03"
+      },
+      {
+        "path": "src/shared/ui/ErrorBoundary.tsx",
+        "sha256": "ed971e0c22269f4c1c5de61a734b45a0ff9b38cef9c638d8c79747cae9b6897d"
+      },
+      {
+        "path": "src/shared/ui/FullscreenButton.tsx",
+        "sha256": "23c0adae25fdc0c455e36384e98218de0b21bb417b3d4e31e69f6268cb46de6a"
+      },
+      {
+        "path": "src/shared/ui/NamePicker.tsx",
+        "sha256": "1a465cf0ea28997770db16dfa18a8dba62d80e25a5f817144bcf26a9476e8f07"
+      },
+      {
+        "path": "src/shared/ui/VictoryFX.tsx",
+        "sha256": "a2575c855506d0f9a6f307612ef7bda58abc72036d40e48bf37c357227679a3a"
+      },
+      {
+        "path": "src/shared/ui/icons.tsx",
+        "sha256": "66c78c04e8e39014aa0b10e4aae579c9fdc3f8d2abf42c89643dd05478b226a2"
+      },
+      {
+        "path": "src/shared/ui/useDismissOnEscape.ts",
+        "sha256": "6c2e25e09a666ce80ea939d5a51784939285a8255a91c907ee67aa7f54a1aafa"
+      },
+      {
+        "path": "tsconfig.app.json",
+        "sha256": "a831b954ad548bdd3717062f416ed7ee249152f9fed9350140dbf2c2ebb5a9a3"
+      },
+      {
+        "path": "tsconfig.json",
+        "sha256": "770b4140bbb581e2dfd9ea9946ffc9c75a1d86ba7d2db5f77c83e37cbdf9d808"
+      },
+      {
+        "path": "tsconfig.node.json",
+        "sha256": "ea3a56ad2b1d3c9b012d82a31090c90e508a9300b03d88d11189f4668fcb995b"
+      },
+      {
+        "path": "vite.config.ts",
+        "sha256": "98bd8c562cf5cd049bd7ca4861fa8cf8b339cb23c77841a04f53d29136149d22"
+      }
+    ],
+    "sourceHash": "cd4a2e69be451f02da1cda47129cbfc82e17c4c62c1684a14d31dfd936c83332"
+  },
+  "canonicalInput": {
+    "battleId": "battle-lab-red-jackdaw",
+    "seed": 1702
+  },
+  "seed": 1702,
+  "browser": {
+    "name": "Chromium",
+    "version": "151.0.7922.34",
+    "angleArgs": [
+      "--use-gl=angle",
+      "--use-angle=default",
+      "--enable-unsafe-swiftshader"
+    ]
+  },
+  "viewports": {
+    "tablet": {
+      "width": 1180,
+      "height": 820
+    },
+    "desktop": {
+      "width": 1440,
+      "height": 900
+    },
+    "minimum": {
+      "width": 1024,
+      "height": 768
+    },
+    "boundary": {
+      "width": 960,
+      "height": 600
+    },
+    "phonePortrait": {
+      "width": 430,
+      "height": 932
+    },
+    "phoneLandscape": {
+      "width": 844,
+      "height": 390
+    }
+  },
+  "deviceScaleFactor": 1,
+  "tiers": {
+    "tablet": "high",
+    "desktop": "high",
+    "minimum": "high",
+    "boundary": "high"
+  },
+  "fps": {
+    "samples": [
+      75,
+      78,
+      79,
+      78,
+      83,
+      81,
+      84,
+      79,
+      78,
+      76,
+      79,
+      84,
+      75,
+      85,
+      79,
+      80,
+      80,
+      78,
+      77,
+      83
+    ],
+    "sustainedFloorMethod": "minimum 3-sample moving average after warm-up during an unpaused advancing battle with live effects",
+    "sustained": 77.333
+  },
+  "maximums": {
+    "drawCalls": 32,
+    "triangles": 7870,
+    "textures": 3,
+    "geometries": 29,
+    "materials": 29,
+    "bufferAttributes": 96,
+    "effectActive": 26,
+    "effectCapacity": 96
+  },
+  "resourcePlateau": {
+    "warmupSeconds": 2,
+    "observedSeconds": 20,
+    "samples": [
+      {
+        "fps": 75,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 32,
+        "triangles": 7337,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 16,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 354,
+        "cameraIntermediateFrames": 177,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 185,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 28,
+        "triangles": 6854,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 1,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 594,
+        "cameraIntermediateFrames": 297,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 247,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 79,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 714,
+        "cameraIntermediateFrames": 357,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 307,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 834,
+        "cameraIntermediateFrames": 417,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 367,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 83,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1074,
+        "cameraIntermediateFrames": 537,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 428,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 81,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1194,
+        "cameraIntermediateFrames": 597,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 488,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 84,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1314,
+        "cameraIntermediateFrames": 657,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 542,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 79,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1554,
+        "cameraIntermediateFrames": 777,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 608,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1674,
+        "cameraIntermediateFrames": 837,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 663,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 76,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 1794,
+        "cameraIntermediateFrames": 897,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 723,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 79,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2034,
+        "cameraIntermediateFrames": 1017,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 783,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 84,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2154,
+        "cameraIntermediateFrames": 1077,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 845,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 75,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2274,
+        "cameraIntermediateFrames": 1137,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 905,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 85,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2514,
+        "cameraIntermediateFrames": 1257,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 966,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 79,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2634,
+        "cameraIntermediateFrames": 1317,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1027,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 80,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2754,
+        "cameraIntermediateFrames": 1377,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1087,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 80,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 2994,
+        "cameraIntermediateFrames": 1497,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1147,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 78,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 3114,
+        "cameraIntermediateFrames": 1557,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1208,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 77,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 27,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 3234,
+        "cameraIntermediateFrames": 1617,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1268,
+        "paused": false,
+        "outcome": null
+      },
+      {
+        "fps": 83,
+        "dpr": 1,
+        "tier": "high",
+        "drawCalls": 26,
+        "triangles": 6774,
+        "textures": 3,
+        "geometries": 29,
+        "materials": 29,
+        "bufferAttributes": 96,
+        "activeEffects": 0,
+        "effectCapacity": 96,
+        "reducedMotion": false,
+        "shipIntermediateFrames": 3474,
+        "cameraIntermediateFrames": 1737,
+        "reducedMotionShipSnaps": 0,
+        "reducedMotionCameraSnaps": 0,
+        "tick": 1323,
+        "paused": false,
+        "outcome": null
+      }
+    ],
+    "growthAfterWarmup": {
+      "textures": 0,
+      "geometries": 0,
+      "materials": 0,
+      "bufferAttributes": 0,
+      "activeEffects": 16,
+      "effectCapacity": 0
+    },
+    "allocationErrors": [],
+    "capacityErrors": [],
+    "poolErrors": []
+  },
+  "asset": {
+    "path": "/assets/caribbean-sloop-P-mk3eaS.glb",
+    "bytes": 56864,
+    "sha256": "36c9b53aeebe28706932af7d66d67e3a9a545ac1a4ea00ad5ffd944876270320"
+  },
+  "failures": {
+    "console": [],
+    "page": [],
+    "requests": [],
+    "unhandledRejections": [],
+    "remoteDependencies": []
+  },
+  "outcome": {
+    "ok": true,
+    "outcome": "boarding-ready",
+    "elapsedBrowserSeconds": 0.209,
+    "initial": {
+      "distance": 7.02,
+      "outcomeInjected": false,
+      "damageInjectedAfterStart": false,
+      "timeInjected": false,
+      "opponent": {
+        "hull": 72,
+        "sails": 30,
+        "crew": 18,
+        "cannon": 6
+      }
+    }
+  },
+  "handedness": {
+    "portVectorX": 1,
+    "starboardVectorX": -1,
+    "portMuzzleOriginX": 3.1,
+    "starboardMuzzleOriginX": -3.1,
+    "steeringPortHeadingDelta": 0.286,
+    "steeringStarboardHeadingDelta": -0.234,
+    "staleRudder": false,
+    "port": {
+      "eventId": 3,
+      "side": "port",
+      "vector": {
+        "x": 1,
+        "z": 0
+      },
+      "muzzleOrigin": {
+        "x": 3.1,
+        "z": 0.2790229259999995
+      }
+    },
+    "starboard": {
+      "eventId": 3,
+      "side": "starboard",
+      "vector": {
+        "x": -1,
+        "z": 0
+      },
+      "muzzleOrigin": {
+        "x": -3.1,
+        "z": 0.09922977791999982
+      }
+    }
+  },
+  "fallback": {
+    "ok": true,
+    "chart": true,
+    "retry": true,
+    "restart": true,
+    "battleControls": true,
+    "labelsClear": true
+  },
+  "motion": {
+    "normal": {
+      "preference": "no-preference",
+      "reducedMotion": false,
+      "shipIntermediateFrames": 118,
+      "cameraIntermediateFrames": 59
+    },
+    "reduced": {
+      "preference": "reduce",
+      "reducedMotion": true,
+      "shipSnaps": 16,
+      "cameraSnaps": 8
+    }
+  },
+  "display": {
+    "supported": {
+      "desktop": {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "battle": true,
+        "notice": false,
+        "fullBleed": true,
+        "centerClear": true,
+        "controlsVisible": true,
+        "touchSized": true,
+        "labelsContained": true,
+        "shortcutKeys": true,
+        "minimumActionFontSize": 14,
+        "measuredActionControls": [
+          "naval-rudder-port",
+          "naval-fire-port",
+          "naval-shot-cycle",
+          "naval-sail-toggle",
+          "naval-fire-starboard",
+          "naval-rudder-starboard",
+          "naval-options-toggle",
+          "naval-pause"
+        ],
+        "sailControl": true,
+        "noOuterScroll": true
+      },
+      "tablet": {
+        "viewport": {
+          "width": 1180,
+          "height": 820
+        },
+        "battle": true,
+        "notice": false,
+        "fullBleed": true,
+        "centerClear": true,
+        "controlsVisible": true,
+        "touchSized": true,
+        "labelsContained": true,
+        "shortcutKeys": true,
+        "minimumActionFontSize": 14,
+        "measuredActionControls": [
+          "naval-rudder-port",
+          "naval-fire-port",
+          "naval-shot-cycle",
+          "naval-sail-toggle",
+          "naval-fire-starboard",
+          "naval-rudder-starboard",
+          "naval-options-toggle",
+          "naval-pause"
+        ],
+        "sailControl": true,
+        "noOuterScroll": true
+      },
+      "minimum": {
+        "viewport": {
+          "width": 1024,
+          "height": 768
+        },
+        "battle": true,
+        "notice": false,
+        "fullBleed": true,
+        "centerClear": true,
+        "controlsVisible": true,
+        "touchSized": true,
+        "labelsContained": true,
+        "shortcutKeys": true,
+        "minimumActionFontSize": 14,
+        "measuredActionControls": [
+          "naval-rudder-port",
+          "naval-fire-port",
+          "naval-shot-cycle",
+          "naval-sail-toggle",
+          "naval-fire-starboard",
+          "naval-rudder-starboard",
+          "naval-options-toggle",
+          "naval-pause"
+        ],
+        "sailControl": true,
+        "noOuterScroll": true
+      },
+      "boundary": {
+        "viewport": {
+          "width": 960,
+          "height": 600
+        },
+        "battle": true,
+        "notice": false,
+        "fullBleed": true,
+        "centerClear": true,
+        "controlsVisible": true,
+        "touchSized": true,
+        "labelsContained": true,
+        "shortcutKeys": true,
+        "minimumActionFontSize": 14,
+        "measuredActionControls": [
+          "naval-rudder-port",
+          "naval-fire-port",
+          "naval-shot-cycle",
+          "naval-sail-toggle",
+          "naval-fire-starboard",
+          "naval-rudder-starboard",
+          "naval-options-toggle",
+          "naval-pause"
+        ],
+        "sailControl": true,
+        "noOuterScroll": true
+      }
+    },
+    "unsupported": {
+      "portrait": {
+        "viewport": {
+          "width": 430,
+          "height": 932
+        },
+        "notice": true,
+        "battle": false,
+        "liveFrame": false,
+        "focused": true
+      },
+      "landscape": {
+        "viewport": {
+          "width": 844,
+          "height": 390
+        },
+        "notice": true,
+        "battle": false,
+        "liveFrame": false,
+        "focused": true
+      }
+    },
+    "resize": {
+      "notice": true,
+      "noticeFocused": true,
+      "battleUnmounted": true,
+      "tickStopped": true,
+      "restoredWithNewSession": true
+    },
+    "prebattle": {
+      "decision": {
+        "legendComplete": true,
+        "ctaVisible": true,
+        "noOuterScroll": true
+      },
+      "briefing": {
+        "legendComplete": true,
+        "ctaVisible": true,
+        "noOuterScroll": true
+      }
+    }
+  },
+  "verdict": {
+    "ok": true,
+    "issues": []
+  }
+}

@@ -1,0 +1,265 @@
+@import './theme.css';
+
+.caribbean-lab {
+  width: min(1360px, 100%);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: max(24px, env(safe-area-inset-top)) max(28px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(28px, env(safe-area-inset-left));
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.caribbean-lab__masthead {
+  min-height: 72px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-brass) 46%, transparent);
+}
+
+.caribbean-lab__masthead span,
+.caribbean-eyebrow,
+.caribbean-lab__masthead p,
+.caribbean-next-slice > span,
+.caribbean-lab-action > span,
+.caribbean-briefing dt {
+  margin: 0;
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 58%, var(--caribbean-trade-wind));
+  font: 700 14px/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.caribbean-lab__masthead h1 {
+  margin: 5px 0 16px;
+  font: 600 clamp(22px, 2.2vw, 30px)/1 "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.caribbean-lab__masthead p {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding-top: 8px;
+  color: var(--caribbean-trade-wind);
+}
+
+.caribbean-lab__masthead p i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--caribbean-trade-wind);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--caribbean-trade-wind) 13%, transparent);
+}
+
+.caribbean-decision,
+.caribbean-briefing {
+  min-height: 0;
+  display: grid;
+  align-items: center;
+  gap: clamp(40px, 7vw, 112px);
+  padding: clamp(32px, 6vh, 72px) clamp(0px, 3vw, 42px);
+}
+
+.caribbean-decision { grid-template-columns: minmax(0, 1.35fr) minmax(330px, 0.65fr); }
+.caribbean-briefing { grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr); }
+
+.caribbean-decision__instrument { min-width: 0; }
+.caribbean-eyebrow { display: flex; align-items: center; gap: 9px; color: var(--caribbean-trade-wind); }
+
+.caribbean-decision h2,
+.caribbean-briefing h2 {
+  margin: 20px 0 18px;
+  max-width: 760px;
+  font: 500 clamp(48px, 7.4vw, 112px)/0.84 "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+}
+
+.caribbean-briefing h2 { font-size: clamp(46px, 6vw, 84px); }
+.caribbean-briefing h2:focus { outline: 3px solid var(--caribbean-trade-wind); outline-offset: 6px; }
+
+.caribbean-decision__instrument > p:last-of-type,
+.caribbean-briefing__copy > p {
+  max-width: 680px;
+  margin: 0;
+  color: color-mix(in srgb, var(--caribbean-sailcloth) 70%, transparent);
+  font-size: clamp(15px, 1.5vw, 19px);
+  line-height: 1.65;
+}
+
+.caribbean-bearing-thesis {
+  position: relative;
+  width: min(640px, 100%);
+  aspect-ratio: 2.13 / 1;
+  margin-top: clamp(24px, 5vh, 52px);
+  border-top: 1px solid color-mix(in srgb, var(--caribbean-brass) 42%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 20%, transparent);
+  overflow: hidden;
+}
+
+.caribbean-bearing-thesis::before {
+  content: "LIVE BEARING";
+  position: absolute;
+  top: 14px;
+  left: 0;
+  z-index: 1;
+  color: var(--caribbean-brass);
+  font: 700 14px/1 ui-monospace, monospace;
+  letter-spacing: 0.15em;
+}
+
+.caribbean-bearing-thesis svg { width: 100%; height: 100%; fill: none; stroke: color-mix(in srgb, var(--caribbean-trade-wind) 26%, transparent); }
+.caribbean-bearing-thesis svg circle { stroke-dasharray: 1 8; }
+.caribbean-bearing-thesis__ticks { stroke: var(--caribbean-brass); opacity: 0.65; }
+.caribbean-bearing-thesis__line { stroke: var(--caribbean-brass); stroke-width: 1.5; }
+.caribbean-bearing-thesis__wind { stroke: var(--caribbean-trade-wind); fill: color-mix(in srgb, var(--caribbean-trade-wind) 18%, transparent); }
+.caribbean-bearing-thesis__ship { fill: var(--caribbean-trade-wind); stroke: var(--caribbean-trade-wind); }
+.caribbean-bearing-thesis__ship--target { fill: var(--caribbean-signal-red); stroke: var(--caribbean-signal-red); }
+
+.caribbean-bearing-thesis__label {
+  position: absolute;
+  font: 700 14px/1 ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.caribbean-bearing-thesis__label--player { left: 12%; bottom: 10%; color: var(--caribbean-trade-wind); }
+.caribbean-bearing-thesis__label--target { right: 8%; top: 12%; color: color-mix(in srgb, var(--caribbean-signal-red) 75%, white); }
+.caribbean-bearing-thesis > strong,
+.caribbean-bearing-thesis > small { position: absolute; left: 50%; transform: translateX(-50%); font-family: ui-monospace, monospace; }
+.caribbean-bearing-thesis > strong { top: 44%; font-size: 16px; color: var(--caribbean-sailcloth); }
+.caribbean-bearing-thesis > small { top: 55%; color: color-mix(in srgb, var(--caribbean-sailcloth) 52%, transparent); font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; }
+
+.caribbean-decision__choices { display: grid; gap: 34px; }
+.battle-shortcut-legend {
+  min-width: 0;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--caribbean-brass) 36%, transparent);
+}
+.battle-shortcut-legend__label { display: block; margin-bottom: 10px; color: color-mix(in srgb, var(--caribbean-sailcloth) 58%, var(--caribbean-trade-wind)); font: 700 14px/1 ui-monospace, monospace; letter-spacing: .11em; text-transform: uppercase; }
+.battle-shortcut-legend ul { display: flex; flex-wrap: wrap; gap: 7px 12px; margin: 0; padding: 0; list-style: none; }
+.battle-shortcut-legend li { display: inline-flex; align-items: center; gap: 6px; color: color-mix(in srgb, var(--caribbean-sailcloth) 68%, transparent); font-size: 14px; }
+.battle-shortcut-legend kbd { min-width: 24px; padding: 4px 6px; border: 1px solid color-mix(in srgb, var(--caribbean-brass) 52%, transparent); color: var(--caribbean-brass); font: 800 14px/1 ui-monospace, monospace; text-align: center; }
+.caribbean-briefing .battle-shortcut-legend { margin: 20px 0; }
+.caribbean-lab-action,
+.caribbean-next-slice {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  padding: 28px 26px;
+  text-align: left;
+  color: var(--caribbean-sailcloth);
+  background: linear-gradient(115deg, color-mix(in srgb, var(--caribbean-harbor-glass) 88%, transparent), color-mix(in srgb, var(--caribbean-deep-keel) 88%, transparent));
+  border: 0;
+  border-top: 2px solid var(--caribbean-trade-wind);
+  border-bottom: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 28%, transparent);
+  font: inherit;
+}
+
+.caribbean-lab-action { cursor: pointer; touch-action: manipulation; }
+.caribbean-lab-action::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto auto;
+  width: 52px;
+  height: 52px;
+  border-top: 1px solid var(--caribbean-brass);
+  border-right: 1px solid var(--caribbean-brass);
+}
+
+.caribbean-lab-action > span { display: flex; align-items: center; gap: 9px; color: var(--caribbean-trade-wind); }
+.caribbean-lab-action > strong,
+.caribbean-next-slice > strong {
+  display: block;
+  margin: 26px 0 8px;
+  font: 600 clamp(25px, 3vw, 38px)/1 "Avenir Next Condensed", "Roboto Condensed", sans-serif;
+  letter-spacing: 0.01em;
+}
+.caribbean-lab-action > small,
+.caribbean-next-slice > small { color: color-mix(in srgb, var(--caribbean-sailcloth) 58%, transparent); font-size: 14px; }
+.caribbean-lab-action > i { position: absolute; right: 24px; bottom: 24px; color: var(--caribbean-brass); font-style: normal; }
+.caribbean-lab-action > i svg,
+.caribbean-enter-battle > svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.caribbean-next-slice { opacity: 0.52; border-color: color-mix(in srgb, var(--caribbean-brass) 35%, transparent); background: transparent; }
+.caribbean-next-slice > strong { font-size: 22px; }
+
+.caribbean-lab-action:hover { background: color-mix(in srgb, var(--caribbean-harbor-glass) 92%, white 3%); }
+.caribbean-lab-action:focus-visible,
+.caribbean-enter-battle:focus-visible { outline: 3px solid var(--caribbean-trade-wind); outline-offset: 4px; }
+
+.caribbean-briefing__route .caribbean-bearing-thesis { width: 100%; margin: 0; }
+.caribbean-briefing__copy { border-left: 1px solid color-mix(in srgb, var(--caribbean-brass) 50%, transparent); padding-left: clamp(24px, 4vw, 54px); }
+.caribbean-briefing dl { margin: 28px 0; border-top: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 22%, transparent); }
+.caribbean-briefing dl div { display: grid; grid-template-columns: 120px 1fr; gap: 18px; padding: 13px 0; border-bottom: 1px solid color-mix(in srgb, var(--caribbean-trade-wind) 14%, transparent); }
+.caribbean-briefing dd { margin: 0; color: color-mix(in srgb, var(--caribbean-sailcloth) 72%, transparent); font-size: 14px; }
+.caribbean-enter-battle {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border: 1px solid var(--caribbean-trade-wind);
+  background: var(--caribbean-trade-wind);
+  color: var(--caribbean-deep-keel);
+  font: 800 14px/1 ui-monospace, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .caribbean-bearing-thesis__line { stroke-dasharray: 340; animation: caribbean-route-in 900ms cubic-bezier(.2,.8,.2,1) both; }
+  .caribbean-lab-action { transition: border-color 160ms, background 160ms, transform 160ms; }
+  .caribbean-lab-action:hover { transform: translateX(4px); }
+}
+
+@keyframes caribbean-route-in { from { stroke-dashoffset: 340; } to { stroke-dashoffset: 0; } }
+
+@media (min-width: 960px) and (max-height: 900px) {
+  .caribbean-lab { padding-block: 18px; }
+  .caribbean-lab__masthead { min-height: 60px; }
+  .caribbean-lab__masthead h1 { margin-bottom: 10px; }
+  .caribbean-briefing {
+    grid-template-columns: minmax(0, .9fr) minmax(520px, 1.1fr);
+    gap: clamp(34px, 4vw, 58px);
+    padding: 18px 20px;
+  }
+  .caribbean-briefing h2 { margin: 12px 0 10px; font-size: clamp(48px, 5vw, 58px); line-height: .86; }
+  .caribbean-briefing__copy { padding-left: 30px; }
+  .caribbean-briefing__copy > p { font-size: 15px; line-height: 1.4; }
+  .caribbean-briefing dl { margin: 12px 0; }
+  .caribbean-briefing dl div { padding: 8px 0; }
+  .caribbean-briefing .battle-shortcut-legend { margin: 12px 0; padding-top: 10px; }
+  .caribbean-briefing .battle-shortcut-legend__label { margin-bottom: 7px; }
+  .caribbean-briefing .battle-shortcut-legend ul { gap: 5px 10px; }
+  .caribbean-enter-battle { min-height: 50px; }
+}
+
+@media (max-width: 820px) {
+  .caribbean-decision,
+  .caribbean-briefing { grid-template-columns: 1fr; gap: 36px; align-content: start; }
+  .caribbean-decision h2 { font-size: clamp(50px, 13vw, 84px); }
+  .caribbean-decision__choices { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .caribbean-briefing__copy { max-width: 680px; border-left: 0; padding-left: 0; }
+}
+
+@media (max-width: 560px) {
+  .caribbean-lab { padding: max(18px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom)); }
+  .caribbean-lab__masthead { min-height: 58px; }
+  .caribbean-lab__masthead p { font-size: 14px; }
+  .caribbean-lab__masthead h1 { font-size: 18px; }
+  .caribbean-decision,
+  .caribbean-briefing { padding: 26px 0; }
+  .caribbean-decision h2 { margin-top: 14px; font-size: clamp(48px, 16vw, 70px); }
+  .caribbean-decision__instrument > p:last-of-type { font-size: 15px; line-height: 1.5; }
+  .caribbean-bearing-thesis { margin-top: 22px; }
+  .caribbean-decision__choices { grid-template-columns: 1fr; }
+  .caribbean-lab-action,
+  .caribbean-next-slice { padding: 22px 20px; }
+  .caribbean-next-slice { padding-block: 16px; }
+  .caribbean-briefing h2 { font-size: 50px; }
+  .caribbean-briefing__copy > p { font-size: 15px; line-height: 1.5; }
+}

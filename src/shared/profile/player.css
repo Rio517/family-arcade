@@ -51,6 +51,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  min-height: 44px;
 }
 .pstub:focus-visible {
   outline: 2px solid var(--accent);
@@ -76,15 +77,17 @@
   top: 50%;
   transform: translateY(-50%) rotate(90deg);
   font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.5rem;
+  font-size: 14px;
   letter-spacing: 0.2em;
   color: var(--muted);
 }
 .pstub-name { font-weight: 800; font-size: 1.05rem; display: block; }
-.pstub-stats {
+.pstub-stats,
+.pstub-pronouns {
   font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.74rem;
+  font-size: 14px;
   color: var(--muted);
+  display: block;
 }
 .pstub-stats b { color: var(--c, var(--accent)); font-weight: 600; }
 .pstub-new {

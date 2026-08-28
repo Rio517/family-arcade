@@ -1,0 +1,36 @@
+:root {
+  --caribbean-deep-keel: #07151d;
+  --caribbean-harbor-glass: #0b3340;
+  --caribbean-trade-wind: #4ec5c1;
+  --caribbean-sailcloth: #f1d6a1;
+  --caribbean-signal-red: #e55243;
+  --caribbean-brass: #c79a45;
+}
+
+html,
+body,
+#root,
+.caribbean-app {
+  min-height: 100%;
+}
+
+body:has(.caribbean-app) {
+  background:
+    radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--caribbean-trade-wind) 10%, transparent), transparent 30rem),
+    var(--caribbean-deep-keel);
+}
+
+.caribbean-app {
+  --bg: var(--caribbean-deep-keel);
+  --surface: var(--caribbean-harbor-glass);
+  --surface-2: color-mix(in srgb, var(--caribbean-harbor-glass) 72%, white 8%);
+  --border: color-mix(in srgb, var(--caribbean-trade-wind) 26%, transparent);
+  --text: var(--caribbean-sailcloth);
+  --muted: color-mix(in srgb, var(--caribbean-sailcloth) 62%, var(--caribbean-deep-keel));
+  --accent: var(--caribbean-trade-wind);
+  max-width: none;
+  min-height: 100dvh;
+  padding: 0;
+  color: var(--caribbean-sailcloth);
+  font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
