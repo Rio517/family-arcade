@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameConnection, generateCode, normalizeCode } from './peer';
 import { seededRng } from '@test/helpers';
 
@@ -156,5 +156,55 @@ describe('normalizeCode', () => {
     expect(normalizeCode('  wxyz  ')).toBe('WXYZ');
     expect(normalizeCode('abcdef')).toBe('ABCD'); // capped to 4
     expect(normalizeCode('!!')).toBe('');
+  });
+});
+
+describe('GameConnection — a reload must not strand the party', () => {
+  beforeEach(() => {
+    fakePeers.length = 0;
+    vi.useFakeTimers();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const quiet = (statuses: string[]) => ({
+    onStatus: (s: string) => statuses.push(s),
+    onMessage: () => {},
+    onOpen: () => {},
+  });
+
+  it('a guest keeps dialing for as long as it was told to — a cold-starting iPad takes a while', () => {
+    const statuses: string[] = [];
+    const gc = new GameConnection<Msg>(quiet(statuses), { prefix: 'test-v1-', isMessage: isMsg, dialTimeoutMs: 120_000 });
+    gc.join('KXQZ');
+    fakePeers[fakePeers.length - 1].emit('open'); // dials; the channel never opens
+    vi.advanceTimersByTime(25_000); // past the default 20 s window
+    expect(statuses).not.toContain('error');
+    vi.advanceTimersByTime(100_000);
+    expect(statuses).toContain('error');
+  });
+
+  it('a host reclaims its own id when the broker still holds the old registration', () => {
+    const statuses: string[] = [];
+    const gc = new GameConnection<Msg>(quiet(statuses), { prefix: 'test-v1-', isMessage: isMsg });
+    gc.host('KXQZ');
+    const first = fakePeers[fakePeers.length - 1];
+    first.emit('error', { type: 'unavailable-id' });
+    expect(statuses[statuses.length - 1]).toBe('reconnecting');
+    expect(first.destroyed).toBe(true);
+    vi.advanceTimersByTime(2_500);
+    expect(fakePeers).toHaveLength(2);
+    expect(fakePeers[1].id).toBe('test-v1-KXQZ');
+    fakePeers[1].emit('open');
+    expect(statuses).not.toContain('error');
+    gc.destroy();
+  });
+
+  it('a code that stays taken past the deadline is still an error', () => {
+    const statuses: string[] = [];
+    const gc = new GameConnection<Msg>(quiet(statuses), { prefix: 'test-v1-', isMessage: isMsg });
+    gc.host('KXQZ');
+    vi.advanceTimersByTime(21_000);
+    fakePeers[fakePeers.length - 1].emit('error', { type: 'unavailable-id' });
+    expect(statuses[statuses.length - 1]).toBe('error');
   });
 });
