@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import type { PartyValue } from './PartyContext';
+import { fakeParty } from './testing';
 
 // A controllable useParty so we can render each party state without a network.
 const mockParty = vi.hoisted(() => ({ value: null as any }));
@@ -12,42 +13,14 @@ vi.mock('./PartyContext', () => ({ useParty: () => mockParty.value }));
 import { PartyBar } from './PartyBar';
 import { FloatingVideo } from './FloatingVideo';
 
-function makeParty(over: Partial<PartyValue> = {}): PartyValue {
-  return {
+const makeParty = (over: Partial<PartyValue> = {}): PartyValue =>
+  fakeParty({
     myName: 'Rio',
-    status: 'idle',
-    code: '',
-    role: null,
-    inParty: false,
-    theirName: null,
     hostParty: vi.fn(() => 'ABCD'),
-    joinParty: vi.fn(),
-    leaveParty: vi.fn(),
-    retry: vi.fn(),
-    reconnecting: false,
-    table: null,
-    knock: null,
-    openTable: vi.fn(() => 'WXYZ'),
-    closeTable: vi.fn(),
-    knockOn: vi.fn(),
-    clearKnock: vi.fn(),
     resolveGame: (id: string) =>
       id === 'chess' ? { title: 'Chess', path: '/chess' } : id === 'racer' ? { title: 'Rainbow Racer', path: '/racer' } : null,
-    call: {
-      active: false,
-      status: 'idle',
-      muted: false,
-      cameraOn: false,
-      localStream: null,
-      remoteStream: null,
-      start: vi.fn(),
-      stop: vi.fn(),
-      toggleMute: vi.fn(),
-      toggleCamera: vi.fn(),
-    },
     ...over,
-  } as PartyValue;
-}
+  });
 
 const renderBar = (path = '/') => render(<MemoryRouter initialEntries={[path]}><PartyBar /></MemoryRouter>);
 
@@ -150,11 +123,23 @@ describe('PartyBar', () => {
     it('the host hears a knock and can open that game', () => {
       mockParty.value = live({ role: 'host', knock: 'racer' });
       renderBar('/');
+      const pill = screen.getByTestId('party-pill');
       expect(screen.getByTestId('party-badge')).toHaveTextContent('Rainbow Racer?');
-      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(pill).toHaveAccessibleName(/Kai wants to play Rainbow Racer/);
+      fireEvent.click(pill);
       expect(screen.getByTestId('party-knock')).toHaveTextContent('Kai wants to play Rainbow Racer');
       fireEvent.click(screen.getByTestId('party-knock-go'));
       expect(mockParty.value.clearKnock).toHaveBeenCalledTimes(1);
+    });
+
+    it('the host who wandered off is offered the way back to its own table', () => {
+      mockParty.value = live({ role: 'host', table: { game: 'chess', code: 'WXYZ', hostSide: 'b' } });
+      renderBar('/');
+      expect(screen.getByTestId('party-badge')).toHaveTextContent('Chess ›');
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.getByTestId('party-invite')).toHaveTextContent('Your table — Chess');
+      expect(screen.getByTestId('party-invite-go')).toHaveTextContent('Back to it');
+      expect(screen.getByTestId('party-invite-go')).toHaveAttribute('href', '/chess');
     });
 
     it('a game the app does not know stays quiet', () => {

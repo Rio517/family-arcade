@@ -98,8 +98,8 @@ drives the *real* app with *real* input.
   element instead is the single biggest saving for the owner's time, as opposed
   to the agent's.
 - **The party / P2P layer, which has no live coverage.** `PartyContext` is
-  unit-tested under a mocked link, and `preview-party.html` /
-  `preview-lobbies.html` screenshot the in-party states, but video, voice
+  unit-tested under a mocked link, and `preview-lobbies.html` screenshots
+  the in-party states (the pill, and every lobby), but video, voice
   and the real peer connection need live browsers; jsdom can't go near them. Even driving one side of a call would be
   more than exists now.
 
