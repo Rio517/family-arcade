@@ -72,15 +72,26 @@ export default tseslint.config(
     // players design's "no game writes a name" rule, enforced at the import
     // boundary rather than by convention.
     files: ['src/games/**/*.{ts,tsx}'],
+    // Tests seed the roster directly; the rule is about game code.
+    ignores: ['**/*.test.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: ['**/useIdentity', '@shared/profile/useIdentity'],
+              // The writer hook AND the raw store beneath it — a guard on the
+              // hook alone left setUsersState/updateActiveProfile wide open.
+              group: [
+                '**/useIdentity',
+                '@shared/profile/useIdentity',
+                '**/usersStore',
+                '@shared/profile/usersStore',
+                '**/profile/users',
+                '@shared/profile/users',
+              ],
               message:
-                'Games read the ticket through useProfile(); only the gate, the booth, PlayingAs and the seat pickers change who is signed in.',
+                'Games read the ticket through useProfile() and seat people through useSeats(); only the gate, the booth and PlayingAs change who is signed in (seat pickers only append tickets).',
             },
           ],
         },
