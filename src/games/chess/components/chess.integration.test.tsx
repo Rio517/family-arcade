@@ -1,6 +1,8 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
+import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { addUser, emptyUsersState } from '@shared/profile/users';
 import { ChessPage } from './ChessPage';
 
 /**
@@ -92,10 +94,24 @@ function renderClient() {
 
 type Client = ReturnType<typeof renderClient>;
 
-/** Mode picker → online lobby, with the player's name filled in. */
+/**
+ * Sign this browser in as `name`. Both clients share one roster (one jsdom, one
+ * localStorage), so each side signs in just before it creates or joins — the
+ * name is copied into that client's session at that moment and stays put.
+ */
+function signInAs(name: string) {
+  act(() => {
+    setUsersState(addUser(emptyUsersState(), `u-${name.toLowerCase()}`, name, 1));
+  });
+}
+
+/** Sign in, then walk the mode picker into the online lobby. */
 function toOnlineLobby(app: Client, name: string) {
+  signInAs(name);
   fireEvent.click(app.getByTestId('mode-online'));
-  fireEvent.change(app.getByTestId('chess-name'), { target: { value: name } });
+  // The lobby names you from your ticket instead of asking.
+  expect(app.getByTestId('playing-as')).toHaveTextContent(`You're ${name}`);
+  expect(app.queryByTestId('chess-name')).toBeNull();
 }
 
 /** Does this client's board show a piece on the named square? */
@@ -139,6 +155,7 @@ async function connectClients(): Promise<{ host: Client; guest: Client; code: st
 beforeEach(() => {
   localStorage.clear();
   cleanup();
+  resetUsersStore();
   bus.reset();
 });
 

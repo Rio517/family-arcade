@@ -1,6 +1,8 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { addUser, emptyUsersState } from '@shared/profile/users';
 import { ChessPage } from './ChessPage';
 
 function renderPage(entry = '/chess') {
@@ -12,7 +14,13 @@ function renderPage(entry = '/chess') {
 }
 
 describe('<ChessPage> — local flow', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    // A game route always has somebody signed in (the PlayerGate sees to it),
+    // so every case here plays as Rio's ticket.
+    resetUsersStore();
+    setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
+  });
 
   it('offers a mode picker with both same-device and online options', () => {
     renderPage();
@@ -25,7 +33,8 @@ describe('<ChessPage> — local flow', () => {
     fireEvent.click(screen.getByTestId('mode-local'));
     fireEvent.click(screen.getByTestId('start-local'));
     expect(screen.getByTestId('chess-board')).toBeInTheDocument();
-    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/White to move/);
+    // White's chair starts on the signed-in player's ticket name.
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Rio to move/);
   });
 
   it('plays a move and hands the turn to Black', () => {
@@ -268,9 +277,9 @@ describe('<ChessPage> — local flow', () => {
     fireEvent.click(screen.getByTestId('fp-sq-d4'));
     fireEvent.click(screen.getByTestId('fp-start-game'));
 
-    // A real game now: the rules board is up, White to move, position live.
+    // A real game now: the rules board is up, White (Rio) to move, position live.
     expect(screen.getByTestId('chess-board')).toBeInTheDocument();
-    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/White to move/);
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Rio to move/);
     expect(screen.getByTestId('sq-d4').querySelector('svg')).toBeTruthy();
 
     // And it IS rules-bound: the queen may not hop like a knight.
@@ -324,23 +333,31 @@ describe('<ChessPage> — local flow', () => {
     expect(container.querySelector('.chess-theme-classic')).toBeTruthy();
   });
 
-  it('reaching the online lobby shows create/join controls', () => {
+  it('the online lobby plays as your ticket — no name box in sight', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
+    // Who you are is the ticket you signed in with; nothing asks again.
+    expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Rio");
+    expect(screen.queryByTestId('chess-name')).toBeNull();
     expect(screen.getByTestId('chess-create')).toBeInTheDocument();
     expect(screen.getByTestId('chess-join-code')).toBeInTheDocument();
   });
 
-  it('white name chips set player one without renaming the signed-in player', () => {
+  it('same-device chair names stay game-local — they never rename the signed-in player', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-local'));
-    fireEvent.click(screen.getByTestId('white-chip-flora'));
+    // White opens on the ticket name, and can be typed over for a guest.
+    expect((screen.getByTestId('white-name') as HTMLInputElement).value).toBe('Rio');
+    fireEvent.change(screen.getByTestId('white-name'), { target: { value: 'Flora' } });
     expect((screen.getByTestId('white-name') as HTMLInputElement).value).toBe('Flora');
     // Pass-and-play names are game-local — the roster must not gain "Flora".
     expect(localStorage.getItem('arcade.users.v1') ?? '').not.toContain('Flora');
-    // Flora is taken now — Black's chips hide her, in roster order otherwise.
-    expect(screen.queryByTestId('black-chip-flora')).toBeNull();
-    fireEvent.click(screen.getByTestId('black-chip-rio'));
-    expect((screen.getByTestId('black-name') as HTMLInputElement).value).toBe('Rio');
+    // Black is a plain box too — the chip rows are gone.
+    fireEvent.change(screen.getByTestId('black-name'), { target: { value: 'Klara' } });
+    expect((screen.getByTestId('black-name') as HTMLInputElement).value).toBe('Klara');
+    expect(screen.queryByTestId('white-chip-flora')).toBeNull();
+    expect(screen.queryByTestId('black-chip-rio')).toBeNull();
+    // And the same-device screen never claims a chair is "you".
+    expect(screen.queryByTestId('playing-as')).toBeNull();
   });
 });
