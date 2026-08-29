@@ -36,12 +36,14 @@ function BulbString({ count }: { count: number }) {
 }
 
 /** One game ticket: awning strip, glyph, name, blurb. */
-function Ticket({ title, sub, tag, releaseStatus, players, computer, children }: {
+function Ticket({ title, sub, tag, releaseStatus, players, seats, computer, children }: {
   title: string;
   sub: string;
   tag?: string;
   releaseStatus?: 'under-construction';
   players: { min: number; max: number };
+  /** Chairs on one device — when fewer than the players, say so. */
+  seats: { min: number; max: number };
   computer?: boolean;
   children: React.ReactNode;
 }) {
@@ -73,6 +75,9 @@ function Ticket({ title, sub, tag, releaseStatus, players, computer, children }:
             )}
           </span>
           <span className="tk-desc">{sub}</span>
+          {seats.max < players.max && (
+            <span className="tk-devices">One player per device — a second iPad joins in</span>
+          )}
           {releaseStatus === 'under-construction' && (
             <span className="tk-status">Under construction · playable</span>
           )}
@@ -119,6 +124,7 @@ export function Menu() {
               sub="Roll real dice — tap to log the scorecard. Works offline."
               tag="Solo+"
               players={{ min: 1, max: 1 }}
+              seats={{ min: 1, max: 1 }}
             >
               <GridIcon size={30} />
             </Ticket>
@@ -138,6 +144,7 @@ export function Menu() {
                 tag={game.tag}
                 releaseStatus={game.releaseStatus}
                 players={game.players}
+                seats={game.seats}
                 computer={game.computer}
               >
                 <game.Icon size={30} />
