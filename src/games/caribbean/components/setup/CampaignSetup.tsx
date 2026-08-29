@@ -4,6 +4,7 @@ import type { Talent } from '../../domain/types';
 import { provisionsMonths } from '../../domain/selectors';
 import { CAMPAIGN_LENGTH_LABELS } from '../../state/selectors';
 import { normalizePronouns, pronounCodePointLength } from '@shared/profile/profile';
+import { PlayingAs } from '@shared/profile/PlayingAs';
 import type {
   CaribbeanController,
   RecoveryActionFailure,
@@ -235,6 +236,7 @@ export function CampaignSetup({
           </div>
         ) : state === null ? (
           <form onSubmit={submit} noValidate>
+            <PlayingAs />
             <h1>Sign a captain’s commission</h1>
             <p className="caribbean-intro">Choose your captain and their starting talent. Adventure begins from Bridgetown.</p>
             <div className="caribbean-form-grid">
