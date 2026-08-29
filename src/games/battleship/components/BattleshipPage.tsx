@@ -2,6 +2,7 @@ import '../styles/battleship.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProfile } from '@shared/profile/useProfile';
+import { recordResultFor } from '@shared/profile/results';
 import { useParty } from '@shared/party/PartyContext';
 import { usePartyDoor } from '@shared/party/usePartyDoor';
 import { generateCode } from '@shared/net/peer';
@@ -51,21 +52,21 @@ export function BattleshipPage() {
     try { localStorage.setItem('bs-fleet-era-v1', era); } catch { /* ignore */ }
   };
 
-  const onFinish = useCallback(
-    (info: FinishInfo) => {
-      const pointsEarned = pointsForResult(info.won, info.survivingCells);
-      profile.recordResult({
-        won: info.won,
-        survivingCells: info.survivingCells,
-        code: info.code,
-        game: 'battleship',
-        opponent: info.opponent,
-        finishedAt: Date.now(),
-      });
-      setFinish({ won: info.won, pointsEarned });
-    },
-    [profile],
-  );
+  // The result lands on the ticket that sat down (captured when the table
+  // opened and carried by the session), never on whoever is signed in now —
+  // a Change at the booth mid-game must not hand the win to the wrong player.
+  const onFinish = useCallback((info: FinishInfo) => {
+    const pointsEarned = pointsForResult(info.won, info.survivingCells);
+    recordResultFor(info.seatedUserId, {
+      won: info.won,
+      survivingCells: info.survivingCells,
+      code: info.code,
+      game: GAME_ID,
+      opponent: info.opponent,
+      finishedAt: Date.now(),
+    });
+    setFinish({ won: info.won, pointsEarned });
+  }, []);
 
   const bs = useBattleship({
     name: profile.profile.name,
@@ -298,7 +299,7 @@ export function BattleshipPage() {
             onHost={() => sitDown('host', generateCode())}
             onJoin={(code) => sitDown('guest', code)}
             onHostTable={(code) => sitDown('host', code)}
-            onSolo={bs.startSoloGame}
+            onSolo={(personaId) => bs.startSoloGame(personaId, profile.userId)}
             initialJoinCode={joinCode ?? undefined}
           />
         </div>

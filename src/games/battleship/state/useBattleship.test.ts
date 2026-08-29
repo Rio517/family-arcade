@@ -9,11 +9,18 @@ import type { Fleet, GameLog } from '@games/battleship/domain/types';
  * app.integration.test); here the network is a stand-in that only records
  * what the hook asked of it — host or join, and under which code.
  */
-const wire = vi.hoisted(() => ({ host: [] as string[], join: [] as string[] }));
+const wire = vi.hoisted(() => ({
+  host: [] as string[],
+  join: [] as string[],
+  /** Push a message to the hook as if the peer had sent it. */
+  deliver: null as ((msg: unknown) => void) | null,
+}));
 vi.mock('@shared/net/peer', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@shared/net/peer')>();
   class GameConnection {
-    constructor(private handlers: { onStatus: (status: string, detail?: string) => void }) {}
+    constructor(private handlers: { onStatus: (status: string, detail?: string) => void; onMessage: (msg: unknown) => void }) {
+      wire.deliver = (msg) => handlers.onMessage(msg);
+    }
     host(code: string) {
       wire.host.push(code);
       this.handlers.onStatus('hosting');
@@ -78,6 +85,7 @@ beforeEach(() => {
   localStorage.clear();
   wire.host.length = 0;
   wire.join.length = 0;
+  wire.deliver = null;
 });
 
 describe('useBattleship.startTable', () => {
@@ -118,12 +126,55 @@ describe('useBattleship.startTable', () => {
 describe('useBattleship.startSoloGame', () => {
   it('sails as the signed-in captain against the chosen computer captain', () => {
     const { result } = mount('Klara');
-    act(() => result.current.startSoloGame('bobble'));
+    act(() => result.current.startSoloGame('bobble', 'u-klara'));
 
     expect(result.current.code).toBe('SOLO');
     expect(result.current.side).toBe('host');
     expect(result.current.myName).toBe('Klara');
     expect(wire.host).toEqual([]); // the loopback captain, never the network
+  });
+
+  it('seats the ticket too, and the save carries it — a solo win is history like any other', () => {
+    const { result } = mount('Klara');
+    act(() => result.current.startSoloGame('bobble', 'u-klara'));
+
+    expect(result.current.seatedUserId).toBe('u-klara');
+    expect(loadSession('SOLO')?.seatedUserId).toBe('u-klara');
+  });
+
+  it('seats nobody when the ticket id is unknown', () => {
+    const { result } = mount('Klara');
+    act(() => result.current.startSoloGame('bobble', null));
+
+    expect(result.current.seatedUserId).toBeNull();
+    expect(loadSession('SOLO')?.seatedUserId).toBeNull();
+  });
+});
+
+/**
+ * The finish is the page's cue to record a result. It fires minutes after the
+ * table opened, and tickets can change in between — so the seat rides along
+ * with it, and the page never has to ask the roster who is signed in now.
+ */
+describe('useBattleship reports the finish for the seat', () => {
+  it('hands onFinish the ticket that sat down at this table', () => {
+    seedSave('guest', 'QRST');
+    const onFinish = vi.fn();
+    const { result } = renderHook(() => useBattleship({ name: 'Kai', skinId: 'aqua', onFinish }));
+    act(() => result.current.startTable({ role: 'guest', code: 'QRST', seatedUserId: 'u-kai' }));
+
+    // The host's winning shot arrives in a catch-up sync (the reconnect race).
+    const overLog: GameLog = [
+      ...MID_BATTLE,
+      { type: 'shot', by: 'host', row: 0, col: 0, hit: true, sunk: 'carrier', allSunk: true },
+    ];
+    act(() => wire.deliver?.({ t: 'sync', log: overLog, ready: true }));
+
+    expect(result.current.phase).toBe('over');
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(onFinish).toHaveBeenCalledWith(
+      expect.objectContaining({ won: false, code: 'QRST', opponent: 'Rio', seatedUserId: 'u-kai' }),
+    );
   });
 });
 

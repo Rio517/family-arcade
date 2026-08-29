@@ -72,6 +72,12 @@ export interface FinishInfo {
   survivingCells: number;
   code: string;
   opponent: string;
+  /**
+   * The ticket that sat down at this table, captured at the start. The finish
+   * fires minutes later and the signed-in ticket may have changed by then, so
+   * the page credits this id and never asks the roster who is signed in now.
+   */
+  seatedUserId: string | null;
 }
 
 export interface Outcome {
@@ -305,6 +311,7 @@ function detectFinish(beforeLog: GameLog, afterLog: GameLog, s: SessionState): F
     survivingCells: survivingCells(afterLog, s.myFleet, s.side),
     code: s.code,
     opponent: s.oppName ?? 'Opponent',
+    seatedUserId: s.seatedUserId,
   };
 }
 
