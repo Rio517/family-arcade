@@ -313,7 +313,9 @@ like `users`/`usersStore`.
    then the game seam — `startTable` in the three lobbies, the host's colour
    pick in chess, `preview-lobbies.html`.)
 4. **Everyone's history.** `recordResultFor` with ids captured at start,
-   `useProfile().recordResult` deleted, the per-game credits.
+   `useProfile().recordResult` deleted, the per-game credits. (Shipped
+   2026-08-29; Magic Coins' champions carry their ids but record nothing —
+   an open decision, see NEXT_STEP.)
 
 ## Open questions for the family
 
