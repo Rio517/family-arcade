@@ -29,41 +29,12 @@ const bus = vi.hoisted(() => ({
 
 // Nobody is in a party here: these are the two code doors, the way a family
 // member on a fresh device plays. (The party's own journey is covered in
-// ChessPage.test.tsx.)
-vi.mock('@shared/party/PartyContext', () => ({
-  useParty: () => ({
-    myName: 'Player',
-    status: 'idle',
-    code: '',
-    role: null,
-    inParty: false,
-    theirName: null,
-    reconnecting: false,
-    table: null,
-    knock: null,
-    hostParty: () => 'ABCD',
-    joinParty: () => {},
-    leaveParty: () => {},
-    retry: () => {},
-    openTable: () => 'WXYZ',
-    closeTable: () => {},
-    knockOn: () => {},
-    clearKnock: () => {},
-    resolveGame: () => null,
-    call: {
-      active: false,
-      status: 'idle',
-      muted: false,
-      cameraOn: false,
-      localStream: null,
-      remoteStream: null,
-      start: () => {},
-      stop: () => {},
-      toggleMute: () => {},
-      toggleCamera: () => {},
-    },
-  }),
-}));
+// ChessPage.test.tsx.) One inert party for both clients, built once.
+vi.mock('@shared/party/PartyContext', async () => {
+  const { fakeParty } = await import('@shared/party/testing');
+  const party = fakeParty();
+  return { useParty: () => party };
+});
 
 // Replace the PeerJS transport with an in-memory bus linking host and guest.
 // generateCode / normalizeCode stay real (spread from the actual module).

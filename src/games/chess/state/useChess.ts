@@ -96,7 +96,7 @@ export function useChess(opts: UseChessOptions): UseChessResult {
   const onFinishRef = useRef(opts.onFinish);
   onFinishRef.current = opts.onFinish;
 
-  const setSessionState = useCallback((s: SessionState) => {
+  const setSessionState = useCallback((s: SessionState | null) => {
     sessionRef.current = s;
     setSession(s);
   }, []);
@@ -174,7 +174,16 @@ export function useChess(opts: UseChessOptions): UseChessResult {
   const name = opts.name;
   const startTable = useCallback(({ role, code, seatedUserId, hostSide }: StartTableOptions) => {
     const conn = ensureConn();
-    setSessionState({ ...Session.createOnlineSession(role, code, name, hostSide), seatedUserId });
+    // A reload mid-game: the party seats the guest again under the same code,
+    // and a fresh session here would overwrite the save. The same code from
+    // the same chair picks that game back up instead. A finished save is a
+    // game that is over — it starts fresh, and the sync settles the rest.
+    const stored = loadChessGame(code);
+    if (stored && stored.side === role && !stored.finished) {
+      setSessionState(storedToChess(stored));
+    } else {
+      setSessionState({ ...Session.createOnlineSession(role, code, name, hostSide), seatedUserId });
+    }
     if (role === 'host') conn.host(code);
     else conn.join(code);
   }, [ensureConn, name, setSessionState]);
@@ -222,7 +231,12 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     if (s?.mode === 'online' && s.code) clearChessGame(s.code);
     connRef.current?.destroy();
     connRef.current = null;
-  }, []);
+    // Back to the lobby with the link idle: hanging up a dial must not leave
+    // a dead board — and a stale "dialing" badge — on screen.
+    setSessionState(null);
+    setStatus('idle');
+    setStatusDetail(undefined);
+  }, [setSessionState]);
 
   // ── Derived view ─────────────────────────────────────────────────────────
   const s = session;

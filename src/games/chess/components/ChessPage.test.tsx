@@ -4,7 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { LINEUP_KEY, resetLineupStore } from '@shared/profile/lineupStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
-import type { PartyValue } from '@shared/party/PartyContext';
+import { fakeParty, fakePartyWithKai } from '@shared/party/testing';
+import { loadChessGame } from '@games/chess/storage/chessPersistence';
 
 // A controllable useParty so each party state renders without a network.
 const mockParty = vi.hoisted(() => ({ value: null as any }));
@@ -57,46 +58,6 @@ vi.mock('@games/chess/state/useChess', async (importOriginal) => {
 
 import { ChessPage } from './ChessPage';
 
-function makeParty(over: Partial<PartyValue> = {}): PartyValue {
-  return {
-    myName: 'Rio',
-    status: 'idle',
-    code: '',
-    role: null,
-    inParty: false,
-    theirName: null,
-    hostParty: vi.fn(() => 'ABCD'),
-    joinParty: vi.fn(),
-    leaveParty: vi.fn(),
-    retry: vi.fn(),
-    reconnecting: false,
-    table: null,
-    knock: null,
-    openTable: vi.fn(() => 'WXYZ'),
-    closeTable: vi.fn(),
-    knockOn: vi.fn(),
-    clearKnock: vi.fn(),
-    resolveGame: (id: string) => (id === 'chess' ? { title: 'Chess', path: '/chess' } : null),
-    call: {
-      active: false,
-      status: 'idle',
-      muted: false,
-      cameraOn: false,
-      localStream: null,
-      remoteStream: null,
-      start: vi.fn(),
-      stop: vi.fn(),
-      toggleMute: vi.fn(),
-      toggleCamera: vi.fn(),
-    },
-    ...over,
-  } as PartyValue;
-}
-
-/** A party you're in with Kai, as host or guest. */
-const withKai = (role: 'host' | 'guest', over: Partial<PartyValue> = {}) =>
-  makeParty({ inParty: true, status: 'connected', code: 'PRTY', role, theirName: 'Kai', ...over });
-
 function renderPage(entry = '/chess') {
   return render(
     <MemoryRouter initialEntries={[entry]}>
@@ -125,7 +86,7 @@ beforeEach(() => {
   setUsersState(
     setActiveUser(addUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u2', 'Flora'), 'u1'),
   );
-  mockParty.value = makeParty();
+  mockParty.value = fakeParty();
   net.handlers = null;
   net.hosted = [];
   net.joined = [];
@@ -161,7 +122,7 @@ describe('<ChessPage> — the party is the table', () => {
   });
 
   it('host in a party: pick a colour, one tap opens the table and starts as host with that colour', () => {
-    mockParty.value = withKai('host');
+    mockParty.value = fakePartyWithKai('host');
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
 
@@ -187,8 +148,26 @@ describe('<ChessPage> — the party is the table', () => {
     expect(screen.queryByRole('dialog', { name: 'Invite your opponent' })).toBeNull();
   });
 
+  it("host in a party before the friend's hello lands: the play button still reads sensibly", () => {
+    mockParty.value = fakePartyWithKai('host', { theirName: null });
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    expect(screen.getByTestId('chess-party-play')).toHaveTextContent('Play Chess with your friend');
+  });
+
+  it("host in a party: ‹ Menu closes the table too, so the friend's screen never points at a hostless board", () => {
+    mockParty.value = fakePartyWithKai('host');
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    fireEvent.click(screen.getByTestId('chess-party-play'));
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('chess-back'));
+    expect(mockParty.value.closeTable).toHaveBeenCalledWith('WXYZ');
+  });
+
   it('guest in a party: knocks on Chess once, then sits down when the host opens the table', () => {
-    mockParty.value = withKai('guest');
+    mockParty.value = fakePartyWithKai('guest');
     const r = renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
 
@@ -205,7 +184,7 @@ describe('<ChessPage> — the party is the table', () => {
 
     // The host opens Chess as Black: the guest sits down as White on that code.
     const knockOn = mockParty.value.knockOn;
-    mockParty.value = withKai('guest', { knockOn, table: { game: 'chess', code: 'QRST', hostSide: 'b' } });
+    mockParty.value = fakePartyWithKai('guest', { knockOn, table: { game: 'chess', code: 'QRST', hostSide: 'b' } });
     rerenderPage(r);
     expect(sat.calls).toEqual([{ role: 'guest', code: 'QRST', seatedUserId: 'u1', hostSide: 'b' }]);
     expect(net.joined).toEqual(['QRST']);
@@ -214,15 +193,26 @@ describe('<ChessPage> — the party is the table', () => {
   });
 
   it('guest in a party: a Chess table already open means no knock — just sit down', () => {
-    mockParty.value = withKai('guest', { table: { game: 'chess', code: 'QRST' } });
+    mockParty.value = fakePartyWithKai('guest', { table: { game: 'chess', code: 'QRST' } });
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
     expect(mockParty.value.knockOn).not.toHaveBeenCalled();
     expect(sat.calls).toEqual([{ role: 'guest', code: 'QRST', seatedUserId: 'u1', hostSide: undefined }]);
   });
 
+  it("guest in a party: a host side that isn't a colour is ignored — the guest sits down as Black", () => {
+    // Junk off the wire ('white' instead of 'w') must not become an error or
+    // a wrong chair: the default holds, host White, guest Black.
+    mockParty.value = fakePartyWithKai('guest', { table: { game: 'chess', code: 'QRST', hostSide: 'white' } });
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    expect(sat.calls).toEqual([{ role: 'guest', code: 'QRST', seatedUserId: 'u1', hostSide: undefined }]);
+    expect(loadChessGame('QRST')).toMatchObject({ side: 'guest', myColor: 'b' });
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
+  });
+
   it('guest in a party: a table for another game still means knocking on Chess', () => {
-    mockParty.value = withKai('guest', { table: { game: 'racer', code: 'RACE' } });
+    mockParty.value = fakePartyWithKai('guest', { table: { game: 'racer', code: 'RACE' } });
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
     expect(mockParty.value.knockOn).toHaveBeenCalledWith('chess');
@@ -230,8 +220,48 @@ describe('<ChessPage> — the party is the table', () => {
     expect(screen.getByTestId('chess-party-waiting')).toBeInTheDocument();
   });
 
+  it('guest in a party: the table closing mid-dial hangs up and puts the guest back at the door', () => {
+    mockParty.value = fakePartyWithKai('guest', { table: { game: 'chess', code: 'QRST' } });
+    const r = renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    expect(net.joined).toEqual(['QRST']);
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
+    expect(loadChessGame('QRST')).not.toBeNull();
+
+    // The host walks away before the link opens: the dial at that dead code
+    // is hung up, the save goes with it, and the guest is waiting — and
+    // knocking — again.
+    const { knockOn } = mockParty.value;
+    mockParty.value = fakePartyWithKai('guest', { knockOn, table: null });
+    rerenderPage(r);
+    expect(screen.queryByTestId('chess-board')).toBeNull();
+    expect(screen.getByTestId('chess-party-waiting')).toHaveTextContent('Waiting for Kai to open Chess');
+    expect(loadChessGame('QRST')).toBeNull();
+    expect(knockOn).toHaveBeenCalledTimes(1);
+
+    // The host opens a fresh table: the guest sits straight down at it.
+    mockParty.value = fakePartyWithKai('guest', { knockOn, table: { game: 'chess', code: 'EF67' } });
+    rerenderPage(r);
+    expect(net.joined).toEqual(['QRST', 'EF67']);
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
+  });
+
+  it('guest in a party: a game that is actually connected is never torn down by the table closing', () => {
+    mockParty.value = fakePartyWithKai('guest', { table: { game: 'chess', code: 'QRST' } });
+    const r = renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    act(() => net.handlers.onStatus('connected'));
+
+    const { knockOn } = mockParty.value;
+    mockParty.value = fakePartyWithKai('guest', { knockOn, table: null });
+    rerenderPage(r);
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
+    expect(loadChessGame('QRST')).not.toBeNull();
+    expect(knockOn).not.toHaveBeenCalled();
+  });
+
   it('rejoining a remembered party: a quiet line, no doors, no play button', () => {
-    mockParty.value = makeParty({ reconnecting: true });
+    mockParty.value = fakeParty({ reconnecting: true });
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
     expect(screen.getByTestId('chess-party-reconnecting')).toHaveTextContent('Reconnecting to your party');
@@ -242,7 +272,7 @@ describe('<ChessPage> — the party is the table', () => {
   });
 
   it('leaving an online game tells the party which table it is leaving — the party decides whether that closes anything', () => {
-    mockParty.value = withKai('host');
+    mockParty.value = fakePartyWithKai('host');
     const r = renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
     fireEvent.click(screen.getByTestId('chess-party-play'));
@@ -254,7 +284,7 @@ describe('<ChessPage> — the party is the table', () => {
     r.unmount();
 
     // A guest says so too; the party ignores it (only the host closes a table).
-    mockParty.value = withKai('guest', { table: { game: 'chess', code: 'QRST' } });
+    mockParty.value = fakePartyWithKai('guest', { table: { game: 'chess', code: 'QRST' } });
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
     act(() => net.handlers.onStatus('error', 'Lost the link.'));

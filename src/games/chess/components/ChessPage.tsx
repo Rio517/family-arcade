@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useProfile } from '@shared/profile/useProfile';
 import { useParty, type PartyValue } from '@shared/party/PartyContext';
-import type { PartyTableInfo } from '@shared/party/party';
+import { usePartyDoor } from '@shared/party/usePartyDoor';
 import { useChess, type StartTableOptions } from '@games/chess/state/useChess';
 import { pointsForResult } from '@shared/profile/profile';
 import { generateCode, normalizeCode } from '@shared/net/peer';
@@ -34,6 +34,9 @@ import type { FinishInfo } from '@games/chess/domain/session';
 import type { Color, PieceType, Ply, Status } from '@games/chess/domain/types';
 
 type Setup = 'pick' | 'local' | 'online' | 'free';
+
+/** The registry id — the seats, the profile's history and the party's table all key on it. */
+const GAME_ID = 'chess';
 
 /** One line under each world in the ☰ menu, so picking isn't a guess. */
 const THEME_BLURBS: Record<ChessThemeId, string> = {
@@ -79,7 +82,7 @@ export function ChessPage() {
   // The two same-device chairs: tickets off the roster, seeded from the lineup
   // this device played last (or the signed-in ticket on chair one). Sitting
   // down never signs anybody in or renames them.
-  const table = useSeats('chess', 2);
+  const table = useSeats(GAME_ID, 2);
   const whiteName = seatName(table.seats[0], table.users) || 'White';
   const blackName = seatName(table.seats[1], table.users) || 'Black';
   const [logOpen, setLogOpen] = useState(false);
@@ -122,8 +125,8 @@ export function ChessPage() {
         profile.recordResult({
           won: info.iWon,
           survivingCells: 0,
-          code: info.code || 'chess',
-          game: 'chess',
+          code: info.code || GAME_ID,
+          game: GAME_ID,
           opponent: info.opponent || 'Opponent',
           finishedAt: Date.now(),
         });
@@ -140,9 +143,26 @@ export function ChessPage() {
   const lobby = lobbyFor(party);
   // Host in a party: the colour you'll play. Your friend gets the other one.
   const [hostSide, setHostSide] = useState<Color>('w');
+  const inGame = cx.phase === 'play' || cx.phase === 'over';
+  // The hook's actions are stable; `cx` itself is a fresh object every render.
+  const { startTable, leave: hangUp } = cx;
   /** Sit down at an online table as the signed-in ticket. */
-  const sitDown = (opts: Omit<StartTableOptions, 'seatedUserId'>) =>
-    cx.startTable({ ...opts, seatedUserId: profile.userId });
+  const sitDown = useCallback(
+    (opts: Omit<StartTableOptions, 'seatedUserId'>) => startTable({ ...opts, seatedUserId: profile.userId }),
+    [startTable, profile.userId],
+  );
+  // A guest in a party stands at the one door: it knocks while the online
+  // lobby is up with no table open, and sits down the moment the host opens
+  // one. A table that goes away while its dial is still ringing gets hung up;
+  // a game that is actually connected is never torn down from here.
+  const onTable = useCallback(
+    (code: string, side?: string) => sitDown({ role: 'guest', code, hostSide: asColor(side) }),
+    [sitDown],
+  );
+  const onClosed = useCallback(() => {
+    if (cx.mode === 'online' && cx.side === 'guest' && !cx.oppConnected) hangUp();
+  }, [cx.mode, cx.side, cx.oppConnected, hangUp]);
+  const door = usePartyDoor(GAME_ID, !inGame && setup === 'online', onTable, onClosed);
 
   // Deep links: resume the saved hotseat game (?resume=local, used by the
   // arcade's saved-games list), resume a saved online game (?resume=CODE),
@@ -191,11 +211,15 @@ export function ChessPage() {
     }
   };
 
-  const goMenu = () => navigate('/');
+  // Both ways out close the host's table with the game, so the friend's
+  // screen stops pointing at a board nobody is sitting at. (The party
+  // ignores this unless we are the host and this is the open table.)
+  // ‹ Menu keeps the save for the Save Station; Back to menu leaves for good.
+  const goMenu = () => {
+    if (cx.code) party.closeTable(cx.code);
+    navigate('/');
+  };
   const exitToMenu = () => {
-    // The host's table closes with the game, so the friend's screen stops
-    // pointing at a board nobody is sitting at. (The party ignores this
-    // unless we are the host and this is the open table.)
     if (cx.code) party.closeTable(cx.code);
     cx.leave();
     navigate('/');
@@ -213,7 +237,6 @@ export function ChessPage() {
   const nameW = (cx.myColor === 'b' ? cx.oppName : cx.myName) || 'White';
   const nameB = (cx.myColor === 'b' ? cx.myName : cx.oppName) || 'Black';
 
-  const inGame = cx.phase === 'play' || cx.phase === 'over';
   const showCodeChip = cx.mode === 'online' && cx.side === 'host' && !cx.oppConnected && cx.phase === 'play';
   // Unfinished games offered on the mode picker: the last online game, and
   // the same-device autosave slot.
@@ -449,7 +472,8 @@ export function ChessPage() {
 
             {lobby === 'party-host' && (
               <>
-                <h2>Play with {party.theirName}</h2>
+                {/* The friend's name arrives with their hello — a beat after the link. */}
+                <h2>Play with {party.theirName ?? 'your friend'}</h2>
                 <div className="row-actions" role="group" aria-label="Your colour">
                   <button
                     className={`btn${hostSide === 'w' ? ' btn-primary' : ''}`}
@@ -470,21 +494,20 @@ export function ChessPage() {
                 </div>
                 <button
                   className="btn btn-primary btn-lg btn-block"
-                  onClick={() => sitDown({ role: 'host', code: party.openTable('chess', hostSide), hostSide })}
+                  onClick={() => sitDown({ role: 'host', code: party.openTable(GAME_ID, hostSide), hostSide })}
                   data-testid="chess-party-play"
                 >
-                  Play Chess with {party.theirName}
+                  Play Chess with {party.theirName ?? 'your friend'}
                 </button>
               </>
             )}
 
             {lobby === 'party-guest' && (
-              <PartyGuestDoor
-                theirName={party.theirName}
-                table={party.table}
-                knockOn={party.knockOn}
-                onTable={(code, side) => sitDown({ role: 'guest', code, hostSide: side })}
-              />
+              <p className="subtle center" data-testid="chess-party-waiting">
+                {door.waiting
+                  ? `Waiting for ${door.friend ?? 'your friend'} to open Chess…`
+                  : `${door.friend ?? 'Your friend'} opened Chess — sitting down…`}
+              </p>
             )}
 
             {lobby === 'doors' && (
@@ -689,48 +712,6 @@ export function ChessPage() {
       </div>
     </div>
     </ChessThemeContext.Provider>
-  );
-}
-
-/**
- * A guest in a party, standing at the Chess door: knock once so the host's
- * screen offers to open Chess, then sit down the moment the table appears.
- */
-function PartyGuestDoor({
-  theirName,
-  table,
-  knockOn,
-  onTable,
-}: {
-  theirName: string | null;
-  table: PartyTableInfo | null;
-  knockOn: (game: string) => void;
-  onTable: (code: string, hostSide?: Color) => void;
-}) {
-  const chessTable = table?.game === 'chess' ? table : null;
-
-  // One knock per visit to the door — not one per render, and none at all
-  // when Chess is already open.
-  const knockedRef = useRef(false);
-  useEffect(() => {
-    if (knockedRef.current) return;
-    knockedRef.current = true;
-    if (!chessTable) knockOn('chess');
-  }, [chessTable, knockOn]);
-
-  // Sit down once per table code: the host re-announces the same table on
-  // every reconnect, and that must never dial the game a second time.
-  const seatedRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!chessTable || seatedRef.current === chessTable.code) return;
-    seatedRef.current = chessTable.code;
-    onTable(chessTable.code, asColor(chessTable.hostSide));
-  }, [chessTable, onTable]);
-
-  return (
-    <p className="subtle center" data-testid="chess-party-waiting">
-      Waiting for {theirName ?? 'your friend'} to open Chess…
-    </p>
   );
 }
 
