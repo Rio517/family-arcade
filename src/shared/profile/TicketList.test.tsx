@@ -50,6 +50,17 @@ describe('<TicketList>', () => {
     expect(onCreate).toHaveBeenCalledWith('Nana');
   });
 
+  it("typing a saved ticket's whole name still finds it (no dead end)", () => {
+    const onPick = vi.fn();
+    render(<TicketList users={[u('d', 'Mommy Zoë')]} onPick={onPick} onCreate={() => {}} />);
+    const field = screen.getByTestId('ticket-name');
+    fireEvent.change(field, { target: { value: 'Mommy Zoe' } });
+    expect(screen.getByTestId('ticket-user-d')).toBeInTheDocument();
+    expect(screen.queryByTestId('ticket-create')).toBeNull();
+    fireEvent.submit(field.closest('form')!);
+    expect(onPick).toHaveBeenCalledWith('d');
+  });
+
   it('never offers a duplicate ticket', () => {
     render(<TicketList users={ROSTER} onPick={() => {}} onCreate={() => {}} />);
     fireEvent.change(screen.getByTestId('ticket-name'), { target: { value: 'papa' } });
@@ -71,8 +82,13 @@ describe('<TicketList>', () => {
   });
 
   it('invites a brand-new browser to make its first ticket', () => {
-    render(<TicketList users={[]} onPick={() => {}} onCreate={() => {}} focusField />);
+    render(<TicketList users={[]} onPick={() => {}} onCreate={() => {}} />);
     expect(screen.getByText('Make your ticket')).toBeInTheDocument();
     expect(screen.getByTestId('ticket-name')).toHaveFocus();
+  });
+
+  it('never grabs the keyboard when there are tickets to tap', () => {
+    render(<TicketList users={ROSTER} onPick={() => {}} onCreate={() => {}} />);
+    expect(screen.getByTestId('ticket-name')).not.toHaveFocus();
   });
 });

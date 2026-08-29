@@ -1,8 +1,8 @@
 /**
  * React binding for the player roster: who exists on this browser, who is
- * signed in, and the three roster moves (sign in, add a player, sign out).
- * Renaming goes through useProfile().setName — it edits the signed-in
- * player's profile like any other profile write.
+ * signed in, and the two roster moves (sign in, add a player). Renaming goes
+ * through useProfile().setName — it edits the signed-in player's profile like
+ * any other profile write, and only the booth does it.
  */
 
 import { useCallback, useSyncExternalStore } from 'react';

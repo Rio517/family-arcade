@@ -36,11 +36,22 @@ describe('<PlayingAs>', () => {
     render(<PlayingAs />);
     fireEvent.click(screen.getByTestId('playing-as-change'));
     expect(screen.getByTestId('playing-as-change')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('dialog', { name: 'Change player' })).toBeInTheDocument();
     expect(screen.getByTestId('switch-user-u2')).toHaveTextContent(/you/i);
     fireEvent.click(screen.getByTestId('switch-user-u1'));
     expect(getUsersSnapshot().activeId).toBe('u1');
     expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Flora");
     expect(screen.queryByTestId('switch-name')).toBeNull();
+  });
+
+  it('picking your own ticket again just closes the list', () => {
+    seed();
+    render(<PlayingAs />);
+    fireEvent.click(screen.getByTestId('playing-as-change'));
+    fireEvent.click(screen.getByTestId('switch-user-u2'));
+    expect(getUsersSnapshot().activeId).toBe('u2');
+    expect(screen.queryByTestId('switch-name')).toBeNull();
+    expect(screen.getByTestId('playing-as-change')).toHaveFocus();
   });
 
   it('makes a new ticket from the list and signs it in', () => {

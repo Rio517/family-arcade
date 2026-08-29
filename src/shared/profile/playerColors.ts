@@ -7,5 +7,5 @@
 const PLAYER_COLORS = ['#34e0c8', '#ff7ec0', '#a78bfa', '#ffd76a', '#e0405f', '#f6ead2'];
 
 export function playerColor(index: number): string {
-  return PLAYER_COLORS[((index % PLAYER_COLORS.length) + PLAYER_COLORS.length) % PLAYER_COLORS.length];
+  return PLAYER_COLORS[index % PLAYER_COLORS.length];
 }

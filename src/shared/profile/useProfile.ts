@@ -1,7 +1,7 @@
 /**
- * React binding around the pure, game-neutral profile logic. Loads once from
- * localStorage and writes back on every change, so points and unlocks survive
- * refreshes and are shared across every game on the device.
+ * React binding around the pure, game-neutral profile logic: the signed-in
+ * player's profile, read from the roster store and written back on every
+ * change, so points and unlocks follow that player into every game.
  *
  * It exposes generic profile actions plus an escape hatch, `update`, so a game
  * can apply its own profile transitions (e.g. buying a skin) without this hook

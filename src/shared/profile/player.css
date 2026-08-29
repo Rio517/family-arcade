@@ -89,7 +89,17 @@
   letter-spacing: 0.02em;
   color: var(--muted);
 }
-.pstub-name { font-weight: 800; font-size: 1.05rem; display: block; }
+/* The body yields to the medallion and the strip; a long name clips with an
+   ellipsis instead of pushing the stub wider than its card. */
+.pstub-body { flex: 1; min-width: 0; }
+.pstub-name {
+  font-weight: 800;
+  font-size: 1.05rem;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .pstub-stats,
 .pstub-pronouns {
   font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
@@ -116,9 +126,10 @@
    One field filters the stubs as you type and makes a ticket when nobody
    matches — no five-name chip row anywhere. ── */
 .tlist { display: flex; flex-direction: column; gap: 10px; }
-.tlist-label { color: var(--muted); font-size: 0.85rem; }
+.tlist-label { color: var(--muted); font-size: 14px; }
 .tlist-field {
   width: 100%;
+  min-height: 44px;
   padding: 11px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
@@ -151,9 +162,9 @@
 }
 .pstub-you {
   margin-left: 8px;
-  font-size: 0.78rem;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--gold, #ffd76a);
 }
