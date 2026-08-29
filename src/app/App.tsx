@@ -8,6 +8,13 @@ import { PartyBar } from '@shared/party/PartyBar';
 import { FloatingVideo } from '@shared/party/FloatingVideo';
 import { PlayerGate } from '@shared/profile/PlayerGate';
 
+/** The party pill says "Klara opened Chess" without shared code knowing any
+ * game: the registry stays the only list (ADR 0002). */
+function resolveGame(id: string) {
+  const game = GAMES.find((g) => g.id === id);
+  return game ? { title: game.title, path: game.path } : null;
+}
+
 /** The whole arcade shell — routes plus the cross-game party layer. */
 export function App() {
   return (
@@ -16,7 +23,7 @@ export function App() {
       <ErrorBoundary>
         {/* The party — connection + names + opt-in video — lives above the routes
             so it survives moving between games (even into a different game). */}
-        <PartyProvider>
+        <PartyProvider resolveGame={resolveGame}>
           {/* Every routed page lives in the one main landmark; display:contents
               in app.css keeps it out of the layout entirely. */}
           <main className="app-main">
