@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  chessToStored,
   loadChessGame,
   loadResumableChessGame,
   saveChessGame,
+  storedToChess,
   sweepStaleChessSessions,
   type StoredChessGame,
 } from './chessPersistence';
+import { createOnlineSession } from '@games/chess/domain/session';
 import type { Ply, Square } from '@games/chess/domain/types';
 
 const sq = (name: string): Square => ({ row: 8 - Number(name[1]), col: 'abcdefgh'.indexOf(name[0]) });
@@ -27,6 +30,43 @@ const key = (code: string) => `chess:session:v1:${code}`;
 
 beforeEach(() => {
   localStorage.clear();
+});
+
+describe('who sat down, and as which colour, survives a refresh', () => {
+  it('round-trips the colour and the seated ticket through storage', () => {
+    // A host who chose Black, playing as ticket u1.
+    const live = { ...createOnlineSession('host', 'ABCD', 'Rio', 'b'), seatedUserId: 'u1', oppName: 'Kai', log: LIVE_LOG };
+    const stored = chessToStored(live, 7)!;
+    expect(stored).toMatchObject({ code: 'ABCD', side: 'host', myColor: 'b', seatedUserId: 'u1', updatedAt: 7 });
+
+    saveChessGame(stored);
+    const back = storedToChess(loadChessGame('ABCD')!);
+    expect(back.myColor).toBe('b');
+    expect(back.seatedUserId).toBe('u1');
+    expect(back).toMatchObject({ side: 'host', myName: 'Rio', oppName: 'Kai', log: LIVE_LOG });
+  });
+
+  it('a nobody-signed-in seat is kept as null, not dropped', () => {
+    const live = { ...createOnlineSession('guest', 'ABCD', 'Kai', 'b'), oppName: 'Rio' };
+    const back = storedToChess(chessToStored(live, 1)!);
+    expect(back.myColor).toBe('w'); // guest of a Black host
+    expect(back.seatedUserId).toBeNull();
+  });
+
+  it('a save from before colours were stored still loads: host=White, no ticket', () => {
+    // The shape older builds wrote — no myColor, no seatedUserId.
+    const old = stored('OLDG', LIVE_LOG, false);
+    expect('myColor' in old).toBe(false);
+    localStorage.setItem(key('OLDG'), JSON.stringify(old));
+
+    const back = storedToChess(loadChessGame('OLDG')!);
+    expect(back.myColor).toBe('w');
+    expect(back.seatedUserId).toBeNull();
+    expect(back.side).toBe('host');
+
+    const oldGuest = storedToChess({ ...old, side: 'guest' });
+    expect(oldGuest.myColor).toBe('b');
+  });
 });
 
 describe('sweepStaleChessSessions', () => {

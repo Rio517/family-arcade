@@ -1,10 +1,101 @@
-import { describe, expect, it, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { LINEUP_KEY, resetLineupStore } from '@shared/profile/lineupStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
+import type { PartyValue } from '@shared/party/PartyContext';
+
+// A controllable useParty so each party state renders without a network.
+const mockParty = vi.hoisted(() => ({ value: null as any }));
+vi.mock('@shared/party/PartyContext', () => ({ useParty: () => mockParty.value }));
+
+// The chess link, stubbed: remembers the handlers and which codes were
+// hosted/dialled, so a test can push a status without WebRTC.
+const net = vi.hoisted(() => ({ handlers: null as any, hosted: [] as string[], joined: [] as string[] }));
+vi.mock('@shared/net/peer', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@shared/net/peer')>();
+  class GameConnection {
+    constructor(private handlers: { onStatus: (s: string, d?: string) => void }) {
+      net.handlers = handlers;
+    }
+    host(code: string) {
+      net.hosted.push(code);
+      this.handlers.onStatus('hosting');
+    }
+    join(code: string) {
+      net.joined.push(code);
+      this.handlers.onStatus('connecting');
+    }
+    send() {
+      return true;
+    }
+    destroy() {}
+  }
+  return { ...actual, GameConnection };
+});
+
+// The real hook, with startTable wrapped so a test can read exactly how the
+// page sat down — role, code, ticket, colour — while the game still starts.
+const sat = vi.hoisted(() => ({ calls: [] as unknown[] }));
+vi.mock('@games/chess/state/useChess', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@games/chess/state/useChess')>();
+  return {
+    ...actual,
+    useChess: (o: Parameters<typeof actual.useChess>[0]) => {
+      const cx = actual.useChess(o);
+      return {
+        ...cx,
+        startTable: (opts: Parameters<typeof cx.startTable>[0]) => {
+          sat.calls.push(opts);
+          cx.startTable(opts);
+        },
+      };
+    },
+  };
+});
+
 import { ChessPage } from './ChessPage';
+
+function makeParty(over: Partial<PartyValue> = {}): PartyValue {
+  return {
+    myName: 'Rio',
+    status: 'idle',
+    code: '',
+    role: null,
+    inParty: false,
+    theirName: null,
+    hostParty: vi.fn(() => 'ABCD'),
+    joinParty: vi.fn(),
+    leaveParty: vi.fn(),
+    retry: vi.fn(),
+    reconnecting: false,
+    table: null,
+    knock: null,
+    openTable: vi.fn(() => 'WXYZ'),
+    closeTable: vi.fn(),
+    knockOn: vi.fn(),
+    clearKnock: vi.fn(),
+    resolveGame: (id: string) => (id === 'chess' ? { title: 'Chess', path: '/chess' } : null),
+    call: {
+      active: false,
+      status: 'idle',
+      muted: false,
+      cameraOn: false,
+      localStream: null,
+      remoteStream: null,
+      start: vi.fn(),
+      stop: vi.fn(),
+      toggleMute: vi.fn(),
+      toggleCamera: vi.fn(),
+    },
+    ...over,
+  } as PartyValue;
+}
+
+/** A party you're in with Kai, as host or guest. */
+const withKai = (role: 'host' | 'guest', over: Partial<PartyValue> = {}) =>
+  makeParty({ inParty: true, status: 'connected', code: 'PRTY', role, theirName: 'Kai', ...over });
 
 function renderPage(entry = '/chess') {
   return render(
@@ -14,18 +105,164 @@ function renderPage(entry = '/chess') {
   );
 }
 
-describe('<ChessPage> — local flow', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    // A game route always has somebody signed in (the PlayerGate sees to it),
-    // so every case here plays as Rio's ticket — with Flora's ticket sitting
-    // on the same browser, ready to take the other chair.
-    resetUsersStore();
-    resetLineupStore();
-    setUsersState(
-      setActiveUser(addUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u2', 'Flora'), 'u1'),
-    );
+const rerenderPage = (r: ReturnType<typeof renderPage>) =>
+  r.rerender(
+    <MemoryRouter initialEntries={['/chess']}>
+      <ChessPage />
+    </MemoryRouter>,
+  );
+
+/** Only characters the real generateCode can emit (no look-alikes O/0, I/1, L). */
+const CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4}$/;
+
+beforeEach(() => {
+  localStorage.clear();
+  // A game route always has somebody signed in (the PlayerGate sees to it),
+  // so every case here plays as Rio's ticket — with Flora's ticket sitting
+  // on the same browser, ready to take the other chair.
+  resetUsersStore();
+  resetLineupStore();
+  setUsersState(
+    setActiveUser(addUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u2', 'Flora'), 'u1'),
+  );
+  mockParty.value = makeParty();
+  net.handlers = null;
+  net.hosted = [];
+  net.joined = [];
+  sat.calls = [];
+});
+
+describe('<ChessPage> — the party is the table', () => {
+  it('not in a party: both code doors, and creating sits you down as host on a fresh code', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    expect(screen.getByTestId('chess-create')).toBeInTheDocument();
+    expect(screen.getByTestId('chess-join')).toBeInTheDocument();
+    expect(screen.queryByTestId('chess-party-play')).toBeNull();
+    expect(screen.queryByTestId('chess-party-waiting')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('chess-create'));
+    expect(sat.calls).toHaveLength(1);
+    expect(sat.calls[0]).toEqual({ role: 'host', code: expect.stringMatching(CODE_RE), seatedUserId: 'u1' });
+    // The page minted the code; the hook listens on that very code.
+    const { code } = sat.calls[0] as { code: string };
+    expect(net.hosted).toEqual([code]);
+    expect(screen.getByTestId('chess-code')).toHaveTextContent(code);
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
   });
+
+  it('not in a party: joining with a code sits you down as guest on it, as your ticket', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    fireEvent.change(screen.getByTestId('chess-join-code'), { target: { value: 'qrst' } });
+    fireEvent.click(screen.getByTestId('chess-join'));
+    expect(sat.calls).toEqual([{ role: 'guest', code: 'QRST', seatedUserId: 'u1' }]);
+    expect(net.joined).toEqual(['QRST']);
+  });
+
+  it('host in a party: pick a colour, one tap opens the table and starts as host with that colour', () => {
+    mockParty.value = withKai('host');
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+
+    // No code doors — the friend is already here.
+    expect(screen.queryByTestId('chess-create')).toBeNull();
+    expect(screen.queryByTestId('chess-join-code')).toBeNull();
+    const play = screen.getByTestId('chess-party-play');
+    expect(play).toHaveTextContent('Play Chess with Kai');
+
+    // White is the default; Black is one tap.
+    expect(screen.getByTestId('chess-side-w')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('chess-side-b')).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByTestId('chess-side-b'));
+    expect(screen.getByTestId('chess-side-b')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('chess-side-w')).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(play);
+    expect(mockParty.value.openTable).toHaveBeenCalledWith('chess', 'b');
+    expect(sat.calls).toEqual([{ role: 'host', code: 'WXYZ', seatedUserId: 'u1', hostSide: 'b' }]);
+    expect(net.hosted).toEqual(['WXYZ']);
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
+    // The friend is already here: no QR invite flashes up while they walk in.
+    expect(screen.queryByRole('dialog', { name: 'Invite your opponent' })).toBeNull();
+  });
+
+  it('guest in a party: knocks on Chess once, then sits down when the host opens the table', () => {
+    mockParty.value = withKai('guest');
+    const r = renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+
+    expect(screen.getByTestId('chess-party-waiting')).toHaveTextContent('Waiting for Kai to open Chess');
+    expect(screen.queryByTestId('chess-create')).toBeNull();
+    expect(screen.queryByTestId('chess-join-code')).toBeNull();
+    expect(mockParty.value.knockOn).toHaveBeenCalledTimes(1);
+    expect(mockParty.value.knockOn).toHaveBeenCalledWith('chess');
+    expect(sat.calls).toEqual([]);
+
+    // A re-render with no table yet doesn't knock again.
+    rerenderPage(r);
+    expect(mockParty.value.knockOn).toHaveBeenCalledTimes(1);
+
+    // The host opens Chess as Black: the guest sits down as White on that code.
+    const knockOn = mockParty.value.knockOn;
+    mockParty.value = withKai('guest', { knockOn, table: { game: 'chess', code: 'QRST', hostSide: 'b' } });
+    rerenderPage(r);
+    expect(sat.calls).toEqual([{ role: 'guest', code: 'QRST', seatedUserId: 'u1', hostSide: 'b' }]);
+    expect(net.joined).toEqual(['QRST']);
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
+    expect(knockOn).toHaveBeenCalledTimes(1);
+  });
+
+  it('guest in a party: a Chess table already open means no knock — just sit down', () => {
+    mockParty.value = withKai('guest', { table: { game: 'chess', code: 'QRST' } });
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    expect(mockParty.value.knockOn).not.toHaveBeenCalled();
+    expect(sat.calls).toEqual([{ role: 'guest', code: 'QRST', seatedUserId: 'u1', hostSide: undefined }]);
+  });
+
+  it('guest in a party: a table for another game still means knocking on Chess', () => {
+    mockParty.value = withKai('guest', { table: { game: 'racer', code: 'RACE' } });
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    expect(mockParty.value.knockOn).toHaveBeenCalledWith('chess');
+    expect(sat.calls).toEqual([]);
+    expect(screen.getByTestId('chess-party-waiting')).toBeInTheDocument();
+  });
+
+  it('rejoining a remembered party: a quiet line, no doors, no play button', () => {
+    mockParty.value = makeParty({ reconnecting: true });
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    expect(screen.getByTestId('chess-party-reconnecting')).toHaveTextContent('Reconnecting to your party');
+    expect(screen.queryByTestId('chess-create')).toBeNull();
+    expect(screen.queryByTestId('chess-join-code')).toBeNull();
+    expect(screen.queryByTestId('chess-party-play')).toBeNull();
+    expect(screen.queryByTestId('chess-party-waiting')).toBeNull();
+  });
+
+  it('the host leaving an online game closes the table on the party; a guest leaving does not', () => {
+    mockParty.value = withKai('host');
+    const r = renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    fireEvent.click(screen.getByTestId('chess-party-play'));
+
+    // The link fails; the error panel's way out is the exit-to-menu path.
+    act(() => net.handlers.onStatus('error', 'Lost the link.'));
+    fireEvent.click(screen.getByRole('button', { name: /Back to menu/ }));
+    expect(mockParty.value.closeTable).toHaveBeenCalledTimes(1);
+    r.unmount();
+
+    mockParty.value = withKai('guest', { table: { game: 'chess', code: 'QRST' } });
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    act(() => net.handlers.onStatus('error', 'Lost the link.'));
+    fireEvent.click(screen.getByRole('button', { name: /Back to menu/ }));
+    expect(mockParty.value.closeTable).not.toHaveBeenCalled();
+  });
+});
+
+describe('<ChessPage> — local flow', () => {
 
   it('offers a mode picker with both same-device and online options', () => {
     renderPage();

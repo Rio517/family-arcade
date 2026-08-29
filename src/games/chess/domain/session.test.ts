@@ -130,6 +130,33 @@ describe('online session — turn ownership', () => {
   });
 });
 
+describe('online session — the host picks a colour', () => {
+  it('host=White by default, and the guest takes the other colour', () => {
+    expect(createOnlineSession('host', 'ABCD', 'Host').myColor).toBe('w');
+    expect(createOnlineSession('guest', 'ABCD', 'Guest').myColor).toBe('b');
+    expect(createOnlineSession('host', 'ABCD', 'Host', 'w').myColor).toBe('w');
+    expect(createOnlineSession('guest', 'ABCD', 'Guest', 'w').myColor).toBe('b');
+  });
+
+  it('a host who picks Black hands White to the guest', () => {
+    const host = createOnlineSession('host', 'ABCD', 'Host', 'b');
+    const guest = createOnlineSession('guest', 'ABCD', 'Guest', 'b');
+    expect(host.myColor).toBe('b');
+    expect(guest.myColor).toBe('w');
+    // Turn ownership follows the colour, not the side of the connection.
+    expect(canIMove(host)).toBe(false);
+    expect(canIMove(guest)).toBe(true);
+    const afterWhite = makeMove(guest, ply('e2', 'e4')).state;
+    expect(canIMove(afterWhite)).toBe(false);
+  });
+
+  it('no session remembers a ticket until someone sits down', () => {
+    expect(createOnlineSession('host', 'ABCD', 'Host').seatedUserId).toBeNull();
+    expect(createOnlineSession('guest', 'ABCD', 'Guest', 'b').seatedUserId).toBeNull();
+    expect(createLocalSession('A', 'B').seatedUserId).toBeNull();
+  });
+});
+
 describe('online session — sync between two peers', () => {
   function relay(to: SessionState, msgs: ReturnType<typeof makeMove>['outgoing']) {
     let s = to;
