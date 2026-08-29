@@ -337,10 +337,48 @@ describe('<RiskPage>', () => {
       fireEvent.click(screen.getByTestId('strip-user-u2'));
       expect(screen.getByTestId('seat-1')).toHaveTextContent('Klara');
       // Seated tickets grey out, and × hands the chair back.
-      expect(screen.getByTestId('strip-user-u2')).toBeDisabled();
+      expect(screen.getByTestId('strip-user-u2')).toHaveAttribute('aria-disabled', 'true');
       fireEvent.click(screen.getByTestId('seat-1-clear'));
       expect(screen.getByTestId('seat-1')).toHaveTextContent(/tap a ticket/i);
-      expect(screen.getByTestId('strip-user-u2')).not.toBeDisabled();
+      expect(screen.getByTestId('strip-user-u2')).toHaveAttribute('aria-disabled', 'false');
+    });
+
+    it('changing the number of generals keeps the chairs already filled', () => {
+      renderPage();
+      fireEvent.click(screen.getByTestId('count-6'));
+      fireEvent.click(screen.getByTestId('strip-user-u3'));
+      expect(screen.getByTestId('seat-1')).toHaveTextContent('Flora');
+
+      // Shrinking the council and opening it back up doesn't re-deal the
+      // table: Flora is still in the chair she took.
+      fireEvent.click(screen.getByTestId('count-2'));
+      expect(screen.getByTestId('seat-1')).toHaveTextContent('Flora');
+      expect(screen.queryByTestId('seat-2')).toBeNull();
+
+      fireEvent.click(screen.getByTestId('count-6'));
+      expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
+      expect(screen.getByTestId('seat-1')).toHaveTextContent('Flora');
+      expect(screen.getByTestId('seat-2')).toHaveTextContent(/tap a ticket/i);
+    });
+
+    it('handing a seated chair to a computer frees the ticket, and handing it back empties the chair', () => {
+      renderPage();
+      fireEvent.click(screen.getByTestId('strip-user-u2'));
+      expect(screen.getByTestId('seat-1')).toHaveTextContent('Klara');
+      expect(screen.getByTestId('strip-user-u2')).toHaveAttribute('aria-disabled', 'true');
+
+      // The chair goes to a computer general — Klara's ticket is handed back
+      // to the strip, tappable into any other chair.
+      fireEvent.click(screen.getByTestId('seat-bot-1'));
+      expect(screen.getByTestId('persona-1-cadet')).toBeInTheDocument();
+      expect(screen.getByTestId('strip-user-u2')).toHaveAttribute('aria-disabled', 'false');
+
+      // Turning it back over to a person leaves the chair open rather than
+      // re-seating whoever was there — it's a fresh invitation.
+      fireEvent.click(screen.getByTestId('seat-bot-1'));
+      expect(screen.queryByTestId('persona-1-cadet')).toBeNull();
+      expect(screen.getByTestId('seat-1')).toHaveTextContent(/tap a ticket/i);
+      expect(screen.getByTestId('strip-user-u2')).toHaveAttribute('aria-disabled', 'false');
     });
 
     it('a chair handed to a computer shows the persona ladder', () => {

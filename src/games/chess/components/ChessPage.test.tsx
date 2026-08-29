@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
-import { resetLineupStore } from '@shared/profile/lineupStore';
+import { LINEUP_KEY, resetLineupStore } from '@shared/profile/lineupStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import { ChessPage } from './ChessPage';
 
@@ -405,5 +405,35 @@ describe('<ChessPage> — local flow', () => {
     fireEvent.click(screen.getByTestId('mode-local'));
     expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
     expect(screen.getByTestId('seat-1')).toHaveTextContent('Flora');
+  });
+
+  it('a picker left half-filled and abandoned changes nothing for next time', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.click(screen.getByTestId('strip-user-u2'));
+    expect(screen.getByTestId('seat-1')).toHaveTextContent('Flora');
+
+    // Walking back out of the picker without starting: nothing was played, so
+    // nothing is remembered — the next visit is as blank as this one was.
+    fireEvent.click(screen.getByRole('button', { name: /←\s*Back/ }));
+    expect(screen.getByTestId('mode-local')).toBeInTheDocument();
+    expect(localStorage.getItem(LINEUP_KEY)).toBeNull();
+  });
+
+  it('swapping the sides before the game is what the next visit opens with', () => {
+    const first = renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.click(screen.getByTestId('strip-user-u2'));
+    fireEvent.click(screen.getByTestId('chess-swap-sides'));
+    fireEvent.click(screen.getByTestId('start-local'));
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Flora to move/);
+    first.unmount();
+
+    // The chairs the game actually started with — swapped — are the ones the
+    // table opens with next time, White and Black the same way round.
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    expect(screen.getByTestId('seat-0')).toHaveTextContent('Flora');
+    expect(screen.getByTestId('seat-1')).toHaveTextContent('Rio');
   });
 });
