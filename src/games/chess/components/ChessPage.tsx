@@ -186,7 +186,9 @@ export function ChessPage() {
 
   // In 3D the scene owns the whole window — stars in every direction; the
   // title bar and the hint float over it.
-  const immersive = cx.phase === 'play' && view === '3d';
+  // The board owns the whole window in 3D play and in free play (flat or 3D):
+  // the title bar, trays, hint and actions float over its edges.
+  const immersive = (cx.phase === 'play' && view === '3d') || (!inGame && setup === 'free');
 
   return (
     <ChessThemeContext.Provider value={{ theme, setTheme }}>

@@ -407,6 +407,16 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('seat-1')).toHaveTextContent('Flora');
   });
 
+  it('free play owns the whole window, and gives it back on exit', () => {
+    renderPage();
+    expect(document.querySelector('.chess-immersive')).toBeNull();
+    fireEvent.click(screen.getByTestId('mode-free'));
+    expect(document.querySelector('.chess-immersive')).not.toBeNull();
+    fireEvent.click(screen.getByTestId('fp-menu'));
+    fireEvent.click(screen.getByTestId('fp-end'));
+    expect(document.querySelector('.chess-immersive')).toBeNull();
+  });
+
   it('a picker left half-filled and abandoned changes nothing for next time', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-local'));

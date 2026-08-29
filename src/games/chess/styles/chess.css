@@ -347,10 +347,65 @@ body:has(.chess-immersive) .party-root {
 .fp-menu-body .fp-view { width: 100%; }
 .fp-3d { width: min(100%, 720px); }
 
+/* ── Free play owns the whole window ───────────────────────────────────────
+   The board fills the screen's short side under the floating title bar; the
+   trays, the hint and Start/Menu float over its edges as overlays. The 3D
+   sandbox fills the window edge to edge like immersive play does. */
+.chess-immersive .freeplay { position: fixed; inset: 0; z-index: 0; display: block; gap: 0; }
+.chess-immersive .fp-row {
+  position: absolute;
+  inset: calc(60px + env(safe-area-inset-top)) 0 calc(48px + env(safe-area-inset-bottom));
+  display: grid; place-items: center; gap: 0; width: auto;
+}
+/* Sized from the viewport (a percentage inside an auto grid track resolves to
+   the board's intrinsic ~300px): the screen's short side, less the floating
+   title bar and hint, less room for the two trays at the sides. */
+.chess-immersive .fp-wrap { width: min(calc(100vw - 260px), calc(100dvh - 156px)); }
+.chess-immersive .chess3d.fp-3d { position: absolute; inset: 0; width: 100%; height: 100%; gap: 0; }
+.chess-immersive .fp-tray {
+  position: fixed; z-index: 5; top: 50%; transform: translateY(-50%);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(6px); box-shadow: 0 10px 30px -14px #000;
+}
+.chess-immersive .fp-tray.black { left: calc(10px + env(safe-area-inset-left)); }
+.chess-immersive .fp-tray.white { right: calc(10px + env(safe-area-inset-right)); }
+.chess-immersive .fp-hint,
+.chess-immersive .fp-issue {
+  position: fixed; z-index: 5; left: 50%; transform: translateX(-50%);
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  margin: 0; padding: 7px 16px; border-radius: 999px; min-height: 0;
+  max-width: min(92vw, 680px); text-align: center;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid var(--border);
+}
+.chess-immersive .fp-issue { bottom: calc(56px + env(safe-area-inset-bottom)); }
+/* The 3D sandbox's own orbit hint rides above the free-play hint. */
+.chess-immersive .fp-3d .chess3d-hint { bottom: calc(56px + env(safe-area-inset-bottom)); }
+.chess-immersive .fp-actions {
+  position: fixed; z-index: 5; flex-direction: column;
+  right: calc(12px + env(safe-area-inset-right));
+  bottom: calc(64px + env(safe-area-inset-bottom));
+}
+
 @media (max-width: 640px), (orientation: portrait) {
   .fp-row { flex-direction: column; }
   .fp-tray { flex-direction: row; }
   .fp-wrap { width: min(92vw, calc(100dvh - 330px), 560px); }
+  /* Phones: the black tray is a row under the title bar; from the bottom up
+     sit the hint (clear of the Party pill), Start/Menu, then the white tray.
+     The board takes the width that's left. */
+  .chess-immersive .fp-wrap { width: min(calc(100vw - 16px), calc(100dvh - 360px)); }
+  .chess-immersive .fp-tray { top: auto; transform: none; left: 50%; translate: -50% 0; }
+  .chess-immersive .fp-tray.black { top: calc(64px + env(safe-area-inset-top)); left: 50%; }
+  .chess-immersive .fp-tray.white { bottom: calc(232px + env(safe-area-inset-bottom)); right: auto; left: 50%; }
+  /* The hint runs to three lines on a phone; everything above it makes room. */
+  .chess-immersive .fp-hint { bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .chess-immersive .fp-issue { bottom: calc(300px + env(safe-area-inset-bottom)); }
+  .chess-immersive .fp-actions {
+    flex-direction: row; top: auto;
+    bottom: calc(176px + env(safe-area-inset-bottom)); right: calc(10px + env(safe-area-inset-right));
+  }
+  .chess-immersive .fp-row { inset: calc(128px + env(safe-area-inset-top)) 0 calc(300px + env(safe-area-inset-bottom)); }
 }
 
 /* ── Theme chrome ───────────────────────────────────────────────────────────

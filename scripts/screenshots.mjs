@@ -201,6 +201,32 @@ const SHOTS = [
     },
   },
   {
+    // Free play: the board owns the window; trays, hint and Start/Menu float
+    // over its edges. A few pieces placed so the trays' drag path is visible.
+    name: 'chess-freeplay',
+    path: '/#/chess',
+    viewport: TABLET,
+    prep: async (page) => {
+      await page.getByTestId('mode-free').click();
+      await page.getByTestId('fp-board').waitFor();
+      await page.getByTestId('fp-tray-w-q').click();
+      await page.getByTestId('fp-sq-d1').click();
+      await page.getByTestId('fp-tray-w-q').click();
+      await page.getByTestId('fp-tray-b-k').click();
+      await page.getByTestId('fp-sq-e8').click();
+      await page.getByTestId('fp-tray-b-k').click();
+    },
+  },
+  {
+    name: 'chess-freeplay-phone',
+    path: '/#/chess',
+    viewport: PHONE,
+    prep: async (page) => {
+      await page.getByTestId('mode-free').click();
+      await page.getByTestId('fp-board').waitFor();
+    },
+  },
+  {
     // Magic Coins: who's playing, by ticket, before picking a world.
     name: 'unicorn-seats',
     path: '/#/unicorn',
