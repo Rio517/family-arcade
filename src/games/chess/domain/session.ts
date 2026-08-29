@@ -95,6 +95,7 @@ export interface FinishInfo {
 export interface Outcome {
   state: SessionState;
   outgoing: ChessMessage[];
+  /** Set only by the transition that ends the game — never again for a board already over. */
   finished?: FinishInfo;
   error?: string;
 }
@@ -228,6 +229,20 @@ function finishInfo(s: SessionState): FinishInfo | undefined {
   };
 }
 
+/**
+ * The finish a transition *produced*: reported on the play→over edge and
+ * never again for a board that was already over. A reopened link replays
+ * connectHandshake both ways, so the same finished log comes straight back
+ * as a `sync`; a second FinishInfo for it would credit the mate twice
+ * (Ship Battle's detectFinish draws the same line). `after` is replayed even
+ * when `before` was over — the sync reducers lean on that replay to refuse
+ * an illegal log.
+ */
+function finishedBy(before: SessionState, after: SessionState): FinishInfo | undefined {
+  const info = finishInfo(after);
+  return phase(before) === 'over' ? undefined : info;
+}
+
 // ── Transitions ────────────────────────────────────────────────────────────
 
 /** Messages to (re)send whenever a data channel opens. */
@@ -258,7 +273,7 @@ export function makeMove(s: SessionState, ply: Ply): Outcome {
   const next: SessionState = { ...s, log: [...s.log, stored] };
   const outgoing: ChessMessage[] =
     s.mode === 'online' ? [{ t: 'move', ply: stored }] : [];
-  return { state: next, outgoing, finished: finishInfo(next) };
+  return { state: next, outgoing, finished: finishedBy(s, next) };
 }
 
 /**
@@ -338,9 +353,12 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
         // Same hostile-log defence as the equal-epoch branch below: the
         // adopted log is replayed right here, and a shape-valid but illegal
         // log (behind a forged newer epoch) must be refused, not thrown.
+        // A newer epoch is a different game — whatever finish this session
+        // reported belongs to the old one — so it is measured from its own
+        // opening: a rematch the peer finished while we slept is news.
         let finished: FinishInfo | undefined;
         try {
-          finished = finishInfo(next);
+          finished = finishedBy({ ...next, log: [] }, next);
         } catch {
           return {
             state: s,
@@ -374,7 +392,7 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
       // replay here; if it's bogus, refuse the sync and re-assert our own log.
       let finished: FinishInfo | undefined;
       try {
-        finished = finishInfo(next);
+        finished = finishedBy(s, next);
       } catch {
         return {
           state: s,
@@ -403,7 +421,7 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
         ? { from: msg.ply.from, to: msg.ply.to, promotion: move.promotion }
         : { from: msg.ply.from, to: msg.ply.to };
       const next: SessionState = { ...s, log: [...s.log, stored] };
-      return { state: next, outgoing: [], finished: finishInfo(next) };
+      return { state: next, outgoing: [], finished: finishedBy(s, next) };
     }
 
     case 'rematch': {

@@ -120,6 +120,12 @@ export function ChessPage() {
   const [camDirty, setCamDirty] = useState(false);
   const resetViewRef = useRef<(() => void) | null>(null);
 
+  // The party you're in, if any — it decides which online lobby you see, and
+  // its table closes with the game.
+  const party = useParty();
+  const lobby = lobbyFor(party);
+  const { closeTable } = party;
+
   const onFinish = useCallback((info: FinishInfo) => {
     // Results land on the tickets the session captured when the game started
     // — never on the roster as it stands now, since a sign-in switch between
@@ -143,19 +149,19 @@ export function ChessPage() {
       recordResultFor(info.seatedUserId, row(info.iWon, info.opponent));
     } else if (info.winner !== null) {
       // Same device, decisive: a win for the winning chair, a loss for the
-      // other. The card shows the winner's points — two chairs, two profiles.
-      pointsEarned = pointsForResult(true, 0);
+      // other. Points on the card are an online thing; here the ledger
+      // credit is what each ticket gets.
       recordResultFor(info.whiteUserId, row(info.winner === 'w', info.blackName));
       recordResultFor(info.blackUserId, row(info.winner === 'b', info.whiteName));
     }
+    // Online, the game closes the host's table with it, so a friend who
+    // reloads after the result is never sat down at a finished game. (The
+    // party ignores this unless we are the host and this is the open table.)
+    if (info.code) closeTable(info.code);
     setFinish({ status: info.status, pointsEarned });
-  }, []);
+  }, [closeTable]);
 
   const cx = useChess({ name: profile.profile.name, onFinish });
-
-  // The party you're in, if any — it decides which online lobby you see.
-  const party = useParty();
-  const lobby = lobbyFor(party);
   // Host in a party: the colour you'll play. Your friend gets the other one.
   const [hostSide, setHostSide] = useState<Color>('w');
   const inGame = cx.phase === 'play' || cx.phase === 'over';
@@ -720,7 +726,9 @@ export function ChessPage() {
             whiteName={nameW}
             blackName={nameB}
             pointsEarned={finish.pointsEarned}
-            totalPoints={profile.profile.points}
+            // "You now have…" is only true of the ticket the result credited;
+            // if somebody else signed in since, their total is not the news.
+            totalPoints={cx.seatedUserId === profile.userId ? profile.profile.points : undefined}
             iWantRematch={cx.iWantRematch}
             oppWantsRematch={cx.oppWantsRematch}
             onRematch={cx.requestRematch}

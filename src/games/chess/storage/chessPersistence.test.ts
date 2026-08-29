@@ -157,4 +157,12 @@ describe('the same-device autosave keeps both chairs — tickets included', () =
     expect(back.whiteUserId).toBeNull();
     expect(back.blackUserId).toBeNull();
   });
+
+  it('a ticket that is not a string (a hand-edited save) loads as null, never as a made-up id', () => {
+    const odd = { v: 1, whiteName: 'Rio', blackName: 'Flora', log: LIVE_LOG, updatedAt: 1, whiteUserId: 42, blackUserId: { id: 'u2' } };
+    localStorage.setItem('chess:local:v1', JSON.stringify(odd));
+    const back = storedToLocalChess(loadLocalChessGame()!);
+    expect(back.whiteUserId).toBeNull();
+    expect(back.blackUserId).toBeNull();
+  });
 });
