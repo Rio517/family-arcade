@@ -425,13 +425,13 @@ describe('<RiskPage>', () => {
       // Chair 1 (Rio) marches under Crimson; tap the seal and choose Cobalt.
       fireEvent.click(screen.getByTestId('seat-color-0'));
       const cobalt = screen.getByTestId('tincture-0-cobalt');
-      expect(cobalt).toHaveAccessibleName(/Cobalt — Cobalt's; tap to swap/);
+      expect(cobalt).toHaveAccessibleName(/Cobalt — chair 2 has it; tap to swap/);
       fireEvent.click(cobalt);
       expect(screen.queryByTestId('tincture-0-cobalt')).toBeNull(); // the picker folds away
       // Chair 2 took Crimson in the swap, so no two chairs share a colour.
       fireEvent.click(screen.getByTestId('seat-color-1'));
       expect(screen.getByTestId('tincture-1-crimson')).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.getByTestId('tincture-1-cobalt')).toHaveAccessibleName(/Rio's; tap to swap/);
+      expect(screen.getByTestId('tincture-1-cobalt')).toHaveAccessibleName(/Rio has it; tap to swap/);
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(screen.queryByTestId('tincture-1-crimson')).toBeNull();
 
