@@ -66,6 +66,25 @@ describe('PartyBar', () => {
     expect(screen.getByTestId('party-pill')).toHaveFocus();
   });
 
+  it('the collapse chevron minimizes the panel and hands focus back to the pill', () => {
+    renderBar();
+    fireEvent.click(screen.getByTestId('party-pill'));
+    expect(screen.getByRole('dialog', { name: 'Party' })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('party-collapse'));
+    expect(screen.queryByRole('dialog', { name: 'Party' })).toBeNull();
+    expect(screen.getByTestId('party-pill')).toHaveFocus();
+  });
+
+  it('the collapse chevron is there mid-party too — calls stay minimizable', () => {
+    mockParty.value = makeParty({ inParty: true, status: 'connected', theirName: 'Kai' });
+    renderBar();
+    fireEvent.click(screen.getByTestId('party-pill'));
+    fireEvent.click(screen.getByTestId('party-collapse'));
+    expect(screen.queryByRole('dialog', { name: 'Party' })).toBeNull();
+    // Minimizing is not leaving: the party itself is untouched.
+    expect(mockParty.value.leaveParty).not.toHaveBeenCalled();
+  });
+
   it('offers "Start a party" when not in a party', () => {
     renderBar();
     fireEvent.click(screen.getByTestId('party-pill'));
