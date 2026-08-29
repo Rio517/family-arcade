@@ -18,6 +18,9 @@ export interface GameSession {
   side: Side;
   myName: string;
   mySkinId: string;
+  /** The ticket that sat down at this table. Absent in blobs written before
+   * tickets took seats — restored as null. */
+  seatedUserId?: string | null;
   oppName: string | null;
   oppSkinId: string | null;
   myFleet: Fleet;
@@ -41,6 +44,7 @@ export function sessionToStored(s: SessionState, now: number): GameSession {
     side: s.side,
     myName: s.myName,
     mySkinId: s.mySkinId,
+    seatedUserId: s.seatedUserId,
     oppName: s.oppName,
     oppSkinId: s.oppSkinId,
     myFleet: s.myFleet,
@@ -63,6 +67,7 @@ export function storedToSession(g: GameSession): SessionState {
     code: g.code,
     myName: g.myName,
     mySkinId: g.mySkinId,
+    seatedUserId: g.seatedUserId ?? null,
     oppName: g.oppName,
     oppSkinId: g.oppSkinId,
     myFleet: g.myFleet,

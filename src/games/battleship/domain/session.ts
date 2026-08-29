@@ -40,6 +40,12 @@ export interface SessionState {
   code: string;
   myName: string;
   mySkinId: string;
+  /**
+   * The signed-in ticket that sat down at this table (null for a captain with
+   * no ticket: a computer captain, or a save from before tickets existed). The
+   * session only remembers it — crediting the result is the page's job.
+   */
+  seatedUserId: string | null;
   oppName: string | null;
   oppSkinId: string | null;
   myFleet: Fleet;
@@ -81,12 +87,19 @@ const none = (state: SessionState): Outcome => ({ state, outgoing: [] });
 
 // ── Construction ─────────────────────────────────────────────────────────
 
-export function createSession(side: Side, code: string, myName: string, mySkinId: string): SessionState {
+export function createSession(
+  side: Side,
+  code: string,
+  myName: string,
+  mySkinId: string,
+  seatedUserId: string | null = null,
+): SessionState {
   return {
     side,
     code,
     myName,
     mySkinId,
+    seatedUserId,
     oppName: null,
     oppSkinId: null,
     myFleet: [],

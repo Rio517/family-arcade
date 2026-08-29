@@ -2,6 +2,8 @@ import '../styles/battleship.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProfile } from '@shared/profile/useProfile';
+import { useParty } from '@shared/party/PartyContext';
+import { generateCode } from '@shared/net/peer';
 import { useBattleship } from '@games/battleship/state/useBattleship';
 import { pointsForResult } from '@shared/profile/profile';
 import { buySkin, currentSkinId, selectSkin } from '@games/battleship/domain/skins';
@@ -29,6 +31,7 @@ export function BattleshipPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const profile = useProfile();
+  const party = useParty();
   const [finish, setFinish] = useState<ResultSummary | null>(null);
   const [copied, setCopied] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -101,23 +104,33 @@ export function BattleshipPage() {
     }
   };
 
+  // A solo game has nobody to invite: no code chip, no share modal — the
+  // computer captain doesn't scan QR codes.
+  const solo = bs.code === 'SOLO';
+
   const goMenu = () => navigate('/');
   const exitToMenu = () => {
+    // A party host walking away from an online table closes it, so the
+    // friend's lobby stops waiting on (or walking into) a game that is over.
+    if (!solo && party.role === 'host') party.closeTable();
     bs.leave();
     navigate('/');
   };
 
-  // A solo game has nobody to invite: no code chip, no share modal — the
-  // computer captain doesn't scan QR codes.
-  const solo = bs.code === 'SOLO';
+  // Sit down at an online table under this ticket: hosting draws a fresh
+  // code, the party hands one over, a join brings its own.
+  const sitDown = (role: 'host' | 'guest', code: string) =>
+    bs.startTable({ role, code, seatedUserId: profile.userId });
+
   const isSetup = bs.phase === 'fleet' || bs.phase === 'placing' || bs.phase === 'waiting';
   const showCode = !solo && bs.side === 'host' && isSetup && !bs.oppConnected;
 
   // The host has readied up and is waiting. Two sub-states: nobody has joined
   // yet (show the invite big), or the opponent is here but still placing their
   // ships (show that instead of hiding). The modal opens on entering the wait
-  // and closes once the battle actually starts.
-  const awaitingJoin = !solo && bs.side === 'host' && bs.phase === 'waiting' && !bs.oppConnected;
+  // and closes once the battle actually starts. In a party nobody needs the
+  // invite — the friend is already walking in — so only the placing wait shows.
+  const awaitingJoin = !solo && !party.inParty && bs.side === 'host' && bs.phase === 'waiting' && !bs.oppConnected;
   const awaitingPlacement = !solo && bs.side === 'host' && bs.phase === 'waiting' && bs.oppConnected;
   const hostWaiting = awaitingJoin || awaitingPlacement;
   useEffect(() => {
@@ -237,7 +250,7 @@ export function BattleshipPage() {
           <p className="subtle" style={{ color: 'var(--bad)' }}>
             {bs.statusDetail ?? 'Connection error.'}
           </p>
-          <button className="btn btn-block" onClick={exitToMenu}>← Back to menu</button>
+          <button className="btn btn-block" onClick={exitToMenu} data-testid="exit-to-menu">← Back to menu</button>
         </div>
       )}
 
@@ -258,9 +271,9 @@ export function BattleshipPage() {
             </button>
           )}
           <Lobby
-            name={profile.profile.name}
-            onHost={bs.hostGame}
-            onJoin={bs.joinGame}
+            onHost={() => sitDown('host', generateCode())}
+            onJoin={(code) => sitDown('guest', code)}
+            onHostTable={(code) => sitDown('host', code)}
             onSolo={bs.startSoloGame}
             initialJoinCode={joinCode ?? undefined}
           />
