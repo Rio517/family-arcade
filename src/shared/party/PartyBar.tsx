@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { normalizeCode } from '@shared/net/peer';
 import { PlayingAs } from '@shared/profile/PlayingAs';
 import { initialOf } from '@shared/profile/tickets';
-import { useIdentity } from '@shared/profile/useIdentity';
+import { useProfile } from '@shared/profile/useProfile';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { CameraIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
 import { useParty } from './PartyContext';
@@ -17,8 +17,9 @@ import './party.css';
 
 export function PartyBar() {
   const party = useParty();
-  // Your ticket is your name here too — the party never asks for one.
-  const { active } = useIdentity();
+  // Your ticket is your name here too — the party never asks for one. A read,
+  // so the reader hook, not the writer one.
+  const active = Boolean(useProfile().profile.name);
   const [open, setOpen] = useState(false);
   const [joining, setJoining] = useState(false);
   const [codeInput, setCodeInput] = useState('');
