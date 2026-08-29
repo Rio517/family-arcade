@@ -27,7 +27,14 @@ vi.mock('@shared/net/peer', () => ({
 }));
 
 import { useChess } from './useChess';
-import { loadChessGame, saveChessGame, type StoredChessGame } from '@games/chess/storage/chessPersistence';
+import {
+  loadChessGame,
+  loadLocalChessGame,
+  saveChessGame,
+  type StoredChessGame,
+  type StoredLocalChess,
+} from '@games/chess/storage/chessPersistence';
+import type { FinishInfo } from '@games/chess/domain/session';
 import type { Ply, Square } from '@games/chess/domain/types';
 
 const sq = (name: string): Square => ({ row: 8 - Number(name[1]), col: 'abcdefgh'.indexOf(name[0]) });
@@ -167,5 +174,74 @@ describe('useChess — leaving the table', () => {
     act(() => result.current.leave());
     expect(result.current).toMatchObject({ phase: 'lobby', mode: null, side: null, code: '', status: 'idle' });
     expect(loadChessGame('WXYZ')).toBeNull();
+  });
+});
+
+describe('useChess — who is playing, for the result', () => {
+  const rio = { name: 'Rio', userId: 'u1' };
+  const flora = { name: 'Flora', userId: 'u2' };
+
+  /** Play fool's mate on whatever session is live: Black wins on ply four. */
+  function playFoolsMate(move: (p: Ply) => void) {
+    for (const p of FOOLS_MATE) act(() => move(p));
+  }
+
+  it('exposes the seated ticket online, like Ship Battle does', () => {
+    const { result } = renderHook(() => useChess({ name: 'Rio', onFinish: vi.fn() }));
+    expect(result.current.seatedUserId).toBeNull();
+    act(() => result.current.startTable({ role: 'host', code: 'ABCD', seatedUserId: 'u1' }));
+    expect(result.current.seatedUserId).toBe('u1');
+  });
+
+  it('a same-device game starts with both tickets, saves them, and hands them to onFinish', () => {
+    const onFinish = vi.fn<(info: FinishInfo) => void>();
+    const { result } = renderHook(() => useChess({ name: 'Rio', onFinish }));
+    act(() => result.current.startLocal(rio, flora));
+    expect(result.current).toMatchObject({ mode: 'local', myName: 'Rio', oppName: 'Flora', seatedUserId: null });
+
+    act(() => result.current.move(FOOLS_MATE[0]));
+    expect(loadLocalChessGame()).toMatchObject({ whiteUserId: 'u1', blackUserId: 'u2' });
+
+    for (const p of FOOLS_MATE.slice(1)) act(() => result.current.move(p));
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(onFinish.mock.calls[0][0]).toMatchObject({
+      winner: 'b',
+      iWon: null,
+      whiteUserId: 'u1',
+      blackUserId: 'u2',
+      whiteName: 'Rio',
+      blackName: 'Flora',
+      seatedUserId: null,
+    });
+  });
+
+  it('blank names fall back to White and Black, and a ticketless chair stays null', () => {
+    const { result } = renderHook(() => useChess({ name: 'Rio', onFinish: vi.fn() }));
+    act(() => result.current.startLocal({ name: '  ', userId: 'u1' }, { name: '', userId: null }));
+    expect(result.current).toMatchObject({ myName: 'White', oppName: 'Black' });
+  });
+
+  it('resuming the same-device save brings the tickets back to the finish', () => {
+    const onFinish = vi.fn<(info: FinishInfo) => void>();
+    const first = renderHook(() => useChess({ name: 'Rio', onFinish: vi.fn() }));
+    act(() => first.result.current.startLocal(rio, flora));
+    act(() => first.result.current.move(FOOLS_MATE[0]));
+    first.unmount();
+
+    const { result } = renderHook(() => useChess({ name: 'Rio', onFinish }));
+    act(() => result.current.resumeLocal());
+    expect(result.current).toMatchObject({ mode: 'local', myName: 'Rio', oppName: 'Flora' });
+    playFoolsMate((p) => result.current.move(p)); // the first ply is refused (already played)
+    expect(onFinish.mock.calls[0][0]).toMatchObject({ whiteUserId: 'u1', blackUserId: 'u2' });
+  });
+
+  it('a save from before tickets rode along resumes and finishes with null chairs', () => {
+    const old: StoredLocalChess = { v: 1, whiteName: 'Rio', blackName: 'Flora', log: FOOLS_MATE.slice(0, 3), updatedAt: 1 };
+    localStorage.setItem('chess:local:v1', JSON.stringify(old));
+    const onFinish = vi.fn<(info: FinishInfo) => void>();
+    const { result } = renderHook(() => useChess({ name: 'Rio', onFinish }));
+    act(() => result.current.resumeLocal());
+    act(() => result.current.move(FOOLS_MATE[3]));
+    expect(onFinish.mock.calls[0][0]).toMatchObject({ winner: 'b', whiteUserId: null, blackUserId: null, whiteName: 'Rio', blackName: 'Flora' });
   });
 });

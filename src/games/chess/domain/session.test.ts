@@ -23,9 +23,15 @@ const ply = (from: string, to: string, promotion?: Ply['promotion']): Ply => ({
   ...(promotion ? { promotion } : {}),
 });
 
+/** Two tickets at a same-device table. */
+const alice = { name: 'Alice', userId: 'u-alice' };
+const bob = { name: 'Bob', userId: 'u-bob' };
+/** A chair holding no ticket — a bot, or nobody at all. */
+const unticketed = (name: string) => ({ name, userId: null });
+
 describe('local session', () => {
   it('lets either colour move on its turn, alternating', () => {
-    let s = createLocalSession('Alice', 'Bob');
+    let s = createLocalSession(alice, bob);
     expect(turnColor(s)).toBe('w');
     expect(canIMove(s)).toBe(true);
 
@@ -39,13 +45,13 @@ describe('local session', () => {
   });
 
   it('ignores an illegal move', () => {
-    const s = createLocalSession('Alice', 'Bob');
+    const s = createLocalSession(alice, bob);
     const out = makeMove(s, ply('e2', 'e5')); // pawn can't jump three
     expect(out.state.log).toHaveLength(0);
   });
 
   it('reports a finish on checkmate (fool\'s mate)', () => {
-    let s = createLocalSession('Alice', 'Bob');
+    let s = createLocalSession(alice, bob);
     s = makeMove(s, ply('f2', 'f3')).state;
     s = makeMove(s, ply('e7', 'e5')).state;
     s = makeMove(s, ply('g2', 'g4')).state;
@@ -57,15 +63,42 @@ describe('local session', () => {
     expect(phase(out.state)).toBe('over');
   });
 
+  it('the finish names both chairs — tickets and names — so the page never re-reads the roster', () => {
+    let s = createLocalSession(alice, bob);
+    s = makeMove(s, ply('f2', 'f3')).state;
+    s = makeMove(s, ply('e7', 'e5')).state;
+    s = makeMove(s, ply('g2', 'g4')).state;
+    const out = makeMove(s, ply('d8', 'h4'));
+    expect(out.finished).toMatchObject({
+      winner: 'b',
+      whiteUserId: 'u-alice',
+      blackUserId: 'u-bob',
+      whiteName: 'Alice',
+      blackName: 'Bob',
+      seatedUserId: null, // same device: nobody "sat down at this device" online
+    });
+  });
+
+  it('a chair with no ticket finishes as null, never as a made-up id', () => {
+    let s = createLocalSession(alice, unticketed('Bot'));
+    expect(s.whiteUserId).toBe('u-alice');
+    expect(s.blackUserId).toBeNull();
+    s = makeMove(s, ply('f2', 'f3')).state;
+    s = makeMove(s, ply('e7', 'e5')).state;
+    s = makeMove(s, ply('g2', 'g4')).state;
+    const out = makeMove(s, ply('d8', 'h4'));
+    expect(out.finished).toMatchObject({ whiteUserId: 'u-alice', blackUserId: null, blackName: 'Bot' });
+  });
+
   it('rematch resets the board immediately', () => {
-    let s = createLocalSession('Alice', 'Bob');
+    let s = createLocalSession(alice, bob);
     s = makeMove(s, ply('e2', 'e4')).state;
     s = proposeRematch(s).state;
     expect(s.log).toHaveLength(0);
   });
 
   it('takes back the last move (and no-ops on an empty log)', () => {
-    let s = createLocalSession('Alice', 'Bob');
+    let s = createLocalSession(alice, bob);
     expect(undoMove(s).state.log).toHaveLength(0); // nothing to undo
 
     s = makeMove(s, ply('e2', 'e4')).state;
@@ -78,7 +111,7 @@ describe('local session', () => {
   });
 
   it('rewinds to an earlier move via the log', () => {
-    let s = createLocalSession('Alice', 'Bob');
+    let s = createLocalSession(alice, bob);
     s = makeMove(s, ply('e2', 'e4')).state;
     s = makeMove(s, ply('e7', 'e5')).state;
     s = makeMove(s, ply('g1', 'f3')).state;
@@ -125,7 +158,7 @@ describe('online session — turn ownership', () => {
     expect(makeMove(online, ply('e2', 'e4')).outgoing).toEqual([
       { t: 'move', ply: ply('e2', 'e4') },
     ]);
-    const local = createLocalSession('A', 'B');
+    const local = createLocalSession(unticketed('A'), unticketed('B'));
     expect(makeMove(local, ply('e2', 'e4')).outgoing).toEqual([]);
   });
 });
@@ -153,7 +186,43 @@ describe('online session — the host picks a colour', () => {
   it('no session remembers a ticket until someone sits down', () => {
     expect(createOnlineSession('host', 'ABCD', 'Host').seatedUserId).toBeNull();
     expect(createOnlineSession('guest', 'ABCD', 'Guest', 'b').seatedUserId).toBeNull();
-    expect(createLocalSession('A', 'B').seatedUserId).toBeNull();
+    expect(createLocalSession(unticketed('A'), unticketed('B')).seatedUserId).toBeNull();
+  });
+
+  it('online sessions have no chair tickets — the seat is the one ticket at this device', () => {
+    const host = createOnlineSession('host', 'ABCD', 'Host');
+    expect(host.whiteUserId).toBeNull();
+    expect(host.blackUserId).toBeNull();
+  });
+
+  it('an online finish carries the seated ticket (captured at the start), not the chairs', () => {
+    // The host sat down as u-rio, playing White; the guest is Kai. Scholar's
+    // mate arrives via sync and the finish says who to credit.
+    let host: SessionState = { ...createOnlineSession('host', 'ABCD', 'Rio'), seatedUserId: 'u-rio' };
+    host = applyMessage(host, { t: 'hello', v: 1, side: 'guest', name: 'Kai' }).state;
+    const mate: Ply[] = [
+      ply('e2', 'e4'), ply('e7', 'e5'),
+      ply('f1', 'c4'), ply('b8', 'c6'),
+      ply('d1', 'h5'), ply('g8', 'f6'),
+      ply('h5', 'f7'),
+    ];
+    const out = applyMessage(host, { t: 'sync', log: mate, wantRematch: false });
+    expect(out.finished).toMatchObject({
+      iWon: true,
+      seatedUserId: 'u-rio',
+      whiteUserId: null,
+      blackUserId: null,
+      whiteName: 'Rio',
+      blackName: 'Kai',
+      opponent: 'Kai',
+    });
+  });
+
+  it('an online finish as Black still names the colours the right way round', () => {
+    const guest = { ...createOnlineSession('guest', 'ABCD', 'Kai'), seatedUserId: 'u-kai', oppName: 'Rio' };
+    const mate: Ply[] = [ply('f2', 'f3'), ply('e7', 'e5'), ply('g2', 'g4'), ply('d8', 'h4')];
+    const out = applyMessage(guest, { t: 'sync', log: mate, wantRematch: false });
+    expect(out.finished).toMatchObject({ iWon: true, seatedUserId: 'u-kai', whiteName: 'Rio', blackName: 'Kai' });
   });
 });
 

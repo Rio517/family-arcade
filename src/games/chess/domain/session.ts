@@ -42,6 +42,13 @@ export interface SessionState {
    * signed in when the game ends. Local (hotseat) sessions: null.
    */
   seatedUserId: string | null;
+  /**
+   * Same-device (hotseat) only: the tickets in the two chairs, captured when
+   * the game starts — null for a bot or an empty chair. Online sessions carry
+   * null here; the one ticket at this device is `seatedUserId`.
+   */
+  whiteUserId: string | null;
+  blackUserId: string | null;
   log: GameLog;
   /**
    * Optional custom starting position (a free-play setup promoted into a
@@ -71,6 +78,18 @@ export interface FinishInfo {
   code: string;
   /** The opponent's hello name ('' if it never arrived). */
   opponent: string;
+  /**
+   * Who to credit — captured when the game started, so the page never has to
+   * read the roster at finish time (a sign-in switch mid-game must not move
+   * the result). Online: the ticket at this device, chairs null. Same device:
+   * the two chairs' tickets (null for a bot or an empty chair), seat null.
+   */
+  seatedUserId: string | null;
+  whiteUserId: string | null;
+  blackUserId: string | null;
+  /** The names at the board by colour, as they were when the game started. */
+  whiteName: string;
+  blackName: string;
 }
 
 export interface Outcome {
@@ -91,15 +110,23 @@ function colorForSide(side: Side, hostSide: Color): Color {
   return side === 'host' ? hostSide : opposite(hostSide);
 }
 
-export function createLocalSession(whiteName: string, blackName: string, start?: GameState): SessionState {
+/** A chair at a same-device table: the name to show, and the ticket to credit (null for a bot or nobody). */
+export interface LocalPlayer {
+  name: string;
+  userId: string | null;
+}
+
+export function createLocalSession(white: LocalPlayer, black: LocalPlayer, start?: GameState): SessionState {
   return {
     mode: 'local',
     side: null,
     myColor: null,
     code: '',
-    myName: whiteName,
-    oppName: blackName,
+    myName: white.name,
+    oppName: black.name,
     seatedUserId: null,
+    whiteUserId: white.userId,
+    blackUserId: black.userId,
     log: [],
     start,
     epoch: 0,
@@ -126,6 +153,8 @@ export function createOnlineSession(
     myName,
     oppName: '',
     seatedUserId: null,
+    whiteUserId: null,
+    blackUserId: null,
     log: [],
     epoch: 0,
     iWantRematch: false,
@@ -182,7 +211,21 @@ function finishInfo(s: SessionState): FinishInfo | undefined {
   if (!isGameOver(st)) return undefined;
   const winner = winnerOf(boardState(s));
   const iWon = s.mode === 'online' && winner !== null ? winner === s.myColor : null;
-  return { status: st, winner, iWon, code: s.code, opponent: s.oppName };
+  // Local: I am White (chair one) and the opponent is Black. Online: the
+  // names follow the colour I was dealt.
+  const iAmBlack = s.myColor === 'b';
+  return {
+    status: st,
+    winner,
+    iWon,
+    code: s.code,
+    opponent: s.oppName,
+    seatedUserId: s.seatedUserId,
+    whiteUserId: s.whiteUserId,
+    blackUserId: s.blackUserId,
+    whiteName: iAmBlack ? s.oppName : s.myName,
+    blackName: iAmBlack ? s.myName : s.oppName,
+  };
 }
 
 // ── Transitions ────────────────────────────────────────────────────────────
