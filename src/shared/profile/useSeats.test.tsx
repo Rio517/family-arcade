@@ -40,6 +40,31 @@ describe('useSeats', () => {
     });
   });
 
+  it('a table that learns its size after mount still restores the remembered chairs', () => {
+    // Magic Coins asks "how many?" first, so the hook mounts at 1 chair.
+    setLineup('unicorn', [{ userId: 'u3' }, { userId: 'u1' }]);
+    const { result, rerender } = renderHook(({ count }) => useSeats('unicorn', count), {
+      initialProps: { count: 1 },
+    });
+    expect(result.current.seats).toEqual([{ kind: 'ticket', userId: 'u3' }]);
+    rerender({ count: 2 });
+    expect(result.current.seats).toEqual([{ kind: 'ticket', userId: 'u3' }, { kind: 'ticket', userId: 'u1' }]);
+  });
+
+  it('once chairs are chosen, a bigger table fills the new chairs from the lineup, never seating anyone twice', () => {
+    setLineup('risk', [{ userId: 'u3' }, { bot: 'vex' }, { userId: 'u1' }]);
+    const { result, rerender } = renderHook(({ count }) => useSeats('risk', count), {
+      initialProps: { count: 1 },
+    });
+    act(() => result.current.setSeats([{ kind: 'ticket', userId: 'u1' }]));
+    rerender({ count: 3 });
+    expect(result.current.seats).toEqual([
+      { kind: 'ticket', userId: 'u1' },
+      { kind: 'bot', botId: 'vex' },
+      EMPTY_SEAT, // u1 is already in chair one
+    ]);
+  });
+
   it('a bigger table keeps the chairs already chosen and adds empties', () => {
     const { result, rerender } = renderHook(({ count }) => useSeats('risk', count), {
       initialProps: { count: 2 },
