@@ -30,6 +30,7 @@ function state(owners: Record<string, [number, number]>, over: Partial<GameState
     territories[t] = { owner, armies };
   }
   return {
+    id: 'test-campaign',
     mapId: 'test',
     players: [
       { id: 0, name: 'Bot', color: '#f00', alive: true, bot: 'vex' },

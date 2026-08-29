@@ -46,6 +46,7 @@ function state(owners: Record<string, [number, number]>, over: Partial<GameState
     territories[t] = { owner, armies };
   }
   return {
+    id: 'test-campaign',
     mapId: 'test',
     players: [
       { id: 0, name: 'P0', color: '#f00', alive: true },
@@ -96,6 +97,13 @@ describe('newGame', () => {
     expect(g.players.map((p) => p.userId ?? null)).toEqual(['u1', null, null]);
     // The id rides along as its own field — it never leaks into the name.
     expect(g.players[0].name).toBe('Rio');
+  });
+
+  it('gives every campaign its own id, so one finished war is told from the next', () => {
+    const a = newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }]);
+    const b = newGame(MAP, [{ name: 'A', color: '#f00' }, { name: 'B', color: '#00f' }]);
+    expect(a.id).toMatch(/\S/);
+    expect(b.id).not.toBe(a.id);
   });
 });
 
