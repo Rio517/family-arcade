@@ -137,6 +137,29 @@
 }
 .uni-dot.now { transform: scale(1.35); }
 
+/* the table — the shared seat picker, re-lit for this candy setup screen.
+   The picker paints itself from the console's dark tokens; remapping them
+   here (rather than restyling every .spick-/.tstrip- class) keeps it in step
+   with the shared component while it sits on a pastel card. */
+.uni-seats {
+  --surface-2: rgba(255, 255, 255, 0.9);
+  --border: rgba(123, 63, 160, 0.3);
+  --text: #3a1d5c;
+  --muted: #7a6a9a;
+  --accent: #b0479c;
+  --gold: #b0479c;
+
+  max-width: 520px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.uni-seats .spick-row { box-shadow: 0 4px 12px rgba(123, 63, 160, 0.12); }
+.uni-seats .tstrip-chip { box-shadow: 0 3px 10px rgba(123, 63, 160, 0.14); }
+.uni-seats .tlist-field { font-family: inherit; }
+
+.uni-seats-next { display: block; margin: 24px auto 0; }
+
 /* ---------- play stage ---------- */
 
 .uni-stage { max-width: 1040px; margin: 0 auto; }
