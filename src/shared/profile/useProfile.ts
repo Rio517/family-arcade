@@ -16,9 +16,15 @@ import {
   type ResultInput,
 } from './profile';
 import { getProfileSnapshot, setProfileState, subscribeProfile } from './profileStore';
+import { activeUser } from './users';
+import { getUsersSnapshot, subscribeUsers } from './usersStore';
 
 export interface UseProfile {
   profile: Profile;
+  /** The signed-in ticket's id (null at the gate) — what a game session
+   * remembers about who sat down, so results can credit the right ticket
+   * without the game importing identity. */
+  userId: string | null;
   /** Pronouns are profile data a game may ask for (Caribbean's commission);
    * the *name* is identity and lives in useIdentity, which games can't import. */
   setPronouns: (pronouns: string) => void;
@@ -32,6 +38,7 @@ export function useProfile(): UseProfile {
   // bar, the game on screen) reflects the same identity, live. Persistence
   // happens inside the store on each change.
   const profile = useSyncExternalStore(subscribeProfile, getProfileSnapshot);
+  const userId = activeUser(useSyncExternalStore(subscribeUsers, getUsersSnapshot))?.id ?? null;
 
   const setPronouns = useCallback((pronouns: string) => {
     setProfileState(pureSetPronouns(getProfileSnapshot(), pronouns));
@@ -51,5 +58,5 @@ export function useProfile(): UseProfile {
     return false;
   }, []);
 
-  return { profile, setPronouns, recordResult, update };
+  return { profile, userId, setPronouns, recordResult, update };
 }
