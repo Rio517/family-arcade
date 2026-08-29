@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { resetLineupStore } from '@shared/profile/lineupStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import { ChessPage } from './ChessPage';
 
@@ -17,9 +18,13 @@ describe('<ChessPage> — local flow', () => {
   beforeEach(() => {
     localStorage.clear();
     // A game route always has somebody signed in (the PlayerGate sees to it),
-    // so every case here plays as Rio's ticket.
+    // so every case here plays as Rio's ticket — with Flora's ticket sitting
+    // on the same browser, ready to take the other chair.
     resetUsersStore();
-    setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
+    resetLineupStore();
+    setUsersState(
+      setActiveUser(addUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u2', 'Flora'), 'u1'),
+    );
   });
 
   it('offers a mode picker with both same-device and online options', () => {
@@ -55,26 +60,26 @@ describe('<ChessPage> — local flow', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-local'));
 
-    // Give the two players real names.
-    fireEvent.change(screen.getByTestId('white-name'), { target: { value: 'Alice' } });
-    fireEvent.change(screen.getByTestId('black-name'), { target: { value: 'Bob' } });
+    // Both chairs come from the roster: White already holds the signed-in
+    // ticket, and Flora takes Black with one tap.
+    fireEvent.click(screen.getByTestId('strip-user-u2'));
     fireEvent.click(screen.getByTestId('start-local'));
 
-    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Alice to move/);
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Rio to move/);
 
     // Nothing to undo before the first move.
     expect(screen.getByTestId('chess-undo')).toBeDisabled();
 
     fireEvent.click(screen.getByTestId('sq-e2'));
     fireEvent.click(screen.getByTestId('sq-e4'));
-    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Bob to move/);
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Flora to move/);
     expect(screen.getByTestId('sq-e4').querySelector('svg')).toBeTruthy();
 
-    // Undo restores the pawn and hands the turn back to Alice.
+    // Undo restores the pawn and hands the turn back to Rio.
     fireEvent.click(screen.getByTestId('chess-undo'));
     expect(screen.getByTestId('sq-e4').querySelector('svg')).toBeNull();
     expect(screen.getByTestId('sq-e2').querySelector('svg')).toBeTruthy();
-    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Alice to move/);
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Rio to move/);
     expect(screen.getByTestId('chess-undo')).toBeDisabled();
   });
 
@@ -214,8 +219,7 @@ describe('<ChessPage> — local flow', () => {
   it('autosaves a hotseat game and resumes it later — names, moves and all', () => {
     const first = renderPage();
     fireEvent.click(screen.getByTestId('mode-local'));
-    fireEvent.change(screen.getByTestId('white-name'), { target: { value: 'Alice' } });
-    fireEvent.change(screen.getByTestId('black-name'), { target: { value: 'Bob' } });
+    fireEvent.click(screen.getByTestId('strip-user-u2'));
     fireEvent.click(screen.getByTestId('start-local'));
     fireEvent.click(screen.getByTestId('sq-e2'));
     fireEvent.click(screen.getByTestId('sq-e4'));
@@ -224,14 +228,14 @@ describe('<ChessPage> — local flow', () => {
     // Back at the mode picker, the saved game is offered…
     renderPage();
     const card = screen.getByTestId('chess-resume-local');
-    expect(card).toHaveTextContent('Alice vs Bob');
+    expect(card).toHaveTextContent('Rio vs Flora');
     expect(card).toHaveTextContent(/1 move in/);
 
     // …and resuming restores the position and the turn.
     fireEvent.click(card);
     expect(screen.getByTestId('sq-e4').querySelector('svg')).toBeTruthy();
     expect(screen.getByTestId('sq-e2').querySelector('svg')).toBeNull();
-    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Bob to move/);
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Flora to move/);
   });
 
   it('deep-links straight into the saved hotseat game (?resume=local)', () => {
@@ -343,21 +347,63 @@ describe('<ChessPage> — local flow', () => {
     expect(screen.getByTestId('chess-join-code')).toBeInTheDocument();
   });
 
-  it('same-device chair names stay game-local — they never rename the signed-in player', () => {
+  it('same-device chairs come from the roster — seating someone signs nobody in', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-local'));
-    // White opens on the ticket name, and can be typed over for a guest.
-    expect((screen.getByTestId('white-name') as HTMLInputElement).value).toBe('Rio');
-    fireEvent.change(screen.getByTestId('white-name'), { target: { value: 'Flora' } });
-    expect((screen.getByTestId('white-name') as HTMLInputElement).value).toBe('Flora');
-    // Pass-and-play names are game-local — the roster must not gain "Flora".
-    expect(localStorage.getItem('arcade.users.v1') ?? '').not.toContain('Flora');
-    // Black is a plain box too — the chip rows are gone.
-    fireEvent.change(screen.getByTestId('black-name'), { target: { value: 'Klara' } });
-    expect((screen.getByTestId('black-name') as HTMLInputElement).value).toBe('Klara');
-    expect(screen.queryByTestId('white-chip-flora')).toBeNull();
-    expect(screen.queryByTestId('black-chip-rio')).toBeNull();
-    // And the same-device screen never claims a chair is "you".
+
+    // Chair one opens on the signed-in ticket; the other waits for a tap.
+    expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
+    expect(screen.getByTestId('seat-1')).toHaveTextContent(/tap a ticket/i);
+    // The old free-text boxes are gone, and the screen never announces a chair
+    // as "you" the way the online lobby does.
+    expect(screen.queryByTestId('white-name')).toBeNull();
+    expect(screen.queryByTestId('black-name')).toBeNull();
     expect(screen.queryByTestId('playing-as')).toBeNull();
+
+    // Flora takes the other chair from the ticket strip.
+    fireEvent.click(screen.getByTestId('strip-user-u2'));
+    expect(screen.getByTestId('seat-1')).toHaveTextContent('Flora');
+
+    fireEvent.click(screen.getByTestId('start-local'));
+    expect(screen.getByTestId('chess-board')).toBeInTheDocument();
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Rio to move/);
+
+    // Sitting down at a chair is not signing in: Rio still holds the device,
+    // and nobody was renamed.
+    const roster = JSON.parse(localStorage.getItem('arcade.users.v1') ?? '{}');
+    expect(roster.activeId).toBe('u1');
+    expect(roster.users.map((u: { profile: { name: string } }) => u.profile.name)).toEqual([
+      'Rio',
+      'Flora',
+    ]);
+  });
+
+  it('swaps the sides at the table', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.click(screen.getByTestId('strip-user-u2'));
+    expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
+
+    // One tap trades the chairs — no clearing both and re-seating.
+    fireEvent.click(screen.getByTestId('chess-swap-sides'));
+    expect(screen.getByTestId('seat-0')).toHaveTextContent('Flora');
+    expect(screen.getByTestId('seat-1')).toHaveTextContent('Rio');
+
+    fireEvent.click(screen.getByTestId('start-local'));
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Flora to move/);
+  });
+
+  it('next visit opens with the same chairs', () => {
+    const first = renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.click(screen.getByTestId('strip-user-u2'));
+    fireEvent.click(screen.getByTestId('start-local'));
+    first.unmount();
+
+    // Same browser, next visit: the lineup the game started with is remembered.
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
+    expect(screen.getByTestId('seat-1')).toHaveTextContent('Flora');
   });
 });

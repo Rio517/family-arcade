@@ -562,3 +562,11 @@ body:has(.chess-immersive) .party-root {
   58% { opacity: 0.7; width: 128px; }
   100% { opacity: 0.6; width: 122px; }
 }
+
+/* Same-device setup: "Swap sides" is a small trade between the two chairs, not
+   a third full-width action competing with Start game and Back. */
+.chess-swap-btn {
+  justify-self: center;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px;
+}
