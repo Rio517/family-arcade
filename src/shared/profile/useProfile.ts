@@ -5,16 +5,12 @@
  *
  * It exposes generic profile actions plus an escape hatch, `update`, so a game
  * can apply its own profile transitions (e.g. buying a skin) without this hook
- * needing to know about that game.
+ * needing to know about that game. Results are not recorded here: they land on
+ * the ticket that sat down, through `recordResultFor` in `./results`.
  */
 
 import { useCallback, useSyncExternalStore } from 'react';
-import {
-  recordResult as pureRecordResult,
-  setPronouns as pureSetPronouns,
-  type Profile,
-  type ResultInput,
-} from './profile';
+import { setPronouns as pureSetPronouns, type Profile } from './profile';
 import { getProfileSnapshot, setProfileState, subscribeProfile } from './profileStore';
 import { activeUser } from './users';
 import { getUsersSnapshot, subscribeUsers } from './usersStore';
@@ -28,7 +24,6 @@ export interface UseProfile {
   /** Pronouns are profile data a game may ask for (Caribbean's commission);
    * the *name* is identity and lives in useIdentity, which games can't import. */
   setPronouns: (pronouns: string) => void;
-  recordResult: (input: ResultInput) => void;
   /** Apply any pure profile transition; returns whether it changed anything. */
   update: (fn: (p: Profile) => Profile | null) => boolean;
 }
@@ -44,10 +39,6 @@ export function useProfile(): UseProfile {
     setProfileState(pureSetPronouns(getProfileSnapshot(), pronouns));
   }, []);
 
-  const recordResult = useCallback((input: ResultInput) => {
-    setProfileState(pureRecordResult(getProfileSnapshot(), input));
-  }, []);
-
   const update = useCallback((fn: (p: Profile) => Profile | null): boolean => {
     const prev = getProfileSnapshot();
     const next = fn(prev);
@@ -58,5 +49,5 @@ export function useProfile(): UseProfile {
     return false;
   }, []);
 
-  return { profile, userId, setPronouns, recordResult, update };
+  return { profile, userId, setPronouns, update };
 }
