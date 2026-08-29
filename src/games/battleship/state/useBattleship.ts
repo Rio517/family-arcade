@@ -67,8 +67,11 @@ export interface UseBattleshipResult {
    * is always the hook's `name` option — the ticket, never a lobby field.
    */
   startTable: (opts: { role: 'host' | 'guest'; code: string; seatedUserId: string | null }) => void;
-  /** Start a game against a computer captain (ADR 0009). */
-  startSoloGame: (personaId: string) => void;
+  /**
+   * Start a game against a computer captain (ADR 0009). The ticket sits down
+   * here just as at an online table, so a solo win is history like any other.
+   */
+  startSoloGame: (personaId: string, seatedUserId: string | null) => void;
   resumeGame: (code: string) => void;
   chooseSkin: (skinId: string) => void;
   confirmSkin: () => void;
@@ -225,10 +228,10 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     [ensureConn, restoreOnline, setSessionState],
   );
 
-  const startSoloGame = useCallback((personaId: string) => {
+  const startSoloGame = useCallback((personaId: string, seatedUserId: string | null) => {
     const conn = makeLoopback(personaId);
     const { name, skinId } = identityRef.current;
-    setSessionState(Session.createSession('host', 'SOLO', name, skinId));
+    setSessionState(Session.createSession('host', 'SOLO', name, skinId, seatedUserId));
     conn.host('SOLO');
   }, [makeLoopback, setSessionState]);
 

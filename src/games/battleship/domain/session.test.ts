@@ -197,6 +197,20 @@ describe('finish detection', () => {
     expect(out.finished).toBeDefined();
     expect(out.finished?.won).toBe(false); // host sank everything; I'm the guest
   });
+
+  it('carries the seat, so the page credits the ticket that sat down — never whoever is signed in at the end', () => {
+    const seated: SessionState = {
+      ...createSession('guest', 'CODE', 'Kid', 'aqua', 'u-kid'),
+      myFleet: autoPlace(seededRng(2)),
+      log: [{ type: 'start', first: 'host' }],
+    };
+    expect(applyMessage(seated, { t: 'sync', log: overLog, ready: true }).finished?.seatedUserId).toBe('u-kid');
+  });
+
+  it('reports no seat for a captain without a ticket (an old save), so nothing gets credited', () => {
+    const unseated: SessionState = { ...newSession('guest'), myFleet: autoPlace(seededRng(2)), log: [{ type: 'start', first: 'host' }] };
+    expect(applyMessage(unseated, { t: 'sync', log: overLog, ready: true }).finished?.seatedUserId).toBeNull();
+  });
 });
 
 describe('fire lock (pendingFire)', () => {

@@ -1,10 +1,12 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { getUsersSnapshot, resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import { loadSession, saveSession } from '@games/battleship/storage/sessionStore';
-import type { Fleet, GameLog } from '@games/battleship/domain/types';
+import { shipCells } from '@games/battleship/domain/board';
+import { resolveShot } from '@games/battleship/domain/engine';
+import type { Coord, Fleet, GameLog } from '@games/battleship/domain/types';
 import type { PartyValue } from '@shared/party/PartyContext';
 import { fakeParty, fakePartyWithKai } from '@shared/party/testing';
 
@@ -342,6 +344,119 @@ describe('solo games never ask you to invite anyone', () => {
       expect(app.queryByText(/Waiting for opponent to join/)).toBeNull();
       expect(app.queryByTestId('share-chip')).toBeNull();
     });
+  });
+
+  it('seats the signed-in ticket, so the win has somebody to land on', () => {
+    const app = within(renderApp().container);
+    fireEvent.click(app.getByTestId('solo-game'));
+    fireEvent.click(app.getByTestId('captain-grimtide'));
+    expect(loadSession('SOLO')?.seatedUserId).toBe('u1');
+  });
+});
+
+/**
+ * A battle one shot from victory: the host has hit every cell of the captain's
+ * fleet but the last, and the captain answered each shot with a miss into open
+ * water (rows 7 and 9 are empty in FLEET). Built with the engine's own shot
+ * resolver so every hit carries the right `sunk` flag.
+ */
+function nearWinLog(botFleet: Fleet): { log: GameLog; last: Coord } {
+  const cells = botFleet.flatMap((p) => shipCells(p));
+  const last = cells[cells.length - 1];
+  const log: GameLog = [{ type: 'start', first: 'host' }];
+  const prior: Coord[] = [];
+  cells.slice(0, -1).forEach((c, i) => {
+    log.push(resolveShot(botFleet, prior, c, 'host'));
+    prior.push(c);
+    log.push({ type: 'shot', by: 'guest', row: i < 10 ? 9 : 7, col: i % 10, hit: false, sunk: null, allSunk: false });
+  });
+  return { log, last };
+}
+
+/** A solo save one shot from victory, seated under `seatedUserId`. Returns the winning cell. */
+function seedNearWinSolo(seatedUserId: string | null): Coord {
+  const { log, last } = nearWinLog(FLEET);
+  saveSession({
+    code: 'SOLO',
+    side: 'host',
+    myName: 'Kai',
+    mySkinId: 'aqua',
+    seatedUserId,
+    oppName: 'Admiral Grimtide',
+    oppSkinId: 'void',
+    myFleet: FLEET,
+    myReady: true,
+    oppReady: true,
+    log,
+    epoch: 0,
+    solo: { personaId: 'grimtide', botFleet: FLEET, botReady: true },
+    finished: false,
+    updatedAt: 1,
+  });
+  return last;
+}
+
+/** Every ticket's history, by id. */
+function historyById() {
+  return Object.fromEntries(getUsersSnapshot().users.map((u) => [u.id, u.profile.history]));
+}
+
+/**
+ * Resume the seeded solo game from the lobby's card and fire the winning shot.
+ * Waits for the captain to be on the line first — a fire sent before the
+ * loopback has built its session is dropped on the floor.
+ */
+async function resumeAndWin(app: ReturnType<typeof within>, last: Coord) {
+  fireEvent.click(app.getByTestId('resume-game'));
+  await waitFor(() => expect(app.getAllByText(/Connected/i).length).toBeGreaterThan(0));
+  fireEvent.click(app.getByTestId(`cell-enemy-${last.row}-${last.col}`));
+  await app.findByText('You Win!', {}, { timeout: 4000 });
+}
+
+describe('the result lands on the ticket that sat down', () => {
+  beforeEach(() => {
+    // Two tickets on this device; Kai is signed in when the game is picked up.
+    setUsersState(setActiveUser(addUser(addUser(emptyUsersState(), 'u-kai', 'Kai'), 'u-rio', 'Rio'), 'u-kai'));
+  });
+
+  it('a solo win credits the ticket that started the game', async () => {
+    const last = seedNearWinSolo('u-kai');
+    const app = within(renderApp().container);
+
+    await resumeAndWin(app, last);
+
+    const rows = historyById();
+    expect(rows['u-kai']).toHaveLength(1);
+    expect(rows['u-kai'][0]).toMatchObject({ game: 'battleship', result: 'win', opponent: 'Admiral Grimtide', code: 'SOLO' });
+    expect(rows['u-rio']).toEqual([]);
+  });
+
+  it('even when a different ticket is signed in by the time the game ends', async () => {
+    const last = seedNearWinSolo('u-kai');
+    const app = within(renderApp().container);
+    fireEvent.click(app.getByTestId('resume-game'));
+
+    // Mid-game, the family taps Change: Rio is signed in when the last shot lands.
+    act(() => setUsersState(setActiveUser(getUsersSnapshot(), 'u-rio')));
+    await waitFor(() => expect(app.getAllByText(/Connected/i).length).toBeGreaterThan(0));
+    fireEvent.click(app.getByTestId(`cell-enemy-${last.row}-${last.col}`));
+    await app.findByText('You Win!', {}, { timeout: 4000 });
+
+    const rows = historyById();
+    expect(rows['u-kai']).toHaveLength(1);
+    expect(rows['u-kai'][0]).toMatchObject({ game: 'battleship', result: 'win' });
+    expect(rows['u-rio']).toEqual([]);
+  });
+
+  it('a save from before tickets took seats records nothing — for anybody', async () => {
+    const last = seedNearWinSolo(null);
+    const app = within(renderApp().container);
+
+    await resumeAndWin(app, last);
+
+    const rows = historyById();
+    expect(rows['u-kai']).toEqual([]);
+    expect(rows['u-rio']).toEqual([]);
   });
 });
 
