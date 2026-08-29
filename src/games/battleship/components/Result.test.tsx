@@ -77,6 +77,23 @@ describe('<Result>', () => {
     expect(container.querySelector('.result-emblem.win')).toBeNull();
   });
 
+  it('leaves out the running total when the ticket signed in is not the one that played', () => {
+    render(
+      <Result
+        won
+        pointsEarned={130}
+        myName="Kid"
+        oppName="Dad"
+        iWantRematch={false}
+        oppWantsRematch={false}
+        onRematch={vi.fn()}
+        onExit={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/\+130 points!/)).toBeInTheDocument();
+    expect(screen.queryByText(/You now have/)).toBeNull();
+  });
+
   it('fires rematch and exit callbacks', () => {
     const { onRematch, onExit } = renderResult();
     fireEvent.click(screen.getByTestId('rematch'));
