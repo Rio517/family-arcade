@@ -28,6 +28,7 @@ import {
   saveSession,
   sessionToStored,
   storedToSession,
+  type GameSession,
 } from '@games/battleship/storage/sessionStore';
 import type { Coord, Fleet, GameLog, Side } from '@games/battleship/domain/types';
 
@@ -193,15 +194,35 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
   }, []);
 
   // ── Actions ─────────────────────────────────────────────────────────────
+  // Sit back down in a saved online game and dial its table again from the
+  // saved side; the log reconciliation on reconnect brings both peers level.
+  const restoreOnline = useCallback((stored: GameSession) => {
+    const conn = ensureConn();
+    setSessionState(storedToSession(stored));
+    if (stored.side === 'host') conn.host(stored.code);
+    else conn.join(stored.code);
+  }, [ensureConn, setSessionState]);
+
   const startTable = useCallback(
     ({ role, code, seatedUserId }: { role: 'host' | 'guest'; code: string; seatedUserId: string | null }) => {
+      // A save under this code, on this side of the table, IS this game: a
+      // guest reloading mid-battle, whom the party seats again at once. Pick
+      // it back up rather than open a fresh session — the persist pass would
+      // write that fresh, empty fleet over the save, and every host shot
+      // would miss from then on. A solo save or a finished one is not this
+      // table; those start fresh.
+      const stored = loadSession(code);
+      if (stored && !stored.solo && !stored.finished && stored.side === role) {
+        restoreOnline(stored);
+        return;
+      }
       const conn = ensureConn();
       const { name, skinId } = identityRef.current;
       setSessionState(Session.createSession(role, code, name, skinId, seatedUserId));
       if (role === 'host') conn.host(code);
       else conn.join(code);
     },
-    [ensureConn, setSessionState],
+    [ensureConn, restoreOnline, setSessionState],
   );
 
   const startSoloGame = useCallback((personaId: string) => {
@@ -227,11 +248,8 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
       conn.host(stored.code);
       return;
     }
-    const conn = ensureConn();
-    setSessionState(restored);
-    if (stored.side === 'host') conn.host(stored.code);
-    else conn.join(stored.code);
-  }, [ensureConn, makeLoopback, setSessionState]);
+    restoreOnline(stored);
+  }, [makeLoopback, restoreOnline, setSessionState]);
 
   // Transitions that only mutate local state need the latest session via ref.
   const withSession = useCallback((fn: (s: SessionState) => SessionState) => {
@@ -270,12 +288,19 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     if (sent) setSessionState(state);
   }, [setSessionState]);
 
+  // Leave the table for good: the save goes, the link goes, and the captain
+  // is back in the lobby with a clean status — so a party guest hanging up a
+  // dead dial is standing at the door again, not stranded on a fleet screen.
   const leave = useCallback(() => {
     const s = sessionRef.current;
     if (s?.code) clearSession(s.code);
     connRef.current?.destroy();
     connRef.current = null;
     soloRef.current = null;
+    sessionRef.current = null;
+    setSession(null);
+    setStatus('idle');
+    setStatusDetail(undefined);
   }, []);
 
   // ── Derived view ─────────────────────────────────────────────────────────

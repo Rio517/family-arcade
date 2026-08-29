@@ -3,67 +3,27 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import type { PartyValue } from '@shared/party/PartyContext';
+import { fakeParty, fakePartyWithKai } from '@shared/party/testing';
 
 // A controllable useParty so each party state renders without a network.
-const mockParty = vi.hoisted(() => ({ value: null as any }));
+const mockParty = vi.hoisted(() => ({ value: null as unknown as PartyValue }));
 vi.mock('@shared/party/PartyContext', () => ({ useParty: () => mockParty.value }));
 
 import { Lobby } from './Lobby';
-
-function makeParty(over: Partial<PartyValue> = {}): PartyValue {
-  return {
-    myName: 'Rio',
-    status: 'idle',
-    code: '',
-    role: null,
-    inParty: false,
-    theirName: null,
-    hostParty: vi.fn(() => 'ABCD'),
-    joinParty: vi.fn(),
-    leaveParty: vi.fn(),
-    retry: vi.fn(),
-    reconnecting: false,
-    table: null,
-    knock: null,
-    openTable: vi.fn(() => 'WXYZ'),
-    closeTable: vi.fn(),
-    knockOn: vi.fn(),
-    clearKnock: vi.fn(),
-    resolveGame: () => null,
-    call: {
-      active: false,
-      status: 'idle',
-      muted: false,
-      cameraOn: false,
-      localStream: null,
-      remoteStream: null,
-      start: vi.fn(),
-      stop: vi.fn(),
-      toggleMute: vi.fn(),
-      toggleCamera: vi.fn(),
-    },
-    ...over,
-  } as PartyValue;
-}
-
-/** The party as seen from one side of it, already linked to the friend. */
-const inPartyAs = (role: 'host' | 'guest', over: Partial<PartyValue> = {}) =>
-  makeParty({ inParty: true, status: 'connected', role, code: 'PRTY', theirName: 'Kai', ...over });
 
 function setup(initialJoinCode?: string) {
   const onHost = vi.fn();
   const onJoin = vi.fn();
   const onSolo = vi.fn();
   const onHostTable = vi.fn();
-  const lobby = () => (
-    <Lobby onHost={onHost} onJoin={onJoin} onSolo={onSolo} onHostTable={onHostTable} initialJoinCode={initialJoinCode} />
+  render(
+    <Lobby onHost={onHost} onJoin={onJoin} onSolo={onSolo} onHostTable={onHostTable} initialJoinCode={initialJoinCode} />,
   );
-  const view = render(lobby());
-  return { onHost, onJoin, onSolo, onHostTable, rerender: () => view.rerender(lobby()) };
+  return { onHost, onJoin, onSolo, onHostTable };
 }
 
 beforeEach(() => {
-  mockParty.value = makeParty();
+  mockParty.value = fakeParty();
   localStorage.clear();
   resetUsersStore();
   // A ticket is the identity: Rio is signed in, so the lobby never asks.
@@ -126,7 +86,7 @@ describe('<Lobby> on your own', () => {
 
 describe('<Lobby> in a party', () => {
   it('as host: one tap opens the table for the friend — no codes to share', () => {
-    mockParty.value = inPartyAs('host');
+    mockParty.value = fakePartyWithKai('host');
     const { onHost, onHostTable } = setup();
 
     const play = screen.getByTestId('battle-party-play');
@@ -142,49 +102,21 @@ describe('<Lobby> in a party', () => {
     expect(onHost).not.toHaveBeenCalled();
   });
 
-  it('as guest: knocks once, waits, then joins the table the moment it opens', () => {
-    mockParty.value = inPartyAs('guest');
-    const { onJoin, rerender } = setup();
+  it('as guest: shows the waiting door — the knocking and the walking in are the page’s door', () => {
+    mockParty.value = fakePartyWithKai('guest');
+    const { onJoin } = setup();
 
-    expect(mockParty.value.knockOn).toHaveBeenCalledTimes(1);
-    expect(mockParty.value.knockOn).toHaveBeenCalledWith('battleship');
     expect(screen.getByTestId('battle-party-waiting')).toHaveTextContent('Waiting for Kai to open Ship Battle');
     expect(screen.queryByTestId('create-game')).toBeNull();
     expect(screen.queryByTestId('show-join')).toBeNull();
-    expect(onJoin).not.toHaveBeenCalled();
-
-    // A rerender with the same (absent) table knocks no second time.
-    rerender();
-    expect(mockParty.value.knockOn).toHaveBeenCalledTimes(1);
-
-    // The host opens Ship Battle: the party carries the code, the lobby joins.
-    mockParty.value = inPartyAs('guest', { knockOn: mockParty.value.knockOn, table: { game: 'battleship', code: 'QRST' } });
-    rerender();
-    expect(onJoin).toHaveBeenCalledTimes(1);
-    expect(onJoin).toHaveBeenCalledWith('QRST');
-
-    // Still the same table on the next render — no double join.
-    rerender();
-    expect(onJoin).toHaveBeenCalledTimes(1);
-  });
-
-  it('as guest: a table for another game is not ours — keep waiting, and knock', () => {
-    mockParty.value = inPartyAs('guest', { table: { game: 'chess', code: 'CHSS' } });
-    const { onJoin } = setup();
-    expect(mockParty.value.knockOn).toHaveBeenCalledWith('battleship');
-    expect(screen.getByTestId('battle-party-waiting')).toBeInTheDocument();
-    expect(onJoin).not.toHaveBeenCalled();
-  });
-
-  it('as guest: a Ship Battle table already open joins straight away without knocking', () => {
-    mockParty.value = inPartyAs('guest', { table: { game: 'battleship', code: 'QRST' } });
-    const { onJoin } = setup();
+    expect(screen.getByTestId('solo-game')).toBeInTheDocument();
+    // The lobby only shows the door; usePartyDoor on the page knocks and seats.
     expect(mockParty.value.knockOn).not.toHaveBeenCalled();
-    expect(onJoin).toHaveBeenCalledWith('QRST');
+    expect(onJoin).not.toHaveBeenCalled();
   });
 
   it('while reconnecting: says so and hides the code doors', () => {
-    mockParty.value = makeParty({ reconnecting: true });
+    mockParty.value = fakeParty({ reconnecting: true });
     setup();
     expect(screen.getByTestId('battle-party-reconnecting')).toHaveTextContent('Reconnecting to your party');
     expect(screen.queryByTestId('create-game')).toBeNull();

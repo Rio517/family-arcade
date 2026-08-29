@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { normalizeCode } from '@shared/net/peer';
 import { useParty } from '@shared/party/PartyContext';
 import { PlayingAs } from '@shared/profile/PlayingAs';
@@ -19,7 +19,8 @@ const RUNG_WORDS: Record<number, string> = {
 interface LobbyProps {
   /** Create a game on your own: the page draws the code and seats the ticket. */
   onHost: () => void;
-  /** Join a game by code — typed in, from a shared link, or handed over by the party. */
+  /** Join a game by code — typed in or from a shared link. (A code the party
+   * hands over goes through the page's door, never through here.) */
   onJoin: (code: string) => void;
   /** Start a game against a computer captain (ADR 0009). */
   onSolo: (personaId: string) => void;
@@ -33,7 +34,8 @@ interface LobbyProps {
  * Entry screen: create a game, join by code, or battle a computer captain.
  * Nobody is asked for a name — the signed-in ticket is the captain. In a party
  * the code doors close: the party is the table (the host opens it with one
- * tap, the guest walks in the moment it opens), and only the solo door stays.
+ * tap; the guest sees the waiting door here while the page's `usePartyDoor`
+ * knocks and walks them in the moment it opens), and only the solo door stays.
  */
 export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode }: LobbyProps) {
   const party = useParty();
@@ -45,26 +47,6 @@ export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode }: 
   const partyGuest = party.inParty && party.role === 'guest';
   // While the party is (re)linking or linked, codes are its business, not the player's.
   const partyBusy = party.reconnecting || party.inParty;
-  const ourTable = party.table?.game === GAME_ID ? party.table.code : null;
-
-  // The guest at the door: knock once so the host's pill lights up, then walk
-  // in the moment the party says a Ship Battle table is open — once per code,
-  // however many times the party value re-renders.
-  const knockedRef = useRef(false);
-  const joinedCodeRef = useRef<string | null>(null);
-  const { knockOn } = party;
-  useEffect(() => {
-    if (!partyGuest) return;
-    if (ourTable) {
-      if (joinedCodeRef.current === ourTable) return;
-      joinedCodeRef.current = ourTable;
-      onJoin(ourTable);
-      return;
-    }
-    if (knockedRef.current) return;
-    knockedRef.current = true;
-    knockOn(GAME_ID);
-  }, [partyGuest, ourTable, onJoin, knockOn]);
 
   return (
     <div className="stack">

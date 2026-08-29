@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { loadSession } from '@games/battleship/storage/sessionStore';
+import { loadSession, saveSession, type GameSession } from '@games/battleship/storage/sessionStore';
+import type { Fleet, GameLog } from '@games/battleship/domain/types';
 
 /**
  * The hook's seam with the page: how a table starts. The session state
@@ -34,6 +35,43 @@ import { useBattleship } from './useBattleship';
 /** Mount the hook for a signed-in captain; the name comes from the ticket, never from the lobby. */
 function mount(name = 'Rio') {
   return renderHook(() => useBattleship({ name, skinId: 'aqua', onFinish: vi.fn() }));
+}
+
+/** A legal, hand-placed fleet: five ships on even rows, all pointing east. */
+const FLEET: Fleet = [
+  { shipId: 'carrier', row: 0, col: 0, orientation: 'H' },
+  { shipId: 'battleship', row: 2, col: 0, orientation: 'H' },
+  { shipId: 'cruiser', row: 4, col: 0, orientation: 'H' },
+  { shipId: 'submarine', row: 6, col: 0, orientation: 'H' },
+  { shipId: 'destroyer', row: 8, col: 0, orientation: 'H' },
+];
+
+/** A battle two shots in: the host opened fire and missed, the guest answered in kind. */
+const MID_BATTLE: GameLog = [
+  { type: 'start', first: 'host' },
+  { type: 'shot', by: 'host', row: 9, col: 9, hit: false, sunk: null, allSunk: false },
+  { type: 'shot', by: 'guest', row: 9, col: 9, hit: false, sunk: null, allSunk: false },
+];
+
+/** Write the save a reload would find: Kai mid-battle under `code`, on `side`. */
+function seedSave(side: 'host' | 'guest', code: string, over: Partial<GameSession> = {}) {
+  saveSession({
+    code,
+    side,
+    myName: 'Kai',
+    mySkinId: 'aqua',
+    seatedUserId: 'u-kai',
+    oppName: 'Rio',
+    oppSkinId: 'aqua',
+    myFleet: FLEET,
+    myReady: true,
+    oppReady: true,
+    log: MID_BATTLE,
+    epoch: 0,
+    finished: false,
+    updatedAt: 1,
+    ...over,
+  });
 }
 
 beforeEach(() => {
@@ -86,5 +124,65 @@ describe('useBattleship.startSoloGame', () => {
     expect(result.current.side).toBe('host');
     expect(result.current.myName).toBe('Klara');
     expect(wire.host).toEqual([]); // the loopback captain, never the network
+  });
+});
+
+/**
+ * A guest who reloads mid-battle is seated again by the party under the same
+ * code — that must pick the saved game back up, not open a fresh one whose
+ * empty fleet the persist pass would write over the save (every host shot a
+ * miss from then on).
+ */
+describe('useBattleship.startTable picks a saved game back up', () => {
+  it('as guest under the same code: keeps the fleet and the shots, and dials the table again', () => {
+    seedSave('guest', 'QRST');
+    const { result } = mount('Kai');
+    act(() => result.current.startTable({ role: 'guest', code: 'QRST', seatedUserId: 'u-kai' }));
+
+    expect(result.current.phase).toBe('battle');
+    expect(result.current.side).toBe('guest');
+    expect(result.current.code).toBe('QRST');
+    expect(result.current.myFleet).toEqual(FLEET);
+    expect(result.current.log).toEqual(MID_BATTLE);
+    expect(wire.join).toEqual(['QRST']);
+    expect(wire.host).toEqual([]);
+    // The save survives the persist pass — a reload never blanks a fleet.
+    expect(loadSession('QRST')?.myFleet).toEqual(FLEET);
+    expect(loadSession('QRST')?.log).toEqual(MID_BATTLE);
+  });
+
+  it('but not a save from the other side of the table', () => {
+    seedSave('host', 'QRST');
+    const { result } = mount('Kai');
+    act(() => result.current.startTable({ role: 'guest', code: 'QRST', seatedUserId: 'u-kai' }));
+
+    expect(result.current.phase).toBe('fleet');
+    expect(result.current.side).toBe('guest');
+    expect(result.current.myFleet).toEqual([]);
+    expect(result.current.log).toEqual([]);
+    expect(wire.join).toEqual(['QRST']);
+  });
+
+  it('nor a finished one — that table is done, sit down fresh', () => {
+    seedSave('guest', 'QRST', { finished: true });
+    const { result } = mount('Kai');
+    act(() => result.current.startTable({ role: 'guest', code: 'QRST', seatedUserId: 'u-kai' }));
+
+    expect(result.current.phase).toBe('fleet');
+    expect(result.current.log).toEqual([]);
+  });
+});
+
+describe('useBattleship.leave', () => {
+  it('drops the save and the seat, so the captain is back in the lobby', () => {
+    const { result } = mount('Kai');
+    act(() => result.current.startTable({ role: 'guest', code: 'WXYZ', seatedUserId: 'u-kai' }));
+    expect(result.current.phase).toBe('fleet');
+
+    act(() => result.current.leave());
+    expect(result.current.phase).toBe('lobby');
+    expect(result.current.side).toBeNull();
+    expect(result.current.code).toBe('');
+    expect(loadSession('WXYZ')).toBeNull();
   });
 });
