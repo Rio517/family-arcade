@@ -1,13 +1,20 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
+import type { GameHistoryEntry } from '@shared/profile/profile';
 import { activeProfile } from '@shared/profile/users';
 import { getUsersSnapshot, resetUsersStore } from '@shared/profile/usersStore';
 import { PlayerBooth } from './PlayerBooth';
 
 const boothStyles = readFileSync('src/app/styles/app.css', 'utf8');
 
-function seedUsers(users: Array<{ id: string; name: string; pronouns?: string }>, activeId = users[0]?.id) {
+/** A fixed local noon, so "today"/"yest." never depend on when the suite runs. */
+const NOW = new Date(2026, 7, 29, 12, 0, 0).getTime();
+const HOUR = 3_600_000;
+
+type SeedUser = { id: string; name: string; pronouns?: string; history?: GameHistoryEntry[] };
+
+function seedUsers(users: SeedUser[], activeId = users[0]?.id) {
   localStorage.setItem('arcade.users.v1', JSON.stringify({
     users: users.map((user, index) => ({
       id: user.id,
@@ -20,7 +27,7 @@ function seedUsers(users: Array<{ id: string; name: string; pronouns?: string }>
         losses: 0,
         unlocked: [],
         lastSkinId: '',
-        history: [],
+        history: user.history ?? [],
       },
     })),
     activeId,
@@ -28,10 +35,26 @@ function seedUsers(users: Array<{ id: string; name: string; pronouns?: string }>
   resetUsersStore();
 }
 
+/** One finished game, ready to seed into a profile's history. */
+function played(entry: Partial<GameHistoryEntry> & { finishedAt: number }): GameHistoryEntry {
+  return {
+    code: 'AB12',
+    game: 'chess',
+    opponent: 'Morgan',
+    result: 'win',
+    pointsEarned: 100,
+    ...entry,
+  };
+}
+
 describe('<PlayerBooth>', () => {
   beforeEach(() => {
     localStorage.clear();
     resetUsersStore();
+  });
+
+  afterEach(() => {
+    delete window.__ARCADE_TEST_NOW__;
   });
 
   it('shows the normalized legacy pronouns on the active ticket', () => {
@@ -124,6 +147,37 @@ describe('<PlayerBooth>', () => {
     fireEvent.click(screen.getByTestId('booth-create'));
     expect(activeProfile(getUsersSnapshot())?.name).toBe('Nana');
     expect(screen.queryByTestId('booth-name')).not.toBeInTheDocument();
+  });
+
+  it('threads the history: when it happened, which game, and the ticket chip', () => {
+    // The booth samples arcadeNow() once per mount (shared/time/clock.ts), so
+    // pinning it here makes "today" / "yest." deterministic.
+    window.__ARCADE_TEST_NOW__ = () => NOW;
+    seedUsers([{
+      id: 'mario',
+      name: 'Mario',
+      history: [
+        played({ game: 'chess', opponent: 'Morgan', result: 'win', pointsEarned: 100, finishedAt: NOW - 2 * HOUR }),
+        // 26 hours back crosses exactly one midnight — the "yest." boundary.
+        played({ game: '', opponent: 'Nana', result: 'loss', pointsEarned: 25, finishedAt: NOW - 26 * HOUR }),
+      ],
+    }]);
+    render(<PlayerBooth />);
+
+    const rows = within(screen.getByTestId('booth-history')).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+
+    // Newest first: this morning's chess win, named from the registry (not 'chess').
+    expect(within(rows[0]).getByText('today')).toBeVisible();
+    expect(within(rows[0]).getByText('Chess')).toBeVisible();
+    expect(within(rows[0]).getByText('vs Morgan')).toBeVisible();
+    expect(within(rows[0]).getByText('WIN +100')).toBeVisible();
+
+    // Yesterday's loss, on a row saved before we recorded which game it was.
+    expect(within(rows[1]).getByText('yest.')).toBeVisible();
+    expect(within(rows[1]).getByText('Game')).toBeVisible();
+    expect(within(rows[1]).getByText('vs Nana')).toBeVisible();
+    expect(within(rows[1]).getByText('LOSS +25')).toBeVisible();
   });
 
   it('keeps the editor controls at 44px with an explicit keyboard-focus indicator', () => {

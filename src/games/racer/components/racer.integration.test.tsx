@@ -3,7 +3,7 @@ import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } f
 import { MemoryRouter } from 'react-router-dom';
 import { RacerPage } from './RacerPage';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
-import { addUser, emptyUsersState } from '@shared/profile/users';
+import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 
 /**
  * Two-player integration tests: real <RacerPage> clients wired together through
@@ -67,6 +67,38 @@ vi.mock('../domain/kart', async (importOriginal) => {
       { x: 0.5, z: 0, heading: 0 },
     ],
   };
+});
+
+/**
+ * Two devices, one jsdom. Unlike chess and battleship — which copy the ticket
+ * name into the session the moment you create or join — the racer reads its
+ * player live: `useRacerNet` re-reads `opts.name` on every render and sends it
+ * on channel open. Both channels open inside the guest's Connect click, so
+ * switching the one shared roster mid-flow cannot tell the two roots apart:
+ * the host's `hello` would go out carrying whoever was signed in by then
+ * (measured — it carried the guest's name).
+ *
+ * So the one thing a single browser cannot have — a different ticket signed in
+ * per device — is what this mock supplies: each <RacerPage> latches a roster id
+ * at mount and reads THAT ticket's profile out of the real store. The roster,
+ * the profile objects, and everything downstream (page → hello → the other
+ * player's screen) stay real.
+ */
+const tickets = vi.hoisted(() => ({ queue: [] as string[] }));
+vi.mock('@shared/profile/useProfile', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@shared/profile/useProfile')>();
+  const { useState } = await import('react');
+  const { getUsersSnapshot } = await import('@shared/profile/usersStore');
+  function useProfile() {
+    // The real hook still runs: same store subscription, same writers, so a
+    // roster change re-renders this client and the read below stays live.
+    const real = actual.useProfile();
+    const [id] = useState(() => tickets.queue.shift() ?? '');
+    if (!id) return real;
+    const mine = getUsersSnapshot().users.find((u) => u.id === id);
+    return mine ? { ...real, profile: mine.profile } : real;
+  }
+  return { ...actual, useProfile };
 });
 
 // Replace the PeerJS transport with an in-memory bus linking host and guest.
@@ -141,7 +173,9 @@ vi.mock('@shared/net/peer', async (importOriginal) => {
 /** Only characters the real generateCode can emit (no look-alikes O/0, I/1, L). */
 const CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4}$/;
 
-function renderClient() {
+/** Render one client; `ticket` is the roster id this simulated device plays as. */
+function renderClient(ticket = '') {
+  if (ticket) tickets.queue.push(ticket);
   const result: RenderResult = render(
     <MemoryRouter initialEntries={['/racer']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <RacerPage />
@@ -158,10 +192,21 @@ function toNetLobby(app: Client, driverId: string) {
   fireEvent.click(app.getByTestId(`racer-driver-${driverId}`));
 }
 
-/** Full two-client setup: host creates a game, guest joins with its code. */
+/**
+ * Two tickets on the roster and nobody signed in on the shared browser: each
+ * client signs itself in (see the useProfile mock), so the two sides are
+ * genuinely different players.
+ */
+function seedTwoTickets() {
+  const roster = addUser(addUser(emptyUsersState(), 'u-rio', 'Rio', 1), 'u-kai', 'Kai', 2);
+  setUsersState(setActiveUser(roster, null));
+}
+
+/** Full two-client setup: Rio hosts a game, Kai joins with its code. */
 function connectClients(): { host: Client; guest: Client; code: string } {
-  const host = renderClient();
-  const guest = renderClient();
+  seedTwoTickets();
+  const host = renderClient('u-rio');
+  const guest = renderClient('u-kai');
 
   toNetLobby(host, 'unicorn');
   fireEvent.click(host.getByTestId('racer-create'));
@@ -178,11 +223,12 @@ function connectClients(): { host: Client; guest: Client; code: string } {
 beforeEach(() => {
   cleanup();
   bus.reset();
+  tickets.queue.length = 0;
   localStorage.clear();
   resetUsersStore();
-  // Both simulated clients in these tests run in the same jsdom process, so
-  // they share the one signed-in ticket — same as two roles played from one
-  // signed-in browser. Every lobby now plays as this ticket's name.
+  // One ticket signed in on this browser — what a single-client test plays as.
+  // Two-client tests call connectClients, which puts a second ticket on the
+  // roster and hands one to each side.
   setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
 });
 
@@ -266,15 +312,15 @@ describe('two-player racer: handshake and race start', () => {
         const hellos = bus.wire.filter((w) => w.msg.t === 'hello');
         expect(hellos.map((h) => h.from).sort()).toEqual(['guest', 'host']);
       });
-      // Both simulated clients share one signed-in ticket in this jsdom
-      // process (see the top-level beforeEach), so both hellos carry that
-      // ticket's name — only the chosen driver tells them apart here.
+      // Each side introduces itself with ITS OWN ticket name — the host is Rio,
+      // the guest is Kai — so a hello that echoed the local player back, or one
+      // built from anything but the signed-in ticket, would show up here.
       expect(bus.wire.find((w) => w.from === 'host' && w.msg.t === 'hello')!.msg).toMatchObject({
         name: 'Rio',
         driver: 'unicorn',
       });
       expect(bus.wire.find((w) => w.from === 'guest' && w.msg.t === 'hello')!.msg).toMatchObject({
-        name: 'Rio',
+        name: 'Kai',
         driver: 'dragon',
       });
 
@@ -415,10 +461,13 @@ describe('two-player racer: reconnect re-sync', () => {
       // …without restarting the race (both hellos said inRace).
       expect(bus.wire.filter((w) => w.msg.t === 'go')).toHaveLength(1);
 
-      // The guest now learns the race ended and crowns the host by name.
+      // The guest now learns the race ended and crowns the host by name. The
+      // guest is playing as Kai, so "Rio" on this screen can only have come off
+      // the wire — the host's hello, carried into the race's name list.
       await pump(2);
       expect(guest.getByTestId('racer-win')).toBeInTheDocument();
       expect(guest.getByText('Rio wins!')).toBeInTheDocument();
+      expect(guest.queryByText('Kai wins!')).toBeNull();
     },
     20000,
   );
