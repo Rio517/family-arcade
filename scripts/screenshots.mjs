@@ -185,6 +185,17 @@ const SHOTS = [
     seed: 'signedOut',
   },
   {
+    // The party panel wears the signed-in ticket — "You're Klara · Change" —
+    // where a name box and five-name chips used to be.
+    name: 'party-panel',
+    path: '/',
+    viewport: PHONE,
+    prep: async (page) => {
+      await page.getByTestId('party-pill').click();
+      await page.getByTestId('playing-as').waitFor();
+    },
+  },
+  {
     // The arena with the artist-made bunny steed (coins land randomly, so the
     // pixels churn a little every regeneration — that's expected).
     name: 'racer-arena',
