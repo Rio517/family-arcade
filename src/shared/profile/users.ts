@@ -30,11 +30,16 @@ export function emptyUsersState(): UsersState {
 export function normalizeUsersState(raw: unknown): UsersState {
   if (typeof raw !== 'object' || raw === null) return emptyUsersState();
   const r = raw as Partial<UsersState>;
+  const seen = new Set<string>();
   const users: StoredUser[] = Array.isArray(r.users)
     ? r.users.flatMap((u) => {
         if (typeof u !== 'object' || u === null) return [];
         const su = u as Partial<StoredUser>;
         if (typeof su.id !== 'string' || !su.id) return [];
+        // One ticket per id — a duplicated row would take the same colour and
+        // receive every write meant for the first.
+        if (seen.has(su.id)) return [];
+        seen.add(su.id);
         return [
           {
             id: su.id,
@@ -73,7 +78,7 @@ export function migrateDeviceProfile(old: Profile | null, now: number): UsersSta
   const user: StoredUser = {
     id: 'player-legacy',
     createdAt: now,
-    profile: { ...old, name: old.name.trim() || 'Player 1' },
+    profile: { ...old, name: old.name.trim().slice(0, 20) || 'Player 1' },
   };
   return { users: [user], activeId: named ? user.id : null };
 }

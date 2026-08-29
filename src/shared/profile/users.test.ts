@@ -18,6 +18,27 @@ describe('normalizeUsersState', () => {
     expect(normalizeUsersState({ users: 'x', activeId: 3 })).toEqual(emptyUsersState());
   });
 
+  it('keeps one ticket per id and tolerates a non-numeric createdAt', () => {
+    const state = normalizeUsersState({
+      users: [
+        { id: 'a', createdAt: 'x', profile: { name: 'Rio' } },
+        { id: 'a', createdAt: 2, profile: { name: 'Rio again' } },
+      ],
+      activeId: 'a',
+    });
+    expect(state.users).toHaveLength(1);
+    expect(state.users[0]).toMatchObject({ createdAt: 0, profile: { name: 'Rio' } });
+    expect(state.activeId).toBe('a');
+  });
+
+  it('caps a stored name at 20 characters like setName does', () => {
+    const state = normalizeUsersState({
+      users: [{ id: 'a', createdAt: 1, profile: { name: '  Bartholomew Fitzgerald III  ' } }],
+      activeId: null,
+    });
+    expect(state.users[0].profile.name).toBe('Bartholomew Fitzgera');
+  });
+
   it('drops malformed users and clears an activeId that matches nobody', () => {
     const state = normalizeUsersState({
       users: [{ id: 'a', createdAt: 5, profile: { name: 'Rio' } }, { nope: true }, null],
@@ -85,6 +106,11 @@ describe('roster transitions', () => {
     expect(activeProfile(state)?.name).toBe('Rio');
     expect(setActiveUser(state, 'ghost')).toBe(state);
     expect(setActiveUser(state, null).activeId).toBeNull();
+  });
+
+  it('addUser trims and caps the name at 20 characters', () => {
+    const state = addUser(emptyUsersState(), 'u1', '  Bartholomew Fitzgerald III  ', 1);
+    expect(state.users[0].profile.name).toBe('Bartholomew Fitzgera');
   });
 
   it('updateActiveProfile touches only the signed-in player', () => {

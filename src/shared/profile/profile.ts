@@ -147,7 +147,8 @@ export function normalizeProfile(raw: unknown): Profile {
     ? r.unlocked.filter((x) => typeof x === 'string')
     : base.unlocked;
   return {
-    name: typeof r.name === 'string' ? r.name : base.name,
+    // Same cap as setName — a hand-edited or pre-cap save can't widen a stub.
+    name: typeof r.name === 'string' ? r.name.trim().slice(0, 20) : base.name,
     pronouns: normalizePronouns(r.pronouns),
     points: Number.isFinite(r.points) ? (r.points as number) : base.points,
     wins: Number.isFinite(r.wins) ? (r.wins as number) : base.wins,
