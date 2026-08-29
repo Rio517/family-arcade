@@ -140,6 +140,18 @@ describe('session <-> stored mapping', () => {
     expect(storedToSession(legacy as GameSession).epoch).toBe(0);
   });
 
+  it('round-trips the seated ticket id', () => {
+    const live = createSession('guest', 'ABCD', 'Kid', 'ember', 'u-kid');
+    const stored = sessionToStored(live, 123);
+    expect(stored.seatedUserId).toBe('u-kid');
+    expect(storedToSession(stored).seatedUserId).toBe('u-kid');
+  });
+
+  it('seats nobody when restoring a blob written before tickets sat down', () => {
+    // sampleSession() has no seatedUserId at all — the pre-ticket shape.
+    expect(storedToSession(sampleSession()).seatedUserId).toBeNull();
+  });
+
   it('derives the setup phase from readiness and clears volatile flags', () => {
     const notReady = storedToSession(sessionToStored({ ...createSession('host', 'C', 'N', 'aqua') }, 1));
     expect(notReady.setupPhase).toBe('placing');

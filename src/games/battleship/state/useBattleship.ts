@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GameConnection, generateCode, type ConnStatus } from '@shared/net/peer';
+import { GameConnection, type ConnStatus } from '@shared/net/peer';
 import { isMessage, type Message } from '@games/battleship/domain/protocol';
 import { LoopbackConnection } from './loopback';
 import * as Session from '@games/battleship/domain/session';
@@ -44,6 +44,8 @@ export interface UseBattleshipResult {
   statusDetail: string | undefined;
   myName: string;
   mySkinId: string;
+  /** The ticket that sat down at this table (null: no ticket, or the lobby). */
+  seatedUserId: string | null;
   myFleet: Fleet;
   myReady: boolean;
   oppName: string | null;
@@ -57,10 +59,15 @@ export interface UseBattleshipResult {
   pendingFire: Coord | null;
   winnerSide: Side | null;
   // actions
-  hostGame: (name: string) => void;
-  joinGame: (code: string, name: string) => void;
+  /**
+   * Sit down at an online table: host it under `code` or join it by `code`.
+   * The page owns the code (it comes from the party's table, a shared link, or
+   * a fresh draw) and says which ticket is sitting down; the captain's name
+   * is always the hook's `name` option — the ticket, never a lobby field.
+   */
+  startTable: (opts: { role: 'host' | 'guest'; code: string; seatedUserId: string | null }) => void;
   /** Start a game against a computer captain (ADR 0009). */
-  startSoloGame: (personaId: string, name: string) => void;
+  startSoloGame: (personaId: string) => void;
   resumeGame: (code: string) => void;
   chooseSkin: (skinId: string) => void;
   confirmSkin: () => void;
@@ -186,22 +193,21 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
   }, []);
 
   // ── Actions ─────────────────────────────────────────────────────────────
-  const hostGame = useCallback((name: string) => {
-    const code = generateCode();
-    const conn = ensureConn();
-    setSessionState(Session.createSession('host', code, name.trim() || 'Captain', identityRef.current.skinId));
-    conn.host(code);
-  }, [ensureConn, setSessionState]);
+  const startTable = useCallback(
+    ({ role, code, seatedUserId }: { role: 'host' | 'guest'; code: string; seatedUserId: string | null }) => {
+      const conn = ensureConn();
+      const { name, skinId } = identityRef.current;
+      setSessionState(Session.createSession(role, code, name, skinId, seatedUserId));
+      if (role === 'host') conn.host(code);
+      else conn.join(code);
+    },
+    [ensureConn, setSessionState],
+  );
 
-  const joinGame = useCallback((code: string, name: string) => {
-    const conn = ensureConn();
-    setSessionState(Session.createSession('guest', code, name.trim() || 'Captain', identityRef.current.skinId));
-    conn.join(code);
-  }, [ensureConn, setSessionState]);
-
-  const startSoloGame = useCallback((personaId: string, name: string) => {
+  const startSoloGame = useCallback((personaId: string) => {
     const conn = makeLoopback(personaId);
-    setSessionState(Session.createSession('host', 'SOLO', name.trim() || 'Captain', identityRef.current.skinId));
+    const { name, skinId } = identityRef.current;
+    setSessionState(Session.createSession('host', 'SOLO', name, skinId));
     conn.host('SOLO');
   }, [makeLoopback, setSessionState]);
 
@@ -282,6 +288,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     statusDetail,
     myName: s?.myName ?? opts.name,
     mySkinId: s?.mySkinId ?? opts.skinId,
+    seatedUserId: s?.seatedUserId ?? null,
     myFleet: s?.myFleet ?? [],
     myReady: s?.myReady ?? false,
     oppName: s?.oppName ?? null,
@@ -294,8 +301,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     myTurn: s ? Session.isMyTurn(s) : false,
     pendingFire: s?.pendingFire ?? null,
     winnerSide: s ? Session.winnerSide(s) : null,
-    hostGame,
-    joinGame,
+    startTable,
     startSoloGame,
     resumeGame,
     chooseSkin,

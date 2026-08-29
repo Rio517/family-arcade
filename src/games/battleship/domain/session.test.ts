@@ -32,6 +32,15 @@ function mkShot(by: Side, row: number, col: number, hit = false): ShotEvent {
 
 // ── Unit transitions ─────────────────────────────────────────────────────────
 
+describe('createSession', () => {
+  it('remembers which ticket sat down, so the result can credit the right player', () => {
+    expect(createSession('host', 'CODE', 'Rio', 'aqua', 'u-rio').seatedUserId).toBe('u-rio');
+  });
+  it('seats nobody by default (a captain with no ticket, e.g. an old save)', () => {
+    expect(newSession('guest').seatedUserId).toBeNull();
+  });
+});
+
 describe('setup transitions', () => {
   it('starts in the fleet phase', () => {
     expect(phase(newSession('host'))).toBe('fleet');
