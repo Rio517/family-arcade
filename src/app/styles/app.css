@@ -347,6 +347,14 @@
   margin-top: 4px;
   line-height: 1.45;
 }
+/* "One player per device" — the fact the family gets wrong about Ship Battle. */
+.tk-devices {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--teal);
+}
 .tk-status {
   width: fit-content;
   margin-top: 8px;

@@ -39,6 +39,18 @@ describe('<Menu> — the arcade landing page', () => {
     expect(document.querySelector('.game-yahtzee [aria-label="For 1 player"]')).not.toBeNull();
   });
 
+  it('says "one player per device" exactly where the chairs are fewer than the players', () => {
+    renderMenu();
+    for (const game of GAMES) {
+      const ticket = document.querySelector(`.game-${game.id}`)!;
+      const hint = ticket.querySelector('.tk-devices');
+      if (game.seats.max < game.players.max) expect(hint, game.id).not.toBeNull();
+      else expect(hint, game.id).toBeNull();
+    }
+    // Ship Battle is the one the family gets wrong: two players, one per iPad.
+    expect(document.querySelector('.game-battleship .tk-devices')).not.toBeNull();
+  });
+
   it('games with computer opponents wear the little robot, with a tooltip', () => {
     renderMenu();
     for (const id of ['risk', 'battleship']) {
