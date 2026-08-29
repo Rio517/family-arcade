@@ -39,8 +39,13 @@ export default defineConfig({
         // .glb belongs here: ship meshes are bundled assets, and without them
         // in the precache the app would fetch a model at runtime the first
         // time someone opens the 3D board — which is exactly the offline
-        // invariant this project doesn't break.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,glb,webp}'],
+        // invariant this project doesn't break. .wasm/.task are the camera
+        // effects' tracker runtime + models (ADR 0010) — same rule.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,glb,webp,wasm,task}'],
+        // Workbox silently skips files over 2 MiB by default, which would
+        // quietly drop the ~11 MB tracker WASM from the precache and break
+        // offline effects. Sized to fit the largest bundled asset.
+        maximumFileSizeToCacheInBytes: 13 * 1024 * 1024,
         navigateFallbackDenylist: [/calculator\.html$/],
       },
       manifest: {
@@ -91,6 +96,7 @@ export default defineConfig({
               new URL('./preview-caribbean-game.html', import.meta.url),
             ),
             'preview-lobbies': fileURLToPath(new URL('./preview-lobbies.html', import.meta.url)),
+            'preview-mirror': fileURLToPath(new URL('./preview-mirror.html', import.meta.url)),
           },
         }
       : {},

@@ -270,6 +270,7 @@
 .tk.game-unicorn { --c: var(--pink); } /* Magic Coins */
 .tk.game-caribbean { --c: #e2b765; }
 .tk.game-racer { --c: var(--violet); } /* Rainbow Racer */
+.tk.game-mirror { --c: #7ae582; } /* Magic Mirror — dragon green */
 .tk:hover,
 .tk:focus-visible {
   transform: translateY(-3px);

@@ -8,8 +8,9 @@ import type { GameDescriptor } from '@shared/game';
 import { battleship } from '@games/battleship';
 import { caribbean } from '@games/caribbean';
 import { chess } from '@games/chess';
+import { mirror } from '@games/mirror';
 import { racer } from '@games/racer';
 import { risk } from '@games/risk';
 import { unicorn } from '@games/unicorn';
 
-export const GAMES: GameDescriptor[] = [unicorn, caribbean, racer, battleship, chess, risk];
+export const GAMES: GameDescriptor[] = [unicorn, caribbean, mirror, racer, battleship, chess, risk];

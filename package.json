@@ -25,6 +25,7 @@
     "risk:drag": "node scripts/risk-drag-check.mjs"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1",
     "d3-geo": "^3.1.1",
     "maplibre-gl": "^5.20.1",
     "peerjs": "^1.5.4",
