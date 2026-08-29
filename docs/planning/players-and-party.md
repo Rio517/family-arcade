@@ -264,11 +264,16 @@ at the finish. `useProfile().recordResult` is **deleted**; every game records
 through `recordResultFor(userId, input)` on the users store, with the user id
 captured **at game start** from the seat (online: the active id at
 `startTable`). Chess same-device then records a win and a loss (draws still
-record nothing), Risk credits the winning general's ticket, Rainbow Racer's
-2P finishes record both racers — which means racer needs a seat/user-id at
-start (it has none today; Phase 2 gives it one). Ship Battle records for the
-captain whose id started the table; its opponent is on another device with
-their own ticket.
+record nothing), Risk credits the winning general's ticket, and Rainbow
+Racer's online finishes credit the racer on each device (racer has no local
+two-player mode — the other racer is on the other iPad with their own
+ticket). Every online game captures the signed-in ticket's id when the table
+opens (`startTable({ role, code, seatedUserId })`, Phase 3) and keeps it in
+its saved session, so a *resumed* game can still credit the right ticket —
+which means a version bump on `chess:local:v1` and `risk-campaign-v1` lands
+with Phase 3, when the seam is being carved anyway. Ship Battle records for
+the captain whose id started the table; its opponent is on another device
+with their own ticket.
 
 ### Storage keys
 
@@ -297,7 +302,8 @@ like `users`/`usersStore`.
 2. **Seats from the roster.** Three-state seats, `TicketStrip` +
    `SeatPicker`, lineup memory, `seats` on the descriptor, `addUser`
    append-only, the `useIdentity` split, `createdAt` dropped; Chess
-   same-device, Risk, Magic Coins, and a seat for racer.
+   same-device, Risk, Magic Coins. (Shipped 2026-08-29, #126; racer's
+   ticket id arrives with Phase 3's `startTable`.)
 3. **The party is the table.** `PartyContext` tests first; protocol,
    `table`/`knock`, `resolveGame`, the pill badge, `startTable({ role, code })`
    in the three online hooks (dead local-name fallbacks deleted with it),

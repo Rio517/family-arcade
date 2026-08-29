@@ -20,8 +20,8 @@ Introduce a **party**: a single connection + identity + optional call that lives
 **above the router**, so navigating Home → a game → a different game never tears
 it down.
 
-- `PartyProvider` (`src/shared/party/PartyContext.tsx`) is mounted in `main.tsx`
-  outside `<Routes>`. It owns:
+- `PartyProvider` (`src/shared/party/PartyContext.tsx`) is mounted in `App.tsx`
+  outside `<Routes>` (`main.tsx` only renders `<App />`). It owns:
   - a persistent presence `GameConnection` (prefix `party-v1-`) that only
     exchanges names (a `hello` message) — **game rules still travel on each
     game's own link**, unchanged;
