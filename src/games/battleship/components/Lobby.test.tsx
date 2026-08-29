@@ -1,24 +1,32 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Lobby } from './Lobby';
+import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { addUser, emptyUsersState } from '@shared/profile/users';
 
 function setup(name = 'Rio') {
-  const onName = vi.fn();
   const onHost = vi.fn();
   const onJoin = vi.fn();
   const onSolo = vi.fn();
-  render(<Lobby name={name} onName={onName} onHost={onHost} onJoin={onJoin} onSolo={onSolo} />);
-  return { onName, onHost, onJoin, onSolo };
+  render(<Lobby name={name} onHost={onHost} onJoin={onJoin} onSolo={onSolo} />);
+  return { onHost, onJoin, onSolo };
 }
 
+beforeEach(() => {
+  localStorage.clear();
+  resetUsersStore();
+  // A ticket is the identity: Rio is signed in, so the lobby never asks.
+  setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
+});
+
 describe('<Lobby>', () => {
-  it('reports name edits', () => {
-    const { onName } = setup('');
-    fireEvent.change(screen.getByTestId('name-input'), { target: { value: 'Kid' } });
-    expect(onName).toHaveBeenCalledWith('Kid');
+  it('says who is playing instead of asking for a name', () => {
+    setup('Rio');
+    expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Rio");
+    expect(screen.queryByTestId('name-input')).toBeNull();
   });
 
-  it('creates a game with the entered name', () => {
+  it('creates a game with the signed-in captain’s name', () => {
     const { onHost } = setup('Rio');
     fireEvent.click(screen.getByTestId('create-game'));
     expect(onHost).toHaveBeenCalledWith('Rio');
@@ -42,7 +50,7 @@ describe('<Lobby>', () => {
   });
 
   it('pre-fills a shared join code', () => {
-    render(<Lobby name="Kid" onName={vi.fn()} onHost={vi.fn()} onJoin={vi.fn()} onSolo={vi.fn()} initialJoinCode="wxyz" />);
+    render(<Lobby name="Kid" onHost={vi.fn()} onJoin={vi.fn()} onSolo={vi.fn()} initialJoinCode="wxyz" />);
     expect((screen.getByTestId('code-input') as HTMLInputElement).value).toBe('WXYZ');
   });
 
@@ -65,15 +73,5 @@ describe('<Lobby>', () => {
     expect(ladder[3]).toHaveTextContent(/level 4, the boss/i);
     fireEvent.click(ladder[2]);
     expect(onSolo).toHaveBeenCalledWith('wake', 'Klara');
-  });
-
-  it('offers the family roster as one-tap name chips, in house order', () => {
-    const { onName } = setup('');
-    const chips = ['rio', 'klara', 'flora', 'mommy', 'papa'].map((n) =>
-      screen.getByTestId(`name-chip-${n}`),
-    );
-    expect(chips.map((c) => c.textContent)).toEqual(['Rio', 'Klara', 'Flora', 'Mommy', 'Papa']);
-    fireEvent.click(screen.getByTestId('name-chip-klara'));
-    expect(onName).toHaveBeenCalledWith('Klara');
   });
 });

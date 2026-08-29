@@ -259,7 +259,6 @@ export function BattleshipPage() {
           )}
           <Lobby
             name={profile.profile.name}
-            onName={profile.setName}
             onHost={bs.hostGame}
             onJoin={bs.joinGame}
             onSolo={bs.startSoloGame}
@@ -275,11 +274,6 @@ export function BattleshipPage() {
             selectedSkinId={bs.mySkinId}
             era={fleetEra}
             onEra={pickFleetEra}
-            name={profile.profile.name}
-            onName={(name) => {
-              profile.setName(name);
-              bs.setMyName(name);
-            }}
             onSelect={(id) => {
               profile.update((p) => selectSkin(p, id));
               bs.chooseSkin(id);

@@ -7,7 +7,6 @@ function setup(overrides = {}) {
   const onSelect = vi.fn();
   const onUnlock = vi.fn(() => false);
   const onContinue = vi.fn();
-  const onName = vi.fn();
   const onEra = vi.fn();
   render(
     <FleetSelect
@@ -15,15 +14,13 @@ function setup(overrides = {}) {
       selectedSkinId="aqua"
       era="classic"
       onEra={onEra}
-      name="Kid"
-      onName={onName}
       onSelect={onSelect}
       onUnlock={onUnlock}
       onContinue={onContinue}
       {...overrides}
     />,
   );
-  return { onSelect, onUnlock, onContinue, onName, onEra };
+  return { onSelect, onUnlock, onContinue, onEra };
 }
 
 describe('<FleetSelect>', () => {
@@ -54,10 +51,9 @@ describe('<FleetSelect>', () => {
     expect(onContinue).toHaveBeenCalled();
   });
 
-  it('lets you change your captain name here', () => {
-    const { onName } = setup();
-    fireEvent.change(screen.getByTestId('fleet-name-input'), { target: { value: 'Skipper' } });
-    expect(onName).toHaveBeenCalledWith('Skipper');
+  it('never asks for a captain name — the ticket already says who you are', () => {
+    setup();
+    expect(screen.queryByTestId('fleet-name-input')).toBeNull();
   });
 
   it('offers Classic and Modern navies as a separate choice, by those names', () => {

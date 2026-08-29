@@ -63,7 +63,6 @@ export interface UseBattleshipResult {
   startSoloGame: (personaId: string, name: string) => void;
   resumeGame: (code: string) => void;
   chooseSkin: (skinId: string) => void;
-  setMyName: (name: string) => void;
   confirmSkin: () => void;
   setFleet: (fleet: Fleet) => void;
   confirmReady: () => void;
@@ -248,10 +247,6 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     withSession((s) => Session.chooseSkin(s, skinId));
     announceIdentity();
   }, [withSession, announceIdentity]);
-  const setMyName = useCallback((name: string) => {
-    withSession((s) => Session.setMyName(s, name));
-    announceIdentity();
-  }, [withSession, announceIdentity]);
   const confirmSkin = useCallback(() => withSession(Session.toPlacing), [withSession]);
   const setFleet = useCallback((fleet: Fleet) => withSession((s) => Session.setFleet(s, fleet)), [withSession]);
   const confirmReady = useCallback(() => withOutcome((s) => Session.confirmReady(s)), [withOutcome]);
@@ -304,7 +299,6 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     startSoloGame,
     resumeGame,
     chooseSkin,
-    setMyName,
     confirmSkin,
     setFleet,
     confirmReady,

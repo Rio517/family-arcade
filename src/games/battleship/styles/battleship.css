@@ -50,8 +50,8 @@
 
 /* ── Fleet setup, one screen — no scrolling to reach Deploy ────────────────── */
 .fleet-col { max-width: 1040px; margin: 0 auto; }
-.fleet-top { display: flex; gap: 14px; align-items: flex-end; margin-bottom: 16px; }
-.fleet-top .fleet-name { flex: 1; margin: 0; }
+/* Just the points readout now — the captain's name comes from their ticket. */
+.fleet-top { display: flex; justify-content: flex-end; margin-bottom: 16px; }
 .fleet-points {
   display: flex; align-items: baseline; gap: 8px; padding: 10px 14px; flex: 0 0 auto;
   border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
@@ -77,10 +77,6 @@
 .fleet-setup .era-note { margin: -2px 0 10px; font-size: 14px; }
 .fleet-setup .era-card { padding: 10px 12px; }
 .fleet-setup .era-ships { margin-top: 4px; font-size: 12px; }
-@media (max-width: 560px) {
-  .fleet-top { flex-direction: column; align-items: stretch; }
-}
-
 /* ── The navy picker: Classic vs Modern, a separate choice from the colour ── */
 .era-note { margin: -4px 0 12px; font-size: 14px; }
 .eras { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
