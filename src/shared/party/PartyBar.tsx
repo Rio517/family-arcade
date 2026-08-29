@@ -2,10 +2,11 @@
  * The app-level Party control — a small pill pinned to the bottom-centre of
  * every screen. Collapsed it just shows who you're with; tapped it opens a panel
  * to start/join a party, turn voice/video on (opt-in), or leave. Because it's
- * mounted above the router it stays put as you move between games.
+ * mounted above the router it stays put as you move between games — and it
+ * lights up when the friend opens a table or knocks on a game's door.
  */
 import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { normalizeCode } from '@shared/net/peer';
 import { PlayingAs } from '@shared/profile/PlayingAs';
 import { initialOf } from '@shared/profile/tickets';
@@ -17,6 +18,7 @@ import './party.css';
 
 export function PartyBar() {
   const party = useParty();
+  const { pathname } = useLocation();
   // Your ticket is your name here too — the party never asks for one. A read,
   // so the reader hook, not the writer one.
   const active = Boolean(useProfile().profile.name);
@@ -38,6 +40,13 @@ export function PartyBar() {
   };
 
   const { inParty, call } = party;
+  const friend = party.theirName ?? 'your friend';
+  // A table open somewhere you aren't: the friend opened a game (or you did,
+  // and walked away). A knock: the friend is at a game's door.
+  const table = party.table ? party.resolveGame(party.table.game) : null;
+  const invite = table && pathname !== table.path ? table : null;
+  const knock = party.knock ? party.resolveGame(party.knock) : null;
+  const lit = inParty && Boolean(invite || knock);
 
   return (
     <aside className="party-root" aria-label="Party">
@@ -47,11 +56,30 @@ export function PartyBar() {
             <>
               <PlayingAs />
 
-              {party.role === 'host' ? (
+              {party.reconnecting ? (
+                <div className="party-waiting" data-testid="party-reconnecting">
+                  <span className="party-eyebrow">Your party</span>
+                  <p className="party-hint">Reconnecting to your party…</p>
+                  <button className="party-btn ghost" onClick={leave} data-testid="party-leave">Leave party</button>
+                </div>
+              ) : party.status === 'error' ? (
+                <div className="party-waiting" data-testid="party-error">
+                  <span className="party-eyebrow">Hmm</span>
+                  <p className="party-hint">Couldn't reach your party. Is the other iPad awake?</p>
+                  <button className="party-btn primary" onClick={party.retry} data-testid="party-retry">Try again</button>
+                  <button className="party-btn ghost" onClick={leave} data-testid="party-leave">Leave party</button>
+                </div>
+              ) : party.role === 'host' ? (
                 <div className="party-waiting">
                   <span className="party-eyebrow">Share this code</span>
                   <div className="party-code" data-testid="party-code">{party.code}</div>
                   <p className="party-hint">Tell your friend to open the Party and join with it.</p>
+                  <button className="party-btn ghost" onClick={leave} data-testid="party-cancel">Cancel</button>
+                </div>
+              ) : party.role === 'guest' ? (
+                <div className="party-waiting" data-testid="party-dialing">
+                  <span className="party-eyebrow">Joining {party.code}</span>
+                  <p className="party-hint">Looking for your friend's party…</p>
                   <button className="party-btn ghost" onClick={leave} data-testid="party-cancel">Cancel</button>
                 </div>
               ) : joining ? (
@@ -109,8 +137,38 @@ export function PartyBar() {
                 </span>
               </div>
               <p className="party-with">
-                <b>{party.myName}</b> &amp; <b>{party.theirName ?? 'your friend'}</b>
+                <b>{party.myName}</b> &amp; <b>{friend}</b>
               </p>
+
+              {invite && (
+                <div className="party-invite" data-testid="party-invite">
+                  <span>
+                    <b>{party.role === 'host' ? 'Your table' : friend}</b>
+                    {party.role === 'host' ? ` — ${invite.title}` : ` opened ${invite.title}`}
+                  </span>
+                  <Link className="party-btn teal" to={invite.path} onClick={close} data-testid="party-invite-go">
+                    {party.role === 'host' ? 'Back to it ›' : 'Join ›'}
+                  </Link>
+                </div>
+              )}
+              {knock && (
+                <div className="party-invite knock" data-testid="party-knock">
+                  <span>
+                    <b>{friend}</b> wants to play {knock.title}
+                  </span>
+                  <Link
+                    className="party-btn teal"
+                    to={knock.path}
+                    onClick={() => {
+                      party.clearKnock();
+                      close();
+                    }}
+                    data-testid="party-knock-go"
+                  >
+                    Open ›
+                  </Link>
+                </div>
+              )}
 
               {!call.active ? (
                 <>
@@ -153,10 +211,18 @@ export function PartyBar() {
 
       <button
         ref={pillRef}
-        className={`party-pill ${inParty ? 'live' : ''}`}
+        className={`party-pill ${inParty ? 'live' : ''} ${lit ? 'invite' : ''}`}
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-label={inParty ? `Party with ${party.theirName ?? 'a friend'}` : 'Start a party'}
+        aria-label={
+          lit
+            ? `Party — ${knock ? `${friend} wants to play ${knock.title}` : `${friend} opened ${invite?.title}`}`
+            : inParty
+              ? `Party with ${friend}`
+              : party.reconnecting
+                ? 'Party — reconnecting'
+                : 'Start a party'
+        }
         data-testid="party-pill"
       >
         {inParty ? (
@@ -164,11 +230,20 @@ export function PartyBar() {
             <span className="party-ava a">{initialOf(party.myName)}</span>
             <span className="party-ava b">{initialOf(party.theirName ?? '?')}</span>
             <span className="party-dot" aria-hidden="true" />
+            {lit && (
+              <span className="party-badge" data-testid="party-badge">
+                {knock ? `${knock.title}?` : `${invite?.title} ›`}
+              </span>
+            )}
             {call.active && (
               <span className="party-mini">
                 {call.cameraOn ? <CameraIcon size={14} /> : <MicIcon size={14} />}
               </span>
             )}
+          </>
+        ) : party.reconnecting ? (
+          <>
+            <PartyIcon size={16} /> reconnecting…
           </>
         ) : (
           <>

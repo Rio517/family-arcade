@@ -48,6 +48,22 @@
 .party-ava.a { background: linear-gradient(160deg, #ff9ecb, #ff5fa2); }
 .party-ava.b { background: linear-gradient(160deg, #8fe3a0, #2fae5f); margin-left: -10px; }
 .party-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good, #4ade80); box-shadow: 0 0 10px var(--good, #4ade80); }
+/* The friend opened a table, or knocked: the pill glows gold and says which game. */
+.party-pill.invite {
+  border-color: var(--gold, #ffd76a);
+  box-shadow: 0 0 0 3px rgba(255, 215, 106, 0.28), 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.party-badge {
+  background: var(--gold, #ffd76a); color: #0c1322;
+  border-radius: 999px; padding: 2px 10px; font-size: 14px; font-weight: 800;
+}
+.party-invite {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(255, 215, 106, 0.12); border: 1px solid rgba(255, 215, 106, 0.45); font-size: 15px;
+}
+.party-invite > span { flex: 1; min-width: 0; }
+.party-invite .party-btn { padding: 8px 12px; min-height: 40px; text-decoration: none; }
+.party-btn.teal { background: rgba(52, 224, 200, 0.14); color: var(--accent, #34e0c8); border: 1px solid rgba(52, 224, 200, 0.4); }
 .party-mini { display: inline-flex; align-items: center; color: var(--muted, #94a3b8); }
 
 /* ---- popover panel ---- */
@@ -174,4 +190,9 @@
 @media (prefers-reduced-motion: no-preference) {
   .party-pill.live .party-dot { animation: party-pulse 1.8s ease-in-out infinite; }
   @keyframes party-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .party-pill.invite { animation: party-glow 1.6s ease-in-out infinite; }
+  @keyframes party-glow {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(255, 215, 106, 0.28), 0 8px 24px rgba(0, 0, 0, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(255, 215, 106, 0.12), 0 8px 24px rgba(0, 0, 0, 0.4); }
+  }
 }

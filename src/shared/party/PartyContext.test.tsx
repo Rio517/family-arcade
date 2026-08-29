@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PartyValue } from './PartyContext';
@@ -67,10 +68,15 @@ import { PartyProvider, useParty } from './PartyContext';
 
 let party: PartyValue;
 function Probe() {
-  party = useParty();
+  const value = useParty();
+  // Captured after commit (never during render — the compiler rule is right
+  // to object to that); every test reads it inside or after an act().
+  useEffect(() => {
+    party = value;
+  });
   return (
     <p data-testid="probe">
-      {party.myName}|{party.status}|{party.theirName ?? '-'}|{party.code}|{party.role ?? '-'}
+      {value.myName}|{value.status}|{value.theirName ?? '-'}|{value.code}|{value.role ?? '-'}
     </p>
   );
 }
