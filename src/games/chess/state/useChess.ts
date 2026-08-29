@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GameConnection, generateCode, type ConnStatus } from '@shared/net/peer';
+import { GameConnection, type ConnStatus } from '@shared/net/peer';
 import { isChessMessage, type ChessMessage } from '@games/chess/domain/protocol';
 import * as Session from '@games/chess/domain/session';
 import type { FinishInfo, Outcome, Phase as GamePhase, SessionState } from '@games/chess/domain/session';
@@ -31,6 +31,17 @@ import type { Color, GameLog, GameState, Ply, Side } from '@games/chess/domain/t
 const CHESS_PREFIX = 'chess-v1-';
 
 export type Phase = 'lobby' | GamePhase;
+
+/** Sitting down at an online table: which end of the code, and as whom. */
+export interface StartTableOptions {
+  role: Side;
+  /** The game code — minted by the page (or handed across by the party). */
+  code: string;
+  /** The signed-in ticket taking this chair; null if nobody is. */
+  seatedUserId: string | null;
+  /** The colour the host chose; White when unsaid. Both ends pass the same value. */
+  hostSide?: Color;
+}
 
 export interface UseChessResult {
   phase: Phase;
@@ -56,8 +67,8 @@ export interface UseChessResult {
   // actions
   /** Start a hotseat game — from the standard opening, or from `start`. */
   startLocal: (whiteName: string, blackName: string, start?: GameState) => void;
-  hostGame: (name: string) => void;
-  joinGame: (code: string, name: string) => void;
+  /** Host or join an online game under `code`, as the hook's `name` (your ticket). */
+  startTable: (opts: StartTableOptions) => void;
   resumeGame: (code: string) => void;
   /** Resume the saved same-device (hotseat) game. */
   resumeLocal: () => void;
@@ -70,6 +81,7 @@ export interface UseChessResult {
 }
 
 interface UseChessOptions {
+  /** The signed-in ticket's name — what the opponent sees. The gate guarantees one. */
   name: string;
   onFinish: (info: FinishInfo) => void;
 }
@@ -158,18 +170,14 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     setSessionState(Session.createLocalSession(whiteName.trim() || 'White', blackName.trim() || 'Black', start));
   }, [setSessionState]);
 
-  const hostGame = useCallback((name: string) => {
-    const code = generateCode();
+  // My name is the ticket's name, verbatim: the gate guarantees there is one.
+  const name = opts.name;
+  const startTable = useCallback(({ role, code, seatedUserId, hostSide }: StartTableOptions) => {
     const conn = ensureConn();
-    setSessionState(Session.createOnlineSession('host', code, name.trim() || 'Player'));
-    conn.host(code);
-  }, [ensureConn, setSessionState]);
-
-  const joinGame = useCallback((code: string, name: string) => {
-    const conn = ensureConn();
-    setSessionState(Session.createOnlineSession('guest', code, name.trim() || 'Player'));
-    conn.join(code);
-  }, [ensureConn, setSessionState]);
+    setSessionState({ ...Session.createOnlineSession(role, code, name, hostSide), seatedUserId });
+    if (role === 'host') conn.host(code);
+    else conn.join(code);
+  }, [ensureConn, name, setSessionState]);
 
   const resumeGame = useCallback((code: string) => {
     const stored = loadChessGame(code);
@@ -239,8 +247,7 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     canMove: s ? canIMove(s) : false,
     canUndo: s?.mode === 'local' && s.log.length > 0,
     startLocal,
-    hostGame,
-    joinGame,
+    startTable,
     resumeGame,
     resumeLocal,
     move,

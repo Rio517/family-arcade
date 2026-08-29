@@ -4,8 +4,9 @@
  * One model serves both modes:
  *  - **local** (same device / hotseat): no network, no side restriction —
  *    whoever's turn it is may move. `side`/`myColor` are null.
- *  - **online** (two devices, one code): host plays White, guest plays Black.
- *    You may only move your own colour on your own turn; each move is appended
+ *  - **online** (two devices, one code): the host picks a colour (White unless
+ *    they say otherwise) and the guest takes the other one. You may only move
+ *    your own colour on your own turn; each move is appended
  *    to the log *and* emitted as a `move` message. Peers resync via the same
  *    "longer log wins" reconciliation Ship Battle uses.
  *
@@ -29,12 +30,18 @@ export interface SessionState {
   mode: Mode;
   /** Online: which side of the connection I am. Local: null. */
   side: Side | null;
-  /** Online: the colour I control (host=White, guest=Black). Local: null. */
+  /** Online: the colour I control (the host's pick; the guest gets the other). Local: null. */
   myColor: Color | null;
   /** Online game code; empty in local mode. */
   code: string;
   myName: string;
   oppName: string;
+  /**
+   * The ticket that sat down at this device for the game (online only; the
+   * React adapter fills it in). Results credit this ticket, not whoever is
+   * signed in when the game ends. Local (hotseat) sessions: null.
+   */
+  seatedUserId: string | null;
   log: GameLog;
   /**
    * Optional custom starting position (a free-play setup promoted into a
@@ -73,11 +80,15 @@ export interface Outcome {
   error?: string;
 }
 
-const HOST_COLOR: Color = 'w';
-const GUEST_COLOR: Color = 'b';
+const DEFAULT_HOST_COLOR: Color = 'w';
 
-function colorForSide(side: Side): Color {
-  return side === 'host' ? HOST_COLOR : GUEST_COLOR;
+function opposite(c: Color): Color {
+  return c === 'w' ? 'b' : 'w';
+}
+
+/** The colour `side` plays when the host holds `hostSide`. */
+function colorForSide(side: Side, hostSide: Color): Color {
+  return side === 'host' ? hostSide : opposite(hostSide);
 }
 
 export function createLocalSession(whiteName: string, blackName: string, start?: GameState): SessionState {
@@ -88,6 +99,7 @@ export function createLocalSession(whiteName: string, blackName: string, start?:
     code: '',
     myName: whiteName,
     oppName: blackName,
+    seatedUserId: null,
     log: [],
     start,
     epoch: 0,
@@ -96,14 +108,24 @@ export function createLocalSession(whiteName: string, blackName: string, start?:
   };
 }
 
-export function createOnlineSession(side: Side, code: string, myName: string): SessionState {
+/**
+ * A fresh online session. `hostSide` is the colour the host chose (both peers
+ * must agree on it — the party hands it across); the guest gets the other.
+ */
+export function createOnlineSession(
+  side: Side,
+  code: string,
+  myName: string,
+  hostSide: Color = DEFAULT_HOST_COLOR,
+): SessionState {
   return {
     mode: 'online',
     side,
-    myColor: colorForSide(side),
+    myColor: colorForSide(side, hostSide),
     code,
     myName,
     oppName: '',
+    seatedUserId: null,
     log: [],
     epoch: 0,
     iWantRematch: false,
@@ -220,7 +242,7 @@ export function truncateLog(s: SessionState, n: number): Outcome {
 
 /**
  * Propose a rematch. When both sides have proposed, the board resets to the
- * opening and rematch flags clear. Online, colours stay the same (host=White).
+ * opening and rematch flags clear. Online, colours stay the same.
  */
 export function proposeRematch(s: SessionState): Outcome {
   if (s.mode === 'local') {

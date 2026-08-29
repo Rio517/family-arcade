@@ -11,7 +11,7 @@
 import { safeGet, safeRemove, safeSet } from '@shared/storage/kv';
 import { createLocalSession, createOnlineSession, type SessionState } from '@games/chess/domain/session';
 import { isGameOver, replay, status } from '@games/chess/domain/rules';
-import type { GameLog, GameState, Side } from '@games/chess/domain/types';
+import type { Color, GameLog, GameState, Side } from '@games/chess/domain/types';
 
 const SESSION_PREFIX = 'chess:session:v1:';
 const LOCAL_KEY = 'chess:local:v1';
@@ -26,11 +26,18 @@ export interface StoredChessGame {
   log: GameLog;
   finished: boolean;
   updatedAt: number;
+  /**
+   * The colour I play. Optional: saves from before the host could pick a
+   * colour don't carry it, and there the host was always White.
+   */
+  myColor?: Color;
+  /** The ticket that sat down here (null when nobody was signed in). Optional for old saves. */
+  seatedUserId?: string | null;
 }
 
 /** Serialize a live online session for storage. `now` is injected to stay pure. */
 export function chessToStored(s: SessionState, now: number): StoredChessGame | null {
-  if (s.mode !== 'online' || !s.side) return null;
+  if (s.mode !== 'online' || !s.side || !s.myColor) return null;
   return {
     code: s.code,
     side: s.side,
@@ -39,12 +46,23 @@ export function chessToStored(s: SessionState, now: number): StoredChessGame | n
     log: s.log,
     finished: isGameOver(status(replay(s.log))),
     updatedAt: now,
+    myColor: s.myColor,
+    seatedUserId: s.seatedUserId,
   };
 }
 
 /** Rebuild a session from storage. Rematch flags start clear on restore. */
 export function storedToChess(g: StoredChessGame): SessionState {
-  return { ...createOnlineSession(g.side, g.code, g.myName), oppName: g.oppName, log: g.log };
+  // An old save has no colour: the host was White back then, which is what
+  // createOnlineSession's default hands back.
+  const base = createOnlineSession(g.side, g.code, g.myName);
+  return {
+    ...base,
+    myColor: g.myColor ?? base.myColor,
+    seatedUserId: g.seatedUserId ?? null,
+    oppName: g.oppName,
+    log: g.log,
+  };
 }
 
 function sessionKey(code: string): string {

@@ -3,9 +3,11 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useProfile } from '@shared/profile/useProfile';
-import { useChess } from '@games/chess/state/useChess';
+import { useParty, type PartyValue } from '@shared/party/PartyContext';
+import type { PartyTableInfo } from '@shared/party/party';
+import { useChess, type StartTableOptions } from '@games/chess/state/useChess';
 import { pointsForResult } from '@shared/profile/profile';
-import { normalizeCode } from '@shared/net/peer';
+import { generateCode, normalizeCode } from '@shared/net/peer';
 import { PlayingAs } from '@shared/profile/PlayingAs';
 import { SeatPicker } from '@shared/profile/SeatPicker';
 import { useSeats } from '@shared/profile/useSeats';
@@ -43,6 +45,25 @@ const THEME_BLURBS: Record<ChessThemeId, string> = {
 interface ResultSummary {
   status: Status;
   pointsEarned: number;
+}
+
+/**
+ * What the online panel shows. In a party the friend is already here, so the
+ * code doors give way to one tap (host) or a quiet wait (guest); while a
+ * remembered party is still dialling, neither is right yet.
+ */
+type Lobby = 'doors' | 'reconnecting' | 'party-host' | 'party-guest';
+
+function lobbyFor(party: PartyValue): Lobby {
+  if (party.reconnecting) return 'reconnecting';
+  if (party.inParty && party.role === 'host') return 'party-host';
+  if (party.inParty && party.role === 'guest') return 'party-guest';
+  return 'doors';
+}
+
+/** A colour off the wire — the party carries the host's side as a plain string. */
+function asColor(side: string | undefined): Color | undefined {
+  return side === 'w' || side === 'b' ? side : undefined;
 }
 
 export function ChessPage() {
@@ -114,6 +135,15 @@ export function ChessPage() {
 
   const cx = useChess({ name: profile.profile.name, onFinish });
 
+  // The party you're in, if any — it decides which online lobby you see.
+  const party = useParty();
+  const lobby = lobbyFor(party);
+  // Host in a party: the colour you'll play. Your friend gets the other one.
+  const [hostSide, setHostSide] = useState<Color>('w');
+  /** Sit down at an online table as the signed-in ticket. */
+  const sitDown = (opts: Omit<StartTableOptions, 'seatedUserId'>) =>
+    cx.startTable({ ...opts, seatedUserId: profile.userId });
+
   // Deep links: resume the saved hotseat game (?resume=local, used by the
   // arcade's saved-games list), resume a saved online game (?resume=CODE),
   // or pre-fill a join code from a shared link (?g=CODE).
@@ -142,7 +172,9 @@ export function ChessPage() {
   }, [cx.phase]);
 
   // Host waits for the guest to connect: show the invite until the link opens.
-  const hostWaiting = cx.mode === 'online' && cx.side === 'host' && !cx.oppConnected && cx.phase !== 'over';
+  // In a party there is nobody to invite — the friend is already walking in.
+  const hostWaiting =
+    cx.mode === 'online' && cx.side === 'host' && !cx.oppConnected && cx.phase !== 'over' && !party.inParty;
   useEffect(() => {
     if (hostWaiting) setShareOpen(true);
     else if (cx.oppConnected) setShareOpen(false);
@@ -161,6 +193,9 @@ export function ChessPage() {
 
   const goMenu = () => navigate('/');
   const exitToMenu = () => {
+    // The host's table closes with the game, so the friend's screen stops
+    // pointing at a board nobody is sitting at.
+    if (cx.mode === 'online' && party.role === 'host') party.closeTable();
     cx.leave();
     navigate('/');
   };
@@ -399,44 +434,94 @@ export function ChessPage() {
         </div>
       )}
 
-      {/* ── Setup: online lobby ── */}
+      {/* ── Setup: online lobby — the party is the table ── */}
       {!inGame && setup === 'online' && (
         <div className="narrow-col stack">
           {/* Your ticket is your name online — your opponent sees it. */}
           <PlayingAs />
           <div className="panel stack">
-            <h2>Start a game</h2>
-            <button
-              className="btn btn-primary btn-lg btn-block"
-              onClick={() => cx.hostGame(profile.profile.name)}
-              data-testid="chess-create"
-            >
-              Create a game
-            </button>
-            <p className="subtle center">You’ll get a code to share. You play White.</p>
-            <div className="field">
-              <label htmlFor="jcode">…or join with a 4-character code</label>
-              <input
-                id="jcode"
-                className="code-input"
-                value={joinInput}
-                autoCapitalize="characters"
-                autoCorrect="off"
-                spellCheck={false}
-                maxLength={4}
-                placeholder="ABCD"
-                onChange={(e) => setJoinInput(normalizeCode(e.target.value))}
-                data-testid="chess-join-code"
+            {lobby === 'reconnecting' && (
+              <p className="subtle center" data-testid="chess-party-reconnecting">
+                Reconnecting to your party…
+              </p>
+            )}
+
+            {lobby === 'party-host' && (
+              <>
+                <h2>Play with {party.theirName}</h2>
+                <div className="row-actions" role="group" aria-label="Your colour">
+                  <button
+                    className={`btn${hostSide === 'w' ? ' btn-primary' : ''}`}
+                    aria-pressed={hostSide === 'w'}
+                    onClick={() => setHostSide('w')}
+                    data-testid="chess-side-w"
+                  >
+                    I play White
+                  </button>
+                  <button
+                    className={`btn${hostSide === 'b' ? ' btn-primary' : ''}`}
+                    aria-pressed={hostSide === 'b'}
+                    onClick={() => setHostSide('b')}
+                    data-testid="chess-side-b"
+                  >
+                    I play Black
+                  </button>
+                </div>
+                <button
+                  className="btn btn-primary btn-lg btn-block"
+                  onClick={() => sitDown({ role: 'host', code: party.openTable('chess', hostSide), hostSide })}
+                  data-testid="chess-party-play"
+                >
+                  Play Chess with {party.theirName}
+                </button>
+              </>
+            )}
+
+            {lobby === 'party-guest' && (
+              <PartyGuestDoor
+                theirName={party.theirName}
+                table={party.table}
+                knockOn={party.knockOn}
+                onTable={(code, side) => sitDown({ role: 'guest', code, hostSide: side })}
               />
-            </div>
-            <button
-              className="btn btn-violet btn-lg btn-block"
-              disabled={joinInput.length !== 4}
-              onClick={() => cx.joinGame(joinInput, profile.profile.name)}
-              data-testid="chess-join"
-            >
-              Join game →
-            </button>
+            )}
+
+            {lobby === 'doors' && (
+              <>
+                <h2>Start a game</h2>
+                <button
+                  className="btn btn-primary btn-lg btn-block"
+                  onClick={() => sitDown({ role: 'host', code: generateCode() })}
+                  data-testid="chess-create"
+                >
+                  Create a game
+                </button>
+                <p className="subtle center">You’ll get a code to share. You play White.</p>
+                <div className="field">
+                  <label htmlFor="jcode">…or join with a 4-character code</label>
+                  <input
+                    id="jcode"
+                    className="code-input"
+                    value={joinInput}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    maxLength={4}
+                    placeholder="ABCD"
+                    onChange={(e) => setJoinInput(normalizeCode(e.target.value))}
+                    data-testid="chess-join-code"
+                  />
+                </div>
+                <button
+                  className="btn btn-violet btn-lg btn-block"
+                  disabled={joinInput.length !== 4}
+                  onClick={() => sitDown({ role: 'guest', code: joinInput })}
+                  data-testid="chess-join"
+                >
+                  Join game →
+                </button>
+              </>
+            )}
             <button className="btn btn-ghost btn-block" onClick={() => setSetup('pick')}>← Back</button>
           </div>
         </div>
@@ -603,6 +688,48 @@ export function ChessPage() {
       </div>
     </div>
     </ChessThemeContext.Provider>
+  );
+}
+
+/**
+ * A guest in a party, standing at the Chess door: knock once so the host's
+ * screen offers to open Chess, then sit down the moment the table appears.
+ */
+function PartyGuestDoor({
+  theirName,
+  table,
+  knockOn,
+  onTable,
+}: {
+  theirName: string | null;
+  table: PartyTableInfo | null;
+  knockOn: (game: string) => void;
+  onTable: (code: string, hostSide?: Color) => void;
+}) {
+  const chessTable = table?.game === 'chess' ? table : null;
+
+  // One knock per visit to the door — not one per render, and none at all
+  // when Chess is already open.
+  const knockedRef = useRef(false);
+  useEffect(() => {
+    if (knockedRef.current) return;
+    knockedRef.current = true;
+    if (!chessTable) knockOn('chess');
+  }, [chessTable, knockOn]);
+
+  // Sit down once per table code: the host re-announces the same table on
+  // every reconnect, and that must never dial the game a second time.
+  const seatedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!chessTable || seatedRef.current === chessTable.code) return;
+    seatedRef.current = chessTable.code;
+    onTable(chessTable.code, asColor(chessTable.hostSide));
+  }, [chessTable, onTable]);
+
+  return (
+    <p className="subtle center" data-testid="chess-party-waiting">
+      Waiting for {theirName ?? 'your friend'} to open Chess…
+    </p>
   );
 }
 
