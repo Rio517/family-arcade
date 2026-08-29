@@ -20,10 +20,7 @@ import { EMPTY_SEAT, seatName, setSeat, type Seat } from '@shared/profile/seats'
 import type { StoredUser } from '@shared/profile/users';
 import type { BattleResult, DiceMode, GameState } from '../domain/types';
 
-// Heraldic tinctures — a general's banner. Kept bright enough that the dark
-// border lines read against them, and the six stay easy to tell apart.
-const PLAYER_COLORS = ['#cf3a30', '#3f78bd', '#4f9c60', '#d69a34', '#9b5aa6', '#2fa199'];
-const PLAYER_NAMES = ['Crimson', 'Cobalt', 'Forest', 'Amber', 'Plum', 'Teal'];
+import { loadColors, pickColor, saveColors, TINCTURES, tinctureName } from '../storage/riskColors';
 
 const PHASE_NAMES: Record<string, string> = {
   setup: 'Setting up',
@@ -48,14 +45,21 @@ function timeAgo(ts: number): string {
  * name, ×), a computer general's persona ladder, or the "tap a ticket" invite —
  * and the little figure that turns the chair over to a general and back.
  */
-function CouncilSeat({ seat, index, users, activeId, onChange }: {
+function CouncilSeat({ seat, index, users, activeId, color, holders, onChange, onColor }: {
   seat: Seat;
   index: number;
   users: StoredUser[];
   activeId: string | null;
+  /** This chair's tincture. */
+  color: string;
+  /** Who holds each tincture at the table (hex → chair name), for the swap hint. */
+  holders: Record<string, string>;
   onChange: (next: Seat) => void;
+  onColor: (hex: string) => void;
 }) {
   const rowRef = useRef<HTMLDivElement>(null);
+  const [picking, setPicking] = useState(false);
+  useDismissOnEscape(picking, () => setPicking(false));
   const isBot = seat.kind === 'bot';
   const name = seatName(seat, users);
   const rosterIndex = seat.kind === 'ticket' ? users.findIndex((u) => u.id === seat.userId) : -1;
@@ -65,8 +69,18 @@ function CouncilSeat({ seat, index, users, activeId, onChange }: {
     rowRef.current?.focus();
   };
   return (
+    <>
     <div ref={rowRef} tabIndex={-1} className={`risk-player-row ${seat.kind}`} data-testid={`seat-${index}`}>
-      <span className="risk-seal" style={{ ['--pc' as string]: PLAYER_COLORS[index] }} />
+      <button
+        type="button"
+        className="risk-seal-btn"
+        aria-expanded={picking}
+        aria-label={`Chair ${index + 1} marches under ${tinctureName(color)} — change colour`}
+        onClick={() => setPicking((p) => !p)}
+        data-testid={`seat-color-${index}`}
+      >
+        <span className="risk-seal" style={{ ['--pc' as string]: color }} />
+      </button>
       <span className="sr-only">Chair {index + 1}: </span>
       {seat.kind === 'bot' ? (
         <div className="risk-personas" role="radiogroup" aria-label={`Computer general for seat ${index + 1}`}>
@@ -120,6 +134,33 @@ function CouncilSeat({ seat, index, users, activeId, onChange }: {
         {isBot ? <BotIcon size={18} /> : <PersonIcon size={18} />}
       </button>
     </div>
+    {picking && (
+      <div className="risk-tinctures" role="group" aria-label={`Colours for chair ${index + 1}`}>
+        {TINCTURES.map((t) => {
+          const mine = t.hex === color;
+          const holder = mine ? null : holders[t.hex] ?? null;
+          return (
+            <button
+              key={t.hex}
+              type="button"
+              className={`risk-tincture ${mine ? 'on' : ''}`}
+              aria-pressed={mine}
+              aria-label={mine ? `${t.name} — yours` : holder ? `${t.name} — ${holder}'s; tap to swap` : t.name}
+              onClick={() => {
+                onColor(t.hex);
+                setPicking(false);
+              }}
+              data-testid={`tincture-${index}-${t.name.toLowerCase()}`}
+            >
+              <span className="risk-seal" style={{ ['--pc' as string]: t.hex }} />
+              <span className="risk-tincture-name">{t.name}</span>
+              {holder && <span className="risk-tincture-holder">{holder}</span>}
+            </button>
+          );
+        })}
+      </div>
+    )}
+    </>
   );
 }
 
@@ -129,6 +170,8 @@ export function RiskPage() {
   // The chairs at the table: a ticket from the roster, a computer general, or
   // an empty chair that still marches under its banner colour's name.
   const table = useSeats('risk', count);
+  // Each chair's tincture — remembered on this device; never two the same.
+  const [colors, setColors] = useState<string[]>(loadColors);
   // Balanced by default — the family prefers luck that evens out; pure random
   // stays one tap away for anyone chasing glorious upsets.
   const [diceMode, setDiceMode] = useState<DiceMode>('balanced');
@@ -153,14 +196,24 @@ export function RiskPage() {
     if (!risk.resume(resumable)) setResumable(null);
   }
 
+  /** The name a chair goes to war under — a ticket's, a general's, or its tincture's. */
+  const chairName = (seat: Seat, i: number): string =>
+    seat.kind === 'bot' ? personaById(seat.botId).name : seatName(seat, table.users) || tinctureName(colors[i]);
+  // Who holds each tincture at the table, so the picker can say "Klara's — tap to swap".
+  const holders: Record<string, string> = {};
+  table.seats.forEach((seat, i) => {
+    holders[colors[i]] = chairName(seat, i);
+  });
+
   function start() {
     // Whoever is at the table now is who the next war council opens with.
     table.remember();
+    saveColors(colors);
     const players: NewPlayer[] = table.seats.map((seat, i) => {
-      const color = PLAYER_COLORS[i];
-      if (seat.kind === 'bot') return { name: personaById(seat.botId).name, color, bot: seat.botId };
+      const color = colors[i];
+      if (seat.kind === 'bot') return { name: chairName(seat, i), color, bot: seat.botId };
       // A chair nobody claimed still plays, under its banner's name.
-      return { name: seatName(seat, table.users) || PLAYER_NAMES[i], color };
+      return { name: chairName(seat, i), color };
     });
     risk.start({ mapId: MAPS[0].id, players, diceMode });
   }
@@ -216,7 +269,10 @@ export function RiskPage() {
                   index={i}
                   users={table.users}
                   activeId={table.activeId}
+                  color={colors[i]}
+                  holders={holders}
                   onChange={(next) => table.setSeats(setSeat(table.seats, i, next))}
+                  onColor={(hex) => setColors(pickColor(colors, i, hex))}
                 />
               ))}
             </div>

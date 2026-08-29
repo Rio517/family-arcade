@@ -420,6 +420,32 @@ describe('<RiskPage>', () => {
       expect(screen.getByTestId('persona-2-cadet')).toHaveAttribute('aria-checked', 'true');
     });
 
+    it('a general picks a tincture, and picking one another chair holds swaps them', () => {
+      renderPage();
+      // Chair 1 (Rio) marches under Crimson; tap the seal and choose Cobalt.
+      fireEvent.click(screen.getByTestId('seat-color-0'));
+      const cobalt = screen.getByTestId('tincture-0-cobalt');
+      expect(cobalt).toHaveAccessibleName(/Cobalt — Cobalt's; tap to swap/);
+      fireEvent.click(cobalt);
+      expect(screen.queryByTestId('tincture-0-cobalt')).toBeNull(); // the picker folds away
+      // Chair 2 took Crimson in the swap, so no two chairs share a colour.
+      fireEvent.click(screen.getByTestId('seat-color-1'));
+      expect(screen.getByTestId('tincture-1-crimson')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('tincture-1-cobalt')).toHaveAccessibleName(/Rio's; tap to swap/);
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByTestId('tincture-1-crimson')).toBeNull();
+
+      fireEvent.click(screen.getByTestId('risk-start'));
+      const saved = JSON.parse(localStorage.getItem(CAMPAIGN_KEY) ?? 'null')?.state.players as { name: string; color: string }[];
+      expect(saved[0]).toMatchObject({ name: 'Rio', color: '#3f78bd' });
+      expect(saved[1].color).toBe('#cf3a30');
+      // An unclaimed chair marches under the tincture it now wears.
+      expect(saved[1].name).toBe('Crimson');
+      expect(new Set(saved.map((p) => p.color)).size).toBe(saved.length);
+      // Remembered for next war night.
+      expect(JSON.parse(localStorage.getItem('risk:colors:v1') ?? '[]')[0]).toBe('#3f78bd');
+    });
+
     it('an empty chair still plays, under its banner name', () => {
       renderPage();
       fireEvent.click(screen.getByTestId('count-2'));
