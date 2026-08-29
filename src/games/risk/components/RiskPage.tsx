@@ -145,7 +145,7 @@ function CouncilSeat({ seat, index, users, activeId, color, holders, onChange, o
               type="button"
               className={`risk-tincture ${mine ? 'on' : ''}`}
               aria-pressed={mine}
-              aria-label={mine ? `${t.name} — yours` : holder ? `${t.name} — ${holder}'s; tap to swap` : t.name}
+              aria-label={mine ? `${t.name} — yours` : holder ? `${t.name} — ${holder} has it; tap to swap` : t.name}
               onClick={() => {
                 onColor(t.hex);
                 setPicking(false);
@@ -199,10 +199,12 @@ export function RiskPage() {
   /** The name a chair goes to war under — a ticket's, a general's, or its tincture's. */
   const chairName = (seat: Seat, i: number): string =>
     seat.kind === 'bot' ? personaById(seat.botId).name : seatName(seat, table.users) || tinctureName(colors[i]);
-  // Who holds each tincture at the table, so the picker can say "Klara's — tap to swap".
+  // Who holds each tincture at the table, so the picker can say "Klara has
+  // it — tap to swap". An unclaimed chair is named by its number, not by the
+  // tincture it's wearing (that would read "Cobalt — Cobalt has it").
   const holders: Record<string, string> = {};
   table.seats.forEach((seat, i) => {
-    holders[colors[i]] = chairName(seat, i);
+    holders[colors[i]] = seat.kind === 'empty' ? `chair ${i + 1}` : chairName(seat, i);
   });
 
   function start() {
