@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PartyValue } from './PartyContext';
 import { getUsersSnapshot, resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
+import { PARTY_TTL_MS } from './party';
+import { PARTY_KEY, saveParty } from './partyStore';
 
 /**
  * A stand-in for GameConnection that records what the party does with its
@@ -151,5 +153,127 @@ describe('<PartyProvider>', () => {
     act(() => link().connect());
     expect(party.call.active).toBe(false);
     expect(party.call.status).toBe('idle');
+  });
+});
+
+const tables = (l: InstanceType<typeof FakeLink>) => l.sent.filter((m) => (m as { t: string }).t === 'table');
+const stored = () => JSON.parse(localStorage.getItem(PARTY_KEY) ?? 'null');
+
+describe('the party is the table', () => {
+  beforeEach(() => {
+    window.__ARCADE_TEST_NOW__ = () => 1_000_000;
+  });
+  afterEach(() => {
+    delete window.__ARCADE_TEST_NOW__;
+  });
+
+  it('the host opens a table under a fresh code and tells the friend', () => {
+    render(<PartyProvider><Probe /></PartyProvider>);
+    let partyCode = '';
+    act(() => {
+      partyCode = party.hostParty();
+    });
+    act(() => link().connect());
+    let tableCode = '';
+    act(() => {
+      tableCode = party.openTable('chess', 'w');
+    });
+    expect(tableCode).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4}$/);
+    expect(tableCode).not.toBe(partyCode);
+    expect(party.table).toEqual({ game: 'chess', code: tableCode, hostSide: 'w' });
+    expect(tables(link())).toEqual([{ t: 'table', game: 'chess', code: tableCode, hostSide: 'w' }]);
+    // Remembered with the party, so a reload can re-announce it.
+    expect(stored()).toMatchObject({ code: partyCode, role: 'host', table: { game: 'chess', code: tableCode } });
+    act(() => party.closeTable());
+    expect(party.table).toBeNull();
+    expect(link().sent.at(-1)).toEqual({ t: 'table-closed' });
+    expect(stored().table).toBeNull();
+  });
+
+  it('a fresh channel re-announces the open table', () => {
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => void party.hostParty());
+    act(() => link().connect());
+    act(() => void party.openTable('racer'));
+    act(() => link().connect()); // the friend's device reconnects
+    expect(tables(link())).toHaveLength(2);
+  });
+
+  it('the guest learns of the table and of its closing; the host hears a knock', () => {
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => party.joinParty('AB23'));
+    act(() => link().connect());
+    act(() => link().receive({ t: 'table', game: 'chess', code: 'CD45' }));
+    expect(party.table).toEqual({ game: 'chess', code: 'CD45' });
+    act(() => link().receive({ t: 'table-closed' }));
+    expect(party.table).toBeNull();
+    act(() => party.knockOn('racer'));
+    expect(link().sent.at(-1)).toEqual({ t: 'knock', game: 'racer' });
+    // On the other device the knock lands on the host.
+    act(() => link().receive({ t: 'knock', game: 'racer' }));
+    expect(party.knock).toBe('racer');
+    act(() => party.clearKnock());
+    expect(party.knock).toBeNull();
+  });
+
+  it('resolves a game id through the app, staying game-blind itself', () => {
+    render(
+      <PartyProvider resolveGame={(id) => (id === 'chess' ? { title: 'Chess', path: '/chess' } : null)}>
+        <Probe />
+      </PartyProvider>,
+    );
+    expect(party.resolveGame('chess')).toEqual({ title: 'Chess', path: '/chess' });
+    expect(party.resolveGame('bingo')).toBeNull();
+  });
+});
+
+describe('a remembered party', () => {
+  beforeEach(() => {
+    window.__ARCADE_TEST_NOW__ = () => 1_000_000;
+  });
+  afterEach(() => {
+    delete window.__ARCADE_TEST_NOW__;
+  });
+
+  it('the host re-hosts the same code on load, reconnecting, with its table ready to announce', () => {
+    saveParty({ code: 'AB23', role: 'host', at: 999_000, table: { game: 'chess', code: 'CD45', hostSide: 'b' } });
+    render(<PartyProvider><Probe /></PartyProvider>);
+    expect(party.reconnecting).toBe(true);
+    expect(party.role).toBe('host');
+    expect(party.code).toBe('AB23');
+    expect(link().hosted).toBe('AB23');
+    expect(party.table).toEqual({ game: 'chess', code: 'CD45', hostSide: 'b' });
+    act(() => link().connect());
+    expect(party.reconnecting).toBe(false);
+    expect(party.inParty).toBe(true);
+    expect(tables(link())).toEqual([{ t: 'table', game: 'chess', code: 'CD45', hostSide: 'b' }]);
+  });
+
+  it('the guest re-dials the same code on load', () => {
+    saveParty({ code: 'AB23', role: 'guest', at: 999_000, table: null });
+    render(<PartyProvider><Probe /></PartyProvider>);
+    expect(party.reconnecting).toBe(true);
+    expect(link().dialled).toBe('AB23');
+  });
+
+  it('a stale party is left alone', () => {
+    saveParty({ code: 'AB23', role: 'guest', at: 1_000_000 - PARTY_TTL_MS - 1, table: null });
+    render(<PartyProvider><Probe /></PartyProvider>);
+    expect(party.reconnecting).toBe(false);
+    expect(links.all).toHaveLength(0);
+    expect(localStorage.getItem(PARTY_KEY)).toBeNull();
+  });
+
+  it('leaving forgets the party; an error can be retried on the same code', () => {
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => party.joinParty('AB23'));
+    expect(stored()).toMatchObject({ code: 'AB23', role: 'guest' });
+    act(() => link().handlers.onStatus('error', 'Could not reach that party'));
+    expect(party.status).toBe('error');
+    act(() => party.retry());
+    expect(links.all).toHaveLength(2);
+    expect(link().dialled).toBe('AB23');
+    act(() => party.leaveParty());
+    expect(localStorage.getItem(PARTY_KEY)).toBeNull();
   });
 });
