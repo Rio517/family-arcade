@@ -114,35 +114,30 @@
   flex: none;
 }
 
-/* ── the new-player form ── */
-.pgate-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
-.pgate-chip {
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-.pgate-chip:focus-visible,
-.pgate-create:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.pgate-row { display: flex; flex-direction: column; gap: 8px; }
-.pgate-label { color: var(--muted); font-size: 0.85rem; }
-.pgate-row input {
-  padding: 10px 12px;
+/* ── the ticket list: the gate, "Change" in every lobby, the booth's Switch.
+   One field filters the stubs as you type and makes a ticket when nobody
+   matches — no five-name chip row anywhere. ── */
+.tlist { display: flex; flex-direction: column; gap: 10px; }
+.tlist-label { color: var(--muted); font-size: 0.85rem; }
+.tlist-field {
+  width: 100%;
+  padding: 11px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   font: inherit;
+  font-weight: 700;
 }
-.pgate-create {
-  padding: 10px;
+.tlist-field:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.tlist-stubs { display: flex; flex-direction: column; }
+.tlist-stubs .pstub:last-child { margin-bottom: 0; }
+.tlist-empty { color: var(--muted); text-align: center; margin: 0; }
+.tlist-create {
+  padding: 11px;
   border-radius: 10px;
   border: 1px solid rgba(52, 224, 200, 0.4);
   background: rgba(52, 224, 200, 0.12);
@@ -150,6 +145,78 @@
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+  min-height: 44px;
+}
+.tlist-create:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.pstub-you {
+  margin-left: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold, #ffd76a);
 }
 .pgate-back { text-align: center; margin: 14px 0 2px; }
 .pgate-back a { color: var(--muted); }
+
+/* ── "You're Papa · Change ›" at the top of every lobby ── */
+.pas { display: flex; flex-direction: column; gap: 10px; margin: 0 0 14px; }
+.pas-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 12px 6px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+}
+.pas-who { font-weight: 800; }
+.pas-change {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  padding: 8px 6px;
+  border-radius: 8px;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 44px;
+}
+.pas-change:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.pas-card {
+  background: linear-gradient(180deg, #131c30, #0e1626);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pas-cancel {
+  background: none;
+  border: 0;
+  padding: 10px;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 44px;
+}
+.pas-cancel:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.pmedal.sm {
+  width: 30px;
+  height: 30px;
+  font-size: 0.9rem;
+}
