@@ -210,9 +210,11 @@ captain; its opponent is on another device with their own ticket.
 - **No PINs, no accounts.** Trust-based family device; nothing leaves it.
 - **Parties stay two devices.** Every online game is two-player; a bigger
   party is a different project.
-- **Caribbean Career's captain name** is a character name inside a campaign,
-  built on another branch; it should read the ticket for its default and drop
-  the input when that branch is ready — not touched here.
+- **Caribbean Career's captain name stays.** It is a role-play name inside a
+  campaign, by design (2026-08-24 port-identity design: editable for
+  role-playing, never renames the arcade profile), and it already defaults to
+  the ticket. Its setup gets the *You're Papa · Change* line like every other
+  game, and nothing else changes.
 ## Phases (each a PR, each playable)
 
 1. **No more name boxes.** `TicketList` with the filter-or-create field at the
