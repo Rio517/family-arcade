@@ -5,7 +5,6 @@ import type { StoredUser } from './users';
 
 const u = (id: string, name: string): StoredUser => ({
   id,
-  createdAt: 0,
   profile: { name, pronouns: 'he/him', points: 0, wins: 0, losses: 0, unlocked: [], lastSkinId: '', history: [] },
 });
 const ROSTER = [u('a', 'Papa'), u('b', 'Klara'), u('c', 'Flora')];

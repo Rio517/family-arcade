@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
-import { addUser, emptyUsersState } from '@shared/profile/users';
+import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import type { PartyValue } from './PartyContext';
 
 // A controllable useParty so we can render each party state without a network.
@@ -46,7 +46,7 @@ beforeEach(() => {
   localStorage.clear();
   resetUsersStore();
   // A party is made from a ticket, so the panel's tests start signed in.
-  setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
+  setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
 });
 
 /** Nobody signed in — the front-page booth hasn't printed a ticket yet. */

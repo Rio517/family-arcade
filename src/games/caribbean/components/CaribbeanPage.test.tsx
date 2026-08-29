@@ -170,7 +170,6 @@ describe('<CaribbeanPage>', () => {
     setUsersState({
       users: [{
         id: 'mario',
-        createdAt: 0,
         profile: { ...defaultProfile(), name: 'Mario', pronouns: 'he/him' },
       }],
       activeId: 'mario',

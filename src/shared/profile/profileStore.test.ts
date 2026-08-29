@@ -23,9 +23,9 @@ describe('the profile facade over the player roster', () => {
   });
 
   it('writes land on the signed-in player only, and switching swaps everything back', () => {
-    let roster = addUser(emptyUsersState(), 'u1', 'Rio', 1);
-    roster = addUser(roster, 'u2', 'Klara', 2);
-    setUsersState(roster);
+    let roster = addUser(emptyUsersState(), 'u1', 'Rio');
+    roster = addUser(roster, 'u2', 'Klara');
+    setUsersState(setActiveUser(roster, 'u2'));
 
     setProfileState({ ...getProfileSnapshot(), points: 777 }); // Klara is active
     expect(getProfileSnapshot()).toMatchObject({ name: 'Klara', points: 777 });
@@ -38,7 +38,7 @@ describe('the profile facade over the player roster', () => {
   });
 
   it('notifies subscribers on change and stops after unsubscribe', () => {
-    setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
+    setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
     let hits = 0;
     const unsub = subscribeProfile(() => hits++);
 

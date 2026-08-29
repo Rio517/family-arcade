@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
-import { addUser, emptyUsersState } from '@shared/profile/users';
+import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import { ChessPage } from './ChessPage';
 
 function renderPage(entry = '/chess') {
@@ -19,7 +19,7 @@ describe('<ChessPage> — local flow', () => {
     // A game route always has somebody signed in (the PlayerGate sees to it),
     // so every case here plays as Rio's ticket.
     resetUsersStore();
-    setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
+    setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
   });
 
   it('offers a mode picker with both same-device and online options', () => {

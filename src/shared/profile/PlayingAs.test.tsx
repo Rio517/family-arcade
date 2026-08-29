@@ -6,9 +6,9 @@ import { addUser, emptyUsersState, setActiveUser } from './users';
 
 function seed() {
   // Klara signed in, Flora waiting in the roster.
-  let roster = addUser(emptyUsersState(), 'u1', 'Flora', 1);
-  roster = addUser(roster, 'u2', 'Klara', 2);
-  setUsersState(roster);
+  let roster = addUser(emptyUsersState(), 'u1', 'Flora');
+  roster = addUser(roster, 'u2', 'Klara');
+  setUsersState(setActiveUser(roster, 'u2'));
 }
 
 beforeEach(() => {

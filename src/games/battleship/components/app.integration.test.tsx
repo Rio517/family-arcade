@@ -3,7 +3,7 @@ import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } f
 import { MemoryRouter } from 'react-router-dom';
 import { BattleshipPage } from './BattleshipPage';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
-import { addUser, emptyUsersState } from '@shared/profile/users';
+import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 
 /**
  * High-level, DOM-driven integration test: two real <BattleshipPage> clients
@@ -75,7 +75,8 @@ function renderApp(): RenderResult {
  */
 function signInAs(name: string) {
   act(() => {
-    setUsersState(addUser(emptyUsersState(), `u-${name.toLowerCase()}`, name, 1));
+    const id = `u-${name.toLowerCase()}`;
+    setUsersState(setActiveUser(addUser(emptyUsersState(), id, name), id));
   });
 }
 
@@ -86,7 +87,7 @@ beforeEach(() => {
   localStorage.setItem('bs-fleet-view-v1', '2d');
   // One ticket signed in — the games never ask for a name any more.
   resetUsersStore();
-  setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
+  setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
   cleanup();
 });
 

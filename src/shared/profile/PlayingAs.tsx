@@ -10,11 +10,11 @@ import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { playerColor } from './playerColors';
 import { initialOf } from './tickets';
 import { TicketList } from './TicketList';
-import { useUsers } from './useUsers';
+import { useIdentity } from './useIdentity';
 import './player.css';
 
 export function PlayingAs() {
-  const { users, active, signIn, newPlayer } = useUsers();
+  const { users, active, signIn, newPlayer } = useIdentity();
   const [open, setOpen] = useState(false);
   const changeRef = useRef<HTMLButtonElement>(null);
 

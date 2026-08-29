@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
-import { addUser, emptyUsersState } from '@shared/profile/users';
+import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import { ChessPage } from './ChessPage';
 
 /**
@@ -101,7 +101,8 @@ type Client = ReturnType<typeof renderClient>;
  */
 function signInAs(name: string) {
   act(() => {
-    setUsersState(addUser(emptyUsersState(), `u-${name.toLowerCase()}`, name, 1));
+    const id = `u-${name.toLowerCase()}`;
+    setUsersState(setActiveUser(addUser(emptyUsersState(), id, name), id));
   });
 }
 

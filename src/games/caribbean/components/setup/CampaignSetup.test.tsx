@@ -9,7 +9,7 @@ import type { CaribbeanController, CaribbeanPersistencePhase } from '../../state
 import type { LoadResult } from '../../storage/persistence';
 import { normalizePronouns } from '@shared/profile/profile';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
-import { addUser, emptyUsersState } from '@shared/profile/users';
+import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import { CampaignSetup, type CampaignSetupIdentity } from './CampaignSetup';
 
 const EMPTY_REVISION = { currentRaw: null, previousRaw: null };
@@ -102,7 +102,7 @@ describe('<CampaignSetup>', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('shows whose ticket signs the commission when a player is signed in', () => {
-    setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
+    setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
     renderSetup();
 
     expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Rio");

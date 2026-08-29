@@ -11,7 +11,6 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import {
   recordResult as pureRecordResult,
-  setName as pureSetName,
   setPronouns as pureSetPronouns,
   type Profile,
   type ResultInput,
@@ -20,7 +19,8 @@ import { getProfileSnapshot, setProfileState, subscribeProfile } from './profile
 
 export interface UseProfile {
   profile: Profile;
-  setName: (name: string) => void;
+  /** Pronouns are profile data a game may ask for (Caribbean's commission);
+   * the *name* is identity and lives in useIdentity, which games can't import. */
   setPronouns: (pronouns: string) => void;
   recordResult: (input: ResultInput) => void;
   /** Apply any pure profile transition; returns whether it changed anything. */
@@ -32,10 +32,6 @@ export function useProfile(): UseProfile {
   // bar, the game on screen) reflects the same identity, live. Persistence
   // happens inside the store on each change.
   const profile = useSyncExternalStore(subscribeProfile, getProfileSnapshot);
-
-  const setName = useCallback((name: string) => {
-    setProfileState(pureSetName(getProfileSnapshot(), name));
-  }, []);
 
   const setPronouns = useCallback((pronouns: string) => {
     setProfileState(pureSetPronouns(getProfileSnapshot(), pronouns));
@@ -55,5 +51,5 @@ export function useProfile(): UseProfile {
     return false;
   }, []);
 
-  return { profile, setName, setPronouns, recordResult, update };
+  return { profile, setPronouns, recordResult, update };
 }

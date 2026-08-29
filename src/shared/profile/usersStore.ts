@@ -28,7 +28,7 @@ function load(): UsersState {
   const legacy = safeGet(LEGACY_PROFILE_KEY);
   if (!legacy) return emptyUsersState();
   try {
-    return migrateDeviceProfile(normalizeProfile(JSON.parse(legacy)), Date.now());
+    return migrateDeviceProfile(normalizeProfile(JSON.parse(legacy)));
   } catch {
     return emptyUsersState();
   }
