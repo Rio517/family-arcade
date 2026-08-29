@@ -613,23 +613,60 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
 }
 .risk-choice:hover { border-color: var(--brass); }
 .risk-choice.on { background: linear-gradient(#6c3122, #4a1e14); border-color: var(--brass); color: var(--brass-hi); }
-.risk-player-row { display: flex; align-items: center; gap: 12px; }
-.risk-player-row input {
-  flex: 1; padding: 11px 13px; font-family: var(--font-body); font-size: 16px; color: var(--ink);
-  background: var(--parchment); border: 1px solid var(--brass-dim); border-radius: 3px;
+/* A chair at the war council: a wax seal, then whoever holds it — a ticket
+   from the roster, a computer general's persona ladder, or an open invitation
+   — and the person/computer switch on the end. */
+.risk-player-row {
+  display: flex; align-items: center; gap: 12px; min-height: 52px;
+  padding: 4px 4px 4px 8px; border-radius: 3px;
+  /* Recessed into the walnut board, so the leather chips on a computer chair
+     still read as raised buttons against it. */
+  border: 1px solid var(--brass-dim); background: rgba(0, 0, 0, 0.22);
 }
-.risk-player-row input::placeholder { color: #8a7a55; }
-.risk-player-row input:focus { outline: none; border-color: var(--brass); }
-/* The person/computer switch on each chair, and the persona ladder that
-   replaces the name box when a computer general is seated. */
+.risk-player-row.empty { border-style: dashed; background: transparent; }
+.risk-seat-name {
+  flex: 1; min-width: 0; font-size: 16px; font-weight: 600; color: var(--cream);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.risk-seat-empty { flex: 1; min-width: 0; font-size: 15px; font-style: italic; color: var(--muted); }
+.risk-seat-clear {
+  flex: 0 0 auto; width: 44px; height: 44px; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer;
+}
+.risk-seat-clear:hover { background: rgba(224, 168, 60, 0.14); color: var(--brass-hi); }
+.risk-seat-clear:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
+/* The person/computer switch on each chair, and the persona ladder that takes
+   over the chair when a computer general is seated. */
 .risk-seat-kind {
-  flex: 0 0 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: center;
-  padding: 9px 11px; color: var(--brass);
+  flex: 0 0 auto; min-width: 44px; min-height: 44px; display: inline-flex;
+  align-items: center; justify-content: center; padding: 9px 11px; color: var(--brass);
 }
 .risk-seat-kind:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
-.risk-personas { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; }
-.risk-persona { font-size: 14px; padding: 8px 10px; }
+.risk-personas { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.risk-persona { min-height: 44px; font-size: 14px; padding: 8px 10px; }
 .risk-persona:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
+
+/* The roster strip below the chairs, dressed for the war room — the shared
+   component brings the layout, the theme brings the leather and brass. */
+.risk-theme .tstrip-label { font-family: var(--font-display); color: var(--brass); }
+.risk-theme .tstrip-chip {
+  font-family: var(--font-body); color: var(--cream);
+  background: linear-gradient(#3c2818, #2c1d11); border-color: var(--brass-dim); border-radius: 3px;
+}
+.risk-theme .tstrip-chip:hover:not(:disabled) { border-color: var(--brass); }
+.risk-theme .tstrip-chip.new { color: var(--muted); }
+.risk-theme .tstrip-chip:focus-visible { outline-color: var(--brass-hi); }
+.risk-theme .tstrip-hint { color: var(--muted); font-style: italic; }
+.risk-theme .tlist-label { color: var(--muted); }
+.risk-theme .tlist-field {
+  font-family: var(--font-body); color: var(--ink);
+  background: var(--parchment); border-color: var(--brass-dim); border-radius: 3px;
+}
+.risk-theme .tlist-create {
+  font-family: var(--font-display); color: var(--brass-hi);
+  background: linear-gradient(#6c3122, #4a1e14); border-color: var(--brass); border-radius: 3px;
+}
+.risk-theme .pas-cancel { color: var(--muted); }
 
 /* ── Victory plaque ──────────────────────────────────────────────────────── */
 .risk-victory {
