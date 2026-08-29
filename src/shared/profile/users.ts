@@ -12,7 +12,6 @@ import { defaultProfile, normalizeProfile, type Profile } from './profile';
 
 export interface StoredUser {
   id: string;
-  createdAt: number;
   profile: Profile;
 }
 
@@ -40,13 +39,7 @@ export function normalizeUsersState(raw: unknown): UsersState {
         // receive every write meant for the first.
         if (seen.has(su.id)) return [];
         seen.add(su.id);
-        return [
-          {
-            id: su.id,
-            createdAt: Number.isFinite(su.createdAt) ? (su.createdAt as number) : 0,
-            profile: normalizeProfile(su.profile),
-          },
-        ];
+        return [{ id: su.id, profile: normalizeProfile(su.profile) }];
       })
     : [];
   const activeId =
@@ -72,21 +65,24 @@ function hasSubstance(p: Profile): boolean {
  * carried a name, the device was effectively already signed in as that person,
  * so they stay signed in; a nameless profile waits for the gate to ask.
  */
-export function migrateDeviceProfile(old: Profile | null, now: number): UsersState {
+export function migrateDeviceProfile(old: Profile | null): UsersState {
   if (!old || !hasSubstance(old)) return emptyUsersState();
   const named = Boolean(old.name.trim());
   const user: StoredUser = {
     id: 'player-legacy',
-    createdAt: now,
     profile: { ...old, name: old.name.trim().slice(0, 20) || 'Player 1' },
   };
   return { users: [user], activeId: named ? user.id : null };
 }
 
-/** Add a brand-new player and sign them in. */
-export function addUser(state: UsersState, id: string, name: string, now: number): UsersState {
+/**
+ * Append a brand-new player. Signing them in is a separate move
+ * (`setActiveUser`) — a seat picker makes tickets for other people at the
+ * table without changing who is playing on this browser.
+ */
+export function addUser(state: UsersState, id: string, name: string): UsersState {
   const profile = { ...defaultProfile(), name: name.trim().slice(0, 20) || 'Player' };
-  return { users: [...state.users, { id, createdAt: now, profile }], activeId: id };
+  return { ...state, users: [...state.users, { id, profile }] };
 }
 
 /** Sign a player in (or everyone out with null). Unknown ids are ignored. */

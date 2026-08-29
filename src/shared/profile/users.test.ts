@@ -18,7 +18,7 @@ describe('normalizeUsersState', () => {
     expect(normalizeUsersState({ users: 'x', activeId: 3 })).toEqual(emptyUsersState());
   });
 
-  it('keeps one ticket per id and tolerates a non-numeric createdAt', () => {
+  it('keeps one ticket per id and ignores keys it no longer stores', () => {
     const state = normalizeUsersState({
       users: [
         { id: 'a', createdAt: 'x', profile: { name: 'Rio' } },
@@ -27,7 +27,7 @@ describe('normalizeUsersState', () => {
       activeId: 'a',
     });
     expect(state.users).toHaveLength(1);
-    expect(state.users[0]).toMatchObject({ createdAt: 0, profile: { name: 'Rio' } });
+    expect(state.users[0]).toEqual({ id: 'a', profile: expect.objectContaining({ name: 'Rio' }) });
     expect(state.activeId).toBe('a');
   });
 
@@ -70,13 +70,13 @@ describe('normalizeUsersState', () => {
 
 describe('migrateDeviceProfile', () => {
   it('ignores a missing or untouched device profile', () => {
-    expect(migrateDeviceProfile(null, 1)).toEqual(emptyUsersState());
-    expect(migrateDeviceProfile(defaultProfile(), 1)).toEqual(emptyUsersState());
+    expect(migrateDeviceProfile(null)).toEqual(emptyUsersState());
+    expect(migrateDeviceProfile(defaultProfile())).toEqual(emptyUsersState());
   });
 
   it('adopts a named device profile and keeps that person signed in', () => {
     const old = { ...defaultProfile(), name: 'Klara', points: 500, wins: 4 };
-    const state = migrateDeviceProfile(old, 7);
+    const state = migrateDeviceProfile(old);
     expect(state.users).toHaveLength(1);
     expect(state.users[0].profile).toMatchObject({ name: 'Klara', points: 500, wins: 4 });
     expect(state.activeId).toBe(state.users[0].id);
@@ -84,24 +84,27 @@ describe('migrateDeviceProfile', () => {
 
   it('adopts a nameless-but-played profile without signing anyone in', () => {
     const old = { ...defaultProfile(), points: 120 };
-    const state = migrateDeviceProfile(old, 7);
+    const state = migrateDeviceProfile(old);
     expect(state.users[0].profile.name).toBe('Player 1');
     expect(state.activeId).toBeNull();
   });
 });
 
 describe('roster transitions', () => {
-  it('addUser trims the name and signs the new player in', () => {
-    const state = addUser(emptyUsersState(), 'u1', '  Flora  ', 3);
+  it('addUser appends a trimmed ticket and leaves the signed-in player alone', () => {
+    let state = addUser(emptyUsersState(), 'u1', '  Flora  ');
+    expect(state.activeId).toBeNull();
+    expect(state.users[0].profile).toMatchObject({ name: 'Flora', points: 0 });
+    state = setActiveUser(state, 'u1');
+    state = addUser(state, 'u2', 'Rio');
     expect(activeUser(state)?.id).toBe('u1');
-    expect(activeProfile(state)?.name).toBe('Flora');
-    expect(activeProfile(state)?.points).toBe(0);
+    expect(state.users.map((u) => u.id)).toEqual(['u1', 'u2']);
   });
 
   it('setActiveUser switches between known players and ignores strangers', () => {
-    let state = addUser(emptyUsersState(), 'u1', 'Rio', 1);
-    state = addUser(state, 'u2', 'Klara', 2);
-    expect(state.activeId).toBe('u2');
+    let state = addUser(emptyUsersState(), 'u1', 'Rio');
+    state = addUser(state, 'u2', 'Klara');
+    expect(state.activeId).toBeNull();
     state = setActiveUser(state, 'u1');
     expect(activeProfile(state)?.name).toBe('Rio');
     expect(setActiveUser(state, 'ghost')).toBe(state);
@@ -109,13 +112,13 @@ describe('roster transitions', () => {
   });
 
   it('addUser trims and caps the name at 20 characters', () => {
-    const state = addUser(emptyUsersState(), 'u1', '  Bartholomew Fitzgerald III  ', 1);
+    const state = addUser(emptyUsersState(), 'u1', '  Bartholomew Fitzgerald III  ');
     expect(state.users[0].profile.name).toBe('Bartholomew Fitzgera');
   });
 
   it('updateActiveProfile touches only the signed-in player', () => {
-    let state = addUser(emptyUsersState(), 'u1', 'Rio', 1);
-    state = addUser(state, 'u2', 'Klara', 2);
+    let state = addUser(emptyUsersState(), 'u1', 'Rio');
+    state = setActiveUser(addUser(state, 'u2', 'Klara'), 'u2');
     state = updateActiveProfile(state, { ...activeProfile(state)!, points: 999 });
     expect(state.users.find((u) => u.id === 'u2')?.profile.points).toBe(999);
     expect(state.users.find((u) => u.id === 'u1')?.profile.points).toBe(0);

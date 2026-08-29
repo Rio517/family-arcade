@@ -8,14 +8,14 @@
 
 import { Link } from 'react-router-dom';
 import { TicketList } from './TicketList';
-import { useUsers } from './useUsers';
+import { useIdentity } from './useIdentity';
 import './player.css';
 
 export function PlayerGate({ gameTitle, children }: {
   gameTitle: string;
   children: React.ReactNode;
 }) {
-  const { users, active, signIn, newPlayer } = useUsers();
+  const { users, active, signIn, newPlayer } = useIdentity();
 
   if (active) return children;
 

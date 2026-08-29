@@ -68,6 +68,26 @@ export default tseslint.config(
     },
   },
   {
+    // Identity is set at the gate and the booth, never inside a game — the
+    // players design's "no game writes a name" rule, enforced at the import
+    // boundary rather than by convention.
+    files: ['src/games/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/useIdentity', '@shared/profile/useIdentity'],
+              message:
+                'Games read the ticket through useProfile(); only the gate, the booth, PlayingAs and the seat pickers change who is signed in.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Node-side config files.
     files: ['*.config.{ts,js}', '.claude/hooks/*.mjs'],
     languageOptions: { globals: globals.node },

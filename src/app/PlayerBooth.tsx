@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { useProfile } from '@shared/profile/useProfile';
-import { useUsers } from '@shared/profile/useUsers';
+import { useIdentity } from '@shared/profile/useIdentity';
 import { playerColor } from '@shared/profile/playerColors';
 import { initialOf } from '@shared/profile/tickets';
 import { TicketList } from '@shared/profile/TicketList';
@@ -56,9 +56,9 @@ function HistoryRow({ entry, now }: { entry: GameHistoryEntry; now: number }) {
 }
 
 export function PlayerBooth() {
-  const { users, active, signIn, newPlayer } = useUsers();
-  // Display reads `active.profile`; useProfile is only here for its writers.
-  const { setName, setPronouns } = useProfile();
+  const { users, active, signIn, newPlayer, setName } = useIdentity();
+  // Display reads `active.profile`; useProfile is only here for pronouns.
+  const { setPronouns } = useProfile();
   const [mode, setMode] = useState<'view' | 'switch' | 'edit-profile'>('view');
   const [draftName, setDraftName] = useState('');
   const [draftPronouns, setDraftPronouns] = useState('');

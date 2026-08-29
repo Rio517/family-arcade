@@ -198,7 +198,7 @@ function toNetLobby(app: Client, driverId: string) {
  * genuinely different players.
  */
 function seedTwoTickets() {
-  const roster = addUser(addUser(emptyUsersState(), 'u-rio', 'Rio', 1), 'u-kai', 'Kai', 2);
+  const roster = addUser(addUser(emptyUsersState(), 'u-rio', 'Rio'), 'u-kai', 'Kai');
   setUsersState(setActiveUser(roster, null));
 }
 
@@ -229,7 +229,7 @@ beforeEach(() => {
   // One ticket signed in on this browser — what a single-client test plays as.
   // Two-client tests call connectClients, which puts a second ticket on the
   // roster and hands one to each side.
-  setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
+  setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
 });
 
 describe('two-player racer: lobby flows', () => {

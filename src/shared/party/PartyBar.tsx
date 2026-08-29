@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { normalizeCode } from '@shared/net/peer';
 import { PlayingAs } from '@shared/profile/PlayingAs';
 import { initialOf } from '@shared/profile/tickets';
-import { useUsers } from '@shared/profile/useUsers';
+import { useIdentity } from '@shared/profile/useIdentity';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { CameraIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
 import { useParty } from './PartyContext';
@@ -18,7 +18,7 @@ import './party.css';
 export function PartyBar() {
   const party = useParty();
   // Your ticket is your name here too — the party never asks for one.
-  const { active } = useUsers();
+  const { active } = useIdentity();
   const [open, setOpen] = useState(false);
   const [joining, setJoining] = useState(false);
   const [codeInput, setCodeInput] = useState('');

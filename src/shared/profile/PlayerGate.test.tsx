@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe('<PlayerGate>', () => {
   it('lets a signed-in player straight through', () => {
-    setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
+    setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
     gate();
     expect(screen.getByTestId('the-game')).toBeInTheDocument();
     expect(screen.queryByTestId('player-gate')).not.toBeInTheDocument();
@@ -50,8 +50,8 @@ describe('<PlayerGate>', () => {
   });
 
   it('shows existing tickets when players exist but nobody is signed in', () => {
-    let roster = addUser(emptyUsersState(), 'u1', 'Rio', 1);
-    roster = addUser(roster, 'u2', 'Klara', 2);
+    let roster = addUser(emptyUsersState(), 'u1', 'Rio');
+    roster = addUser(roster, 'u2', 'Klara');
     setUsersState(setActiveUser(roster, null));
     gate();
     expect(screen.getByText(/Galaxy Chess needs a player/)).toBeInTheDocument();
@@ -62,8 +62,8 @@ describe('<PlayerGate>', () => {
   });
 
   it('filters the tickets as you type and Enter takes the top match', () => {
-    let roster = addUser(emptyUsersState(), 'u1', 'Rio', 1);
-    roster = addUser(roster, 'u2', 'Klara', 2);
+    let roster = addUser(emptyUsersState(), 'u1', 'Rio');
+    roster = addUser(roster, 'u2', 'Klara');
     setUsersState(setActiveUser(roster, null));
     gate();
     fireEvent.change(screen.getByTestId('pgate-name'), { target: { value: 'kl' } });

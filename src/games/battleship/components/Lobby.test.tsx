@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Lobby } from './Lobby';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
-import { addUser, emptyUsersState } from '@shared/profile/users';
+import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 
 function setup(name = 'Rio') {
   const onHost = vi.fn();
@@ -16,7 +16,7 @@ beforeEach(() => {
   localStorage.clear();
   resetUsersStore();
   // A ticket is the identity: Rio is signed in, so the lobby never asks.
-  setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
+  setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
 });
 
 describe('<Lobby>', () => {
