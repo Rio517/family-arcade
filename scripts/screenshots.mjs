@@ -178,6 +178,28 @@ const SHOTS = [
     prep: playRiskToAttack,
   },
   {
+    // Chess same-device: two chairs filled from the roster, White and Black.
+    name: 'chess-seats',
+    path: '/#/chess',
+    viewport: TABLET,
+    prep: async (page) => {
+      await page.getByTestId('mode-local').click();
+      await page.getByTestId('seat-0').waitFor();
+      await page.getByTestId('strip-user-seed-flora').click();
+    },
+  },
+  {
+    // Magic Coins: who's playing, by ticket, before picking a world.
+    name: 'unicorn-seats',
+    path: '/#/unicorn',
+    viewport: TABLET,
+    prep: async (page) => {
+      await page.getByTestId('uni-players-2').click();
+      await page.getByTestId('seat-0').waitFor();
+      await page.getByTestId('strip-user-seed-rio').click();
+    },
+  },
+  {
     // The ticket booth gate at a game door: players exist, nobody signed in.
     name: 'player-gate',
     path: '/#/chess',
