@@ -430,6 +430,28 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
 }
 .risk-seal.lg { width: 42px; height: 42px; border-width: 2.5px; }
 
+/* The seal on a council chair is a button: tap it to pick the chair's tincture. */
+.risk-seal-btn {
+  width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer; border-radius: 50%;
+}
+.risk-seal-btn:hover .risk-seal { filter: brightness(1.12); }
+.risk-seal-btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.risk-tinctures {
+  display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 10px 10px 40px;
+  margin-top: -6px;
+}
+.risk-tincture {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 12px 6px 6px;
+  font-family: var(--font-display); font-size: 14px; color: var(--cream);
+  background: linear-gradient(#3c2818, #2c1d11); border: 1px solid var(--brass-dim); border-radius: 3px;
+  cursor: pointer;
+}
+.risk-tincture:hover { border-color: var(--brass); }
+.risk-tincture.on { border-color: var(--brass); color: var(--brass-hi); background: linear-gradient(#6c3122, #4a1e14); }
+.risk-tincture:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.risk-tincture-holder { font-family: var(--font-body, inherit); font-style: italic; font-size: 14px; color: var(--parchment-dim, #c9b48a); }
+
 /* One sentence, one place, telling you the next thing to do. */
 .risk-hintline {
   position: absolute; left: 50%; transform: translateX(-50%); bottom: 74px;

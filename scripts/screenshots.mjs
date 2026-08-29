@@ -166,6 +166,18 @@ const SHOTS = [
     },
   },
   {
+    // The war council with a chair's tincture picker open — no two alike.
+    name: 'risk-tinctures',
+    path: '/#/risk',
+    viewport: TABLET,
+    prep: async (page) => {
+      const help = page.getByTestId('risk-help-close');
+      if (await help.count()) await help.click();
+      await page.getByTestId('seat-color-0').click();
+      await page.getByTestId('tincture-0-cobalt').waitFor();
+    },
+  },
+  {
     name: 'risk-board',
     path: '/#/risk',
     viewport: TABLET,
