@@ -11,17 +11,15 @@ Sorted by likely value. Nothing here blocks anything else.
 
 ### Code
 
-- **One ticket, every game — phases 2–4.** The design and the phase list live
-  in `docs/planning/players-and-party.md`. Phase 1 (no game asks the signed-in
-  player for a name; the ticket list with its filter-or-create field at the
-  gate, behind "Change" in every lobby, and at the booth) shipped 2026-08-29.
-  Next, in order, each its own PR:
+- **One ticket, every game — phases 3–4.** The design and the phase list live
+  in `docs/planning/players-and-party.md`. Shipped 2026-08-29: Phase 1 (no
+  game asks the signed-in player for a name; the ticket list at the gate,
+  behind "Change", and at the booth) and Phase 2 (pass-and-play chairs in
+  Chess same-device, Risk and Magic Coins are tickets tapped from the roster,
+  remembered per game in `arcade.lineup.v1`; `useIdentity` owns every name
+  writer and `src/games/**` cannot import it). Next, in order, each its own
+  PR:
 
-  2. **Seats from the roster.** Pass-and-play chairs (Chess same-device,
-     Risk's six, Magic Coins) are filled by tapping tickets; `+ New player`
-     makes a ticket without switching who's signed in; the last lineup is
-     remembered per game (`arcade.lineup.v1`). Chess same-device still has two
-     plain name inputs until this lands.
   3. **The party is the table.** `table`/`knock` messages on the party's
      presence link, the glowing pill invite, `hostGame(name, code?)` in chess,
      battleship and racer so two devices in a party never trade a code; the
