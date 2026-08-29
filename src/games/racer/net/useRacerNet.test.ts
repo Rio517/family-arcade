@@ -24,7 +24,6 @@ vi.mock('@shared/net/peer', () => ({
     }
     destroy() {}
   },
-  generateCode: () => 'ABCD',
 }));
 
 import { useRacerNet } from './useRacerNet';
@@ -50,9 +49,10 @@ describe('useRacerNet handshake', () => {
     const { result } = renderHook(() =>
       useRacerNet({ name: 'Rio', driver: 'unicorn', target: 20, inRace: () => false, getWorld: () => null }),
     );
-    act(() => result.current.host());
+    act(() => result.current.startTable({ role: 'host', code: 'ABCD', seatedUserId: 'u-rio' }));
     expect(h.state.hostCode).toBe('ABCD');
     expect(result.current.code).toBe('ABCD');
+    expect(result.current.role).toBe('host');
 
     act(() => h.state.handlers.onOpen());
     expect(h.state.sent.find((m) => m.t === 'hello')).toMatchObject({ name: 'Rio', driver: 'unicorn', inRace: false });
@@ -68,7 +68,7 @@ describe('useRacerNet handshake', () => {
     const { result } = renderHook(() =>
       useRacerNet({ name: 'Rio', driver: 'unicorn', target: 20, inRace: () => false, getWorld: () => null }),
     );
-    act(() => result.current.host());
+    act(() => result.current.startTable({ role: 'host', code: 'ABCD', seatedUserId: 'u-rio' }));
     act(() => h.state.handlers.onOpen());
     act(() => h.state.handlers.onMessage({ t: 'hello', name: 'Kai', driver: 'dragon', inRace: true }));
     expect(h.state.sent.some((m) => m.t === 'go')).toBe(false);
@@ -77,8 +77,10 @@ describe('useRacerNet handshake', () => {
 
   it('guest: mirrors an inbound world into the ref', () => {
     const { result } = renderHook(() => useRacerNet({ name: 'Kai', driver: 'dragon', target: 20 }));
-    act(() => result.current.join('WXYZ'));
+    act(() => result.current.startTable({ role: 'guest', code: 'WXYZ', seatedUserId: 'u-kai' }));
     expect(h.state.joinCode).toBe('WXYZ');
+    expect(h.state.hostCode).toBe('');
+    expect(result.current.role).toBe('guest');
     act(() => h.state.handlers.onMessage(world));
     expect(result.current.remoteWorldRef.current).not.toBeNull();
   });
@@ -87,8 +89,35 @@ describe('useRacerNet handshake', () => {
     const { result } = renderHook(() =>
       useRacerNet({ name: 'Rio', driver: 'unicorn', target: 20, inRace: () => false }),
     );
-    act(() => result.current.host());
+    act(() => result.current.startTable({ role: 'host', code: 'ABCD', seatedUserId: 'u-rio' }));
     act(() => h.state.handlers.onMessage(world));
     expect(result.current.remoteWorldRef.current).toBeNull();
+  });
+});
+
+describe('useRacerNet seat', () => {
+  it('remembers which ticket sat down at the table and forgets it on leave', () => {
+    const { result } = renderHook(() => useRacerNet({ name: 'Rio', driver: 'unicorn', target: 20 }));
+    expect(result.current.seatedUserId).toBeNull();
+
+    act(() => result.current.startTable({ role: 'host', code: 'ABCD', seatedUserId: 'u-rio' }));
+    expect(result.current.seatedUserId).toBe('u-rio');
+
+    // Still seated after the handshake — it is who results get credited to.
+    act(() => h.state.handlers.onOpen());
+    act(() => h.state.handlers.onMessage({ t: 'hello', name: 'Kai', driver: 'dragon', inRace: false }));
+    expect(result.current.seatedUserId).toBe('u-rio');
+
+    act(() => result.current.leave());
+    expect(result.current.seatedUserId).toBeNull();
+    expect(result.current.role).toBeNull();
+    expect(result.current.code).toBe('');
+  });
+
+  it('a guest with nobody signed in sits down as null (the gate normally prevents this)', () => {
+    const { result } = renderHook(() => useRacerNet({ name: 'Kai', driver: 'dragon', target: 20 }));
+    act(() => result.current.startTable({ role: 'guest', code: 'WXYZ', seatedUserId: null }));
+    expect(result.current.seatedUserId).toBeNull();
+    expect(result.current.role).toBe('guest');
   });
 });
