@@ -81,25 +81,16 @@ export function drawDice(
   return { values, bag: b };
 }
 
-/** A fresh campaign id — uniqueness matters, prettiness doesn't (nobody reads it). */
-export function mintCampaignId(now: number = Date.now(), rng: () => number = Math.random): string {
-  return `risk-${now.toString(36)}-${rng().toString(36).slice(2, 8)}`;
-}
-
 /**
  * Open the board with every territory unclaimed. Setup then runs the classic
  * two-stage draft, one army per turn with automatic rotation: first everyone
  * takes turns CLAIMING empty lands (1 army each), then everyone takes turns
  * REINFORCING their own lands until all starting armies are down.
- *
- * `id` defaults to a freshly minted one — the only thing here that isn't a
- * pure function of its inputs, like `resolveAttack`'s default rng.
  */
 export function newGame(
   map: MapTopology,
   newPlayers: NewPlayer[],
   diceMode: DiceMode = 'random',
-  id: string = mintCampaignId(),
 ): GameState {
   const players: PlayerState[] = newPlayers.map((p, id) => ({
     id,
@@ -114,7 +105,6 @@ export function newGame(
   for (const tid of map.territoryIds) territories[tid] = { owner: -1, armies: 0 };
 
   const state: GameState = {
-    id,
     mapId: map.id,
     players,
     territories,

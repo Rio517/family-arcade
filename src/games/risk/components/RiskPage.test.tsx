@@ -518,7 +518,7 @@ describe('<RiskPage>', () => {
       resumeAndStrike();
       expect(screen.getByText(/Rio holds the world/)).toBeInTheDocument();
 
-      // Rio's ticket carries the win, under this campaign's id…
+      // Rio's ticket carries the win, filed under the game…
       expect(ticket('u1').wins).toBe(1);
       expect(ticket('u1').losses).toBe(0);
       expect(ticket('u1').history).toHaveLength(1);
@@ -526,7 +526,7 @@ describe('<RiskPage>', () => {
         game: 'risk',
         result: 'win',
         opponent: 'Klara & Cadet Pip',
-        code: campaign.id,
+        code: 'risk',
       });
       // …while the general who lost, and the ticket that never sat down, are
       // left exactly as they were — nobody is handed a loss.
