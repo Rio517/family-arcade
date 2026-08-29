@@ -418,3 +418,16 @@ body {
   .result-hero .subtle.reveal { animation-delay: 740ms; }
 }
 
+/* ── Screen-reader-only text: spoken, never painted. Shared by any module. ── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+

@@ -10,35 +10,20 @@
  * what was chosen and fills the new chairs from the lineup.
  */
 
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { getLineupsSnapshot, setLineup, subscribeLineups } from './lineupStore';
-import { EMPTY_SEAT, lineupOf, seatedUserIds, seatsFromLineup, type Seat } from './seats';
+import { EMPTY_SEAT, fillChairs, lineupOf, seatsFromLineup, type Seat } from './seats';
 import type { StoredUser } from './users';
 import { getUsersSnapshot, subscribeUsers } from './usersStore';
 
 export interface UseSeats {
   seats: Seat[];
   users: StoredUser[];
+  /** The signed-in ticket's id, for the "you" mark. */
+  activeId: string | null;
   setSeats: (next: Seat[]) => void;
   /** Persist this lineup for the game — call when the game starts. */
   remember: () => void;
-}
-
-/** Fit chosen chairs to the seeded table: keep what's chosen, take the rest
- * from the seed unless that ticket is already seated. */
-function fit(chosen: Seat[], seeded: Seat[]): Seat[] {
-  const next = chosen.slice(0, seeded.length);
-  const taken = new Set(seatedUserIds(next));
-  for (let i = next.length; i < seeded.length; i++) {
-    const s = seeded[i];
-    if (s.kind === 'ticket' && taken.has(s.userId)) {
-      next.push(EMPTY_SEAT);
-    } else {
-      next.push(s);
-      if (s.kind === 'ticket') taken.add(s.userId);
-    }
-  }
-  return next;
 }
 
 export function useSeats(gameId: string, count: number): UseSeats {
@@ -47,11 +32,12 @@ export function useSeats(gameId: string, count: number): UseSeats {
   const seeded = seatsFromLineup(roster.users, lineups[gameId] ?? null, roster.activeId, count);
   // null until a chair is touched — the seed stays live until then.
   const [chosen, setChosen] = useState<Seat[] | null>(null);
-  const seats = chosen ? fit(chosen, seeded) : seeded;
+  const seats = chosen ? fillChairs(count, (i) => chosen[i] ?? seeded[i] ?? EMPTY_SEAT) : seeded;
 
-  const remember = useCallback(() => {
-    setLineup(gameId, lineupOf(seats));
-  }, [gameId, seats]);
+  // Called from click handlers only; the array is fresh every render, so a
+  // memoised version would be rebuilt every time anyway.
+  const remember = () => setLineup(gameId, lineupOf(seats));
+  const setSeats = (next: Seat[]) => setChosen(next);
 
-  return { seats, users: roster.users, setSeats: setChosen, remember };
+  return { seats, users: roster.users, activeId: roster.activeId, setSeats, remember };
 }

@@ -56,7 +56,7 @@ export function UnicornPage() {
   // simply plays as "Player 2". Names are derived every render from the ticket
   // ids, so a rename at the booth renames the player here too.
   const table = useSeats('unicorn', playerCount);
-  const seatNames = table.seats.map((s, i) => seatName(s, table.users, () => '') || PLAYER_NAMES[i]);
+  const seatNames = table.seats.map((s, i) => seatName(s, table.users) || PLAYER_NAMES[i]);
 
   // The live game lives in a ref so the animation loop never restarts on a
   // React render. A version counter nudges the HUD to repaint a few times a

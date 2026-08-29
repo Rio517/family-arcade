@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   EMPTY_SEAT,
   clearSeat,
+  fillChairs,
   fillNextEmpty,
+  isFull,
   lineupOf,
   normalizeLineup,
   normalizeLineups,
@@ -49,6 +51,21 @@ describe('seatsFromLineup', () => {
   it('never seats the same ticket twice, even from a corrupt lineup', () => {
     const lineup: Lineup = [{ userId: 'u1' }, { userId: 'u1' }];
     expect(seatsFromLineup(USERS, lineup, null, 2)).toEqual([ticket('u1'), EMPTY_SEAT]);
+  });
+});
+
+describe('fillChairs', () => {
+  it('never seats a ticket twice but lets a general serve twice', () => {
+    const source = [ticket('u1'), bot('vex'), ticket('u1'), bot('vex')];
+    expect(fillChairs(4, (i) => source[i])).toEqual([ticket('u1'), bot('vex'), EMPTY_SEAT, bot('vex')]);
+  });
+});
+
+describe('isFull', () => {
+  it('is true only when every chair is taken, and never for an empty table', () => {
+    expect(isFull([ticket('u1'), bot('vex')])).toBe(true);
+    expect(isFull([ticket('u1'), EMPTY_SEAT])).toBe(false);
+    expect(isFull([])).toBe(false);
   });
 });
 

@@ -6,6 +6,11 @@
  * `Lineup`s per game, and `seatsFromLineup` is the one place the precedence
  * rule lives: a saved lineup wins wholesale; the signed-in ticket seeds chair
  * one only when the game has no lineup yet.
+ *
+ * `Lineup` and `Seat` are deliberately two shapes: `Lineup` is the disk format
+ * under `arcade.lineup.v1` (null for an empty chair, forgiving of hand-edited
+ * JSON) with a stability contract, while `Seat` is the runtime union free to
+ * grow a fourth kind. `lineupOf`/`normalizeLineup` are the encode/decode pair.
  */
 
 import type { StoredUser } from './users';
@@ -20,6 +25,22 @@ export type Lineup = LineupEntry[];
 
 export const EMPTY_SEAT: Seat = { kind: 'empty' };
 
+/**
+ * Build `count` chairs from a per-chair source, never seating the same ticket
+ * twice (the second occurrence becomes an empty chair). Bots may repeat: two
+ * "Cadet Pip"s is a lineup the family can choose on purpose.
+ */
+export function fillChairs(count: number, at: (index: number) => Seat): Seat[] {
+  const taken = new Set<string>();
+  return Array.from({ length: count }, (_, i) => {
+    const seat = at(i);
+    if (seat.kind !== 'ticket') return seat;
+    if (taken.has(seat.userId)) return EMPTY_SEAT;
+    taken.add(seat.userId);
+    return seat;
+  });
+}
+
 export function seatsFromLineup(
   users: StoredUser[],
   lineup: Lineup | null,
@@ -27,26 +48,17 @@ export function seatsFromLineup(
   count: number,
 ): Seat[] {
   const known = new Set(users.map((u) => u.id));
-  const seats: Seat[] = [];
   if (!lineup) {
-    for (let i = 0; i < count; i++) {
-      seats.push(i === 0 && activeId && known.has(activeId) ? { kind: 'ticket', userId: activeId } : EMPTY_SEAT);
-    }
-    return seats;
+    return fillChairs(count, (i) =>
+      i === 0 && activeId && known.has(activeId) ? { kind: 'ticket', userId: activeId } : EMPTY_SEAT,
+    );
   }
-  const seated = new Set<string>();
-  for (let i = 0; i < count; i++) {
+  return fillChairs(count, (i) => {
     const entry = lineup[i] ?? null;
-    let seat: Seat = EMPTY_SEAT;
-    if (entry && 'userId' in entry && known.has(entry.userId) && !seated.has(entry.userId)) {
-      seat = { kind: 'ticket', userId: entry.userId };
-      seated.add(entry.userId);
-    } else if (entry && 'bot' in entry) {
-      seat = { kind: 'bot', botId: entry.bot };
-    }
-    seats.push(seat);
-  }
-  return seats;
+    if (entry && 'userId' in entry && known.has(entry.userId)) return { kind: 'ticket', userId: entry.userId };
+    if (entry && 'bot' in entry) return { kind: 'bot', botId: entry.bot };
+    return EMPTY_SEAT;
+  });
 }
 
 export function lineupOf(seats: Seat[]): Lineup {
@@ -79,8 +91,17 @@ export function seatedUserIds(seats: Seat[]): string[] {
   return seats.flatMap((s) => (s.kind === 'ticket' ? [s.userId] : []));
 }
 
-/** The name to show for a chair: the ticket's, the bot's, or '' for empty (or a ticket that vanished). */
-export function seatName(seat: Seat, users: StoredUser[], botName: (botId: string) => string): string {
+export function isFull(seats: Seat[]): boolean {
+  return seats.length > 0 && seats.every((s) => s.kind !== 'empty');
+}
+
+/** The name to show for a chair: the ticket's, the bot's (only games with bots
+ * pass a namer), or '' for empty (or a ticket that vanished). */
+export function seatName(
+  seat: Seat,
+  users: StoredUser[],
+  botName: (botId: string) => string = () => '',
+): string {
   if (seat.kind === 'ticket') return users.find((u) => u.id === seat.userId)?.profile.name ?? '';
   if (seat.kind === 'bot') return botName(seat.botId);
   return '';

@@ -1,33 +1,30 @@
 /**
- * The tappable roster row under any seat UI: every ticket on this browser as a
- * chip, the ones already at the table greyed, and "+ New player" to make a
+ * The tappable roster row under any seat UI: every ticket on this device as a
+ * chip, the ones already at the table greyed (still reachable by keyboard, so
+ * a screen reader hears that Klara is seated), and "+ New player" to make a
  * ticket for someone else without changing who is signed in.
  */
 
-import { useState } from 'react';
-import { playerColor } from './playerColors';
-import { canCreateTicket, initialOf } from './tickets';
+import { useEffect, useRef, useState } from 'react';
+import { Medal } from './Medal';
+import { fillNextEmpty, isFull, seatedUserIds, type Seat } from './seats';
+import { canCreateTicket } from './tickets';
 import { useIdentity } from './useIdentity';
 import './player.css';
 
-export function TicketStrip({
-  seated,
-  onPick,
-  full = false,
-  testIdPrefix = 'strip',
-}: {
-  /** Ticket ids already at the table — shown taken. */
-  seated: ReadonlySet<string>;
-  /** An unseated ticket was tapped, or a brand-new one was just made. */
-  onPick: (userId: string) => void;
-  /** Every chair is taken: the whole strip greys and says so. */
-  full?: boolean;
-  testIdPrefix?: string;
-}) {
+export function TicketStrip({ seats, onChange }: { seats: Seat[]; onChange: (next: Seat[]) => void }) {
   const { users, addPlayer } = useIdentity();
+  const seated = new Set(seatedUserIds(seats));
+  const full = isFull(seats);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
+  const fieldRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (adding) fieldRef.current?.focus();
+  }, [adding]);
   const creatable = canCreateTicket(users, name);
+
+  const pick = (userId: string) => onChange(fillNextEmpty(seats, { kind: 'ticket', userId }));
 
   const make = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,27 +32,34 @@ export function TicketStrip({
     const id = addPlayer(name.trim());
     setName('');
     setAdding(false);
-    onPick(id);
+    pick(id);
+  };
+
+  const cancel = () => {
+    setName('');
+    setAdding(false);
   };
 
   return (
     <div className="tstrip">
-      <span className="tstrip-label">Tickets on this {deviceWord()}</span>
+      <span className="tstrip-label">Tickets on this device</span>
       <div className="tstrip-chips">
         {users.map((u, i) => {
           const taken = seated.has(u.id);
+          const off = taken || full;
           return (
             <button
               key={u.id}
               type="button"
-              className={`tstrip-chip ${taken ? 'taken' : ''}`}
-              style={{ '--c': playerColor(i) } as React.CSSProperties}
-              disabled={taken || full}
-              aria-pressed={taken}
-              data-testid={`${testIdPrefix}-user-${u.id}`}
-              onClick={() => onPick(u.id)}
+              className={`tstrip-chip ${off ? 'taken' : ''}`}
+              aria-disabled={off}
+              aria-label={taken ? `${u.profile.name} — already at the table` : u.profile.name}
+              data-testid={`strip-user-${u.id}`}
+              onClick={() => {
+                if (!off) pick(u.id);
+              }}
             >
-              <span className="pmedal sm" aria-hidden="true">{initialOf(u.profile.name)}</span>
+              <Medal name={u.profile.name} index={i} small />
               {u.profile.name}
             </button>
           );
@@ -65,7 +69,7 @@ export function TicketStrip({
             type="button"
             className="tstrip-chip new"
             disabled={full}
-            data-testid={`${testIdPrefix}-new`}
+            data-testid="strip-new"
             onClick={() => setAdding(true)}
           >
             + New player
@@ -75,12 +79,13 @@ export function TicketStrip({
       {full && <p className="tstrip-hint">Every chair is taken — clear one to swap.</p>}
       {adding && (
         <form className="tstrip-form" onSubmit={make}>
-          <label className="tlist-label" htmlFor={`${testIdPrefix}-name`}>Who's joining?</label>
+          <label className="tlist-label" htmlFor="strip-name">Who's joining?</label>
           <div className="tstrip-form-row">
             <input
-              id={`${testIdPrefix}-name`}
+              ref={fieldRef}
+              id="strip-name"
               className="tlist-field"
-              data-testid={`${testIdPrefix}-name`}
+              data-testid="strip-name"
               value={name}
               maxLength={20}
               autoComplete="off"
@@ -89,20 +94,15 @@ export function TicketStrip({
               placeholder="Type a name…"
               onChange={(e) => setName(e.target.value)}
             />
-            <button type="submit" className="tlist-create" disabled={!creatable} data-testid={`${testIdPrefix}-create`}>
+            <button type="submit" className="tlist-create" disabled={!creatable} data-testid="strip-create">
               Make a ticket
             </button>
           </div>
-          <button type="button" className="pas-cancel" onClick={() => setAdding(false)}>
+          <button type="button" className="pas-cancel" data-testid="strip-cancel" onClick={cancel}>
             Never mind
           </button>
         </form>
       )}
     </div>
   );
-}
-
-/** "iPad" on a touch device, "computer" otherwise — the family's own words. */
-function deviceWord(): string {
-  return typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0 ? 'iPad' : 'computer';
 }

@@ -308,11 +308,5 @@
 }
 .spick-clear:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
 .spick-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
+.spick-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tstrip-chip.taken { opacity: 0.4; cursor: default; }

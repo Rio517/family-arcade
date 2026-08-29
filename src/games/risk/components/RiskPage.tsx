@@ -1,5 +1,5 @@
 import '../styles/risk.css';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { RiskBoard } from './RiskBoard';
 import { useMapZoom } from './useMapZoom';
@@ -15,9 +15,9 @@ import { personaById, RISK_PERSONAS } from '../domain/bots/personas';
 import { BotIcon, CloseIcon, FullscreenExitIcon, PersonIcon, ResumeIcon } from '@shared/ui/icons';
 import { useSeats } from '@shared/profile/useSeats';
 import { TicketStrip } from '@shared/profile/TicketStrip';
-import { clearSeat, EMPTY_SEAT, fillNextEmpty, seatName, seatedUserIds, setSeat } from '@shared/profile/seats';
-import { playerColor } from '@shared/profile/playerColors';
-import { initialOf } from '@shared/profile/tickets';
+import { Medal } from '@shared/profile/Medal';
+import { EMPTY_SEAT, seatName, setSeat, type Seat } from '@shared/profile/seats';
+import type { StoredUser } from '@shared/profile/users';
 import type { BattleResult, DiceMode, GameState } from '../domain/types';
 
 // Heraldic tinctures — a general's banner. Kept bright enough that the dark
@@ -41,6 +41,86 @@ function timeAgo(ts: number): string {
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
   const days = Math.round(hours / 24);
   return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
+/**
+ * One chair at the war council: the heraldic seal, then a seated ticket (medal,
+ * name, ×), a computer general's persona ladder, or the "tap a ticket" invite —
+ * and the little figure that turns the chair over to a general and back.
+ */
+function CouncilSeat({ seat, index, users, activeId, onChange }: {
+  seat: Seat;
+  index: number;
+  users: StoredUser[];
+  activeId: string | null;
+  onChange: (next: Seat) => void;
+}) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const isBot = seat.kind === 'bot';
+  const name = seatName(seat, users);
+  const rosterIndex = seat.kind === 'ticket' ? users.findIndex((u) => u.id === seat.userId) : -1;
+  const clear = () => {
+    onChange(EMPTY_SEAT);
+    // The × unmounts with the ticket; keep the keyboard on the chair it emptied.
+    rowRef.current?.focus();
+  };
+  return (
+    <div ref={rowRef} tabIndex={-1} className={`risk-player-row ${seat.kind}`} data-testid={`seat-${index}`}>
+      <span className="risk-seal" style={{ ['--pc' as string]: PLAYER_COLORS[index] }} />
+      <span className="sr-only">Chair {index + 1}: </span>
+      {seat.kind === 'bot' ? (
+        <div className="risk-personas" role="radiogroup" aria-label={`Computer general for seat ${index + 1}`}>
+          {RISK_PERSONAS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`risk-choice risk-persona ${seat.botId === p.id ? 'on' : ''}`}
+              role="radio"
+              aria-checked={seat.botId === p.id}
+              title={p.tagline}
+              onClick={() => onChange({ kind: 'bot', botId: p.id })}
+              data-testid={`persona-${index}-${p.id}`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      ) : seat.kind === 'ticket' ? (
+        <>
+          <Medal name={name} index={rosterIndex} small />
+          <span className="risk-seat-name">
+            {name || 'Someone'}
+            {seat.userId === activeId && <span className="pstub-you">you</span>}
+          </span>
+          <button
+            type="button"
+            className="risk-seat-clear"
+            aria-label={`Clear chair ${index + 1}: ${name || 'Someone'}`}
+            onClick={clear}
+            data-testid={`seat-${index}-clear`}
+          >
+            <CloseIcon size={18} />
+          </button>
+        </>
+      ) : (
+        <span className="risk-seat-empty">tap a ticket below</span>
+      )}
+      <button
+        type="button"
+        className={`risk-choice risk-seat-kind ${isBot ? 'on' : ''}`}
+        aria-pressed={isBot}
+        aria-label={
+          isBot
+            ? `Seat ${index + 1}: a computer general — tap for a person`
+            : `Seat ${index + 1}: a person — tap for a computer general`
+        }
+        onClick={() => onChange(isBot ? EMPTY_SEAT : { kind: 'bot', botId: RISK_PERSONAS[0].id })}
+        data-testid={`seat-bot-${index}`}
+      >
+        {isBot ? <BotIcon size={18} /> : <PersonIcon size={18} />}
+      </button>
+    </div>
+  );
 }
 
 export function RiskPage() {
@@ -80,7 +160,7 @@ export function RiskPage() {
       const color = PLAYER_COLORS[i];
       if (seat.kind === 'bot') return { name: personaById(seat.botId).name, color, bot: seat.botId };
       // A chair nobody claimed still plays, under its banner's name.
-      return { name: seatName(seat, table.users, () => '') || PLAYER_NAMES[i], color };
+      return { name: seatName(seat, table.users) || PLAYER_NAMES[i], color };
     });
     risk.start({ mapId: MAPS[0].id, players, diceMode });
   }
@@ -129,79 +209,18 @@ export function RiskPage() {
               ))}
             </div>
             <div className="stack" style={{ marginTop: 14 }}>
-              {table.seats.map((seat, i) => {
-                const isBot = seat.kind === 'bot';
-                const rosterIndex = seat.kind === 'ticket' ? table.users.findIndex((u) => u.id === seat.userId) : -1;
-                const name = seatName(seat, table.users, () => '');
-                return (
-                  <div className={`risk-player-row ${seat.kind}`} key={i} data-testid={`seat-${i}`}>
-                    <span className="risk-seal" style={{ ['--pc' as string]: PLAYER_COLORS[i] }} />
-                    {seat.kind === 'bot' ? (
-                      <div className="risk-personas" role="radiogroup" aria-label={`Computer general for seat ${i + 1}`}>
-                        {RISK_PERSONAS.map((p) => (
-                          <button
-                            key={p.id}
-                            className={`risk-choice risk-persona ${seat.botId === p.id ? 'on' : ''}`}
-                            role="radio"
-                            aria-checked={seat.botId === p.id}
-                            title={p.tagline}
-                            onClick={() => table.setSeats(setSeat(table.seats, i, { kind: 'bot', botId: p.id }))}
-                            data-testid={`persona-${i}-${p.id}`}
-                          >
-                            {p.name}
-                          </button>
-                        ))}
-                      </div>
-                    ) : seat.kind === 'ticket' ? (
-                      <>
-                        <span
-                          className="pmedal sm"
-                          style={{ ['--c' as string]: playerColor(rosterIndex) }}
-                          aria-hidden="true"
-                        >
-                          {initialOf(name)}
-                        </span>
-                        <span className="risk-seat-name">{name || 'Someone'}</span>
-                        <button
-                          className="risk-seat-clear"
-                          aria-label={`Chair ${i + 1}: ${name} — clear it`}
-                          onClick={() => table.setSeats(clearSeat(table.seats, i))}
-                          data-testid={`seat-${i}-clear`}
-                        >
-                          <CloseIcon size={18} />
-                        </button>
-                      </>
-                    ) : (
-                      <span className="risk-seat-empty">
-                        <span className="sr-only">Chair {i + 1}: </span>tap a ticket below
-                      </span>
-                    )}
-                    <button
-                      className={`risk-choice risk-seat-kind ${isBot ? 'on' : ''}`}
-                      aria-pressed={isBot}
-                      aria-label={
-                        isBot
-                          ? `Seat ${i + 1}: a computer general — tap for a person`
-                          : `Seat ${i + 1}: a person — tap for a computer general`
-                      }
-                      onClick={() =>
-                        table.setSeats(
-                          setSeat(table.seats, i, isBot ? EMPTY_SEAT : { kind: 'bot', botId: RISK_PERSONAS[0].id }),
-                        )
-                      }
-                      data-testid={`seat-bot-${i}`}
-                    >
-                      {isBot ? <BotIcon size={18} /> : <PersonIcon size={18} />}
-                    </button>
-                  </div>
-                );
-              })}
+              {table.seats.map((seat, i) => (
+                <CouncilSeat
+                  key={i}
+                  seat={seat}
+                  index={i}
+                  users={table.users}
+                  activeId={table.activeId}
+                  onChange={(next) => table.setSeats(setSeat(table.seats, i, next))}
+                />
+              ))}
             </div>
-            <TicketStrip
-              seated={new Set(seatedUserIds(table.seats))}
-              full={table.seats.every((s) => s.kind !== 'empty')}
-              onPick={(userId) => table.setSeats(fillNextEmpty(table.seats, { kind: 'ticket', userId }))}
-            />
+            <TicketStrip seats={table.seats} onChange={table.setSeats} />
             <p className="risk-note" style={{ marginTop: 10 }}>
               Tap a ticket to take a chair — or tap the little figure to seat a
               computer general, gentler or fiercer as you like.
