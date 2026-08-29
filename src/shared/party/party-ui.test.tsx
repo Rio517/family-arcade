@@ -85,6 +85,21 @@ describe('PartyBar', () => {
     expect(mockParty.value.leaveParty).not.toHaveBeenCalled();
   });
 
+  it('collapses while hosting and waiting for the friend — the code keeps waiting', () => {
+    // The owner hit exactly this: panel open, code on show, nobody joined yet.
+    mockParty.value = makeParty({ role: 'host', code: 'ABCD' });
+    renderBar();
+    fireEvent.click(screen.getByTestId('party-pill'));
+    expect(screen.getByTestId('party-code')).toHaveTextContent('ABCD');
+    fireEvent.click(screen.getByTestId('party-collapse'));
+    expect(screen.queryByRole('dialog', { name: 'Party' })).toBeNull();
+    // Minimizing didn't cancel the party — the code is still live behind the pill.
+    expect(mockParty.value.leaveParty).not.toHaveBeenCalled();
+    // And reopening brings the code straight back.
+    fireEvent.click(screen.getByTestId('party-pill'));
+    expect(screen.getByTestId('party-code')).toHaveTextContent('ABCD');
+  });
+
   it('offers "Start a party" when not in a party', () => {
     renderBar();
     fireEvent.click(screen.getByTestId('party-pill'));
