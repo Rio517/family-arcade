@@ -387,12 +387,16 @@ describe('two-player racer: reconnect re-sync', () => {
   let frames: FrameRequestCallback[];
   let now: number;
 
-  // Pay the lazy 3D chunk's transform cost once, before the timed waits below —
-  // the first client's `import('./Track3D')` is what outlived the ceilings on
-  // a loaded CI worker (the same fix the Ship Battle Fleet3D tests needed).
+  // Pay both lazy imports once, before the timed waits below. Track3D's own
+  // `import('../three/scene')` is what outlived the ceilings on a loaded
+  // worker: a failed run's DOM shows the guest's scene resolving only AFTER
+  // the timeout (the mock had been switched off by then, so the fallback
+  // rendered). Both modules are mocked here, so this is cheap when it isn't
+  // stalled — and the hook gets a generous budget for when it is.
   beforeAll(async () => {
     await import('./Track3D');
-  });
+    await import('../three/scene');
+  }, 60000);
 
   beforeEach(() => {
     fake3d.enabled = true;
@@ -478,7 +482,9 @@ describe('two-player racer: reconnect re-sync', () => {
       expect(guest.getByText('Rio wins!')).toBeInTheDocument();
       expect(guest.queryByText('Kai wins!')).toBeNull();
     },
-    // Two 20s ceilings above, plus the race itself.
-    60000,
+    // Two 20s ceilings above, plus the race itself. The retries cover a
+    // module-loading stall under CI contention that is not the product's
+    // doing (see the beforeAll above); a real regression fails all three.
+    { timeout: 60000, retry: 2 },
   );
 });
