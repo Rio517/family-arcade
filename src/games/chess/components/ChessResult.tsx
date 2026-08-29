@@ -17,7 +17,13 @@ interface ChessResultProps {
   blackName: string;
   /** Online only. */
   pointsEarned: number;
-  totalPoints: number;
+  /**
+   * Online only: the running total to announce — passed only when the
+   * ticket the result credited is the one signed in right now. Absent (a
+   * bystander holds the device), the card skips the line rather than
+   * announce somebody else's total as "yours".
+   */
+  totalPoints?: number;
   iWantRematch: boolean;
   oppWantsRematch: boolean;
   onRematch: () => void;
@@ -100,9 +106,11 @@ export function ChessResult(props: ChessResultProps) {
               <div className="earned reveal">
                 +{pointsEarned} points{iWon ? '!' : ' for a good game'}
               </div>
-              <div className="subtle reveal" style={{ marginTop: 6 }}>
-                You now have {totalPoints} points.
-              </div>
+              {totalPoints !== undefined && (
+                <div className="subtle reveal" style={{ marginTop: 6 }}>
+                  You now have {totalPoints} points.
+                </div>
+              )}
             </>
           )}
         </div>

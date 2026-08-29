@@ -813,6 +813,8 @@ describe('<ChessPage> — results land on the tickets that sat down', () => {
 
     expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Kai wins!');
     expect(screen.getByText(new RegExp(`\\+${pointsForResult(false, 0)} points`))).toBeInTheDocument();
+    // "You now have…" would read Flora's total — the bystander's — so the line stays off.
+    expect(screen.queryByText(/You now have/)).toBeNull();
 
     const rio = profileOf('u1');
     expect(rio.losses).toBe(1);
@@ -831,5 +833,92 @@ describe('<ChessPage> — results land on the tickets that sat down', () => {
     tap('d8', 'h4');
     expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Flora wins!');
     expect(getUsersSnapshot()).toBe(before);
+  });
+
+  it('online: the mate is recorded once — the reopened link replaying the finished log adds no second row', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    fireEvent.click(screen.getByTestId('chess-create'));
+    act(() => net.handlers.onMessage({ t: 'hello', v: 1, side: 'guest', name: 'Kai' }));
+    tap('f2', 'f3');
+    act(() => net.handlers.onMessage({ t: 'move', ply: ply('e7', 'e5') }));
+    tap('g2', 'g4');
+    act(() => net.handlers.onMessage({ t: 'move', ply: ply('d8', 'h4') }));
+    expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Kai wins!');
+
+    const points = pointsForResult(false, 0);
+    expect(profileOf('u1').history).toHaveLength(1);
+    expect(profileOf('u1').points).toBe(points);
+    // Rio sat down AND is signed in: the card's running total is Rio's.
+    expect(screen.getByText(`You now have ${points} points.`)).toBeInTheDocument();
+
+    // The iPad slept; the link reopens and Kai's handshake replays the very
+    // same finished log. Nothing new happened — nothing new is recorded.
+    act(() =>
+      net.handlers.onMessage({ t: 'sync', log: FOOLS_MATE.map(([f, t]) => ply(f, t)), wantRematch: false, epoch: 0 }),
+    );
+    expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Kai wins!');
+    expect(profileOf('u1').history).toHaveLength(1);
+    expect(profileOf('u1').losses).toBe(1);
+    expect(profileOf('u1').points).toBe(points);
+  });
+
+  it('host in a party: the mate closes the table, so a friend who reloads is never sat down at a finished game', () => {
+    mockParty.value = fakePartyWithKai('host');
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    fireEvent.click(screen.getByTestId('chess-party-play'));
+    act(() => net.handlers.onMessage({ t: 'hello', v: 1, side: 'guest', name: 'Kai' }));
+    expect(mockParty.value.closeTable).not.toHaveBeenCalled();
+
+    tap('f2', 'f3');
+    act(() => net.handlers.onMessage({ t: 'move', ply: ply('e7', 'e5') }));
+    tap('g2', 'g4');
+    act(() => net.handlers.onMessage({ t: 'move', ply: ply('d8', 'h4') }));
+    expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Kai wins!');
+    expect(mockParty.value.closeTable).toHaveBeenCalledWith('WXYZ');
+  });
+
+  it('a game promoted from free play ends like any other — both chairs get their rows', () => {
+    setLineup('chess', [{ userId: 'u1' }, { userId: 'u2' }]);
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-free'));
+    // Kb6 + Qh7 against a lone Ka8, one move from mate. Tray pieces stamp,
+    // so each is tapped again to put the stamp down before the next.
+    for (const [piece, square] of [['w-k', 'b6'], ['b-k', 'a8'], ['w-q', 'h7']]) {
+      fireEvent.click(screen.getByTestId(`fp-tray-${piece}`));
+      fireEvent.click(screen.getByTestId(`fp-sq-${square}`));
+      fireEvent.click(screen.getByTestId(`fp-tray-${piece}`));
+    }
+    fireEvent.click(screen.getByTestId('fp-start-game'));
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Rio to move/);
+
+    tap('h7', 'b7'); // Qb7#
+    expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Rio wins!');
+    const rio = profileOf('u1');
+    expect(rio.wins).toBe(1);
+    expect(rio.history[0]).toMatchObject({ game: 'chess', code: 'chess', opponent: 'Flora', result: 'win' });
+    const flora = profileOf('u2');
+    expect(flora.losses).toBe(1);
+    expect(flora.history[0]).toMatchObject({ game: 'chess', opponent: 'Rio', result: 'loss' });
+  });
+
+  it('same device: playing again after the mate records a second pair of rows — the chairs keep their tickets', () => {
+    setLineup('chess', [{ userId: 'u1' }, { userId: 'u2' }]);
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    fireEvent.click(screen.getByTestId('start-local'));
+    for (const [from, to] of FOOLS_MATE) tap(from, to);
+    expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Flora wins!');
+
+    fireEvent.click(screen.getByTestId('chess-rematch'));
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Rio to move/);
+    for (const [from, to] of FOOLS_MATE) tap(from, to);
+    expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Flora wins!');
+
+    expect(profileOf('u2').wins).toBe(2);
+    expect(profileOf('u2').history).toHaveLength(2);
+    expect(profileOf('u1').losses).toBe(2);
+    expect(profileOf('u1').history).toHaveLength(2);
   });
 });

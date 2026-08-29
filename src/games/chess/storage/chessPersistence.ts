@@ -192,8 +192,9 @@ export function loadLocalChessGame(): StoredLocalChess | null {
 
 /** Rebuild a live hotseat session from the autosave. */
 export function storedToLocalChess(g: StoredLocalChess): SessionState {
-  const white = { name: g.whiteName, userId: g.whiteUserId ?? null };
-  const black = { name: g.blackName, userId: g.blackUserId ?? null };
+  // A ticket is a string or nothing: a hand-edited save never smuggles an odd id into the ledger.
+  const white = { name: g.whiteName, userId: typeof g.whiteUserId === 'string' ? g.whiteUserId : null };
+  const black = { name: g.blackName, userId: typeof g.blackUserId === 'string' ? g.blackUserId : null };
   return { ...createLocalSession(white, black, g.start), log: g.log };
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyMessage,
+  boardState,
   canIMove,
   connectHandshake,
   createLocalSession,
@@ -14,6 +15,7 @@ import {
   type SessionState,
 } from './session';
 import { isChessMessage } from './protocol';
+import { winnerOf } from './rules';
 import type { Ply, Square } from './types';
 
 const sq = (name: string): Square => ({ row: 8 - Number(name[1]), col: 'abcdefgh'.indexOf(name[0]) });
@@ -264,8 +266,8 @@ describe('online session — sync between two peers', () => {
     expect(phase(host)).toBe('over');
     expect(phase(guest)).toBe('over');
     // Host is White and delivered mate; the winner is White on both peers.
-    const hostFinish = applyMessage(guest, { t: 'sync', log: host.log, wantRematch: false });
-    expect(hostFinish.finished?.winner).toBe('w');
+    expect(winnerOf(boardState(host))).toBe('w');
+    expect(winnerOf(boardState(guest))).toBe('w');
   });
 
   it('a rematch cannot reset a game still in progress (guard parity with battleship)', () => {
@@ -469,5 +471,53 @@ describe('security: forged sync log', () => {
     const legal = [ply('e2', 'e4'), ply('e7', 'e5')];
     const out = applyMessage(guest, { t: 'sync', log: legal, epoch: 0, wantRematch: false });
     expect(out.state.log).toHaveLength(2);
+  });
+});
+
+describe('a finish is reported exactly once', () => {
+  // Scholar's mate — White (the host) wins on move 4.
+  const MATE: Ply[] = [
+    ply('e2', 'e4'), ply('e7', 'e5'),
+    ply('f1', 'c4'), ply('b8', 'c6'),
+    ply('d1', 'h5'), ply('g8', 'f6'),
+    ply('h5', 'f7'),
+  ];
+  const BEFORE_MATE = MATE.slice(0, -1);
+  const host = (log: Ply[]): SessionState => ({ ...createOnlineSession('host', 'ABCD', 'Host'), log });
+  const guest = (log: Ply[]): SessionState => ({ ...createOnlineSession('guest', 'ABCD', 'Guest'), log });
+
+  it('a sync that finishes the game reports it', () => {
+    const out = applyMessage(host(BEFORE_MATE), { t: 'sync', log: MATE, wantRematch: false, epoch: 0 });
+    expect(out.finished).toMatchObject({ winner: 'w', iWon: true });
+    expect(phase(out.state)).toBe('over');
+  });
+
+  it("the peer's sync of the same finished log into a finished game reports nothing — a reopened link must not credit the mate twice", () => {
+    // An iPad sleeps after the mate; the channel reopens and both ends replay
+    // connectHandshake, carrying the finished log both ways.
+    const out = applyMessage(host(MATE), { t: 'sync', log: MATE, wantRematch: false, epoch: 0 });
+    expect(out.finished).toBeUndefined();
+    expect(out.state.log).toEqual(MATE);
+    expect(out.outgoing).toEqual([]);
+  });
+
+  it('a newer-epoch sync that is already decided is a new finish, even onto a finished game', () => {
+    // The peer rematch-reset without us and played the rematch to mate: a
+    // different game, never recorded here.
+    const out = applyMessage(host(MATE), { t: 'sync', log: MATE, wantRematch: false, epoch: 1 });
+    expect(out.state.epoch).toBe(1);
+    expect(out.finished).toMatchObject({ winner: 'w' });
+  });
+
+  it('a newer-epoch sync of a game still in play reports nothing', () => {
+    const out = applyMessage(host(MATE), { t: 'sync', log: [], wantRematch: false, epoch: 1 });
+    expect(out.finished).toBeUndefined();
+  });
+
+  it("the opponent's mating move reports the finish once — and their resync after it reports nothing", () => {
+    const mated = applyMessage(guest(BEFORE_MATE), { t: 'move', ply: ply('h5', 'f7') });
+    expect(mated.finished).toMatchObject({ winner: 'w', iWon: false });
+    const again = applyMessage(mated.state, { t: 'sync', log: MATE, wantRematch: false, epoch: 0 });
+    expect(again.finished).toBeUndefined();
   });
 });
