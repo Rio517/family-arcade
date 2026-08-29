@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProfile } from '@shared/profile/useProfile';
 import { useParty } from '@shared/party/PartyContext';
+import { usePartyDoor } from '@shared/party/usePartyDoor';
 import { generateCode } from '@shared/net/peer';
 import { useBattleship } from '@games/battleship/state/useBattleship';
 import { pointsForResult } from '@shared/profile/profile';
@@ -20,6 +21,9 @@ import { loadResumableSession } from '@games/battleship/storage/sessionStore';
 import { QRCodeSVG } from 'qrcode.react';
 import type { FinishInfo } from '@games/battleship/domain/session';
 import type { FleetEra } from '@games/battleship/domain/types';
+
+/** Ship Battle's registry id — what the party's table and knock carry. */
+const GAME_ID = 'battleship';
 
 /** The finished-game summary shown on the Result screen. */
 interface ResultSummary {
@@ -108,11 +112,15 @@ export function BattleshipPage() {
   // computer captain doesn't scan QR codes.
   const solo = bs.code === 'SOLO';
 
-  const goMenu = () => navigate('/');
+  // Walking away from an online table — for a rest (‹ Menu keeps the save)
+  // or for good (Back to menu drops it) — closes it either way, so a party
+  // friend's lobby stops waiting on (or walking into) a game nobody is at.
+  // (The party ignores this unless we are the host and this is the open table.)
+  const goMenu = () => {
+    if (bs.code) party.closeTable(bs.code);
+    navigate('/');
+  };
   const exitToMenu = () => {
-    // A party host walking away from an online table closes it, so the
-    // friend's lobby stops waiting on (or walking into) a game that is over.
-    // (The party ignores this unless we are the host and this is the open table.)
     if (bs.code) party.closeTable(bs.code);
     bs.leave();
     navigate('/');
@@ -120,8 +128,23 @@ export function BattleshipPage() {
 
   // Sit down at an online table under this ticket: hosting draws a fresh
   // code, the party hands one over, a join brings its own.
-  const sitDown = (role: 'host' | 'guest', code: string) =>
-    bs.startTable({ role, code, seatedUserId: profile.userId });
+  const { startTable, leave, side, oppConnected, log } = bs;
+  const sitDown = useCallback(
+    (role: 'host' | 'guest', code: string) => startTable({ role, code, seatedUserId: profile.userId }),
+    [startTable, profile.userId],
+  );
+
+  // The party guest's door is the page's, not the lobby screen's: one hook
+  // for the whole visit, reset on unmount, so the table the party hands over
+  // seats us exactly once (and StrictMode's rehearsal mount can't leave a
+  // guest stuck dialing). It is only open while we are in the lobby.
+  const onTable = useCallback((code: string) => sitDown('guest', code), [sitDown]);
+  // The table we were handed went away: hang up a dial at a dead code — but
+  // never throw away a game with shots in it (leave() deletes the save).
+  const onClosed = useCallback(() => {
+    if (side === 'guest' && !oppConnected && log.length === 0) leave();
+  }, [side, oppConnected, log.length, leave]);
+  usePartyDoor(GAME_ID, bs.phase === 'lobby', onTable, onClosed);
 
   const isSetup = bs.phase === 'fleet' || bs.phase === 'placing' || bs.phase === 'waiting';
   const showCode = !solo && bs.side === 'host' && isSetup && !bs.oppConnected;

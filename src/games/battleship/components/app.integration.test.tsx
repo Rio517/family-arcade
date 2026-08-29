@@ -3,53 +3,51 @@ import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } f
 import { MemoryRouter } from 'react-router-dom';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
-import { loadSession } from '@games/battleship/storage/sessionStore';
+import { loadSession, saveSession } from '@games/battleship/storage/sessionStore';
+import type { Fleet, GameLog } from '@games/battleship/domain/types';
 import type { PartyValue } from '@shared/party/PartyContext';
+import { fakeParty, fakePartyWithKai } from '@shared/party/testing';
 
-// The party is mocked (its provider lives above the router): the lobby reads
-// it to decide whether the code doors are open, and the tests below set it.
-const mockParty = vi.hoisted(() => ({ value: null as any }));
+// The party is mocked (its provider lives above the router): the page's door
+// and the lobby's ladder read it, and the tests below set it.
+const mockParty = vi.hoisted(() => ({ value: null as unknown as PartyValue }));
 vi.mock('@shared/party/PartyContext', () => ({ useParty: () => mockParty.value }));
 
-function makeParty(over: Partial<PartyValue> = {}): PartyValue {
-  return {
-    myName: 'Rio',
-    status: 'idle',
-    code: '',
-    role: null,
-    inParty: false,
-    theirName: null,
-    hostParty: vi.fn(() => 'ABCD'),
-    joinParty: vi.fn(),
-    leaveParty: vi.fn(),
-    retry: vi.fn(),
-    reconnecting: false,
-    table: null,
-    knock: null,
-    openTable: vi.fn(() => 'WXYZ'),
-    closeTable: vi.fn(),
-    knockOn: vi.fn(),
-    clearKnock: vi.fn(),
-    resolveGame: () => null,
-    call: {
-      active: false,
-      status: 'idle',
-      muted: false,
-      cameraOn: false,
-      localStream: null,
-      remoteStream: null,
-      start: vi.fn(),
-      stop: vi.fn(),
-      toggleMute: vi.fn(),
-      toggleCamera: vi.fn(),
-    },
-    ...over,
-  } as PartyValue;
-}
+/** A legal, hand-placed fleet: five ships on even rows, all pointing east. */
+const FLEET: Fleet = [
+  { shipId: 'carrier', row: 0, col: 0, orientation: 'H' },
+  { shipId: 'battleship', row: 2, col: 0, orientation: 'H' },
+  { shipId: 'cruiser', row: 4, col: 0, orientation: 'H' },
+  { shipId: 'submarine', row: 6, col: 0, orientation: 'H' },
+  { shipId: 'destroyer', row: 8, col: 0, orientation: 'H' },
+];
 
-/** The party as seen from one side of it, already linked to the friend. */
-const inPartyAs = (role: 'host' | 'guest', over: Partial<PartyValue> = {}) =>
-  makeParty({ inParty: true, status: 'connected', role, code: 'PRTY', theirName: 'Kai', ...over });
+/** A battle two shots in: the host opened fire and missed, the guest answered in kind. */
+const MID_BATTLE: GameLog = [
+  { type: 'start', first: 'host' },
+  { type: 'shot', by: 'host', row: 9, col: 9, hit: false, sunk: null, allSunk: false },
+  { type: 'shot', by: 'guest', row: 9, col: 9, hit: false, sunk: null, allSunk: false },
+];
+
+/** The save a reload finds: Kai, the guest, mid-battle against Rio under `code`. */
+function seedGuestSave(code: string) {
+  saveSession({
+    code,
+    side: 'guest',
+    myName: 'Kai',
+    mySkinId: 'aqua',
+    seatedUserId: 'u-kai',
+    oppName: 'Rio',
+    oppSkinId: 'aqua',
+    myFleet: FLEET,
+    myReady: true,
+    oppReady: true,
+    log: MID_BATTLE,
+    epoch: 0,
+    finished: false,
+    updatedAt: 1,
+  });
+}
 
 /**
  * High-level, DOM-driven integration test: two real <BattleshipPage> clients
@@ -61,6 +59,10 @@ const inPartyAs = (role: 'host' | 'guest', over: Partial<PartyValue> = {}) =>
  * the one test that exercises the whole stack (components → hook → session
  * state machine → "network") the way a player does.
  */
+
+// What the page asked of the wire — which codes it dialled — so a test can
+// say "joined once" without a second client on the other end.
+const wire = vi.hoisted(() => ({ joins: [] as string[] }));
 
 // Replace the PeerJS transport with an in-memory bus that links the two clients.
 vi.mock('@shared/net/peer', async (importOriginal) => {
@@ -81,6 +83,7 @@ vi.mock('@shared/net/peer', async (importOriginal) => {
       this.handlers.onStatus('hosting');
     }
     join(code: string) {
+      wire.joins.push(code);
       const host = hosts.get(code);
       if (!host) return this.handlers.onStatus('error', 'no host');
       this.peer = host;
@@ -109,12 +112,19 @@ vi.mock('@shared/net/peer', async (importOriginal) => {
 
 import { BattleshipPage } from './BattleshipPage';
 
+/**
+ * One page under a router. A fresh element every time: a rerender with the
+ * identical element lets React bail out of the whole subtree, and the mocked
+ * party value would never be read again.
+ */
+const page = () => (
+  <MemoryRouter initialEntries={['/play']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BattleshipPage />
+  </MemoryRouter>
+);
+
 function renderApp(): RenderResult {
-  return render(
-    <MemoryRouter initialEntries={['/play']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <BattleshipPage />
-    </MemoryRouter>,
-  );
+  return render(page());
 }
 
 /**
@@ -132,7 +142,8 @@ function signInAs(name: string) {
 
 beforeEach(() => {
   localStorage.clear();
-  mockParty.value = makeParty();
+  mockParty.value = fakeParty();
+  wire.joins.length = 0;
   // This flow exercises the radar and the wire, not the 3D ocean — pin the
   // fleet tile to the 2D grid so the lazy three.js chunk never enters the run.
   localStorage.setItem('bs-fleet-view-v1', '2d');
@@ -157,7 +168,7 @@ describe('the ticket sits down at the table', () => {
 
 describe('in a party, the party is the table', () => {
   it('the host opens Ship Battle for the friend under the code the party hands back', async () => {
-    mockParty.value = inPartyAs('host');
+    mockParty.value = fakePartyWithKai('host');
     const app = within(renderApp().container);
 
     fireEvent.click(app.getByTestId('battle-party-play'));
@@ -168,21 +179,125 @@ describe('in a party, the party is the table', () => {
     expect(saved?.seatedUserId).toBe('u1');
   });
 
+  it('the guest knocks once, waits, then walks in the moment the table opens — once per code', () => {
+    signInAs('Kai');
+    mockParty.value = fakePartyWithKai('guest', { theirName: 'Rio' });
+    const view = renderApp();
+    const app = within(view.container);
+
+    expect(mockParty.value.knockOn).toHaveBeenCalledTimes(1);
+    expect(mockParty.value.knockOn).toHaveBeenCalledWith('battleship');
+    expect(app.getByTestId('battle-party-waiting')).toHaveTextContent('Waiting for Rio to open Ship Battle');
+    expect(app.queryByTestId('create-game')).toBeNull();
+    expect(app.queryByTestId('show-join')).toBeNull();
+    expect(wire.joins).toEqual([]);
+
+    // A rerender with the same (absent) table knocks no second time.
+    view.rerender(page());
+    expect(mockParty.value.knockOn).toHaveBeenCalledTimes(1);
+
+    // The host opens Ship Battle: the party carries the code, the page joins.
+    const { knockOn } = mockParty.value;
+    mockParty.value = fakePartyWithKai('guest', { theirName: 'Rio', knockOn, table: { game: 'battleship', code: 'QRST' } });
+    view.rerender(page());
+    expect(wire.joins).toEqual(['QRST']);
+    expect(loadSession('QRST')?.side).toBe('guest');
+    expect(loadSession('QRST')?.seatedUserId).toBe('u-kai');
+    expect(app.queryByTestId('battle-party-waiting')).toBeNull();
+    expect(app.getByTestId('fleet-continue')).toBeInTheDocument();
+
+    // Still the same table on the next render — no double join.
+    view.rerender(page());
+    expect(wire.joins).toEqual(['QRST']);
+  });
+
   it('the guest walks in the moment the table is open, seated under their own ticket', () => {
     signInAs('Kai');
-    mockParty.value = inPartyAs('guest', { theirName: 'Rio', table: { game: 'battleship', code: 'NOPE' } });
+    mockParty.value = fakePartyWithKai('guest', { theirName: 'Rio', table: { game: 'battleship', code: 'NOPE' } });
     renderApp();
 
     // No knock — the table was already open — and the join went out at once.
     expect(mockParty.value.knockOn).not.toHaveBeenCalled();
+    expect(wire.joins).toEqual(['NOPE']);
     const saved = loadSession('NOPE');
     expect(saved?.side).toBe('guest');
     expect(saved?.myName).toBe('Kai');
     expect(saved?.seatedUserId).toBe('u-kai');
   });
 
+  it('a table for another game is not ours — the guest keeps waiting, and knocks', () => {
+    signInAs('Kai');
+    mockParty.value = fakePartyWithKai('guest', { theirName: 'Rio', table: { game: 'chess', code: 'CHSS' } });
+    const app = within(renderApp().container);
+
+    expect(mockParty.value.knockOn).toHaveBeenCalledWith('battleship');
+    expect(app.getByTestId('battle-party-waiting')).toBeInTheDocument();
+    expect(wire.joins).toEqual([]);
+  });
+
+  it('a guest reloading mid-battle is seated back in the saved game, fleet intact', () => {
+    // The reload: a save under the code the party will seat us at again.
+    signInAs('Kai');
+    seedGuestSave('NOPE');
+    mockParty.value = fakePartyWithKai('guest', { theirName: 'Rio', table: { game: 'battleship', code: 'NOPE' } });
+    const app = within(renderApp().container);
+
+    expect(wire.joins).toEqual(['NOPE']);
+    // The persist pass wrote the *restored* game back, not a fresh, empty one
+    // — an empty fleet here is how every host shot turned into a miss.
+    const saved = loadSession('NOPE');
+    expect(saved?.myFleet).toEqual(FLEET);
+    expect(saved?.log).toEqual(MID_BATTLE);
+    // …and the captain is back on the battle board, not picking a fleet.
+    expect(app.queryByTestId('fleet-continue')).toBeNull();
+    expect(app.getByTestId('turn-pill')).toBeInTheDocument();
+  });
+
+  it('a guest whose table closes before anything happened hangs up and waits at the door again', () => {
+    signInAs('Kai');
+    mockParty.value = fakePartyWithKai('guest', { theirName: 'Rio', table: { game: 'battleship', code: 'NOPE' } });
+    const view = renderApp();
+    const app = within(view.container);
+    expect(loadSession('NOPE')?.side).toBe('guest');
+    expect(app.queryByTestId('battle-party-waiting')).toBeNull();
+
+    // The host walked away: the table closes under us.
+    mockParty.value = fakePartyWithKai('guest', { theirName: 'Rio' });
+    view.rerender(page());
+    expect(loadSession('NOPE')).toBeNull();
+    expect(app.getByTestId('battle-party-waiting')).toBeInTheDocument();
+    // …and knocks again, so the host's pill lights up for the next game.
+    expect(mockParty.value.knockOn).toHaveBeenCalledWith('battleship');
+  });
+
+  it('but a table closing mid-battle leaves the saved game alone', () => {
+    signInAs('Kai');
+    seedGuestSave('NOPE');
+    mockParty.value = fakePartyWithKai('guest', { theirName: 'Rio', table: { game: 'battleship', code: 'NOPE' } });
+    const view = renderApp();
+    const app = within(view.container);
+
+    mockParty.value = fakePartyWithKai('guest', { theirName: 'Rio' });
+    view.rerender(page());
+    expect(loadSession('NOPE')?.myFleet).toEqual(FLEET);
+    expect(loadSession('NOPE')?.log).toEqual(MID_BATTLE);
+    expect(app.queryByTestId('battle-party-waiting')).toBeNull();
+  });
+
+  it('the host tapping ‹ Menu closes the table too — not only the in-game Back to menu', async () => {
+    mockParty.value = fakePartyWithKai('host');
+    const app = within(renderApp().container);
+
+    fireEvent.click(app.getByTestId('battle-party-play'));
+    expect((await app.findByTestId('game-code')).textContent!.trim()).toBe('WXYZ');
+    fireEvent.click(app.getByTestId('back'));
+    expect(mockParty.value.closeTable).toHaveBeenCalledWith('WXYZ');
+    // Menu is not Leave: the game is still saved for a resume.
+    expect(loadSession('WXYZ')?.side).toBe('host');
+  });
+
   it('a party host readying up sees no QR invite — the friend is already walking in', async () => {
-    mockParty.value = inPartyAs('host');
+    mockParty.value = fakePartyWithKai('host');
     const app = within(renderApp().container);
 
     fireEvent.click(app.getByTestId('battle-party-play'));
@@ -196,7 +311,7 @@ describe('in a party, the party is the table', () => {
   });
 
   it('a host backing out of a table that could not open closes it for the friend', async () => {
-    mockParty.value = inPartyAs('host', { openTable: vi.fn(() => 'DOWN') });
+    mockParty.value = fakePartyWithKai('host', { openTable: vi.fn(() => 'DOWN') });
     const app = within(renderApp().container);
 
     fireEvent.click(app.getByTestId('battle-party-play'));
