@@ -6,7 +6,6 @@
  * Finished games clear themselves.
  */
 
-import { mintCampaignId } from '../domain/rules';
 import type { GameState } from '../domain/types';
 
 const KEY = 'risk-campaign-v1';
@@ -56,13 +55,6 @@ export function loadRiskGame(): StoredRisk | null {
     // old campaigns keep working without a storage-version bump.
     if (!Array.isArray(parsed.state.defenseBag)) {
       parsed.state.defenseBag = [];
-    }
-    // The campaign id arrived with everyone's history. A save from before it
-    // — or a hand-edited one holding junk — gets a fresh id rather than none,
-    // so the finish can still tell this war from the next when it credits
-    // the winner's ticket.
-    if (typeof parsed.state.id !== 'string' || parsed.state.id === '') {
-      parsed.state.id = mintCampaignId();
     }
     // A seat's ticket id rides along so a finished war can credit the right
     // roster entry. Saves from before it simply have none (nobody is

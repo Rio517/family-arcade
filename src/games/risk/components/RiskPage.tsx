@@ -23,6 +23,9 @@ import type { BattleResult, DiceMode, GameState } from '../domain/types';
 
 import { loadColors, pickColor, saveColors, TINCTURES, tinctureName } from '../storage/riskColors';
 
+/** Registry id — the seat lineup key and the `game` on a credited history row. */
+const GAME_ID = 'risk';
+
 const PHASE_NAMES: Record<string, string> = {
   setup: 'Setting up',
   reinforce: 'Placing armies',
@@ -170,7 +173,7 @@ export function RiskPage() {
   const [count, setCount] = useState(3);
   // The chairs at the table: a ticket from the roster, a computer general, or
   // an empty chair that still marches under its banner colour's name.
-  const table = useSeats('risk', count);
+  const table = useSeats(GAME_ID, count);
   // Each chair's tincture — remembered on this device; never two the same.
   const [colors, setColors] = useState<string[]>(loadColors);
   // Balanced by default — the family prefers luck that evens out; pure random
@@ -197,20 +200,22 @@ export function RiskPage() {
   // handed a loss. A computer general or an unclaimed chair has no ticket, so
   // its victory is nobody's to keep. The ticket id was captured when the war
   // opened (see start), never read from whoever is signed in at the finish.
-  // The once-guard lives in memory on purpose: a finished war is never saved
-  // (useRisk clears it and the loader refuses one), so a reload lands on the
-  // war council with nothing to credit again.
-  const creditedRef = useRef<string | null>(null);
+  // The once-guard is the finished state object itself: every reducer hands
+  // back the same object once the phase is `over`, so one finished war is one
+  // object — and a finished war is never saved (useRisk clears it, the loader
+  // refuses one), so a reload lands on the war council with nothing to credit
+  // again. A ref, not state, so StrictMode's double-run can't credit twice.
+  const creditedRef = useRef<GameState | null>(null);
   useEffect(() => {
     if (!state || state.phase !== 'over' || state.winner === null) return;
-    if (creditedRef.current === state.id) return;
-    creditedRef.current = state.id;
+    if (creditedRef.current === state) return;
+    creditedRef.current = state;
     const w = state.players[state.winner];
     recordResultFor(w.userId ?? null, {
       won: true,
       survivingCells: 0,
-      code: state.id,
-      game: 'risk',
+      code: GAME_ID,
+      game: GAME_ID,
       opponent: state.players.filter((p) => p.id !== w.id).map((p) => p.name).join(' & '),
       finishedAt: Date.now(),
     });

@@ -73,36 +73,6 @@ describe('risk persistence', () => {
     expect(stored!.state.players[0].userId).toBeUndefined();
   });
 
-  it('keeps the campaign id through a save and back', () => {
-    const g = newGame(MAP, players);
-    expect(g.id).toMatch(/\S/);
-    saveRiskGame(g);
-    expect(loadRiskGame()!.state.id).toBe(g.id);
-  });
-
-  it('gives a save from before campaigns had ids a fresh one on load', () => {
-    // The id arrived with everyone's history; an older campaign still resumes,
-    // and gets an id so its finish can be credited like any other.
-    const legacyState: Record<string, unknown> = { ...newGame(MAP, players) };
-    delete legacyState.id;
-    localStorage.setItem('risk-campaign-v1', JSON.stringify({ v: 1, savedAt: 1, state: legacyState }));
-    const stored = loadRiskGame();
-    expect(stored).not.toBeNull();
-    expect(stored!.state.id).toMatch(/\S/);
-  });
-
-  it('replaces a junk campaign id from a hand-edited save rather than trusting it', () => {
-    for (const junk of [42, '', null, { nested: true }]) {
-      localStorage.setItem(
-        'risk-campaign-v1',
-        JSON.stringify({ v: 1, savedAt: 1, state: { ...newGame(MAP, players), id: junk } }),
-      );
-      const stored = loadRiskGame();
-      expect(stored).not.toBeNull();
-      expect(stored!.state.id).toMatch(/\S/);
-    }
-  });
-
   it('never offers a finished war', () => {
     const g = newGame(MAP, players);
     saveRiskGame({ ...g, phase: 'over', winner: 0 });
