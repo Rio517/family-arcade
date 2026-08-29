@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { LINEUP_KEY, resetLineupStore } from '@shared/profile/lineupStore';
+import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
+import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { UnicornPage } from './UnicornPage';
 
 function renderPage() {
@@ -37,9 +40,10 @@ function pumpUntilWin() {
   expect(screen.getByTestId('uni-win')).toBeInTheDocument();
 }
 
-/** Click through the pickers: 1 player, a world, a character. */
+/** Click through the pickers: 1 player, the table, a world, a character. */
 function startSolo(world: 'sky' | 'ocean' = 'sky', charId = 'fairy') {
   fireEvent.click(screen.getByTestId('uni-players-1'));
+  fireEvent.click(screen.getByTestId('uni-seats-next'));
   fireEvent.click(screen.getByTestId(`uni-world-${world}`));
   fireEvent.click(screen.getByTestId(`uni-char-${charId}`));
 }
@@ -53,7 +57,17 @@ function pinLuck() {
   vi.spyOn(Math, 'random').mockReturnValue(0.5);
 }
 
+/** Rio is signed in; Klara has a ticket on this iPad too. */
+function seedRoster() {
+  setUsersState(setActiveUser(addUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u2', 'Klara'), 'u1'));
+}
+
 beforeEach(() => {
+  // No roster and no remembered lineup unless a test asks for one, so the
+  // chairs fall back to Player 1/2/3.
+  localStorage.clear();
+  resetUsersStore();
+  resetLineupStore();
   pendingFrames.clear();
   nextFrameId = 1;
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
@@ -77,9 +91,13 @@ describe('<UnicornPage>', () => {
       for (const n of [1, 2, 3]) expect(screen.getByTestId(`uni-players-${n}`)).toBeInTheDocument();
     });
 
-    it('choosing a player count moves on to the world picker', () => {
+    it('choosing a player count opens the table, and Next moves on to the world picker', () => {
       renderPage();
       fireEvent.click(screen.getByTestId('uni-players-2'));
+      expect(screen.getByTestId('seat-0')).toBeInTheDocument();
+      expect(screen.getByTestId('seat-1')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('uni-seats-next'));
       expect(screen.getByTestId('uni-world-sky')).toBeInTheDocument();
       expect(screen.getByTestId('uni-world-ocean')).toBeInTheDocument();
     });
@@ -87,6 +105,7 @@ describe('<UnicornPage>', () => {
     it('each world offers its own cast of characters', () => {
       const first = renderPage();
       fireEvent.click(screen.getByTestId('uni-players-1'));
+      fireEvent.click(screen.getByTestId('uni-seats-next'));
       fireEvent.click(screen.getByTestId('uni-world-sky'));
       for (const id of ['fairy', 'butterfly', 'dragon', 'princess']) {
         expect(screen.getByTestId(`uni-char-${id}`)).toBeInTheDocument();
@@ -95,6 +114,7 @@ describe('<UnicornPage>', () => {
 
       renderPage();
       fireEvent.click(screen.getByTestId('uni-players-1'));
+      fireEvent.click(screen.getByTestId('uni-seats-next'));
       fireEvent.click(screen.getByTestId('uni-world-ocean'));
       for (const id of ['mermaid', 'seahorse', 'turtle', 'princess']) {
         expect(screen.getByTestId(`uni-char-${id}`)).toBeInTheDocument();
@@ -105,6 +125,7 @@ describe('<UnicornPage>', () => {
     it('the character pick rotates through every seat, then the game starts', () => {
       renderPage();
       fireEvent.click(screen.getByTestId('uni-players-3'));
+      fireEvent.click(screen.getByTestId('uni-seats-next'));
       fireEvent.click(screen.getByTestId('uni-world-sky'));
 
       expect(screen.getByRole('heading', { name: /Player 1, pick your character/ })).toBeInTheDocument();
@@ -129,6 +150,78 @@ describe('<UnicornPage>', () => {
       fireEvent.click(screen.getByTestId('uni-players-2'));
       fireEvent.click(screen.getByTestId('uni-back'));
       expect(screen.getByTestId('uni-players-1')).toBeInTheDocument();
+    });
+
+    it('the back button on the world picker returns to the table', () => {
+      renderPage();
+      fireEvent.click(screen.getByTestId('uni-players-2'));
+      fireEvent.click(screen.getByTestId('uni-seats-next'));
+      fireEvent.click(screen.getByTestId('uni-back'));
+      expect(screen.getByTestId('seat-0')).toBeInTheDocument();
+    });
+  });
+
+  describe("who's playing", () => {
+    beforeEach(seedRoster);
+
+    it('seats the tickets, names the character picks, and remembers the table', () => {
+      renderPage();
+      fireEvent.click(screen.getByTestId('uni-players-2'));
+
+      // Chair 1 opens with the signed-in ticket; chair 2 waits for a tap.
+      expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
+      expect(screen.getByTestId('seat-1')).toHaveTextContent(/tap a ticket/i);
+
+      fireEvent.click(screen.getByTestId('strip-user-u2'));
+      expect(screen.getByTestId('seat-1')).toHaveTextContent('Klara');
+
+      fireEvent.click(screen.getByTestId('uni-seats-next'));
+      fireEvent.click(screen.getByTestId('uni-world-sky'));
+
+      // Each chair is asked for its character by name.
+      expect(screen.getByRole('heading', { name: /Rio, pick your character/ })).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('uni-char-fairy'));
+      expect(screen.getByRole('heading', { name: /Klara, pick your character/ })).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('uni-char-dragon'));
+
+      // The round is live, the scoreboard carries the ticket names…
+      expect(screen.getByTestId('uni-canvas')).toBeInTheDocument();
+      // …and the table is remembered for next time.
+      expect(JSON.parse(localStorage.getItem(LINEUP_KEY) ?? '{}')).toEqual({
+        unicorn: [{ userId: 'u1' }, { userId: 'u2' }],
+      });
+    });
+
+    it('a solo game still opens the table — one tap through for the signed-in ticket', () => {
+      renderPage();
+      fireEvent.click(screen.getByTestId('uni-players-1'));
+      expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
+      expect(screen.queryByTestId('seat-1')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('uni-seats-next'));
+      expect(screen.getByTestId('uni-world-sky')).toBeInTheDocument();
+    });
+
+    it('an empty chair simply plays as its player number', () => {
+      pinLuck();
+      renderPage();
+      fireEvent.click(screen.getByTestId('uni-players-1'));
+      fireEvent.click(screen.getByTestId('seat-0-clear'));
+      fireEvent.click(screen.getByTestId('uni-seats-next'));
+      fireEvent.click(screen.getByTestId('uni-world-sky'));
+      fireEvent.click(screen.getByTestId('uni-char-fairy'));
+
+      pumpUntilWin();
+      expect(screen.getByTestId('uni-win')).toHaveTextContent('Player 1 wins!');
+      expect(JSON.parse(localStorage.getItem(LINEUP_KEY) ?? '{}')).toEqual({ unicorn: [null] });
+    });
+
+    it('the winner is announced by ticket name', () => {
+      pinLuck();
+      renderPage();
+      startSolo();
+      pumpUntilWin();
+      expect(screen.getByTestId('uni-win')).toHaveTextContent('Rio wins!');
     });
   });
 

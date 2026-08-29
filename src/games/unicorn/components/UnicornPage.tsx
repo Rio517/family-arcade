@@ -1,6 +1,9 @@
 import '../styles/unicorn.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { SeatPicker } from '@shared/profile/SeatPicker';
+import { seatName } from '@shared/profile/seats';
+import { useSeats } from '@shared/profile/useSeats';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { BoltIcon, CoinIcon, MagnetIcon, SparkleIcon } from '@shared/ui/icons';
 import {
@@ -25,7 +28,7 @@ import {
 import { pickPlayerForTouch, steerToward } from '../domain/input';
 import { renderScene } from './scene';
 
-type Phase = 'players' | 'world' | 'characters' | 'play' | 'over';
+type Phase = 'players' | 'seats' | 'world' | 'characters' | 'play' | 'over';
 
 
 /** Keyboard steering for up to three seats. Player 1 can also drag/tap. */
@@ -49,32 +52,39 @@ export function UnicornPage() {
   const [picks, setPicks] = useState<(Character | null)[]>([]);
   const [pickingSeat, setPickingSeat] = useState(0);
 
+  // Who is in each chair: a ticket from the roster, or nobody — an empty chair
+  // simply plays as "Player 2". Names are derived every render from the ticket
+  // ids, so a rename at the booth renames the player here too.
+  const table = useSeats('unicorn', playerCount);
+  const seatNames = table.seats.map((s, i) => seatName(s, table.users, () => '') || PLAYER_NAMES[i]);
+
   // The live game lives in a ref so the animation loop never restarts on a
   // React render. A version counter nudges the HUD to repaint a few times a
   // second without re-running the physics.
   const gameRef = useRef<GameState | null>(null);
   const [, setTick] = useState(0);
 
-  const startGame = useCallback(
-    (chosen: Character[]) => {
-      const players: PlayerConfig[] = chosen.map((c, i) => ({
-        id: i,
-        name: PLAYER_NAMES[i],
-        color: PLAYER_COLORS[i],
-        emoji: c.emoji,
-        mount: c.mount,
-      }));
-      gameRef.current = createGame({ world, players });
-      setPhase('play');
-    },
-    [world],
-  );
+  // Called only from click handlers, so a plain function is enough — a
+  // useCallback would be rebuilt on every render anyway (seatNames is fresh).
+  const startGame = (chosen: Character[]) => {
+    const players: PlayerConfig[] = chosen.map((c, i) => ({
+      id: i,
+      name: seatNames[i],
+      color: PLAYER_COLORS[i],
+      emoji: c.emoji,
+      mount: c.mount,
+    }));
+    gameRef.current = createGame({ world, players });
+    // The round really started — open with this table next time.
+    table.remember();
+    setPhase('play');
+  };
 
   // ----- setup flow -----
   const chooseCount = (n: number) => {
     setPlayerCount(n);
     setPicks(Array(n).fill(null));
-    setPhase('world');
+    setPhase('seats');
   };
 
   const chooseWorld = (w: World) => {
@@ -128,9 +138,28 @@ export function UnicornPage() {
     );
   }
 
+  if (phase === 'seats') {
+    return (
+      <Shell onMenu={() => setPhase('players')}>
+        <SetupCard title="Who's playing?" subtitle="Tap a ticket for each chair — or just press Next.">
+          <div className="uni-seats">
+            <SeatPicker seats={table.seats} onChange={table.setSeats} accent={(i) => PLAYER_COLORS[i]} />
+            <button
+              className="uni-primary uni-seats-next"
+              data-testid="uni-seats-next"
+              onClick={() => setPhase('world')}
+            >
+              Next
+            </button>
+          </div>
+        </SetupCard>
+      </Shell>
+    );
+  }
+
   if (phase === 'world') {
     return (
-      <Shell onMenu={backToStart}>
+      <Shell onMenu={() => setPhase('seats')}>
         <SetupCard title="Pick your world" subtitle="Where do you want to play?">
           <div className="uni-choices">
             {WORLD_LIST.map((w) => (
@@ -156,7 +185,7 @@ export function UnicornPage() {
     return (
       <Shell onMenu={backToStart}>
         <SetupCard
-          title={playerCount > 1 ? `${PLAYER_NAMES[pickingSeat]}, pick your character` : 'Pick your character'}
+          title={playerCount > 1 ? `${seatNames[pickingSeat]}, pick your character` : 'Pick your character'}
           subtitle={`${info.emoji} ${info.name}`}
           accent={PLAYER_COLORS[pickingSeat]}
         >
