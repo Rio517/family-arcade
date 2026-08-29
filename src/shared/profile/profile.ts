@@ -138,13 +138,6 @@ export function setPronouns(profile: Profile, pronouns: string): Profile {
   return { ...profile, pronouns: normalizePronouns(pronouns) };
 }
 
-/**
- * The household roster, in the family's chosen order — offered as one-tap
- * name chips wherever a game asks "who's playing?". (The Yahtzee logger
- * carries its own copy: it's a standalone HTML page that can't import this.)
- */
-export const FAMILY_NAMES = ['Rio', 'Klara', 'Flora', 'Mommy', 'Papa'];
-
 /** Merge a possibly-partial stored object onto defaults (forward-compatible). */
 export function normalizeProfile(raw: unknown): Profile {
   const base = defaultProfile();

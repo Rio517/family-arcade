@@ -122,7 +122,7 @@ describe('<PlayerBooth>', () => {
 
     fireEvent.change(screen.getByTestId('booth-name'), { target: { value: 'Nana' } });
     fireEvent.click(screen.getByTestId('booth-create'));
-    expect(activeProfile(getUsersSnapshot()).name).toBe('Nana');
+    expect(activeProfile(getUsersSnapshot())?.name).toBe('Nana');
     expect(screen.queryByTestId('booth-name')).not.toBeInTheDocument();
   });
 

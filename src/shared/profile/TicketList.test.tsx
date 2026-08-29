@@ -71,7 +71,7 @@ describe('<TicketList>', () => {
   });
 
   it('invites a brand-new browser to make its first ticket', () => {
-    render(<TicketList users={[]} onPick={() => {}} onCreate={() => {}} autoFocus />);
+    render(<TicketList users={[]} onPick={() => {}} onCreate={() => {}} focusField />);
     expect(screen.getByText('Make your ticket')).toBeInTheDocument();
     expect(screen.getByTestId('ticket-name')).toHaveFocus();
   });

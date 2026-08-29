@@ -36,7 +36,7 @@ export function PlayerGate({ gameTitle, children }: {
           onCreate={newPlayer}
           // A brand-new browser has nothing to tap, so the keyboard may come
           // up; a returning player just taps their stub.
-          autoFocus={users.length === 0}
+          focusField={users.length === 0}
           testIdPrefix="pgate"
         />
 

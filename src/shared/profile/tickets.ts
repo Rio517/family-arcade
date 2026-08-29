@@ -15,6 +15,12 @@ export function matchTickets(users: StoredUser[], query: string): StoredUser[] {
   return users.filter((u) => foldName(u.profile.name).split(/\s+/).some((w) => w.startsWith(q)));
 }
 
+/** The letter on a ticket's medallion. */
+export function initialOf(name: string): string {
+  const first = [...name.trim()][0];
+  return (first ?? '?').toUpperCase();
+}
+
 /** A new ticket can be made unless the name is blank or already taken. */
 export function canCreateTicket(users: StoredUser[], query: string): boolean {
   const q = foldName(query);

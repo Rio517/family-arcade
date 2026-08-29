@@ -7,7 +7,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { playerColor } from './playerColors';
-import { canCreateTicket, matchTickets } from './tickets';
+import { canCreateTicket, initialOf, matchTickets } from './tickets';
 import type { StoredUser } from './users';
 import './player.css';
 
@@ -16,7 +16,7 @@ export function TicketList({
   activeId = null,
   onPick,
   onCreate,
-  autoFocus = false,
+  focusField = false,
   testIdPrefix = 'ticket',
 }: {
   users: StoredUser[];
@@ -27,15 +27,15 @@ export function TicketList({
   onCreate: (name: string) => void;
   /** Focus the field on mount — only when the roster is empty, so a returning
    * player who just needs to tap their stub isn't handed a keyboard. */
-  autoFocus?: boolean;
+  focusField?: boolean;
   testIdPrefix?: string;
 }) {
   const [query, setQuery] = useState('');
   const fieldId = useId();
   const fieldRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (autoFocus) fieldRef.current?.focus();
-  }, [autoFocus]);
+    if (focusField) fieldRef.current?.focus();
+  }, [focusField]);
 
   const matches = matchTickets(users, query);
   const name = query.trim();
@@ -108,9 +108,4 @@ export function TicketList({
       )}
     </form>
   );
-}
-
-export function initialOf(name: string): string {
-  const first = [...name.trim()][0];
-  return (first ?? '?').toUpperCase();
 }
