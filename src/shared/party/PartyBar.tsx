@@ -7,7 +7,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { normalizeCode } from '@shared/net/peer';
-import { NamePicker } from '@shared/ui/NamePicker';
+import { PlayingAs } from '@shared/profile/PlayingAs';
+import { useUsers } from '@shared/profile/useUsers';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { CameraIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
 import { useParty } from './PartyContext';
@@ -15,6 +16,8 @@ import './party.css';
 
 export function PartyBar() {
   const party = useParty();
+  // Your ticket is your name here too — the party never asks for one.
+  const { active } = useUsers();
   const [open, setOpen] = useState(false);
   const [joining, setJoining] = useState(false);
   const [codeInput, setCodeInput] = useState('');
@@ -29,17 +32,7 @@ export function PartyBar() {
         <div className="party-panel" role="dialog" aria-label="Party">
           {!inParty ? (
             <>
-              <label className="party-field">
-                <span>Your name</span>
-                <input
-                  className="party-input"
-                  value={party.myName}
-                  maxLength={20}
-                  onChange={(e) => party.setMyName(e.target.value)}
-                  data-testid="party-name"
-                />
-              </label>
-              <NamePicker value={party.myName} onPick={party.setMyName} testIdPrefix="party-chip" />
+              <PlayingAs />
 
               {party.role === 'host' ? (
                 <div className="party-waiting">
@@ -72,6 +65,12 @@ export function PartyBar() {
                   </button>
                   <button className="party-btn ghost" onClick={() => setJoining(false)}>Back</button>
                 </div>
+              ) : !active ? (
+                <p className="party-hint" data-testid="party-needs-ticket">
+                  A party needs your ticket.
+                  <br />
+                  <Link to="/" onClick={() => setOpen(false)}>Make one at the booth ›</Link>
+                </p>
               ) : (
                 <div className="party-start">
                   <button className="party-btn primary" onClick={() => party.hostParty()} data-testid="party-create">

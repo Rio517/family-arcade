@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { addUser, emptyUsersState } from '@shared/profile/users';
 import type { PartyValue } from './PartyContext';
 
 // A controllable useParty so we can render each party state without a network.
@@ -13,7 +15,6 @@ import { FloatingVideo } from './FloatingVideo';
 function makeParty(over: Partial<PartyValue> = {}): PartyValue {
   return {
     myName: 'Rio',
-    setMyName: vi.fn(),
     status: 'idle',
     code: '',
     role: null,
@@ -42,7 +43,17 @@ const renderBar = () => render(<MemoryRouter><PartyBar /></MemoryRouter>);
 
 beforeEach(() => {
   mockParty.value = makeParty();
+  localStorage.clear();
+  resetUsersStore();
+  // A party is made from a ticket, so the panel's tests start signed in.
+  setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
 });
+
+/** Nobody signed in — the front-page booth hasn't printed a ticket yet. */
+function signEveryoneOut() {
+  localStorage.clear();
+  resetUsersStore();
+}
 
 describe('PartyBar', () => {
   it('offers "Start a party" when not in a party', () => {
@@ -50,6 +61,23 @@ describe('PartyBar', () => {
     fireEvent.click(screen.getByTestId('party-pill'));
     expect(screen.getByTestId('party-create')).toBeInTheDocument();
     expect(screen.getByTestId('party-join')).toBeInTheDocument();
+  });
+
+  it('wears your ticket instead of asking for a name', () => {
+    renderBar();
+    fireEvent.click(screen.getByTestId('party-pill'));
+    expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Rio");
+    expect(screen.getByTestId('party-create')).toBeInTheDocument();
+  });
+
+  it('sends you to the booth for a ticket before it offers a party', () => {
+    signEveryoneOut();
+    renderBar();
+    fireEvent.click(screen.getByTestId('party-pill'));
+    expect(screen.getByTestId('party-needs-ticket')).toBeInTheDocument();
+    expect(screen.queryByTestId('playing-as')).toBeNull();
+    expect(screen.queryByTestId('party-create')).toBeNull();
+    expect(screen.queryByTestId('party-join')).toBeNull();
   });
 
   it('the panel closes on Escape, like every dialog in the arcade', () => {
