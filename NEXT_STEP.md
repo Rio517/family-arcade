@@ -20,10 +20,17 @@ Sorted by likely value. Nothing here blocks anything else.
   writer and `src/games/**` cannot import it). Next, in order, each its own
   PR:
 
-  3. **The party is the table.** `table`/`knock` messages on the party's
-     presence link, the glowing pill invite, `hostGame(name, code?)` in chess,
-     battleship and racer so two devices in a party never trade a code; the
-     party survives a reload (`arcade.party.v1`, 12-hour memory).
+  3. **The party is the table.** Half shipped 2026-08-29 (PR 3a): the party
+     survives a reload (`arcade.party.v1`, 12-hour memory, "Reconnecting…"
+     and "Try again" in the panel), `table`/`knock` travel on the presence
+     link, the pill glows gold with the game's name. **Next: PR 3b** — the
+     plan is Tasks 8–10 of
+     `docs/plans/2026-08-29-players-phase-3-the-party-is-the-table.md`:
+     `startTable({ role, code, seatedUserId, hostSide? })` in `useChess`,
+     `useBattleship` and `useRacerNet`, every session keeping its ticket id,
+     and the three lobbies branching on the party (host "Play Chess with Kai",
+     guest auto-joins, `closeTable` on leaving) so two devices in a party
+     never trade a code.
   4. **Everyone's history.** `recordResultFor(userId, …)` so chess same-device,
      Risk's winner and racer 2P credit every seated ticket.
 
@@ -39,9 +46,10 @@ Sorted by likely value. Nothing here blocks anything else.
 - **Decide on the 62 react-hooks warnings.** `npm run check` passes with them
   as warnings (rationale in `eslint.config.js`). Most are the deliberate
   game-loop pattern — a ref holding per-frame state the HUD reads — but
-  `PartyContext.tsx:72` writes a ref during render, which is the one shape
-  that can actually misbehave under concurrent rendering. Worth a look on its
-  own. Scope: an hour to triage, unknown to fix.
+  `PartyContext.tsx` writes `nameRef` during render (the line flagged
+  "Cannot access refs during render"), which is the one shape that can
+  actually misbehave under concurrent rendering. Worth a look on its own.
+  Scope: an hour to triage, unknown to fix.
 
 - **Add game screens to the screenshot set.** `SHOTS` in
   `scripts/screenshots.mjs` covers the landing page (tablet + phone), privacy,
@@ -88,9 +96,11 @@ drives the *real* app with *real* input.
   screenshot round-trips on "the thing in the top-right corner". Clicking the
   element instead is the single biggest saving for the owner's time, as opposed
   to the agent's.
-- **The party / P2P layer, which has no meaningful coverage at all.** Video,
-  voice and peer connection need live browsers; jsdom can't go near them. Even
-  driving one side of a call would be more than exists now.
+- **The party / P2P layer, which has no live coverage.** `PartyContext` is
+  unit-tested under a mocked link and `preview-party.html` screenshots the
+  in-party states, but video, voice and the real peer connection need live
+  browsers; jsdom can't go near them. Even driving one side of a call would be
+  more than exists now.
 
 Limits worth knowing before leaning on it:
 
