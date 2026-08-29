@@ -12,7 +12,7 @@ import type { UsersState } from './users';
 import { getUsersSnapshot, setUsersState } from './usersStore';
 
 /** Fold a finished game into one ticket's profile. Unknown ids leave the roster as it was. */
-export function creditResult(state: UsersState, userId: string | null, input: ResultInput): UsersState {
+function creditResult(state: UsersState, userId: string | null, input: ResultInput): UsersState {
   if (!userId || !state.users.some((u) => u.id === userId)) return state;
   return {
     ...state,
