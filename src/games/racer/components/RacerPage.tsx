@@ -25,18 +25,11 @@ export function RacerPage() {
   const [mode, setMode] = useState<RaceMode>('solo');
   const [driver, setDriver] = useState<Driver>(DRIVERS[0]);
   const profile = useProfile();
-  // "Player one" travels with the arcade profile; picking a name here
-  // remembers it for every game.
-  const [name, setNameState] = useState(() => profile.profile.name || 'Racer');
-  const setName = (n: string) => {
-    setNameState(n);
-    profile.setName(n);
-  };
   const [raceKey, setRaceKey] = useState(0);
 
   const ctxRef = useRef<RaceCtx | null>(null);
   const net = useRacerNet({
-    name: name.trim() || 'Racer',
+    name: profile.profile.name.trim() || 'Racer',
     driver: driver.id,
     target: TARGET,
     // Said in `hello` so a reconnect mid-race re-syncs instead of restarting.
@@ -53,7 +46,7 @@ export function RacerPage() {
         ctxRef.current = {
           ...createRaceCore('solo', 0, TARGET, Math.random),
           looks: [myLook],
-          names: ['You'],
+          names: [profile.profile.name || 'You'],
         };
       } else {
         const isHost = net.role === 'host';
@@ -61,13 +54,15 @@ export function RacerPage() {
         ctxRef.current = {
           ...createRaceCore('net', isHost ? 0 : 1, TARGET, Math.random),
           looks: isHost ? [myLook, theirLook] : [theirLook, myLook],
-          names: isHost ? [name.trim() || 'You', net.theirName] : [net.theirName, name.trim() || 'You'],
+          names: isHost
+            ? [profile.profile.name.trim() || 'You', net.theirName]
+            : [net.theirName, profile.profile.name.trim() || 'You'],
         };
       }
       setRaceKey((k) => k + 1);
       setPhase('race');
     },
-    [net, name],
+    [net, profile.profile.name],
   );
 
   // When the host says "go" (start or rematch), both sides (re)begin the race.
@@ -126,7 +121,7 @@ export function RacerPage() {
   if (phase === 'lobby') {
     return (
       <Shell onMenu={leaveToMenu}>
-        <RacerLobby driver={driver} name={name} setName={setName} net={net} />
+        <RacerLobby driver={driver} net={net} />
       </Shell>
     );
   }
