@@ -64,7 +64,10 @@
   color: var(--text, #f1f5f9);
 }
 
-.party-field { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: 14px; color: var(--muted, #94a3b8); }
+/* The "You're Rio · Change ›" pill carries a bottom margin for lobby pages;
+   inside the panel the flex `gap` already spaces it. */
+.party-panel .pas { margin: 0; }
+
 .party-input {
   font-family: inherit;
   font-size: 16px;

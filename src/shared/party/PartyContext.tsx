@@ -16,12 +16,11 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { GameConnection, generateCode, normalizeCode, type ConnStatus } from '@shared/net/peer';
 import { MediaLink, type CallStatus, type Role } from '@shared/net/media';
 import { useProfile } from '@shared/profile/useProfile';
-import { rememberName } from '@shared/profile/recentNames';
 import { isPartyMsg, type PartyMsg } from './protocol';
 
 export interface PartyValue {
+  /** Your signed-in ticket's name — the party never asks for one. */
   myName: string;
-  setMyName: (name: string) => void;
 
   status: ConnStatus;
   code: string;
@@ -95,9 +94,7 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
         },
         onMessage: (msg) => {
           if (msg.t === 'hello') {
-            const n = msg.name.slice(0, 24) || 'Friend';
-            setTheirName(n);
-            rememberName(n); // a returning guest becomes a one-tap chip
+            setTheirName(msg.name.slice(0, 24) || 'Friend');
           }
         },
       },
@@ -194,7 +191,6 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
 
   const value: PartyValue = {
     myName,
-    setMyName: profile.setName,
     status,
     code,
     role,
