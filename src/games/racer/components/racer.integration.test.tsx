@@ -2,6 +2,8 @@ import { describe, expect, it, afterEach, beforeEach, vi } from 'vitest';
 import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RacerPage } from './RacerPage';
+import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { addUser, emptyUsersState } from '@shared/profile/users';
 
 /**
  * Two-player integration tests: real <RacerPage> clients wired together through
@@ -162,12 +164,10 @@ function connectClients(): { host: Client; guest: Client; code: string } {
   const guest = renderClient();
 
   toNetLobby(host, 'unicorn');
-  fireEvent.change(host.getByTestId('racer-name-input'), { target: { value: 'Mario' } });
   fireEvent.click(host.getByTestId('racer-create'));
   const code = host.getByTestId('racer-code').textContent!.trim();
 
   toNetLobby(guest, 'dragon');
-  fireEvent.change(guest.getByTestId('racer-name-input'), { target: { value: 'Kiddo' } });
   fireEvent.click(guest.getByTestId('racer-show-join'));
   fireEvent.change(guest.getByTestId('racer-code-input'), { target: { value: code } });
   fireEvent.click(guest.getByTestId('racer-join'));
@@ -178,6 +178,12 @@ function connectClients(): { host: Client; guest: Client; code: string } {
 beforeEach(() => {
   cleanup();
   bus.reset();
+  localStorage.clear();
+  resetUsersStore();
+  // Both simulated clients in these tests run in the same jsdom process, so
+  // they share the one signed-in ticket — same as two roles played from one
+  // signed-in browser. Every lobby now plays as this ticket's name.
+  setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
 });
 
 describe('two-player racer: lobby flows', () => {
@@ -185,11 +191,19 @@ describe('two-player racer: lobby flows', () => {
     const app = renderClient();
 
     toNetLobby(app, 'unicorn');
-    fireEvent.change(app.getByTestId('racer-name-input'), { target: { value: 'Mario' } });
     fireEvent.click(app.getByTestId('racer-create'));
 
     expect(app.getByTestId('racer-code').textContent!.trim()).toMatch(CODE_RE);
     expect(app.getByText(/Waiting for your friend to join/)).toBeInTheDocument();
+  });
+
+  it('the lobby plays as the signed-in ticket, with no name box to fill in', () => {
+    const app = renderClient();
+
+    toNetLobby(app, 'unicorn');
+
+    expect(app.getByTestId('playing-as')).toHaveTextContent("You're Rio");
+    expect(app.queryByTestId('racer-name-input')).toBeNull();
   });
 
   it('guest: Connect stays disabled until the code has 4 valid characters, and Back returns to the choice', () => {
@@ -252,12 +266,15 @@ describe('two-player racer: handshake and race start', () => {
         const hellos = bus.wire.filter((w) => w.msg.t === 'hello');
         expect(hellos.map((h) => h.from).sort()).toEqual(['guest', 'host']);
       });
+      // Both simulated clients share one signed-in ticket in this jsdom
+      // process (see the top-level beforeEach), so both hellos carry that
+      // ticket's name — only the chosen driver tells them apart here.
       expect(bus.wire.find((w) => w.from === 'host' && w.msg.t === 'hello')!.msg).toMatchObject({
-        name: 'Mario',
+        name: 'Rio',
         driver: 'unicorn',
       });
       expect(bus.wire.find((w) => w.from === 'guest' && w.msg.t === 'hello')!.msg).toMatchObject({
-        name: 'Kiddo',
+        name: 'Rio',
         driver: 'dragon',
       });
 
@@ -401,7 +418,7 @@ describe('two-player racer: reconnect re-sync', () => {
       // The guest now learns the race ended and crowns the host by name.
       await pump(2);
       expect(guest.getByTestId('racer-win')).toBeInTheDocument();
-      expect(guest.getByText('Mario wins!')).toBeInTheDocument();
+      expect(guest.getByText('Rio wins!')).toBeInTheDocument();
     },
     20000,
   );

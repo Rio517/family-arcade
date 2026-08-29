@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
-import { NamePicker } from '@shared/ui/NamePicker';
+import { PlayingAs } from '@shared/profile/PlayingAs';
 import { normalizeCode } from '@shared/net/peer';
 import type { RacerLook } from '../three/scene';
 import type { RaceMode } from '../domain/race';
@@ -79,13 +79,9 @@ export function PickScreen({ mode, onPick }: { mode: RaceMode; onPick: (d: Drive
 
 export function RacerLobby({
   driver,
-  name,
-  setName,
   net,
 }: {
   driver: Driver;
-  name: string;
-  setName: (n: string) => void;
   net: RacerNet;
 }) {
   const [joinMode, setJoinMode] = useState(false);
@@ -120,20 +116,9 @@ export function RacerLobby({
 
   return (
     <div className="racer-lobby">
+      <PlayingAs />
       <div className="racer-lobby-card">
         <h2>Your racer {driver.emoji}</h2>
-        <NamePicker value={name} onPick={setName} testIdPrefix="racer-chip" />
-        <label className="racer-name-label">
-          Your name
-          <input
-            className="racer-name-input"
-            data-testid="racer-name-input"
-            value={name}
-            maxLength={16}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Racer"
-          />
-        </label>
       </div>
       {joinMode ? (
         <div className="racer-lobby-card">
