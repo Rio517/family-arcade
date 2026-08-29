@@ -1,31 +1,16 @@
 import { describe, expect, it, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import type { PartyValue } from '@shared/party/PartyContext';
+import { fakeParty } from '@shared/party/testing';
 import { RacerPage } from './RacerPage';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 
 // Neither device is in a party here, so the lobby keeps its code doors — the
 // journey these tests walk. (The party lobby itself is covered in
-// RacerSetup.test.tsx; only the corners the page reads are filled in.)
+// RacerSetup.test.tsx; the shared fake is a complete, inert PartyValue.)
 const noParty = vi.hoisted(() => ({ value: null as any }));
 vi.mock('@shared/party/PartyContext', () => ({ useParty: () => noParty.value }));
-
-function makeParty(over: Partial<PartyValue> = {}): PartyValue {
-  return {
-    status: 'idle',
-    role: null,
-    inParty: false,
-    theirName: null,
-    reconnecting: false,
-    table: null,
-    openTable: vi.fn(() => 'WXYZ'),
-    closeTable: vi.fn(),
-    knockOn: vi.fn(),
-    ...over,
-  } as PartyValue;
-}
 
 /**
  * Two-player integration tests: real <RacerPage> clients wired together through
@@ -250,7 +235,7 @@ beforeEach(() => {
   tickets.queue.length = 0;
   localStorage.clear();
   resetUsersStore();
-  noParty.value = makeParty();
+  noParty.value = fakeParty();
   // One ticket signed in on this browser — what a single-client test plays as.
   // Two-client tests call connectClients, which puts a second ticket on the
   // roster and hands one to each side.

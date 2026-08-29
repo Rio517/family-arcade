@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { PartyValue } from '@shared/party/PartyContext';
+import { fakeParty, fakePartyWithKai } from '@shared/party/testing';
 import type { RacerNet } from '../net/useRacerNet';
 
 /**
  * The two-player lobby on the party (Phase 3b): with no party it keeps its
  * code doors; in a party the host gets one "Race {friend}" button and the
- * guest is auto-seated the moment the host opens the racer's table. The net
- * layer is a fake here — what the lobby *asks* of it is the contract.
+ * guest is auto-seated the moment the host opens the racer's table (through
+ * the shared party door, `usePartyDoor`). The net layer is a fake here — what
+ * the lobby *asks* of it is the contract.
  */
 
 // A controllable useParty so each party state renders without a network.
@@ -15,42 +17,6 @@ const mockParty = vi.hoisted(() => ({ value: null as any }));
 vi.mock('@shared/party/PartyContext', () => ({ useParty: () => mockParty.value }));
 
 import { DRIVERS, RacerLobby } from './RacerSetup';
-
-function makeParty(over: Partial<PartyValue> = {}): PartyValue {
-  return {
-    myName: 'Rio',
-    status: 'idle',
-    code: '',
-    role: null,
-    inParty: false,
-    theirName: null,
-    hostParty: vi.fn(() => 'ABCD'),
-    joinParty: vi.fn(),
-    leaveParty: vi.fn(),
-    retry: vi.fn(),
-    reconnecting: false,
-    table: null,
-    knock: null,
-    openTable: vi.fn(() => 'WXYZ'),
-    closeTable: vi.fn(),
-    knockOn: vi.fn(),
-    clearKnock: vi.fn(),
-    resolveGame: (id: string) => (id === 'racer' ? { title: 'Rainbow Racer', path: '/racer' } : null),
-    call: {
-      active: false,
-      status: 'idle',
-      muted: false,
-      cameraOn: false,
-      localStream: null,
-      remoteStream: null,
-      start: vi.fn(),
-      stop: vi.fn(),
-      toggleMute: vi.fn(),
-      toggleCamera: vi.fn(),
-    },
-    ...over,
-  } as PartyValue;
-}
 
 function makeNet(over: Partial<RacerNet> = {}): RacerNet {
   return {
@@ -82,9 +48,8 @@ const lobby = (net: RacerNet, seatedUserId: string | null = 'u1') => (
 /** Only characters the real generateCode can emit (no look-alikes O/0, I/1, L). */
 const CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4}$/;
 
-const inPartyAsHost = () => makeParty({ inParty: true, status: 'connected', role: 'host', theirName: 'Kai' });
-const inPartyAsGuest = (table: PartyValue['table'] = null) =>
-  makeParty({ inParty: true, status: 'connected', role: 'guest', theirName: 'Rio', table });
+const inPartyAsHost = () => fakePartyWithKai('host');
+const inPartyAsGuest = (table: PartyValue['table'] = null) => fakePartyWithKai('guest', { theirName: 'Rio', table });
 
 /** The lobby's code doors: create, or join with a code. */
 function expectCodeDoors(present: boolean) {
@@ -93,7 +58,7 @@ function expectCodeDoors(present: boolean) {
 }
 
 beforeEach(() => {
-  mockParty.value = makeParty();
+  mockParty.value = fakeParty();
   localStorage.clear();
 });
 
@@ -213,6 +178,11 @@ describe('<RacerLobby> — party guest', () => {
 
     expect(mockParty.value.knockOn).not.toHaveBeenCalled();
     expect(net.startTable).toHaveBeenCalledWith({ role: 'guest', code: 'QRST', seatedUserId: 'u-kai' });
+    // Until the dial lands on the net (the fake never does), the guest sees
+    // itself hopping in — never the code doors, and no longer "waiting for
+    // Rio to open" a table that is plainly open.
+    expect(screen.getByTestId('racer-party-waiting')).toHaveTextContent('Hopping into Rio’s race');
+    expectCodeDoors(false);
   });
 
   it("ignores another game's table, and keeps waiting", () => {
@@ -269,7 +239,7 @@ describe('<RacerLobby> — party guest', () => {
 
 describe('<RacerLobby> — party reconnecting', () => {
   it('says so and shows no doors at all', () => {
-    mockParty.value = makeParty({ reconnecting: true, status: 'dialing', role: 'guest' });
+    mockParty.value = fakeParty({ reconnecting: true, status: 'dialing', role: 'guest' });
     render(lobby(makeNet()));
 
     expect(screen.getByTestId('racer-party-reconnecting')).toHaveTextContent('Reconnecting to your party');

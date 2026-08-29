@@ -6,13 +6,15 @@
  * The lobby stands on the party (ADR 0008): with no party it keeps its code
  * doors (create a code / join with a code); in a party the host gets one
  * "Race {friend}" button that opens the racer's table, and the guest is seated
- * automatically the moment that table appears — nobody types a code.
+ * automatically the moment that table appears — nobody types a code. The
+ * guest's knock-and-seat is the shared party door (`usePartyDoor`).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { PlayingAs } from '@shared/profile/PlayingAs';
 import { generateCode, normalizeCode } from '@shared/net/peer';
 import { useParty } from '@shared/party/PartyContext';
+import { usePartyDoor } from '@shared/party/usePartyDoor';
 import type { RacerLook } from '../three/scene';
 import type { RaceMode } from '../domain/race';
 import type { RacerNet } from '../net/useRacerNet';
@@ -102,42 +104,20 @@ export function RacerLobby({
 
   const partyHost = party.inParty && party.role === 'host';
   const partyGuest = party.inParty && party.role === 'guest';
-  const friend = party.theirName ?? 'your friend';
-  /** Guest: the code of the racer table the host has open, if any. */
-  const tableCode = partyGuest && party.table?.game === GAME_ID ? party.table.code : null;
 
-  // Guest in a party: knock on the racer's door once, unless the host has
-  // already opened it. (A re-render, or the table changing, never re-knocks.)
-  const { knockOn } = party;
-  const knockedRef = useRef(false);
-  useEffect(() => {
-    if (!partyGuest || tableCode || knockedRef.current) return;
-    knockedRef.current = true;
-    knockOn(GAME_ID);
-  }, [partyGuest, tableCode, knockOn]);
-
-  // Guest in a party: sit down at the host's table as soon as it opens —
-  // exactly once per code. A closed table drops the link and goes back to
-  // waiting; a fresh code hangs up the old link first, since a live
-  // GameConnection can't dial twice.
+  // Guest in a party: the shared door knocks on the racer once and sits us
+  // down at the host's table the moment it opens — exactly once per code. A
+  // closed table drops the link (`leave`) and goes back to waiting; a fresh
+  // code hangs up the old link first, since a live GameConnection can't dial
+  // twice. The host, and anyone outside a party, get nothing from the door.
   const { startTable, leave } = net;
-  const dialedCodeRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!partyGuest) return;
-    if (!tableCode) {
-      if (dialedCodeRef.current) {
-        dialedCodeRef.current = null;
-        leave();
-      }
-      return;
-    }
-    if (dialedCodeRef.current === tableCode) return;
-    if (dialedCodeRef.current) leave();
-    dialedCodeRef.current = tableCode;
-    startTable({ role: 'guest', code: tableCode, seatedUserId });
-  }, [partyGuest, tableCode, startTable, leave, seatedUserId]);
+  const onTable = useCallback(
+    (tableCode: string) => startTable({ role: 'guest', code: tableCode, seatedUserId }),
+    [startTable, seatedUserId],
+  );
+  const door = usePartyDoor(GAME_ID, true, onTable, leave);
+  const friend = door.friend ?? 'your friend';
 
-  /** Back out of a table: hang up, and (as the party host) tell the friend it closed. */
   /** Back out of a table: tell the party (it ignores a code that isn't its open table), then hang up. */
   const leaveTable = () => {
     if (net.code) party.closeTable(net.code);
@@ -212,9 +192,14 @@ export function RacerLobby({
           <p className="racer-lobby-status">{friend} hops in automatically — no code needed.</p>
         </div>
       ) : partyGuest ? (
+        // A guest never sees the code doors. `door.waiting` is the host not
+        // having opened the racer yet; once the table is up, the door is
+        // seating us and the net's guest card takes over on the next render.
         <div className="racer-lobby-card" data-testid="racer-party-waiting">
           <h2>Almost there!</h2>
-          <p className="racer-lobby-status">Waiting for {friend} to open Rainbow Racer…</p>
+          <p className="racer-lobby-status">
+            {door.waiting ? `Waiting for ${friend} to open Rainbow Racer…` : `Hopping into ${friend}’s race…`}
+          </p>
         </div>
       ) : joinMode ? (
         <div className="racer-lobby-card">

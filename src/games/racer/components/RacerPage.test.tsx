@@ -1,30 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import type { PartyValue } from '@shared/party/PartyContext';
+import { fakeParty, fakePartyWithKai } from '@shared/party/testing';
 
 // The page stands on the party (ADR 0008); a controllable useParty keeps
-// these tests off the network. Only the corners the page and its lobby read
-// are filled in — the full shape lives in party-ui.test.tsx.
+// these tests off the network. The shared fake is the complete PartyValue,
+// so the page may read any field without a partial cast blowing up.
 const mockParty = vi.hoisted(() => ({ value: null as any }));
 vi.mock('@shared/party/PartyContext', () => ({ useParty: () => mockParty.value }));
 
 import { RacerPage } from './RacerPage';
-
-function makeParty(over: Partial<PartyValue> = {}): PartyValue {
-  return {
-    status: 'idle',
-    role: null,
-    inParty: false,
-    theirName: null,
-    reconnecting: false,
-    table: null,
-    openTable: vi.fn(() => 'WXYZ'),
-    closeTable: vi.fn(),
-    knockOn: vi.fn(),
-    ...over,
-  } as PartyValue;
-}
 
 /**
  * jsdom has no WebGL, so the real RacerScene constructor throws and Track3D
@@ -73,7 +58,7 @@ function startSoloRace(driverId: string) {
 }
 
 beforeEach(() => {
-  mockParty.value = makeParty();
+  mockParty.value = fakeParty();
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -86,7 +71,7 @@ describe('<RacerPage> — the party table', () => {
   }
 
   it('a party host leaving an opened table via ‹ Menu closes it for the friend', () => {
-    mockParty.value = makeParty({ inParty: true, status: 'connected', role: 'host', theirName: 'Kai' });
+    mockParty.value = fakePartyWithKai('host');
     renderRacer();
     goToNetLobby();
     expect(screen.getByTestId('racer-party-play')).toHaveTextContent('Race Kai');
@@ -98,7 +83,7 @@ describe('<RacerPage> — the party table', () => {
   });
 
   it('a party host playing a solo race closes nothing when they leave — the friend keeps their table', () => {
-    mockParty.value = makeParty({ inParty: true, status: 'connected', role: 'host', theirName: 'Kai' });
+    mockParty.value = fakePartyWithKai('host');
     renderRacer();
     fireEvent.click(screen.getByTestId('racer-mode-solo'));
     fireEvent.click(screen.getByTestId('racer-driver-unicorn'));
@@ -109,7 +94,7 @@ describe('<RacerPage> — the party table', () => {
   });
 
   it('a party guest leaving the lobby via ‹ Menu never closes a table it does not own', () => {
-    mockParty.value = makeParty({ inParty: true, status: 'connected', role: 'guest', theirName: 'Rio' });
+    mockParty.value = fakePartyWithKai('guest', { theirName: 'Rio' });
     renderRacer();
     goToNetLobby();
     expect(screen.getByTestId('racer-party-waiting')).toBeInTheDocument();
