@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { LINEUP_KEY, resetLineupStore } from '@shared/profile/lineupStore';
+import { LINEUP_KEY, resetLineupStore, setLineup } from '@shared/profile/lineupStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { UnicornPage } from './UnicornPage';
@@ -214,6 +214,78 @@ describe('<UnicornPage>', () => {
       pumpUntilWin();
       expect(screen.getByTestId('uni-win')).toHaveTextContent('Player 1 wins!');
       expect(JSON.parse(localStorage.getItem(LINEUP_KEY) ?? '{}')).toEqual({ unicorn: [null] });
+    });
+
+    it('a remembered two-chair table restores both chairs, count chosen after mount', () => {
+      // Magic Coins asks "how many players?" only after the page is up, so the
+      // table has no chairs to seed at mount — last week's pair must still come
+      // back the moment the count is picked, without a single tap.
+      setLineup('unicorn', [{ userId: 'u2' }, { userId: 'u1' }]);
+      renderPage();
+      fireEvent.click(screen.getByTestId('uni-players-2'));
+
+      expect(screen.getByTestId('seat-0')).toHaveTextContent('Klara');
+      expect(screen.getByTestId('seat-1')).toHaveTextContent('Rio');
+    });
+
+    it('three chairs with two tickets: the spare chair plays as Player 3', () => {
+      renderPage();
+      fireEvent.click(screen.getByTestId('uni-players-3'));
+
+      // Rio is already sitting down; Klara takes the next chair, and the third
+      // stays open for whoever grabs the third set of keys.
+      expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
+      fireEvent.click(screen.getByTestId('strip-user-u2'));
+      expect(screen.getByTestId('seat-1')).toHaveTextContent('Klara');
+      expect(screen.getByTestId('seat-2')).toHaveTextContent(/tap a ticket/i);
+
+      fireEvent.click(screen.getByTestId('uni-seats-next'));
+      fireEvent.click(screen.getByTestId('uni-world-sky'));
+
+      // The character pick asks each chair by the name it has — the empty one
+      // simply by its player number.
+      expect(screen.getByRole('heading', { name: /Rio, pick your character/ })).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('uni-char-fairy'));
+      expect(screen.getByRole('heading', { name: /Klara, pick your character/ })).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('uni-char-dragon'));
+      expect(screen.getByRole('heading', { name: /Player 3, pick your character/ })).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('uni-char-princess'));
+
+      expect(screen.getByTestId('uni-canvas')).toBeInTheDocument();
+    });
+
+    it('"Play again" keeps the ticket names at the table', () => {
+      pinLuck();
+      renderPage();
+      fireEvent.click(screen.getByTestId('uni-players-2'));
+      fireEvent.click(screen.getByTestId('strip-user-u2'));
+      fireEvent.click(screen.getByTestId('uni-seats-next'));
+      fireEvent.click(screen.getByTestId('uni-world-sky'));
+      fireEvent.click(screen.getByTestId('uni-char-fairy')); // Rio
+      fireEvent.click(screen.getByTestId('uni-char-dragon')); // Klara
+
+      // Pinned luck stacks every coin dead-centre; Rio (arrow keys) flies into
+      // the pile and takes the round.
+      fireEvent.keyDown(window, { key: 'ArrowRight' });
+      for (let i = 0; i < 24 && !screen.queryByTestId('uni-win'); i++) pumpFrame(i * 100);
+      expect(screen.getByTestId('uni-win')).toHaveTextContent('Rio wins!');
+      fireEvent.keyUp(window, { key: 'ArrowRight' });
+
+      fireEvent.click(screen.getByTestId('uni-again'));
+
+      // A fresh round with the same two characters and the scores back to nil…
+      expect(screen.getByTestId('uni-score-0').textContent).toMatch(/\D0\/20/);
+      expect(screen.getByTestId('uni-score-1').textContent).toMatch(/\D0\/20/);
+      expect(screen.getByTestId('uni-score-0').textContent).toContain('🧚');
+      expect(screen.getByTestId('uni-score-1').textContent).toContain('🐉');
+
+      // …and both chairs still hold their ticket rather than falling back to
+      // "Player 1"/"Player 2": this time Klara (W A S D) scoops the pile, and
+      // the round is announced in her name.
+      fireEvent.keyDown(window, { key: 'a' });
+      for (let i = 0; i < 24 && !screen.queryByTestId('uni-win'); i++) pumpFrame(5000 + i * 100);
+      expect(screen.getByTestId('uni-win')).toHaveTextContent('Klara wins!');
+      fireEvent.keyUp(window, { key: 'a' });
     });
 
     it('the winner is announced by ticket name', () => {
