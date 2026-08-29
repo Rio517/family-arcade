@@ -56,6 +56,33 @@ function signEveryoneOut() {
 }
 
 describe('PartyBar', () => {
+  it('opens on the start screen after leaving a party you joined by code', () => {
+    const { rerender } = renderBar();
+    fireEvent.click(screen.getByTestId('party-pill'));
+    fireEvent.click(screen.getByTestId('party-join'));
+    expect(screen.getByTestId('party-code-input')).toBeInTheDocument();
+
+    // The join connects; then the player leaves.
+    mockParty.value = makeParty({ inParty: true, status: 'connected', role: 'guest', theirName: 'Kai' });
+    rerender(<MemoryRouter><PartyBar /></MemoryRouter>);
+    fireEvent.click(screen.getByTestId('party-leave'));
+    expect(mockParty.value.leaveParty).toHaveBeenCalledTimes(1);
+    mockParty.value = makeParty();
+    rerender(<MemoryRouter><PartyBar /></MemoryRouter>);
+
+    expect(screen.getByTestId('party-create')).toBeInTheDocument();
+    expect(screen.queryByTestId('party-code-input')).toBeNull();
+  });
+
+  it('Escape closes the panel and hands focus back to the pill', () => {
+    renderBar();
+    fireEvent.click(screen.getByTestId('party-pill'));
+    expect(screen.getByRole('dialog', { name: 'Party' })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Party' })).toBeNull();
+    expect(screen.getByTestId('party-pill')).toHaveFocus();
+  });
+
   it('offers "Start a party" when not in a party', () => {
     renderBar();
     fireEvent.click(screen.getByTestId('party-pill'));

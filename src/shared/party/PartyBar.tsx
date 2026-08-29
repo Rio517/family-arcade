@@ -4,10 +4,11 @@
  * to start/join a party, turn voice/video on (opt-in), or leave. Because it's
  * mounted above the router it stays put as you move between games.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { normalizeCode } from '@shared/net/peer';
 import { PlayingAs } from '@shared/profile/PlayingAs';
+import { initialOf } from '@shared/profile/tickets';
 import { useUsers } from '@shared/profile/useUsers';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { CameraIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
@@ -21,8 +22,19 @@ export function PartyBar() {
   const [open, setOpen] = useState(false);
   const [joining, setJoining] = useState(false);
   const [codeInput, setCodeInput] = useState('');
-  // The panel is a dialog like any other in the arcade: Escape closes it.
-  useDismissOnEscape(open, () => setOpen(false));
+  const pillRef = useRef<HTMLButtonElement>(null);
+  // The panel is a dialog like any other in the arcade: Escape closes it and
+  // hands focus back to the pill that opened it.
+  const close = () => {
+    setOpen(false);
+    pillRef.current?.focus();
+  };
+  useDismissOnEscape(open, close);
+  const leave = () => {
+    // Back to the start screen next time, not the code form you joined with.
+    setJoining(false);
+    party.leaveParty();
+  };
 
   const { inParty, call } = party;
 
@@ -39,7 +51,7 @@ export function PartyBar() {
                   <span className="party-eyebrow">Share this code</span>
                   <div className="party-code" data-testid="party-code">{party.code}</div>
                   <p className="party-hint">Tell your friend to open the Party and join with it.</p>
-                  <button className="party-btn ghost" onClick={party.leaveParty}>Cancel</button>
+                  <button className="party-btn ghost" onClick={leave} data-testid="party-cancel">Cancel</button>
                 </div>
               ) : joining ? (
                 <div className="party-join">
@@ -63,7 +75,7 @@ export function PartyBar() {
                   >
                     Connect →
                   </button>
-                  <button className="party-btn ghost" onClick={() => setJoining(false)}>Back</button>
+                  <button className="party-btn ghost" onClick={() => setJoining(false)} data-testid="party-join-back">Back</button>
                 </div>
               ) : !active ? (
                 <p className="party-hint" data-testid="party-needs-ticket">
@@ -130,7 +142,7 @@ export function PartyBar() {
                 </div>
               )}
 
-              <button className="party-btn ghost" onClick={party.leaveParty} data-testid="party-leave">
+              <button className="party-btn ghost" onClick={leave} data-testid="party-leave">
                 Leave party
               </button>
             </div>
@@ -139,6 +151,7 @@ export function PartyBar() {
       )}
 
       <button
+        ref={pillRef}
         className={`party-pill ${inParty ? 'live' : ''}`}
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
@@ -147,8 +160,8 @@ export function PartyBar() {
       >
         {inParty ? (
           <>
-            <span className="party-ava a">{initial(party.myName)}</span>
-            <span className="party-ava b">{initial(party.theirName ?? '?')}</span>
+            <span className="party-ava a">{initialOf(party.myName)}</span>
+            <span className="party-ava b">{initialOf(party.theirName ?? '?')}</span>
             <span className="party-dot" aria-hidden="true" />
             {call.active && (
               <span className="party-mini">
@@ -164,8 +177,4 @@ export function PartyBar() {
       </button>
     </aside>
   );
-}
-
-function initial(name: string): string {
-  return (name.trim()[0] ?? '?').toUpperCase();
 }
