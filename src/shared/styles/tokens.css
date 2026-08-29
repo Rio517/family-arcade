@@ -85,31 +85,11 @@ body {
 .icon-btn:focus-visible,
 .fs-btn:focus-visible,
 .code-chip:focus-visible,
-.name-chip:focus-visible,
 .seg-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* ── Family name chips (NamePicker) ─────────────────────────────────────── */
-.name-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-.name-chip {
-  padding: 8px 14px;
-  min-height: 36px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-.name-chip.on {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-dim);
-}
 .btn-primary {
   background: var(--accent-dim);
   border-color: var(--accent);

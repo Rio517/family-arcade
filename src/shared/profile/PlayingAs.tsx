@@ -8,7 +8,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { playerColor } from './playerColors';
-import { initialOf, TicketList } from './TicketList';
+import { initialOf } from './tickets';
+import { TicketList } from './TicketList';
 import { useUsers } from './useUsers';
 import './player.css';
 
