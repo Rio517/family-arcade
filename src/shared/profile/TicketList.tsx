@@ -16,7 +16,6 @@ export function TicketList({
   activeId = null,
   onPick,
   onCreate,
-  focusField = false,
   testIdPrefix = 'ticket',
 }: {
   users: StoredUser[];
@@ -25,17 +24,17 @@ export function TicketList({
   onPick: (id: string) => void;
   /** Called with a trimmed, non-blank name nobody has yet. */
   onCreate: (name: string) => void;
-  /** Focus the field on mount — only when the roster is empty, so a returning
-   * player who just needs to tap their stub isn't handed a keyboard. */
-  focusField?: boolean;
   testIdPrefix?: string;
 }) {
   const [query, setQuery] = useState('');
   const fieldId = useId();
   const fieldRef = useRef<HTMLInputElement>(null);
+  // A brand-new browser has nothing to tap, so the field takes focus (and the
+  // keyboard may come up); a returning player just taps their stub.
+  const firstTicket = users.length === 0;
   useEffect(() => {
-    if (focusField) fieldRef.current?.focus();
-  }, [focusField]);
+    if (firstTicket) fieldRef.current?.focus();
+  }, [firstTicket]);
 
   const matches = matchTickets(users, query);
   const name = query.trim();

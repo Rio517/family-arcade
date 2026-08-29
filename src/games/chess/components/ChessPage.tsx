@@ -52,7 +52,7 @@ export function ChessPage() {
   useDismissOnEscape(shareOpen, () => setShareOpen(false));
   const [copied, setCopied] = useState(false);
   const [joinInput, setJoinInput] = useState(normalizeCode(params.get('g') ?? ''));
-  // "Player one" is the arcade-wide profile name; White defaults to them.
+  // Same-device chairs are game-local names; White starts as the signed-in ticket.
   const [whiteName, setWhiteName] = useState(() => profile.profile.name || 'White');
   const [blackName, setBlackName] = useState('Black');
   const [logOpen, setLogOpen] = useState(false);

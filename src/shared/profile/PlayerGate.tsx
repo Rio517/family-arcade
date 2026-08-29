@@ -30,15 +30,7 @@ export function PlayerGate({ gameTitle, children }: {
             : `${gameTitle} needs a player — whose ticket?`}
         </p>
 
-        <TicketList
-          users={users}
-          onPick={signIn}
-          onCreate={newPlayer}
-          // A brand-new browser has nothing to tap, so the keyboard may come
-          // up; a returning player just taps their stub.
-          focusField={users.length === 0}
-          testIdPrefix="pgate"
-        />
+        <TicketList users={users} onPick={signIn} onCreate={newPlayer} testIdPrefix="pgate" />
 
         <p className="pgate-back">
           <Link to="/">‹ Back to the arcade</Link>

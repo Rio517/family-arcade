@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { useProfile } from '@shared/profile/useProfile';
 import { useUsers } from '@shared/profile/useUsers';
 import { playerColor } from '@shared/profile/playerColors';
+import { initialOf } from '@shared/profile/tickets';
 import { TicketList } from '@shared/profile/TicketList';
 import { pronounCodePointLength, type GameHistoryEntry } from '@shared/profile/profile';
 import { arcadeNow } from '@shared/time/clock';
@@ -56,7 +57,8 @@ function HistoryRow({ entry, now }: { entry: GameHistoryEntry; now: number }) {
 
 export function PlayerBooth() {
   const { users, active, signIn, newPlayer } = useUsers();
-  const { profile, setName, setPronouns } = useProfile();
+  // Display reads `active.profile`; useProfile is only here for its writers.
+  const { setName, setPronouns } = useProfile();
   const [mode, setMode] = useState<'view' | 'switch' | 'edit-profile'>('view');
   const [draftName, setDraftName] = useState('');
   const [draftPronouns, setDraftPronouns] = useState('');
@@ -64,8 +66,6 @@ export function PlayerBooth() {
   // Sampled once per mount — "today" flipping to "yest." mid-visit isn't
   // worth an impure read on every render.
   const [now] = useState(arcadeNow);
-
-  const activeIndex = users.findIndex((u) => u.id === active?.id);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,16 +97,14 @@ export function PlayerBooth() {
           <>
             <div
               className="pstub booth-hero"
-              style={{ '--c': playerColor(activeIndex) } as React.CSSProperties}
+              style={{ '--c': playerColor(users.indexOf(active)) } as React.CSSProperties}
             >
-              <span className="pmedal" aria-hidden="true">
-                {[...active.profile.name.trim()][0]?.toUpperCase() ?? '?'}
-              </span>
+              <span className="pmedal" aria-hidden="true">{initialOf(active.profile.name)}</span>
               <span className="pstub-body">
                 <span className="pstub-name">{active.profile.name}</span>
-                <span className="pstub-pronouns">{profile.pronouns}</span>
+                <span className="pstub-pronouns">{active.profile.pronouns}</span>
                 <span className="pstub-stats">
-                  <b>{profile.points}</b> tickets · {profile.wins} W · {profile.losses} L
+                  <b>{active.profile.points}</b> tickets · {active.profile.wins} W · {active.profile.losses} L
                 </span>
                 <span className="booth-profile-note">Shared across every arcade game.</span>
               </span>
@@ -128,7 +126,7 @@ export function PlayerBooth() {
                 className={mode === 'edit-profile' ? 'on' : ''}
                 onClick={() => {
                   setDraftName(active.profile.name);
-                  setDraftPronouns(profile.pronouns);
+                  setDraftPronouns(active.profile.pronouns);
                   setPronounsError(false);
                   setMode(mode === 'edit-profile' ? 'view' : 'edit-profile');
                 }}
@@ -190,9 +188,9 @@ export function PlayerBooth() {
               </form>
             )}
 
-            {profile.history.length > 0 && mode === 'view' && (
+            {active.profile.history.length > 0 && mode === 'view' && (
               <ul className="booth-thread" data-testid="booth-history">
-                {profile.history.slice(0, HISTORY_SHOWN).map((entry, i) => (
+                {active.profile.history.slice(0, HISTORY_SHOWN).map((entry, i) => (
                   <HistoryRow key={`${entry.finishedAt}-${i}`} entry={entry} now={now} />
                 ))}
               </ul>
