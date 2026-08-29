@@ -152,14 +152,39 @@ the party changes only the two-device path.
 
 ### Seats
 
-- `src/shared/profile/seats.ts` (pure): `Seat = { userId: string | null;
-  name: string }`, `fillSeat`, `clearSeat`, `seatsFromLineup(users, lineup,
-  activeId, count)`, `lineupOf(seats)`.
+Revised after the 2026-08-29 architecture audit (a two-state seat could not
+hold a Risk general, so Risk night would have reopened with every bot chair
+empty; a seat carrying a name copy would go stale on rename).
+
+- `src/shared/profile/seats.ts` (pure): a seat is one of three things —
+  `{ kind: 'ticket', userId } | { kind: 'bot', botId } | { kind: 'empty' }`.
+  Ids only; display names are derived at render (ticket → roster, bot → the
+  game's persona table). `fillSeat`, `clearSeat`, `seatsFromLineup(users,
+  lineup, activeId, count)`, `lineupOf(seats)`.
+- **Precedence:** a saved lineup wins wholesale; the signed-in ticket seeds
+  chair ① only when the game has no lineup yet.
 - `src/shared/profile/lineupStore.ts`: `arcade.lineup.v1` =
-  `Record<gameId, (string | null)[]>`.
-- `src/shared/profile/SeatPicker.tsx`: the UI above; `+ New player` calls
-  `addUser` **without** activating (a new `addGuest` in `users.ts`).
-- Game pages keep their own seat *count* UI and pass `count` in.
+  `Record<gameId, Lineup>` where `Lineup = ({ userId } | { bot } | null)[]`;
+  normalized on read (unknown user ids become `null`; unknown *game* ids are
+  kept, not pruned); read through `useSyncExternalStore` like the roster,
+  never synchronously in render.
+- `GameDescriptor` gains `seats?: { min, max }` — chairs on *this* device
+  (Ship Battle seats one; Risk 2–6; Chess same-device 2; Magic Coins 1–3).
+  The existing `players` stays the menu badge and is documented as such.
+- `addUser` becomes append-only; `useUsers.newPlayer` composes it with
+  `setActiveUser`. No `addGuest` — one function that appends, one that
+  activates. `+ New player` in a seat picker appends only.
+- One shared `TicketStrip` (the tappable roster row) plus a default
+  `SeatPicker` composition that Chess same-device and Magic Coins use as-is;
+  Risk composes `TicketStrip` into its own heraldic row with the persona
+  chips. No `variant` prop.
+- `useProfile` splits: games keep `{ profile, update }`; a new `useIdentity`
+  owns `setName`/`setPronouns`/`newPlayer` and is importable only by
+  `PlayerBooth`, `PlayingAs`, `TicketList` (ESLint `no-restricted-imports`
+  for `src/games/**`). "No game writes a name" becomes structural.
+- `StoredUser.createdAt` is write-only today; drop it (and the `now`
+  parameters it drags through `addUser`/`migrateDeviceProfile`) in this
+  phase, since `users.ts` changes anyway.
 
 ### The party carries the table
 
@@ -170,40 +195,89 @@ the party changes only the two-device path.
   session under the old code).
 - `{ t: 'knock', game: GameId }` — the guest asks the host to open a game.
 
-`PartyContext` gains `table: { game, code } | null`, `knock: GameId | null`,
-`openTable(game): code` (host), `knockOn(game)` (guest), `closeTable()`. The
-party host always hosts the game link — a fixed mapping, so there's never a
-race over who creates the code.
+`PartyContext` gains `table: { game, code, hostSide? } | null`,
+`knock: string | null`, `openTable(game): code` (host), `knockOn(game)`
+(guest), `closeTable()`. The party host always hosts the game link — a fixed
+mapping, so there's never a race over who creates the code.
 
-Game side, the three online hooks accept an optional code —
-`hostGame(name, code?)` in chess and battleship, `host(code?)` in racer —
-instead of always minting one. Each game's lobby component branches on
-`party.inParty`:
+Shared stays game-blind: `game` travels as a length-bounded string (checked in
+`isPartyMsg` beside the name bound), and `PartyProvider` takes a
+`resolveGame(id) → { title, path } | null` prop wired from `App.tsx`, so the
+pill can say *Klara opened Chess → Join* without `shared/party` importing the
+registry (ADR 0002). `GameDescriptor` gains `online?: boolean` so the pill
+knows which games can host a table at all.
 
-- host: *Play X with Flora* → `hostGame(profile.name, party.openTable('x'))`.
+Game side, the three online hooks collapse `hostGame`/`joinGame`/`resumeGame`
+into one seam — `startTable({ role, code })` — with the name read from the
+hook's own options (racer's `host()` already works this way; chess's
+`resumeGame` already *is* `{ role, code }` internally). The ~10 dead
+`name.trim() || 'Captain'/'Player'/'Racer'` fallbacks for the local player go
+with it (the gate guarantees a name); opponent fallbacks stay. Each lobby
+branches on `party.inParty`:
+
+- host: *Play X with Flora* → `startTable({ role: 'host', code:
+  party.openTable('x') })`.
 - guest: an effect watches `party.table`; when `table.game` matches, it calls
-  `joinGame(table.code, profile.name)` once.
+  `startTable({ role: 'guest', code: table.code })` once.
+- Chess: the party host would otherwise be White forever. `table` announces
+  `hostSide`, and chess's online create offers a side swap.
 
 Game **rules still travel on each game's own link** (ADR 0003/0008 hold). The
 party's presence link carries names and a four-character handoff, nothing
 else — nothing that replays or rewrites game history.
 
+**Before touching `PartyContext`:** it has no tests today (every party test
+mocks `useParty`). A `PartyContext.test.tsx` with a mocked `GameConnection`
+lands first: name follows the roster, `hello` re-sends on a ticket switch,
+peer-name clamp, `leaveParty` clears state.
+
 ### The party survives a reload
 
 Today a PWA close or a reload drops the party and the call. The party's
-`{ code, role, at }` is written to `arcade.party.v1`; on load, a party younger
-than 12 hours rejoins automatically (host re-hosts the code, guest re-dials).
+`{ code, role, at, table }` is written to `arcade.party.v1` (pure `party.ts` +
+`partyStore.ts`, normalized on read: `role` narrowed, `code` re-run through
+`normalizeCode`, `at` via `arcadeNow()` so the expiry is testable); on load, a
+party younger than 12 hours rejoins automatically (host re-hosts the code,
+guest re-dials). Failure modes the audit found and the design covers:
+
+- **The host's reload must not strand the guest.** The host re-announces
+  `table` on every fresh channel open (`buildConn`'s `onOpen`, the idiom
+  `useRacerNet` already uses), and the guest refreshes its dial deadline on
+  each `hello` rather than only on close — a PWA cold start can exceed the
+  20-second dial window in `peer.ts`.
+- **A stale broker registration** (`unavailable-id` after a hard PWA kill)
+  is retried with backoff instead of ending in a terminal error nobody sees.
+- **`party.reconnecting`** (persisted party present, not yet connected) is
+  exposed, and lobbies show *Reconnecting to your party…* instead of briefly
+  flashing the code doors.
+
 *Leave party* clears it. The call is not auto-resumed — mic and camera stay
-opt-in per session, as ADR 0007 decided.
+opt-in per session, as ADR 0007 decided (`hostParty`/`joinParty` both stop
+the call; auto-rejoin routes through them).
 
 ### Results for everyone seated
 
-`recordResult` today writes to the signed-in ticket only. A
-`recordResultFor(userId, input)` on the users store lets a game credit every
-seated ticket: Chess same-device records a win and a loss (draws still record
-nothing), Risk credits the winning general's ticket, Rainbow Racer's 2P
-finishes record both racers. Ship Battle already records for the signed-in
-captain; its opponent is on another device with their own ticket.
+`recordResult` today writes to the signed-in ticket — and it is already a
+footgun: a game's `onFinish` fires minutes after the start, and *Change* in a
+lobby can switch tickets in between, so the win lands on whoever is signed in
+at the finish. `useProfile().recordResult` is **deleted**; every game records
+through `recordResultFor(userId, input)` on the users store, with the user id
+captured **at game start** from the seat (online: the active id at
+`startTable`). Chess same-device then records a win and a loss (draws still
+record nothing), Risk credits the winning general's ticket, Rainbow Racer's
+2P finishes record both racers — which means racer needs a seat/user-id at
+start (it has none today; Phase 2 gives it one). Ship Battle records for the
+captain whose id started the table; its opponent is on another device with
+their own ticket.
+
+### Storage keys
+
+The implicit scheme, now written down (in `shared/storage/kv.ts`): shared
+state is `arcade.<thing>.v<n>` (`arcade.users.v1`, `arcade.lineup.v1`,
+`arcade.party.v1`); a game's own state is `<game>:<thing>:v<n>`. Existing keys
+are never renamed — a rename costs the family their saves. Every key gets a
+pure `normalizeX(raw)` at its read boundary, in a `x.ts` + `xStore.ts` pair
+like `users`/`usersStore`.
 
 ## Out of scope, on purpose
 
@@ -220,11 +294,17 @@ captain; its opponent is on another device with their own ticket.
 1. **No more name boxes.** `TicketList` with the filter-or-create field at the
    gate and the booth; `PlayingAs` at the top of every lobby and the party
    panel; every name field, `NamePicker` and the five-name chips gone.
-2. **Seats from the roster.** `seats.ts`, `SeatPicker`, lineup memory; Chess
-   same-device, Risk, Magic Coins.
-3. **The party is the table.** Protocol, `table`/`knock`, the pill badge,
-   `hostGame(name, code?)`, the three lobbies' party panels, party reload.
-4. **Everyone's history.** `recordResultFor` and the per-game credits.
+2. **Seats from the roster.** Three-state seats, `TicketStrip` +
+   `SeatPicker`, lineup memory, `seats` on the descriptor, `addUser`
+   append-only, the `useIdentity` split, `createdAt` dropped; Chess
+   same-device, Risk, Magic Coins, and a seat for racer.
+3. **The party is the table.** `PartyContext` tests first; protocol,
+   `table`/`knock`, `resolveGame`, the pill badge, `startTable({ role, code })`
+   in the three online hooks (dead local-name fallbacks deleted with it),
+   chess side swap, `online` on the descriptor, party persistence with the
+   reconnect cases above.
+4. **Everyone's history.** `recordResultFor` with ids captured at start,
+   `useProfile().recordResult` deleted, the per-game credits.
 
 ## Open questions for the family
 
