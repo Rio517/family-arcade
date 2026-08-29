@@ -308,7 +308,9 @@ like `users`/`usersStore`.
    `table`/`knock`, `resolveGame`, the pill badge, `startTable({ role, code })`
    in the three online hooks (dead local-name fallbacks deleted with it),
    chess side swap, `online` on the descriptor, party persistence with the
-   reconnect cases above.
+   reconnect cases above. (Two PRs: 3a — the party layer: persistence,
+   `table`/`knock`, the lit pill, `preview-party.html` — shipped 2026-08-29;
+   3b — the game seam, `startTable` in the three lobbies — next.)
 4. **Everyone's history.** `recordResultFor` with ids captured at start,
    `useProfile().recordResult` deleted, the per-game credits.
 

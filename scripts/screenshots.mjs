@@ -256,6 +256,30 @@ const SHOTS = [
     },
   },
   {
+    // In a party, the friend opened Chess somewhere you aren't: the pill glows
+    // gold with the game's name and the panel offers "Join ›". A harness page,
+    // because a real party needs a second device.
+    name: 'party-invite',
+    path: '/preview-party.html?scene=invite',
+    viewport: PHONE,
+    prep: async (page) => {
+      await page.getByTestId('party-badge').waitFor();
+      await page.getByTestId('party-pill').click();
+      await page.getByTestId('party-invite').waitFor();
+    },
+  },
+  {
+    // The host's side: the friend knocked on Rainbow Racer's door.
+    name: 'party-knock',
+    path: '/preview-party.html?scene=knock',
+    viewport: PHONE,
+    prep: async (page) => {
+      await page.getByTestId('party-badge').waitFor();
+      await page.getByTestId('party-pill').click();
+      await page.getByTestId('party-knock').waitFor();
+    },
+  },
+  {
     // The arena with the artist-made bunny steed (coins land randomly, so the
     // pixels churn a little every regeneration — that's expected).
     name: 'racer-arena',
