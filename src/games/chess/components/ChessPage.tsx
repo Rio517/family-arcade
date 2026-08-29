@@ -6,7 +6,7 @@ import { useProfile } from '@shared/profile/useProfile';
 import { useChess } from '@games/chess/state/useChess';
 import { pointsForResult } from '@shared/profile/profile';
 import { normalizeCode } from '@shared/net/peer';
-import { NamePicker } from '@shared/ui/NamePicker';
+import { PlayingAs } from '@shared/profile/PlayingAs';
 import { ChessBoard } from './ChessBoard';
 import { ChessResult } from './ChessResult';
 import { ChessLogModal, CapturedTray } from './ChessLogModal';
@@ -357,21 +357,15 @@ export function ChessPage() {
         <div className="narrow-col stack">
           <div className="panel stack">
             <h2>Same-device game</h2>
+            {/* Pass-and-play chairs are game-local names, not tickets — typing
+                one here never renames whoever is signed in on this browser.
+                A proper roster picker for the two chairs comes in Phase 2. */}
             <div className="field">
               <label htmlFor="wname">White player</label>
-              <NamePicker
-                value={whiteName}
-                exclude={[blackName]}
-                testIdPrefix="white-chip"
-                // Pass-and-play names are game-local: picking a chip must not
-                // rename whoever is signed in on this browser.
-                onPick={setWhiteName}
-              />
               <input id="wname" value={whiteName} maxLength={20} onChange={(e) => setWhiteName(e.target.value)} data-testid="white-name" />
             </div>
             <div className="field">
               <label htmlFor="bname">Black player</label>
-              <NamePicker value={blackName} exclude={[whiteName]} testIdPrefix="black-chip" onPick={setBlackName} />
               <input id="bname" value={blackName} maxLength={20} onChange={(e) => setBlackName(e.target.value)} data-testid="black-name" />
             </div>
             <button className="btn btn-primary btn-lg btn-block" onClick={() => cx.startLocal(whiteName, blackName)} data-testid="start-local">
@@ -385,21 +379,8 @@ export function ChessPage() {
       {/* ── Setup: online lobby ── */}
       {!inGame && setup === 'online' && (
         <div className="narrow-col stack">
-          <div className="panel">
-            <h2>Your name</h2>
-            <NamePicker value={profile.profile.name} onPick={profile.setName} />
-            <div className="field">
-              <label htmlFor="oname">Shown to your opponent</label>
-              <input
-                id="oname"
-                value={profile.profile.name}
-                maxLength={20}
-                placeholder="Player"
-                onChange={(e) => profile.setName(e.target.value)}
-                data-testid="chess-name"
-              />
-            </div>
-          </div>
+          {/* Your ticket is your name online — your opponent sees it. */}
+          <PlayingAs />
           <div className="panel stack">
             <h2>Start a game</h2>
             <button
