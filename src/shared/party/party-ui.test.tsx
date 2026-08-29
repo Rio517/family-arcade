@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { cleanup as cleanupBar, render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
@@ -23,6 +23,16 @@ function makeParty(over: Partial<PartyValue> = {}): PartyValue {
     hostParty: vi.fn(() => 'ABCD'),
     joinParty: vi.fn(),
     leaveParty: vi.fn(),
+    retry: vi.fn(),
+    reconnecting: false,
+    table: null,
+    knock: null,
+    openTable: vi.fn(() => 'WXYZ'),
+    closeTable: vi.fn(),
+    knockOn: vi.fn(),
+    clearKnock: vi.fn(),
+    resolveGame: (id: string) =>
+      id === 'chess' ? { title: 'Chess', path: '/chess' } : id === 'racer' ? { title: 'Rainbow Racer', path: '/racer' } : null,
     call: {
       active: false,
       status: 'idle',
@@ -39,7 +49,7 @@ function makeParty(over: Partial<PartyValue> = {}): PartyValue {
   } as PartyValue;
 }
 
-const renderBar = () => render(<MemoryRouter><PartyBar /></MemoryRouter>);
+const renderBar = (path = '/') => render(<MemoryRouter initialEntries={[path]}><PartyBar /></MemoryRouter>);
 
 beforeEach(() => {
   mockParty.value = makeParty();
@@ -113,6 +123,73 @@ describe('PartyBar', () => {
     expect(screen.getByRole('dialog', { name: 'Party' })).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Party' })).toBeNull();
+  });
+
+  describe('the pill lights up', () => {
+    const live = (over: Partial<PartyValue> = {}) =>
+      makeParty({ inParty: true, status: 'connected', role: 'guest', theirName: 'Kai', code: 'ABCD', ...over });
+
+    it('says who opened what, with one tap to join — unless you are already there', () => {
+      mockParty.value = live({ table: { game: 'chess', code: 'WXYZ' } });
+      renderBar('/');
+      const pill = screen.getByTestId('party-pill');
+      expect(pill).toHaveClass('invite');
+      expect(screen.getByTestId('party-badge')).toHaveTextContent('Chess ›');
+      expect(pill).toHaveAccessibleName(/Kai opened Chess/);
+      fireEvent.click(pill);
+      expect(screen.getByTestId('party-invite')).toHaveTextContent('Kai opened Chess');
+      expect(screen.getByTestId('party-invite-go')).toHaveAttribute('href', '/chess');
+      cleanupBar();
+
+      // Standing at that game already: nothing to announce.
+      renderBar('/chess');
+      expect(screen.getByTestId('party-pill')).not.toHaveClass('invite');
+      expect(screen.queryByTestId('party-badge')).toBeNull();
+    });
+
+    it('the host hears a knock and can open that game', () => {
+      mockParty.value = live({ role: 'host', knock: 'racer' });
+      renderBar('/');
+      expect(screen.getByTestId('party-badge')).toHaveTextContent('Rainbow Racer?');
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.getByTestId('party-knock')).toHaveTextContent('Kai wants to play Rainbow Racer');
+      fireEvent.click(screen.getByTestId('party-knock-go'));
+      expect(mockParty.value.clearKnock).toHaveBeenCalledTimes(1);
+    });
+
+    it('a game the app does not know stays quiet', () => {
+      mockParty.value = live({ table: { game: 'bingo', code: 'WXYZ' } });
+      renderBar('/');
+      expect(screen.getByTestId('party-pill')).not.toHaveClass('invite');
+    });
+  });
+
+  describe('a remembered party coming back', () => {
+    it('says it is reconnecting and only offers to leave', () => {
+      mockParty.value = makeParty({ reconnecting: true, role: 'guest', code: 'ABCD', status: 'dialing' });
+      renderBar();
+      expect(screen.getByTestId('party-pill')).toHaveTextContent(/reconnecting/i);
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.getByTestId('party-reconnecting')).toBeInTheDocument();
+      expect(screen.queryByTestId('party-create')).toBeNull();
+      expect(screen.queryByTestId('party-code-input')).toBeNull();
+    });
+
+    it('after an error you can try again on the same code', () => {
+      mockParty.value = makeParty({ role: 'guest', code: 'ABCD', status: 'error' });
+      renderBar();
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.getByTestId('party-error')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('party-retry'));
+      expect(mockParty.value.retry).toHaveBeenCalledTimes(1);
+    });
+
+    it('a guest still dialing sees the code it is looking for', () => {
+      mockParty.value = makeParty({ role: 'guest', code: 'ABCD', status: 'dialing' });
+      renderBar();
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.getByTestId('party-dialing')).toHaveTextContent('Joining ABCD');
+    });
   });
 
   it('offers opt-in voice (video off) once connected', () => {

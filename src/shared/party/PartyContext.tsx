@@ -18,7 +18,7 @@
  * Everything the two devices share is peer-to-peer and ephemeral — no server of
  * ours, nothing recorded (see the privacy page).
  */
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { GameConnection, generateCode, normalizeCode, type ConnStatus } from '@shared/net/peer';
 import { MediaLink, type CallStatus, type Role } from '@shared/net/media';
 import { useProfile } from '@shared/profile/useProfile';
@@ -26,6 +26,7 @@ import { arcadeNow } from '@shared/time/clock';
 import type { PartyTableInfo } from './party';
 import { clearParty, loadParty, saveParty } from './partyStore';
 import { isPartyMsg, type PartyMsg } from './protocol';
+import { PartyCtx } from './partyCtx';
 
 /** What the app knows about a game that shared code may not import. */
 export interface GameInfo {
@@ -82,10 +83,8 @@ export interface PartyValue {
   };
 }
 
-const Ctx = createContext<PartyValue | null>(null);
-
 export function useParty(): PartyValue {
-  const v = useContext(Ctx);
+  const v = useContext(PartyCtx);
   if (!v) throw new Error('useParty must be used inside <PartyProvider>');
   return v;
 }
@@ -102,13 +101,16 @@ export function PartyProvider({
   const profile = useProfile();
   const myName = profile.profile.name || 'Player';
 
+  // A remembered party (arcade.party.v1, twelve hours) seeds the initial
+  // state; the boot effect below only dials it.
+  const [remembered] = useState(() => loadParty(arcadeNow()));
   const [status, setStatus] = useState<ConnStatus>('idle');
   const [code, setCode] = useState('');
   const [role, setRole] = useState<Role | null>(null);
   const [theirName, setTheirName] = useState<string | null>(null);
-  const [table, setTable] = useState<PartyTableInfo | null>(null);
+  const [table, setTable] = useState<PartyTableInfo | null>(remembered?.table ?? null);
   const [knock, setKnock] = useState<string | null>(null);
-  const [reconnecting, setReconnecting] = useState(false);
+  const [reconnecting, setReconnecting] = useState(remembered !== null);
   // Derived, not stored — it can never disagree with the status (the same
   // pattern callActive uses below).
   const inParty = status === 'connected';
@@ -123,7 +125,7 @@ export function PartyProvider({
   // writes, which must not read stale render closures.
   const codeRef = useRef('');
   const roleRef = useRef<Role | null>(null);
-  const tableRef = useRef<PartyTableInfo | null>(null);
+  const tableRef = useRef<PartyTableInfo | null>(remembered?.table ?? null);
 
   /** Write the party to storage as it stands right now. */
   const remember = useCallback(() => {
@@ -274,17 +276,13 @@ export function PartyProvider({
   const clearKnock = useCallback(() => setKnock(null), []);
 
   // A remembered party rejoins on load — through the same host/join path, so
-  // the call stays opt-in and the table is ready to re-announce on open.
+  // the call stays opt-in and the table (seeded above) re-announces on open.
   const bootedRef = useRef(false);
   useEffect(() => {
-    if (bootedRef.current) return;
+    if (bootedRef.current || !remembered) return;
     bootedRef.current = true;
-    const remembered = loadParty(arcadeNow());
-    if (!remembered) return;
-    setReconnecting(true);
-    setTableState(remembered.table);
     start(remembered.role, remembered.code);
-  }, [setTableState, start]);
+  }, [remembered, start]);
 
   // Keep my name fresh on the wire if the ticket changes mid-party.
   useEffect(() => {
@@ -364,5 +362,5 @@ export function PartyProvider({
     },
   };
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return <PartyCtx.Provider value={value}>{children}</PartyCtx.Provider>;
 }
