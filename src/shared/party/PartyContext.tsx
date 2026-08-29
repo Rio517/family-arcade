@@ -312,11 +312,17 @@ export function PartyProvider({
 
   // A remembered party rejoins on load — through the same host/join path, so
   // the call stays opt-in and the table (seeded above) re-announces on open.
-  // No once-guard: the deps are stable, and `start` replaces any earlier
-  // link, so StrictMode's rehearsal mount (which destroys that link in its
-  // cleanup below) still leaves exactly one live link dialling.
+  // The once-guard resets in the cleanup: StrictMode's rehearsal mount
+  // destroys the link (the unmount cleanup below), so the real mount must
+  // dial again rather than find a stale "already booted" flag.
+  const bootedRef = useRef(false);
   useEffect(() => {
-    if (remembered) start(remembered.role, remembered.code);
+    if (!remembered || bootedRef.current) return;
+    bootedRef.current = true;
+    start(remembered.role, remembered.code);
+    return () => {
+      bootedRef.current = false;
+    };
   }, [remembered, start]);
 
   // Keep my name fresh on the wire if the ticket changes mid-party.
