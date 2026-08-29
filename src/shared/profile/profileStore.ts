@@ -7,8 +7,8 @@
  */
 
 import { defaultProfile, type Profile } from './profile';
-import { activeProfile, addUser, updateActiveProfile } from './users';
-import { getUsersSnapshot, makeUserId, resetUsersStore, setUsersState, subscribeUsers } from './usersStore';
+import { activeProfile, updateActiveProfile } from './users';
+import { getUsersSnapshot, setUsersState, subscribeUsers } from './usersStore';
 
 // Signed-out placeholder. One stable reference — useSyncExternalStore treats a
 // fresh object per read as an endless re-render loop.
@@ -20,21 +20,16 @@ export function getProfileSnapshot(): Profile {
 
 export const subscribeProfile = subscribeUsers;
 
-/** Replace the signed-in player's profile, persist, wake subscribers. */
+/**
+ * Replace the signed-in player's profile, persist, wake subscribers. With
+ * nobody signed in the write is dropped: every writer sits behind the gate or
+ * inside the booth's signed-in branch, so this only happens on corrupt
+ * storage — and minting a nameless "Player" ticket would be worse than losing
+ * one write. Only the roster (TicketList → newPlayer) creates players.
+ */
 export function setProfileState(next: Profile): void {
   const users = getUsersSnapshot();
-  if (users.activeId) {
-    if (activeProfile(users) === next) return;
-    setUsersState(updateActiveProfile(users, next));
-    return;
-  }
-  // Defensive: a profile write with nobody signed in (say, a rename from the
-  // party bar before any game door was opened) mints that person on the spot.
-  const withUser = addUser(users, makeUserId(), next.name || 'Player', Date.now());
-  setUsersState(updateActiveProfile(withUser, next));
-}
-
-/** Re-read the store from storage. For tests, to isolate between cases. */
-export function resetProfileStore(): void {
-  resetUsersStore();
+  if (!users.activeId) return;
+  if (activeProfile(users) === next) return;
+  setUsersState(updateActiveProfile(users, next));
 }

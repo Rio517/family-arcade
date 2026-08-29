@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { beforeEach } from 'vitest';
-import { resetProfileStore } from '@shared/profile/profileStore';
+import { resetUsersStore } from '@shared/profile/usersStore';
 
 // MapLibre prepares its worker URL while the game registry is imported. jsdom
 // does not implement object URLs, even in shell tests that never mount a map.
@@ -21,5 +21,5 @@ if (typeof window.URL.revokeObjectURL !== 'function') {
 // from localStorage before each test so a name/points change in one case can't
 // leak into the next.
 beforeEach(() => {
-  resetProfileStore();
+  resetUsersStore();
 });

@@ -1,17 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  getProfileSnapshot,
-  resetProfileStore,
-  setProfileState,
-  subscribeProfile,
-} from './profileStore';
+import { getProfileSnapshot, setProfileState, subscribeProfile } from './profileStore';
 import { defaultProfile } from './profile';
 import { getUsersSnapshot, resetUsersStore, setUsersState } from './usersStore';
 import { addUser, emptyUsersState, setActiveUser } from './users';
 
 beforeEach(() => {
   localStorage.clear();
-  resetProfileStore();
+  resetUsersStore();
 });
 
 describe('the profile facade over the player roster', () => {
@@ -20,11 +15,11 @@ describe('the profile facade over the player roster', () => {
     expect(getProfileSnapshot()).toBe(getProfileSnapshot()); // stable reference
   });
 
-  it('mints a player on a write with nobody signed in, and persists it', () => {
+  it('drops a write with nobody signed in — only the roster makes players', () => {
     setProfileState({ ...defaultProfile(), name: 'Kai', points: 40 });
-    expect(getProfileSnapshot()).toMatchObject({ name: 'Kai', points: 40 });
-    resetProfileStore(); // re-read from storage
-    expect(getProfileSnapshot()).toMatchObject({ name: 'Kai', points: 40 });
+    expect(getProfileSnapshot()).toEqual(defaultProfile());
+    expect(getUsersSnapshot().users).toEqual([]);
+    expect(localStorage.getItem('arcade.users.v1')).toBeNull();
   });
 
   it('writes land on the signed-in player only, and switching swaps everything back', () => {
