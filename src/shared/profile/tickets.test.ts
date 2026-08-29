@@ -29,6 +29,11 @@ describe('matchTickets', () => {
   it('does not match inside a word', () => {
     expect(matchTickets(ROSTER, 'lara')).toEqual([]);
   });
+
+  it('matches a whole multi-word name typed out, spaces and all', () => {
+    expect(matchTickets(ROSTER, 'Mommy Zo').map((x) => x.id)).toEqual(['d']);
+    expect(matchTickets(ROSTER, 'mommy zoe').map((x) => x.id)).toEqual(['d']);
+  });
 });
 
 describe('canCreateTicket', () => {

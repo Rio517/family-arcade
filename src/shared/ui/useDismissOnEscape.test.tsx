@@ -40,6 +40,31 @@ describe('useDismissOnEscape', () => {
     expect(onDismiss).not.toHaveBeenCalled();
   });
 
+  it('closes only the dialog opened last when two are open', () => {
+    const outer = vi.fn();
+    const inner = vi.fn();
+    const { rerender } = render(
+      <>
+        <Dialog open onDismiss={outer} />
+        <Dialog open onDismiss={inner} />
+      </>,
+    );
+    escape();
+    expect(inner).toHaveBeenCalledTimes(1);
+    expect(outer).not.toHaveBeenCalled();
+
+    // The inner one closes; the next Escape reaches the outer one.
+    rerender(
+      <>
+        <Dialog open onDismiss={outer} />
+        <Dialog open={false} onDismiss={inner} />
+      </>,
+    );
+    escape();
+    expect(outer).toHaveBeenCalledTimes(1);
+    expect(inner).toHaveBeenCalledTimes(1);
+  });
+
   it('calls the latest callback without resubscribing', () => {
     const first = vi.fn();
     const second = vi.fn();
