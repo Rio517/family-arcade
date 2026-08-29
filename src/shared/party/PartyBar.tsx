@@ -12,7 +12,7 @@ import { PlayingAs } from '@shared/profile/PlayingAs';
 import { initialOf } from '@shared/profile/tickets';
 import { useProfile } from '@shared/profile/useProfile';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
-import { CameraIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
+import { CameraIcon, ChevronDownIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
 import { useParty } from './PartyContext';
 import './party.css';
 
@@ -52,6 +52,19 @@ export function PartyBar() {
     <aside className="party-root" aria-label="Party">
       {open && (
         <div className="party-panel" role="dialog" aria-label="Party">
+          {/* The panel's one always-there row: its name, and the obvious way
+              back down — tapping the pill again wasn't discoverable. */}
+          <div className="party-panel-head">
+            <span className="party-eyebrow">Party</span>
+            <button
+              className="party-collapse"
+              onClick={close}
+              aria-label="Minimize the party panel"
+              data-testid="party-collapse"
+            >
+              <ChevronDownIcon size={18} />
+            </button>
+          </div>
           {!inParty ? (
             <>
               <PlayingAs />

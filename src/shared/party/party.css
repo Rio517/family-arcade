@@ -99,6 +99,27 @@
 .party-start, .party-join, .party-waiting, .party-live { display: flex; flex-direction: column; gap: 10px; }
 
 .party-eyebrow { font-size: 14px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 800; color: var(--muted, #94a3b8); }
+
+/* The panel's header row: name on the left, the way down on the right. */
+.party-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: -4px; /* the panel's gap is roomy; the head sits tighter */
+}
+.party-collapse {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border, #475569);
+  background: var(--surface-2, #334155);
+  color: var(--muted, #94a3b8);
+  cursor: pointer;
+}
+.party-collapse:hover { color: var(--accent, #22d3ee); border-color: var(--accent, #22d3ee); }
+.party-collapse:focus-visible { outline: 2px solid var(--accent, #22d3ee); outline-offset: 2px; }
 .party-code {
   font-size: 34px; font-weight: 900; letter-spacing: 8px; text-align: center;
   color: var(--accent, #22d3ee);

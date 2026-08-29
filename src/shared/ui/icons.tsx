@@ -446,6 +446,10 @@ export const PeaceHandIcon = (p: IconProps) =>
     p,
   );
 
+/** A chevron pointing down — collapse/minimize a panel. */
+export const ChevronDownIcon = (p: IconProps) =>
+  svg(<path d="M5.5 9.2 12 15.7l6.5-6.5" />, p);
+
 /**
  * A distinct filled emblem per fleet skin, drawn in the skin's colour
  * (`currentColor`, set by the caller). Replaces the old emoji skin icons.
