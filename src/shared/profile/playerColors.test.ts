@@ -8,4 +8,8 @@ describe('playerColor', () => {
     expect(playerColor(6)).toBe(playerColor(0));
     expect(playerColor(13)).toBe(playerColor(1));
   });
+
+  it('a ticket missing from the roster still gets a colour', () => {
+    expect(playerColor(-1)).toBe(playerColor(0));
+  });
 });
