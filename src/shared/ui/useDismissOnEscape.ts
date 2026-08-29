@@ -25,14 +25,26 @@ export function useDismissOnEscape(active: boolean, onDismiss: () => void): void
 
   useEffect(() => {
     if (!active) return;
+    openDialogs.push(handler);
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // Dialogs stack (the ticket list inside the party panel): one Escape
+      // closes only the one opened last. Every open dialog hears the key on
+      // `window`; only the top of the stack acts on it.
+      if (openDialogs[openDialogs.length - 1] !== handler) return;
       // Stop the key reaching a game underneath — Escape shouldn't also
       // pause the racer or deselect a chess piece while closing a dialog.
       e.stopPropagation();
       handler.current();
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      const i = openDialogs.lastIndexOf(handler);
+      if (i >= 0) openDialogs.splice(i, 1);
+    };
   }, [active]);
 }
+
+/** Every dialog currently listening, oldest first. */
+const openDialogs: Array<{ current: () => void }> = [];

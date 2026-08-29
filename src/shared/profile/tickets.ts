@@ -12,7 +12,12 @@ export function foldName(s: string): string {
 export function matchTickets(users: StoredUser[], query: string): StoredUser[] {
   const q = foldName(query);
   if (!q) return users;
-  return users.filter((u) => foldName(u.profile.name).split(/\s+/).some((w) => w.startsWith(q)));
+  return users.filter((u) => {
+    const full = foldName(u.profile.name);
+    // The whole name as typed ("mommy zo") as well as any single word ("zo") —
+    // a child typing her full name must still find her own ticket.
+    return full.startsWith(q) || full.split(/\s+/).some((w) => w.startsWith(q));
+  });
 }
 
 /** The letter on a ticket's medallion. */
