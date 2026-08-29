@@ -2,8 +2,12 @@ import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RiskPage } from './RiskPage';
+import { LINEUP_KEY, resetLineupStore } from '@shared/profile/lineupStore';
+import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 
 const HELP_SEEN_KEY = 'risk-help-seen-v1';
+const CAMPAIGN_KEY = 'risk-campaign-v1';
 
 function renderPage() {
   return render(
@@ -12,6 +16,18 @@ function renderPage() {
     </MemoryRouter>,
   );
 }
+
+/** Three tickets on this iPad, with Rio signed in. */
+function seedRoster() {
+  const roster = addUser(addUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u2', 'Klara'), 'u3', 'Flora');
+  setUsersState(setActiveUser(roster, 'u1'));
+}
+
+const savedPlayers = () =>
+  (JSON.parse(localStorage.getItem(CAMPAIGN_KEY) ?? 'null')?.state.players ?? []) as {
+    name: string;
+    bot?: string;
+  }[];
 
 // The svg deliberately has no role="img" (that would hide the territory
 // buttons inside it from assistive tech), so grab it by testid.
@@ -44,6 +60,10 @@ describe('<RiskPage>', () => {
   // pop over the other flows; the how-to-play tests override this explicitly.
   beforeEach(() => {
     localStorage.clear();
+    // The roster and the remembered lineup live in module-level stores, so a
+    // cleared localStorage isn't enough — re-read them, empty, for every case.
+    resetUsersStore();
+    resetLineupStore();
     localStorage.setItem(HELP_SEEN_KEY, '1');
   });
   afterEach(() => vi.restoreAllMocks());
@@ -273,9 +293,9 @@ describe('<RiskPage>', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('count-2'));
 
-    // Toggling seat 2 to a computer swaps its name box for the persona ladder.
+    // Toggling seat 2 to a computer swaps its chair for the persona ladder.
     fireEvent.click(screen.getByTestId('seat-bot-1'));
-    expect(screen.queryByTestId('name-1')).toBeNull();
+    expect(screen.getByTestId('seat-1')).not.toHaveTextContent(/tap a ticket/i);
     fireEvent.click(screen.getByTestId('persona-1-flint'));
     fireEvent.click(screen.getByTestId('risk-start'));
 
@@ -288,12 +308,86 @@ describe('<RiskPage>', () => {
     await waitFor(() => expect(general()).not.toBe('General Flint'), { timeout: 3000 });
   });
 
-  it('toggling a computer seat back restores the name box', () => {
+  it('toggling a computer seat back frees the chair for a ticket', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('seat-bot-0'));
-    expect(screen.queryByTestId('name-0')).toBeNull();
+    expect(screen.getByTestId('persona-0-cadet')).toBeInTheDocument();
+    expect(screen.getByTestId('seat-bot-0')).toHaveAttribute('aria-pressed', 'true');
+
     fireEvent.click(screen.getByTestId('seat-bot-0'));
-    expect(screen.getByTestId('name-0')).toBeInTheDocument();
+    expect(screen.queryByTestId('persona-0-cadet')).toBeNull();
+    expect(screen.getByTestId('seat-0')).toHaveTextContent(/tap a ticket/i);
+    expect(screen.getByTestId('seat-bot-0')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  describe('the war council takes its tickets', () => {
+    beforeEach(seedRoster);
+
+    it('seats the signed-in general first and invites a tap for the rest', () => {
+      renderPage();
+      expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
+      expect(screen.getByTestId('seat-1')).toHaveTextContent(/tap a ticket/i);
+      expect(screen.getByTestId('seat-2')).toHaveTextContent(/tap a ticket/i);
+      // The chairs come from the roster now — nothing is typed.
+      expect(screen.queryByTestId('name-0')).toBeNull();
+    });
+
+    it('tapping a ticket in the strip fills the next free chair', () => {
+      renderPage();
+      fireEvent.click(screen.getByTestId('strip-user-u2'));
+      expect(screen.getByTestId('seat-1')).toHaveTextContent('Klara');
+      // Seated tickets grey out, and × hands the chair back.
+      expect(screen.getByTestId('strip-user-u2')).toBeDisabled();
+      fireEvent.click(screen.getByTestId('seat-1-clear'));
+      expect(screen.getByTestId('seat-1')).toHaveTextContent(/tap a ticket/i);
+      expect(screen.getByTestId('strip-user-u2')).not.toBeDisabled();
+    });
+
+    it('a chair handed to a computer shows the persona ladder', () => {
+      renderPage();
+      fireEvent.click(screen.getByTestId('seat-bot-2'));
+      expect(screen.getByTestId('seat-2')).toHaveTextContent('Cadet Pip');
+      for (const id of ['cadet', 'wren', 'flint', 'vex']) {
+        expect(screen.getByTestId(`persona-2-${id}`)).toBeInTheDocument();
+      }
+      fireEvent.click(screen.getByTestId('persona-2-vex'));
+      expect(screen.getByTestId('persona-2-vex')).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('takes the field with the seated tickets and remembers the lineup', () => {
+      const first = renderPage();
+      fireEvent.click(screen.getByTestId('strip-user-u2'));
+      fireEvent.click(screen.getByTestId('seat-bot-2'));
+      fireEvent.click(screen.getByTestId('risk-start'));
+
+      // The rail lists exactly the three chairs, in order.
+      const rail = screen.getByTestId('risk-rail');
+      expect(rail).toHaveTextContent('Rio');
+      expect(rail).toHaveTextContent('Klara');
+      expect(rail).toHaveTextContent('Cadet Pip');
+      expect(savedPlayers().map((p) => p.name)).toEqual(['Rio', 'Klara', 'Cadet Pip']);
+      expect(savedPlayers().map((p) => p.bot ?? null)).toEqual([null, null, 'cadet']);
+
+      // The lineup — tickets and the computer general alike — is remembered.
+      expect(JSON.parse(localStorage.getItem(LINEUP_KEY) ?? '{}')).toEqual({
+        risk: [{ userId: 'u1' }, { userId: 'u2' }, { bot: 'cadet' }],
+      });
+
+      // …so the next war council opens with the same three chairs.
+      first.unmount();
+      renderPage();
+      expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
+      expect(screen.getByTestId('seat-1')).toHaveTextContent('Klara');
+      expect(screen.getByTestId('seat-2')).toHaveTextContent('Cadet Pip');
+      expect(screen.getByTestId('persona-2-cadet')).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('an empty chair still plays, under its banner name', () => {
+      renderPage();
+      fireEvent.click(screen.getByTestId('count-2'));
+      fireEvent.click(screen.getByTestId('risk-start'));
+      expect(savedPlayers().map((p) => p.name)).toEqual(['Rio', 'Cobalt']);
+    });
   });
 
   it('opens the how-to-play guide automatically on the first ever visit', () => {
