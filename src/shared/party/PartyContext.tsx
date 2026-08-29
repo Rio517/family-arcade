@@ -3,7 +3,8 @@
  * game (see docs/adr — the "party" idea). It lives above the router in
  * `main.tsx`, so walking Home → a game → a different game never tears it down.
  *
- *  • Identity — your name (shared with the profile) and the friend you're with.
+ *  • Identity — your ticket's name (read from the profile, never written
+ *    here) and the friend you're with.
  *  • Presence — a persistent `GameConnection` on a shared party code that
  *    exchanges names. (Game *rules* still travel on each game's own link.)
  *  • Video/voice — an opt-in `MediaLink`. Nothing turns the camera or mic on
