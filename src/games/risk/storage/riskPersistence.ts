@@ -56,6 +56,13 @@ export function loadRiskGame(): StoredRisk | null {
     if (!Array.isArray(parsed.state.defenseBag)) {
       parsed.state.defenseBag = [];
     }
+    // A seat's ticket id rides along so a finished war can credit the right
+    // roster entry. Saves from before it simply have none (nobody is
+    // credited), and a hand-edited one may hold junk — anything that isn't a
+    // string is dropped rather than trusted.
+    for (const p of parsed.state.players) {
+      if (p.userId !== undefined && typeof p.userId !== 'string') delete p.userId;
+    }
     return parsed;
   } catch {
     return null;

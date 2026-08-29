@@ -4,7 +4,16 @@ import { MemoryRouter } from 'react-router-dom';
 import { LINEUP_KEY, resetLineupStore, setLineup } from '@shared/profile/lineupStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { createGame } from '../domain/engine';
 import { UnicornPage } from './UnicornPage';
+
+// Wrap the engine's `createGame` in a transparent spy: the live game sits in
+// a ref the page never exposes, so the one way to see which players the chairs
+// produced is to watch them go in. Every call still runs the real engine.
+vi.mock('../domain/engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../domain/engine')>();
+  return { ...actual, createGame: vi.fn(actual.createGame) };
+});
 
 function renderPage() {
   return render(
@@ -190,6 +199,24 @@ describe('<UnicornPage>', () => {
       expect(JSON.parse(localStorage.getItem(LINEUP_KEY) ?? '{}')).toEqual({
         unicorn: [{ userId: 'u1' }, { userId: 'u2' }],
       });
+    });
+
+    it('every ticket keeps its id on its player; an empty chair has none', () => {
+      vi.mocked(createGame).mockClear();
+      renderPage();
+      fireEvent.click(screen.getByTestId('uni-players-3'));
+      fireEvent.click(screen.getByTestId('strip-user-u2'));
+      fireEvent.click(screen.getByTestId('uni-seats-next'));
+      fireEvent.click(screen.getByTestId('uni-world-sky'));
+      fireEvent.click(screen.getByTestId('uni-char-fairy')); // Rio
+      fireEvent.click(screen.getByTestId('uni-char-dragon')); // Klara
+      fireEvent.click(screen.getByTestId('uni-char-princess')); // the open chair
+
+      expect(createGame).toHaveBeenCalledTimes(1);
+      const { players } = vi.mocked(createGame).mock.calls[0][0];
+      expect(players.map((p) => p.name)).toEqual(['Rio', 'Klara', 'Player 3']);
+      // The id rides on the player so a won round can credit the right ticket.
+      expect(players.map((p) => p.userId ?? null)).toEqual(['u1', 'u2', null]);
     });
 
     it('a solo game still opens the table — one tap through for the signed-in ticket', () => {

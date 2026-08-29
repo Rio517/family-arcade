@@ -86,6 +86,17 @@ describe('newGame', () => {
     expect(g.players[0].bot).toBeUndefined();
     expect(g.players[1].bot).toBe('cadet');
   });
+
+  it('keeps each seated ticket id on the player state — none for a bot or an empty chair', () => {
+    const g = newGame(MAP, [
+      { name: 'Rio', color: '#f00', userId: 'u1' },
+      { name: 'Cadet Pip', color: '#00f', bot: 'cadet' },
+      { name: 'Cobalt', color: '#0f0' },
+    ]);
+    expect(g.players.map((p) => p.userId ?? null)).toEqual(['u1', null, null]);
+    // The id rides along as its own field — it never leaks into the name.
+    expect(g.players[0].name).toBe('Rio');
+  });
 });
 
 describe('setup — claim then deploy, one army per turn', () => {

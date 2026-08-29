@@ -40,6 +40,8 @@ export interface NewPlayer {
   color: string;
   /** Computer persona id (see domain/bots) — absent means a human seat. */
   bot?: string;
+  /** Roster ticket id for a seated person — absent for a bot or an empty chair. */
+  userId?: string;
 }
 
 const die = (rng: () => number) => Math.floor(rng() * 6) + 1;
@@ -96,6 +98,7 @@ export function newGame(
     color: p.color,
     alive: true,
     ...(p.bot ? { bot: p.bot } : {}),
+    ...(p.userId ? { userId: p.userId } : {}),
   }));
 
   const territories: Record<string, TerritoryState> = {};

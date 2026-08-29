@@ -62,6 +62,9 @@ export interface PlayerConfig {
   emoji: string;
   /** If the character rides, the mount's face, e.g. "🦄". Rendering only. */
   mount?: string;
+  /** Roster ticket id of the person in this chair, so a won round can be
+   *  credited to them. Absent for a chair nobody claimed. Opaque to the engine. */
+  userId?: string;
 }
 
 export interface ActivePower {
