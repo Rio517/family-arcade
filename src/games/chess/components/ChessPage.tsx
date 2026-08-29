@@ -59,8 +59,8 @@ export function ChessPage() {
   // this device played last (or the signed-in ticket on chair one). Sitting
   // down never signs anybody in or renames them.
   const table = useSeats('chess', 2);
-  const whiteName = seatName(table.seats[0], table.users, () => '') || 'White';
-  const blackName = seatName(table.seats[1], table.users, () => '') || 'Black';
+  const whiteName = seatName(table.seats[0], table.users) || 'White';
+  const blackName = seatName(table.seats[1], table.users) || 'Black';
   const [logOpen, setLogOpen] = useState(false);
   // The ☰ options menu: board view, world, move log. Undo stays outside, in
   // the title bar — taking back a move shouldn't cost two taps.
@@ -354,7 +354,11 @@ export function ChessPage() {
       {!inGame && setup === 'free' && (
         <FreePlay
           onExit={() => setSetup('pick')}
-          onStartGame={(board) => cx.startLocal(whiteName, blackName, customStart(board))}
+          onStartGame={(board) => {
+            // A promoted free-play board is a game starting like any other.
+            table.remember();
+            cx.startLocal(whiteName, blackName, customStart(board));
+          }}
         />
       )}
 

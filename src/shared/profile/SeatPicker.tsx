@@ -5,10 +5,10 @@
  * composes TicketStrip into its own rows instead.
  */
 
+import { useRef } from 'react';
 import { CloseIcon } from '@shared/ui/icons';
-import { playerColor } from './playerColors';
-import { clearSeat, fillNextEmpty, seatName, seatedUserIds, type Seat } from './seats';
-import { initialOf } from './tickets';
+import { Medal } from './Medal';
+import { clearSeat, seatName, type Seat } from './seats';
 import { TicketStrip } from './TicketStrip';
 import { useIdentity } from './useIdentity';
 import './player.css';
@@ -18,8 +18,6 @@ export function SeatPicker({
   onChange,
   rowLabel,
   accent,
-  botName = () => '',
-  testIdPrefix = 'seat',
 }: {
   seats: Seat[];
   onChange: (next: Seat[]) => void;
@@ -27,44 +25,41 @@ export function SeatPicker({
   rowLabel?: (index: number) => React.ReactNode;
   /** A per-chair colour for the number badge (a game's seat colours). */
   accent?: (index: number) => string;
-  /** Names a computer chair; only games with bots pass one. */
-  botName?: (botId: string) => string;
-  testIdPrefix?: string;
 }) {
   const { users, active } = useIdentity();
-  const seated = new Set(seatedUserIds(seats));
-  const full = seats.every((s) => s.kind !== 'empty');
+  const rows = useRef<(HTMLLIElement | null)[]>([]);
+
+  const clear = (i: number) => {
+    onChange(clearSeat(seats, i));
+    // The × unmounts with the ticket; keep the keyboard on the chair it emptied.
+    rows.current[i]?.focus();
+  };
 
   return (
     <div className="spick">
       <ol className="spick-rows">
         {seats.map((seat, i) => {
-          const name = seatName(seat, users, botName);
+          const name = seatName(seat, users);
           const rosterIndex = seat.kind === 'ticket' ? users.findIndex((u) => u.id === seat.userId) : -1;
           return (
             <li
               key={i}
+              ref={(el) => {
+                rows.current[i] = el;
+              }}
+              tabIndex={-1}
               className={`spick-row ${seat.kind}`}
               style={{ '--pc': accent?.(i) ?? 'var(--accent)' } as React.CSSProperties}
-              data-testid={`${testIdPrefix}-${i}`}
+              data-testid={`seat-${i}`}
             >
               <span className="spick-num" aria-hidden="true">{i + 1}</span>
+              <span className="sr-only">Chair {i + 1}: </span>
               {rowLabel && <span className="spick-label">{rowLabel(i)}</span>}
               {seat.kind === 'empty' ? (
-                <span className="spick-empty">
-                  <span className="sr-only">Chair {i + 1}: </span>tap a ticket below
-                </span>
+                <span className="spick-empty">tap a ticket below</span>
               ) : (
                 <>
-                  {seat.kind === 'ticket' && (
-                    <span
-                      className="pmedal sm"
-                      style={{ '--c': playerColor(rosterIndex) } as React.CSSProperties}
-                      aria-hidden="true"
-                    >
-                      {initialOf(name)}
-                    </span>
-                  )}
+                  {seat.kind === 'ticket' && <Medal name={name} index={rosterIndex} small />}
                   <span className="spick-name">
                     {name || 'Someone'}
                     {seat.kind === 'ticket' && seat.userId === active?.id && <span className="pstub-you">you</span>}
@@ -72,9 +67,9 @@ export function SeatPicker({
                   <button
                     type="button"
                     className="spick-clear"
-                    aria-label={`Clear chair ${i + 1}`}
-                    data-testid={`${testIdPrefix}-${i}-clear`}
-                    onClick={() => onChange(clearSeat(seats, i))}
+                    aria-label={`Clear chair ${i + 1}: ${name || 'Someone'}`}
+                    data-testid={`seat-${i}-clear`}
+                    onClick={() => clear(i)}
                   >
                     <CloseIcon size={18} />
                   </button>
@@ -84,11 +79,7 @@ export function SeatPicker({
           );
         })}
       </ol>
-      <TicketStrip
-        seated={seated}
-        full={full}
-        onPick={(userId) => onChange(fillNextEmpty(seats, { kind: 'ticket', userId }))}
-      />
+      <TicketStrip seats={seats} onChange={onChange} />
     </div>
   );
 }

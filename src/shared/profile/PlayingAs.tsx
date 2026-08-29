@@ -7,8 +7,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
-import { playerColor } from './playerColors';
-import { initialOf } from './tickets';
+import { Medal } from './Medal';
 import { TicketList } from './TicketList';
 import { useIdentity } from './useIdentity';
 import './player.css';
@@ -31,13 +30,7 @@ export function PlayingAs() {
   return (
     <div className="pas" data-testid="playing-as">
       <div className="pas-pill">
-        <span
-          className="pmedal sm"
-          style={{ '--c': playerColor(index) } as React.CSSProperties}
-          aria-hidden="true"
-        >
-          {initialOf(active.profile.name)}
-        </span>
+        <Medal name={active.profile.name} index={index} small />
         <span className="pas-who">You're {active.profile.name}</span>
         <button
           ref={changeRef}

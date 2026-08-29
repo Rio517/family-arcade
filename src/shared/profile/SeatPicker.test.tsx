@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { SeatPicker } from './SeatPicker';
 import { EMPTY_SEAT, type Seat } from './seats';
-import { resetUsersStore, setUsersState } from './usersStore';
-import { addUser, emptyUsersState, setActiveUser } from './users';
+import { getUsersSnapshot, resetUsersStore, setUsersState } from './usersStore';
+import { addUser, emptyUsersState, setActiveUser, updateActiveProfile } from './users';
 
 const ticket = (userId: string): Seat => ({ kind: 'ticket', userId });
 
@@ -20,6 +20,9 @@ describe('<SeatPicker>', () => {
     expect(screen.getByTestId('seat-0')).toHaveTextContent('Klara');
     expect(screen.getByTestId('seat-0')).toHaveTextContent(/you/i);
     expect(screen.getByTestId('seat-1')).toHaveTextContent(/tap a ticket/i);
+    // Every chair announces its number, filled or not.
+    expect(screen.getByTestId('seat-0')).toHaveTextContent(/Chair 1:/);
+    expect(screen.getByTestId('seat-1')).toHaveTextContent(/Chair 2:/);
   });
 
   it('tapping a ticket in the strip fills the first empty chair', () => {
@@ -29,30 +32,47 @@ describe('<SeatPicker>', () => {
     expect(onChange).toHaveBeenCalledWith([ticket('u2'), ticket('u3'), EMPTY_SEAT]);
   });
 
-  it('× empties a chair', () => {
+  it('× empties a chair, names whose it was, and keeps the keyboard on that chair', () => {
     const onChange = vi.fn();
     render(<SeatPicker seats={[ticket('u2'), ticket('u1')]} onChange={onChange} />);
-    fireEvent.click(screen.getByTestId('seat-0-clear'));
+    const clear = screen.getByTestId('seat-0-clear');
+    expect(clear).toHaveAccessibleName('Clear chair 1: Klara');
+    fireEvent.click(clear);
     expect(onChange).toHaveBeenCalledWith([EMPTY_SEAT, ticket('u1')]);
+    expect(screen.getByTestId('seat-0')).toHaveFocus();
   });
 
   it('greys the strip when every chair is taken', () => {
-    render(<SeatPicker seats={[ticket('u2'), ticket('u1')]} onChange={() => {}} />);
-    expect(screen.getByTestId('strip-user-u3')).toBeDisabled();
+    const onChange = vi.fn();
+    render(<SeatPicker seats={[ticket('u2'), ticket('u1')]} onChange={onChange} />);
+    expect(screen.getByTestId('strip-user-u3')).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(screen.getByTestId('strip-user-u3'));
+    expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('names a computer chair through botName and lets the game label and colour chairs', () => {
+  it('names are derived at render — a rename at the booth shows up in the chair', () => {
+    render(<SeatPicker seats={[ticket('u2')]} onChange={() => {}} />);
+    expect(screen.getByTestId('seat-0')).toHaveTextContent('Klara');
+    act(() => {
+      const users = getUsersSnapshot();
+      const me = users.users.find((u) => u.id === 'u2')!;
+      setUsersState(updateActiveProfile(users, { ...me.profile, name: 'Klarabelle' }));
+    });
+    expect(screen.getByTestId('seat-0')).toHaveTextContent('Klarabelle');
+  });
+
+  it('lets the game label and colour chairs; a bot chair here reads as Someone', () => {
     render(
       <SeatPicker
         seats={[ticket('u2'), { kind: 'bot', botId: 'cadet' }]}
         onChange={() => {}}
         rowLabel={(i) => (i === 0 ? 'White' : 'Black')}
         accent={(i) => (i === 0 ? '#fff' : '#000')}
-        botName={(id) => `General ${id}`}
       />,
     );
     expect(screen.getByTestId('seat-0')).toHaveTextContent('White');
-    expect(screen.getByTestId('seat-1')).toHaveTextContent('General cadet');
     expect(screen.getByTestId('seat-1')).toHaveTextContent('Black');
+    // Only Risk seats generals, and Risk draws its own chairs.
+    expect(screen.getByTestId('seat-1')).toHaveTextContent('Someone');
   });
 });
