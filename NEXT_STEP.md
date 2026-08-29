@@ -27,13 +27,20 @@ Sorted by likely value. Nothing here blocks anything else.
      ticket id, the three lobbies branching on the party — host "Play Chess
      with Kai", guest knocks and auto-joins, `closeTable` on leaving).
      `preview-lobbies.html` screenshots the party lobbies.
-  4. **Everyone's history.** Next. `recordResultFor(userId, …)` replacing
-     `useProfile().recordResult`, so chess same-device, Risk's winner, Magic
-     Coins and racer 2P credit every seated ticket. The ids are already
-     there: `seatedUserId` on the chess/battleship sessions and the racer
-     net, `userId` on Risk's `PlayerState` and Magic Coins' `PlayerConfig`.
-     Ship Battle solo games seat nobody yet (`startSoloGame(personaId)` —
-     credit the signed-in ticket directly, or add a `seatedUserId` option).
+  4. **Everyone's history.** Shipped 2026-08-29. `recordResultFor(userId, …)`
+     (`src/shared/profile/results.ts`) replaced `useProfile().recordResult`;
+     every game records for the ticket id it captured at the start — chess
+     same-device (a win and a loss), chess online and Ship Battle (the seated
+     captain, solo included), racer 2P (the racer on each device), Risk (the
+     winning general). Draws, ties, bots and empty chairs record nothing.
+     **Left open:** Magic Coins' champions carry `userId` on `PlayerConfig`
+     but record nothing — decide whether a coin round is a "result" worth
+     arcade points before wiring it.
+
+  The one-ticket plan is complete. Its open findings live in the audit PRs
+  (#125, #127, #133 and the Phase 4 audit) — the chess colour agreement on
+  the game link and the game links' 20 s dial window are the two worth
+  doing first.
 
 - **Ship Battle visual glow-up — image-asset ships.** The whole plan is in
   "The Ship Battle glow-up" below. This is the active piece of work; assets are
