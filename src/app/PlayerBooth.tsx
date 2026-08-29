@@ -1,14 +1,17 @@
 /**
  * The Ticket Booth on the arcade's front page: shows who's signed in on this
  * browser with their tickets and record, their game history across every
- * game, and the roster moves — switch player, rename, new player. Replaces
- * the old Prize Counter, whose numbers were one anonymous pile per device.
+ * game, and the roster moves — switch (or add) a player, edit the profile.
+ * Switching is the same ticket list as the gate and every lobby's "Change":
+ * tap a stub, or type a name to filter or make a new ticket. Replaces the old
+ * Prize Counter, whose numbers were one anonymous pile per device.
  */
 
 import { useState } from 'react';
 import { useProfile } from '@shared/profile/useProfile';
 import { useUsers } from '@shared/profile/useUsers';
 import { playerColor } from '@shared/profile/playerColors';
+import { TicketList } from '@shared/profile/TicketList';
 import { pronounCodePointLength, type GameHistoryEntry } from '@shared/profile/profile';
 import { arcadeNow } from '@shared/time/clock';
 import { GAMES } from './registry';
@@ -54,7 +57,7 @@ function HistoryRow({ entry, now }: { entry: GameHistoryEntry; now: number }) {
 export function PlayerBooth() {
   const { users, active, signIn, newPlayer } = useUsers();
   const { profile, setName, setPronouns } = useProfile();
-  const [mode, setMode] = useState<'view' | 'switch' | 'edit-profile' | 'new'>('view');
+  const [mode, setMode] = useState<'view' | 'switch' | 'edit-profile'>('view');
   const [draftName, setDraftName] = useState('');
   const [draftPronouns, setDraftPronouns] = useState('');
   const [pronounsError, setPronounsError] = useState(false);
@@ -68,11 +71,8 @@ export function PlayerBooth() {
     e.preventDefault();
     const clean = draftName.trim();
     if (!clean) return;
-    if (mode === 'edit-profile') {
-      setName(clean);
-      setPronouns(draftPronouns);
-    }
-    if (mode === 'new') newPlayer(clean);
+    setName(clean);
+    setPronouns(draftPronouns);
     setDraftName('');
     setDraftPronouns('');
     setPronounsError(false);
@@ -135,94 +135,56 @@ export function PlayerBooth() {
               >
                 Edit profile
               </button>
-              <button
-                type="button"
-                data-testid="booth-new"
-                className={mode === 'new' ? 'on' : ''}
-                onClick={() => {
-                  setDraftName('');
-                  setDraftPronouns('');
-                  setPronounsError(false);
-                  setMode(mode === 'new' ? 'view' : 'new');
-                }}
-              >
-                New player
-              </button>
             </div>
 
             {mode === 'switch' && (
               <div className="booth-roster">
-                {users
-                  .filter((u) => u.id !== active.id)
-                  .map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      className="pstub"
-                      style={{ '--c': playerColor(users.indexOf(u)) } as React.CSSProperties}
-                      data-testid={`booth-user-${u.id}`}
-                      onClick={() => {
-                        signIn(u.id);
-                        setMode('view');
-                      }}
-                    >
-                      <span className="pmedal" aria-hidden="true">
-                        {[...u.profile.name.trim()][0]?.toUpperCase() ?? '?'}
-                      </span>
-                      <span className="pstub-body">
-                        <span className="pstub-name">{u.profile.name}</span>
-                        <span className="pstub-stats">
-                          <b>{u.profile.points}</b> tickets · {u.profile.wins} wins
-                        </span>
-                      </span>
-                      <span className="pstub-admit" aria-hidden="true">ADMIT ONE</span>
-                    </button>
-                  ))}
-                {users.length === 1 && (
-                  <p className="booth-empty">Nobody else has a ticket yet — add a new player.</p>
-                )}
+                <TicketList
+                  users={users}
+                  activeId={active.id}
+                  testIdPrefix="booth"
+                  onPick={(id) => {
+                    signIn(id);
+                    setMode('view');
+                  }}
+                  onCreate={(name) => {
+                    newPlayer(name);
+                    setMode('view');
+                  }}
+                />
               </div>
             )}
 
-            {(mode === 'edit-profile' || mode === 'new') && (
+            {mode === 'edit-profile' && (
               <form className="booth-form" onSubmit={submit}>
-                <label htmlFor="booth-name">
-                  {mode === 'edit-profile' ? 'Name' : 'Who joins the arcade?'}
-                </label>
+                <label htmlFor="booth-profile-name">Name</label>
                 <div className="booth-form-fields">
                   <input
-                    id="booth-name"
-                    data-testid={mode === 'edit-profile' ? 'booth-profile-name' : 'booth-name'}
+                    id="booth-profile-name"
+                    data-testid="booth-profile-name"
                     value={draftName}
                     maxLength={20}
                     onChange={(e) => setDraftName(e.target.value)}
                     placeholder="Name"
                   />
-                  {mode === 'edit-profile' && (
-                    <>
-                      <label htmlFor="booth-pronouns">Pronouns</label>
-                      <input
-                        id="booth-pronouns"
-                        data-testid="booth-profile-pronouns"
-                        value={draftPronouns}
-                        aria-describedby={pronounsError ? 'booth-pronouns-error' : undefined}
-                        onChange={(e) => changePronouns(e.target.value)}
-                        placeholder="Pronouns"
-                      />
-                      {pronounsError && (
-                        <p id="booth-pronouns-error" className="booth-form-error" role="alert">
-                          Use 24 characters or fewer
-                        </p>
-                      )}
-                    </>
+                  <label htmlFor="booth-pronouns">Pronouns</label>
+                  <input
+                    id="booth-pronouns"
+                    data-testid="booth-profile-pronouns"
+                    value={draftPronouns}
+                    aria-describedby={pronounsError ? 'booth-pronouns-error' : undefined}
+                    onChange={(e) => changePronouns(e.target.value)}
+                    placeholder="Pronouns"
+                  />
+                  {pronounsError && (
+                    <p id="booth-pronouns-error" className="booth-form-error" role="alert">
+                      Use 24 characters or fewer
+                    </p>
                   )}
                 </div>
                 <div className="booth-form-row">
-                  <button
-                    type="submit"
-                    data-testid={mode === 'edit-profile' ? 'booth-profile-save' : 'booth-save'}
-                  >
-                    {mode === 'edit-profile' ? 'Save profile' : 'Make ticket'}
+                  <button type="submit" data-testid="booth-profile-save">
+                    Save profile
                   </button>
                 </div>
               </form>

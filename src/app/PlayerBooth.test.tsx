@@ -105,6 +105,27 @@ describe('<PlayerBooth>', () => {
     expect(screen.queryByText('he/him')).not.toBeInTheDocument();
   });
 
+  it('Switch player is the ticket list: filter, tap, or make a new one', () => {
+    seedUsers([
+      { id: 'mario', name: 'Mario' },
+      { id: 'morgan', name: 'Morgan' },
+    ]);
+    render(<PlayerBooth />);
+    // One list everywhere — no separate "New player" form at the booth.
+    expect(screen.queryByTestId('booth-new')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('booth-switch'));
+    expect(screen.getByTestId('booth-user-mario')).toHaveTextContent(/you/i);
+    fireEvent.change(screen.getByTestId('booth-name'), { target: { value: 'mo' } });
+    expect(screen.queryByTestId('booth-user-mario')).not.toBeInTheDocument();
+    expect(screen.getByTestId('booth-user-morgan')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('booth-name'), { target: { value: 'Nana' } });
+    fireEvent.click(screen.getByTestId('booth-create'));
+    expect(activeProfile(getUsersSnapshot()).name).toBe('Nana');
+    expect(screen.queryByTestId('booth-name')).not.toBeInTheDocument();
+  });
+
   it('keeps the editor controls at 44px with an explicit keyboard-focus indicator', () => {
     expect(boothStyles).toMatch(/\.booth-actions button\s*{[\s\S]*?min-height: 44px;/);
     expect(boothStyles).toMatch(/\.booth-form-fields input\s*{[\s\S]*?min-height: 44px;/);
