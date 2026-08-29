@@ -20,19 +20,20 @@ Sorted by likely value. Nothing here blocks anything else.
   writer and `src/games/**` cannot import it). Next, in order, each its own
   PR:
 
-  3. **The party is the table.** Half shipped 2026-08-29 (PR 3a): the party
-     survives a reload (`arcade.party.v1`, 12-hour memory, "Reconnecting…"
-     and "Try again" in the panel), `table`/`knock` travel on the presence
-     link, the pill glows gold with the game's name. **Next: PR 3b** — the
-     plan is Tasks 8–10 of
-     `docs/plans/2026-08-29-players-phase-3-the-party-is-the-table.md`:
-     `startTable({ role, code, seatedUserId, hostSide? })` in `useChess`,
-     `useBattleship` and `useRacerNet`, every session keeping its ticket id,
-     and the three lobbies branching on the party (host "Play Chess with Kai",
-     guest auto-joins, `closeTable` on leaving) so two devices in a party
-     never trade a code.
-  4. **Everyone's history.** `recordResultFor(userId, …)` so chess same-device,
-     Risk's winner and racer 2P credit every seated ticket.
+  3. **The party is the table.** Shipped 2026-08-29 in two PRs (#131 the
+     party layer: `arcade.party.v1` memory, `table`/`knock`, the gold pill;
+     then the game seam: `startTable({ role, code, seatedUserId, hostSide? })`
+     in `useChess`/`useBattleship`/`useRacerNet`, every session keeping its
+     ticket id, the three lobbies branching on the party — host "Play Chess
+     with Kai", guest knocks and auto-joins, `closeTable` on leaving).
+     `preview-lobbies.html` screenshots the party lobbies.
+  4. **Everyone's history.** Next. `recordResultFor(userId, …)` replacing
+     `useProfile().recordResult`, so chess same-device, Risk's winner, Magic
+     Coins and racer 2P credit every seated ticket. The ids are already
+     there: `seatedUserId` on the chess/battleship sessions and the racer
+     net, `userId` on Risk's `PlayerState` and Magic Coins' `PlayerConfig`.
+     Ship Battle solo games seat nobody yet (`startSoloGame(personaId)` —
+     credit the signed-in ticket directly, or add a `seatedUserId` option).
 
 - **Ship Battle visual glow-up — image-asset ships.** The whole plan is in
   "The Ship Battle glow-up" below. This is the active piece of work; assets are
@@ -97,9 +98,9 @@ drives the *real* app with *real* input.
   element instead is the single biggest saving for the owner's time, as opposed
   to the agent's.
 - **The party / P2P layer, which has no live coverage.** `PartyContext` is
-  unit-tested under a mocked link and `preview-party.html` screenshots the
-  in-party states, but video, voice and the real peer connection need live
-  browsers; jsdom can't go near them. Even driving one side of a call would be
+  unit-tested under a mocked link, and `preview-party.html` /
+  `preview-lobbies.html` screenshot the in-party states, but video, voice
+  and the real peer connection need live browsers; jsdom can't go near them. Even driving one side of a call would be
   more than exists now.
 
 Limits worth knowing before leaning on it:

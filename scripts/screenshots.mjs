@@ -279,6 +279,64 @@ const SHOTS = [
       await page.getByTestId('party-knock').waitFor();
     },
   },
+  // ── The party is the table: each online lobby in a party (harness page) ──
+  {
+    // Chess, host in a party: pick a colour, one tap — no code doors.
+    name: 'chess-party-host',
+    path: '/preview-lobbies.html?scene=host#/chess',
+    viewport: TABLET,
+    prep: async (page) => {
+      await page.getByTestId('mode-online').click();
+      await page.getByTestId('chess-party-play').waitFor();
+    },
+  },
+  {
+    // Chess, guest in a party: knocked, waiting for the friend to open it.
+    name: 'chess-party-guest',
+    path: '/preview-lobbies.html?scene=guest#/chess',
+    viewport: TABLET,
+    prep: async (page) => {
+      await page.getByTestId('mode-online').click();
+      await page.getByTestId('chess-party-waiting').waitFor();
+    },
+  },
+  {
+    name: 'battle-party-host',
+    path: '/preview-lobbies.html?scene=host#/play',
+    viewport: TABLET,
+    prep: async (page) => {
+      await page.getByTestId('battle-party-play').waitFor();
+    },
+  },
+  {
+    name: 'battle-party-guest',
+    path: '/preview-lobbies.html?scene=guest#/play',
+    viewport: TABLET,
+    prep: async (page) => {
+      await page.getByTestId('battle-party-waiting').waitFor();
+      await page.waitForTimeout(300);
+    },
+  },
+  {
+    name: 'racer-party-host',
+    path: '/preview-lobbies.html?scene=host#/racer',
+    viewport: TABLET,
+    prep: async (page) => {
+      await page.getByTestId('racer-mode-net').click();
+      await page.getByTestId('racer-driver-unicorn').click();
+      await page.getByTestId('racer-party-play').waitFor();
+    },
+  },
+  {
+    name: 'racer-party-guest',
+    path: '/preview-lobbies.html?scene=guest#/racer',
+    viewport: TABLET,
+    prep: async (page) => {
+      await page.getByTestId('racer-mode-net').click();
+      await page.getByTestId('racer-driver-unicorn').click();
+      await page.getByTestId('racer-party-waiting').waitFor();
+    },
+  },
   {
     // The arena with the artist-made bunny steed (coins land randomly, so the
     // pixels churn a little every regeneration — that's expected).
