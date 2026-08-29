@@ -60,6 +60,11 @@ export type Phase = 'setup' | 'reinforce' | 'attack' | 'fortify' | 'over';
 export type DiceMode = 'random' | 'balanced';
 
 export interface GameState {
+  /** A stable id for this campaign, minted when the war opens. It tells one
+   *  finished war from the next when the winner's ticket is credited, and is
+   *  the `code` on that history row. Saves from before it existed are given
+   *  one on load (see storage/riskPersistence). */
+  id: string;
   mapId: string;
   players: PlayerState[];
   territories: Record<string, TerritoryState>;

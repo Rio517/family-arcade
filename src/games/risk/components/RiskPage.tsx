@@ -17,6 +17,7 @@ import { useSeats } from '@shared/profile/useSeats';
 import { TicketStrip } from '@shared/profile/TicketStrip';
 import { Medal } from '@shared/profile/Medal';
 import { EMPTY_SEAT, seatName, setSeat, type Seat } from '@shared/profile/seats';
+import { recordResultFor } from '@shared/profile/results';
 import type { StoredUser } from '@shared/profile/users';
 import type { BattleResult, DiceMode, GameState } from '../domain/types';
 
@@ -190,6 +191,30 @@ export function RiskPage() {
     // A newly built map may have a different extent than the placeholder above.
     resetZoom();
   }, [map, resetZoom]);
+
+  // The winning general's ticket takes the war — once per campaign, however
+  // often the victory screen re-renders. Only the winner records; nobody is
+  // handed a loss. A computer general or an unclaimed chair has no ticket, so
+  // its victory is nobody's to keep. The ticket id was captured when the war
+  // opened (see start), never read from whoever is signed in at the finish.
+  // The once-guard lives in memory on purpose: a finished war is never saved
+  // (useRisk clears it and the loader refuses one), so a reload lands on the
+  // war council with nothing to credit again.
+  const creditedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!state || state.phase !== 'over' || state.winner === null) return;
+    if (creditedRef.current === state.id) return;
+    creditedRef.current = state.id;
+    const w = state.players[state.winner];
+    recordResultFor(w.userId ?? null, {
+      won: true,
+      survivingCells: 0,
+      code: state.id,
+      game: 'risk',
+      opponent: state.players.filter((p) => p.id !== w.id).map((p) => p.name).join(' & '),
+      finishedAt: Date.now(),
+    });
+  }, [state]);
 
   function resume() {
     if (!resumable) return;

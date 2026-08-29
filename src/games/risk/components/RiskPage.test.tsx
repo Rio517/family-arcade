@@ -2,19 +2,25 @@ import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RiskPage } from './RiskPage';
+import { MAPS } from '../maps/registry';
+import { newGame, type NewPlayer } from '../domain/rules';
+import { saveRiskGame } from '../storage/riskPersistence';
+import type { GameState } from '../domain/types';
 import { LINEUP_KEY, resetLineupStore } from '@shared/profile/lineupStore';
-import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { getUsersSnapshot, resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 
 const HELP_SEEN_KEY = 'risk-help-seen-v1';
 const CAMPAIGN_KEY = 'risk-campaign-v1';
 
+const page = () => (
+  <MemoryRouter initialEntries={['/risk']}>
+    <RiskPage />
+  </MemoryRouter>
+);
+
 function renderPage() {
-  return render(
-    <MemoryRouter initialEntries={['/risk']}>
-      <RiskPage />
-    </MemoryRouter>,
-  );
+  return render(page());
 }
 
 /** Three tickets on this iPad, with Rio signed in. */
@@ -457,6 +463,122 @@ describe('<RiskPage>', () => {
       expect(savedPlayers().map((p) => p.name)).toEqual(['Rio', 'Cobalt']);
       // An unclaimed chair has no ticket to credit.
       expect(savedPlayers().map((p) => p.userId ?? null)).toEqual(['u1', null]);
+    });
+  });
+
+  describe('the winning general takes the war', () => {
+    beforeEach(seedRoster);
+
+    /** A campaign one blow from over: `attacker` holds every land but one,
+     *  with a stack in Alaska; `defender` holds Kamchatka with a single army.
+     *  Balanced dice with the bags pre-dealt (attacker 6-6-6, defender 1)
+     *  make the capture certain without touching Math.random. */
+    function lastBlow(players: NewPlayer[], attacker: number, defender: number): GameState {
+      const topo = MAPS[0].build().topology;
+      const g = newGame(topo, players, 'balanced');
+      const territories: GameState['territories'] = {};
+      for (const id of topo.territoryIds) territories[id] = { owner: attacker, armies: 1 };
+      territories.alaska = { owner: attacker, armies: 10 };
+      territories.kamchatka = { owner: defender, armies: 1 };
+      return {
+        ...g,
+        territories,
+        players: g.players.map((p) => ({ ...p, alive: p.id === attacker || p.id === defender })),
+        current: attacker,
+        phase: 'attack',
+        toPlace: 0,
+        diceBag: [6, 6, 6],
+        defenseBag: [1],
+      };
+    }
+    const resumeAndStrike = () => {
+      fireEvent.click(screen.getByTestId('risk-resume-btn'));
+      fireEvent.click(screen.getByTestId('terr-alaska'));
+      fireEvent.click(screen.getByTestId('terr-kamchatka'));
+    };
+    const ticket = (id: string) => getUsersSnapshot().users.find((u) => u.id === id)!.profile;
+    const expectUntouched = (id: string) => {
+      expect(ticket(id).wins).toBe(0);
+      expect(ticket(id).losses).toBe(0);
+      expect(ticket(id).history).toEqual([]);
+    };
+
+    it("credits the winner's ticket with the war, naming the generals they beat", () => {
+      const campaign = lastBlow(
+        [
+          { name: 'Rio', color: '#f00', userId: 'u1' },
+          { name: 'Klara', color: '#00f', userId: 'u2' },
+          { name: 'Cadet Pip', color: '#0f0', bot: 'cadet' },
+        ],
+        0,
+        1,
+      );
+      saveRiskGame(campaign);
+      renderPage();
+      resumeAndStrike();
+      expect(screen.getByText(/Rio holds the world/)).toBeInTheDocument();
+
+      // Rio's ticket carries the win, under this campaign's id…
+      expect(ticket('u1').wins).toBe(1);
+      expect(ticket('u1').losses).toBe(0);
+      expect(ticket('u1').history).toHaveLength(1);
+      expect(ticket('u1').history[0]).toMatchObject({
+        game: 'risk',
+        result: 'win',
+        opponent: 'Klara & Cadet Pip',
+        code: campaign.id,
+      });
+      // …while the general who lost, and the ticket that never sat down, are
+      // left exactly as they were — nobody is handed a loss.
+      expectUntouched('u2');
+      expectUntouched('u3');
+    });
+
+    it('re-rendering or reloading the victory screen does not credit the war twice', () => {
+      saveRiskGame(
+        lastBlow([{ name: 'Rio', color: '#f00', userId: 'u1' }, { name: 'Klara', color: '#00f', userId: 'u2' }], 0, 1),
+      );
+      const view = renderPage();
+      resumeAndStrike();
+      expect(screen.getByTestId('risk-again')).toBeInTheDocument();
+      expect(ticket('u1').wins).toBe(1);
+
+      // Every way the victory screen re-renders: a fresh render pass, the
+      // field manual opening and closing over it.
+      view.rerender(page());
+      fireEvent.click(screen.getByTestId('risk-help-open'));
+      fireEvent.click(screen.getByTestId('risk-help-close'));
+      expect(ticket('u1').wins).toBe(1);
+      expect(ticket('u1').history).toHaveLength(1);
+
+      // "Reload": a finished war is never saved, so a fresh visit opens the
+      // war council with nothing to resume — and nothing to credit again.
+      view.unmount();
+      renderPage();
+      expect(screen.queryByTestId('risk-resume')).toBeNull();
+      expect(ticket('u1').wins).toBe(1);
+      expect(ticket('u1').history).toHaveLength(1);
+      expectUntouched('u2');
+    });
+
+    it("a computer general's victory is nobody's to keep", async () => {
+      saveRiskGame(
+        lastBlow(
+          [{ name: 'Rio', color: '#f00', userId: 'u1' }, { name: 'Field Marshal Vex', color: '#00f', bot: 'vex' }],
+          1,
+          0,
+        ),
+      );
+      renderPage();
+      fireEvent.click(screen.getByTestId('risk-resume-btn'));
+      // Vex thinks for a moment, then lands the last blow himself.
+      await waitFor(() => expect(screen.getByTestId('risk-again')).toBeInTheDocument(), { timeout: 3000 });
+      expect(screen.getByText(/Field Marshal Vex holds the world/)).toBeInTheDocument();
+
+      // No ticket sat in the winning chair, so no ticket records anything.
+      expectUntouched('u1');
+      expectUntouched('u2');
+      expectUntouched('u3');
     });
   });
 
