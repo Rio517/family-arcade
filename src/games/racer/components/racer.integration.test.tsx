@@ -3,7 +3,7 @@ import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } f
 import { MemoryRouter } from 'react-router-dom';
 import { fakeParty } from '@shared/party/testing';
 import { RacerPage } from './RacerPage';
-import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { getUsersSnapshot, resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 
 // Neither device is in a party here, so the lobby keeps its code doors — the
@@ -445,7 +445,8 @@ describe('two-player racer: reconnect re-sync', () => {
   it(
     'a channel reopen after a lost "race over" packet re-syncs the guest with the finished world',
     async () => {
-      const { host, guest } = connectClients();
+      const { host, guest, code } = connectClients();
+      const ticket = (id: string) => getUsersSnapshot().users.find((u) => u.id === id)!.profile;
       // Generous ceilings: both waits gate on each client's lazy scene import
       // resolving, and under full-suite CPU load that occasionally outlives
       // testing-library's 1s default — this test flaked three times in a week
@@ -463,10 +464,18 @@ describe('two-player racer: reconnect re-sync', () => {
       for (let i = 0; i < 40 && !host.queryByTestId('racer-win'); i++) await pump();
       expect(host.getByTestId('racer-win')).toBeInTheDocument();
 
-      // The finish went out — and was lost. The guest still thinks it's racing.
+      // The finish credits this device's racer — Rio, the ticket that sat down
+      // — once, as a racer win over Kai under this table's code.
+      expect(ticket('u-rio').wins).toBe(1);
+      expect(ticket('u-rio').history).toHaveLength(1);
+      expect(ticket('u-rio').history[0]).toMatchObject({ game: 'racer', opponent: 'Kai', result: 'win', code });
+
+      // The finish went out — and was lost. The guest still thinks it's racing,
+      // and Kai's ticket has heard nothing.
       expect(bus.wire.some((w) => w.from === 'host' && w.msg.status === 'over')).toBe(true);
       await pump(2);
       expect(guest.queryByTestId('racer-win')).toBeNull();
+      expect(ticket('u-kai').history).toHaveLength(0);
 
       // The connection blips and the channel comes back.
       bus.drop = null;
@@ -491,6 +500,13 @@ describe('two-player racer: reconnect re-sync', () => {
       expect(guest.getByTestId('racer-win')).toBeInTheDocument();
       expect(guest.getByText('Rio wins!')).toBeInTheDocument();
       expect(guest.queryByText('Kai wins!')).toBeNull();
+
+      // Kai's device credits Kai's ticket with the loss (named for Rio), and
+      // the re-sync did not credit Rio a second time.
+      expect(ticket('u-kai').losses).toBe(1);
+      expect(ticket('u-kai').history).toHaveLength(1);
+      expect(ticket('u-kai').history[0]).toMatchObject({ game: 'racer', opponent: 'Rio', result: 'loss', code });
+      expect(ticket('u-rio').history).toHaveLength(1);
     },
     // Two 20s ceilings above, plus the race itself. The retries cover a
     // module-loading stall under CI contention that is not the product's
