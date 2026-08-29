@@ -72,6 +72,9 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
   const connRef = useRef<GameConnection<PartyMsg> | null>(null);
   const nameRef = useRef(myName);
   nameRef.current = myName;
+  // The name last said on the wire, so a fresh channel's hello and the
+  // rename effect below never introduce the same name twice.
+  const announcedRef = useRef<string | null>(null);
 
   // ---- call (video/voice) state, driven by the MediaLink ----
   const linkRef = useRef<MediaLink | null>(null);
@@ -92,6 +95,7 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
         },
         onOpen: () => {
           connRef.current?.send({ t: 'hello', name: nameRef.current });
+          announcedRef.current = nameRef.current;
         },
         onMessage: (msg) => {
           if (msg.t === 'hello') {
@@ -147,9 +151,11 @@ export function PartyProvider({ children }: { children: React.ReactNode }) {
     setCode('');
   }, [stopCall]);
 
-  // Keep my name fresh on the wire if I rename mid-party.
+  // Keep my name fresh on the wire if the ticket changes mid-party.
   useEffect(() => {
-    if (inParty) connRef.current?.send({ t: 'hello', name: myName });
+    if (!inParty || announcedRef.current === myName) return;
+    connRef.current?.send({ t: 'hello', name: myName });
+    announcedRef.current = myName;
   }, [myName, inParty]);
 
   const startCall = useCallback(() => {
