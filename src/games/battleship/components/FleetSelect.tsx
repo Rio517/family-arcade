@@ -11,8 +11,6 @@ interface FleetSelectProps {
   /** Which navy this captain sails in 3D; a separate choice from the colour. */
   era: FleetEra;
   onEra: (era: FleetEra) => void;
-  name: string;
-  onName: (name: string) => void;
   onSelect: (skinId: string) => void;
   onUnlock: (skinId: string) => boolean;
   onContinue: () => void;
@@ -35,11 +33,12 @@ const ERAS: { id: FleetEra; name: string; sub: string; ships: string }[] = [
 ];
 
 /**
- * Screen 1 of setup: set your captain's name and choose the look of your fleet.
- * Both are editable here (and any change is announced to a connected opponent).
+ * Screen 1 of setup: choose the look of your fleet and which navy you sail.
+ * The captain's name isn't asked for here — the signed-in ticket is the
+ * identity, and a fleet change is announced to a connected opponent.
  * Free skins are always available; premium skins are unlocked by spending points.
  */
-export function FleetSelect({ profile, selectedSkinId, era, onEra, name, onName, onSelect, onUnlock, onContinue }: FleetSelectProps) {
+export function FleetSelect({ profile, selectedSkinId, era, onEra, onSelect, onUnlock, onContinue }: FleetSelectProps) {
   const [toast, setToast] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
 
@@ -61,23 +60,12 @@ export function FleetSelect({ profile, selectedSkinId, era, onEra, name, onName,
     setTimeout(() => setToast(null), 2200);
   }
 
-  // One compact panel — name, colours, navy, deploy — sized to fit a tablet
+  // One compact panel — points, colours, navy, deploy — sized to fit a tablet
   // screen without scrolling. Three stacked panels used to run ~2300px tall.
   return (
     <div className="stack fleet-setup">
       <div className="panel">
         <div className="fleet-top">
-          <div className="field fleet-name">
-            <label htmlFor="captain-name">Captain’s name — shown to your opponent</label>
-            <input
-              id="captain-name"
-              value={name}
-              maxLength={20}
-              placeholder="Captain"
-              onChange={(e) => onName(e.target.value)}
-              data-testid="fleet-name-input"
-            />
-          </div>
           <div className="fleet-points">
             <span className="k">Points</span>
             <span className="v">{profile.points}</span>

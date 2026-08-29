@@ -123,11 +123,6 @@ export function chooseSkin(s: SessionState, skinId: string): SessionState {
   return { ...s, mySkinId: skinId };
 }
 
-/** Change the name shown to the opponent (editable on the setup page). */
-export function setMyName(s: SessionState, name: string): SessionState {
-  return { ...s, myName: name };
-}
-
 export function toPlacing(s: SessionState): SessionState {
   return { ...s, setupPhase: 'placing' };
 }
