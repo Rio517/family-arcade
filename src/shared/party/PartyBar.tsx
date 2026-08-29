@@ -59,7 +59,11 @@ export function PartyBar() {
               {party.reconnecting ? (
                 <div className="party-waiting" data-testid="party-reconnecting">
                   <span className="party-eyebrow">Your party</span>
-                  <p className="party-hint">Reconnecting to your party…</p>
+                  {/* The host keeps its code on show: the friend comes back with it. */}
+                  {party.role === 'host' && <div className="party-code" data-testid="party-code">{party.code}</div>}
+                  <p className="party-hint">
+                    {party.role === 'host' ? 'Waiting for your friend to come back…' : 'Reconnecting to your party…'}
+                  </p>
                   <button className="party-btn ghost" onClick={leave} data-testid="party-leave">Leave party</button>
                 </div>
               ) : party.status === 'error' ? (

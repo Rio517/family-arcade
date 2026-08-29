@@ -138,9 +138,10 @@ export function RacerLobby({
   }, [partyGuest, tableCode, startTable, leave, seatedUserId]);
 
   /** Back out of a table: hang up, and (as the party host) tell the friend it closed. */
+  /** Back out of a table: tell the party (it ignores a code that isn't its open table), then hang up. */
   const leaveTable = () => {
+    if (net.code) party.closeTable(net.code);
     net.leave();
-    if (party.role === 'host') party.closeTable();
   };
 
   if (net.role) {

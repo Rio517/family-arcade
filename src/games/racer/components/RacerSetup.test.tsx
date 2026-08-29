@@ -127,14 +127,14 @@ describe('<RacerLobby> — not in a party', () => {
     expect(net.startTable).toHaveBeenCalledWith({ role: 'guest', code: 'WXYZ', seatedUserId: 'u-kai' });
   });
 
-  it('a host waiting on a code shows it, and Back only leaves the link (no party table to close)', () => {
+  it('a host waiting on a code shows it; Back names the code it is leaving (the party ignores one that is not its table) and hangs up', () => {
     const net = makeNet({ role: 'host', code: 'QRST', status: 'hosting' });
     render(lobby(net));
     expect(screen.getByTestId('racer-code')).toHaveTextContent('QRST');
 
     fireEvent.click(screen.getByTestId('racer-lobby-back'));
     expect(net.leave).toHaveBeenCalledTimes(1);
-    expect(mockParty.value.closeTable).not.toHaveBeenCalled();
+    expect(mockParty.value.closeTable).toHaveBeenCalledWith('QRST');
   });
 });
 
@@ -168,7 +168,7 @@ describe('<RacerLobby> — party host', () => {
 
     fireEvent.click(screen.getByTestId('racer-lobby-back'));
     expect(net.leave).toHaveBeenCalledTimes(1);
-    expect(mockParty.value.closeTable).toHaveBeenCalledTimes(1);
+    expect(mockParty.value.closeTable).toHaveBeenCalledWith('WXYZ');
   });
 });
 
