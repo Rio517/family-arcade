@@ -7,6 +7,9 @@ import { useChess } from '@games/chess/state/useChess';
 import { pointsForResult } from '@shared/profile/profile';
 import { normalizeCode } from '@shared/net/peer';
 import { PlayingAs } from '@shared/profile/PlayingAs';
+import { SeatPicker } from '@shared/profile/SeatPicker';
+import { useSeats } from '@shared/profile/useSeats';
+import { seatName, swapSeats } from '@shared/profile/seats';
 import { ChessBoard } from './ChessBoard';
 import { ChessResult } from './ChessResult';
 import { ChessLogModal, CapturedTray } from './ChessLogModal';
@@ -21,7 +24,7 @@ type BoardView = 'flat' | '3d';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
-import { CloseIcon, GridIcon, ListIcon, ResumeIcon, TargetIcon } from '@shared/ui/icons';
+import { CloseIcon, GridIcon, ListIcon, ResumeIcon, ShuffleIcon, TargetIcon } from '@shared/ui/icons';
 import { loadLocalChessGame, loadResumableChessGame } from '../storage/chessPersistence';
 import { customStart, winnerOf, status as statusOf } from '@games/chess/domain/rules';
 import { analyzeGame, tallyCaptures } from '@games/chess/domain/analysis';
@@ -52,9 +55,12 @@ export function ChessPage() {
   useDismissOnEscape(shareOpen, () => setShareOpen(false));
   const [copied, setCopied] = useState(false);
   const [joinInput, setJoinInput] = useState(normalizeCode(params.get('g') ?? ''));
-  // Same-device chairs are game-local names; White starts as the signed-in ticket.
-  const [whiteName, setWhiteName] = useState(() => profile.profile.name || 'White');
-  const [blackName, setBlackName] = useState('Black');
+  // The two same-device chairs: tickets off the roster, seeded from the lineup
+  // this device played last (or the signed-in ticket on chair one). Sitting
+  // down never signs anybody in or renames them.
+  const table = useSeats('chess', 2);
+  const whiteName = seatName(table.seats[0], table.users, () => '') || 'White';
+  const blackName = seatName(table.seats[1], table.users, () => '') || 'Black';
   const [logOpen, setLogOpen] = useState(false);
   // The ☰ options menu: board view, world, move log. Undo stays outside, in
   // the title bar — taking back a move shouldn't cost two taps.
@@ -352,23 +358,34 @@ export function ChessPage() {
         />
       )}
 
-      {/* ── Setup: local (hotseat) name form ── */}
+      {/* ── Setup: local (hotseat) — two chairs, filled from the roster ── */}
       {!inGame && setup === 'local' && (
         <div className="narrow-col stack">
           <div className="panel stack">
             <h2>Same-device game</h2>
-            {/* Pass-and-play chairs are game-local names, not tickets — typing
-                one here never renames whoever is signed in on this browser.
-                A proper roster picker for the two chairs comes in Phase 2. */}
-            <div className="field">
-              <label htmlFor="wname">White player</label>
-              <input id="wname" value={whiteName} maxLength={20} onChange={(e) => setWhiteName(e.target.value)} data-testid="white-name" />
-            </div>
-            <div className="field">
-              <label htmlFor="bname">Black player</label>
-              <input id="bname" value={blackName} maxLength={20} onChange={(e) => setBlackName(e.target.value)} data-testid="black-name" />
-            </div>
-            <button className="btn btn-primary btn-lg btn-block" onClick={() => cx.startLocal(whiteName, blackName)} data-testid="start-local">
+            {/* Chairs hold tickets, not typed-in names: tapping someone into
+                a chair never signs them in or renames whoever is holding the
+                device. Who sits where is remembered once the game starts. */}
+            <SeatPicker
+              seats={table.seats}
+              onChange={table.setSeats}
+              rowLabel={(i) => (i === 0 ? 'White' : 'Black')}
+            />
+            <button
+              className="btn btn-ghost chess-swap-btn"
+              onClick={() => table.setSeats(swapSeats(table.seats, 0, 1))}
+              data-testid="chess-swap-sides"
+            >
+              <ShuffleIcon size={18} /> Swap sides
+            </button>
+            <button
+              className="btn btn-primary btn-lg btn-block"
+              onClick={() => {
+                table.remember();
+                cx.startLocal(whiteName, blackName);
+              }}
+              data-testid="start-local"
+            >
               Start game
             </button>
             <button className="btn btn-ghost btn-block" onClick={() => setSetup('pick')}>← Back</button>
