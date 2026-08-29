@@ -20,20 +20,8 @@ import { WinOverlay } from './WinOverlay';
 type Phase = 'mode' | 'pick' | 'lobby' | 'race' | 'over';
 
 const TARGET = 20;
-
-/**
- * Who this device is racing as, and against whom — captured when a
- * two-player race starts, so the finish credits the ticket that sat down
- * (never whoever is signed in minutes later). One per race: `race` ties it to
- * that race's ctx, and the finish consumes it, so a re-render or the host's
- * late "race over" re-sync can't record the same race twice.
- */
-interface PendingCredit {
-  race: RaceCtx;
-  userId: string | null;
-  opponent: string;
-  code: string;
-}
+/** The registry id — what the history row and the party's table name. */
+const GAME_ID = 'racer';
 
 export function RacerPage() {
   const navigate = useNavigate();
@@ -48,7 +36,6 @@ export function RacerPage() {
   const myName = profile.profile.name.trim();
 
   const ctxRef = useRef<RaceCtx | null>(null);
-  const creditRef = useRef<PendingCredit | null>(null);
   const net = useRacerNet({
     name: myName,
     driver: driver.id,
@@ -64,23 +51,19 @@ export function RacerPage() {
     (d: Driver, m: RaceMode) => {
       const myLook = lookOf(d);
       if (m === 'solo') {
-        // A time trial, not a result — nothing to credit at the finish.
         ctxRef.current = {
           ...createRaceCore('solo', 0, TARGET, Math.random),
           looks: [myLook],
           names: [myName],
         };
-        creditRef.current = null;
       } else {
         const isHost = net.role === 'host';
         const theirLook = lookOf(driverById(net.theirDriver ?? 'unicorn'));
-        const race: RaceCtx = {
+        ctxRef.current = {
           ...createRaceCore('net', isHost ? 0 : 1, TARGET, Math.random),
           looks: isHost ? [myLook, theirLook] : [theirLook, myLook],
           names: isHost ? [myName, net.theirName] : [net.theirName, myName],
         };
-        ctxRef.current = race;
-        creditRef.current = { race, userId: net.seatedUserId, opponent: net.theirName, code: net.code };
       }
       setRaceKey((k) => k + 1);
       setPhase('race');
@@ -119,29 +102,29 @@ export function RacerPage() {
     if (net.code) party.closeTable(net.code);
     net.leave();
     ctxRef.current = null;
-    creditRef.current = null;
     lastStartRef.current = 0;
     setPhase('mode');
   };
 
   /**
-   * The race on screen just ended (Track3D says so once per race). Show the
-   * card, and credit the racer on this device with the win or loss — the
-   * other racer is on the other iPad with their own ticket. A tie, a solo
-   * time trial, or a seat with no ticket records nothing.
+   * The race on screen just ended. Track3D says so exactly once per race (its
+   * own latch, and a fresh mount per `raceKey`), so this is the one place a
+   * result is written. The racer on this device gets the win or loss — the
+   * other racer is on the other iPad with their own ticket. Who sat down
+   * (`net.seatedUserId`), under which code and against whom were all fixed at
+   * `startTable` and hold until `leave`, so reading them here is reading the
+   * start. A tie, a solo time trial, or a seat with no ticket records nothing.
    */
   const finishRace = () => {
     setPhase('over');
     const ctx = ctxRef.current;
-    const credit = creditRef.current;
-    creditRef.current = null;
-    if (!ctx || !credit || credit.race !== ctx || ctx.winner === null) return;
-    recordResultFor(credit.userId, {
+    if (!ctx || ctx.mode !== 'net' || ctx.winner === null) return;
+    recordResultFor(net.seatedUserId, {
       won: ctx.winner === ctx.myIndex,
       survivingCells: 0,
-      code: credit.code,
-      game: 'racer',
-      opponent: credit.opponent,
+      code: net.code,
+      game: GAME_ID,
+      opponent: net.theirName,
       finishedAt: Date.now(),
     });
   };

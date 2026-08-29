@@ -269,9 +269,9 @@ Racer's online finishes credit the racer on each device (racer has no local
 two-player mode — the other racer is on the other iPad with their own
 ticket). Every online game captures the signed-in ticket's id when the table
 opens (`startTable({ role, code, seatedUserId })`, Phase 3) and keeps it in
-its saved session, so a *resumed* game can still credit the right ticket —
-which means a version bump on `chess:local:v1` and `risk-campaign-v1` lands
-with Phase 3, when the seam is being carved anyway. Ship Battle records for
+its saved session, so a *resumed* game can still credit the right ticket.
+(The ids are optional fields defaulted on read — no key needed a version
+bump; a save from before tickets simply credits nobody.) Ship Battle records for
 the captain whose id started the table; its opponent is on another device
 with their own ticket.
 
