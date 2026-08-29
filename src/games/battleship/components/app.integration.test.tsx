@@ -6,7 +6,7 @@ import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import { loadSession, saveSession } from '@games/battleship/storage/sessionStore';
 import { shipCells } from '@games/battleship/domain/board';
 import { resolveShot } from '@games/battleship/domain/engine';
-import type { Coord, Fleet, GameLog } from '@games/battleship/domain/types';
+import { BOARD_SIZE, type Coord, type Fleet, type GameLog } from '@games/battleship/domain/types';
 import type { PartyValue } from '@shared/party/PartyContext';
 import { fakeParty, fakePartyWithKai } from '@shared/party/testing';
 
@@ -140,6 +140,11 @@ function signInAs(name: string) {
     const id = `u-${name.toLowerCase()}`;
     setUsersState(setActiveUser(addUser(emptyUsersState(), id, name), id));
   });
+}
+
+/** Tap Change at the booth: another ticket already on the roster signs in. */
+function switchTo(id: string) {
+  act(() => setUsersState(setActiveUser(getUsersSnapshot(), id)));
 }
 
 beforeEach(() => {
@@ -429,6 +434,9 @@ describe('the result lands on the ticket that sat down', () => {
     expect(rows['u-kai']).toHaveLength(1);
     expect(rows['u-kai'][0]).toMatchObject({ game: 'battleship', result: 'win', opponent: 'Admiral Grimtide', code: 'SOLO' });
     expect(rows['u-rio']).toEqual([]);
+    // Kai is seated and signed in: the card's running total is Kai's.
+    const kai = getUsersSnapshot().users.find((u) => u.id === 'u-kai')!.profile;
+    expect(app.getByText(new RegExp(`You now have ${kai.points} points`))).toBeInTheDocument();
   });
 
   it('even when a different ticket is signed in by the time the game ends', async () => {
@@ -437,7 +445,7 @@ describe('the result lands on the ticket that sat down', () => {
     fireEvent.click(app.getByTestId('resume-game'));
 
     // Mid-game, the family taps Change: Rio is signed in when the last shot lands.
-    act(() => setUsersState(setActiveUser(getUsersSnapshot(), 'u-rio')));
+    switchTo('u-rio');
     await waitFor(() => expect(app.getAllByText(/Connected/i).length).toBeGreaterThan(0));
     fireEvent.click(app.getByTestId(`cell-enemy-${last.row}-${last.col}`));
     await app.findByText('You Win!', {}, { timeout: 4000 });
@@ -446,6 +454,9 @@ describe('the result lands on the ticket that sat down', () => {
     expect(rows['u-kai']).toHaveLength(1);
     expect(rows['u-kai'][0]).toMatchObject({ game: 'battleship', result: 'win' });
     expect(rows['u-rio']).toEqual([]);
+    // Rio is signed in but the points went to Kai: the card must not read
+    // Rio's balance back as "You now have".
+    expect(app.queryByText(/You now have/)).toBeNull();
   });
 
   it('a save from before tickets took seats records nothing — for anybody', async () => {
@@ -457,6 +468,23 @@ describe('the result lands on the ticket that sat down', () => {
     const rows = historyById();
     expect(rows['u-kai']).toEqual([]);
     expect(rows['u-rio']).toEqual([]);
+    // Nothing was credited, so there is no running total to report.
+    expect(app.queryByText(/You now have/)).toBeNull();
+  });
+});
+
+describe('the table closes when the game ends', () => {
+  it('the host closes the table at the finish, so a guest reloading is not seated at a finished game', async () => {
+    mockParty.value = fakePartyWithKai('host');
+    const last = seedNearWinSolo('u1');
+    const app = within(renderApp().container);
+
+    await resumeAndWin(app, last);
+
+    // The page always says "I'm done with <my code>" at the finish — once;
+    // the party decides whether that code is its open table.
+    expect(mockParty.value.closeTable).toHaveBeenCalledTimes(1);
+    expect(mockParty.value.closeTable).toHaveBeenCalledWith('SOLO');
   });
 });
 
@@ -517,4 +545,107 @@ describe('two-player integration: create → place → fire', () => {
     // Two full clients in one jsdom is heavy; the default 5s flakes when the
     // whole suite runs in parallel on a loaded machine.
   }, 20000);
+});
+
+type Scope = ReturnType<typeof within>;
+
+/** Every cell on the board, row-major. */
+function allCoords(): Coord[] {
+  return Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, i) => ({
+    row: Math.floor(i / BOARD_SIZE),
+    col: i % BOARD_SIZE,
+  }));
+}
+
+/**
+ * Lay out FLEET by hand: the placement screen selects the next unplaced ship
+ * in fleet order (carrier first) pointing east, so tapping each ship's bow
+ * cell rebuilds the fixture exactly — a fleet the test knows, for both
+ * captains, with no random auto-place to read back.
+ */
+function placeFleetByHand(player: Scope) {
+  for (const p of FLEET) fireEvent.click(player.getByTestId(`cell-own-${p.row}-${p.col}`));
+}
+
+/** Both captains lay out FLEET and ready up; the host's coin toss opens the battle. */
+async function deployBoth(host: Scope, guest: Scope) {
+  for (const player of [host, guest]) {
+    placeFleetByHand(player);
+    await waitFor(() => expect(player.getByTestId('ready')).not.toBeDisabled());
+    fireEvent.click(player.getByTestId('ready'));
+  }
+}
+
+/**
+ * Play the battle out with the host winning: the host shells every cell of
+ * the guest's fleet while the guest answers into open water (the odd rows are
+ * empty in FLEET). Whoever the coin toss put first, the host's 17th hit lands
+ * before the guest runs out of misses.
+ */
+async function playToHostWin(host: Scope, guest: Scope) {
+  const targets = FLEET.flatMap((p) => shipCells(p));
+  const water = allCoords().filter((c) => !targets.some((t) => t.row === c.row && t.col === c.col));
+  let hits = 0;
+  let misses = 0;
+  while (hits < targets.length) {
+    await waitFor(() => expect(host.queryByText(/Your shot/) || guest.queryByText(/Your shot/)).toBeTruthy());
+    if (host.queryByText(/Your shot/)) {
+      const t = targets[hits++];
+      fireEvent.click(host.getByTestId(`cell-enemy-${t.row}-${t.col}`));
+    } else {
+      const w = water[misses++];
+      fireEvent.click(guest.getByTestId(`cell-enemy-${w.row}-${w.col}`));
+    }
+  }
+  await host.findByText('You Win!');
+  await guest.findByText('Good Game!');
+}
+
+describe('two-player integration: to the finish, and a rematch', () => {
+  beforeEach(() => {
+    // Two tickets on this device, so both captains have a history to land on.
+    setUsersState(setActiveUser(addUser(addUser(emptyUsersState(), 'u-rio', 'Rio'), 'u-kai', 'Kai'), 'u-rio'));
+  });
+
+  it('records the win on the host ticket and the loss on the guest ticket — and a rematch records a second row each', async () => {
+    const host = within(renderApp().container);
+    const guest = within(renderApp().container);
+
+    // Rio hosts; Kai signs in on "the other iPad" and joins with the code.
+    fireEvent.click(host.getByTestId('create-game'));
+    const code = (await host.findByTestId('game-code')).textContent!.trim();
+    switchTo('u-kai');
+    fireEvent.click(guest.getByTestId('show-join'));
+    fireEvent.change(guest.getByTestId('code-input'), { target: { value: code } });
+    fireEvent.click(guest.getByTestId('join-game'));
+    await waitFor(() => expect(host.getAllByText(/Connected/i).length).toBeGreaterThan(0));
+
+    for (const player of [host, guest]) fireEvent.click(player.getByTestId('fleet-continue'));
+    await deployBoth(host, guest);
+    await playToHostWin(host, guest);
+
+    let rows = historyById();
+    expect(rows['u-rio']).toHaveLength(1);
+    expect(rows['u-rio'][0]).toMatchObject({ game: 'battleship', result: 'win', opponent: 'Kai', code });
+    expect(rows['u-kai']).toHaveLength(1);
+    expect(rows['u-kai'][0]).toMatchObject({ game: 'battleship', result: 'loss', opponent: 'Rio', code });
+
+    // Play again: both ask, both are back at placement, and the second game
+    // is history too — by design, a rematch is a new game at the same table.
+    fireEvent.click(host.getByTestId('rematch'));
+    fireEvent.click(guest.getByTestId('rematch'));
+    await waitFor(() => {
+      expect(host.getByTestId('ready')).toBeInTheDocument();
+      expect(guest.getByTestId('ready')).toBeInTheDocument();
+    });
+    await deployBoth(host, guest);
+    await playToHostWin(host, guest);
+
+    rows = historyById();
+    expect(rows['u-rio'].map((r) => r.result)).toEqual(['win', 'win']);
+    expect(rows['u-kai'].map((r) => r.result)).toEqual(['loss', 'loss']);
+    expect(rows['u-rio'].map((r) => r.code)).toEqual([code, code]);
+    expect(rows['u-kai'].map((r) => r.code)).toEqual([code, code]);
+    // Two whole games across two full clients in one jsdom.
+  }, 40000);
 });

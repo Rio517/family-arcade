@@ -30,6 +30,8 @@ const GAME_ID = 'battleship';
 interface ResultSummary {
   won: boolean;
   pointsEarned: number;
+  /** The ticket the result landed on (null: nobody was seated, nothing recorded). */
+  seatedUserId: string | null;
 }
 
 export function BattleshipPage() {
@@ -55,6 +57,7 @@ export function BattleshipPage() {
   // The result lands on the ticket that sat down (captured when the table
   // opened and carried by the session), never on whoever is signed in now —
   // a Change at the booth mid-game must not hand the win to the wrong player.
+  const { closeTable } = party;
   const onFinish = useCallback((info: FinishInfo) => {
     const pointsEarned = pointsForResult(info.won, info.survivingCells);
     recordResultFor(info.seatedUserId, {
@@ -65,8 +68,14 @@ export function BattleshipPage() {
       opponent: info.opponent,
       finishedAt: Date.now(),
     });
-    setFinish({ won: info.won, pointsEarned });
-  }, []);
+    setFinish({ won: info.won, pointsEarned, seatedUserId: info.seatedUserId });
+    // The table closes with the game: a party guest reloading after the
+    // result would otherwise be seated back at the finished table, start a
+    // fresh session under the same code, and record the finish a second time
+    // when the host's sync arrives. (The party ignores this unless we are the
+    // host and this is the open table.)
+    closeTable(info.code);
+  }, [closeTable]);
 
   const bs = useBattleship({
     name: profile.profile.name,
@@ -146,6 +155,11 @@ export function BattleshipPage() {
     if (side === 'guest' && !oppConnected && log.length === 0) leave();
   }, [side, oppConnected, log.length, leave]);
   usePartyDoor(GAME_ID, bs.phase === 'lobby', onTable, onClosed);
+
+  // The Result card's running total is the signed-in ticket's balance — shown
+  // only when that is the ticket the points landed on, never a bystander's
+  // (compared at render, so a Change on the result screen hides it too).
+  const seatSignedIn = finish !== null && finish.seatedUserId !== null && finish.seatedUserId === profile.userId;
 
   const isSetup = bs.phase === 'fleet' || bs.phase === 'placing' || bs.phase === 'waiting';
   const showCode = !solo && bs.side === 'host' && isSetup && !bs.oppConnected;
@@ -353,7 +367,7 @@ export function BattleshipPage() {
           <Result
             won={finish.won}
             pointsEarned={finish.pointsEarned}
-            totalPoints={profile.profile.points}
+            totalPoints={seatSignedIn ? profile.profile.points : undefined}
             myName={bs.myName}
             oppName={bs.oppName ?? 'Opponent'}
             iWantRematch={bs.iWantRematch}

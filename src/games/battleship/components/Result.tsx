@@ -5,7 +5,10 @@ import { BrokenShipIcon, TrophyIcon } from '@shared/ui/icons';
 interface ResultProps {
   won: boolean;
   pointsEarned: number;
-  totalPoints: number;
+  /** The player's running total — left out when the ticket signed in is not
+   * the one the points landed on, so the card never reads a bystander's
+   * balance back as "you". */
+  totalPoints?: number;
   myName: string;
   oppName: string;
   iWantRematch: boolean;
@@ -73,9 +76,11 @@ export function Result({
           <div className="earned reveal">
             +{pointsEarned} points{won ? '!' : ' for a great battle'}
           </div>
-          <div className="subtle reveal" style={{ marginTop: 6 }}>
-            You now have {totalPoints} points — spend them on cooler fleets!
-          </div>
+          {totalPoints !== undefined && (
+            <div className="subtle reveal" style={{ marginTop: 6 }}>
+              You now have {totalPoints} points — spend them on cooler fleets!
+            </div>
+          )}
         </div>
       </div>
 
