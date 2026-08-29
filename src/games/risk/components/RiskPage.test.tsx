@@ -27,6 +27,7 @@ const savedPlayers = () =>
   (JSON.parse(localStorage.getItem(CAMPAIGN_KEY) ?? 'null')?.state.players ?? []) as {
     name: string;
     bot?: string;
+    userId?: string;
   }[];
 
 // The svg deliberately has no role="img" (that would hide the territory
@@ -405,6 +406,9 @@ describe('<RiskPage>', () => {
       expect(rail).toHaveTextContent('Cadet Pip');
       expect(savedPlayers().map((p) => p.name)).toEqual(['Rio', 'Klara', 'Cadet Pip']);
       expect(savedPlayers().map((p) => p.bot ?? null)).toEqual([null, null, 'cadet']);
+      // Every ticket keeps its id on its general, so a finished war can credit
+      // the right roster entry; a computer general has none.
+      expect(savedPlayers().map((p) => p.userId ?? null)).toEqual(['u1', 'u2', null]);
 
       // The lineup — tickets and the computer general alike — is remembered.
       expect(JSON.parse(localStorage.getItem(LINEUP_KEY) ?? '{}')).toEqual({
@@ -451,6 +455,8 @@ describe('<RiskPage>', () => {
       fireEvent.click(screen.getByTestId('count-2'));
       fireEvent.click(screen.getByTestId('risk-start'));
       expect(savedPlayers().map((p) => p.name)).toEqual(['Rio', 'Cobalt']);
+      // An unclaimed chair has no ticket to credit.
+      expect(savedPlayers().map((p) => p.userId ?? null)).toEqual(['u1', null]);
     });
   });
 

@@ -36,6 +36,10 @@ export interface PlayerState {
   alive: boolean;
   /** Computer persona id (see domain/bots) — absent means a human seat. */
   bot?: string;
+  /** Roster ticket id of the person in this chair, so a finished war can be
+   *  credited to them. Absent for a bot, an unclaimed chair, or any save from
+   *  before tickets rode along. */
+  userId?: string;
 }
 
 export interface TerritoryState {

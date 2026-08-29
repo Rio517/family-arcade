@@ -214,6 +214,8 @@ export function RiskPage() {
     const players: NewPlayer[] = table.seats.map((seat, i) => {
       const color = colors[i];
       if (seat.kind === 'bot') return { name: chairName(seat, i), color, bot: seat.botId };
+      // A ticket keeps its id so the war's result can be credited to its holder.
+      if (seat.kind === 'ticket') return { name: chairName(seat, i), color, userId: seat.userId };
       // A chair nobody claimed still plays, under its banner's name.
       return { name: chairName(seat, i), color };
     });

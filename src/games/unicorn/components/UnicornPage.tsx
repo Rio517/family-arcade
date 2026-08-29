@@ -67,13 +67,18 @@ export function UnicornPage() {
   // Called only from click handlers, so a plain function is enough — a
   // useCallback would be rebuilt on every render anyway (seatNames is fresh).
   const startGame = (chosen: Character[]) => {
-    const players: PlayerConfig[] = chosen.map((c, i) => ({
-      id: i,
-      name: seatNames[i],
-      color: PLAYER_COLORS[i],
-      emoji: c.emoji,
-      mount: c.mount,
-    }));
+    const players: PlayerConfig[] = chosen.map((c, i) => {
+      const seat = table.seats[i];
+      return {
+        id: i,
+        name: seatNames[i],
+        color: PLAYER_COLORS[i],
+        emoji: c.emoji,
+        mount: c.mount,
+        // A ticket keeps its id so a won round can be credited to its holder.
+        ...(seat?.kind === 'ticket' ? { userId: seat.userId } : {}),
+      };
+    });
     gameRef.current = createGame({ world, players });
     // The round really started — open with this table next time.
     table.remember();

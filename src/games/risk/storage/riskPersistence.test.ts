@@ -48,6 +48,31 @@ describe('risk persistence', () => {
     expect(stored!.state.players).toHaveLength(2);
   });
 
+  it('carries each seated ticket id through a save and back', () => {
+    const g = newGame(MAP, [
+      { name: 'Rio', color: '#f00', userId: 'u1' },
+      { name: 'Cadet Pip', color: '#00f', bot: 'cadet' },
+    ]);
+    saveRiskGame(g);
+    expect(loadRiskGame()!.state.players.map((p) => p.userId ?? null)).toEqual(['u1', null]);
+  });
+
+  it('loads a save from before tickets rode along — nobody is credited, nothing breaks', () => {
+    saveRiskGame(newGame(MAP, players)); // no userIds, like every pre-ticket campaign
+    const stored = loadRiskGame();
+    expect(stored).not.toBeNull();
+    expect(stored!.state.players.every((p) => p.userId === undefined)).toBe(true);
+  });
+
+  it('drops a junk ticket id from a hand-edited save rather than trusting it', () => {
+    const g = newGame(MAP, players);
+    const tampered = { ...g, players: g.players.map((p, i) => (i === 0 ? { ...p, userId: 42 } : p)) };
+    localStorage.setItem('risk-campaign-v1', JSON.stringify({ v: 1, savedAt: 1, state: tampered }));
+    const stored = loadRiskGame();
+    expect(stored).not.toBeNull();
+    expect(stored!.state.players[0].userId).toBeUndefined();
+  });
+
   it('never offers a finished war', () => {
     const g = newGame(MAP, players);
     saveRiskGame({ ...g, phase: 'over', winner: 0 });

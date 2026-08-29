@@ -54,6 +54,11 @@ describe('createGame', () => {
     }
   });
 
+  it('keeps a seated ticket id on the player, and none where the chair had no ticket', () => {
+    const g = createGame({ world: 'sky', players: [{ ...TWO[0], userId: 'u1' }, TWO[1]], rng: seeded(3) });
+    expect(g.players.map((p) => p.userId ?? null)).toEqual(['u1', null]);
+  });
+
   it('carries the chosen world and target through', () => {
     const g = createGame({ world: 'ocean', players: ONE, target: 10, rng: seeded(2) });
     expect(g.world).toBe('ocean');
