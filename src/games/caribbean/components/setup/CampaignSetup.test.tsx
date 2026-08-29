@@ -8,6 +8,8 @@ import { createJournal } from '../../domain/replay';
 import type { CaribbeanController, CaribbeanPersistencePhase } from '../../state/useCaribbean';
 import type { LoadResult } from '../../storage/persistence';
 import { normalizePronouns } from '@shared/profile/profile';
+import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { addUser, emptyUsersState } from '@shared/profile/users';
 import { CampaignSetup, type CampaignSetupIdentity } from './CampaignSetup';
 
 const EMPTY_REVISION = { currentRaw: null, previousRaw: null };
@@ -93,9 +95,18 @@ describe('<CampaignSetup>', () => {
       createObjectURL: vi.fn(() => 'blob:journal'),
       revokeObjectURL: vi.fn(),
     });
+    localStorage.clear();
+    resetUsersStore();
   });
 
   afterEach(() => vi.restoreAllMocks());
+
+  it('shows whose ticket signs the commission when a player is signed in', () => {
+    setUsersState(addUser(emptyUsersState(), 'u1', 'Rio', 1));
+    renderSetup();
+
+    expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Rio");
+  });
 
   it('aligns all three commission fields and keeps the manifest rule level', () => {
     const css = readFileSync(resolve('src/games/caribbean/styles/production.css'), 'utf8');
