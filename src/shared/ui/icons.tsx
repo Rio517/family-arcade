@@ -406,6 +406,46 @@ export const ClockIcon = (p: IconProps) =>
     p,
   );
 
+/** A hand mirror with a glint — the Magic Mirror's menu icon. */
+export const MirrorIcon = (p: IconProps) =>
+  svg(
+    <>
+      <circle cx="12" cy="9.2" r="6.4" />
+      <path d="M12 15.6v5" />
+      <path d="M9.2 20.6h5.6" />
+      <path d="M9.1 7.2a3.6 3.6 0 0 1 2.4-1.7" />
+    </>,
+    p,
+  );
+
+/** A dragon head in profile, breathing a wisp of fire. */
+export const DragonIcon = (p: IconProps) =>
+  svg(
+    <>
+      {/* Head and jaw */}
+      <path d="M8.6 6.4c3.4-1 6.4.4 7.6 3l3 1.6-2.8 1.4c-.6 2.8-3 4.4-5.8 4.2l-4.6-.5" />
+      {/* Horn and neck spikes */}
+      <path d="M9.4 6.2 8 3l3.2 2" />
+      <path d="M6 16.1 4.2 18l3.1.5L5.6 21" />
+      {/* Eye */}
+      <circle cx="12.4" cy="9.2" r="0.9" fill="currentColor" stroke="none" />
+      {/* Fire wisp from the mouth */}
+      <path d="M17.6 13.6c1.2.9 1.7 2 1.5 3.4-1.3-.2-2.3-.9-3-2" />
+    </>,
+    p,
+  );
+
+/** Two fingers up — the peace-sign gesture effect. */
+export const PeaceHandIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M9.2 12.4 7.6 5.8a1.4 1.4 0 0 1 2.7-.7l1.4 5.5" />
+      <path d="M11.7 10.6 13.4 4a1.4 1.4 0 0 1 2.7.7l-1.7 6.7" />
+      <path d="M9.2 12.4c-1.2-.7-2.6-.6-3.4.4l2 3.6a6.4 6.4 0 0 0 5.6 3.3c2.9 0 4.6-1.8 4.6-4.6v-3.3a1.3 1.3 0 0 0-2.6 0" />
+    </>,
+    p,
+  );
+
 /**
  * A distinct filled emblem per fleet skin, drawn in the skin's colour
  * (`currentColor`, set by the caller). Replaces the old emoji skin icons.

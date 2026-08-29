@@ -354,6 +354,24 @@ const SHOTS = [
       await page.keyboard.up('ArrowDown');
     },
   },
+  {
+    // The Magic Mirror's front door — the camera opt-in card.
+    name: 'mirror-page',
+    path: '/#/mirror',
+    viewport: TABLET,
+    fullPage: true,
+  },
+  {
+    // The effects themselves, driven by a scripted tracking frame (no camera
+    // in CI): two dragons — one breathing fire — plus a peace-sign burst.
+    name: 'mirror-effects',
+    path: '/preview-mirror.html',
+    viewport: { width: 960, height: 700 },
+    selector: '[data-testid="mirror-harness"]',
+    prep: async (page) => {
+      await page.waitForSelector('[data-ready="1"]', { timeout: 20000 });
+    },
+  },
 ];
 
 /**
