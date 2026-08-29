@@ -260,7 +260,7 @@ const SHOTS = [
     // gold with the game's name and the panel offers "Join ›". A harness page,
     // because a real party needs a second device.
     name: 'party-invite',
-    path: '/preview-party.html?scene=invite',
+    path: '/preview-lobbies.html?scene=invite#/',
     viewport: PHONE,
     prep: async (page) => {
       await page.getByTestId('party-badge').waitFor();
@@ -271,7 +271,7 @@ const SHOTS = [
   {
     // The host's side: the friend knocked on Rainbow Racer's door.
     name: 'party-knock',
-    path: '/preview-party.html?scene=knock',
+    path: '/preview-lobbies.html?scene=knock#/',
     viewport: PHONE,
     prep: async (page) => {
       await page.getByTestId('party-badge').waitFor();

@@ -7,7 +7,6 @@
     "src/games/battleship/preview-battleship.tsx",
     "src/games/caribbean-poc/preview.tsx",
     "src/games/caribbean/preview.tsx",
-    "src/shared/party/preview-party.tsx",
     "src/app/preview-lobbies.tsx"
   ],
   "project": ["src/**/*.{ts,tsx}"],
