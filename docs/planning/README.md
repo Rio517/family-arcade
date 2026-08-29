@@ -14,3 +14,8 @@ finished specs, and not necessarily built yet.
   magnets, no dragons). Racers and stars first, then AI rivals, then a
   Rainbow Road track, then two-girls-one-tablet — each phase a playable
   release.
+- [players-and-party.md](./players-and-party.md) — one ticket, every game:
+  no game ever asks the signed-in player for a name again, pass-and-play
+  chairs are filled by tapping tickets from the roster, and a party opens the
+  table for online games so two devices never trade a code. Four phases, each
+  a PR.
