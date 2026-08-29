@@ -14,7 +14,7 @@
  * re-rendering.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GameConnection, generateCode, type ConnStatus } from '@shared/net/peer';
+import { GameConnection, type ConnStatus } from '@shared/net/peer';
 import { isRacerMsg, type RacerMsg } from './protocol';
 import {
   applyWorldDelta,
@@ -27,18 +27,29 @@ import {
 
 export type Role = 'host' | 'guest';
 
+/** Sitting down at a table: which side, under which code, and as whom. */
+export interface StartTableOpts {
+  role: Role;
+  /** The 4-character link code — minted by the lobby, or handed over by the party. */
+  code: string;
+  /** The signed-in ticket's id, so results can be credited to the right player. */
+  seatedUserId: string | null;
+}
+
 export interface RacerNet {
   status: ConnStatus;
   statusDetail?: string;
   code: string;
   role: Role | null;
+  /** Who sat down at this table (null between tables). */
+  seatedUserId: string | null;
   connected: boolean;
   /** Bumps each time the race should (re)start — initial "go" and every rematch. */
   startNonce: number;
   theirName: string;
   theirDriver: string | null;
-  host: () => void;
-  join: (code: string) => void;
+  /** Open (host) or dial (guest) the table — the one way into a two-player race. */
+  startTable: (opts: StartTableOpts) => void;
   leave: () => void;
   sendPos: (p: RemoteKartPos) => void;
   /** Host only: broadcast the full world (race start; reopens are automatic). */
@@ -66,6 +77,7 @@ export function useRacerNet(opts: {
   const [statusDetail, setStatusDetail] = useState<string | undefined>();
   const [code, setCode] = useState('');
   const [role, setRole] = useState<Role | null>(null);
+  const [seatedUserId, setSeatedUserId] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [startNonce, setStartNonce] = useState(0);
   const [theirName, setTheirName] = useState('Friend');
@@ -157,20 +169,15 @@ export function useRacerNet(opts: {
     return connRef.current;
   }, [doGo]);
 
-  const host = useCallback(() => {
-    const c = generateCode();
-    setCode(c);
-    setRole('host');
-    roleRef.current = 'host';
-    ensureConn().host(c);
-  }, [ensureConn]);
-
-  const join = useCallback(
-    (c: string) => {
+  const startTable = useCallback(
+    ({ role: r, code: c, seatedUserId: uid }: StartTableOpts) => {
       setCode(c);
-      setRole('guest');
-      roleRef.current = 'guest';
-      ensureConn().join(c);
+      setRole(r);
+      setSeatedUserId(uid);
+      roleRef.current = r;
+      const conn = ensureConn();
+      if (r === 'host') conn.host(c);
+      else conn.join(c);
     },
     [ensureConn],
   );
@@ -186,6 +193,7 @@ export function useRacerNet(opts: {
     setConnected(false);
     setStartNonce(0);
     setRole(null);
+    setSeatedUserId(null);
     setTheirDriver(null);
     setCode('');
   }, []);
@@ -214,12 +222,12 @@ export function useRacerNet(opts: {
     statusDetail,
     code,
     role,
+    seatedUserId,
     connected,
     startNonce,
     theirName,
     theirDriver,
-    host,
-    join,
+    startTable,
     leave,
     sendPos,
     sendWorld,

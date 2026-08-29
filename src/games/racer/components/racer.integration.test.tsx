@@ -1,9 +1,31 @@
 import { describe, expect, it, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import type { PartyValue } from '@shared/party/PartyContext';
 import { RacerPage } from './RacerPage';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
+
+// Neither device is in a party here, so the lobby keeps its code doors — the
+// journey these tests walk. (The party lobby itself is covered in
+// RacerSetup.test.tsx; only the corners the page reads are filled in.)
+const noParty = vi.hoisted(() => ({ value: null as any }));
+vi.mock('@shared/party/PartyContext', () => ({ useParty: () => noParty.value }));
+
+function makeParty(over: Partial<PartyValue> = {}): PartyValue {
+  return {
+    status: 'idle',
+    role: null,
+    inParty: false,
+    theirName: null,
+    reconnecting: false,
+    table: null,
+    openTable: vi.fn(() => 'WXYZ'),
+    closeTable: vi.fn(),
+    knockOn: vi.fn(),
+    ...over,
+  } as PartyValue;
+}
 
 /**
  * Two-player integration tests: real <RacerPage> clients wired together through
@@ -96,7 +118,9 @@ vi.mock('@shared/profile/useProfile', async (importOriginal) => {
     const [id] = useState(() => tickets.queue.shift() ?? '');
     if (!id) return real;
     const mine = getUsersSnapshot().users.find((u) => u.id === id);
-    return mine ? { ...real, profile: mine.profile } : real;
+    // This client signed in as that ticket: its profile AND its id, so the
+    // seat it takes at the table is credited to the right player.
+    return mine ? { ...real, profile: mine.profile, userId: id } : real;
   }
   return { ...actual, useProfile };
 });
@@ -226,6 +250,7 @@ beforeEach(() => {
   tickets.queue.length = 0;
   localStorage.clear();
   resetUsersStore();
+  noParty.value = makeParty();
   // One ticket signed in on this browser — what a single-client test plays as.
   // Two-client tests call connectClients, which puts a second ticket on the
   // roster and hands one to each side.

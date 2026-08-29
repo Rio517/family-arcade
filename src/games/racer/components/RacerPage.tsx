@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { useProfile } from '@shared/profile/useProfile';
+import { useParty } from '@shared/party/PartyContext';
 import { createRaceCore, takeWorldSnapshot, type RaceMode } from '../domain/race';
 import { useRacerNet } from '../net/useRacerNet';
 import { DRIVERS, driverById, lookOf, ModeScreen, PickScreen, RacerLobby, type Driver } from './RacerSetup';
@@ -25,11 +26,15 @@ export function RacerPage() {
   const [mode, setMode] = useState<RaceMode>('solo');
   const [driver, setDriver] = useState<Driver>(DRIVERS[0]);
   const profile = useProfile();
+  const party = useParty();
   const [raceKey, setRaceKey] = useState(0);
+
+  // The ticket gate guarantees a signed-in name; no fallback of our own.
+  const myName = profile.profile.name.trim();
 
   const ctxRef = useRef<RaceCtx | null>(null);
   const net = useRacerNet({
-    name: profile.profile.name.trim() || 'Racer',
+    name: myName,
     driver: driver.id,
     target: TARGET,
     // Said in `hello` so a reconnect mid-race re-syncs instead of restarting.
@@ -46,7 +51,7 @@ export function RacerPage() {
         ctxRef.current = {
           ...createRaceCore('solo', 0, TARGET, Math.random),
           looks: [myLook],
-          names: [profile.profile.name || 'You'],
+          names: [myName],
         };
       } else {
         const isHost = net.role === 'host';
@@ -54,15 +59,13 @@ export function RacerPage() {
         ctxRef.current = {
           ...createRaceCore('net', isHost ? 0 : 1, TARGET, Math.random),
           looks: isHost ? [myLook, theirLook] : [theirLook, myLook],
-          names: isHost
-            ? [profile.profile.name.trim() || 'You', net.theirName]
-            : [net.theirName, profile.profile.name.trim() || 'You'],
+          names: isHost ? [myName, net.theirName] : [net.theirName, myName],
         };
       }
       setRaceKey((k) => k + 1);
       setPhase('race');
     },
-    [net, profile.profile.name],
+    [net, myName],
   );
 
   // When the host says "go" (start or rematch), both sides (re)begin the race.
@@ -90,6 +93,9 @@ export function RacerPage() {
 
   const leaveToMenu = () => {
     net.leave();
+    // The party host walking away closes the table, so the friend's screen
+    // stops waiting on a race that isn't there any more.
+    if (party.role === 'host') party.closeTable();
     ctxRef.current = null;
     lastStartRef.current = 0;
     setPhase('mode');
@@ -121,7 +127,7 @@ export function RacerPage() {
   if (phase === 'lobby') {
     return (
       <Shell onMenu={leaveToMenu}>
-        <RacerLobby driver={driver} net={net} />
+        <RacerLobby driver={driver} net={net} seatedUserId={profile.userId} />
       </Shell>
     );
   }

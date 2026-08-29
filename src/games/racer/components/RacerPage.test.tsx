@@ -1,7 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import type { PartyValue } from '@shared/party/PartyContext';
+
+// The page stands on the party (ADR 0008); a controllable useParty keeps
+// these tests off the network. Only the corners the page and its lobby read
+// are filled in — the full shape lives in party-ui.test.tsx.
+const mockParty = vi.hoisted(() => ({ value: null as any }));
+vi.mock('@shared/party/PartyContext', () => ({ useParty: () => mockParty.value }));
+
 import { RacerPage } from './RacerPage';
+
+function makeParty(over: Partial<PartyValue> = {}): PartyValue {
+  return {
+    status: 'idle',
+    role: null,
+    inParty: false,
+    theirName: null,
+    reconnecting: false,
+    table: null,
+    openTable: vi.fn(() => 'WXYZ'),
+    closeTable: vi.fn(),
+    knockOn: vi.fn(),
+    ...over,
+  } as PartyValue;
+}
 
 /**
  * jsdom has no WebGL, so the real RacerScene constructor throws and Track3D
@@ -49,7 +72,52 @@ function startSoloRace(driverId: string) {
   fireEvent.click(screen.getByTestId(`racer-driver-${driverId}`));
 }
 
+beforeEach(() => {
+  mockParty.value = makeParty();
+});
+
 afterEach(() => vi.restoreAllMocks());
+
+describe('<RacerPage> — the party table', () => {
+  /** Mode screen → 2 Players → pick a driver → the lobby. */
+  function goToNetLobby() {
+    fireEvent.click(screen.getByTestId('racer-mode-net'));
+    fireEvent.click(screen.getByTestId('racer-driver-unicorn'));
+  }
+
+  it('a party host leaving the lobby via ‹ Menu closes the table for the friend', () => {
+    mockParty.value = makeParty({ inParty: true, status: 'connected', role: 'host', theirName: 'Kai' });
+    renderRacer();
+    goToNetLobby();
+    expect(screen.getByTestId('racer-party-play')).toHaveTextContent('Race Kai');
+
+    fireEvent.click(screen.getByTestId('racer-back'));
+    expect(mockParty.value.closeTable).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('racer-mode-solo')).toBeInTheDocument();
+  });
+
+  it('a party guest leaving the lobby via ‹ Menu never closes a table it does not own', () => {
+    mockParty.value = makeParty({ inParty: true, status: 'connected', role: 'guest', theirName: 'Rio' });
+    renderRacer();
+    goToNetLobby();
+    expect(screen.getByTestId('racer-party-waiting')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('racer-back'));
+    expect(mockParty.value.closeTable).not.toHaveBeenCalled();
+    expect(screen.getByTestId('racer-mode-solo')).toBeInTheDocument();
+  });
+
+  it('outside a party the lobby keeps its code doors and ‹ Menu leaves the party alone', () => {
+    renderRacer();
+    goToNetLobby();
+    expect(screen.getByTestId('racer-create')).toBeInTheDocument();
+    expect(screen.getByTestId('racer-show-join')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('racer-back'));
+    expect(mockParty.value.closeTable).not.toHaveBeenCalled();
+    expect(screen.getByTestId('racer-mode-solo')).toBeInTheDocument();
+  });
+});
 
 describe('<RacerPage> — solo setup flow', () => {
   it('offers 1-player and 2-player modes, and picking solo advances to the driver picker', () => {
