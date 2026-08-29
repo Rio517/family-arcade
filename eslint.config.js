@@ -90,6 +90,8 @@ export default tseslint.config(
                 '**/profile/users',
                 '@shared/profile/users',
               ],
+              // A `Seat`/`StoredUser` type can't write anything.
+              allowTypeImports: true,
               message:
                 'Games read the ticket through useProfile() and seat people through useSeats(); only the gate, the booth and PlayingAs change who is signed in (seat pickers only append tickets).',
             },

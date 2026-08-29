@@ -35,6 +35,12 @@ describe('the identity import guard', () => {
       'src/games/chess/components/Reader.tsx',
     );
     expect(reads).not.toContain('no-restricted-imports');
+    // A type can't write anything — Risk's CouncilSeat takes a StoredUser[].
+    const types = await ruleIds(
+      "import type { StoredUser } from '@shared/profile/users';",
+      'src/games/risk/components/Types.tsx',
+    );
+    expect(types).not.toContain('no-restricted-imports');
     const shared = await ruleIds(OFFENDERS[0], 'src/shared/party/Fine.tsx');
     expect(shared).not.toContain('no-restricted-imports');
     // Tests inside a game may seed the roster.
