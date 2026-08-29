@@ -149,6 +149,13 @@ export interface StoredLocalChess {
   /** Present when the game began from a free-play setup (incl. king hunts). */
   start?: GameState;
   updatedAt: number;
+  /**
+   * The tickets in the two chairs (null for a bot or an empty chair).
+   * Optional: saves from before tickets rode along don't carry them, and
+   * there nobody gets credited — same version, no migration.
+   */
+  whiteUserId?: string | null;
+  blackUserId?: string | null;
 }
 
 /** Autosave the live hotseat session (callers skip finished/empty games). */
@@ -158,6 +165,8 @@ export function saveLocalChessGame(s: SessionState, now: number): void {
     v: 1,
     whiteName: s.myName,
     blackName: s.oppName,
+    whiteUserId: s.whiteUserId,
+    blackUserId: s.blackUserId,
     log: s.log,
     ...(s.start ? { start: s.start } : {}),
     updatedAt: now,
@@ -183,7 +192,9 @@ export function loadLocalChessGame(): StoredLocalChess | null {
 
 /** Rebuild a live hotseat session from the autosave. */
 export function storedToLocalChess(g: StoredLocalChess): SessionState {
-  return { ...createLocalSession(g.whiteName, g.blackName, g.start), log: g.log };
+  const white = { name: g.whiteName, userId: g.whiteUserId ?? null };
+  const black = { name: g.blackName, userId: g.blackUserId ?? null };
+  return { ...createLocalSession(white, black, g.start), log: g.log };
 }
 
 export function clearLocalChessGame(): void {

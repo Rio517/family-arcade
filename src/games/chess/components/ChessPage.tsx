@@ -7,11 +7,12 @@ import { useParty, type PartyValue } from '@shared/party/PartyContext';
 import { usePartyDoor } from '@shared/party/usePartyDoor';
 import { useChess, type StartTableOptions } from '@games/chess/state/useChess';
 import { pointsForResult } from '@shared/profile/profile';
+import { recordResultFor } from '@shared/profile/results';
 import { generateCode, normalizeCode } from '@shared/net/peer';
 import { PlayingAs } from '@shared/profile/PlayingAs';
 import { SeatPicker } from '@shared/profile/SeatPicker';
 import { useSeats } from '@shared/profile/useSeats';
-import { seatName, swapSeats } from '@shared/profile/seats';
+import { seatName, swapSeats, type Seat } from '@shared/profile/seats';
 import { ChessBoard } from './ChessBoard';
 import { ChessResult } from './ChessResult';
 import { ChessLogModal, CapturedTray } from './ChessLogModal';
@@ -31,7 +32,7 @@ import { loadLocalChessGame, loadResumableChessGame } from '../storage/chessPers
 import { customStart, winnerOf, status as statusOf } from '@games/chess/domain/rules';
 import { analyzeGame, tallyCaptures } from '@games/chess/domain/analysis';
 import type { FinishInfo } from '@games/chess/domain/session';
-import type { Color, PieceType, Ply, Status } from '@games/chess/domain/types';
+import type { Color, GameState, PieceType, Ply, Status } from '@games/chess/domain/types';
 
 type Setup = 'pick' | 'local' | 'online' | 'free';
 
@@ -67,6 +68,11 @@ function lobbyFor(party: PartyValue): Lobby {
 /** A colour off the wire — the party carries the host's side as a plain string. */
 function asColor(side: string | undefined): Color | undefined {
   return side === 'w' || side === 'b' ? side : undefined;
+}
+
+/** The ticket in a chair, for the result — a bot or an empty chair credits nobody. */
+function ticketOf(seat: Seat): string | null {
+  return seat.kind === 'ticket' ? seat.userId : null;
 }
 
 export function ChessPage() {
@@ -114,27 +120,36 @@ export function ChessPage() {
   const [camDirty, setCamDirty] = useState(false);
   const resetViewRef = useRef<(() => void) | null>(null);
 
-  const onFinish = useCallback(
-    (info: FinishInfo) => {
-      // Online decisive games move the shared profile; draws and local games don't.
-      let pointsEarned = 0;
-      if (info.iWon !== null) {
-        pointsEarned = pointsForResult(info.iWon, 0);
-        // Record the real game, not a placeholder — every chess row in the
-        // history used to say "Opponent" even though the hello name was known.
-        profile.recordResult({
-          won: info.iWon,
-          survivingCells: 0,
-          code: info.code || GAME_ID,
-          game: GAME_ID,
-          opponent: info.opponent || 'Opponent',
-          finishedAt: Date.now(),
-        });
-      }
-      setFinish({ status: info.status, pointsEarned });
-    },
-    [profile],
-  );
+  const onFinish = useCallback((info: FinishInfo) => {
+    // Results land on the tickets the session captured when the game started
+    // — never on the roster as it stands now, since a sign-in switch between
+    // the first move and the mate must not move the row. Draws record
+    // nothing; so does a chair with no ticket (a bot, or nobody).
+    const finishedAt = Date.now();
+    const row = (won: boolean, opponent: string) => ({
+      won,
+      survivingCells: 0,
+      code: info.code || GAME_ID,
+      game: GAME_ID,
+      // The real name, not a placeholder — every chess row in the history
+      // used to say "Opponent" even though the hello name was known.
+      opponent: opponent || 'Opponent',
+      finishedAt,
+    });
+    let pointsEarned = 0;
+    if (info.iWon !== null) {
+      // Online, decisive: my ticket's result against the friend's hello name.
+      pointsEarned = pointsForResult(info.iWon, 0);
+      recordResultFor(info.seatedUserId, row(info.iWon, info.opponent));
+    } else if (info.winner !== null) {
+      // Same device, decisive: a win for the winning chair, a loss for the
+      // other. The card shows the winner's points — two chairs, two profiles.
+      pointsEarned = pointsForResult(true, 0);
+      recordResultFor(info.whiteUserId, row(info.winner === 'w', info.blackName));
+      recordResultFor(info.blackUserId, row(info.winner === 'b', info.whiteName));
+    }
+    setFinish({ status: info.status, pointsEarned });
+  }, []);
 
   const cx = useChess({ name: profile.profile.name, onFinish });
 
@@ -151,6 +166,19 @@ export function ChessPage() {
     (opts: Omit<StartTableOptions, 'seatedUserId'>) => startTable({ ...opts, seatedUserId: profile.userId }),
     [startTable, profile.userId],
   );
+  /**
+   * Start a same-device game with the chairs as they stand — names to show,
+   * tickets to credit — remembering the lineup for next time. Called from
+   * click handlers only, so it needn't be memoised.
+   */
+  const startHotseat = (start?: GameState) => {
+    table.remember();
+    cx.startLocal(
+      { name: whiteName, userId: ticketOf(table.seats[0]) },
+      { name: blackName, userId: ticketOf(table.seats[1]) },
+      start,
+    );
+  };
   // A guest in a party stands at the one door: it knocks while the online
   // lobby is up with no table open, and sits down the moment the host opens
   // one. A table that goes away while its dial is still ringing gets hung up;
@@ -415,11 +443,8 @@ export function ChessPage() {
       {!inGame && setup === 'free' && (
         <FreePlay
           onExit={() => setSetup('pick')}
-          onStartGame={(board) => {
-            // A promoted free-play board is a game starting like any other.
-            table.remember();
-            cx.startLocal(whiteName, blackName, customStart(board));
-          }}
+          // A promoted free-play board is a game starting like any other.
+          onStartGame={(board) => startHotseat(customStart(board))}
         />
       )}
 
@@ -445,10 +470,7 @@ export function ChessPage() {
             </button>
             <button
               className="btn btn-primary btn-lg btn-block"
-              onClick={() => {
-                table.remember();
-                cx.startLocal(whiteName, blackName);
-              }}
+              onClick={() => startHotseat()}
               data-testid="start-local"
             >
               Start game

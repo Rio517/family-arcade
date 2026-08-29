@@ -2,13 +2,17 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   chessToStored,
   loadChessGame,
+  loadLocalChessGame,
   loadResumableChessGame,
   saveChessGame,
+  saveLocalChessGame,
   storedToChess,
+  storedToLocalChess,
   sweepStaleChessSessions,
   type StoredChessGame,
+  type StoredLocalChess,
 } from './chessPersistence';
-import { createOnlineSession } from '@games/chess/domain/session';
+import { createLocalSession, createOnlineSession } from '@games/chess/domain/session';
 import type { Ply, Square } from '@games/chess/domain/types';
 
 const sq = (name: string): Square => ({ row: 8 - Number(name[1]), col: 'abcdefgh'.indexOf(name[0]) });
@@ -114,5 +118,43 @@ describe('sweepStaleChessSessions', () => {
     // A live game, by contrast, is still resumable after the sweep.
     saveChessGame(stored('LIVE', LIVE_LOG, false));
     expect(loadResumableChessGame()).toMatchObject({ code: 'LIVE' });
+  });
+});
+
+describe('the same-device autosave keeps both chairs — tickets included', () => {
+  const rio = { name: 'Rio', userId: 'u1' };
+  const flora = { name: 'Flora', userId: 'u2' };
+
+  it('round-trips both tickets with the names and the log', () => {
+    const live = { ...createLocalSession(rio, flora), log: LIVE_LOG };
+    saveLocalChessGame(live, 7);
+
+    const stored = loadLocalChessGame()!;
+    expect(stored).toMatchObject({ v: 1, whiteName: 'Rio', blackName: 'Flora', whiteUserId: 'u1', blackUserId: 'u2', updatedAt: 7 });
+
+    const back = storedToLocalChess(stored);
+    expect(back).toMatchObject({ mode: 'local', myName: 'Rio', oppName: 'Flora', whiteUserId: 'u1', blackUserId: 'u2', log: LIVE_LOG });
+    expect(back.seatedUserId).toBeNull();
+  });
+
+  it('a chair with nobody in it is kept as null, not dropped', () => {
+    saveLocalChessGame({ ...createLocalSession(rio, { name: 'Black', userId: null }), log: LIVE_LOG }, 1);
+    const back = storedToLocalChess(loadLocalChessGame()!);
+    expect(back.whiteUserId).toBe('u1');
+    expect(back.blackUserId).toBeNull();
+  });
+
+  it('a save from before tickets rode along still loads — same version, null tickets', () => {
+    // The exact shape older builds wrote: no whiteUserId, no blackUserId.
+    const old: StoredLocalChess = { v: 1, whiteName: 'Rio', blackName: 'Flora', log: LIVE_LOG, updatedAt: 1 };
+    expect('whiteUserId' in old).toBe(false);
+    localStorage.setItem('chess:local:v1', JSON.stringify(old));
+
+    const stored = loadLocalChessGame();
+    expect(stored).not.toBeNull();
+    const back = storedToLocalChess(stored!);
+    expect(back).toMatchObject({ myName: 'Rio', oppName: 'Flora', log: LIVE_LOG });
+    expect(back.whiteUserId).toBeNull();
+    expect(back.blackUserId).toBeNull();
   });
 });

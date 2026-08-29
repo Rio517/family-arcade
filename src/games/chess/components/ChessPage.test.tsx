@@ -1,11 +1,14 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
-import { LINEUP_KEY, resetLineupStore } from '@shared/profile/lineupStore';
+import { getUsersSnapshot, resetUsersStore, setUsersState } from '@shared/profile/usersStore';
+import { LINEUP_KEY, resetLineupStore, setLineup } from '@shared/profile/lineupStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
+import { pointsForResult } from '@shared/profile/profile';
 import { fakeParty, fakePartyWithKai } from '@shared/party/testing';
-import { loadChessGame } from '@games/chess/storage/chessPersistence';
+import { loadChessGame, type StoredLocalChess } from '@games/chess/storage/chessPersistence';
+import { parseFen } from '@games/chess/domain/fen';
+import type { Ply, Square } from '@games/chess/domain/types';
 
 // A controllable useParty so each party state renders without a network.
 const mockParty = vi.hoisted(() => ({ value: null as any }));
@@ -713,5 +716,120 @@ describe('<ChessPage> — local flow', () => {
     fireEvent.click(screen.getByTestId('mode-local'));
     expect(screen.getByTestId('seat-0')).toHaveTextContent('Flora');
     expect(screen.getByTestId('seat-1')).toHaveTextContent('Rio');
+  });
+});
+
+describe('<ChessPage> — results land on the tickets that sat down', () => {
+  const sq = (name: string): Square => ({ row: 8 - Number(name[1]), col: 'abcdefgh'.indexOf(name[0]) });
+  const ply = (from: string, to: string): Ply => ({ from: sq(from), to: sq(to) });
+  /** Fool's mate as square pairs: 1.f3 e5 2.g4 Qh4# — Black wins. */
+  const FOOLS_MATE: Array<[string, string]> = [['f2', 'f3'], ['e7', 'e5'], ['g2', 'g4'], ['d8', 'h4']];
+
+  const tap = (from: string, to: string) => {
+    fireEvent.click(screen.getByTestId(`sq-${from}`));
+    fireEvent.click(screen.getByTestId(`sq-${to}`));
+  };
+  const profileOf = (id: string) => getUsersSnapshot().users.find((u) => u.id === id)!.profile;
+  /** Drop a hotseat autosave in the slot, the way the game writes it. */
+  const saveHotseat = (over: Partial<StoredLocalChess>) => {
+    const save: StoredLocalChess = { v: 1, whiteName: 'Rio', blackName: 'Flora', log: [], updatedAt: 1, ...over };
+    localStorage.setItem('chess:local:v1', JSON.stringify(save));
+  };
+
+  it("same device: checkmate is a win for the winner's ticket and a loss for the other — whoever is signed in", () => {
+    // Kai holds the device; Rio and Flora are the ones at the board.
+    setUsersState(
+      setActiveUser(
+        addUser(addUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u2', 'Flora'), 'u3', 'Kai'),
+        'u3',
+      ),
+    );
+    setLineup('chess', [{ userId: 'u1' }, { userId: 'u2' }]);
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
+    expect(screen.getByTestId('seat-1')).toHaveTextContent('Flora');
+    fireEvent.click(screen.getByTestId('start-local'));
+
+    for (const [from, to] of FOOLS_MATE) tap(from, to);
+    expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Flora wins!');
+
+    const flora = profileOf('u2');
+    expect(flora.wins).toBe(1);
+    expect(flora.history).toHaveLength(1);
+    expect(flora.history[0]).toMatchObject({ game: 'chess', code: 'chess', opponent: 'Rio', result: 'win' });
+    expect(flora.points).toBe(pointsForResult(true, 0));
+
+    const rio = profileOf('u1');
+    expect(rio.losses).toBe(1);
+    expect(rio.history).toHaveLength(1);
+    expect(rio.history[0]).toMatchObject({ game: 'chess', opponent: 'Flora', result: 'loss' });
+
+    // Kai only held the device: no row, no points.
+    expect(profileOf('u3').history).toHaveLength(0);
+    expect(profileOf('u3').points).toBe(0);
+  });
+
+  it('same device: a draw records nothing for anybody', () => {
+    // Kb6 + Qh7 against a lone Ka8, White to move: Qc7 is stalemate.
+    saveHotseat({ whiteUserId: 'u1', blackUserId: 'u2', start: parseFen('k7/7Q/1K6/8/8/8/8/8 w - - 0 1') });
+    const before = getUsersSnapshot();
+    renderPage('/chess?resume=local');
+    tap('h7', 'c7');
+    expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('A Draw');
+    expect(getUsersSnapshot()).toBe(before);
+  });
+
+  it('same device: an empty chair records nothing — the ticket across the board still gets its row', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-local'));
+    expect(screen.getByTestId('seat-1')).toHaveTextContent(/tap a ticket/i);
+    fireEvent.click(screen.getByTestId('start-local'));
+    for (const [from, to] of FOOLS_MATE) tap(from, to);
+    expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Black wins!');
+
+    const rio = profileOf('u1');
+    expect(rio.losses).toBe(1);
+    expect(rio.history[0]).toMatchObject({ opponent: 'Black', result: 'loss' });
+    // Nobody won a ticket's worth of points: Flora was never at the table.
+    expect(profileOf('u2').history).toHaveLength(0);
+    expect(getUsersSnapshot().users.reduce((n, u) => n + u.profile.wins, 0)).toBe(0);
+  });
+
+  it('online: the result lands on the ticket that sat down, even after someone else signs in mid-game', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    fireEvent.click(screen.getByTestId('chess-create'));
+    const { code } = sat.calls[0] as { code: string };
+    act(() => net.handlers.onMessage({ t: 'hello', v: 1, side: 'guest', name: 'Kai' }));
+
+    // Rio (host, White) walks into fool's mate; Kai's moves arrive off the wire.
+    tap('f2', 'f3');
+    act(() => net.handlers.onMessage({ t: 'move', ply: ply('e7', 'e5') }));
+    tap('g2', 'g4');
+    // Flora picks up the device and signs in before the mate lands.
+    act(() => setUsersState(setActiveUser(getUsersSnapshot(), 'u2')));
+    act(() => net.handlers.onMessage({ t: 'move', ply: ply('d8', 'h4') }));
+
+    expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Kai wins!');
+    expect(screen.getByText(new RegExp(`\\+${pointsForResult(false, 0)} points`))).toBeInTheDocument();
+
+    const rio = profileOf('u1');
+    expect(rio.losses).toBe(1);
+    expect(rio.history).toHaveLength(1);
+    expect(rio.history[0]).toMatchObject({ code, game: 'chess', opponent: 'Kai', result: 'loss' });
+    // Flora is signed in now — and untouched.
+    expect(profileOf('u2').history).toHaveLength(0);
+    expect(profileOf('u2').losses).toBe(0);
+  });
+
+  it('a same-device save from before tickets rode along finishes without recording', () => {
+    saveHotseat({ log: FOOLS_MATE.slice(0, 3).map(([f, t]) => ply(f, t)) });
+    const before = getUsersSnapshot();
+    renderPage('/chess?resume=local');
+    expect(screen.getByTestId('chess-turn')).toHaveTextContent(/Flora to move/);
+    tap('d8', 'h4');
+    expect(screen.getByTestId('chess-result-headline')).toHaveTextContent('Flora wins!');
+    expect(getUsersSnapshot()).toBe(before);
   });
 });

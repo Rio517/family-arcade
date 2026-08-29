@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { GameConnection, type ConnStatus } from '@shared/net/peer';
 import { isChessMessage, type ChessMessage } from '@games/chess/domain/protocol';
 import * as Session from '@games/chess/domain/session';
-import type { FinishInfo, Outcome, Phase as GamePhase, SessionState } from '@games/chess/domain/session';
+import type { FinishInfo, LocalPlayer, Outcome, Phase as GamePhase, SessionState } from '@games/chess/domain/session';
 import { boardState, canIMove, turnColor } from '@games/chess/domain/session';
 import {
   chessToStored,
@@ -29,6 +29,8 @@ import {
 import type { Color, GameLog, GameState, Ply, Side } from '@games/chess/domain/types';
 
 const CHESS_PREFIX = 'chess-v1-';
+/** An unoccupied chair — the lobby's placeholder board is nobody's game. */
+const NOBODY: LocalPlayer = { name: '', userId: null };
 
 export type Phase = 'lobby' | GamePhase;
 
@@ -53,6 +55,8 @@ export interface UseChessResult {
   statusDetail: string | undefined;
   myName: string;
   oppName: string;
+  /** Online: the ticket that sat down at this device for the game. Local or lobby: null. */
+  seatedUserId: string | null;
   oppConnected: boolean;
   iWantRematch: boolean;
   oppWantsRematch: boolean;
@@ -65,8 +69,12 @@ export interface UseChessResult {
   /** Local (hotseat) only: is there a move to take back? */
   canUndo: boolean;
   // actions
-  /** Start a hotseat game — from the standard opening, or from `start`. */
-  startLocal: (whiteName: string, blackName: string, start?: GameState) => void;
+  /**
+   * Start a hotseat game — from the standard opening, or from `start`. Each
+   * chair brings its name and its ticket (null for a bot or nobody); the
+   * tickets are what the result credits when the game ends.
+   */
+  startLocal: (white: LocalPlayer, black: LocalPlayer, start?: GameState) => void;
   /** Host or join an online game under `code`, as the hook's `name` (your ticket). */
   startTable: (opts: StartTableOptions) => void;
   resumeGame: (code: string) => void;
@@ -165,9 +173,15 @@ export function useChess(opts: UseChessOptions): UseChessResult {
   }, []);
 
   // ── Actions ──────────────────────────────────────────────────────────────
-  const startLocal = useCallback((whiteName: string, blackName: string, start?: GameState) => {
+  const startLocal = useCallback((white: LocalPlayer, black: LocalPlayer, start?: GameState) => {
     setStatus('idle');
-    setSessionState(Session.createLocalSession(whiteName.trim() || 'White', blackName.trim() || 'Black', start));
+    setSessionState(
+      Session.createLocalSession(
+        { name: white.name.trim() || 'White', userId: white.userId },
+        { name: black.name.trim() || 'Black', userId: black.userId },
+        start,
+      ),
+    );
   }, [setSessionState]);
 
   // My name is the ticket's name, verbatim: the gate guarantees there is one.
@@ -240,7 +254,7 @@ export function useChess(opts: UseChessOptions): UseChessResult {
 
   // ── Derived view ─────────────────────────────────────────────────────────
   const s = session;
-  const board = s ? boardState(s) : Session.boardState(Session.createLocalSession('', ''));
+  const board = s ? boardState(s) : Session.boardState(Session.createLocalSession(NOBODY, NOBODY));
   return {
     phase: s ? Session.phase(s) : 'lobby',
     mode: s?.mode ?? null,
@@ -251,6 +265,7 @@ export function useChess(opts: UseChessOptions): UseChessResult {
     statusDetail,
     myName: s?.myName ?? opts.name,
     oppName: s?.oppName ?? '',
+    seatedUserId: s?.seatedUserId ?? null,
     oppConnected: status === 'connected',
     iWantRematch: s?.iWantRematch ?? false,
     oppWantsRematch: s?.oppWantsRematch ?? false,
