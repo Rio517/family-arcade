@@ -44,6 +44,9 @@ export interface ConnectionHandlers<TMessage> {
 export interface ConnectionConfig<TMessage> {
   prefix: string;
   isMessage: (value: unknown) => value is TMessage;
+  /** How long a guest keeps dialing before giving up (default 20 s). The
+   * party passes minutes: the other iPad may be cold-starting the PWA. */
+  dialTimeoutMs?: number;
 }
 
 const DIAL_RETRY_MS = 2500;
@@ -84,12 +87,16 @@ export class GameConnection<TMessage> {
   private code = '';
   private dialTimer: ReturnType<typeof setTimeout> | null = null;
   private dialDeadline = 0;
+  private dialTimeoutMs: number;
+  /** Host: until when a stale broker registration of our own id is retried. */
+  private hostDeadline = 0;
   private destroyed = false;
 
   constructor(handlers: ConnectionHandlers<TMessage>, config: ConnectionConfig<TMessage>) {
     this.handlers = handlers;
     this.prefix = config.prefix;
     this.isMessage = config.isMessage;
+    this.dialTimeoutMs = config.dialTimeoutMs ?? DIAL_TIMEOUT_MS;
   }
 
   private peerIdForCode(code: string): string {
@@ -101,6 +108,7 @@ export class GameConnection<TMessage> {
     this.role = 'host';
     this.code = code;
     this.destroyed = false;
+    this.hostDeadline = Date.now() + this.dialTimeoutMs;
     this.handlers.onStatus('hosting');
     this.createPeer(this.peerIdForCode(code));
   }
@@ -111,7 +119,7 @@ export class GameConnection<TMessage> {
     this.code = code;
     this.destroyed = false;
     this.handlers.onStatus('dialing');
-    this.dialDeadline = Date.now() + DIAL_TIMEOUT_MS;
+    this.dialDeadline = Date.now() + this.dialTimeoutMs;
     this.createPeer(undefined);
   }
 
@@ -183,6 +191,23 @@ export class GameConnection<TMessage> {
         return;
       }
       if (err.type === 'unavailable-id') {
+        // Our own id is still registered on the broker — after a hard PWA
+        // kill the old registration lingers for a few seconds. Reclaim it
+        // rather than ending a remembered party on a screen nobody opened;
+        // a genuinely taken code still errors once the deadline passes.
+        if (this.role === 'host' && Date.now() < this.hostDeadline) {
+          this.handlers.onStatus('reconnecting', 'Reclaiming your code…');
+          try {
+            peer.destroy();
+          } catch {
+            /* already gone */
+          }
+          if (this.dialTimer) clearTimeout(this.dialTimer);
+          this.dialTimer = setTimeout(() => {
+            if (!this.destroyed) this.createPeer(id);
+          }, DIAL_RETRY_MS);
+          return;
+        }
         this.handlers.onStatus('error', 'That code is already in use — start a new game.');
         return;
       }
@@ -250,7 +275,7 @@ export class GameConnection<TMessage> {
       if (!isCurrent()) return;
       this.handlers.onStatus('reconnecting', 'Opponent link closed');
       if (this.role === 'guest') {
-        this.dialDeadline = Date.now() + DIAL_TIMEOUT_MS;
+        this.dialDeadline = Date.now() + this.dialTimeoutMs;
         this.scheduleDial();
       }
       // Host simply waits for the guest's peer to re-connect.
