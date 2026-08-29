@@ -42,6 +42,19 @@ Sorted by likely value. Nothing here blocks anything else.
   the game link and the game links' 20 s dial window are the two worth
   doing first.
 
+- **Decide the point economy now that every seat scores.** Before Phase 4
+  only online decisive games moved the ledger; now a same-device chess mate
+  pays both chairs (+100 / +25), a Risk win over bot chairs pays +100, a
+  solo Ship Battle pays up to 100 + 15 × surviving cells, and *+ New
+  player* mints tickets freely — so two tickets on one iPad can farm the
+  Prize Counter with a four-move scholar's mate. Options: accept (a
+  trust-based family device), a source tier on `ResultInput` (online 100,
+  hotseat/solo/bots 50, no consolation for a hotseat loss), or a daily cap.
+  One asymmetry to confirm with the family either way: Risk losers get
+  nothing, a hotseat chess loser gets +25. Pick before the Prize Counter
+  prices anything on points. (`src/shared/profile/profile.ts`
+  `pointsForResult`; the five `recordResultFor` call sites.)
+
 - **Ship Battle visual glow-up — image-asset ships.** The whole plan is in
   "The Ship Battle glow-up" below. This is the active piece of work; assets are
   being generated now.
