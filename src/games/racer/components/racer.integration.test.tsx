@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach, beforeEach, vi } from 'vitest';
+import { describe, expect, it, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RacerPage } from './RacerPage';
@@ -387,6 +387,13 @@ describe('two-player racer: reconnect re-sync', () => {
   let frames: FrameRequestCallback[];
   let now: number;
 
+  // Pay the lazy 3D chunk's transform cost once, before the timed waits below —
+  // the first client's `import('./Track3D')` is what outlived the ceilings on
+  // a loaded CI worker (the same fix the Ship Battle Fleet3D tests needed).
+  beforeAll(async () => {
+    await import('./Track3D');
+  });
+
   beforeEach(() => {
     fake3d.enabled = true;
     frames = [];
@@ -428,10 +435,12 @@ describe('two-player racer: reconnect re-sync', () => {
       // Generous ceilings: both waits gate on each client's lazy scene import
       // resolving, and under full-suite CPU load that occasionally outlives
       // testing-library's 1s default — this test flaked three times in a week
-      // on exactly the frames.length wait before the ceilings were raised.
-      await waitFor(() => expect(bus.wire.filter((w) => w.msg.t === 'go')).toHaveLength(1), { timeout: 8000 });
+      // on exactly the frames.length wait at 1s, then twice more in CI at 8s
+      // once the suite passed 170 files (2026-08-29). The ceilings are only a
+      // cap on how long a slow worker may take; a fast one is never held up.
+      await waitFor(() => expect(bus.wire.filter((w) => w.msg.t === 'go')).toHaveLength(1), { timeout: 20000 });
       // Both race loops are live (the mocked scene builds fine here).
-      await waitFor(() => expect(frames.length).toBeGreaterThanOrEqual(2), { timeout: 8000 });
+      await waitFor(() => expect(frames.length).toBeGreaterThanOrEqual(2), { timeout: 20000 });
 
       // Weak wifi: the host's final "race over" message never arrives.
       bus.drop = (msg) => (msg.t === 'world' || msg.t === 'worldDelta') && msg.status === 'over';
@@ -469,6 +478,7 @@ describe('two-player racer: reconnect re-sync', () => {
       expect(guest.getByText('Rio wins!')).toBeInTheDocument();
       expect(guest.queryByText('Kai wins!')).toBeNull();
     },
-    20000,
+    // Two 20s ceilings above, plus the race itself.
+    60000,
   );
 });
