@@ -36,6 +36,7 @@ export const chess: GameDescriptor = {
   id: 'chess',
   title: 'Chess',
   players: { min: 1, max: 2 },
+  seats: { min: 1, max: 2 },
   path: '/chess',
   description: 'Drag-and-drop chess — same device or online with a code.',
   Icon: ChessIcon,

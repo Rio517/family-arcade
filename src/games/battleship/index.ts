@@ -21,6 +21,7 @@ export const battleship: GameDescriptor = {
   id: 'battleship',
   title: 'Ship Battle',
   players: { min: 2, max: 2 },
+  seats: { min: 1, max: 1 },
   computer: true,
   path: '/play',
   description: 'Two devices, one code. Pick your fleet, place your ships, and duel.',

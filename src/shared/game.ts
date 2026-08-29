@@ -38,8 +38,12 @@ export interface GameDescriptor {
   tag?: string;
   /** Honest release-state signal shown on the menu while keeping the game playable. */
   releaseStatus?: 'under-construction';
-  /** How many people can play — worn as a badge on the landing ticket. */
+  /** How many people can play — worn as a badge on the landing ticket. A menu
+   * fact, not a seat count: Ship Battle says 2 while seating one per device. */
   players: { min: number; max: number };
+  /** Chairs on THIS device — how many tickets a seat picker can seat for one
+   * pass-and-play game (Risk 2–6, Magic Coins 1–3; an online-only game seats 1). */
+  seats: { min: number; max: number };
   /** True when the game seats computer opponents (ADR 0009). */
   computer?: boolean;
   /** Route path, e.g. "/play". */

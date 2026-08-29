@@ -31,6 +31,7 @@ export const caribbean: GameDescriptor = {
   tag: '3D battles',
   releaseStatus: 'under-construction',
   players: { min: 1, max: 1 },
+  seats: { min: 1, max: 1 },
   computer: true,
   path: '/caribbean',
   description: 'Trade, chase rumours, and command a growing fleet across the Caribbean.',
