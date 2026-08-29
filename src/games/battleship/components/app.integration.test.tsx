@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
+import { act, render, within, fireEvent, waitFor, cleanup, type RenderResult } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { BattleshipPage } from './BattleshipPage';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
@@ -67,6 +67,18 @@ function renderApp(): RenderResult {
   );
 }
 
+/**
+ * Sign this browser in as `name`. Both simulated clients share one roster (one
+ * jsdom, one localStorage), so each side signs in just before it creates or
+ * joins: the session copies that name in at that moment (Session.createSession)
+ * and keeps it, which is what lets one process stand in for two devices.
+ */
+function signInAs(name: string) {
+  act(() => {
+    setUsersState(addUser(emptyUsersState(), `u-${name.toLowerCase()}`, name, 1));
+  });
+}
+
 beforeEach(() => {
   localStorage.clear();
   // This flow exercises the radar and the wire, not the 3D ocean — pin the
@@ -108,14 +120,16 @@ describe('two-player integration: create → place → fire', () => {
     const host = within(renderApp().container);
     const guest = within(renderApp().container);
 
-    // ── Host creates a game and gets a code ───────────────────────────────
+    // ── Host creates a game and gets a code, signed in as Rio ─────────────
+    signInAs('Rio');
     fireEvent.click(host.getByTestId('create-game'));
     const code = (await host.findByTestId('game-code')).textContent!.trim();
     expect(code).toMatch(/^[A-Z0-9]{4}$/);
 
-    // ── Guest joins with the code ─────────────────────────────────────────
+    // ── Guest joins with the code, as a different player: Kai ─────────────
     fireEvent.click(guest.getByTestId('show-join'));
     fireEvent.change(guest.getByTestId('code-input'), { target: { value: code } });
+    signInAs('Kai');
     fireEvent.click(guest.getByTestId('join-game'));
 
     // Both should now see they are connected (opponent name exchanged).
@@ -139,10 +153,13 @@ describe('two-player integration: create → place → fire', () => {
 
     // ── The ticket name crossed the wire ──────────────────────────────────
     // The radar header is built from oppName alone, which is only ever set by
-    // the opponent's `hello` — so "Rio's waters" (not "Opponent's") proves the
-    // signed-in ticket name travelled, with nobody typing it.
-    expect(shooter.getAllByText(/Radar — Rio's waters/).length).toBeGreaterThan(0);
-    expect(defender.getAllByText(/Radar — Rio's waters/).length).toBeGreaterThan(0);
+    // the opponent's `hello`. The two captains signed in under different names,
+    // so each header naming the OTHER one proves the ticket name travelled —
+    // nobody typed it, and neither side is reading its own name back.
+    expect(host.getAllByText(/Radar — Kai's waters/).length).toBeGreaterThan(0);
+    expect(host.queryByText(/Radar — Rio's waters/)).toBeNull();
+    expect(guest.getAllByText(/Radar — Rio's waters/).length).toBeGreaterThan(0);
+    expect(guest.queryByText(/Radar — Kai's waters/)).toBeNull();
 
     // ── Fire the first shot at A1 (row 0, col 0) ──────────────────────────
     fireEvent.click(shooter.getAllByTestId('cell-enemy-0-0')[0]);

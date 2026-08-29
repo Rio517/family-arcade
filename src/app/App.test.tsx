@@ -10,6 +10,7 @@ import {
 import { defaultProfile } from '@shared/profile/profile';
 import { resetUsersStore } from '@shared/profile/usersStore';
 import { App } from './App';
+import { GAMES } from './registry';
 
 const originalWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
 const originalHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
@@ -28,6 +29,19 @@ function signIn(): void {
       profile: { ...defaultProfile(), name: 'Rio' },
     }],
     activeId: 'player-rio',
+  }));
+  resetUsersStore();
+}
+
+/** A roster with a ticket in it, but nobody signed in — what the gate asks about. */
+function signOut(): void {
+  localStorage.setItem('arcade.users.v1', JSON.stringify({
+    users: [{
+      id: 'player-rio',
+      createdAt: 1,
+      profile: { ...defaultProfile(), name: 'Rio' },
+    }],
+    activeId: null,
   }));
   resetUsersStore();
 }
@@ -98,6 +112,23 @@ describe('<App> shell landmarks', () => {
       screen.getByRole('heading', { name: 'Sign a captain’s commission' }),
     );
     expect(screen.queryByTestId('player-gate')).not.toBeInTheDocument();
+  });
+
+  // The registry is the only list of games (see registry.ts), so this walks it
+  // rather than naming routes: a game added there is gated from the day it
+  // ships, and by its own title.
+  it('sends every registered game to the ticket booth when nobody is signed in', () => {
+    signOut();
+    expect(GAMES.length).toBeGreaterThan(1);
+
+    for (const game of GAMES) {
+      window.location.hash = `#${game.path}`;
+      const { unmount } = render(<App />);
+
+      const gate = screen.getByTestId('player-gate');
+      expect(gate).toHaveTextContent(`${game.title} needs a player`);
+      unmount();
+    }
   });
 
   it('inerts the complete App shell behind setup abandonment and restores exact prior state on Cancel in StrictMode', () => {
