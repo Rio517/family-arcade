@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { StrictMode, useEffect } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PartyValue } from './PartyContext';
@@ -190,10 +190,23 @@ describe('the party is the table', () => {
     expect(tables(link())).toEqual([{ t: 'table', game: 'chess', code: tableCode, hostSide: 'w' }]);
     // Remembered with the party, so a reload can re-announce it.
     expect(stored()).toMatchObject({ code: partyCode, role: 'host', table: { game: 'chess', code: tableCode } });
-    act(() => party.closeTable());
+    // Closing names the table: another code (a code-door game, a solo one) is ignored.
+    act(() => party.closeTable('ZZZZ'));
+    expect(party.table).not.toBeNull();
+    act(() => party.closeTable(tableCode));
     expect(party.table).toBeNull();
     expect(link().sent.at(-1)).toEqual({ t: 'table-closed' });
     expect(stored().table).toBeNull();
+  });
+
+  it('a guest cannot close the table — only the host says when it is over', () => {
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => party.joinParty('AB23'));
+    act(() => link().connect());
+    act(() => link().receive({ t: 'table', game: 'chess', code: 'CD45' }));
+    act(() => party.closeTable('CD45'));
+    expect(party.table).toEqual({ game: 'chess', code: 'CD45' });
+    expect(link().sent.some((m) => (m as { t: string }).t === 'table-closed')).toBe(false);
   });
 
   it('a fresh channel re-announces the open table', () => {
@@ -215,11 +228,58 @@ describe('the party is the table', () => {
     expect(party.table).toBeNull();
     act(() => party.knockOn('racer'));
     expect(link().sent.at(-1)).toEqual({ t: 'knock', game: 'racer' });
-    // On the other device the knock lands on the host.
+  });
+
+  it('the host hears a knock and can clear it', () => {
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => void party.hostParty());
+    act(() => link().connect());
     act(() => link().receive({ t: 'knock', game: 'racer' }));
     expect(party.knock).toBe('racer');
     act(() => party.clearKnock());
     expect(party.knock).toBeNull();
+  });
+
+  it('a fresh channel with no table says so — a guest that slept through the closing forgets it', () => {
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => void party.hostParty());
+    act(() => link().connect());
+    let tableCode = '';
+    act(() => {
+      tableCode = party.openTable('racer');
+    });
+    act(() => party.closeTable(tableCode));
+    act(() => link().connect()); // the friend's device comes back
+    const afterReopen = link().sent.slice(link().sent.lastIndexOf({ t: 'hello', name: 'Klara' }));
+    expect(afterReopen.some((m) => (m as { t: string }).t === 'table')).toBe(false);
+    expect(link().sent.at(-1)).toEqual({ t: 'table-closed' });
+  });
+
+  it('opening a table answers the knock', () => {
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => void party.hostParty());
+    act(() => link().connect());
+    act(() => link().receive({ t: 'knock', game: 'chess' }));
+    expect(party.knock).toBe('chess');
+    act(() => void party.openTable('chess', 'w'));
+    expect(party.knock).toBeNull();
+  });
+
+  it('a guest ignores a knock and a host ignores a table — each message has one direction', () => {
+    const r = render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => party.joinParty('AB23'));
+    act(() => link().connect());
+    act(() => link().receive({ t: 'knock', game: 'chess' }));
+    expect(party.knock).toBeNull();
+    r.unmount();
+
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => void party.hostParty());
+    act(() => link().connect());
+    act(() => link().receive({ t: 'table', game: 'chess', code: 'CD45' }));
+    expect(party.table).toBeNull();
+    act(() => link().receive({ t: 'table-closed' }));
+    expect(party.table).toBeNull();
   });
 
   it('resolves a game id through the app, staying game-blind itself', () => {
@@ -262,12 +322,47 @@ describe('a remembered party', () => {
     expect(link().dialled).toBe('AB23');
   });
 
+  it('survives StrictMode mounting the provider twice — the remembered party is dialled by the surviving link', () => {
+    saveParty({ code: 'AB23', role: 'guest', at: 999_000, table: null });
+    render(
+      <StrictMode>
+        <PartyProvider><Probe /></PartyProvider>
+      </StrictMode>,
+    );
+    expect(link().dialled).toBe('AB23');
+    expect(link().destroyed).toBe(false);
+    expect(party.reconnecting).toBe(true);
+  });
+
   it('a stale party is left alone', () => {
     saveParty({ code: 'AB23', role: 'guest', at: 1_000_000 - PARTY_TTL_MS - 1, table: null });
     render(<PartyProvider><Probe /></PartyProvider>);
     expect(party.reconnecting).toBe(false);
     expect(links.all).toHaveLength(0);
     expect(localStorage.getItem(PARTY_KEY)).toBeNull();
+  });
+
+  it('a remembered guest whose rejoin fails is not stuck reconnecting — it can try again, then get through', () => {
+    saveParty({ code: 'AB23', role: 'guest', at: 999_000, table: null });
+    render(<PartyProvider><Probe /></PartyProvider>);
+    expect(party.reconnecting).toBe(true);
+    act(() => link().handlers.onStatus('error', 'Could not reach that party'));
+    expect(party.status).toBe('error');
+    expect(party.reconnecting).toBe(false);
+    act(() => party.retry());
+    expect(party.reconnecting).toBe(true);
+    act(() => link().connect());
+    expect(party.reconnecting).toBe(false);
+    expect(party.inParty).toBe(true);
+  });
+
+  it('starting a party by hand is never "reconnecting", even right after a remembered one was left', () => {
+    saveParty({ code: 'AB23', role: 'guest', at: 999_000, table: null });
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => party.leaveParty());
+    act(() => void party.hostParty());
+    expect(party.reconnecting).toBe(false);
+    expect(party.status).toBe('hosting');
   });
 
   it('leaving forgets the party; an error can be retried on the same code', () => {

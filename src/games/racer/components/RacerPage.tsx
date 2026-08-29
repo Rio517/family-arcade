@@ -92,10 +92,12 @@ export function RacerPage() {
   };
 
   const leaveToMenu = () => {
-    net.leave();
     // The party host walking away closes the table, so the friend's screen
-    // stops waiting on a race that isn't there any more.
-    if (party.role === 'host') party.closeTable();
+    // stops waiting on a race that isn't there any more. (The party ignores
+    // this unless we are the host and this is the open table — a solo race
+    // has no code and closes nothing.)
+    if (net.code) party.closeTable(net.code);
+    net.leave();
     ctxRef.current = null;
     lastStartRef.current = 0;
     setPhase('mode');

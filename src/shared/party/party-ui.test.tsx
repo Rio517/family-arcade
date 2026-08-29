@@ -175,6 +175,14 @@ describe('PartyBar', () => {
       expect(screen.queryByTestId('party-code-input')).toBeNull();
     });
 
+    it('a reconnecting host still sees its code — the friend rejoins with it', () => {
+      mockParty.value = makeParty({ reconnecting: true, role: 'host', code: 'ABCD', status: 'hosting' });
+      renderBar();
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.getByTestId('party-reconnecting')).toBeInTheDocument();
+      expect(screen.getByTestId('party-code')).toHaveTextContent('ABCD');
+    });
+
     it('after an error you can try again on the same code', () => {
       mockParty.value = makeParty({ role: 'guest', code: 'ABCD', status: 'error' });
       renderBar();

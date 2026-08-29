@@ -44,7 +44,8 @@ export interface PartyValue {
   /** The presence channel is open — you and your friend are linked. */
   inParty: boolean;
   theirName: string | null;
-  /** A remembered party is being rejoined and isn't connected yet. */
+  /** A remembered party is being rejoined and isn't through yet (an error
+   * ends it — the panel then offers Try again). */
   reconnecting: boolean;
 
   /** The game table open on this party (host: what you opened; guest: what you were told). */
@@ -60,7 +61,9 @@ export interface PartyValue {
 
   /** Host only: open a game's table under a fresh code and tell the friend. Returns the code. */
   openTable: (game: string, hostSide?: string) => string;
-  closeTable: () => void;
+  /** Close the table under `code` — a no-op unless that is the table that's open,
+   * so a game leaving never closes a table it isn't sitting at. */
+  closeTable: (code: string) => void;
   /** Guest: ask the host to open a game. */
   knockOn: (game: string) => void;
   clearKnock: () => void;
@@ -110,7 +113,12 @@ export function PartyProvider({
   const [theirName, setTheirName] = useState<string | null>(null);
   const [table, setTable] = useState<PartyTableInfo | null>(remembered?.table ?? null);
   const [knock, setKnock] = useState<string | null>(null);
-  const [reconnecting, setReconnecting] = useState(remembered !== null);
+  // True from a remembered boot until the party gets through (or is left, or
+  // replaced by one started by hand). `reconnecting` is derived from it and
+  // the status — so an error ends the reconnecting state and the panel can
+  // offer Try again, instead of a stored flag nobody clears.
+  const [fromMemory, setFromMemory] = useState(remembered !== null);
+  const reconnecting = fromMemory && status !== 'error';
   // Derived, not stored — it can never disagree with the status (the same
   // pattern callActive uses below).
   const inParty = status === 'connected';
@@ -155,7 +163,7 @@ export function PartyProvider({
         onStatus: (s) => {
           setStatus(s);
           if (s === 'connected') {
-            setReconnecting(false);
+            setFromMemory(false);
             remember();
           }
         },
@@ -164,26 +172,36 @@ export function PartyProvider({
           if (!conn) return;
           conn.send({ t: 'hello', name: nameRef.current });
           announcedRef.current = nameRef.current;
-          // A fresh channel (a reconnect, or the friend's reload) re-hears
-          // the open table — the host's reload must never strand the guest.
-          if (roleRef.current === 'host' && tableRef.current) conn.send({ t: 'table', ...tableRef.current });
+          // A fresh channel (a reconnect, or the friend's reload) re-hears the
+          // whole table state — open *or* closed — so the host's reload never
+          // strands the guest, and a guest that slept through the closing
+          // doesn't wake up holding a dead code.
+          if (roleRef.current === 'host') {
+            conn.send(tableRef.current ? { t: 'table', ...tableRef.current } : { t: 'table-closed' });
+          }
         },
         onMessage: (msg) => {
+          // Each message has one direction: the host says what the table is,
+          // the guest knocks. Anything else is a confused (or crafted) peer.
+          const iAmHost = roleRef.current === 'host';
           switch (msg.t) {
             case 'hello':
               setTheirName(msg.name.slice(0, 24) || 'Friend');
               break;
             case 'table':
+              if (iAmHost) return;
               setTableState(
                 msg.hostSide ? { game: msg.game, code: msg.code, hostSide: msg.hostSide } : { game: msg.game, code: msg.code },
               );
               remember();
               break;
             case 'table-closed':
+              if (iAmHost) return;
               setTableState(null);
               remember();
               break;
             case 'knock':
+              if (!iAmHost) return;
               setKnock(msg.game);
               break;
           }
@@ -220,16 +238,24 @@ export function PartyProvider({
     [buildConn, remember, stopCall],
   );
 
+  // Started by hand: never "reconnecting", whatever memory held before.
   const hostParty = useCallback(
     (code?: string): string => {
       const c = code ?? generateCode();
+      setFromMemory(false);
       start('host', c);
       return c;
     },
     [start],
   );
 
-  const joinParty = useCallback((raw: string) => start('guest', normalizeCode(raw)), [start]);
+  const joinParty = useCallback(
+    (raw: string) => {
+      setFromMemory(false);
+      start('guest', normalizeCode(raw));
+    },
+    [start],
+  );
 
   const retry = useCallback(() => {
     if (codeRef.current && roleRef.current) start(roleRef.current, codeRef.current);
@@ -247,7 +273,7 @@ export function PartyProvider({
     setCode('');
     setTableState(null);
     setKnock(null);
-    setReconnecting(false);
+    setFromMemory(false);
     clearParty();
   }, [setTableState, stopCall]);
 
@@ -257,6 +283,8 @@ export function PartyProvider({
       const c = generateCode();
       const t: PartyTableInfo = hostSide ? { game, code: c, hostSide } : { game, code: c };
       setTableState(t);
+      // Opening a table is the answer to a knock, whichever door it came through.
+      setKnock(null);
       connRef.current?.send({ t: 'table', ...t });
       remember();
       return c;
@@ -264,11 +292,18 @@ export function PartyProvider({
     [remember, setTableState],
   );
 
-  const closeTable = useCallback(() => {
-    setTableState(null);
-    connRef.current?.send({ t: 'table-closed' });
-    remember();
-  }, [remember, setTableState]);
+  const closeTable = useCallback(
+    (code: string) => {
+      // Only the host closes, and only the table that is actually open — so
+      // every game can say "I'm leaving <my code>" without knowing whether
+      // it was the party's table, a code-door game, or a solo one.
+      if (roleRef.current !== 'host' || !code || tableRef.current?.code !== code) return;
+      setTableState(null);
+      connRef.current?.send({ t: 'table-closed' });
+      remember();
+    },
+    [remember, setTableState],
+  );
 
   const knockOn = useCallback((game: string) => {
     connRef.current?.send({ t: 'knock', game });
@@ -277,11 +312,11 @@ export function PartyProvider({
 
   // A remembered party rejoins on load — through the same host/join path, so
   // the call stays opt-in and the table (seeded above) re-announces on open.
-  const bootedRef = useRef(false);
+  // No once-guard: the deps are stable, and `start` replaces any earlier
+  // link, so StrictMode's rehearsal mount (which destroys that link in its
+  // cleanup below) still leaves exactly one live link dialling.
   useEffect(() => {
-    if (bootedRef.current || !remembered) return;
-    bootedRef.current = true;
-    start(remembered.role, remembered.code);
+    if (remembered) start(remembered.role, remembered.code);
   }, [remembered, start]);
 
   // Keep my name fresh on the wire if the ticket changes mid-party.

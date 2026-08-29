@@ -85,14 +85,26 @@ describe('<RacerPage> — the party table', () => {
     fireEvent.click(screen.getByTestId('racer-driver-unicorn'));
   }
 
-  it('a party host leaving the lobby via ‹ Menu closes the table for the friend', () => {
+  it('a party host leaving an opened table via ‹ Menu closes it for the friend', () => {
     mockParty.value = makeParty({ inParty: true, status: 'connected', role: 'host', theirName: 'Kai' });
     renderRacer();
     goToNetLobby();
     expect(screen.getByTestId('racer-party-play')).toHaveTextContent('Race Kai');
+    fireEvent.click(screen.getByTestId('racer-party-play'));
 
     fireEvent.click(screen.getByTestId('racer-back'));
-    expect(mockParty.value.closeTable).toHaveBeenCalledTimes(1);
+    expect(mockParty.value.closeTable).toHaveBeenCalledWith('WXYZ');
+    expect(screen.getByTestId('racer-mode-solo')).toBeInTheDocument();
+  });
+
+  it('a party host playing a solo race closes nothing when they leave — the friend keeps their table', () => {
+    mockParty.value = makeParty({ inParty: true, status: 'connected', role: 'host', theirName: 'Kai' });
+    renderRacer();
+    fireEvent.click(screen.getByTestId('racer-mode-solo'));
+    fireEvent.click(screen.getByTestId('racer-driver-unicorn'));
+
+    fireEvent.click(screen.getByTestId('racer-back'));
+    expect(mockParty.value.closeTable).not.toHaveBeenCalled();
     expect(screen.getByTestId('racer-mode-solo')).toBeInTheDocument();
   });
 

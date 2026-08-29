@@ -241,7 +241,7 @@ describe('<ChessPage> — the party is the table', () => {
     expect(screen.queryByTestId('chess-party-waiting')).toBeNull();
   });
 
-  it('the host leaving an online game closes the table on the party; a guest leaving does not', () => {
+  it('leaving an online game tells the party which table it is leaving — the party decides whether that closes anything', () => {
     mockParty.value = withKai('host');
     const r = renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
@@ -250,15 +250,16 @@ describe('<ChessPage> — the party is the table', () => {
     // The link fails; the error panel's way out is the exit-to-menu path.
     act(() => net.handlers.onStatus('error', 'Lost the link.'));
     fireEvent.click(screen.getByRole('button', { name: /Back to menu/ }));
-    expect(mockParty.value.closeTable).toHaveBeenCalledTimes(1);
+    expect(mockParty.value.closeTable).toHaveBeenCalledWith('WXYZ');
     r.unmount();
 
+    // A guest says so too; the party ignores it (only the host closes a table).
     mockParty.value = withKai('guest', { table: { game: 'chess', code: 'QRST' } });
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
     act(() => net.handlers.onStatus('error', 'Lost the link.'));
     fireEvent.click(screen.getByRole('button', { name: /Back to menu/ }));
-    expect(mockParty.value.closeTable).not.toHaveBeenCalled();
+    expect(mockParty.value.closeTable).toHaveBeenCalledWith('QRST');
   });
 });
 

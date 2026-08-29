@@ -194,8 +194,9 @@ export function ChessPage() {
   const goMenu = () => navigate('/');
   const exitToMenu = () => {
     // The host's table closes with the game, so the friend's screen stops
-    // pointing at a board nobody is sitting at.
-    if (cx.mode === 'online' && party.role === 'host') party.closeTable();
+    // pointing at a board nobody is sitting at. (The party ignores this
+    // unless we are the host and this is the open table.)
+    if (cx.code) party.closeTable(cx.code);
     cx.leave();
     navigate('/');
   };

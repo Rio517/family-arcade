@@ -112,7 +112,8 @@ export function BattleshipPage() {
   const exitToMenu = () => {
     // A party host walking away from an online table closes it, so the
     // friend's lobby stops waiting on (or walking into) a game that is over.
-    if (!solo && party.role === 'host') party.closeTable();
+    // (The party ignores this unless we are the host and this is the open table.)
+    if (bs.code) party.closeTable(bs.code);
     bs.leave();
     navigate('/');
   };
