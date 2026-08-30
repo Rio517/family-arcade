@@ -1,4 +1,5 @@
 import type { GameDescriptor, SavedGameSummary } from '@shared/game';
+import preview from './assets/preview.webp';
 import { ShipIcon } from '@shared/ui/icons';
 
 import { CaribbeanPage } from './components/CaribbeanPage';
@@ -34,6 +35,12 @@ export const caribbean: GameDescriptor = {
   seats: { min: 1, max: 1 },
   computer: true,
   path: '/caribbean',
+  preview: {
+    image: preview,
+    facts: ['1 player', 'Just this iPad', 'A long voyage'],
+    blurb:
+      'Trade, chase rumours and command a growing fleet across a real map of the Caribbean. Still under construction — but you can sail.',
+  },
   description: 'Trade, chase rumours, and command a growing fleet across the Caribbean.',
   Icon: ShipIcon,
   Page: CaribbeanPage,

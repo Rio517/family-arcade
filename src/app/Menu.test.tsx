@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { createCampaign } from '@games/caribbean/domain/createCampaign';
 import { createJournal } from '@games/caribbean/domain/replay';
@@ -25,6 +25,54 @@ describe('<Menu> — the arcade landing page', () => {
     for (const name of ['Yahtzee', ...GAMES.map((g) => g.title)]) {
       expect(screen.getAllByText(name).length).toBeGreaterThan(0);
     }
+  });
+
+  describe('the poster behind every ticket', () => {
+    it('a tap opens the ticket into its poster — picture, facts, blurb, Play — one at a time', () => {
+      renderMenu();
+      // Closed: no poster, and the ticket is not a link — Play lives inside.
+      expect(screen.queryByTestId('ticket-poster-chess')).toBeNull();
+      expect(screen.queryByRole('link', { name: /Play Chess/ })).toBeNull();
+
+      fireEvent.click(screen.getByTestId('ticket-open-chess'));
+      const poster = screen.getByTestId('ticket-poster-chess');
+      expect(screen.getByTestId('ticket-open-chess')).toHaveAttribute('aria-expanded', 'true');
+      expect(within(poster).getByRole('img')).toHaveAttribute('alt', expect.stringMatching(/Chess/));
+      expect(within(poster).getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
+      expect(within(poster).getByRole('link', { name: /Play Chess/ })).toHaveAttribute('href', '/chess');
+
+      // Opening another closes the first.
+      fireEvent.click(screen.getByTestId('ticket-open-risk'));
+      expect(screen.queryByTestId('ticket-poster-chess')).toBeNull();
+      expect(screen.getByTestId('ticket-poster-risk')).toBeInTheDocument();
+      // A second tap on the open one folds it.
+      fireEvent.click(screen.getByTestId('ticket-open-risk'));
+      expect(screen.queryByTestId('ticket-poster-risk')).toBeNull();
+    });
+
+    it('Escape folds the open ticket', () => {
+      renderMenu();
+      fireEvent.click(screen.getByTestId('ticket-open-racer'));
+      expect(screen.getByTestId('ticket-poster-racer')).toBeInTheDocument();
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByTestId('ticket-poster-racer')).toBeNull();
+    });
+
+    it('every registry game opens, with a Play link to its own path', () => {
+      renderMenu();
+      for (const game of GAMES) {
+        fireEvent.click(screen.getByTestId(`ticket-open-${game.id}`));
+        const poster = screen.getByTestId(`ticket-poster-${game.id}`);
+        expect(within(poster).getByRole('link', { name: new RegExp(`Play ${game.title}`) })).toHaveAttribute('href', game.path);
+      }
+    });
+
+    it('Yahtzee opens too; its Play is the calculator page', () => {
+      renderMenu();
+      fireEvent.click(screen.getByTestId('ticket-open-yahtzee'));
+      const poster = screen.getByTestId('ticket-poster-yahtzee');
+      expect(within(poster).getByRole('link', { name: /Play Yahtzee/ }).getAttribute('href')).toMatch(/calculator\.html$/);
+    });
   });
 
   it('every ticket wears a player-count badge from its descriptor', () => {
@@ -131,9 +179,11 @@ describe('<Menu> — the arcade landing page', () => {
     renderMenu();
 
     const ticket = screen.getByTestId('game-ticket-caribbean');
-    expect(ticket).toHaveAttribute('href', '/caribbean');
     expect(ticket).toHaveAttribute('data-release-status', 'under-construction');
     expect(ticket).toHaveTextContent('Under construction · playable');
+    // Still playable: open the ticket and Play goes to the game.
+    fireEvent.click(screen.getByTestId('ticket-open-caribbean'));
+    expect(screen.getByTestId('game-play-caribbean')).toHaveAttribute('href', '/caribbean');
   });
 
   it('reads a Caribbean Save Station row without writing and links to clean resume', () => {

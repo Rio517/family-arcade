@@ -19,6 +19,7 @@
     "knip": "knip",
     "check": "npm run typecheck && npm run lint && npm run knip",
     "shots": "node scripts/screenshots.mjs",
+    "previews": "node scripts/game-previews.mjs",
     "caribbean:naval-check": "node scripts/caribbean-naval-check.mjs",
     "caribbean:port-check": "node scripts/caribbean-port-check.mjs",
     "glb": "node scripts/optimize-glb.mjs",

@@ -634,3 +634,41 @@
 .footer p { margin: 4px 0; }
 .footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
 .footer a:hover { text-decoration: underline; }
+
+/* ── The poster behind a ticket ──────────────────────────────────────────
+   A ticket is a card whose face is a button: tap it and the poster unfolds
+   underneath — a picture of the game, three facts, two lines, and Play. */
+.tk { flex-direction: column; align-items: stretch; cursor: default; }
+.tk-face {
+  display: flex; align-items: stretch; width: 100%;
+  padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.tk-face:focus-visible { outline: 2px solid var(--c); outline-offset: -3px; border-radius: 12px; }
+.tk.open .tk-go { transform: rotate(90deg); }
+.tk.open { border-color: color-mix(in srgb, var(--c) 70%, #22304e); }
+.tk-poster {
+  display: grid; gap: 12px; padding: 0 16px 16px;
+  animation: tk-unfold 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) { .tk-poster { animation: none; } }
+@keyframes tk-unfold { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.tk-strip {
+  display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover;
+  border-radius: 10px; border: 1px solid color-mix(in srgb, var(--c) 45%, #22304e);
+  background: #0b1220;
+}
+.tk-facts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.tk-facts li {
+  font-family: var(--mono); font-size: 14px; font-weight: 600; color: #d6deef;
+  border: 1px solid rgba(147, 160, 189, 0.45); border-radius: 999px; padding: 5px 11px;
+}
+.tk-blurb { margin: 0; font-size: 15px; line-height: 1.5; color: #b9c4dd; }
+.tk-play {
+  display: flex; align-items: center; justify-content: center; min-height: 48px;
+  border-radius: 12px; text-decoration: none; font-weight: 800; font-size: 16px; letter-spacing: 0.02em;
+  color: #0b1020; background: linear-gradient(90deg, var(--c), color-mix(in srgb, var(--c) 70%, #fff));
+  box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--c) 80%, transparent);
+}
+.tk-play:hover { filter: brightness(1.06); }
+.tk-play:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
