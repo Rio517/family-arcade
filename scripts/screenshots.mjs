@@ -68,6 +68,8 @@ const SHOTS = [
       await page.getByTestId('ticket-open-racer').click();
       await page.getByTestId('ticket-poster-racer').waitFor();
       await page.getByTestId('ticket-poster-racer').scrollIntoViewIfNeeded();
+      // Leave the pill's strip at the bottom clear of the Play button.
+      await page.evaluate(() => window.scrollBy(0, 110));
       await page.waitForTimeout(400);
     },
   },
