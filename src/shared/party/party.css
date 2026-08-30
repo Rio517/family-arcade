@@ -150,6 +150,9 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  /* Some doors are links (the mirror, the invite): dressed as buttons. */
+  text-decoration: none;
+  text-align: center;
 }
 .party-btn.primary { background: linear-gradient(90deg, #ff7fc4, #b06bff); color: #fff; }
 .party-btn.violet { background: var(--violet-dim, rgba(167, 139, 250, 0.18)); color: var(--violet, #a78bfa); }
