@@ -40,6 +40,11 @@ describe('isChessMessage', () => {
 
   it('rejects a hello with a bad side, missing version, or oversized name', () => {
     expect(isChessMessage({ t: 'hello', v: 1, side: 'referee', name: 'M' })).toBe(false);
+    // The host's colour rides on the hello; anything but w/b is refused, and
+    // a hello without one (an older build) is still fine.
+    expect(isChessMessage({ t: 'hello', v: 1, side: 'host', name: 'M', color: 'b' })).toBe(true);
+    expect(isChessMessage({ t: 'hello', v: 1, side: 'host', name: 'M', color: 'white' })).toBe(false);
+    expect(isChessMessage({ t: 'hello', v: 1, side: 'host', name: 'M', color: 7 })).toBe(false);
     expect(isChessMessage({ t: 'hello', side: 'host', name: 'M' })).toBe(false);
     expect(isChessMessage({ t: 'hello', v: 1, side: 'host', name: 'x'.repeat(101) })).toBe(false);
   });

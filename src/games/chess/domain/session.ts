@@ -249,7 +249,7 @@ function finishedBy(before: SessionState, after: SessionState): FinishInfo | und
 export function connectHandshake(s: SessionState): ChessMessage[] {
   if (s.mode !== 'online' || !s.side) return [];
   return [
-    { t: 'hello', v: CHESS_PROTOCOL_VERSION, side: s.side, name: s.myName },
+    { t: 'hello', v: CHESS_PROTOCOL_VERSION, side: s.side, name: s.myName, ...(s.myColor ? { color: s.myColor } : {}) },
     { t: 'sync', log: s.log, epoch: s.epoch, wantRematch: s.iWantRematch },
   ];
 }
@@ -333,7 +333,11 @@ export function applyMessage(s: SessionState, msg: ChessMessage): Outcome {
         // two different ways.
         return { state: s, outgoing: [], error: 'Different app versions — both players refresh the page.' };
       }
-      return { state: { ...s, oppName: msg.name.slice(0, 24) || s.oppName }, outgoing: [] };
+      // The host's colour is the one that counts: a guest hearing it takes
+      // the other, whichever door it came through. A guest's claim changes
+      // nothing on the host; an older build's hello says nothing about colour.
+      const myColor = s.side === 'guest' && msg.side === 'host' && msg.color ? opposite(msg.color) : s.myColor;
+      return { state: { ...s, oppName: msg.name.slice(0, 24) || s.oppName, myColor }, outgoing: [] };
     }
 
     case 'sync': {

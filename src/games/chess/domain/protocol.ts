@@ -11,7 +11,7 @@
  * extends mine."
  */
 
-import type { GameLog, Ply, PromotionType, Side } from './types';
+import type { Color, GameLog, Ply, PromotionType, Side } from './types';
 import { reconcileLogs as reconcile } from '@shared/reconcile';
 
 export const CHESS_PROTOCOL_VERSION = 1;
@@ -21,6 +21,12 @@ export interface HelloMsg {
   v: number;
   side: Side;
   name: string;
+  /**
+   * The colour this end plays. The host's is the authority — a guest that
+   * arrived any other way than the party (the code door assumes host-is-White)
+   * takes the other one on hearing it. Absent from older builds' hellos.
+   */
+  color?: Color;
 }
 
 /** Full-state resync sent on every (re)connect. */
@@ -89,7 +95,8 @@ export function isChessMessage(value: unknown): value is ChessMessage {
         typeof m.v === 'number' &&
         SIDES.includes(m.side as Side) &&
         typeof m.name === 'string' &&
-        m.name.length <= 100
+        m.name.length <= 100 &&
+        (m.color === undefined || m.color === 'w' || m.color === 'b')
       );
     case 'sync':
       return (
