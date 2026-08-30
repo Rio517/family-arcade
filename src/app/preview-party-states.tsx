@@ -229,7 +229,7 @@ createRoot(document.getElementById('root')!).render(
                     {t.show === 'video' || t.show === 'call' ? (
                       <FloatingVideo initiallyExpanded={t.show === 'call'} />
                     ) : (
-                      <PartyBar initiallyOpen={t.show === 'panel'} />
+                      <PartyBar initiallyOpen={t.show === 'panel'} soloEffects={{ title: 'Magic Mirror', path: '/mirror' }} />
                     )}
                   </PartyCtx.Provider>
                 </div>

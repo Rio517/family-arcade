@@ -112,6 +112,43 @@ describe('PartyBar', () => {
     expect(screen.getByRole('dialog', { name: 'Party' })).toBeInTheDocument();
   });
 
+  describe('the door to the camera effects on your own', () => {
+    const mirror = { title: 'Magic Mirror', path: '/mirror' };
+    const renderWithDoor = (party: PartyValue) => {
+      mockParty.value = party;
+      return render(<MemoryRouter><PartyBar soloEffects={mirror} /></MemoryRouter>);
+    };
+
+    it('shows on the start screen — no party needed to play with the dragon', () => {
+      renderWithDoor(makeParty());
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.getByTestId('party-solo-effects')).toHaveAttribute('href', '/mirror');
+      expect(screen.getByTestId('party-solo-effects')).toHaveTextContent(/on your own/);
+    });
+
+    it('shows in a party before a call starts, and steps aside once the call is on', () => {
+      renderWithDoor(makeParty({ inParty: true, status: 'connected', theirName: 'Kai', role: 'host', code: 'ABCD' }));
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.getByTestId('party-solo-effects')).toHaveAttribute('href', '/mirror');
+      cleanupBar();
+
+      renderWithDoor(
+        makeParty({
+          inParty: true, status: 'connected', theirName: 'Kai', role: 'host', code: 'ABCD',
+          call: { ...makeParty().call, active: true, status: 'live' },
+        }),
+      );
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.queryByTestId('party-solo-effects')).toBeNull();
+    });
+
+    it('is simply absent when the app has no such game to point at', () => {
+      renderBar();
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.queryByTestId('party-solo-effects')).toBeNull();
+    });
+  });
+
   it('offers "Start a party" when not in a party', () => {
     renderBar();
     fireEvent.click(screen.getByTestId('party-pill'));
