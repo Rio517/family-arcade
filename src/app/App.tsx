@@ -45,7 +45,9 @@ export function App() {
               ))}
             </Routes>
           </main>
-          <PartyBar />
+          {/* The party panel can send you to play with the camera effects
+              alone — the Magic Mirror, if the registry has it. */}
+          <PartyBar soloEffects={resolveGame('mirror')} />
           <FloatingVideo />
         </PartyProvider>
       </ErrorBoundary>

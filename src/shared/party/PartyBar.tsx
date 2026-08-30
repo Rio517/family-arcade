@@ -13,10 +13,19 @@ import { initialOf } from '@shared/profile/tickets';
 import { useProfile } from '@shared/profile/useProfile';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { CameraIcon, ChevronDownIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
-import { useParty } from './PartyContext';
+import { useParty, type GameInfo } from './PartyContext';
 import './party.css';
 
-export function PartyBar({ initiallyOpen = false }: { /** Harness pages render the panel already open. */ initiallyOpen?: boolean } = {}) {
+export function PartyBar({
+  initiallyOpen = false,
+  soloEffects = null,
+}: {
+  /** Harness pages render the panel already open. */
+  initiallyOpen?: boolean;
+  /** Where the camera effects can be played with alone (the app names the
+   * game — shared code stays game-blind). Null: no such door. */
+  soloEffects?: GameInfo | null;
+} = {}) {
   const party = useParty();
   const { pathname } = useLocation();
   // Your ticket is your name here too — the party never asks for one. A read,
@@ -47,6 +56,13 @@ export function PartyBar({ initiallyOpen = false }: { /** Harness pages render t
   const invite = table && pathname !== table.path ? table : null;
   const knock = party.knock ? party.resolveGame(party.knock) : null;
   const lit = inParty && Boolean(invite || knock);
+  // The camera effects without a party: the door sits under the start screen
+  // and under the call doors, and steps aside once a call is on.
+  const soloDoor = soloEffects && (
+    <Link className="party-btn ghost" to={soloEffects.path} onClick={() => setOpen(false)} data-testid="party-solo-effects">
+      <CameraIcon size={18} /> Try the camera effects on your own ›
+    </Link>
+  );
 
   return (
     <aside className="party-root" aria-label="Party">
@@ -142,6 +158,7 @@ export function PartyBar({ initiallyOpen = false }: { /** Harness pages render t
                     <br />
                     <Link to="/privacy" onClick={() => setOpen(false)}>How this keeps you safe →</Link>
                   </p>
+                  {soloDoor}
                 </div>
               )}
             </>
@@ -198,6 +215,7 @@ export function PartyBar({ initiallyOpen = false }: { /** Harness pages render t
                     <CameraIcon size={18} /> Video call
                   </button>
                   <p className="party-hint">Nothing turns on until you tap. Tap the little video window to make it big.</p>
+                  {soloDoor}
                 </>
               ) : (
                 <div className="party-callctl">
