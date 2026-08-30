@@ -85,7 +85,10 @@ export interface PartyValue {
     cameraOn: boolean;
     localStream: MediaStream | null;
     remoteStream: MediaStream | null;
+    /** Voice: the mic goes on, the camera stays off. */
     start: () => void;
+    /** Video: mic and camera together — one tap, no hunting for a camera icon. */
+    startVideo: () => void;
     stop: () => void;
     toggleMute: () => void;
     toggleCamera: () => void;
@@ -362,25 +365,34 @@ export function PartyProvider({
     announcedRef.current = myName;
   }, [myName, inParty]);
 
-  const startCall = useCallback(() => {
-    if (linkRef.current || !code || !role) return;
-    const link = new MediaLink(
-      {
-        onStatus: (s) => {
-          setCallStatus(s);
-          // 'denied'/'error' here is the *initial* mic request failing — tear
-          // down. A later camera-permission refusal keeps the voice call alive
-          // (MediaLink reports that without a fatal status; see setCamera).
-          if (s === 'denied' || s === 'error') stopCall();
+  const beginCall = useCallback(
+    (withCamera: boolean) => {
+      if (linkRef.current || !code || !role) return;
+      const link = new MediaLink(
+        {
+          onStatus: (s) => {
+            setCallStatus(s);
+            // 'denied'/'error' here is the *initial* mic request failing — tear
+            // down. A later camera-permission refusal keeps the voice call alive
+            // (MediaLink reports that without a fatal status; see setCamera).
+            if (s === 'denied' || s === 'error') stopCall();
+          },
+          onLocalStream: setLocalStream,
+          onRemoteStream: setRemoteStream,
         },
-        onLocalStream: setLocalStream,
-        onRemoteStream: setRemoteStream,
-      },
-      'party-call-v1-',
-    );
-    linkRef.current = link;
-    void link.start(code, role, false); // voice first; camera stays OFF
-  }, [code, role, stopCall]);
+        'party-call-v1-',
+      );
+      linkRef.current = link;
+      // The camera is on only if asked for — and only once the link says so
+      // (a refused camera permission leaves a voice call, not a broken one).
+      void link.start(code, role, withCamera).then(() => {
+        if (linkRef.current === link) setCameraOn(link.isCameraOn);
+      });
+    },
+    [code, role, stopCall],
+  );
+  const startCall = useCallback(() => beginCall(false), [beginCall]);
+  const startVideo = useCallback(() => beginCall(true), [beginCall]);
 
   const toggleMute = useCallback(() => setMuted(linkRef.current?.toggleMute() ?? false), []);
 
@@ -430,6 +442,7 @@ export function PartyProvider({
       localStream,
       remoteStream,
       start: startCall,
+      startVideo,
       stop: stopCall,
       toggleMute,
       toggleCamera,

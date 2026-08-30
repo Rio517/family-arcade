@@ -63,6 +63,7 @@ function party(over: Partial<PartyValue> = {}, call: Partial<PartyValue['call']>
       localStream: null,
       remoteStream: null,
       start: noop,
+      startVideo: noop,
       stop: noop,
       toggleMute: noop,
       toggleCamera: noop,
@@ -110,8 +111,8 @@ interface Tile {
   title: string;
   note?: string;
   value: PartyValue;
-  /** 'panel' shows the bar open; 'pill' just the pill; 'video' the floating video. */
-  show: 'panel' | 'pill' | 'video';
+  /** 'panel' shows the bar open; 'pill' just the pill; 'video' the little window; 'call' the big one. */
+  show: 'panel' | 'pill' | 'video' | 'call';
 }
 
 const TILES: { section: string; tiles: Tile[] }[] = [
@@ -170,6 +171,23 @@ const TILES: { section: string; tiles: Tile[] }[] = [
       },
     ],
   },
+  {
+    section: 'The big video call (tap the little window)',
+    tiles: [
+      { title: 'Big call — voice only', note: 'The camera button is right there; no chips yet.', value: withKai('guest', {}, { active: true, status: 'live' }), show: 'call' },
+      {
+        title: 'Big call — video, both cameras',
+        value: withKai('guest', {}, { active: true, status: 'live', cameraOn: true, remoteStream: kaiCam, localStream: myCam }),
+        show: 'call',
+      },
+      {
+        title: 'Big call — wearing the dragon',
+        note: 'Effects are chosen here, looking at yourself.',
+        value: withKai('guest', { effects: ['dragon'] }, { active: true, status: 'live', cameraOn: true, remoteStream: kaiCam, localStream: myCam }),
+        show: 'call',
+      },
+    ],
+  },
 ];
 
 const CSS = `
@@ -186,6 +204,7 @@ const CSS = `
   /* Both live fixed to the viewport in the app; here each sits in its tile. */
   .stage .party-root { position: static; transform: none; }
   .stage .pv { position: relative; right: auto; bottom: auto; }
+  .stage .cv { position: relative; inset: auto; width: 100%; height: 440px; border-radius: 14px; overflow: hidden; }
 `;
 
 createRoot(document.getElementById('root')!).render(
@@ -207,7 +226,11 @@ createRoot(document.getElementById('root')!).render(
                 <p className="note">{t.note ?? ''}</p>
                 <div className="stage">
                   <PartyCtx.Provider value={t.value}>
-                    {t.show === 'video' ? <FloatingVideo /> : <PartyBar initiallyOpen={t.show === 'panel'} />}
+                    {t.show === 'video' || t.show === 'call' ? (
+                      <FloatingVideo initiallyExpanded={t.show === 'call'} />
+                    ) : (
+                      <PartyBar initiallyOpen={t.show === 'panel'} />
+                    )}
                   </PartyCtx.Provider>
                 </div>
               </div>

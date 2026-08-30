@@ -60,6 +60,7 @@ const party: PartyValue = {
     localStream: null,
     remoteStream: null,
     start: noop,
+    startVideo: noop,
     stop: noop,
     toggleMute: noop,
     toggleCamera: noop,
