@@ -9,6 +9,7 @@
  *   /preview-lobbies.html?scene=reconnecting#/racer
  *   /preview-lobbies.html?scene=invite#/         guest; Kai opened Chess elsewhere
  *   /preview-lobbies.html?scene=knock#/          host; Kai knocked on Rainbow Racer
+ *   /preview-lobbies.html?scene=call#/           host; voice and camera on, wearing the dragon
  */
 import { createRoot } from 'react-dom/client';
 import { HashRouter, Route, Routes } from 'react-router-dom';
@@ -47,11 +48,15 @@ const party: PartyValue = {
   knockOn: noop,
   clearKnock: noop,
   resolveGame,
+  effects: scene === 'call' ? ['dragon'] : [],
+  theirEffects: [],
+  setEffects: noop,
   call: {
-    active: false,
-    status: 'idle',
+    // ?scene=call: voice and camera on, so the panel shows the effect chips.
+    active: scene === 'call',
+    status: scene === 'call' ? 'live' : 'idle',
     muted: false,
-    cameraOn: false,
+    cameraOn: scene === 'call',
     localStream: null,
     remoteStream: null,
     start: noop,
@@ -71,7 +76,9 @@ createRoot(document.getElementById('root')!).render(
             element={
               <div className="app" style={{ minHeight: '100dvh' }}>
                 <p className="subtle center" style={{ margin: '24px 0 0' }}>
-                  Harness — the Party bar in a party with Kai ({scene === 'knock' ? 'Kai knocked on Rainbow Racer' : 'Kai opened Chess'}).
+                  Harness — the Party bar in a party with Kai (
+                  {scene === 'knock' ? 'Kai knocked on Rainbow Racer' : scene === 'call' ? 'voice and camera on' : 'Kai opened Chess'}
+                  ).
                 </p>
               </div>
             }

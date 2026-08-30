@@ -36,7 +36,17 @@ export interface PartyTableClosed {
   t: 'table-closed';
 }
 
-export type PartyMsg = PartyHello | PartyTable | PartyKnock | PartyTableClosed;
+/**
+ * What this device is wearing on its video (ADR 0010): effect ids, as
+ * strings on the wire — the receiver keeps the ones it knows and draws them
+ * on the friend's video itself. The stream is never touched.
+ */
+export interface PartyEffects {
+  t: 'effects';
+  effects: string[];
+}
+
+export type PartyMsg = PartyHello | PartyTable | PartyKnock | PartyTableClosed | PartyEffects;
 
 // Names are truncated to a short display length downstream. Reject anything far
 // longer than any real name here so a peer with the code can't push a giant
@@ -45,6 +55,9 @@ export type PartyMsg = PartyHello | PartyTable | PartyKnock | PartyTableClosed;
 const MAX_NAME_LEN = 100;
 const MAX_GAME_LEN = 32;
 const MAX_SIDE_LEN = 8;
+// A handful of effects at most; the catalogue has two. Ids are short slugs.
+const MAX_EFFECTS = 8;
+const MAX_EFFECT_LEN = 32;
 
 function boundedString(v: unknown, max: number): v is string {
   return typeof v === 'string' && v.length > 0 && v.length <= max;
@@ -72,6 +85,12 @@ export function isPartyMsg(value: unknown): value is PartyMsg {
       return boundedString(m.game, MAX_GAME_LEN);
     case 'table-closed':
       return true;
+    case 'effects':
+      return (
+        Array.isArray(m.effects) &&
+        m.effects.length <= MAX_EFFECTS &&
+        m.effects.every((e) => boundedString(e, MAX_EFFECT_LEN))
+      );
     default:
       return false;
   }

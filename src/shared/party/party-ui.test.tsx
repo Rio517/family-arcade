@@ -9,6 +9,13 @@ import { fakeParty } from './testing';
 // A controllable useParty so we can render each party state without a network.
 const mockParty = vi.hoisted(() => ({ value: null as any }));
 vi.mock('./PartyContext', () => ({ useParty: () => mockParty.value }));
+// The overlay is three.js + MediaPipe behind a lazy import — jsdom can run
+// neither. A stub that says which video it sits on and what it wears is the
+// contract these tests care about.
+vi.mock('@shared/effects/EffectsOverlay', () => ({
+  EffectsOverlay: ({ video, effects }: { video: HTMLVideoElement | null; effects: string[] }) =>
+    video && effects.length > 0 ? <div data-testid="fx" data-effects={effects.join(',')} /> : null,
+}));
 
 import { PartyBar } from './PartyBar';
 import { FloatingVideo } from './FloatingVideo';
@@ -130,6 +137,38 @@ describe('PartyBar', () => {
     expect(screen.getByRole('dialog', { name: 'Party' })).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Party' })).toBeNull();
+  });
+
+  describe('camera effects in the panel', () => {
+    const inCall = (over: Partial<PartyValue> = {}, cameraOn = true) =>
+      makeParty({
+        inParty: true,
+        status: 'connected',
+        role: 'host',
+        theirName: 'Kai',
+        call: { ...makeParty().call, active: true, status: 'live', cameraOn },
+        ...over,
+      });
+
+    it('with the camera on, the effects are chips you can wear and take off', () => {
+      mockParty.value = inCall({ effects: ['dragon'] });
+      renderBar();
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.getByTestId('party-effect-dragon')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('party-effect-peace')).toHaveAttribute('aria-pressed', 'false');
+      fireEvent.click(screen.getByTestId('party-effect-peace'));
+      expect(mockParty.value.setEffects).toHaveBeenLastCalledWith(['dragon', 'peace']);
+      fireEvent.click(screen.getByTestId('party-effect-dragon'));
+      expect(mockParty.value.setEffects).toHaveBeenLastCalledWith([]);
+    });
+
+    it('with the camera off there are no chips, just the hint', () => {
+      mockParty.value = inCall({}, false);
+      renderBar();
+      fireEvent.click(screen.getByTestId('party-pill'));
+      expect(screen.queryByTestId('party-effect-dragon')).toBeNull();
+      expect(screen.getByTestId('party-effects-hint')).toBeInTheDocument();
+    });
   });
 
   describe('the pill lights up', () => {
@@ -336,6 +375,34 @@ describe('FloatingVideo', () => {
       firePointer(card, 'pointerdown', { pointerId: 1, clientX: 100, clientY: 100 });
       firePointer(card, 'pointermove', { pointerId: 1, clientX: 140, clientY: 140, buttons: 0 });
       expect(card.style.left).toBe('');
+    });
+  });
+
+  describe('camera effects ride on the video', () => {
+    const fakeStream = (video: boolean) =>
+      ({ getVideoTracks: () => (video ? [{}] : []), getAudioTracks: () => [] }) as unknown as MediaStream;
+
+    it("draws the friend's effects on their video and mine on my preview", () => {
+      mockParty.value = makeParty({
+        theirName: 'Kai',
+        effects: ['dragon'],
+        theirEffects: ['peace'],
+        call: { ...makeParty().call, active: true, status: 'live', cameraOn: true, remoteStream: fakeStream(true) },
+      });
+      render(<FloatingVideo />);
+      const fx = screen.getAllByTestId('fx').map((el) => el.getAttribute('data-effects'));
+      expect(fx).toEqual(['peace', 'dragon']);
+    });
+
+    it('draws nothing when nobody wears anything, or the friend has no video', () => {
+      mockParty.value = makeParty({
+        theirName: 'Kai',
+        effects: [],
+        theirEffects: ['peace'],
+        call: { ...makeParty().call, active: true, status: 'live', cameraOn: true, remoteStream: fakeStream(false) },
+      });
+      render(<FloatingVideo />);
+      expect(screen.queryAllByTestId('fx')).toHaveLength(0);
     });
   });
 

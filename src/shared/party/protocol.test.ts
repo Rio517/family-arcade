@@ -40,6 +40,18 @@ describe('isPartyMsg', () => {
     });
   });
 
+  it('accepts a short list of effect ids and bounds it — the app decides which it knows', () => {
+    expect(isPartyMsg({ t: 'effects', effects: [] })).toBe(true);
+    expect(isPartyMsg({ t: 'effects', effects: ['dragon', 'peace'] })).toBe(true);
+    expect(isPartyMsg({ t: 'effects', effects: ['laser-eyes'] })).toBe(true);
+    expect(isPartyMsg({ t: 'effects' })).toBe(false);
+    expect(isPartyMsg({ t: 'effects', effects: 'dragon' })).toBe(false);
+    expect(isPartyMsg({ t: 'effects', effects: [7] })).toBe(false);
+    expect(isPartyMsg({ t: 'effects', effects: [''] })).toBe(false);
+    expect(isPartyMsg({ t: 'effects', effects: ['x'.repeat(33)] })).toBe(false);
+    expect(isPartyMsg({ t: 'effects', effects: Array.from({ length: 9 }, () => 'dragon') })).toBe(false);
+  });
+
   it('accepts a knock on a game and a closed table', () => {
     expect(isPartyMsg({ t: 'knock', game: 'racer' })).toBe(true);
     expect(isPartyMsg({ t: 'knock', game: '' })).toBe(false);

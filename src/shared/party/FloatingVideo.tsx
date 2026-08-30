@@ -5,7 +5,8 @@
  * Mounted above the router, so it survives moving between games — including two
  * DIFFERENT games at once. Only appears once the call is on (video is opt-in).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { EffectsOverlay } from '@shared/effects/EffectsOverlay';
 import { ClockIcon, PersonIcon, SpeakerIcon } from '@shared/ui/icons';
 import { useParty } from './PartyContext';
 
@@ -27,9 +28,22 @@ function clampToViewport(x: number, y: number): { x: number; y: number } {
 }
 
 export function FloatingVideo() {
-  const { call, theirName } = useParty();
+  const { call, theirName, effects, theirEffects } = useParty();
+  // Each video element is held twice: a ref for the stream plumbing (written
+  // in effects), and state for the effects overlay, which needs the actual
+  // element to hand to its tracker — a callback ref fills both.
   const localRef = useRef<HTMLVideoElement | null>(null);
   const remoteRef = useRef<HTMLVideoElement | null>(null);
+  const [localEl, setLocalEl] = useState<HTMLVideoElement | null>(null);
+  const [remoteEl, setRemoteEl] = useState<HTMLVideoElement | null>(null);
+  const attachLocal = useCallback((el: HTMLVideoElement | null) => {
+    localRef.current = el;
+    setLocalEl(el);
+  }, []);
+  const attachRemote = useCallback((el: HTMLVideoElement | null) => {
+    remoteRef.current = el;
+    setRemoteEl(el);
+  }, []);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   // The active grab: which pointer, where inside the card it grabbed (so
@@ -48,11 +62,11 @@ export function FloatingVideo() {
 
   useEffect(() => {
     if (localRef.current) localRef.current.srcObject = call.localStream;
-  }, [call.localStream, call.cameraOn]);
+  }, [localEl, call.localStream, call.cameraOn]);
   useEffect(() => {
     if (remoteRef.current) remoteRef.current.srcObject = call.remoteStream;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = call.remoteStream;
-  }, [call.remoteStream, remoteHasVideo]);
+  }, [remoteEl, call.remoteStream, remoteHasVideo]);
 
   // If the window shrinks, pull a dragged card back into view.
   useEffect(() => {
@@ -140,8 +154,13 @@ export function FloatingVideo() {
           // No <track>: this is a live peer-to-peer camera feed, not recorded
           // media — there is no caption file to point at, and we do no
           // speech-to-text (everything stays on-device by design).
-          // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video ref={remoteRef} autoPlay playsInline className="pv-video" data-testid="pv-remote-video" />
+          <div className="pv-feed">
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video ref={attachRemote} autoPlay playsInline className="pv-video" data-testid="pv-remote-video" />
+            {/* The friend's effects, drawn here on their video (ADR 0010: the
+                stream itself is never touched). The avatar has no face to track. */}
+            <EffectsOverlay video={remoteEl} effects={theirEffects} />
+          </div>
         ) : (
           <div className="pv-avatar">
             {call.status === 'live' ? <PersonIcon size={34} /> : <ClockIcon size={30} />}
@@ -149,7 +168,13 @@ export function FloatingVideo() {
         )}
         {/* eslint-disable-next-line jsx-a11y/media-has-caption -- live peer audio, no caption file exists */}
         <audio ref={remoteAudioRef} autoPlay />
-        {call.cameraOn && <video ref={localRef} autoPlay playsInline muted className="pv-self" />}
+        {call.cameraOn && (
+          <div className="pv-self-wrap">
+            <video ref={attachLocal} autoPlay playsInline muted className="pv-self" />
+            {/* Mine, on my own preview, so I can see what the friend sees. */}
+            <EffectsOverlay video={localEl} effects={effects} />
+          </div>
+        )}
         <span className="pv-label">
           {call.status !== 'live' ? (
             'Connecting…'

@@ -30,6 +30,9 @@ export function fakeParty(over: Partial<PartyValue> = {}): PartyValue {
     knockOn: vi.fn(),
     clearKnock: vi.fn(),
     resolveGame: vi.fn(() => null),
+    effects: [],
+    theirEffects: [],
+    setEffects: vi.fn(),
     call: {
       active: false,
       status: 'idle',
