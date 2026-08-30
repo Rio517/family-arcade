@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import type { GamePreview } from '@shared/game';
 import { BotIcon, GridIcon, PersonIcon, ResumeIcon } from '@shared/ui/icons';
+import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { GAMES } from './registry';
 import { PlayerBooth } from './PlayerBooth';
+import yahtzeePreview from './assets/yahtzee-preview.webp';
 
 /**
  * The landing page — the Kny-Flores Family Arcade as a midnight carnival:
@@ -35,8 +39,8 @@ function BulbString({ count }: { count: number }) {
   );
 }
 
-/** One game ticket: awning strip, glyph, name, blurb. */
-function Ticket({ title, sub, tag, releaseStatus, players, seats, computer, children }: {
+/** What a ticket's face says: the same for a registry game and for Yahtzee. */
+interface TicketFace {
   title: string;
   sub: string;
   tag?: string;
@@ -46,7 +50,10 @@ function Ticket({ title, sub, tag, releaseStatus, players, seats, computer, chil
   seats: { min: number; max: number };
   computer?: boolean;
   children: React.ReactNode;
-}) {
+}
+
+/** One game ticket's face: awning strip, glyph, name, blurb. */
+function Ticket({ title, sub, tag, releaseStatus, players, seats, computer, children }: TicketFace) {
   const count = players.min === players.max ? String(players.min) : `${players.min}–${players.max}`;
   const playersLabel =
     players.min === players.max
@@ -88,10 +95,89 @@ function Ticket({ title, sub, tag, releaseStatus, players, seats, computer, chil
   );
 }
 
+/**
+ * A ticket with a poster behind it. Tap the face and the ticket opens in
+ * place — a picture of the game, three facts, two lines that say what it's
+ * like, and Play — so anyone can look at a game before playing it. One
+ * ticket is open at a time; tap it again (or Escape) to fold it.
+ */
+function GameTicket({
+  id,
+  play,
+  preview,
+  open,
+  onToggle,
+  children,
+  ...face
+}: TicketFace & {
+  id: string;
+  /** Where Play goes: a route, or a plain page (Yahtzee's calculator). */
+  play: { to: string } | { href: string };
+  preview?: GamePreview;
+  open: boolean;
+  onToggle: (id: string) => void;
+}) {
+  const facts = preview?.facts ?? [];
+  const blurb = preview?.blurb ?? face.sub;
+  const posterId = `poster-${id}`;
+  return (
+    <article
+      className={`tk game-${id}${open ? ' open' : ''}`}
+      data-testid={`game-ticket-${id}`}
+      data-release-status={face.releaseStatus}
+    >
+      <button
+        type="button"
+        className="tk-face"
+        aria-expanded={open}
+        aria-controls={posterId}
+        onClick={() => onToggle(id)}
+        data-testid={`ticket-open-${id}`}
+      >
+        <Ticket {...face}>{children}</Ticket>
+      </button>
+      {open && (
+        <div className="tk-poster" id={posterId} data-testid={`ticket-poster-${id}`}>
+          {preview && (
+            <img className="tk-strip" src={preview.image} alt={`${face.title} — a look at the game`} width={640} height={360} />
+          )}
+          {facts.length > 0 && (
+            <ul className="tk-facts">
+              {facts.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          )}
+          <p className="tk-blurb">{blurb}</p>
+          {'to' in play ? (
+            <Link className="tk-play" to={play.to} data-testid={`game-play-${id}`}>
+              Play {face.title} ›
+            </Link>
+          ) : (
+            <a className="tk-play" href={play.href} data-testid={`game-play-${id}`}>
+              Play {face.title} ›
+            </a>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+const YAHTZEE_PREVIEW: GamePreview = {
+  image: yahtzeePreview,
+  facts: ['1 player', 'Real dice, this iPad keeps score', 'About 10 min'],
+  blurb: 'Roll real dice at the table and tap to log the scorecard — it adds up the bonuses for you. Works offline.',
+};
+
 export function Menu() {
   // Every resumable game across the arcade, in registry order — each game
   // reports its own saves through the `savedGames` hook on its descriptor.
   const saved = GAMES.flatMap((game) => game.savedGames?.() ?? []);
+  // The one ticket open to its poster, if any.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const toggle = (id: string) => setOpenId((cur) => (cur === id ? null : id));
+  useDismissOnEscape(openId !== null, () => setOpenId(null));
 
   return (
     <div className="app arcade">
@@ -118,38 +204,39 @@ export function Menu() {
         </header>
 
         <nav className="tix" aria-label="Games">
-          <a className="tk game-yahtzee" href={`${import.meta.env.BASE_URL}calculator.html`}>
-            <Ticket
-              title="Yahtzee"
-              sub="Roll real dice — tap to log the scorecard. Works offline."
-              tag="Solo+"
-              players={{ min: 1, max: 1 }}
-              seats={{ min: 1, max: 1 }}
-            >
-              <GridIcon size={30} />
-            </Ticket>
-          </a>
+          <GameTicket
+            id="yahtzee"
+            title="Yahtzee"
+            sub="Roll real dice — tap to log the scorecard. Works offline."
+            tag="Solo+"
+            players={{ min: 1, max: 1 }}
+            seats={{ min: 1, max: 1 }}
+            preview={YAHTZEE_PREVIEW}
+            play={{ href: `${import.meta.env.BASE_URL}calculator.html` }}
+            open={openId === 'yahtzee'}
+            onToggle={toggle}
+          >
+            <GridIcon size={30} />
+          </GameTicket>
 
           {GAMES.map((game) => (
-            <Link
+            <GameTicket
               key={game.id}
-              className={`tk game-${game.id}`}
-              to={game.path}
-              data-testid={`game-ticket-${game.id}`}
-              data-release-status={game.releaseStatus}
+              id={game.id}
+              title={game.title}
+              sub={game.description}
+              tag={game.tag}
+              releaseStatus={game.releaseStatus}
+              players={game.players}
+              seats={game.seats}
+              computer={game.computer}
+              preview={game.preview}
+              play={{ to: game.path }}
+              open={openId === game.id}
+              onToggle={toggle}
             >
-              <Ticket
-                title={game.title}
-                sub={game.description}
-                tag={game.tag}
-                releaseStatus={game.releaseStatus}
-                players={game.players}
-                seats={game.seats}
-                computer={game.computer}
-              >
-                <game.Icon size={30} />
-              </Ticket>
-            </Link>
+              <game.Icon size={30} />
+            </GameTicket>
           ))}
         </nav>
 

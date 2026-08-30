@@ -1,4 +1,5 @@
 import type { GameDescriptor, SavedGameSummary } from '@shared/game';
+import preview from './assets/preview.webp';
 import { ChessIcon } from '@shared/ui/icons';
 import { ChessPage } from './components/ChessPage';
 import { loadLocalChessGame, loadResumableChessGame } from './storage/chessPersistence';
@@ -38,6 +39,12 @@ export const chess: GameDescriptor = {
   players: { min: 1, max: 2 },
   seats: { min: 1, max: 2 },
   path: '/chess',
+  preview: {
+    image: preview,
+    facts: ['1–2 players', 'One iPad or two', 'About 15 min'],
+    blurb:
+      'Real chess in three worlds — the War Room, the Cloud Kingdom, or the Galaxy. Pass one iPad, or play a friend on theirs; the party seats you both. Free play sets up any puzzle.',
+  },
   description: 'Drag-and-drop chess — same device or online with a code.',
   Icon: ChessIcon,
   Page: ChessPage,

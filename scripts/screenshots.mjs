@@ -49,6 +49,29 @@ const SHOTS = [
     fullPage: true,
   },
   {
+    // A ticket opened to its poster: picture, facts, blurb, Play.
+    name: 'arcade-ticket-open',
+    path: '/',
+    viewport: TABLET,
+    fullPage: true,
+    prep: async (page) => {
+      await page.getByTestId('ticket-open-chess').click();
+      await page.getByTestId('ticket-poster-chess').waitFor();
+      await page.waitForTimeout(400);
+    },
+  },
+  {
+    name: 'arcade-ticket-open-phone',
+    path: '/',
+    viewport: PHONE,
+    prep: async (page) => {
+      await page.getByTestId('ticket-open-racer').click();
+      await page.getByTestId('ticket-poster-racer').waitFor();
+      await page.getByTestId('ticket-poster-racer').scrollIntoViewIfNeeded();
+      await page.waitForTimeout(400);
+    },
+  },
+  {
     name: 'privacy',
     path: '/privacy',
     viewport: TABLET,

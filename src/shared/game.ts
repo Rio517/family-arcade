@@ -28,6 +28,15 @@ export interface SavedGameSummary {
   meta: string;
 }
 
+export interface GamePreview {
+  /** A bundled image URL (Vite import of a webp), 16:9. */
+  image: string;
+  /** Short chips, e.g. "One iPad or two", "About 15 min", "Party-ready". */
+  facts: string[];
+  /** Two lines that say what the game is like. */
+  blurb: string;
+}
+
 export interface GameDescriptor {
   /** Stable id. */
   id: string;
@@ -50,6 +59,13 @@ export interface GameDescriptor {
   path: string;
   /** One-line menu blurb. */
   description: string;
+  /**
+   * The poster behind the ticket: what a player sees when they open the
+   * ticket to look before playing. `image` is a bundled webp (made by
+   * `npm run previews`), `facts` three short chips (who, where, how long),
+   * `blurb` two lines that sell the game.
+   */
+  preview?: GamePreview;
   /** Menu icon. */
   Icon: ComponentType<{ size?: number }>;
   /** The full-screen game page. */
