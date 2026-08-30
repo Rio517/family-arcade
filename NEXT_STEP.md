@@ -24,11 +24,13 @@ Sorted by likely value. Nothing here blocks anything else.
   / *Video call* doors in the panel; tap the little window for a full-screen
   call; the camera effects (Magic Mirror's, ADR 0010) live only there.
   `preview-party-states.html` is the gallery of every party state — serve
-  it with `vite preview --host` to look on another device. Open: the effect
-  chips are two small copies (Mirror page, big call); Mario asked how to
-  reach "solo mode" — the Magic Mirror ticket is last on the landing page
-  with an under-construction badge; confirm that is what he meant, or add a
-  "just me" door into the big call.
+  it with `vite preview --host` to look on another device — and for camera
+  things (the mirror, the call) put it behind Tailscale HTTPS: a plain
+  static server on 4322 plus `tailscale serve --bg 4322` (vite preview
+  answers 403 behind that proxy). The party panel has a door to the Magic
+  Mirror — *Try the effects on your own* (#143) — because people look for
+  solo effects where the camera lives. Open: the effect chips are two small
+  copies (Mirror page, big call).
 
 - **One ticket, every game — phases 3–4.** The design and the phase list live
   in `docs/planning/players-and-party.md`. Shipped 2026-08-29: Phase 1 (no
