@@ -60,7 +60,7 @@ export function PartyBar({
   // and under the call doors, and steps aside once a call is on.
   const soloDoor = soloEffects && (
     <Link className="party-btn ghost" to={soloEffects.path} onClick={() => setOpen(false)} data-testid="party-solo-effects">
-      <CameraIcon size={18} /> Try the camera effects on your own ›
+      <CameraIcon size={18} /> Try the effects on your own ›
     </Link>
   );
 
