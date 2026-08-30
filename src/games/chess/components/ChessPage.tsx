@@ -503,7 +503,7 @@ export function ChessPage() {
               <>
                 {/* The friend's name arrives with their hello — a beat after the link. */}
                 <h2>Play with {party.theirName ?? 'your friend'}</h2>
-                <div className="row-actions" role="group" aria-label="Your colour">
+                <div className="row-actions chess-sides" role="group" aria-label="Your colour">
                   <button
                     className={`btn${hostSide === 'w' ? ' btn-primary' : ''}`}
                     aria-pressed={hostSide === 'w'}

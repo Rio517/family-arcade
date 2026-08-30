@@ -625,3 +625,11 @@ body:has(.chess-immersive) .party-root {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 6px 14px;
 }
+
+/* The party host's colour pick: White, Black, or the coin — three across on a
+   tablet; on a phone the coin takes a full row under the two colours. */
+.chess-sides { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 480px) {
+  .chess-sides { grid-template-columns: 1fr 1fr; }
+  .chess-sides > :last-child { grid-column: span 2; }
+}
