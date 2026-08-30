@@ -155,24 +155,21 @@ describe('PartyBar', () => {
         ...over,
       });
 
-    it('with the camera on, the effects are chips you can wear and take off', () => {
+    it('the panel is about the party — the effects live in the expanded video, not here', () => {
       mockParty.value = inCall({ effects: ['dragon'] });
       renderBar();
       fireEvent.click(screen.getByTestId('party-pill'));
-      expect(screen.getByTestId('party-effect-dragon')).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.getByTestId('party-effect-peace')).toHaveAttribute('aria-pressed', 'false');
-      fireEvent.click(screen.getByTestId('party-effect-peace'));
-      expect(mockParty.value.setEffects).toHaveBeenLastCalledWith(['dragon', 'peace']);
-      fireEvent.click(screen.getByTestId('party-effect-dragon'));
-      expect(mockParty.value.setEffects).toHaveBeenLastCalledWith([]);
+      expect(screen.queryByTestId('party-effect-dragon')).toBeNull();
+      expect(screen.queryByTestId('party-effects-hint')).toBeNull();
+      // The call controls are still here.
+      expect(screen.getByTestId('party-camera')).toBeInTheDocument();
     });
 
-    it('with the camera off there are no chips, just the hint', () => {
+    it('with the camera off, likewise no chips', () => {
       mockParty.value = inCall({}, false);
       renderBar();
       fireEvent.click(screen.getByTestId('party-pill'));
       expect(screen.queryByTestId('party-effect-dragon')).toBeNull();
-      expect(screen.getByTestId('party-effects-hint')).toBeInTheDocument();
     });
   });
 
@@ -273,6 +270,15 @@ describe('PartyBar', () => {
     expect(mockParty.value.call.start).toHaveBeenCalled();
     // no camera control until the call is active
     expect(screen.queryByTestId('party-camera')).toBeNull();
+  });
+
+  it('offers a video call as plainly as a voice call — no hunting for a camera icon', () => {
+    mockParty.value = makeParty({ inParty: true, status: 'connected', theirName: 'Kai', role: 'host', code: 'ABCD' });
+    renderBar();
+    fireEvent.click(screen.getByTestId('party-pill'));
+    fireEvent.click(screen.getByTestId('party-video-start'));
+    expect(mockParty.value.call.startVideo).toHaveBeenCalledTimes(1);
+    expect(mockParty.value.call.start).not.toHaveBeenCalled();
   });
 
   it('shows labelled mute/camera/end controls during a live call', () => {
@@ -380,6 +386,85 @@ describe('FloatingVideo', () => {
       firePointer(card, 'pointerdown', { pointerId: 1, clientX: 100, clientY: 100 });
       firePointer(card, 'pointermove', { pointerId: 1, clientX: 140, clientY: 140, buttons: 0 });
       expect(card.style.left).toBe('');
+    });
+  });
+
+  describe('tap to expand — a normal video call', () => {
+    const live = (over: Partial<PartyValue> = {}, call: Partial<PartyValue['call']> = {}) =>
+      makeParty({ theirName: 'Kai', effects: [], ...over, call: { ...makeParty().call, active: true, status: 'live', ...call } });
+
+    function press(el: Element, type: 'pointerdown' | 'pointermove' | 'pointerup', x: number, y: number) {
+      const ev = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, buttons: 1 });
+      Object.assign(ev, { pointerId: 1 });
+      fireEvent(el, ev);
+    }
+
+    it('a tap on the little window opens the big one; a drag does not', () => {
+      mockParty.value = live();
+      render(<FloatingVideo />);
+      const card = screen.getByTestId('party-floating-video');
+      // A drag: crosses the threshold, then releases — still the little window.
+      const face = screen.getByTestId('party-video-expand');
+      press(card, 'pointerdown', 100, 100);
+      press(card, 'pointermove', 140, 140);
+      press(card, 'pointerup', 140, 140);
+      fireEvent.click(face);
+      expect(screen.queryByTestId('call-view')).toBeNull();
+      // A tap: press and release in place.
+      press(card, 'pointerdown', 100, 100);
+      press(card, 'pointerup', 101, 101);
+      fireEvent.click(face);
+      expect(screen.getByRole('dialog', { name: 'Video call with Kai' })).toBeInTheDocument();
+      expect(screen.getByTestId('call-view')).toBeInTheDocument();
+    });
+
+    it('the big window has the call controls, minimizes, and closes on Escape', () => {
+      mockParty.value = live();
+      render(<FloatingVideo />);
+      fireEvent.click(screen.getByTestId('party-video-expand'));
+      for (const id of ['call-view-mute', 'call-view-camera', 'call-view-end', 'call-view-minimize']) {
+        expect(screen.getByTestId(id)).toHaveAttribute('aria-label');
+      }
+      fireEvent.click(screen.getByTestId('call-view-minimize'));
+      expect(screen.queryByTestId('call-view')).toBeNull();
+      expect(screen.getByTestId('party-floating-video')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('party-video-expand'));
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByTestId('call-view')).toBeNull();
+    });
+
+    it('with your camera on, the effects are chips in the big window — worn while you look at yourself', () => {
+      mockParty.value = live({ effects: ['dragon'] }, { cameraOn: true });
+      render(<FloatingVideo />);
+      fireEvent.click(screen.getByTestId('party-video-expand'));
+      expect(screen.getByTestId('call-effect-dragon')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('call-effect-peace')).toHaveAttribute('aria-pressed', 'false');
+      fireEvent.click(screen.getByTestId('call-effect-peace'));
+      expect(mockParty.value.setEffects).toHaveBeenLastCalledWith(['dragon', 'peace']);
+      fireEvent.click(screen.getByTestId('call-effect-dragon'));
+      expect(mockParty.value.setEffects).toHaveBeenLastCalledWith([]);
+    });
+
+    it('with your camera off, the big window offers the camera instead of chips', () => {
+      mockParty.value = live({}, { cameraOn: false });
+      render(<FloatingVideo />);
+      fireEvent.click(screen.getByTestId('party-video-expand'));
+      expect(screen.queryByTestId('call-effect-dragon')).toBeNull();
+      expect(screen.getByTestId('call-effects-hint')).toBeInTheDocument();
+    });
+
+    it('ending the call from the big window closes it', () => {
+      mockParty.value = live();
+      const r = render(<FloatingVideo />);
+      fireEvent.click(screen.getByTestId('party-video-expand'));
+      fireEvent.click(screen.getByTestId('call-view-end'));
+      expect(mockParty.value.call.stop).toHaveBeenCalledTimes(1);
+      // The call is over: nothing left on screen.
+      mockParty.value = makeParty();
+      r.rerender(<FloatingVideo />);
+      expect(screen.queryByTestId('call-view')).toBeNull();
+      expect(screen.queryByTestId('party-floating-video')).toBeNull();
     });
   });
 

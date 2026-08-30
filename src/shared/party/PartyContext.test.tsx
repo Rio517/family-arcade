@@ -63,6 +63,36 @@ vi.mock('@shared/net/peer', async (importOriginal) => {
   return { ...actual, GameConnection: FakeLink };
 });
 
+// The call's media link, stood in for: records how it was started (jsdom has
+// no camera to ask). Hoisted for the same reason as the game link above.
+const { media, FakeMediaLink } = vi.hoisted(() => {
+  class FakeMediaLink {
+    started: { code: string; role: string; withCamera: boolean } | null = null;
+    isCameraOn = false;
+    constructor(public handlers: { onStatus: (s: string) => void }) {
+      media.all.push(this);
+    }
+    async start(code: string, role: string, withCamera = false) {
+      this.started = { code, role, withCamera };
+      this.isCameraOn = withCamera;
+      this.handlers.onStatus('live');
+    }
+    async setCamera(on: boolean) {
+      this.isCameraOn = on;
+    }
+    toggleMute() {
+      return false;
+    }
+    destroy() {}
+  }
+  const media = { all: [] as FakeMediaLink[] };
+  return { media, FakeMediaLink };
+});
+vi.mock('@shared/net/media', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@shared/net/media')>();
+  return { ...actual, MediaLink: FakeMediaLink };
+});
+
 // The provider is imported after the mock is in place.
 import { PartyProvider, useParty } from './PartyContext';
 
@@ -159,6 +189,22 @@ describe('<PartyProvider>', () => {
     act(() => link().connect());
     expect(party.call.active).toBe(false);
     expect(party.call.status).toBe('idle');
+    expect(media.all).toHaveLength(0);
+  });
+
+  it('a voice call starts with the camera off; a video call starts with it on', async () => {
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => void party.hostParty());
+    act(() => link().connect());
+    await act(async () => party.call.start());
+    expect(media.all.at(-1)?.started).toMatchObject({ role: 'host', withCamera: false });
+    expect(party.call.cameraOn).toBe(false);
+    act(() => party.call.stop());
+
+    await act(async () => party.call.startVideo());
+    expect(media.all.at(-1)?.started).toMatchObject({ role: 'host', withCamera: true });
+    expect(party.call.active).toBe(true);
+    expect(party.call.cameraOn).toBe(true);
   });
 });
 

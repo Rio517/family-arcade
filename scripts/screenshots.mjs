@@ -280,14 +280,15 @@ const SHOTS = [
     },
   },
   {
-    // In a call with the camera on: the effect chips in the panel (the
-    // harness mounts the bar alone — no floating video, no streams).
+    // The big video call with the camera on, wearing the dragon: the effect
+    // chips live here (one tile of the party-states gallery).
     name: 'party-effects',
-    path: '/preview-lobbies.html?scene=call#/',
-    viewport: PHONE,
+    path: '/preview-party-states.html',
+    viewport: { width: 1400, height: 1000 },
+    selector: '[data-testid="state-Big call — wearing the dragon"]',
     prep: async (page) => {
-      await page.getByTestId('party-pill').click();
-      await page.getByTestId('party-effect-dragon').waitFor();
+      await page.getByTestId('call-effect-dragon').first().waitFor();
+      await page.waitForTimeout(600);
     },
   },
   {

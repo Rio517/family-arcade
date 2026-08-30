@@ -182,6 +182,30 @@
 .party-cbtn.end { background: var(--bad, #f87171); }
 .party-cbtn:focus-visible { outline: 3px solid var(--accent, #22d3ee); outline-offset: 2px; }
 
+/* ---- the big video call ---- */
+.cv {
+  position: fixed; inset: 0; z-index: 45;
+  background: #06090f; color: var(--text, #f1f5f9);
+  display: grid; grid-template-rows: auto 1fr auto;
+}
+.cv-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+}
+.cv-name { font-weight: 800; font-size: 16px; }
+.cv-stage { position: relative; overflow: hidden; background: #0b1220; display: grid; place-items: center; }
+.cv-stage .pv-feed { position: absolute; inset: 0; }
+.cv-stage .pv-avatar { color: var(--muted, #94a3b8); }
+.cv-stage .pv-avatar svg { width: 96px; height: 96px; }
+/* The self-view grows with the window: still a corner, still mirrored. */
+.pv-self-wrap.cv-self { width: 132px; height: 99px; right: 14px; bottom: 14px; border-radius: 12px; }
+.cv-bar {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 14px 14px max(16px, env(safe-area-inset-bottom));
+}
+.cv-bar .party-cbtn { width: 54px; height: 54px; }
+.cv-hint { margin: 0; text-align: center; }
+
 /* ---- floating video (PiP) ---- */
 .pv {
   position: fixed;
@@ -207,7 +231,10 @@
   background: #0b1220;
   display: grid;
   place-items: center;
+  /* It is a button (tap: make the video big) wearing the window's face. */
+  padding: 0; border: 0; font: inherit; color: inherit; cursor: pointer; text-align: inherit;
 }
+.pv-remote:focus-visible { outline: 3px solid var(--accent, #22d3ee); outline-offset: 2px; }
 /* Each feed is a flipped box holding the video AND its effects canvas, so the
    mirror flip applies to both (ADR 0010: the overlay never touches the stream). */
 .pv-feed { position: absolute; inset: 0; transform: scaleX(-1); }

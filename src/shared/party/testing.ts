@@ -41,6 +41,7 @@ export function fakeParty(over: Partial<PartyValue> = {}): PartyValue {
       localStream: null,
       remoteStream: null,
       start: vi.fn(),
+      startVideo: vi.fn(),
       stop: vi.fn(),
       toggleMute: vi.fn(),
       toggleCamera: vi.fn(),

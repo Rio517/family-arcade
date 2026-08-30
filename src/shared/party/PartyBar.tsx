@@ -13,7 +13,6 @@ import { initialOf } from '@shared/profile/tickets';
 import { useProfile } from '@shared/profile/useProfile';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { CameraIcon, ChevronDownIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
-import { EFFECTS } from '@shared/effects/effects';
 import { useParty } from './PartyContext';
 import './party.css';
 
@@ -190,10 +189,15 @@ export function PartyBar({ initiallyOpen = false }: { /** Harness pages render t
 
               {!call.active ? (
                 <>
+                  {/* Two plain doors: voice, or voice and camera together.
+                      Nothing is on until you tap one of them. */}
                   <button className="party-btn primary" onClick={call.start} data-testid="party-call-start">
-                    <MicIcon size={18} /> Turn on voice
+                    <MicIcon size={18} /> Voice call
                   </button>
-                  <p className="party-hint">Your camera stays off until you turn it on.</p>
+                  <button className="party-btn violet" onClick={call.startVideo} data-testid="party-video-start">
+                    <CameraIcon size={18} /> Video call
+                  </button>
+                  <p className="party-hint">Nothing turns on until you tap. Tap the little video window to make it big.</p>
                 </>
               ) : (
                 <div className="party-callctl">
@@ -218,34 +222,6 @@ export function PartyBar({ initiallyOpen = false }: { /** Harness pages render t
                   </button>
                 </div>
               )}
-              {/* Camera effects (ADR 0010): chips you wear on your own video;
-                  the friend's device draws them on your stream. They need a
-                  camera to sit on. */}
-              {call.active &&
-                (call.cameraOn ? (
-                  <div className="party-chips" role="group" aria-label="Camera effects">
-                    {EFFECTS.map(({ id, name, Icon }) => {
-                      const on = party.effects.includes(id);
-                      return (
-                        <button
-                          key={id}
-                          className="party-chip"
-                          aria-pressed={on}
-                          onClick={() =>
-                            party.setEffects(on ? party.effects.filter((e) => e !== id) : [...party.effects, id])
-                          }
-                          data-testid={`party-effect-${id}`}
-                        >
-                          <Icon size={18} /> {name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="party-hint" data-testid="party-effects-hint">
-                    Turn your camera on to wear the dragon or the rainbow magic.
-                  </p>
-                ))}
 
               <button className="party-btn ghost" onClick={leave} data-testid="party-leave">
                 Leave party
