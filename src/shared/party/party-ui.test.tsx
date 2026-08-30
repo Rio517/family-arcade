@@ -107,6 +107,11 @@ describe('PartyBar', () => {
     expect(screen.getByTestId('party-code')).toHaveTextContent('ABCD');
   });
 
+  it('can render with the panel already open (the states gallery)', () => {
+    render(<MemoryRouter><PartyBar initiallyOpen /></MemoryRouter>);
+    expect(screen.getByRole('dialog', { name: 'Party' })).toBeInTheDocument();
+  });
+
   it('offers "Start a party" when not in a party', () => {
     renderBar();
     fireEvent.click(screen.getByTestId('party-pill'));

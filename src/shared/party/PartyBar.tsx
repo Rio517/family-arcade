@@ -17,13 +17,13 @@ import { EFFECTS } from '@shared/effects/effects';
 import { useParty } from './PartyContext';
 import './party.css';
 
-export function PartyBar() {
+export function PartyBar({ initiallyOpen = false }: { /** Harness pages render the panel already open. */ initiallyOpen?: boolean } = {}) {
   const party = useParty();
   const { pathname } = useLocation();
   // Your ticket is your name here too — the party never asks for one. A read,
   // so the reader hook, not the writer one.
   const active = Boolean(useProfile().profile.name);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const [joining, setJoining] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const pillRef = useRef<HTMLButtonElement>(null);

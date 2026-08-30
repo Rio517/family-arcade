@@ -290,6 +290,17 @@ const SHOTS = [
       await page.getByTestId('party-effect-dragon').waitFor();
     },
   },
+  {
+    // The whole party layer on one page: every panel, pill and video state.
+    name: 'party-states',
+    path: '/preview-party-states.html',
+    viewport: { width: 1400, height: 1000 },
+    fullPage: true,
+    prep: async (page) => {
+      await page.getByTestId('state-Video, both cameras').waitFor();
+      await page.waitForTimeout(600);
+    },
+  },
   // ── The party is the table: each online lobby in a party (harness page) ──
   {
     // Chess, host in a party: pick a colour, one tap — no code doors.
