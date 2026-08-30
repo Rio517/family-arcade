@@ -8,6 +8,7 @@
     "src/games/caribbean-poc/preview.tsx",
     "src/games/caribbean/preview.tsx",
     "src/app/preview-lobbies.tsx",
+    "src/app/preview-party-states.tsx",
     "src/games/mirror/preview.tsx"
   ],
   "project": ["src/**/*.{ts,tsx}"],
