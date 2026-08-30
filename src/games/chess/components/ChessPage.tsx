@@ -163,7 +163,8 @@ export function ChessPage() {
 
   const cx = useChess({ name: profile.profile.name, onFinish });
   // Host in a party: the colour you'll play. Your friend gets the other one.
-  const [hostSide, setHostSide] = useState<Color>('w');
+  // 'flip': the coin decides the moment you tap Play.
+  const [hostSide, setHostSide] = useState<Color | 'flip'>('w');
   const inGame = cx.phase === 'play' || cx.phase === 'over';
   // The hook's actions are stable; `cx` itself is a fresh object every render.
   const { startTable, leave: hangUp } = cx;
@@ -519,10 +520,21 @@ export function ChessPage() {
                   >
                     I play Black
                   </button>
+                  <button
+                    className={`btn${hostSide === 'flip' ? ' btn-primary' : ''}`}
+                    aria-pressed={hostSide === 'flip'}
+                    onClick={() => setHostSide('flip')}
+                    data-testid="chess-side-flip"
+                  >
+                    Flip for it
+                  </button>
                 </div>
                 <button
                   className="btn btn-primary btn-lg btn-block"
-                  onClick={() => sitDown({ role: 'host', code: party.openTable(GAME_ID, hostSide), hostSide })}
+                  onClick={() => {
+                    const side: Color = hostSide === 'flip' ? (Math.random() < 0.5 ? 'w' : 'b') : hostSide;
+                    sitDown({ role: 'host', code: party.openTable(GAME_ID, side), hostSide: side });
+                  }}
                   data-testid="chess-party-play"
                 >
                   Play Chess with {party.theirName ?? 'your friend'}

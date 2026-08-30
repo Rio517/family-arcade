@@ -296,6 +296,30 @@ describe('online session — sync between two peers', () => {
     expect(out.outgoing.some((m) => m.t === 'sync')).toBe(true);
   });
 
+  it('the host says its colour in the hello and the guest takes the other — however the guest arrived', () => {
+    // A guest through the code door assumes the old rule (host is White)…
+    let guest = createOnlineSession('guest', 'ABCD', 'Guest');
+    expect(guest.myColor).toBe('b');
+    // …until the host's hello says it took Black.
+    guest = applyMessage(guest, { t: 'hello', v: 1, side: 'host', name: 'Dad', color: 'b' }).state;
+    expect(guest.myColor).toBe('w');
+    // The host is the authority: a guest's colour claim changes nothing on the host.
+    let host = createOnlineSession('host', 'ABCD', 'Dad', 'b');
+    host = applyMessage(host, { t: 'hello', v: 1, side: 'guest', name: 'Guest', color: 'b' }).state;
+    expect(host.myColor).toBe('b');
+    // An older build's hello carries no colour; nothing moves.
+    let plain = createOnlineSession('guest', 'ABCD', 'Guest');
+    plain = applyMessage(plain, { t: 'hello', v: 1, side: 'host', name: 'Dad' }).state;
+    expect(plain.myColor).toBe('b');
+  });
+
+  it('the handshake carries the colour', () => {
+    const host = createOnlineSession('host', 'ABCD', 'Dad', 'b');
+    expect(connectHandshake(host)[0]).toMatchObject({ t: 'hello', side: 'host', color: 'b' });
+    const guest = createOnlineSession('guest', 'ABCD', 'Guest', 'b');
+    expect(connectHandshake(guest)[0]).toMatchObject({ t: 'hello', side: 'guest', color: 'w' });
+  });
+
   it('reports the code and opponent name with the finish, for the profile history', () => {
     let guest = createOnlineSession('guest', 'ABCD', 'Guest');
     guest = applyMessage(guest, { t: 'hello', v: 1, side: 'host', name: 'Dad' }).state;

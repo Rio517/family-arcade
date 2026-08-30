@@ -124,6 +124,21 @@ describe('<ChessPage> — the party is the table', () => {
     expect(net.joined).toEqual(['QRST']);
   });
 
+  it('host in a party: Flip for it lets the coin pick the colour', () => {
+    mockParty.value = fakePartyWithKai('host');
+    const coin = vi.spyOn(Math, 'random').mockReturnValue(0.9); // tails: Black
+    renderPage();
+    fireEvent.click(screen.getByTestId('mode-online'));
+    fireEvent.click(screen.getByTestId('chess-side-flip'));
+    expect(screen.getByTestId('chess-side-flip')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('chess-side-w')).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(screen.getByTestId('chess-party-play'));
+    expect(mockParty.value.openTable).toHaveBeenCalledWith('chess', 'b');
+    expect(sat.calls).toEqual([{ role: 'host', code: 'WXYZ', seatedUserId: 'u1', hostSide: 'b' }]);
+    coin.mockRestore();
+  });
+
   it('host in a party: pick a colour, one tap opens the table and starts as host with that colour', () => {
     mockParty.value = fakePartyWithKai('host');
     renderPage();
