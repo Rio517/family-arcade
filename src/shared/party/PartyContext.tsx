@@ -21,6 +21,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { GameConnection, generateCode, normalizeCode, type ConnStatus } from '@shared/net/peer';
 import { MediaLink, type CallStatus, type Role } from '@shared/net/media';
+import { EFFECTS, type EffectId } from '@shared/effects/effects';
 import { useProfile } from '@shared/profile/useProfile';
 import { arcadeNow } from '@shared/time/clock';
 import type { PartyTableInfo } from './party';
@@ -71,6 +72,11 @@ export interface PartyValue {
   /** The app resolves a game id to a title and route; shared code stays game-blind. */
   resolveGame: (id: string) => GameInfo | null;
 
+  /** Camera effects (ADR 0010): what I wear on my video, what the friend wears on theirs. */
+  effects: EffectId[];
+  theirEffects: EffectId[];
+  setEffects: (ids: EffectId[]) => void;
+
   call: {
     /** The mic/camera have been turned on (opt-in). */
     active: boolean;
@@ -94,6 +100,9 @@ export function useParty(): PartyValue {
 
 const noGame = (): GameInfo | null => null;
 
+const KNOWN_EFFECTS = new Set<string>(EFFECTS.map((e) => e.id));
+const isKnownEffect = (id: string): id is EffectId => KNOWN_EFFECTS.has(id);
+
 export function PartyProvider({
   children,
   resolveGame = noGame,
@@ -113,6 +122,11 @@ export function PartyProvider({
   const [theirName, setTheirName] = useState<string | null>(null);
   const [table, setTable] = useState<PartyTableInfo | null>(remembered?.table ?? null);
   const [knock, setKnock] = useState<string | null>(null);
+  // Effects live for the party, not the call: turn the camera off and on and
+  // the dragon is still yours. They travel as ids; the friend draws them.
+  const [effects, setEffectsState] = useState<EffectId[]>([]);
+  const [theirEffects, setTheirEffects] = useState<EffectId[]>([]);
+  const effectsRef = useRef<EffectId[]>([]);
   // True from a remembered boot until the party gets through (or is left, or
   // replaced by one started by hand). `reconnecting` is derived from it and
   // the status — so an error ends the reconnecting state and the panel can
@@ -179,6 +193,8 @@ export function PartyProvider({
           if (roleRef.current === 'host') {
             conn.send(tableRef.current ? { t: 'table', ...tableRef.current } : { t: 'table-closed' });
           }
+          // …and what I'm wearing, so the friend's reload doesn't lose my dragon.
+          if (effectsRef.current.length > 0) conn.send({ t: 'effects', effects: effectsRef.current });
         },
         onMessage: (msg) => {
           // Each message has one direction: the host says what the table is,
@@ -203,6 +219,11 @@ export function PartyProvider({
             case 'knock':
               if (!iAmHost) return;
               setKnock(msg.game);
+              break;
+            case 'effects':
+              // Keep the ids this build knows; a newer friend's new effect is
+              // simply not drawn here.
+              setTheirEffects(msg.effects.filter(isKnownEffect));
               break;
           }
         },
@@ -274,8 +295,17 @@ export function PartyProvider({
     setTableState(null);
     setKnock(null);
     setFromMemory(false);
+    effectsRef.current = [];
+    setEffectsState([]);
+    setTheirEffects([]);
     clearParty();
   }, [setTableState, stopCall]);
+
+  const setEffects = useCallback((ids: EffectId[]) => {
+    effectsRef.current = ids;
+    setEffectsState(ids);
+    connRef.current?.send({ t: 'effects', effects: ids });
+  }, []);
 
   const openTable = useCallback(
     (game: string, hostSide?: string): string => {
@@ -389,6 +419,9 @@ export function PartyProvider({
     knockOn,
     clearKnock,
     resolveGame,
+    effects,
+    theirEffects,
+    setEffects,
     call: {
       active: callActive,
       status: callStatus,

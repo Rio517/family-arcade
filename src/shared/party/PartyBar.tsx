@@ -13,6 +13,7 @@ import { initialOf } from '@shared/profile/tickets';
 import { useProfile } from '@shared/profile/useProfile';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { CameraIcon, ChevronDownIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
+import { EFFECTS } from '@shared/effects/effects';
 import { useParty } from './PartyContext';
 import './party.css';
 
@@ -217,6 +218,34 @@ export function PartyBar() {
                   </button>
                 </div>
               )}
+              {/* Camera effects (ADR 0010): chips you wear on your own video;
+                  the friend's device draws them on your stream. They need a
+                  camera to sit on. */}
+              {call.active &&
+                (call.cameraOn ? (
+                  <div className="party-chips" role="group" aria-label="Camera effects">
+                    {EFFECTS.map(({ id, name, Icon }) => {
+                      const on = party.effects.includes(id);
+                      return (
+                        <button
+                          key={id}
+                          className="party-chip"
+                          aria-pressed={on}
+                          onClick={() =>
+                            party.setEffects(on ? party.effects.filter((e) => e !== id) : [...party.effects, id])
+                          }
+                          data-testid={`party-effect-${id}`}
+                        >
+                          <Icon size={18} /> {name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="party-hint" data-testid="party-effects-hint">
+                    Turn your camera on to wear the dragon or the rainbow magic.
+                  </p>
+                ))}
 
               <button className="party-btn ghost" onClick={leave} data-testid="party-leave">
                 Leave party

@@ -279,6 +279,17 @@ const SHOTS = [
       await page.getByTestId('party-knock').waitFor();
     },
   },
+  {
+    // In a call with the camera on: the effect chips in the panel (the
+    // harness mounts the bar alone — no floating video, no streams).
+    name: 'party-effects',
+    path: '/preview-lobbies.html?scene=call#/',
+    viewport: PHONE,
+    prep: async (page) => {
+      await page.getByTestId('party-pill').click();
+      await page.getByTestId('party-effect-dragon').waitFor();
+    },
+  },
   // ── The party is the table: each online lobby in a party (harness page) ──
   {
     // Chess, host in a party: pick a colour, one tap — no code doors.

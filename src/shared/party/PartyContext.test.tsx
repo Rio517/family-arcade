@@ -282,6 +282,36 @@ describe('the party is the table', () => {
     expect(party.table).toBeNull();
   });
 
+  it('wearing an effect tells the friend, is re-said on a fresh channel, and is forgotten on leaving', () => {
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => void party.hostParty());
+    act(() => link().connect());
+    act(() => party.setEffects(['dragon']));
+    expect(party.effects).toEqual(['dragon']);
+    expect(link().sent.at(-1)).toEqual({ t: 'effects', effects: ['dragon'] });
+    // The friend's device reconnects: it hears what I'm wearing again.
+    act(() => link().connect());
+    expect(link().sent.at(-1)).toEqual({ t: 'effects', effects: ['dragon'] });
+    act(() => party.setEffects([]));
+    expect(link().sent.at(-1)).toEqual({ t: 'effects', effects: [] });
+    act(() => party.setEffects(['peace']));
+    act(() => party.leaveParty());
+    expect(party.effects).toEqual([]);
+  });
+
+  it("hears what the friend is wearing — and ignores an effect this build doesn't know", () => {
+    render(<PartyProvider><Probe /></PartyProvider>);
+    act(() => party.joinParty('AB23'));
+    act(() => link().connect());
+    act(() => link().receive({ t: 'effects', effects: ['peace', 'laser-eyes', 'dragon'] }));
+    expect(party.theirEffects).toEqual(['peace', 'dragon']);
+    act(() => link().receive({ t: 'effects', effects: [] }));
+    expect(party.theirEffects).toEqual([]);
+    act(() => link().receive({ t: 'effects', effects: ['dragon'] }));
+    act(() => party.leaveParty());
+    expect(party.theirEffects).toEqual([]);
+  });
+
   it('resolves a game id through the app, staying game-blind itself', () => {
     render(
       <PartyProvider resolveGame={(id) => (id === 'chess' ? { title: 'Chess', path: '/chess' } : null)}>

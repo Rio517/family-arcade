@@ -159,6 +159,20 @@
 .party-btn:disabled { opacity: 0.5; cursor: default; }
 
 .party-callctl { display: flex; gap: 10px; justify-content: center; }
+
+/* Camera-effect chips (ADR 0010) — the same shape as the Magic Mirror's. */
+.party-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.party-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+  padding: 8px 14px; border-radius: 999px;
+  border: 1px solid var(--border, #475569); background: var(--bg, #0f172a);
+  color: var(--text, #f1f5f9); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.party-chip[aria-pressed='true'] {
+  border-color: var(--accent, #22d3ee); color: var(--accent, #22d3ee);
+  background: rgba(52, 224, 200, 0.14);
+}
+.party-chip:focus-visible { outline: 3px solid var(--accent, #22d3ee); outline-offset: 2px; }
 .party-cbtn {
   width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer; font-size: 18px;
   background: rgba(255, 255, 255, 0.12); color: #fff; display: grid; place-items: center;
@@ -194,13 +208,17 @@
   display: grid;
   place-items: center;
 }
-.pv-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+/* Each feed is a flipped box holding the video AND its effects canvas, so the
+   mirror flip applies to both (ADR 0010: the overlay never touches the stream). */
+.pv-feed { position: absolute; inset: 0; transform: scaleX(-1); }
+.pv-video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pv-avatar { color: var(--muted, #94a3b8); display: grid; place-items: center; }
-.pv-self {
+.pv-self-wrap {
   position: absolute; right: 5px; bottom: 5px; width: 42px; height: 42px;
-  object-fit: cover; border-radius: 7px; border: 2px solid rgba(255, 255, 255, 0.6);
-  transform: scaleX(-1); background: #000;
+  border-radius: 7px; border: 2px solid rgba(255, 255, 255, 0.6); overflow: hidden;
+  transform: scaleX(-1); background: #000; z-index: 1;
 }
+.pv-self { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pv-label {
   position: absolute; left: 5px; top: 5px; font-size: 14px; font-weight: 800; color: #e2e8f0;
   background: rgba(0, 0, 0, 0.55); padding: 2px 7px; border-radius: 999px; max-width: 78%;

@@ -2,47 +2,14 @@ import { StrictMode } from 'react';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PartyValue } from './PartyContext';
+import { fakeParty } from './testing';
 import { usePartyDoor } from './usePartyDoor';
 
 const mockParty = vi.hoisted(() => ({ value: null as unknown as PartyValue }));
 vi.mock('./PartyContext', () => ({ useParty: () => mockParty.value }));
 
-const noop = () => {};
-function makeParty(over: Partial<PartyValue> = {}): PartyValue {
-  return {
-    myName: 'Klara',
-    status: 'connected',
-    code: 'AB23',
-    role: 'guest',
-    inParty: true,
-    theirName: 'Kai',
-    reconnecting: false,
-    table: null,
-    knock: null,
-    hostParty: () => 'AB23',
-    joinParty: noop,
-    leaveParty: noop,
-    retry: noop,
-    openTable: () => 'CD45',
-    closeTable: noop,
-    knockOn: vi.fn(),
-    clearKnock: noop,
-    resolveGame: () => null,
-    call: {
-      active: false,
-      status: 'idle',
-      muted: false,
-      cameraOn: false,
-      localStream: null,
-      remoteStream: null,
-      start: noop,
-      stop: noop,
-      toggleMute: noop,
-      toggleCamera: noop,
-    },
-    ...over,
-  };
-}
+const makeParty = (over: Partial<PartyValue> = {}): PartyValue =>
+  fakeParty({ myName: 'Klara', status: 'connected', code: 'AB23', role: 'guest', inParty: true, theirName: 'Kai', ...over });
 
 const onTable = vi.fn();
 const onClosed = vi.fn();
