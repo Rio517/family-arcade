@@ -11,6 +11,25 @@ Sorted by likely value. Nothing here blocks anything else.
 
 ### Code
 
+- **Landing-page posters (shipped 2026-08-30, #141).** Every ticket opens
+  into a poster — image, three facts, two lines, Play — from
+  `GameDescriptor.preview`. The images are 640×360 webps made by
+  `npm run previews` (`scripts/game-previews.mjs`, which also decides *which*
+  screenshot sells each game); re-run it after a game's look changes. The
+  facts and blurbs in each `index.ts` are a first draft — tune them with the
+  family. Option C from the mockups (a slow pan on the tickets) can sit on top
+  of the same images if the "cabinet row" feel is wanted.
+
+- **The party's video call (shipped 2026-08-30, #138, #140).** *Voice call*
+  / *Video call* doors in the panel; tap the little window for a full-screen
+  call; the camera effects (Magic Mirror's, ADR 0010) live only there.
+  `preview-party-states.html` is the gallery of every party state — serve
+  it with `vite preview --host` to look on another device. Open: the effect
+  chips are two small copies (Mirror page, big call); Mario asked how to
+  reach "solo mode" — the Magic Mirror ticket is last on the landing page
+  with an under-construction badge; confirm that is what he meant, or add a
+  "just me" door into the big call.
+
 - **One ticket, every game — phases 3–4.** The design and the phase list live
   in `docs/planning/players-and-party.md`. Shipped 2026-08-29: Phase 1 (no
   game asks the signed-in player for a name; the ticket list at the gate,
@@ -118,8 +137,9 @@ drives the *real* app with *real* input.
   element instead is the single biggest saving for the owner's time, as opposed
   to the agent's.
 - **The party / P2P layer, which has no live coverage.** `PartyContext` is
-  unit-tested under a mocked link, and `preview-lobbies.html` screenshots
-  the in-party states (the pill, and every lobby), but video, voice
+  unit-tested under a mocked link, and `preview-lobbies.html` /
+  `preview-party-states.html` screenshot every in-party state (the pill,
+  every lobby, the little and the big video window), but video, voice
   and the real peer connection need live browsers; jsdom can't go near them. Even driving one side of a call would be
   more than exists now.
 
@@ -140,7 +160,8 @@ Limits worth knowing before leaning on it:
 
 ### Operations
 
-- Nothing pending. Branch `claude/starter-kit-alignment` is the current PR;
+- Nothing pending as of 2026-08-30: #124–#141 are all merged and deployed.
+  (Older note: branch `claude/starter-kit-alignment` was the current PR;
   see it for what landed.
 
 ---
