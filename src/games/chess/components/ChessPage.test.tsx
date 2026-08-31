@@ -627,7 +627,8 @@ describe('<ChessPage> — local flow', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('mode-online'));
     // Who you are is the ticket you signed in with; nothing asks again.
-    expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Rio");
+    expect(screen.getByTestId('playing-as')).toHaveTextContent('Rio');
+    expect(screen.getByTestId('playing-as-change')).toHaveTextContent('Switch player ›');
     expect(screen.queryByTestId('chess-name')).toBeNull();
     expect(screen.getByTestId('chess-create')).toBeInTheDocument();
     expect(screen.getByTestId('chess-join-code')).toBeInTheDocument();
@@ -640,8 +641,8 @@ describe('<ChessPage> — local flow', () => {
     // Chair one opens on the signed-in ticket; the other waits for a tap.
     expect(screen.getByTestId('seat-0')).toHaveTextContent('Rio');
     expect(screen.getByTestId('seat-1')).toHaveTextContent(/tap a ticket/i);
-    // The old free-text boxes are gone, and the screen never announces a chair
-    // as "you" the way the online lobby does.
+    // The old free-text boxes are gone, and the screen never carries the
+    // signed-in identity line the way the online lobby does.
     expect(screen.queryByTestId('white-name')).toBeNull();
     expect(screen.queryByTestId('black-name')).toBeNull();
     expect(screen.queryByTestId('playing-as')).toBeNull();

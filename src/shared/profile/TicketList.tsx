@@ -50,7 +50,7 @@ export function TicketList({
   return (
     <form className="tlist" onSubmit={submit}>
       <label className="tlist-label" htmlFor={fieldId}>
-        {users.length === 0 ? 'Make your ticket' : 'Type a name to find or add'}
+        Pick your player or type your name.
       </label>
       <input
         ref={fieldRef}

@@ -401,8 +401,9 @@
       'sign tix'
       'saved tix'
       'prize tix'
+      'mirror tix'
       '. tix';
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-rows: auto auto auto auto 1fr;
     align-items: start;
     align-content: start;
     column-gap: 30px;
@@ -672,3 +673,49 @@
 }
 .tk-play:hover { filter: brightness(1.06); }
 .tk-play:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* ── Carry on: the game a returning player left, before the catalogue ─────
+   (UX review proposal 4.) Deliberately unboxed — a row, not another card
+   family; the Save Station's box and header give way to it. */
+.cont { max-width: 660px; width: 100%; margin: 0 auto; display: grid; gap: 4px; }
+.cont-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 150ms, transform 150ms;
+}
+.cont-row:hover { background: rgb(255 255 255 / 5%); transform: translateX(2px); }
+.cont-row:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+.cont-icon {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+}
+.cont-body { min-width: 0; }
+.cont-title { display: block; font-size: 17px; font-weight: 800; color: var(--c); }
+.cont-meta { display: block; margin-top: 2px; font-size: 14px; color: #93a0bd; }
+/* An open poster comes into view when its ticket is tapped; this keeps its
+   Play button clear of the floating Play-together control when it lands. */
+.tk-poster { scroll-margin-bottom: calc(max(24px, env(safe-area-inset-bottom)) + 76px); }
+
+/* The camera toy's second door, under the Ticket Booth. Quieter than a
+   Continue row: it is an offer, not unfinished business. */
+.mirror-door { margin-top: 4px; }
+.mirror-door .cont-title { font-size: 16px; }
+
+@media (min-width: 940px) {
+  .arcade-main .cont { grid-area: saved; max-width: none; }
+  /* …but the camera door sits at the foot of the column, under the booth. */
+  .arcade-main .mirror-door { grid-area: mirror; max-width: none; }
+}

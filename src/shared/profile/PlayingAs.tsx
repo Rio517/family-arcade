@@ -1,8 +1,10 @@
 /**
- * "You're Papa · Change ›" — the one line at the top of every lobby that says
+ * "Papa · Switch player ›" — the one line at the top of every lobby that says
  * whose ticket is playing. No game asks for a name; a ticket is the identity.
- * Change drops the ticket list in place, so the wrong person at the iPad is
- * two taps from fixed, without leaving the game.
+ * Switching drops the ticket list in place, so the wrong person at the iPad is
+ * two taps from fixed, without leaving the game. One name, one verb: the gate,
+ * this line and the Ticket Booth all say "Switch player" and open the same
+ * picker (the UX pass, docs/ux-review).
  */
 
 import { useCallback, useRef, useState } from 'react';
@@ -31,7 +33,7 @@ export function PlayingAs() {
     <div className="pas" data-testid="playing-as">
       <div className="pas-pill">
         <Medal name={active.profile.name} index={index} small />
-        <span className="pas-who">You're {active.profile.name}</span>
+        <span className="pas-who">{active.profile.name}</span>
         <button
           ref={changeRef}
           type="button"
@@ -40,7 +42,7 @@ export function PlayingAs() {
           aria-expanded={open}
           onClick={() => (open ? close() : setOpen(true))}
         >
-          {open ? 'Close' : 'Change ›'}
+          {open ? 'Close' : 'Switch player ›'}
         </button>
       </div>
 

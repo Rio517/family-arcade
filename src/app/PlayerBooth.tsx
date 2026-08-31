@@ -106,7 +106,6 @@ export function PlayerBooth() {
                 <span className="pstub-stats">
                   <b>{active.profile.points}</b> tickets · {active.profile.wins} W · {active.profile.losses} L
                 </span>
-                <span className="booth-profile-note">Shared across every arcade game.</span>
               </span>
               <span className="pstub-admit" aria-hidden="true">ADMIT ONE</span>
             </div>

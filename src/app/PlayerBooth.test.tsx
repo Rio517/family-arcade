@@ -62,7 +62,8 @@ describe('<PlayerBooth>', () => {
     render(<PlayerBooth />);
 
     expect(screen.getByText('he/him')).toBeVisible();
-    expect(screen.getByText('Shared across every arcade game.')).toBeVisible();
+    // The "Shared across every arcade game." tagline was dropped from the booth.
+    expect(screen.queryByText('Shared across every arcade game.')).not.toBeInTheDocument();
   });
 
   it('opens a labeled two-field profile editor', () => {

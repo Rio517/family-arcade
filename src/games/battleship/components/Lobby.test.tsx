@@ -33,7 +33,8 @@ beforeEach(() => {
 describe('<Lobby> on your own', () => {
   it('says who is playing instead of asking for a name', () => {
     setup();
-    expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Rio");
+    expect(screen.getByTestId('playing-as')).toHaveTextContent('Rio');
+    expect(screen.getByTestId('playing-as-change')).toHaveTextContent('Switch player ›');
     expect(screen.queryByTestId('name-input')).toBeNull();
   });
 

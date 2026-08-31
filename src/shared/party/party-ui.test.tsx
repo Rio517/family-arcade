@@ -112,6 +112,50 @@ describe('PartyBar', () => {
     expect(screen.getByRole('dialog', { name: 'Party' })).toBeInTheDocument();
   });
 
+  // The UX pass's pairing copy (docs/ux-review), shipped.
+  describe('Play together', () => {
+    const renderProposed = (over: Partial<PartyValue> = {}) => {
+      mockParty.value = makeParty(over);
+      return render(<MemoryRouter><PartyBar initiallyOpen /></MemoryRouter>);
+    };
+
+    it('names the goal and offers two doors — no code until you pick one', () => {
+      renderProposed();
+      expect(screen.getByTestId('party-pill')).toHaveTextContent('Play together');
+      expect(screen.getByRole('dialog', { name: 'Party' })).toHaveTextContent('Play Online');
+      expect(screen.getByTestId('party-create')).toHaveTextContent('Start Pairing');
+      expect(screen.getByTestId('party-join')).toHaveTextContent('Enter Code');
+      expect(screen.queryByTestId('party-code')).toBeNull();
+    });
+
+    it('keeps the code when it cannot reach the other iPad, and offers a way on', () => {
+      renderProposed({ role: 'host', code: 'ABCD', status: 'error' });
+      expect(screen.getByTestId('party-code')).toHaveTextContent('ABCD');
+      fireEvent.click(screen.getByTestId('party-retry'));
+      expect(mockParty.value.retry).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByTestId('party-new-code'));
+      expect(mockParty.value.hostParty).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('party-leave')).toHaveTextContent('Leave');
+      // Every state stays collapsible.
+      expect(screen.getByTestId('party-collapse')).toBeInTheDocument();
+    });
+
+    it('a guest that lost the party can try a different code, and still collapse', () => {
+      const r = renderProposed({ reconnecting: true, role: 'guest', code: 'ABCD', status: 'dialing' });
+      expect(screen.getByTestId('party-code')).toHaveTextContent('ABCD');
+      expect(screen.getByTestId('party-collapse')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('party-other-code'));
+      expect(mockParty.value.leaveParty).toHaveBeenCalledTimes(1);
+      // The party lets go (as the real one does synchronously), and the panel
+      // is already on the code form rather than back at the start screen.
+      mockParty.value = makeParty();
+      r.rerender(<MemoryRouter><PartyBar initiallyOpen /></MemoryRouter>);
+      expect(screen.getByTestId('party-code-input')).toBeInTheDocument();
+      expect(screen.getByTestId('party-collapse')).toBeInTheDocument();
+    });
+  });
+
   describe('the door to the camera effects on your own', () => {
     const mirror = { title: 'Magic Mirror', path: '/mirror' };
     const renderWithDoor = (party: PartyValue) => {
@@ -123,7 +167,7 @@ describe('PartyBar', () => {
       renderWithDoor(makeParty());
       fireEvent.click(screen.getByTestId('party-pill'));
       expect(screen.getByTestId('party-solo-effects')).toHaveAttribute('href', '/mirror');
-      expect(screen.getByTestId('party-solo-effects')).toHaveTextContent(/on your own/);
+      expect(screen.getByTestId('party-solo-effects')).toHaveTextContent('Magic Mirror ›');
     });
 
     it('shows in a party before a call starts, and steps aside once the call is on', () => {
@@ -159,7 +203,8 @@ describe('PartyBar', () => {
   it('wears your ticket instead of asking for a name', () => {
     renderBar();
     fireEvent.click(screen.getByTestId('party-pill'));
-    expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Rio");
+    expect(screen.getByTestId('playing-as')).toHaveTextContent('Rio');
+    expect(screen.getByTestId('playing-as-change')).toHaveTextContent('Switch player ›');
     expect(screen.getByTestId('party-create')).toBeInTheDocument();
   });
 
