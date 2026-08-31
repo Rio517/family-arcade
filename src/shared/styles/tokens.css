@@ -46,11 +46,12 @@ body {
 .app {
   max-width: 1200px;
   margin: 0 auto;
-  /* The bottom pad clears the fixed Party pill (~44px tall, sitting 12px off
-     the bottom). Without it the last row of content — on the landing page,
-     the footer's Privacy and GitHub links — ends up underneath the pill once
-     you scroll to the bottom. */
-  padding: max(20px, env(safe-area-inset-top)) 16px calc(max(24px, env(safe-area-inset-bottom)) + 52px);
+  /* The bottom pad clears the fixed Play-together control (44px tall, sitting
+     12px off the bottom, with a shadow). Without it the last row of content —
+     an open ticket's Play, the footer's Privacy and GitHub links — ends up
+     underneath the control once you scroll to the bottom. 52px was not quite
+     the control's real height; 88px is it, with room to breathe. */
+  padding: max(20px, env(safe-area-inset-top)) 16px calc(max(24px, env(safe-area-inset-bottom)) + 88px);
 }
 
 /* Reading-width wrapper for the single-column setup screens (lobby, fleet,

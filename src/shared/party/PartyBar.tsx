@@ -13,8 +13,35 @@ import { initialOf } from '@shared/profile/tickets';
 import { useProfile } from '@shared/profile/useProfile';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { CameraIcon, ChevronDownIcon, CloseIcon, MicIcon, MicOffIcon, PartyIcon } from '@shared/ui/icons';
-import { useParty, type GameInfo } from './PartyContext';
+import { useParty, type GameInfo, type PartyValue } from './PartyContext';
 import './party.css';
+
+/**
+ * The way on when a pairing is stuck: the host can mint a fresh code, the
+ * guest can go and type a different one. Never a dead end — the UX pass
+ * (docs/ux-review) asked for one recognisable action, not a paragraph.
+ */
+function WayOut({ party, onCode }: { party: PartyValue; onCode: () => void }) {
+  if (party.role === 'host') {
+    return (
+      <button className="party-btn violet" onClick={() => party.hostParty()} data-testid="party-new-code">
+        New code
+      </button>
+    );
+  }
+  return (
+    <button
+      className="party-btn violet"
+      onClick={() => {
+        party.leaveParty();
+        onCode();
+      }}
+      data-testid="party-other-code"
+    >
+      Enter a different code
+    </button>
+  );
+}
 
 export function PartyBar({
   initiallyOpen = false,
@@ -60,7 +87,7 @@ export function PartyBar({
   // and under the call doors, and steps aside once a call is on.
   const soloDoor = soloEffects && (
     <Link className="party-btn ghost" to={soloEffects.path} onClick={() => setOpen(false)} data-testid="party-solo-effects">
-      <CameraIcon size={18} /> Try the effects on your own ›
+      <CameraIcon size={18} /> {soloEffects.title} ›
     </Link>
   );
 
@@ -71,7 +98,7 @@ export function PartyBar({
           {/* The panel's one always-there row: its name, and the obvious way
               back down — tapping the pill again wasn't discoverable. */}
           <div className="party-panel-head">
-            <span className="party-eyebrow">Party</span>
+            <span className="party-eyebrow">Play Online</span>
             <button
               className="party-collapse"
               onClick={close}
@@ -87,32 +114,40 @@ export function PartyBar({
 
               {party.reconnecting ? (
                 <div className="party-waiting" data-testid="party-reconnecting">
-                  <span className="party-eyebrow">Your party</span>
-                  {/* The host keeps its code on show: the friend comes back with it. */}
-                  {party.role === 'host' && <div className="party-code" data-testid="party-code">{party.code}</div>}
+                  <span className="party-eyebrow">Finding your friend</span>
+                  {/* The code stays on show: it is what the friend comes back with. */}
+                  {party.code && <div className="party-code" data-testid="party-code">{party.code}</div>}
                   <p className="party-hint">
                     {party.role === 'host' ? 'Waiting for your friend to come back…' : 'Reconnecting to your party…'}
                   </p>
-                  <button className="party-btn ghost" onClick={leave} data-testid="party-leave">Leave party</button>
+                  <WayOut party={party} onCode={() => setJoining(true)} />
+                  <button className="party-btn ghost" onClick={leave} data-testid="party-leave">Leave</button>
                 </div>
               ) : party.status === 'error' ? (
                 <div className="party-waiting" data-testid="party-error">
-                  <span className="party-eyebrow">Hmm</span>
-                  <p className="party-hint">Couldn't reach your party. Is the other iPad awake?</p>
+                  <span className="party-eyebrow">No luck yet</span>
+                  {/* A still-useful code is never hidden by an error. */}
+                  {party.code && <div className="party-code" data-testid="party-code">{party.code}</div>}
+                  <p className="party-hint">
+                    {party.role === 'host'
+                      ? 'The other iPad has not come in. Is it awake?'
+                      : 'No party with that code right now.'}
+                  </p>
                   <button className="party-btn primary" onClick={party.retry} data-testid="party-retry">Try again</button>
-                  <button className="party-btn ghost" onClick={leave} data-testid="party-leave">Leave party</button>
+                  <WayOut party={party} onCode={() => setJoining(true)} />
+                  <button className="party-btn ghost" onClick={leave} data-testid="party-leave">Leave</button>
                 </div>
               ) : party.role === 'host' ? (
                 <div className="party-waiting">
                   <span className="party-eyebrow">Share this code</span>
                   <div className="party-code" data-testid="party-code">{party.code}</div>
-                  <p className="party-hint">Tell your friend to open the Party and join with it.</p>
+                  <p className="party-hint">On the other iPad: Play together → Enter Code.</p>
                   <button className="party-btn ghost" onClick={leave} data-testid="party-cancel">Cancel</button>
                 </div>
               ) : party.role === 'guest' ? (
                 <div className="party-waiting" data-testid="party-dialing">
                   <span className="party-eyebrow">Joining {party.code}</span>
-                  <p className="party-hint">Looking for your friend's party…</p>
+                  <p className="party-hint">Knocking on the other iPad…</p>
                   <button className="party-btn ghost" onClick={leave} data-testid="party-cancel">Cancel</button>
                 </div>
               ) : joining ? (
@@ -147,15 +182,14 @@ export function PartyBar({
                 </p>
               ) : (
                 <div className="party-start">
+                  <p className="party-hint">Two iPads, one game.</p>
                   <button className="party-btn primary" onClick={() => party.hostParty()} data-testid="party-create">
-                    Start a party
+                    Start Pairing
                   </button>
                   <button className="party-btn violet" onClick={() => setJoining(true)} data-testid="party-join">
-                    Join with a code
+                    Enter Code
                   </button>
                   <p className="party-hint">
-                    Play together, switch games freely, and (if you want) see &amp; hear each other.
-                    <br />
                     <Link to="/privacy" onClick={() => setOpen(false)}>How this keeps you safe →</Link>
                   </p>
                   {soloDoor}
@@ -256,12 +290,12 @@ export function PartyBar({
         aria-expanded={open}
         aria-label={
           lit
-            ? `Party — ${knock ? `${friend} wants to play ${knock.title}` : `${friend} opened ${invite?.title}`}`
+            ? `Play together — ${knock ? `${friend} wants to play ${knock.title}` : `${friend} opened ${invite?.title}`}`
             : inParty
-              ? `Party with ${friend}`
+              ? `Playing with ${friend}`
               : party.reconnecting
-                ? 'Party — reconnecting'
-                : 'Start a party'
+                ? 'Play together — reconnecting'
+                : 'Play together'
         }
         data-testid="party-pill"
       >
@@ -287,7 +321,7 @@ export function PartyBar({
           </>
         ) : (
           <>
-            <PartyIcon size={16} /> Party
+            <PartyIcon size={16} /> Play together
           </>
         )}
       </button>

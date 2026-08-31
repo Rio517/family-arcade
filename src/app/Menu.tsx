@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { GamePreview } from '@shared/game';
-import { BotIcon, GridIcon, PersonIcon, ResumeIcon } from '@shared/ui/icons';
+import { BotIcon, GridIcon, PersonIcon } from '@shared/ui/icons';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { GAMES } from './registry';
 import { PlayerBooth } from './PlayerBooth';
@@ -13,13 +13,13 @@ import yahtzeePreview from './assets/yahtzee-preview.webp';
  * name HANGING from chains as a retro neon sign (hollow tube letters, warm
  * orange glow, the occasional flicker). Every game is an ADMIT-ONE ticket
  * stub under its own awning. On a wide screen the tickets run down the RIGHT;
- * the sign, the Save Station (every saved game, one tap to resume), and the
- * prize counter hold the LEFT.
+ * the sign, the game you left mid-play, the Ticket Booth and the camera door
+ * hold the LEFT.
  *
  * Everything is registry-driven: tickets print per registry entry, and the
- * Save Station rows come from each game's `savedGames` hook on its
- * descriptor — this component names no game. The one exception is the
- * Yahtzee logger, a static HTML page linked directly.
+ * "Continue …" rows come from each game's `savedGames` hook on its
+ * descriptor — a returning player's game comes before the whole catalogue.
+ * The one exception is the Yahtzee logger, a static HTML page linked directly.
  */
 
 const BULBS = ['b1', 'b2', 'b3', 'b4'];
@@ -120,6 +120,15 @@ function GameTicket({
   const facts = preview?.facts ?? [];
   const blurb = preview?.blurb ?? face.sub;
   const posterId = `poster-${id}`;
+  const posterRef = useRef<HTMLDivElement>(null);
+  // A poster that opens below the fold comes to the player; `scroll-margin`
+  // on .tk-poster keeps its Play clear of the floating Play-together control.
+  useEffect(() => {
+    const el = posterRef.current;
+    if (!open || typeof el?.scrollIntoView !== 'function') return;
+    const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'end' });
+  }, [open]);
   return (
     <article
       className={`tk game-${id}${open ? ' open' : ''}`}
@@ -137,7 +146,7 @@ function GameTicket({
         <Ticket {...face}>{children}</Ticket>
       </button>
       {open && (
-        <div className="tk-poster" id={posterId} data-testid={`ticket-poster-${id}`}>
+        <div className="tk-poster" id={posterId} ref={posterRef} data-testid={`ticket-poster-${id}`}>
           {preview && (
             <img className="tk-strip" src={preview.image} alt={`${face.title} — a look at the game`} width={640} height={360} />
           )}
@@ -173,7 +182,14 @@ const YAHTZEE_PREVIEW: GamePreview = {
 export function Menu() {
   // Every resumable game across the arcade, in registry order — each game
   // reports its own saves through the `savedGames` hook on its descriptor.
-  const saved = GAMES.flatMap((game) => game.savedGames?.() ?? []);
+  // The game's own title rides along, so a row can say which game to continue.
+  const saved = GAMES.flatMap((game) =>
+    (game.savedGames?.() ?? []).map((s) => ({ ...s, gameTitle: game.title })),
+  );
+  // The Magic Mirror, if the registry has it: the camera toy earns a second
+  // door at the foot of the left column (the family asked for it in more
+  // than one place). The registry stays the only list.
+  const mirror = GAMES.find((g) => g.id === 'mirror') ?? null;
   // The one ticket open to its poster, if any.
   const [openId, setOpenId] = useState<string | null>(null);
   const toggle = (id: string) => setOpenId((cur) => (cur === id ? null : id));
@@ -202,6 +218,28 @@ export function Menu() {
             </div>
           </div>
         </header>
+
+        {/* What a returning player is most likely to want, before the whole
+            catalogue: one unboxed row per save, from the registry's own data. */}
+        {saved.length > 0 && (
+          <nav className="cont" aria-label="Carry on">
+            {saved.map((s) => (
+              <Link
+                key={s.key}
+                className="cont-row"
+                to={s.to}
+                style={{ '--c': s.color } as React.CSSProperties}
+                data-testid={`continue-${s.key}`}
+              >
+                <span className="cont-icon"><s.Icon size={24} /></span>
+                <span className="cont-body">
+                  <span className="cont-title">Continue {s.gameTitle} ›</span>
+                  <span className="cont-meta">{s.meta}</span>
+                </span>
+              </Link>
+            ))}
+          </nav>
+        )}
 
         <nav className="tix" aria-label="Games">
           <GameTicket
@@ -234,32 +272,33 @@ export function Menu() {
               play={{ to: game.path }}
               open={openId === game.id}
               onToggle={toggle}
-            >
+              >
               <game.Icon size={30} />
             </GameTicket>
           ))}
         </nav>
 
-        {/* The Save Station: every game the family left mid-battle. */}
-        {saved.length > 0 && (
-          <section className="now-playing" aria-label="Saved games">
-            <div className="np-in">
-              <div className="np-h">✦ Save Station ✦</div>
-              {saved.map((s) => (
-                <Link key={s.key} className="np-row" to={s.to} style={{ '--np-c': s.color } as React.CSSProperties} data-testid={`resume-${s.key}`}>
-                  <span className="np-icon"><s.Icon size={20} /></span>
-                  <span className="np-body">
-                    <span className="np-title">{s.title}</span>
-                    <span className="np-meta">{s.meta}</span>
-                  </span>
-                  <span className="np-go" aria-hidden="true"><ResumeIcon size={18} /></span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
         <PlayerBooth />
+
+        {/* The camera toy has a second door here, at the foot of the column,
+            so it is findable without scrolling the whole catalogue — the
+            Play Online panel has the other one. */}
+        {mirror && (
+          <nav className="cont mirror-door" aria-label="Camera">
+            <Link
+              className="cont-row"
+              to={mirror.path}
+              style={{ '--c': '#7ae582' } as React.CSSProperties}
+              data-testid="mirror-door"
+            >
+              <span className="cont-icon"><mirror.Icon size={24} /></span>
+              <span className="cont-body">
+                <span className="cont-title">{mirror.title} ›</span>
+                <span className="cont-meta">Camera effects, just you</span>
+              </span>
+            </Link>
+          </nav>
+        )}
       </div>
 
       <div className="footer">

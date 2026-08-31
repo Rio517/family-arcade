@@ -119,8 +119,11 @@ function signInAs(name: string) {
 function toOnlineLobby(app: Client, name: string) {
   signInAs(name);
   fireEvent.click(app.getByTestId('mode-online'));
-  // The lobby names you from your ticket instead of asking.
-  expect(app.getByTestId('playing-as')).toHaveTextContent(`You're ${name}`);
+  // The lobby names you from your ticket instead of asking: the name alone,
+  // next to the one verb that opens the picker.
+  const playingAs = app.getByTestId('playing-as');
+  expect(within(playingAs).getByText(name)).toBeInTheDocument();
+  expect(within(playingAs).getByTestId('playing-as-change')).toHaveTextContent('Switch player ›');
   expect(app.queryByTestId('chess-name')).toBeNull();
 }
 

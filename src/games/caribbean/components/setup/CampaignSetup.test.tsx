@@ -105,7 +105,8 @@ describe('<CampaignSetup>', () => {
     setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
     renderSetup();
 
-    expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Rio");
+    expect(screen.getByTestId('playing-as')).toHaveTextContent('Rio');
+    expect(screen.getByTestId('playing-as-change')).toHaveTextContent('Switch player ›');
   });
 
   it('aligns all three commission fields and keeps the manifest rule level', () => {

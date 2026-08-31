@@ -109,9 +109,36 @@ describe('<Menu> — the arcade landing page', () => {
     expect(document.querySelector('.game-unicorn [aria-label="Has computer players"]')).toBeNull();
   });
 
-  it('hides the Save Station when nothing is saved', () => {
+  // The UX review's returning-player row (docs/ux-review), now shipped: the
+  // game you were playing, before the whole catalogue.
+  it('a saved game becomes one unboxed Continue row above the tickets', () => {
+    localStorage.setItem('risk-campaign-v1', JSON.stringify({
+      v: 1,
+      savedAt: 456,
+      state: {
+        mapId: 'classic',
+        phase: 'reinforce',
+        players: [{ name: 'Mario' }, { name: 'Peach' }],
+        territories: {},
+        current: 0,
+        diceBag: [1, 2, 3],
+      },
+    }));
     renderMenu();
-    expect(screen.queryByLabelText('Saved games')).toBeNull();
+    const row = screen.getByTestId('continue-risk');
+    expect(row).toHaveTextContent('Continue Risk ›');
+    expect(row).toHaveAttribute('href', '/risk');
+    // The box and its header give way to the row.
+    expect(screen.queryByText(/Save Station/)).toBeNull();
+    // And it comes before the catalogue in the document.
+    const tix = document.querySelector('.tix')!;
+    expect(row.compareDocumentPosition(tix) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows no Continue rows when nothing is saved', () => {
+    renderMenu();
+    expect(screen.queryByLabelText('Carry on')).toBeNull();
+    expect(document.querySelectorAll('[data-testid^="continue-"]')).toHaveLength(0);
   });
 
   it('lists saved games with resume links', () => {
@@ -125,8 +152,8 @@ describe('<Menu> — the arcade landing page', () => {
     }));
     renderMenu();
 
-    const chess = screen.getByTestId('resume-chess-local');
-    expect(chess).toHaveTextContent('Alice vs Bob');
+    const chess = screen.getByTestId('continue-chess-local');
+    expect(chess).toHaveTextContent('Continue Chess ›');
     expect(chess).toHaveTextContent(/1 move in/);
     expect(chess.getAttribute('href')).toContain('/chess?resume=local');
   });
@@ -149,8 +176,8 @@ describe('<Menu> — the arcade landing page', () => {
     }));
     renderMenu();
 
-    const risk = screen.getByTestId('resume-risk');
-    expect(risk).toHaveTextContent('Risk — Mario, Peach');
+    const risk = screen.getByTestId('continue-risk');
+    expect(risk).toHaveTextContent('Continue Risk ›');
     expect(risk).toHaveTextContent('campaign · 2 generals');
     expect(risk.getAttribute('href')).toContain('/risk');
   });
@@ -186,7 +213,7 @@ describe('<Menu> — the arcade landing page', () => {
     expect(screen.getByTestId('game-play-caribbean')).toHaveAttribute('href', '/caribbean');
   });
 
-  it('reads a Caribbean Save Station row without writing and links to clean resume', () => {
+  it('reads a Caribbean Continue row without writing and links to clean resume', () => {
     const result = saveCampaign(
       localStorage,
       createJournal(createCampaign({ seed: 1702, name: 'Morgan', length: 'voyage' })),
@@ -210,14 +237,14 @@ describe('<Menu> — the arcade landing page', () => {
     expect(writes).not.toHaveBeenCalled();
 
     renderMenu();
-    const row = screen.getByTestId('resume-caribbean');
-    expect(row).toHaveTextContent('Caribbean Career — Morgan');
+    const row = screen.getByTestId('continue-caribbean');
+    expect(row).toHaveTextContent('Continue Caribbean Career ›');
     expect(row).toHaveTextContent('Voyage · Bridgetown · 3.4 months provisions');
     expect(row.getAttribute('href')).toContain('/caribbean?resume=1');
     writes.mockRestore();
   });
 
-  it('returns no Caribbean Save Station row when storage access throws', () => {
+  it('returns no Caribbean Continue row when storage access throws', () => {
     const property = Object.getOwnPropertyDescriptor(window, 'localStorage');
     const denied = new DOMException('Storage denied', 'SecurityError');
     Object.defineProperty(window, 'localStorage', {

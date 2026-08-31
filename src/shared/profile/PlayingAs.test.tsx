@@ -20,7 +20,7 @@ describe('<PlayingAs>', () => {
   it('says who you are', () => {
     seed();
     render(<PlayingAs />);
-    expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Klara");
+    expect(screen.getByTestId('playing-as')).toHaveTextContent('Klara');
     expect(screen.queryByTestId('switch-name')).toBeNull();
   });
 
@@ -40,7 +40,7 @@ describe('<PlayingAs>', () => {
     expect(screen.getByTestId('switch-user-u2')).toHaveTextContent(/you/i);
     fireEvent.click(screen.getByTestId('switch-user-u1'));
     expect(getUsersSnapshot().activeId).toBe('u1');
-    expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Flora");
+    expect(screen.getByTestId('playing-as')).toHaveTextContent('Flora');
     expect(screen.queryByTestId('switch-name')).toBeNull();
   });
 
@@ -60,7 +60,7 @@ describe('<PlayingAs>', () => {
     fireEvent.click(screen.getByTestId('playing-as-change'));
     fireEvent.change(screen.getByTestId('switch-name'), { target: { value: 'Nana' } });
     fireEvent.click(screen.getByTestId('switch-create'));
-    expect(screen.getByTestId('playing-as')).toHaveTextContent("You're Nana");
+    expect(screen.getByTestId('playing-as')).toHaveTextContent('Nana');
     expect(getUsersSnapshot().users.map((u) => u.profile.name)).toContain('Nana');
   });
 
@@ -76,5 +76,18 @@ describe('<PlayingAs>', () => {
     fireEvent.click(screen.getByTestId('playing-as-cancel'));
     expect(screen.queryByTestId('switch-name')).toBeNull();
     expect(screen.getByTestId('playing-as-change')).toHaveFocus();
+  });
+
+  // The UX review's identity copy (docs/ux-review), now shipped: one name,
+  // one verb, and the instruction every picker shares.
+  it('shows the name and Switch player, with one picker instruction', () => {
+    seed();
+    render(<PlayingAs />);
+    const line = screen.getByTestId('playing-as');
+    expect(line).toHaveTextContent('Klara');
+    expect(line).not.toHaveTextContent("You're");
+    expect(screen.getByTestId('playing-as-change')).toHaveTextContent('Switch player');
+    fireEvent.click(screen.getByTestId('playing-as-change'));
+    expect(screen.getByText('Pick your player or type your name.')).toBeInTheDocument();
   });
 });

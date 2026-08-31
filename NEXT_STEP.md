@@ -11,6 +11,48 @@ Sorted by likely value. Nothing here blocks anything else.
 
 ### Code
 
+- **The UX pass — checkpoint 1 shipped 2026-08-31.** The brief is
+  `docs/ux-review/CLAUDE-HANDOFF.md` (its `imagegen/`, `boards/` and
+  `index.html` are the *rejected* mockups — failure evidence, never
+  references). Reviewed as a live real-component harness, approved by the
+  family, then folded into the components themselves. What changed:
+
+  - **Play Together.** The pill says *Play together*; the panel is titled
+    *Play Online* and opens on two named doors, *Start Pairing* and *Enter
+    Code* — no code is shown before the child has chosen. Every state
+    collapses.
+  - **Stuck states.** Reconnecting and "no luck yet" keep the code on screen
+    and add a way on: *New code* for the host, *Enter a different code* for
+    the guest, plus *Leave*. `WayOut` in `PartyBar.tsx` is that one control.
+  - **One player, one verb.** The identity line is the name plus *Switch
+    player ›*; the picker (`TicketList`) says *Pick your player or type your
+    name.* wherever it opens; the booth dropped its explanatory line.
+  - **Continue before the catalogue.** Each save is an unboxed
+    *Continue <Game> ›* row above the tickets (`.cont` in `app.css`, built
+    from each descriptor's `savedGames()` plus the game's own title). The
+    Save Station box is gone.
+  - **Room under an open ticket.** `.app` reserves the floating control's
+    real height (88px, `tokens.css`), and a ticket that opens scrolls its
+    poster into view with `scroll-margin-bottom` on `.tk-poster`, so the
+    Play a child just revealed is never underneath the control.
+  - **Magic Mirror has two doors** (the family asked for more than one): the
+    single *Magic Mirror ›* line at the foot of the Play Online panel, and a
+    quiet `.mirror-door` row under the Ticket Booth (its own grid row on a
+    wide screen). Its catalogue ticket stays.
+
+  **Loose thread:** `SavedGameSummary.title` is now dead data in the UI —
+  every game's `savedGames()` still builds "Chess — Alice vs Bob", but a
+  Continue row says "Continue Chess ›" from the registry title instead. Either
+  drop the field or fold the player names into the row's meta line.
+
+  **Checkpoint 2, not started:** lobby titles (*Play here* / *Play Online* /
+  *Free Board*), invitations and knocks, the video-call expand affordance and
+  a bigger self-preview, ticket tap semantics, and any further Magic Mirror
+  consolidation. Mario's own note on the last one: *"it is a little ambiguous
+  how to play the game vs preview"* — the ticket face opens the poster and
+  Play is inside it; he chose not to let that block the ship, but it is the
+  first thing to look at next.
+
 - **Landing-page posters (shipped 2026-08-30, #141).** Every ticket opens
   into a poster — image, three facts, two lines, Play — from
   `GameDescriptor.preview`. The images are 640×360 webps made by

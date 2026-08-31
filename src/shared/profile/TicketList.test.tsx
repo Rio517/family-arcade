@@ -82,7 +82,7 @@ describe('<TicketList>', () => {
 
   it('invites a brand-new browser to make its first ticket', () => {
     render(<TicketList users={[]} onPick={() => {}} onCreate={() => {}} />);
-    expect(screen.getByText('Make your ticket')).toBeInTheDocument();
+    expect(screen.getByText('Pick your player or type your name.')).toBeInTheDocument();
     expect(screen.getByTestId('ticket-name')).toHaveFocus();
   });
 

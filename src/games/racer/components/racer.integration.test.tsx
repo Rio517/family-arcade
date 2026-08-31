@@ -258,7 +258,7 @@ describe('two-player racer: lobby flows', () => {
 
     toNetLobby(app, 'unicorn');
 
-    expect(app.getByTestId('playing-as')).toHaveTextContent("You're Rio");
+    expect(app.getByTestId('playing-as')).toHaveTextContent('Rio');
     expect(app.queryByTestId('racer-name-input')).toBeNull();
   });
 

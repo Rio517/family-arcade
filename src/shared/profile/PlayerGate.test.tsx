@@ -32,8 +32,10 @@ describe('<PlayerGate>', () => {
     gate();
     expect(screen.queryByTestId('the-game')).not.toBeInTheDocument();
     expect(screen.queryByTestId('pgate-chip-Klara')).toBeNull();
-    // The subtitle and the field's label both say it; the label is the field's.
-    expect(screen.getByLabelText('Make your ticket')).toBe(screen.getByTestId('pgate-name'));
+    // The picker's one label belongs to the name field.
+    expect(screen.getByLabelText('Pick your player or type your name.')).toBe(
+      screen.getByTestId('pgate-name'),
+    );
     expect(screen.getByTestId('pgate-name')).toHaveFocus();
     fireEvent.change(screen.getByTestId('pgate-name'), { target: { value: 'Klara' } });
     fireEvent.click(screen.getByTestId('pgate-create'));
