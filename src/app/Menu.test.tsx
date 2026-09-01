@@ -109,7 +109,7 @@ describe('<Menu> — the arcade landing page', () => {
     expect(document.querySelector('.game-unicorn [aria-label="Has computer players"]')).toBeNull();
   });
 
-  // The UX review's returning-player row (docs/ux-review), now shipped: the
+  // The UX review's returning-player row (docs/mockups/20260831-party-ui), now shipped: the
   // game you were playing, before the whole catalogue.
   it('a saved game becomes one unboxed Continue row above the tickets', () => {
     localStorage.setItem('risk-campaign-v1', JSON.stringify({

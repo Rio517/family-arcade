@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Game preview — three ways</title>
+<style>
+  :root {
+    --bg: #0b1220; --bg2: #111a33; --surface: #1e293b; --surface-2: #17213a; --border: #475569;
+    --text: #f1f5f9; --muted: #94a3b8; --accent: #22d3ee; --gold: #ffd76a; --pink: #ff7fc4;
+    --violet: #a78bfa; --teal: #34e0c8; --good: #4ade80;
+    --shots: ../../screenshots/;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #06090f; color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+    padding: 32px 24px 64px;
+  }
+  h1 { font-size: 28px; margin: 0 0 6px; }
+  .lede { color: var(--muted); max-width: 70ch; margin: 0 0 28px; line-height: 1.5; font-size: 15px; }
+  .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 28px; align-items: start; }
+  .opt { display: grid; gap: 14px; }
+  .label {
+    display: inline-flex; align-items: center; gap: 10px; font-weight: 800; font-size: 15px;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold);
+  }
+  .label b {
+    display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--gold); color: #0c1322; font-size: 16px;
+  }
+  .notes { font-size: 14px; line-height: 1.55; color: var(--muted); display: grid; gap: 6px; }
+  .notes strong { color: var(--text); }
+  .notes .cost { color: var(--gold); }
+
+  /* ---- a phone frame showing the landing page ---- */
+  .phone {
+    width: 430px; height: 780px; border-radius: 34px; border: 8px solid #1c2740;
+    background: linear-gradient(180deg, var(--bg2), var(--bg) 40%, #0a1020);
+    overflow: hidden; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,.55);
+  }
+  .awning {
+    height: 26px; background:
+      repeating-linear-gradient(90deg, #e63b5a 0 44px, #f6ead2 44px 88px);
+    border-radius: 0 0 22px 22px / 0 0 14px 14px;
+  }
+  .bulbs { display: flex; justify-content: space-around; padding: 6px 12px 0; }
+  .bulbs i { width: 9px; height: 13px; border-radius: 50%; display: block; }
+  .sign {
+    margin: 14px 26px 10px; padding: 12px 10px; border: 1px solid #33456e; border-radius: 12px;
+    text-align: center; background: rgba(15,23,42,.6);
+  }
+  .sign small { display: block; letter-spacing: .3em; font-size: 10px; color: var(--teal); margin-bottom: 2px; }
+  .sign .neon { font-style: italic; font-weight: 900; font-size: 24px; color: #ff9a3c; text-shadow: 0 0 10px #ff8a2a, 0 0 24px #ff7a1a; letter-spacing: .04em; }
+  .tickets { display: grid; gap: 12px; padding: 8px 14px; }
+  .tk {
+    --c: var(--teal); position: relative; border: 1px solid #2d3a55; border-radius: 16px;
+    background: rgba(17,26,51,.9); padding: 16px 14px 14px; display: grid;
+    grid-template-columns: 52px 1fr 20px; gap: 12px; align-items: center; overflow: hidden;
+  }
+  .tk::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px;
+    background: repeating-linear-gradient(90deg, var(--c) 0 34px, color-mix(in srgb, var(--c) 45%, #000) 34px 68px);
+  }
+  .tk .ic { width: 52px; height: 52px; border-radius: 12px; border: 1.5px solid var(--c); display: grid; place-items: center; color: var(--c); background: rgba(0,0,0,.25); }
+  .tk .ic svg { width: 26px; height: 26px; }
+  .tk .title { font-weight: 900; letter-spacing: .04em; font-size: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tk .tag { font-size: 11px; letter-spacing: .12em; color: var(--c); font-weight: 800; }
+  .tk .pl { font-size: 11px; border: 1px solid #3b4a6b; border-radius: 999px; padding: 2px 8px; color: var(--muted); }
+  .tk .sub { font-size: 13px; color: var(--muted); line-height: 1.35; margin-top: 4px; }
+  .tk .chev { color: var(--c); font-size: 22px; font-weight: 900; text-align: right; }
+  .game-chess { --c: var(--gold); } .game-battleship { --c: #35c7e8; } .game-racer { --c: var(--violet); }
+  .game-risk { --c: #ff7a5c; } .game-unicorn { --c: var(--pink); } .game-mirror { --c: #7bf7c2; }
+
+  /* the "Peek" chip on a ticket */
+  .peek {
+    grid-column: 2 / 4; justify-self: start; margin-top: 8px;
+    font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--c); border: 1px solid var(--c); border-radius: 999px; padding: 5px 10px 5px 8px;
+    display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,.25);
+  }
+  .peek svg { width: 14px; height: 14px; }
+
+  /* ---- A: bottom sheet ---- */
+  .dim { position: absolute; inset: 0; background: rgba(4,8,16,.62); backdrop-filter: blur(2px); }
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; border-radius: 22px 22px 0 0;
+    background: var(--surface); border-top: 1px solid var(--border); padding: 10px 16px 18px;
+    display: grid; gap: 12px; box-shadow: 0 -20px 50px rgba(0,0,0,.6);
+  }
+  .grip { width: 44px; height: 5px; border-radius: 999px; background: #3b4a6b; margin: 0 auto 2px; }
+  .shot { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 12px; border: 1px solid #2d3a55; background: #000; display: block; }
+  .sheet h2, .poster h2 { margin: 0; font-size: 20px; font-weight: 900; letter-spacing: .03em; display: flex; align-items: center; gap: 10px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .facts span { font-size: 12px; font-weight: 700; color: var(--text); background: rgba(255,255,255,.07); border: 1px solid #3b4a6b; border-radius: 999px; padding: 5px 10px; display: inline-flex; gap: 6px; align-items: center; }
+  .facts svg { width: 14px; height: 14px; }
+  .blurb { margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
+  .blurb b { color: var(--text); }
+  .btns { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+  .btn { border: none; border-radius: 12px; min-height: 46px; font-weight: 800; font-size: 15px; font-family: inherit; cursor: pointer; padding: 0 16px; }
+  .btn.play { background: linear-gradient(90deg, var(--gold), #ffb347); color: #1a1200; }
+  .btn.ghost { background: transparent; color: var(--muted); border: 1px solid #3b4a6b; }
+
+  /* ---- B: poster expanded in place ---- */
+  .poster { grid-template-columns: 1fr; gap: 10px; padding-top: 18px; }
+  .poster .head { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: center; }
+  .poster .strip { width: 100%; aspect-ratio: 16 / 8; object-fit: cover; border-radius: 10px; border: 1px solid #2d3a55; display: block; }
+  .collapse { justify-self: end; font-size: 12px; color: var(--muted); font-weight: 700; }
+
+  /* ---- C: attract mode ---- */
+  .attract { grid-template-columns: 52px 1fr 20px; }
+  .reel {
+    grid-column: 1 / 4; margin-top: 10px; aspect-ratio: 16 / 7; border-radius: 10px; overflow: hidden;
+    border: 1px solid #2d3a55; position: relative; background: #000;
+  }
+  .reel img { width: 130%; height: 130%; object-fit: cover; display: block; position: absolute; left: 0; top: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .reel img { animation: pan 9s ease-in-out infinite alternate; }
+    .reel.shimmer::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 40%, rgba(255,255,255,.08) 50%, transparent 60%); animation: shine 3.5s linear infinite; }
+  }
+  @keyframes pan { from { transform: translate(0, 0); } to { transform: translate(-22%, -20%); } }
+  @keyframes shine { from { transform: translateX(-60%); } to { transform: translateX(60%); } }
+  .reel .live { position: absolute; left: 8px; top: 8px; font-size: 10px; letter-spacing: .12em; font-weight: 800; color: #fff; background: rgba(0,0,0,.55); border-radius: 999px; padding: 3px 8px; }
+
+  table { border-collapse: collapse; margin-top: 36px; font-size: 14px; width: 100%; max-width: 1100px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #22304d; vertical-align: top; }
+  th { color: var(--gold); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; }
+  td:first-child { color: var(--muted); white-space: nowrap; }
+  .rec { margin-top: 28px; max-width: 78ch; line-height: 1.55; font-size: 15px; border-left: 3px solid var(--gold); padding-left: 14px; }
+</style>
+</head>
+<body>
+<h1>Game preview — three ways</h1>
+<p class="lede">Same goal each time: someone on the landing page can see what a game is like without playing it. Every mockup uses the arcade's real tickets and real screenshots. The blurb and the facts are example copy — the real ones would come from each game's descriptor.</p>
+
+<div class="options">
+
+  <!-- ================= A: PEEK SHEET ================= -->
+  <section class="opt">
+    <div class="label"><b>A</b> Peek sheet</div>
+    <div class="phone">
+      <div class="awning"></div>
+      <div class="bulbs"><i style="background:#ffd76a"></i><i style="background:#ff7fc4"></i><i style="background:#34e0c8"></i><i style="background:#a78bfa"></i><i style="background:#ffd76a"></i><i style="background:#ff7fc4"></i><i style="background:#34e0c8"></i><i style="background:#a78bfa"></i></div>
+      <div class="sign"><small>★ STEP RIGHT UP TO THE ★</small><div class="neon">KNY-FLORES</div></div>
+      <div class="tickets">
+        <div class="tk game-battleship">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 15h18l-2 4H5z"/><path d="M6 15V9h12v6"/><path d="M12 9V4"/></svg></div>
+          <div><div class="title">SHIP BATTLE <span class="tag">3D</span> <span class="pl">2</span></div><div class="sub">Two devices, one code. Pick your fleet, place your ships, and duel.</div></div>
+          <div class="chev">›</div>
+          <span class="peek"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/></svg>Peek</span>
+        </div>
+        <div class="tk game-chess">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 20h8M9 17h6l-1-4 2-3-3-3V5h-2v2L8 10l2 3z"/></svg></div>
+          <div><div class="title">CHESS <span class="tag">3D</span> <span class="pl">1–2</span></div><div class="sub">Drag-and-drop chess — same device or online with a code.</div></div>
+          <div class="chev">›</div>
+          <span class="peek"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/></svg>Peek</span>
+        </div>
+        <div class="tk game-racer">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 16l3-7h10l3 7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></div>
+          <div><div class="title">RAINBOW RACER <span class="tag">3D</span> <span class="pl">1–2</span></div><div class="sub">Race a 3D arena and grab 20 coins.</div></div>
+          <div class="chev">›</div>
+        </div>
+      </div>
+      <!-- the sheet, opened from Chess's Peek -->
+      <div class="dim"></div>
+      <div class="sheet">
+        <div class="grip"></div>
+        <img class="shot" src="../../screenshots/chess-galaxy-3d.png" alt="Chess, the galaxy set in 3D" />
+        <h2 style="color:var(--gold)">CHESS <span class="tag" style="font-size:12px;letter-spacing:.14em">3D · GALAXY · WAR ROOM · CLOUD KINGDOM</span></h2>
+        <div class="facts">
+          <span>👤 1–2 players</span><span>📱 one iPad or two</span><span>⏱ ~15 min</span><span>🤝 party-ready</span>
+        </div>
+        <p class="blurb"><b>Real chess with three worlds.</b> Play on one iPad passing it back and forth, or against a friend on their own — the party seats you both, no code. Free play lets you set up any puzzle.</p>
+        <div class="btns"><button class="btn play">Play Chess ›</button><button class="btn ghost">Not now</button></div>
+      </div>
+    </div>
+    <div class="notes">
+      <div><strong>What it is.</strong> Every ticket gets a small <em>Peek</em>. Tap it and a sheet slides up: one real screenshot, the name, the facts (players, devices, how long, party-ready), a two-line "what it is", and a big Play. Tap anywhere else to drop it. The ticket itself still plays on tap, exactly as today.</div>
+      <div><strong>Why it works.</strong> Nothing changes on the landing page until you ask; the sheet is the one place to "sell" a game, and it reads on a phone. Kids get one big picture and one big button.</div>
+      <div class="cost"><strong>Cost.</strong> One screenshot per game bundled as a small webp (~40–60 KB each, ~400 KB total, offline-safe), a <code>preview</code> block on each game descriptor (facts + blurb), one shared sheet component. About a day, plus the screenshot curation.</div>
+    </div>
+  </section>
+
+  <!-- ================= B: POSTER STRIP ================= -->
+  <section class="opt">
+    <div class="label"><b>B</b> Poster strip</div>
+    <div class="phone">
+      <div class="awning"></div>
+      <div class="bulbs"><i style="background:#ffd76a"></i><i style="background:#ff7fc4"></i><i style="background:#34e0c8"></i><i style="background:#a78bfa"></i><i style="background:#ffd76a"></i><i style="background:#ff7fc4"></i><i style="background:#34e0c8"></i><i style="background:#a78bfa"></i></div>
+      <div class="sign"><small>★ STEP RIGHT UP TO THE ★</small><div class="neon">KNY-FLORES</div></div>
+      <div class="tickets">
+        <div class="tk game-battleship">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 15h18l-2 4H5z"/><path d="M6 15V9h12v6"/><path d="M12 9V4"/></svg></div>
+          <div><div class="title">SHIP BATTLE <span class="tag">3D</span> <span class="pl">2</span></div><div class="sub">Two devices, one code. Pick your fleet, place your ships, and duel.</div></div>
+          <div class="chev">⌄</div>
+        </div>
+        <!-- Chess, expanded in place -->
+        <div class="tk poster game-chess">
+          <div class="head">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 20h8M9 17h6l-1-4 2-3-3-3V5h-2v2L8 10l2 3z"/></svg></div>
+            <div><div class="title">CHESS <span class="tag">3D</span> <span class="pl">1–2</span></div><div class="sub">Drag-and-drop chess — same device or online with a code.</div></div>
+          </div>
+          <img class="strip" src="../../screenshots/chess-galaxy-3d.png" alt="Chess, the galaxy set" />
+          <div class="facts"><span>👤 1–2</span><span>📱 one iPad or two</span><span>⏱ ~15 min</span><span>🤝 party-ready</span></div>
+          <p class="blurb"><b>Real chess with three worlds</b> — pass one iPad, or the party seats you both. Free play sets up any puzzle.</p>
+          <div class="btns"><button class="btn play">Play Chess ›</button><span class="collapse">less ⌃</span></div>
+        </div>
+        <div class="tk game-racer">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 16l3-7h10l3 7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></div>
+          <div><div class="title">RAINBOW RACER <span class="tag">3D</span> <span class="pl">1–2</span></div><div class="sub">Race a 3D arena and grab 20 coins.</div></div>
+          <div class="chev">⌄</div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div><strong>What it is.</strong> The chevron on each ticket becomes "open": tap the ticket and it grows in place — a wide screenshot strip, the facts, the blurb, a Play button. Tap the header again (or another ticket) and it folds back. No sheet, no dimming.</div>
+      <div><strong>Why it works.</strong> Everything stays on one scrolling page; you can open two tickets and compare. It feels like the ticket is the poster.</div>
+      <div class="cost"><strong>Cost.</strong> Same bundled screenshots and descriptor block as A, plus the ticket needs an open/closed state and a "Play" that's separate from "open" (today the whole card is the Play button — that's the one real UX change, and on a phone a tall open ticket pushes the others below the fold). About a day and a half.</div>
+    </div>
+  </section>
+
+  <!-- ================= C: ATTRACT MODE ================= -->
+  <section class="opt">
+    <div class="label"><b>C</b> Attract mode</div>
+    <div class="phone">
+      <div class="awning"></div>
+      <div class="bulbs"><i style="background:#ffd76a"></i><i style="background:#ff7fc4"></i><i style="background:#34e0c8"></i><i style="background:#a78bfa"></i><i style="background:#ffd76a"></i><i style="background:#ff7fc4"></i><i style="background:#34e0c8"></i><i style="background:#a78bfa"></i></div>
+      <div class="sign"><small>★ STEP RIGHT UP TO THE ★</small><div class="neon">KNY-FLORES</div></div>
+      <div class="tickets">
+        <div class="tk attract game-battleship">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 15h18l-2 4H5z"/><path d="M6 15V9h12v6"/><path d="M12 9V4"/></svg></div>
+          <div><div class="title">SHIP BATTLE <span class="tag">3D</span> <span class="pl">2</span></div><div class="sub">Two devices, one code. Pick your fleet, place your ships, and duel.</div></div>
+          <div class="chev">›</div>
+          <div class="reel shimmer"><img src="../../screenshots/battle-fleet-3d.png" alt="" /><span class="live">PREVIEW</span></div>
+        </div>
+        <div class="tk attract game-chess">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 20h8M9 17h6l-1-4 2-3-3-3V5h-2v2L8 10l2 3z"/></svg></div>
+          <div><div class="title">CHESS <span class="tag">3D</span> <span class="pl">1–2</span></div><div class="sub">Drag-and-drop chess — same device or online with a code.</div></div>
+          <div class="chev">›</div>
+          <div class="reel shimmer"><img src="../../screenshots/chess-galaxy-3d.png" alt="" /><span class="live">PREVIEW</span></div>
+        </div>
+        <div class="tk attract game-racer">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 16l3-7h10l3 7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></div>
+          <div><div class="title">RAINBOW RACER <span class="tag">3D</span> <span class="pl">1–2</span></div><div class="sub">Race a 3D arena and grab 20 coins.</div></div>
+          <div class="chev">›</div>
+          <div class="reel shimmer"><img src="../../screenshots/racer-arena.png" alt="" /><span class="live">PREVIEW</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div><strong>What it is.</strong> Every ticket carries a little moving poster — a slow pan across a screenshot with a shimmer (a real looping clip later, if ever). The landing page becomes an arcade cabinet row: you see all the games moving before you touch anything. Tapping still plays.</div>
+      <div><strong>Why it works.</strong> Maximum "see it" with zero taps; it looks alive. The Midnight Carnival was built for this.</div>
+      <div class="cost"><strong>Cost.</strong> Same screenshots, but every ticket now shows one — the landing page loads 7 images and animates them (fine on iPad, watch older phones; reduced-motion gets stills). Real video loops would be 1–3 MB <em>each</em>, which the offline bundle can't afford. And it does not answer "who is it for / how long" — you still need A or B on top for the facts. Two days for the pan-and-shimmer version.</div>
+    </div>
+  </section>
+</div>
+
+<table>
+  <tr><th></th><th>A · Peek sheet</th><th>B · Poster strip</th><th>C · Attract mode</th></tr>
+  <tr><td>See it without playing</td><td>one tap, big picture + facts</td><td>one tap, in place</td><td>zero taps, always moving</td></tr>
+  <tr><td>Landing page today</td><td>unchanged (+ a Peek chip)</td><td>tickets gain open/close</td><td>every ticket gets a reel</td></tr>
+  <tr><td>Phone</td><td>great (sheet)</td><td>tall when open</td><td>busy; scrolls a lot</td></tr>
+  <tr><td>Offline size</td><td>~400 KB webp</td><td>~400 KB webp</td><td>~400 KB stills (video loops: no)</td></tr>
+  <tr><td>Facts (players, time)</td><td>yes</td><td>yes</td><td>needs A or B anyway</td></tr>
+  <tr><td>Work</td><td>~1 day</td><td>~1.5 days</td><td>~2 days (+ A or B)</td></tr>
+</table>
+
+<p class="rec"><strong>My pick: A.</strong> It does exactly what you asked — see a game, quickly, without playing it — without touching how the landing page works today. If the family wants the cabinet-row feeling later, C's pan-and-shimmer can be added on top of A's screenshots for free; B is the one I'd skip (a ticket that both opens and plays is two jobs on one card, and it gets tall on a phone).</p>
+</body>
+</html>

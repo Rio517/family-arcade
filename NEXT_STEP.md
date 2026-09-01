@@ -11,11 +11,11 @@ Sorted by likely value. Nothing here blocks anything else.
 
 ### Code
 
-- **The UX pass — checkpoint 1 shipped 2026-08-31.** The brief is
-  `docs/ux-review/CLAUDE-HANDOFF.md` (its `imagegen/`, `boards/` and
-  `index.html` are the *rejected* mockups — failure evidence, never
-  references). Reviewed as a live real-component harness, approved by the
-  family, then folded into the components themselves. What changed:
+- **The UX pass — checkpoint 1 shipped 2026-08-31.** The pitch, all ten
+  proposals and which four are still open:
+  `docs/mockups/20260831-party-ui/`. Reviewed as a live real-component
+  harness, approved by the family, then folded into the components
+  themselves. What changed:
 
   - **Play Together.** The pill says *Play together*; the panel is titled
     *Play Online* and opens on two named doors, *Start Pairing* and *Enter
@@ -48,10 +48,10 @@ Sorted by likely value. Nothing here blocks anything else.
   **Checkpoint 2, not started:** lobby titles (*Play here* / *Play Online* /
   *Free Board*), invitations and knocks, the video-call expand affordance and
   a bigger self-preview, ticket tap semantics, and any further Magic Mirror
-  consolidation. Mario's own note on the last one: *"it is a little ambiguous
-  how to play the game vs preview"* — the ticket face opens the poster and
-  Play is inside it; he chose not to let that block the ship, but it is the
-  first thing to look at next.
+  consolidation. Raised in review and still open: it is ambiguous whether a
+  ticket tap means *play* or *preview* — the face opens the poster and Play
+  is inside it. It was explicitly not allowed to block the ship, but it is
+  the first thing to look at next.
 
 - **Landing-page posters (shipped 2026-08-30, #141).** Every ticket opens
   into a poster — image, three facts, two lines, Play — from
@@ -75,7 +75,7 @@ Sorted by likely value. Nothing here blocks anything else.
   copies (Mirror page, big call).
 
 - **One ticket, every game — phases 3–4.** The design and the phase list live
-  in `docs/planning/players-and-party.md`. Shipped 2026-08-29: Phase 1 (no
+  in `docs/ideas/players-and-party.md`. Shipped 2026-08-29: Phase 1 (no
   game asks the signed-in player for a name; the ticket list at the gate,
   behind "Change", and at the booth) and Phase 2 (pass-and-play chairs in
   Chess same-device, Risk and Magic Coins are tickets tapped from the roster,

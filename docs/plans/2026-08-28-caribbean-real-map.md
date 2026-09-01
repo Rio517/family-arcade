@@ -229,7 +229,7 @@ Ask the reviewer to check the full diff against the authoritative design doc, wi
 - [ ] **Step 6: Commit and push the existing branch**
 
 ```bash
-git add package.json package-lock.json src/games/caribbean scripts docs/superpowers/plans/2026-08-28-caribbean-real-map.md
+git add package.json package-lock.json src/games/caribbean scripts docs/plans/2026-08-28-caribbean-real-map.md
 git commit -m "feat: add shared Caribbean nautical map"
 git push origin codex/caribbean-game
 ```

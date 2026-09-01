@@ -9,7 +9,7 @@ The family wants to see and hear each other while playing — a little FaceTime
 window alongside the game — and we want to keep the "no server we run" promise.
 The players are children, so privacy defaults matter.
 
-See `docs/planning/video-voice-streaming.md` for the fuller exploration.
+See `docs/ideas/video-voice-streaming.md` for the fuller exploration.
 
 ## Decision
 

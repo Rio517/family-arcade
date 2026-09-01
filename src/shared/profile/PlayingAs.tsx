@@ -4,7 +4,7 @@
  * Switching drops the ticket list in place, so the wrong person at the iPad is
  * two taps from fixed, without leaving the game. One name, one verb: the gate,
  * this line and the Ticket Booth all say "Switch player" and open the same
- * picker (the UX pass, docs/ux-review).
+ * picker (the UX pass, docs/mockups/20260831-party-ui).
  */
 
 import { useCallback, useRef, useState } from 'react';

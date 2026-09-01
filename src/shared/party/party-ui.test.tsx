@@ -112,7 +112,7 @@ describe('PartyBar', () => {
     expect(screen.getByRole('dialog', { name: 'Party' })).toBeInTheDocument();
   });
 
-  // The UX pass's pairing copy (docs/ux-review), shipped.
+  // The UX pass's pairing copy (docs/mockups/20260831-party-ui), shipped.
   describe('Play together', () => {
     const renderProposed = (over: Partial<PartyValue> = {}) => {
       mockParty.value = makeParty(over);

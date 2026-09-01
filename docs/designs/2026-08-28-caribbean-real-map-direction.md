@@ -30,7 +30,7 @@ of fake geography.
 
 ![Current port screen with a hand-drawn chart and a large gap from the approved concept](./2026-08-28-caribbean-current-port-map-gap.png)
 
-This review capture is the exact 3238×1564 PNG Mario shared on 2026-08-28
+This review capture is the exact 3238×1564 PNG submitted for review on 2026-08-28
 (`sha256 3ddac0d4c4a0438c6af250c50d9eedb9376d94db202f7511a92e9a9d9b3b60a1`).
 The port framing is useful, but the chart is a diagram rather than a real map
 and the whole result remains materially flatter than the concept.
@@ -39,7 +39,7 @@ and the whole result remains materially flatter than the concept.
 
 ![Current sailing screen with an oversized empty sea and placeholder vector boat](./2026-08-28-caribbean-current-sailing-gap.png)
 
-This is the exact 3780×2680 PNG Mario shared on 2026-08-28
+This is the exact 3780×2680 PNG submitted for review on 2026-08-28
 (`sha256 89e31e1d398e42173e5d9b630a0a2c8e2f905c95808cd0d246af494ffc5b1da1`).
 The sparse vector boat, single wave line, and oversized empty field are not an
 acceptable approximation of the map-led experience.

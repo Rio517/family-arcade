@@ -1,7 +1,12 @@
-# Planning
+# Ideas
 
 A scratch space for design notes and ideas we're still thinking through — not
-finished specs, and not necessarily built yet.
+finished specs, and not necessarily built yet. Once an idea is agreed it
+graduates to a [design](../designs/) and a [plan](../plans/); if the family has
+to choose between looks first, it goes through [mockups](../mockups/).
+
+(This folder was called `planning/` until 2026-09-01 — one letter from
+`plans/`, which holds a different thing entirely.)
 
 - [video-voice-streaming.md](./video-voice-streaming.md) — can we add see/hear-each-other
   video & voice to the 2-player games without running a server of our own? (Short
