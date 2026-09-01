@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { seededRng } from '@shared/rng';
 import { disposeDeep } from '@shared/three/disposeDeep';
 import { buildDragonHead, buildDragonMask, loadDragonMask, type DragonHead } from './dragon';
+import { easing, follow, followAngle } from './follow';
 import { FireBreath } from './fire';
 import { PeaceBurst } from './sparkles';
 import type { TrackingFrame } from '../engine/types';
@@ -41,7 +42,28 @@ interface DragonSlot {
   anchor: THREE.Group;
   head: DragonHead;
   fire: FireBreath;
+  /** What the mask is actually wearing, easing toward what the tracker says. */
+  worn: WornPose | null;
 }
+
+/** The tracked pose after smoothing: pixels, pixels-per-face-width, radians. */
+interface WornPose {
+  x: number;
+  y: number;
+  scale: number;
+  pitch: number;
+  yaw: number;
+  roll: number;
+  jawOpen: number;
+}
+
+/**
+ * How long each part of the pose takes to close half the gap to the tracker.
+ * Rotation and size carry the most visible jitter and can afford the most
+ * easing; the jaw stays quick so the fire still lights the moment a mouth
+ * opens.
+ */
+const HALF_LIFE = { move: 0.06, scale: 0.12, turn: 0.12, jaw: 0.04 };
 
 /** Throws when WebGL is unavailable — callers show the friendly fallback. */
 export function createEffectsScene(
@@ -76,7 +98,7 @@ export function createEffectsScene(
     const fire = new FireBreath(rng, opts.reducedMotion);
     fire.group.position.z = 400; // always in front of the dragon geometry
     scene.add(fire.group);
-    dragons.push({ anchor, head, fire });
+    dragons.push({ anchor, head, fire, worn: null });
   }
 
   let disposed = false;
@@ -122,30 +144,61 @@ export function createEffectsScene(
 
       const showDragon = effects.has('dragon');
       for (let i = 0; i < MAX_FACES; i++) {
-        const { anchor, head, fire } = dragons[i];
+        const slot = dragons[i];
+        const { anchor, head, fire } = slot;
         const face = frame.faces[i];
         anchor.visible = Boolean(showDragon && face);
-        let yaw = 0;
         if (face) {
           // Both heads are built in face widths, so the tracked width in
           // pixels is the whole of the scale.
-          const facePx = face.width * width;
-          anchor.position.set(face.center.x * width, (1 - face.center.y) * height, 0);
-          anchor.scale.setScalar(facePx);
+          const target: WornPose = {
+            x: face.center.x * width,
+            y: (1 - face.center.y) * height,
+            scale: face.width * width,
+            pitch: 0,
+            yaw: 0,
+            roll: 0,
+            jawOpen: Math.min(1, Math.max(0, face.jawOpen)),
+          };
           if (face.poseMatrix && face.poseMatrix.length === 16) {
             pose.fromArray(face.poseMatrix);
             euler.setFromRotationMatrix(pose, 'ZYX');
-            yaw = euler.y;
-            // Desk-derived sign mapping from MediaPipe's camera-space pose to
-            // this y-up pixel space; damped so a wrong sign reads as a subtle
-            // lean, not a broken mask. Calibrate live (Tidewave) if it feels
-            // backwards on a real camera.
-            anchor.rotation.set(-euler.x * 0.6, euler.y * 0.7, -euler.z);
+            // MediaPipe hands back the head pose in a y-up space, the same way
+            // round as this one, so the angles carry straight over. Roll is a
+            // turn in the plane of the picture and follows the head exactly;
+            // pitch and yaw tip a mask that has no depth behind it, so they
+            // are eased off a little.
+            target.pitch = euler.x * 0.6;
+            target.yaw = euler.y * 0.8;
+            target.roll = euler.z;
           }
+
+          // A face that has just been found wears its pose outright; from then
+          // on the mask eases toward it and the tracker's jitter damps out.
+          if (!slot.worn) {
+            slot.worn = { ...target };
+          } else {
+            const worn = slot.worn;
+            const move = easing(dtS, HALF_LIFE.move);
+            worn.x = follow(worn.x, target.x, move);
+            worn.y = follow(worn.y, target.y, move);
+            worn.scale = follow(worn.scale, target.scale, easing(dtS, HALF_LIFE.scale));
+            const turn = easing(dtS, HALF_LIFE.turn);
+            worn.pitch = followAngle(worn.pitch, target.pitch, turn);
+            worn.yaw = followAngle(worn.yaw, target.yaw, turn);
+            worn.roll = followAngle(worn.roll, target.roll, turn);
+            worn.jawOpen = follow(worn.jawOpen, target.jawOpen, easing(dtS, HALF_LIFE.jaw));
+          }
+
+          const worn = slot.worn;
+          anchor.position.set(worn.x, worn.y, 0);
+          anchor.scale.setScalar(worn.scale);
+          anchor.rotation.set(worn.pitch, worn.yaw, worn.roll);
+
           // The jaw drops with the wearer's, and the flame leaves the mask's
           // own mouth rather than the landmark behind it — the socket rides
           // along with every tilt and turn of the head.
-          if (head.jaw) head.jaw.rotation.x = head.jawOpenRadians * Math.min(1, Math.max(0, face.jawOpen));
+          if (head.jaw) head.jaw.rotation.x = head.jawOpenRadians * worn.jawOpen;
           let mouthX = face.mouth.x * width;
           let mouthY = (1 - face.mouth.y) * height;
           if (head.fireSocket) {
@@ -157,12 +210,15 @@ export function createEffectsScene(
           fire.update({
             x: mouthX,
             y: mouthY,
-            dirX: Math.sin(yaw),
-            scalePx: Math.max(24, facePx),
-            jawOpen: showDragon ? face.jawOpen : 0,
+            dirX: Math.sin(worn.yaw),
+            scalePx: Math.max(24, worn.scale),
+            jawOpen: showDragon ? worn.jawOpen : 0,
             dtS,
           });
         } else {
+          // Lost the face: forget the pose, so when it comes back the mask
+          // appears on it rather than sliding across the mirror.
+          slot.worn = null;
           fire.update({ x: 0, y: 0, dirX: 0, scalePx: 24, jawOpen: 0, dtS });
         }
       }
