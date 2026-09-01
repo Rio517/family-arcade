@@ -11,67 +11,35 @@ Sorted by likely value. Nothing here blocks anything else.
 
 ### Code
 
-- **Caribbean Career — where it stands (2026-09-01).** All of it is on `main`;
-  nothing is parked on a branch or in a worktree any more. The production
-  module is `src/games/caribbean/`; `src/games/caribbean-poc/` stays as a
-  harness and evidence record and is never imported at runtime. Last to land:
-  the shared real nautical map, the material port interface, and the
-  commission showing whose ticket signs. The game is registered
-  `under-construction · playable`.
+- **Caribbean Career.** All of it is on `main`. Nothing is parked on a branch
+  or in a worktree. The production module is `src/games/caribbean/`, registered
+  `under-construction · playable`. `src/games/caribbean-poc/` is a harness and
+  evidence record and is never imported at runtime.
 
-  Read in this order: `docs/games/caribbean-career/production-roadmap.md` (the
-  phased execution map — start at the first phase whose acceptance criteria
-  aren't met), `docs/games/caribbean-career/README.md`, then the visual
-  direction in `docs/designs/2026-08-28-caribbean-real-map-direction.md`.
-  Its plans are `docs/plans/2026-08-2*-caribbean-*.md`.
+  To pick it up, read `docs/games/caribbean-career/production-roadmap.md` and
+  start at the first phase whose acceptance criteria are not met. Then
+  `docs/games/caribbean-career/README.md`, then the visual direction in
+  `docs/designs/2026-08-28-caribbean-real-map-direction.md`. The plans are
+  `docs/plans/2026-08-2*-caribbean-*.md`. Prove changes with
+  `npm run caribbean:port-check` and `npm run caribbean:naval-check`.
 
-  Before touching it: the map is the repo's one deliberate exception to the
-  offline rule (approved OpenFreeMap tiles at runtime, repo-owned style,
-  explicit network-unavailable state) — never swap it for bundled PMTiles or a
-  tile-extraction pipeline. Evidence harnesses are `npm run caribbean:port-check`
-  and `npm run caribbean:naval-check`.
+  **The map stays online.** It is the repo's one deliberate exception to the
+  offline rule: approved OpenFreeMap tiles at runtime, a repo-owned style, and
+  an explicit network-unavailable state. Bundled PMTiles and tile-extraction
+  pipelines are a closed decision. Do not propose them or accept a plan that
+  reintroduces them.
 
-- **The UX pass — checkpoint 1 shipped 2026-08-31.** The pitch, all ten
-  proposals and which four are still open:
-  `docs/mockups/20260831-party-ui/`. Reviewed as a live real-component
-  harness, approved by the family, then folded into the components
-  themselves. What changed:
+- **Party and player UX, four proposals open.** The pitch and the state of all
+  ten proposals: `docs/mockups/20260831-party-ui/`. The four not built are
+  ticket tap semantics (play vs preview), the pill expanding into an
+  invitation, the lobby mode titles (*Play here* / *Play Online* / *Free
+  Board*), and the video-call full-screen control with a larger self-preview.
+  Take ticket tap semantics first.
 
-  - **Play Together.** The pill says *Play together*; the panel is titled
-    *Play Online* and opens on two named doors, *Start Pairing* and *Enter
-    Code* — no code is shown before the child has chosen. Every state
-    collapses.
-  - **Stuck states.** Reconnecting and "no luck yet" keep the code on screen
-    and add a way on: *New code* for the host, *Enter a different code* for
-    the guest, plus *Leave*. `WayOut` in `PartyBar.tsx` is that one control.
-  - **One player, one verb.** The identity line is the name plus *Switch
-    player ›*; the picker (`TicketList`) says *Pick your player or type your
-    name.* wherever it opens; the booth dropped its explanatory line.
-  - **Continue before the catalogue.** Each save is an unboxed
-    *Continue <Game> ›* row above the tickets (`.cont` in `app.css`, built
-    from each descriptor's `savedGames()` plus the game's own title). The
-    Save Station box is gone.
-  - **Room under an open ticket.** `.app` reserves the floating control's
-    real height (88px, `tokens.css`), and a ticket that opens scrolls its
-    poster into view with `scroll-margin-bottom` on `.tk-poster`, so the
-    Play a child just revealed is never underneath the control.
-  - **Magic Mirror has two doors** (the family asked for more than one): the
-    single *Magic Mirror ›* line at the foot of the Play Online panel, and a
-    quiet `.mirror-door` row under the Ticket Booth (its own grid row on a
-    wide screen). Its catalogue ticket stays.
-
-  **Loose thread:** `SavedGameSummary.title` is now dead data in the UI —
-  every game's `savedGames()` still builds "Chess — Alice vs Bob", but a
-  Continue row says "Continue Chess ›" from the registry title instead. Either
-  drop the field or fold the player names into the row's meta line.
-
-  **Checkpoint 2, not started:** lobby titles (*Play here* / *Play Online* /
-  *Free Board*), invitations and knocks, the video-call expand affordance and
-  a bigger self-preview, ticket tap semantics, and any further Magic Mirror
-  consolidation. Raised in review and still open: it is ambiguous whether a
-  ticket tap means *play* or *preview* — the face opens the poster and Play
-  is inside it. It was explicitly not allowed to block the ship, but it is
-  the first thing to look at next.
+  Also open: `SavedGameSummary.title` is dead data. Every game's
+  `savedGames()` builds a title like "Chess — Alice vs Bob", but a Continue
+  row uses the registry title instead. Either drop the field or fold the
+  player names into the row's meta line.
 
 - **Landing-page posters (shipped 2026-08-30, #141).** Every ticket opens
   into a poster — image, three facts, two lines, Play — from

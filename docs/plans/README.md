@@ -5,14 +5,14 @@ Step-by-step implementation plans, one file per build:
 files to create and modify, the test to write first, the command to run, and
 what its output should say. Bite-sized steps, no placeholders.
 
-**This is the home for plans, including ones the superpowers `writing-plans`
-skill produces** — its default of `docs/superpowers/plans/` is overridden here.
-A `docs/superpowers/` tree drifted into existence once and was folded back in.
+**All plans live here, including the ones the superpowers `writing-plans`
+skill produces.** Its default of `docs/superpowers/plans/` is overridden. There
+is no `docs/superpowers/` tree here; do not create one.
 
-A plan is a record of intent, not a live document: once it ships, leave it as
-written rather than editing it to match what actually happened. What actually
-happened belongs in the commit, the PR, and `NEXT_STEP.md`.
+A plan records what was intended. Once it ships, leave it as written instead
+of editing it to match the result. The result belongs in the commit, the PR,
+and `NEXT_STEP.md`.
 
-Related: the design a plan builds from lives in [../designs/](../designs/) or
-[../ideas/](../ideas/); the options the family chose between live in
+The design a plan builds from is in [../designs/](../designs/) or
+[../ideas/](../ideas/). The options the family chose between are in
 [../mockups/](../mockups/).

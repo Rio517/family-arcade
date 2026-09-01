@@ -11,11 +11,17 @@ a son who loves Star Wars and 3D and suggests features, and parents with a
 taste for retro (70s orange, neon signs). Kid-facing copy is warm and playful;
 nothing needs a manual. Big visual changes are pitched as **mockups first**
 (a local HTML page with ~3 labelled options), built only after the family
-picks. A pitch keeps its own folder — `docs/mockups/YYYYMMDD-<topic>/`, holding
-the write-up, the page, and its assets — and the write-up records what was
-chosen. `docs/README.md` is the map of where every other kind of doc goes;
-read it before adding a folder. Write docs in product terms: what was asked
-for and decided, not who said it.
+picks. Each pitch keeps its own folder, `docs/mockups/YYYYMMDD-<topic>/`,
+holding the write-up, the page, and its assets. The write-up records which
+option was chosen. `docs/README.md` says where every other kind of doc goes;
+read it before adding a folder.
+
+**How to write docs here.** Use product terms: the requirement and the
+decision, not the person who voiced it. Describe the current state and what
+comes next. Do not narrate how the work got here or what an earlier attempt
+looked like — `git log` and merged PRs already hold that, and a doc that
+repeats it goes stale. Write plainly. Avoid rhetorical constructions such as
+"not just X but Y", and do not stack three examples where one is enough.
 
 ## Architecture invariants (do not break)
 
@@ -31,8 +37,11 @@ for and decided, not who said it.
 - **Offline PWA, with one deliberate map exception.** No CDN fonts, fetched 3D
   models, or remote images. The Caribbean real map intentionally loads
   approved OpenFreeMap vector tiles/glyphs at runtime, uses a repository-owned
-  style, and shows a clear network-unavailable state. Never bundle PMTiles or
-  add a tile-extraction pipeline. 3D is procedural three.js geometry (lathe/
+  style, and shows a clear network-unavailable state. **The map stays online.**
+  Bundled PMTiles and tile-extraction pipelines are a closed decision: the cost
+  is out of proportion to the payoff, and the approach already failed in
+  another project. Do not propose it or accept a plan that reintroduces it.
+  3D is procedural three.js geometry (lathe/
   extrude/cones/canvas textures generated in code). three.js loads via
   `React.lazy` so 2D players never download it; chess and battleship share that
   chunk.
