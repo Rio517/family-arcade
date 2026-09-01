@@ -146,13 +146,16 @@ using **rebase merges** (sometimes squash). Therefore:
 `.claude/settings.json` carries a read-mostly permission allowlist (npm
 scripts, vitest, tsc, eslint, knip, read-only git and gh) so routine work
 doesn't prompt; force-push, remote branch deletion, and `rm -rf` stay gated.
-Two hooks back the rules that sessions actually broke:
+Three hooks back the rules that sessions actually broke:
 
 - `.claude/hooks/no-compound-commands.mjs` (PreToolUse) blocks `&&`/`||`/`;`
   chaining. Pipes, `$(...)`, and heredocs are fine. npm-script chaining inside
   `package.json` is exempt — the rule is about tool calls.
 - `.claude/hooks/session-critical-rules.mjs` (SessionStart) injects the short
   rules block. Edit it when a rule changes; keep it short or it stops working.
+- `.claude/hooks/tidewave-autostart.mjs` (SessionStart) starts the Tidewave dev
+  server on port 5178 when nothing is listening, and reports it either way.
+  See the Tidewave section below.
 
 Per-machine additions go in `.claude/settings.local.json` (gitignored), not the
 shared file.
@@ -178,8 +181,15 @@ instead of silently moving to a port that no longer matches `.mcp.json`.
 Three consequences worth knowing:
 
 - **It only works while `npm run dev:tidewave` is running.** The MCP server is
-  the dev server. No dev server, no Tidewave tools — the session just shows it
-  disconnected, which is harmless.
+  the dev server. With no dev server there are no Tidewave tools, and the
+  session shows it disconnected.
+- **A SessionStart hook starts it for you.** `.claude/hooks/tidewave-autostart.mjs`
+  checks port 5178 at session start. If nothing answers it runs
+  `npm run dev:tidewave` detached, logging to `arcade-tidewave.log` in the
+  system temp directory; if the port already answers it does nothing. When it
+  has to start the server, it tells the session to say so, because MCP servers
+  are read at session start and the tools only appear after a reconnect. If it
+  cannot start the server it says that instead of staying quiet.
 - **MCP servers are read at session start.** Installing or changing one has no
   effect until the coding-agent session restarts. The project must be trusted
   for Codex to read `.codex/config.toml`. Start the server first, then
