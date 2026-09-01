@@ -5,11 +5,11 @@
  * recorded, stored, or sent anywhere.
  */
 import '../styles/mirror.css';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { EffectsOverlay } from '@shared/effects/EffectsOverlay';
 import { EFFECTS, type EffectId } from '@shared/effects/effects';
-import { CameraIcon, WarningIcon } from '@shared/ui/icons';
+import { CameraIcon, CloseIcon, WarningIcon } from '@shared/ui/icons';
 
 type Phase = 'intro' | 'starting' | 'live' | 'denied';
 
@@ -19,6 +19,9 @@ export function MirrorPage() {
   // The overlay needs the actual element (it hands it to the tracker), so the
   // video lands in state via callback ref rather than a RefObject.
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+  // The camera's own shape, once it starts. The frame is cut to match it so
+  // nothing is cropped and the effects land where the face really is.
+  const [aspect, setAspect] = useState<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const stopCamera = () => {
@@ -47,6 +50,7 @@ export function MirrorPage() {
   const closeMirror = () => {
     stopCamera();
     setVideoEl(null);
+    setAspect(null);
     setPhase('intro');
   };
 
@@ -57,19 +61,39 @@ export function MirrorPage() {
     if (videoEl && streamRef.current) videoEl.srcObject = streamRef.current;
   }, [videoEl]);
 
+  const readAspect = (e: SyntheticEvent<HTMLVideoElement>) => {
+    const v = e.currentTarget;
+    if (v.videoWidth > 0 && v.videoHeight > 0) setAspect(v.videoWidth / v.videoHeight);
+  };
+
   const toggle = (id: EffectId) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id]));
 
+  const live = phase === 'live';
+  // Both ways round, so the frame can be fitted to width or to height with
+  // multiplication alone (dividing by a custom property is younger than iPad
+  // Safari 16, which this still has to run on).
+  const stageStyle = aspect
+    ? ({ '--mirror-aspect': aspect, '--mirror-aspect-inv': 1 / aspect } as CSSProperties)
+    : undefined;
+
   return (
-    <div className="app mirror">
+    <div className={live ? 'app mirror is-live' : 'app mirror'}>
       <header className="mirror-head">
         <h1>Magic Mirror</h1>
-        <Link className="back-link" to="/">
-          Family game console
-        </Link>
+        {live ? (
+          <button className="back-link mirror-close" data-testid="mirror-close" onClick={closeMirror}>
+            <CloseIcon size={16} />
+            Close
+          </button>
+        ) : (
+          <Link className="back-link" to="/">
+            Family game console
+          </Link>
+        )}
       </header>
 
-      {phase !== 'live' && (
+      {!live && (
         <section className="mirror-card">
           <p className="mirror-lede">
             Look into the mirror and become a <strong>fire-breathing dragon</strong> — open your
@@ -98,18 +122,23 @@ export function MirrorPage() {
         </section>
       )}
 
-      {phase === 'live' && (
+      {live && (
         <section className="mirror-live">
-          <div className="mirror-stage">
-            <video
-              data-testid="mirror-video"
-              ref={setVideoEl}
-              autoPlay
-              playsInline
-              muted
-              aria-label="Your mirror — live camera view"
-            />
-            <EffectsOverlay video={videoEl} effects={selected} />
+          {/* Whatever space the header and the controls leave: the glass is cut
+              to fit inside it, so a short landscape window never scrolls. */}
+          <div className="mirror-fit">
+            <div className="mirror-stage" style={stageStyle}>
+              <video
+                data-testid="mirror-video"
+                ref={setVideoEl}
+                onLoadedMetadata={readAspect}
+                autoPlay
+                playsInline
+                muted
+                aria-label="Your mirror — live camera view"
+              />
+              <EffectsOverlay video={videoEl} effects={selected} />
+            </div>
           </div>
           <div className="mirror-controls">
             <div className="mirror-chips" role="group" aria-label="Effects">
@@ -127,9 +156,6 @@ export function MirrorPage() {
                 </button>
               ))}
             </div>
-            <button className="btn btn-danger" data-testid="mirror-close" onClick={closeMirror}>
-              Close the mirror
-            </button>
           </div>
           <p className="subtle mirror-hints">
             {EFFECTS.filter((e) => selected.includes(e.id))
