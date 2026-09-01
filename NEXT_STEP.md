@@ -9,6 +9,19 @@
 
 Sorted by likely value. Nothing here blocks anything else.
 
+### Uncommitted work, in one place
+
+`.worktrees/party-mode-mockups` holds the only uncommitted work in the repo: a
+camera-effects pitch, `preview-party-effects-concept.html` ("Party camera
+effects — UX concept") plus 11 concept images in
+`docs/designs/party-mode-effects-concept/` (680K). Its branch,
+`codex/party-mode-mockups`, carries nothing that is not already in `main`.
+
+To land it, move both into `docs/mockups/20260830-party-camera-effects/`, write
+the pitch README, and commit from a branch cut fresh off `origin/main`. Once it
+is committed the worktree can go. Until then, do not remove it — the files
+exist nowhere else.
+
 ### Code
 
 - **Caribbean Career.** All of it is on `main`. Nothing is parked on a branch
