@@ -19,7 +19,7 @@ import './party.css';
 /**
  * The way on when a pairing is stuck: the host can mint a fresh code, the
  * guest can go and type a different one. Never a dead end — the UX pass
- * (docs/ux-review) asked for one recognisable action, not a paragraph.
+ * (docs/mockups/20260831-party-ui) asked for one recognisable action, not a paragraph.
  */
 function WayOut({ party, onCode }: { party: PartyValue; onCode: () => void }) {
   if (party.role === 'host') {

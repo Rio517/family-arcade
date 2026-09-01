@@ -2,7 +2,7 @@
 
 Status: proposed 2026-08-29, awaiting the family's go.
 
-## The ask (2026-08-29, in Mario's words, lightly tidied)
+## The ask (2026-08-29, as given in review, lightly tidied)
 
 > Fundamentally change the way people put in their names. A universal profile
 > across all games for the main player; secondary players can also be picked.

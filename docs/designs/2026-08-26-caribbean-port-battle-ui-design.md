@@ -25,7 +25,7 @@ The finished interface must:
 > `world-atlas` SVG map are not the final direction. The approved implementation
 > is the shared offline MapLibre/PMTiles surface in
 > [Caribbean Real-Map and Visual-Parity Direction](./2026-08-28-caribbean-real-map-direction.md).
-> That document also preserves the two current-state screenshots Mario rejected.
+> That document also preserves the two current-state screenshots rejected in review.
 
 ### Port
 

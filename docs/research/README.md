@@ -2,7 +2,7 @@
 
 Notes from looking into tools, libraries, and techniques we're *considering* —
 not decisions (those graduate to [ADRs](../adr/)) and not designs for things
-we've agreed to build (those live in [planning](../planning/)). Each note says
+we've agreed to build (those live in [ideas](../ideas/)). Each note says
 what the thing is, whether it fits this project, and what would make us
 revisit.
 

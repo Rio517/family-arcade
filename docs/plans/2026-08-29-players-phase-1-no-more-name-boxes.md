@@ -24,7 +24,7 @@ game writes a name.
 - One logical shell operation per Bash call (`bash -c "…"` for chains). Files containing markdown backticks are written with the Write tool, never a heredoc.
 - Icons are SVG (`@shared/ui/icons`), never emoji. Every interactive element has a `data-testid` and a keyboard path; dialogs close on Escape via `useDismissOnEscape`; text ≥ 14px.
 - Name rules stay: trimmed, max 20 characters (`setName` in `profile.ts`).
-- Design doc: `docs/planning/players-and-party.md` (rules, phases, out-of-scope).
+- Design doc: `docs/ideas/players-and-party.md` (rules, phases, out-of-scope).
 
 ---
 
@@ -356,7 +356,7 @@ Subtitle copy stays: empty roster → "Make your ticket — it keeps your points
 - Modify: `src/shared/profile/useProfile.ts:26-43` — remove the `rememberName` debounce effect and import.
 - Modify: `src/shared/styles/tokens.css:87-115` — remove `.name-chips`/`.name-chip` rules (keep `.code-chip`).
 - Modify: `scripts/screenshots.mjs` — add two shots: `ship-lobby` (TABLET, `/#/play`, wait `[data-testid="playing-as"]`) and `party-panel` (PHONE, `/#/`, click `party-pill`, wait `[data-testid="playing-as"]`).
-- Modify: `NEXT_STEP.md` — replace the "Cross-game player names, asked for once" entry with a pointer to `docs/planning/players-and-party.md` and the remaining phases.
+- Modify: `NEXT_STEP.md` — replace the "Cross-game player names, asked for once" entry with a pointer to `docs/ideas/players-and-party.md` and the remaining phases.
 
 - [ ] **Step 1:** Delete + edit. `grep -rn 'NamePicker\|recentNames\|rememberName\|FAMILY_NAMES\|setMyName' src scripts` → no hits.
 - [ ] **Step 2:** Gates: `npm run check > …/check.log 2>&1; echo EXIT=$?` (0 errors), `npx vitest run` (all green), `npm run build` (exit 0).

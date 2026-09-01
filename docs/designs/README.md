@@ -15,5 +15,5 @@ or temporary links.
 - [Current sailing gap](./2026-08-28-caribbean-current-sailing-gap.png)
 
 The concept images are targets. The current-gap captures are negative evidence:
-they preserve exactly what Mario rejected on 2026-08-28 so later reviews cannot
+they preserve exactly what was rejected in review on 2026-08-28 so later reviews cannot
 mistake an incremental cleanup for visual parity.

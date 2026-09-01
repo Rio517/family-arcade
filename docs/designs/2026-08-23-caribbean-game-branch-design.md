@@ -10,13 +10,13 @@
 ## Decision
 
 Build the game entirely on the isolated `codex/caribbean-game` branch and do
-not merge or push it without Mario's later approval. Preserve
+not merge or push it without later owner approval. Preserve
 `codex/caribbean-poc` and `codex/caribbean-naval-battle` as reviewed reference
 points. The production module starts at `src/games/caribbean/`; it does not
 runtime-import code from `src/games/caribbean-poc/`.
 
 This is a deliberate local-only exception to the repository's usual
-one-feature/one-branch lifetime because Mario explicitly requested one isolated
+one-feature/one-branch lifetime because the owner explicitly requested one isolated
 whole-game branch. Control the stale-branch risk at every milestone boundary:
 fetch `origin/main`, inspect `git cherry`, rebase the unpushed game branch onto
 the latest `origin/main`, rerun the complete repository gate, and create no
@@ -382,7 +382,7 @@ continue the voyage.
 
 ## Autonomous execution and review
 
-Mario delegated routine choices to the recommended option. The agent may create
+Routine choices are delegated to the recommended option. The agent may create
 commits and mockup/harness files on `codex/caribbean-game`, run local servers,
 tests, Blender scripts, browser checks, subagent reviews, and read-only external
 reviews. It must not merge, push, publish, purchase services, or modify main.

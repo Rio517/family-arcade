@@ -14,7 +14,7 @@
 - `npm run check` exit 0 with **0 errors** (67 deliberate warnings); never pipe it. `npx vitest run` green, on a quiet machine (never while `npm run shots` builds). `npm run build` exit 0. `npm run shots` regenerated and reviewed.
 - One logical shell operation per Bash call (`bash -c "…"` for chains). Files containing backticks are written with the Write tool.
 - Icons are SVG, never emoji. Interactive elements carry `data-testid` and a keyboard path; dialogs close on Escape via `useDismissOnEscape`; text ≥ 14px; tap targets ≥ 44px. Copy is warm and kid-facing.
-- Design: `docs/planning/players-and-party.md` § Seats (revised 2026-08-29). Lineup precedence: **a saved lineup wins wholesale; the signed-in ticket seeds chair ① only when the game has no lineup yet.**
+- Design: `docs/ideas/players-and-party.md` § Seats (revised 2026-08-29). Lineup precedence: **a saved lineup wins wholesale; the signed-in ticket seeds chair ① only when the game has no lineup yet.**
 - Storage keys: shared state is `arcade.<thing>.v<n>`; a game's own is `<game>:<thing>:v<n>`; every key is normalized on read in a pure `x.ts` + `xStore.ts` pair. Never rename an existing key.
 
 ---

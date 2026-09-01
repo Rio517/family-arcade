@@ -13,7 +13,7 @@
 - Gates under Node 20 (`export PATH="$HOME/.local/share/mise/installs/node/20.20.2/bin:$PATH"`); `npm run check` 0 errors (67 warnings), `npx vitest run` on a quiet machine, `npm run build`, `npm run shots` reviewed. One shell op per Bash call; backtick-bearing files via the Write tool.
 - ADR 0003/0008 hold: **game rules travel on each game's own link**; the party's presence link carries names and a four-character handoff only, never anything that replays or rewrites history.
 - `src/shared/**` never imports a game or the registry; `src/games/**` never imports `useIdentity`/`usersStore`/`users` (ESLint guard).
-- Design: `docs/planning/players-and-party.md` §§ "The party carries the table", "The party survives a reload", "Results for everyone seated". Storage key scheme in `src/shared/storage/kv.ts`.
+- Design: `docs/ideas/players-and-party.md` §§ "The party carries the table", "The party survives a reload", "Results for everyone seated". Storage key scheme in `src/shared/storage/kv.ts`.
 - Accessibility floors; SVG icons; warm kid copy; every animation behind `prefers-reduced-motion`.
 
 ---

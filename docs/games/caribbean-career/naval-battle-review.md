@@ -43,5 +43,5 @@ or ten-minute thermal stability.
 This incomplete external evidence does not block continued isolated
 implementation of the Bridgetown port and career loop. It does not label naval
 combat production-ready, authorize a merge, or authorize a push. The branch
-remains local and isolated until Mario supplies or approves the missing human
+remains local and isolated until the owner supplies or approves the missing human
 and target-device evidence and later makes an explicit integration decision.

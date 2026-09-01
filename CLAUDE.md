@@ -10,7 +10,12 @@ A real family plays this every week: daughters who love unicorns and rainbows,
 a son who loves Star Wars and 3D and suggests features, and parents with a
 taste for retro (70s orange, neon signs). Kid-facing copy is warm and playful;
 nothing needs a manual. Big visual changes are pitched as **mockups first**
-(an artifact page with ~3 labelled options), built only after the family picks.
+(a local HTML page with ~3 labelled options), built only after the family
+picks. A pitch keeps its own folder — `docs/mockups/YYYYMMDD-<topic>/`, holding
+the write-up, the page, and its assets — and the write-up records what was
+chosen. `docs/README.md` is the map of where every other kind of doc goes;
+read it before adding a folder. Write docs in product terms: what was asked
+for and decided, not who said it.
 
 ## Architecture invariants (do not break)
 
