@@ -11,6 +11,26 @@ Sorted by likely value. Nothing here blocks anything else.
 
 ### Code
 
+- **Caribbean Career — where it stands (2026-09-01).** All of it is on `main`;
+  nothing is parked on a branch or in a worktree any more. The production
+  module is `src/games/caribbean/`; `src/games/caribbean-poc/` stays as a
+  harness and evidence record and is never imported at runtime. Last to land:
+  the shared real nautical map, the material port interface, and the
+  commission showing whose ticket signs. The game is registered
+  `under-construction · playable`.
+
+  Read in this order: `docs/games/caribbean-career/production-roadmap.md` (the
+  phased execution map — start at the first phase whose acceptance criteria
+  aren't met), `docs/games/caribbean-career/README.md`, then the visual
+  direction in `docs/designs/2026-08-28-caribbean-real-map-direction.md`.
+  Its plans are `docs/plans/2026-08-2*-caribbean-*.md`.
+
+  Before touching it: the map is the repo's one deliberate exception to the
+  offline rule (approved OpenFreeMap tiles at runtime, repo-owned style,
+  explicit network-unavailable state) — never swap it for bundled PMTiles or a
+  tile-extraction pipeline. Evidence harnesses are `npm run caribbean:port-check`
+  and `npm run caribbean:naval-check`.
+
 - **The UX pass — checkpoint 1 shipped 2026-08-31.** The pitch, all ten
   proposals and which four are still open:
   `docs/mockups/20260831-party-ui/`. Reviewed as a live real-component
