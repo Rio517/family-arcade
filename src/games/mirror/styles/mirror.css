@@ -52,13 +52,48 @@
   color: var(--warn);
 }
 
+/* Open, the mirror takes over the window: the page stops scrolling and every
+ * pixel the header and controls don't need goes to the glass. */
+.mirror.is-live {
+  max-width: none;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* The bottom pad clears the party pill (44px, 12px off the bottom). */
+  padding: max(10px, env(safe-area-inset-top)) 12px
+    calc(max(12px, env(safe-area-inset-bottom)) + 52px);
+}
+
+.mirror.is-live .mirror-head {
+  margin-bottom: 0;
+}
+
 .mirror-live {
-  display: grid;
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* The room left for the glass. Sizing the frame against this box rather than
+ * the page width is what keeps a landscape tablet from scrolling: the mirror
+ * is fitted to whichever runs out first, width or height. */
+.mirror-fit {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
 }
 
 /* The looking glass: gilded frame, video + effect canvas mirrored together so
- * it behaves like a real mirror. */
+ * it behaves like a real mirror. It's cut to the camera's own shape (set from
+ * the stream, 4:3 until then) so nothing is cropped and the effects stay on
+ * the face. Browsers without container units fall back to the full width. */
 .mirror-stage {
   position: relative;
   overflow: hidden;
@@ -68,7 +103,10 @@
     0 0 0 1px rgba(255, 214, 140, 0.35),
     0 18px 40px -18px rgba(0, 0, 0, 0.8);
   background: #000;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--mirror-aspect, 1.3333);
+  max-width: 100%;
+  width: min(100cqw, calc(100cqh * var(--mirror-aspect, 1.3333)));
+  height: min(100cqh, calc(100cqw * var(--mirror-aspect-inv, 0.75)));
 }
 
 .mirror-stage video {
@@ -86,7 +124,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
 }
 
@@ -123,6 +161,28 @@
 .mirror-hints {
   margin: 0;
   min-height: 1.2em;
+  text-align: center;
+}
+
+/* Short windows (a tablet in landscape): the words around the mirror shrink so
+ * the glass keeps the space. */
+@media (max-height: 700px) {
+  .mirror.is-live {
+    gap: 8px;
+  }
+  .mirror-live {
+    gap: 8px;
+  }
+  .mirror.is-live .mirror-head h1 {
+    font-size: 1.2rem;
+  }
+  .mirror-hints,
+  .mirror-beta-note {
+    font-size: 13px;
+  }
+  .mirror-chip {
+    padding: 8px 14px;
+  }
 }
 
 /* The honest little "still in testing" tag on every effect chip. */
@@ -141,4 +201,5 @@
   margin: 0;
   font-size: 14px;
   color: var(--warn);
+  text-align: center;
 }
