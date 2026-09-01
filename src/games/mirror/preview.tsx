@@ -37,9 +37,14 @@ const FRAME: TrackingFrame = {
   hands: [{ gesture: 'victory', palm: { x: 0.76, y: 0.78 }, size: 0.09 }],
 };
 
-/** Where a person would be — silhouette stand-ins to judge mask alignment. */
+/**
+ * Where a person would be — silhouette stand-ins to judge mask alignment.
+ * `w` is the tracked ear-to-ear width, so a mask that fits reads as a mask
+ * that fits here too: the head shell should cover the shape with a margin.
+ */
 function silhouette(cx: number, cy: number, w: number): string {
-  return `radial-gradient(ellipse ${w}px ${w * 1.25}px at ${cx}px ${cy}px, #3b4661 0 60%, transparent 62%)`;
+  const rx = w / 2;
+  return `radial-gradient(ellipse ${rx}px ${rx * 1.25}px at ${cx}px ${cy}px, #3b4661 0 60%, transparent 62%)`;
 }
 
 function Harness() {
@@ -55,11 +60,19 @@ function Harness() {
       effects: new Set(['dragon', 'peace']),
     });
     scene.setSize(W, H, 1);
-    // 88 fixed steps lands mid-burst with the flame fully developed; the
-    // seeded rng makes every run byte-identical for saveIfChanged.
-    for (let i = 0; i < 88; i++) scene.render(FRAME, 16);
-    setReady(true);
-    return () => scene.dispose();
+    // Wait for the modelled mask before stepping, or the shot catches whichever
+    // head happened to be on. 88 fixed steps then lands mid-burst with the
+    // flame fully developed; the seeded rng makes every run byte-identical.
+    let cancelled = false;
+    void scene.ready.then(() => {
+      if (cancelled) return;
+      for (let i = 0; i < 88; i++) scene.render(FRAME, 16);
+      setReady(true);
+    });
+    return () => {
+      cancelled = true;
+      scene.dispose();
+    };
   }, []);
 
   return (
@@ -78,8 +91,8 @@ function Harness() {
           borderRadius: 12,
           overflow: 'hidden',
           background: [
-            silhouette(0.3 * W, 0.44 * H, 0.14 * W),
-            silhouette(0.7 * W, 0.46 * H, 0.12 * W),
+            silhouette(0.3 * W, 0.44 * H, FRAME.faces[0].width * W),
+            silhouette(0.7 * W, 0.46 * H, FRAME.faces[1].width * W),
             'linear-gradient(180deg, #202c46 0%, #16203a 100%)',
           ].join(', '),
         }}

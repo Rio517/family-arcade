@@ -38,9 +38,14 @@ payload with the no-SIMD fallback. All of it is lazy-loaded: players who never
 open an effect never download a byte of it, same as the three.js chunk.
 
 **Effects are drawn on top of the video, never burned into the stream.** A
-transparent three.js canvas overlays each `<video>` element and renders
-procedural geometry (ADR 0006: lathe/cones/canvas textures, no fetched
-models) anchored to the tracked face/hand. In a call, each device runs the
+transparent three.js canvas overlays each `<video>` element and draws to the
+tracked face/hand. The Fire Dragon wears a modelled mask — hand-authored in
+Blender, meshopt-compressed and bundled like the ship meshes, with a jaw node
+that follows `jawOpen` and a socket that marks where the breath leaves the
+mouth. Everything else is procedural geometry (ADR 0006). Both are built in
+face widths, so a head lands on a face at any distance from the camera, and
+the procedural head stays as the fallback wherever the model can't be decoded.
+In a call, each device runs the
 tracker on whatever video it is *displaying* — its own preview and the remote
 stream alike — and the chosen effect travels as a tiny message on the
 existing party data channel. The transmitted media stays untouched, which:

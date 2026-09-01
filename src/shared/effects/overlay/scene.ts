@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { seededRng } from '@shared/rng';
 import { disposeDeep } from '@shared/three/disposeDeep';
-import { buildDragonHead } from './dragon';
+import { buildDragonHead, buildDragonMask, loadDragonMask, type DragonHead } from './dragon';
 import { FireBreath } from './fire';
 import { PeaceBurst } from './sparkles';
 import type { TrackingFrame } from '../engine/types';
@@ -23,6 +23,12 @@ export interface EffectsSceneOptions {
 }
 
 export interface EffectsScene {
+  /**
+   * Resolves once the modelled mask has been decoded and worn (or has failed
+   * and left the procedural head on). Screenshot harnesses await it so the
+   * captured dragon is always the same one.
+   */
+  ready: Promise<void>;
   render(frame: TrackingFrame, dtMs: number): void;
   setSize(width: number, height: number, dpr: number): void;
   setEffects(effects: ReadonlySet<EffectId>): void;
@@ -33,6 +39,7 @@ const MAX_FACES = 2;
 
 interface DragonSlot {
   anchor: THREE.Group;
+  head: DragonHead;
   fire: FireBreath;
 }
 
@@ -62,14 +69,30 @@ export function createEffectsScene(
   const dragons: DragonSlot[] = [];
   for (let i = 0; i < MAX_FACES; i++) {
     const anchor = new THREE.Group();
-    anchor.add(buildDragonHead(rng));
+    const head = buildDragonHead(rng);
+    anchor.add(head.group);
     anchor.visible = false;
     scene.add(anchor);
     const fire = new FireBreath(rng, opts.reducedMotion);
     fire.group.position.z = 400; // always in front of the dragon geometry
     scene.add(fire.group);
-    dragons.push({ anchor, fire });
+    dragons.push({ anchor, head, fire });
   }
+
+  let disposed = false;
+  // The modelled mask arrives a moment after the mirror opens; until then the
+  // procedural head is already tracking, so the swap is the only visible step.
+  const ready = loadDragonMask().then(() => {
+    if (disposed) return;
+    for (const slot of dragons) {
+      const mask = buildDragonMask();
+      if (!mask) return; // the model never arrived; the procedural head stays
+      slot.anchor.remove(slot.head.group);
+      disposeDeep(slot.head.group);
+      slot.head = mask;
+      slot.anchor.add(mask.group);
+    }
+  });
 
   const peace = new PeaceBurst(rng, opts.reducedMotion);
   peace.group.position.z = 420;
@@ -77,8 +100,10 @@ export function createEffectsScene(
 
   const pose = new THREE.Matrix4();
   const euler = new THREE.Euler();
+  const socketWorld = new THREE.Vector3();
 
   return {
+    ready,
     setSize(w, h, dpr) {
       width = Math.max(2, w);
       height = Math.max(2, h);
@@ -97,14 +122,16 @@ export function createEffectsScene(
 
       const showDragon = effects.has('dragon');
       for (let i = 0; i < MAX_FACES; i++) {
-        const { anchor, fire } = dragons[i];
+        const { anchor, head, fire } = dragons[i];
         const face = frame.faces[i];
         anchor.visible = Boolean(showDragon && face);
         let yaw = 0;
         if (face) {
-          const scalePx = face.width * width * 0.72;
+          // Both heads are built in face widths, so the tracked width in
+          // pixels is the whole of the scale.
+          const facePx = face.width * width;
           anchor.position.set(face.center.x * width, (1 - face.center.y) * height, 0);
-          anchor.scale.setScalar(scalePx);
+          anchor.scale.setScalar(facePx);
           if (face.poseMatrix && face.poseMatrix.length === 16) {
             pose.fromArray(face.poseMatrix);
             euler.setFromRotationMatrix(pose, 'ZYX');
@@ -115,11 +142,23 @@ export function createEffectsScene(
             // backwards on a real camera.
             anchor.rotation.set(-euler.x * 0.6, euler.y * 0.7, -euler.z);
           }
+          // The jaw drops with the wearer's, and the flame leaves the mask's
+          // own mouth rather than the landmark behind it — the socket rides
+          // along with every tilt and turn of the head.
+          if (head.jaw) head.jaw.rotation.x = head.jawOpenRadians * Math.min(1, Math.max(0, face.jawOpen));
+          let mouthX = face.mouth.x * width;
+          let mouthY = (1 - face.mouth.y) * height;
+          if (head.fireSocket) {
+            anchor.updateMatrixWorld(true);
+            head.fireSocket.getWorldPosition(socketWorld);
+            mouthX = socketWorld.x;
+            mouthY = socketWorld.y;
+          }
           fire.update({
-            x: face.mouth.x * width,
-            y: (1 - face.mouth.y) * height,
+            x: mouthX,
+            y: mouthY,
             dirX: Math.sin(yaw),
-            scalePx: Math.max(24, face.width * width),
+            scalePx: Math.max(24, facePx),
             jawOpen: showDragon ? face.jawOpen : 0,
             dtS,
           });
@@ -143,8 +182,11 @@ export function createEffectsScene(
       renderer.render(scene, camera);
     },
     dispose() {
-      for (const { anchor, fire } of dragons) {
-        disposeDeep(anchor);
+      disposed = true;
+      for (const { anchor, head, fire } of dragons) {
+        // A worn mask shares its geometry and textures with the decoded model
+        // every other dragon draws from; only the procedural head is ours.
+        if (!head.group.userData.cachedResources) disposeDeep(anchor);
         fire.dispose();
       }
       peace.dispose();
