@@ -1,10 +1,12 @@
 # Party & player UX (2026-08-31)
 
-**Product direction:** the visual design is fine; the UX is what needs work.
-Ten proposals came back from the review. Six shipped in
-[#145](https://github.com/Rio517/family-arcade/pull/145); four are still open.
+**Product direction:** the visual design is fine; the UX needs work. Ten
+proposals. Six shipped in
+[#145](https://github.com/Rio517/family-arcade/pull/145); four are open.
 
-There is no HTML page in this folder on purpose — see *How it was reviewed*.
+This folder has no HTML page because the review frames were the production
+components themselves. *How to review the rest* explains how to set that up
+again for the four open proposals.
 
 ## The ten proposals
 
@@ -19,37 +21,31 @@ There is no HTML page in this folder on purpose — see *How it was reviewed*.
 | 7 | An unboxed **Continue Chess ›** row before the catalogue | shipped |
 | 8 | Rich ticket posters survive above the floating control | shipped (scroll-into-view + bottom reserve) |
 | 9 | The floating video gains **Full screen** and a larger self-preview; effect chips stay full-screen-only | **open** |
-| 10 | The Magic Mirror moves out of the catalogue into the global controls | shipped as a *second* door, not a move |
+| 10 | The Magic Mirror moves out of the catalogue into the global controls | shipped as a second door |
 
-One amendment came out of the review: the Magic Mirror should be reachable from
-more than one place. Hence 10 landing as a second door — the catalogue ticket
-and the Play Online panel's door both stay.
+On 10: the Magic Mirror should be reachable from more than one place, so it
+gained a door in the global controls and kept its catalogue ticket.
 
-Boundaries the pitch kept, and which still apply: no new colour, font, server,
-account, or discovery mechanism; reuse the existing ticket, picker, booth,
-party pill/panel, effect chips and call surfaces; the only new layout rule is
-shared bottom clearance on scrollable routes; reduced motion replaces expanding
-or pulsing invitation motion with an instant state change; the global control
+Constraints that still apply: no new colour, font, server, account, or
+discovery mechanism; reuse the existing ticket, picker, booth, party
+pill/panel, effect chips and call surfaces; the only new layout rule is shared
+bottom clearance on scrollable routes; under reduced motion the invitation
+changes state instantly instead of expanding or pulsing; the global control
 never auto-hides while scrolling.
 
-## How it was reviewed — and what failed first
+## How to review the rest
 
-**The failure:** the first pass was generated art and hand-built HTML. It
-drifted from the product — strange icons, changed ticket geometry, a crowded
-footer, a different arcade — and was rejected in review. Roughly 10MB of that
-output (`boards/`, `imagegen/`) was never committed; it sits outside the repo
-at `~/code/arcade/mockups/archive/20260831-ux-review-rejected/` if the negative
-evidence is ever wanted. Its lesson is the first rule in
-[../README.md](../README.md).
+Build the frames from the production components. Show Today beside Proposed,
+with each proposed state being the same component behind an opt-in `proposed`
+prop that defaults to off, so nothing ships while it is under review. Embed
+the fixtures as `<iframe>`s at exactly 1180×820 and 430×932; a scaled div
+reports the wrong media queries and safe areas.
 
-**What worked:** a build-only harness that rendered the **real production
-components** as Today-beside-Proposed frames — each proposed state the same
-component behind an opt-in `proposed` prop (default off), so nothing shipped
-while it was being judged. Fixtures were embedded as `<iframe>`s at exactly
-1180×820 and 430×932 so media queries and safe areas stayed honest; a scaled
-div lies about both. It was served over Tailscale HTTPS, because review happens
-on whatever device is to hand — often remote — and the camera surfaces need a
-secure origin:
+Generated art is a poor fit here. It drifts from the product and moves the
+review onto icons and geometry that were never in question.
+
+Serve the harness over Tailscale HTTPS. Review happens on whatever device is
+to hand, often remote, and the camera surfaces require a secure origin.
 
 ```sh
 export PATH="$HOME/.local/share/mise/installs/node/20.20.2/bin:$PATH"   # Node 20
@@ -59,16 +55,16 @@ nohup python3 -m http.server 4322 --bind 127.0.0.1 --directory dist \
 tailscale serve --bg 4322     # https://marios-mac-mini.taila17368.ts.net/
 ```
 
-`vite preview` answers 403 behind that proxy (unfamiliar Host header), which is
-why the plain Python server is used. Don't run the server as a background
-*tool* task — it dies at the tool timeout, which took the review down twice.
+Use a plain static server. `vite preview` returns 403 behind that proxy
+because it rejects the unfamiliar Host header. Do not run the server as a
+background tool task; it is killed at the tool timeout.
 
-On approval the props, their branches and the harness were deleted in the same
-commit that folded the design in, and squashed, so the harness never landed on
-`main`. `preview-party-states.html` remains as the living gallery of every
-party state.
+Once a proposal is approved, delete the props, their branches, and the harness
+in the same commit that folds the design in, then squash, so the harness does
+not land on `main`. `preview-party-states.html` stays; it is the gallery of
+every party state.
 
-## What shipped, concretely
+## Where the shipped half lives
 
 `PartyBar` (Play together / Play Online / `WayOut` recovery control),
 `PlayingAs` + `TicketList` + `PlayerBooth` (one name, one verb, one

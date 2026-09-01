@@ -1,7 +1,6 @@
 # Docs
 
-Where things go, so a new session doesn't have to guess. Each folder answers a
-different question about the same work.
+Where each kind of doc goes. Each folder answers a different question.
 
 | Folder | Answers | Shape |
 |--------|---------|-------|
@@ -17,21 +16,22 @@ different question about the same work.
 
 ## The usual path
 
-An idea starts in `ideas/`, gets a look in `mockups/` if the family needs to
-choose between options, becomes a `designs/` doc once the shape is agreed, gets
-a `plans/` doc to build from, and leaves an `adr/` entry behind if it changed
-something structural. Most work skips several of those; nothing is required.
+An idea starts in `ideas/`. If the family needs to choose between looks, it
+goes through `mockups/`. Once the shape is agreed it becomes a `designs/` doc,
+then a `plans/` doc to build from, and it gets an `adr/` entry if it changed
+something structural. Most work skips several of these steps. None are
+required.
 
-## Two rules worth knowing
+## Two rules
 
 - **Plans live in `docs/plans/`.** The superpowers `writing-plans` skill
   defaults to `docs/superpowers/plans/`; this repo's preference overrides it.
-  A `docs/superpowers/` tree drifted into existence once and was folded back.
-- **Screenshots live in `docs/screenshots/` only.** Don't copy them beside a
-  doc — they're regenerated on every UI change, and the copies go stale
-  silently. Link them relatively (`../screenshots/foo.png`); a PR pins them by
-  SHA to `raw.githubusercontent.com` instead (see `CLAUDE.md`).
+  There is no `docs/superpowers/` tree here; do not create one.
+- **Screenshots live in `docs/screenshots/` only.** Do not copy them beside a
+  doc. They are regenerated on every UI change, and copies go stale without
+  any warning. Link to them relatively (`../screenshots/foo.png`). In a PR,
+  link them by SHA to `raw.githubusercontent.com` instead (see `CLAUDE.md`).
 
 Session handoffs are not documentation. `NEXT_STEP.md` at the repo root is the
-one running handoff; notes addressed to a particular agent belong in the
+one running handoff. Notes addressed to a particular agent belong in the
 conversation, not in `docs/`.

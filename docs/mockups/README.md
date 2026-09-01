@@ -1,35 +1,32 @@
 # Mockups
 
-One folder per pitch: `YYYYMMDD-<topic>/`, holding everything that pitch was
-made of — the write-up, the HTML page the family actually looked at, and any
-images it needs.
+One folder per pitch, named `YYYYMMDD-<topic>/`. Each folder holds the
+write-up, the HTML page the family looked at, and any images the page needs.
 
-`CLAUDE.md` says big visual changes are pitched as mockups first, ~3 labelled
-options, built only after the family picks. This is where those pitches live
-afterwards, so a later session can see what was offered, what was chosen, and
-what was rejected — without digging through a conversation.
+`CLAUDE.md` requires big visual changes to be pitched as mockups first, with
+about three labelled options, and built only after the family picks. The
+pitches are kept here so a later session can see the options, the choice, and
+what was set aside.
 
 | Pitch | Asked for | Outcome |
 |-------|-----------|---------|
 | [20260830-game-previews](./20260830-game-previews/) | A way to sell a game before anyone signs in | **B, poster strip** — shipped |
-| [20260831-party-ui](./20260831-party-ui/) | "Design is ok, but UX could be improved" | 6 of 10 shipped in [#145](https://github.com/Rio517/family-arcade/pull/145) |
+| [20260831-party-ui](./20260831-party-ui/) | Visual design is fine; the UX needs work | 6 of 10 shipped in [#145](https://github.com/Rio517/family-arcade/pull/145) |
 
-## The shape of a pitch folder
+## What goes in a pitch folder
 
-- `README.md` — what was asked for, what each option was, what the family
-  picked and why, where it ended up. Write the outcome in when it lands; a
-  pitch with no recorded outcome is the thing this folder exists to prevent.
-- `<name>.html` — the page itself. Open it straight off disk. Reference
-  screenshots as **relative** paths (`../../screenshots/foo.png`) — an
-  absolute `file:///Users/...` path breaks for everyone including a later you.
-- Images the pitch generates or needs, beside the page.
+- `README.md` — the requirement, each option, which one was picked and why,
+  and where it ended up. Record the outcome when it lands.
+- `<name>.html` — the page. It should open directly from disk. Link
+  screenshots with relative paths (`../../screenshots/foo.png`); an absolute
+  `file:///Users/...` path stops working as soon as the file moves.
+- Any images the page needs, beside the page.
 
-Two rules learned the hard way:
+## Two rules
 
-- **Real components beat drawn ones.** The strongest review page renders the
-  actual production components behind an opt-in prop (Today beside Proposed),
-  built only under `BUILD_HARNESS=1` as a `preview-*.html` harness. Generated
-  art drifts from the product — see 20260831-party-ui for what that cost.
-- **Don't leave a pitch as a private handoff note.** Notes addressed to a
-  specific agent ("read this before you start") go stale the moment that
-  session ends. Write the pitch for whoever opens the folder next.
+- **Build the pitch from real components.** Render the production components
+  behind an opt-in prop, Today beside Proposed, as a `preview-*.html` harness
+  built only under `BUILD_HARNESS=1`. Generated art tends to drift from the
+  product and shifts the review onto details that were never in question.
+- **Write the pitch for whoever opens the folder next.** A note addressed to
+  one agent in one session is out of date as soon as that session ends.
