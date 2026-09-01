@@ -41,16 +41,24 @@ const DESIGN_FACE_WIDTH = 1.24;
 const HEAD_FIT = 1.1;
 
 /**
+ * Where the wearer's eyes sit in the mask, in model units above its origin —
+ * the height of the eye apertures, taken from the head the mask was fitted to.
+ * The mask hangs from this line, because eyes looking out of the apertures are
+ * what sells it. (The asset publishes the apertures as openings in the shell
+ * rather than as a node, so the height lives here.)
+ */
+const EYE_LINE = 0.12;
+
+/**
  * The tracked anchor is the bridge between the eyes (MediaPipe 168), a little
  * above the pupils. Dropping the mask by this many face widths lands the eye
- * holes on the eyes rather than the brows.
+ * apertures on the eyes rather than the brows.
  */
 const ANCHOR_DROP = 0.027;
 
 /** The rig contract published by the asset, with the values it ships with. */
 const JAW_NODE = 'DragonJaw';
 const FIRE_SOCKET_NODE = 'FireSocket';
-const EYE_NODES = ['EyeRim_L', 'EyeRim_R'];
 const JAW_OPEN_RADIANS = 0.314159;
 
 /** A dragon head ready to wear, plus the parts the scene animates. */
@@ -96,16 +104,9 @@ export function buildDragonMask(): DragonHead | null {
 
   const model = source.clone(true);
 
-  // The eye rims are the mask's own read of where the wearer's eyes are, and
-  // the tracker anchors on the point between them.
-  const eyes = new THREE.Box3();
-  for (const name of EYE_NODES) {
-    const rim = model.getObjectByName(name);
-    if (rim) eyes.expandByObject(rim);
-  }
+  // Hang the mask from its eye line, at the point the tracker anchors on.
   const scale = HEAD_FIT / DESIGN_FACE_WIDTH;
-  if (!eyes.isEmpty()) model.position.sub(eyes.getCenter(new THREE.Vector3()));
-  model.position.y -= ANCHOR_DROP / scale;
+  model.position.y -= EYE_LINE + ANCHOR_DROP / scale;
 
   const group = new THREE.Group();
   group.add(model);
