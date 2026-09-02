@@ -96,7 +96,10 @@ export function createEffectsScene(
     anchor.visible = false;
     scene.add(anchor);
     const fire = new FireBreath(rng, opts.reducedMotion);
-    fire.group.position.z = 400; // always in front of the dragon geometry
+    fire.group.position.z = 400;
+    // Drawn after the mask, and not depth-tested against it (see
+    // additiveOverlay), so the flame is never cut in half by the jaw.
+    fire.group.renderOrder = 10;
     scene.add(fire.group);
     dragons.push({ anchor, head, fire, worn: null });
   }
@@ -118,6 +121,7 @@ export function createEffectsScene(
 
   const peace = new PeaceBurst(rng, opts.reducedMotion);
   peace.group.position.z = 420;
+  peace.group.renderOrder = 11;
   scene.add(peace.group);
 
   const pose = new THREE.Matrix4();

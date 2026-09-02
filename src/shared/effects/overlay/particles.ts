@@ -8,19 +8,65 @@
 import * as THREE from 'three';
 
 /**
- * Additive glow that leaves the canvas's alpha channel alone. Stock
- * `AdditiveBlending` also accumulates alpha, and on this transparent overlay
- * that composites faded (near-black) particles as solid black blotches over
- * the page. Adding RGB while keeping destination alpha works because the
- * canvas is premultiplied: the browser adds our RGB straight onto the video.
+ * The material every glowing particle uses: additive light on a transparent
+ * canvas floating over the video.
+ *
+ * The canvas is premultiplied, and **alpha has to be written wherever colour
+ * is added**. WebKit — every browser on the family's iPads — drops colour it
+ * finds in a pixel whose alpha is zero, so an effect that only added RGB
+ * survived exactly as far as the mask underneath it and was cut off at its
+ * edge. Chromium keeps that colour, which is why it looked right in the
+ * screenshots and wrong in the mirror.
+ *
+ * So the shader writes premultiplied colour and takes the alpha from the
+ * brightness of the pixel it just wrote, after the conversion to the output
+ * colour space. A particle fading to black hands back an alpha fading to zero
+ * with it, which is what keeps a dying ember from compositing as a dark blot
+ * over the video — the reason the alpha channel was left alone before.
+ *
+ * Light also never hides behind the thing it comes off, so these draw over the
+ * scene rather than being depth-tested against it: a face close enough to the
+ * camera scales the mask deeper than the flame's own plane, and the jaw would
+ * otherwise cut through the fire.
  */
-export function additiveOverlay(material: THREE.Material): void {
-  material.blending = THREE.CustomBlending;
-  material.blendEquation = THREE.AddEquation;
-  material.blendSrc = THREE.SrcAlphaFactor;
-  material.blendDst = THREE.OneFactor;
-  material.blendSrcAlpha = THREE.ZeroFactor;
-  material.blendDstAlpha = THREE.OneFactor;
+function glowMaterial(texture: THREE.Texture): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      map: { value: texture },
+      // The overlay camera is orthographic, so distance-based point scaling is
+      // meaningless — sizes are plain pixels.
+      size: { value: 24 },
+    },
+    vertexShader: /* glsl */ `
+      attribute vec3 color;
+      uniform float size;
+      varying vec3 vColor;
+      void main() {
+        vColor = color;
+        gl_PointSize = size;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D map;
+      varying vec3 vColor;
+      void main() {
+        vec4 sprite = texture2D(map, gl_PointCoord);
+        gl_FragColor = vec4(vColor * sprite.a, 1.0);
+        #include <colorspace_fragment>
+        gl_FragColor.a = max(max(gl_FragColor.r, gl_FragColor.g), gl_FragColor.b);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.CustomBlending,
+    blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneFactor,
+    blendSrcAlpha: THREE.OneFactor,
+    blendDstAlpha: THREE.OneFactor,
+  });
 }
 
 /** Soft radial disc — the fire/glow sprite. Canvas-generated (ADR 0006). */
@@ -73,6 +119,8 @@ export interface ParticlePool {
   ): void;
   /** Advance the simulation and re-upload buffers. */
   step(dtS: number, gravityY: number, fade: (c: THREE.Color, lifeLeft: number) => void): void;
+  /** Sprite width in pixels — effects scale it off the face or hand. */
+  setSize(px: number): void;
   /** True when nothing is alive (safe to hide the points object). */
   idle(): boolean;
   dispose(): void;
@@ -89,17 +137,7 @@ export function createParticlePool(capacity: number, texture: THREE.Texture): Pa
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  // The overlay camera is orthographic, so distance-based point scaling is
-  // meaningless — sizes are plain pixels.
-  const material = new THREE.PointsMaterial({
-    map: texture,
-    vertexColors: true,
-    transparent: true,
-    depthWrite: false,
-    sizeAttenuation: false,
-    size: 24,
-  });
-  additiveOverlay(material);
+  const material = glowMaterial(texture);
   const points = new THREE.Points(geometry, material);
   points.frustumCulled = false;
 
@@ -141,10 +179,13 @@ export function createParticlePool(capacity: number, texture: THREE.Texture): Pa
       geometry.attributes.position.needsUpdate = true;
       geometry.attributes.color.needsUpdate = true;
     },
+    setSize(px) {
+      material.uniforms.size.value = px;
+    },
     idle: () => alive <= 0,
     dispose() {
       geometry.dispose();
-      material.map?.dispose();
+      material.uniforms.map.value?.dispose();
       material.dispose();
     },
   };
