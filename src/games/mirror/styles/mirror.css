@@ -20,6 +20,7 @@
   letter-spacing: 0.04em;
 }
 
+/* Only ever the doorway: "opening…", or the camera door that didn't open. */
 .mirror-card {
   display: grid;
   gap: 14px;
@@ -28,12 +29,6 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface);
-}
-
-.mirror-lede {
-  margin: 0;
-  font-size: 1.05rem;
-  line-height: 1.5;
 }
 
 .mirror-open {
@@ -61,7 +56,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* The bottom pad clears the party pill (44px, 12px off the bottom). */
+  /* The bottom pad keeps the glass clear of the party pill (44px, 12px off
+     the bottom) — the mirror shouldn't have a control sitting on the chin. */
   padding: max(10px, env(safe-area-inset-top)) 12px
     calc(max(12px, env(safe-area-inset-bottom)) + 52px);
 }
@@ -120,31 +116,111 @@
   transform: scaleX(-1);
 }
 
-.mirror-controls {
+/* The panel on the glass: a button in the bottom-right corner that opens
+ * upward into a column down the right-hand side, over the picture. */
+.mirror-panel {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.mirror-chips {
-  display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
+  width: min(320px, 62%);
+  max-height: calc(100% - 24px);
 }
 
-.mirror-chip {
+.mirror-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  /* Dark enough to read against a bright window behind the player. */
+  background: rgba(9, 14, 26, 0.82);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.9);
+  overflow-y: auto;
+  animation: mirror-panel-in 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mirror-panel-body {
+    animation: none;
+  }
+}
+
+@keyframes mirror-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.mirror-panel-toggle {
+  align-self: flex-end;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(9, 14, 26, 0.82);
+  backdrop-filter: blur(10px);
   color: var(--text);
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mirror-panel-toggle:focus-visible,
+.mirror-panel .mirror-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The chevron points at what the tap does: down to close, up to open. */
+.mirror-panel-toggle svg:last-child {
+  transition: transform 160ms ease;
+}
+
+.mirror-panel:not(.is-open) .mirror-panel-toggle svg:last-child {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mirror-panel-toggle svg:last-child {
+    transition: none;
+  }
+}
+
+.mirror-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mirror-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(51, 65, 85, 0.75);
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* The beta tag sits at the end of the row, not against the name. */
+.mirror-chip .mirror-beta {
+  margin-left: auto;
 }
 
 .mirror-chip[aria-pressed='true'] {
@@ -160,11 +236,23 @@
 
 .mirror-hints {
   margin: 0;
-  min-height: 1.2em;
-  text-align: center;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
 }
 
-/* Short windows (a tablet in landscape): the words around the mirror shrink so
+/* Where the camera goes, said on the glass rather than on a page nobody
+ * reads on the way in. */
+.mirror-privacy {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* Short windows (a tablet in landscape): the header gives up its height so
  * the glass keeps the space. */
 @media (max-height: 700px) {
   .mirror.is-live {
@@ -176,12 +264,21 @@
   .mirror.is-live .mirror-head h1 {
     font-size: 1.2rem;
   }
-  .mirror-hints,
-  .mirror-beta-note {
-    font-size: 13px;
+  .mirror-panel-body {
+    gap: 10px;
+    padding: 12px;
   }
   .mirror-chip {
-    padding: 8px 14px;
+    padding: 8px 12px;
+  }
+}
+
+/* A phone in portrait has no right-hand side to spare: the panel spans the
+ * glass instead of a column of it. */
+@media (max-width: 520px) {
+  .mirror-panel {
+    left: 12px;
+    width: auto;
   }
 }
 
@@ -200,6 +297,6 @@
 .mirror-beta-note {
   margin: 0;
   font-size: 14px;
+  line-height: 1.45;
   color: var(--warn);
-  text-align: center;
 }

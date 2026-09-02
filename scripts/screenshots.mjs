@@ -403,7 +403,7 @@ const SHOTS = [
     },
   },
   {
-    // The Magic Mirror's front door — the camera opt-in card.
+    // The Magic Mirror: the glass itself, with the effects panel on it.
     name: 'mirror-page',
     path: '/#/mirror',
     viewport: TABLET,
@@ -576,9 +576,20 @@ async function main() {
 
     browser = await chromium.launch({
       executablePath: process.env.PW_CHROMIUM || undefined,
-      // ANGLE gives the 3D scenes a real GL backend headless; without it the
-      // chess/battleship/racer canvases fall back to their error placeholder.
-      args: ['--use-gl=angle', '--use-angle=default', '--enable-unsafe-swiftshader'],
+      args: [
+        // ANGLE gives the 3D scenes a real GL backend headless; without it the
+        // chess/battleship/racer canvases fall back to their error placeholder.
+        '--use-gl=angle',
+        '--use-angle=default',
+        '--enable-unsafe-swiftshader',
+        // A camera that is always there and always the same: the Magic Mirror
+        // opens straight into the glass, and without one every shot of it
+        // would be the "check the camera permission" door. Chromium's fake
+        // device is a moving test pattern, so the mirror shows its frame and
+        // controls rather than a face.
+        '--use-fake-ui-for-media-stream',
+        '--use-fake-device-for-media-stream',
+      ],
     });
 
     console.log(`Capturing ${shots.length} shot(s) into docs/screenshots/`);
