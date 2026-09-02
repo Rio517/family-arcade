@@ -186,9 +186,8 @@ export function Menu() {
   const saved = GAMES.flatMap((game) =>
     (game.savedGames?.() ?? []).map((s) => ({ ...s, gameTitle: game.title })),
   );
-  // The Magic Mirror, if the registry has it: the camera toy earns a second
-  // door at the foot of the left column (the family asked for it in more
-  // than one place). The registry stays the only list.
+  // The Magic Mirror, if the registry has it: the camera toy has its own door
+  // rather than a ticket on the wall. The registry stays the only list.
   const mirror = GAMES.find((g) => g.id === 'mirror') ?? null;
   // The one ticket open to its poster, if any.
   const [openId, setOpenId] = useState<string | null>(null);
@@ -257,7 +256,7 @@ export function Menu() {
             <GridIcon size={30} />
           </GameTicket>
 
-          {GAMES.map((game) => (
+          {GAMES.filter((game) => !game.unlisted).map((game) => (
             <GameTicket
               key={game.id}
               id={game.id}
@@ -280,9 +279,8 @@ export function Menu() {
 
         <PlayerBooth />
 
-        {/* The camera toy has a second door here, at the foot of the column,
-            so it is findable without scrolling the whole catalogue — the
-            Play Online panel has the other one. */}
+        {/* The camera toy's door, at the foot of the column — the Play Online
+            panel has the other one. */}
         {mirror && (
           <nav className="cont mirror-door" aria-label="Camera">
             <Link

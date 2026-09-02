@@ -10,6 +10,9 @@ export const mirror: GameDescriptor = {
   // The camera-effects debut (ADR 0010): head-pose calibration still needs a
   // real-camera pass, so wear the honest badge until the family signs it off.
   releaseStatus: 'under-construction',
+  // Not a game to pick off the wall: the mirror has its own door on the
+  // landing page and another in the Play Online panel.
+  unlisted: true,
   players: { min: 1, max: 2 },
   // No seat picker — the mirror has no chairs, it just sees whoever's in frame.
   seats: { min: 1, max: 1 },

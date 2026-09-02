@@ -47,6 +47,13 @@ export interface GameDescriptor {
   tag?: string;
   /** Honest release-state signal shown on the menu while keeping the game playable. */
   releaseStatus?: 'under-construction';
+  /**
+   * Kept off the ticket wall. The registry is still the only list — routes,
+   * saves and the party's game names all come from it — but the landing page
+   * doesn't print a ticket for it, because it has its own door (the Magic
+   * Mirror is a camera toy, not a game to pick from the wall).
+   */
+  unlisted?: boolean;
   /** How many people can play — worn as a badge on the landing ticket. A menu
    * fact, not a seat count: Ship Battle says 2 while seating one per device. */
   players: { min: number; max: number };
