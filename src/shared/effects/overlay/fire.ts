@@ -6,7 +6,7 @@
  */
 
 import * as THREE from 'three';
-import { additiveOverlay, createParticlePool, softDiscTexture, type ParticlePool } from './particles';
+import { createParticlePool, softDiscTexture, type ParticlePool } from './particles';
 
 /** Hysteresis so the flame doesn't stutter while talking. */
 const JAW_ON = 0.42;
@@ -39,14 +39,17 @@ export class FireBreath {
   ) {
     this.pool = createParticlePool(140, softDiscTexture());
     this.group.add(this.pool.points);
+    // Blended normally rather than additively: a still glow needs no light
+    // maths, and normal blending writes the alpha WebKit needs to keep the
+    // colour where the mask isn't (see particles.ts).
     const glowMaterial = new THREE.SpriteMaterial({
       map: softDiscTexture(),
       color: 0xff8c2e,
       transparent: true,
       opacity: 0.85,
       depthWrite: false,
+      depthTest: false,
     });
-    additiveOverlay(glowMaterial);
     this.glow = new THREE.Sprite(glowMaterial);
     this.glow.visible = false;
     this.group.add(this.glow);
@@ -86,8 +89,7 @@ export class FireBreath {
       this.spawnDebt = 0;
     }
 
-    const mat = this.pool.points.material as THREE.PointsMaterial;
-    mat.size = Math.min(56, Math.max(10, u.scalePx * 0.38));
+    this.pool.setSize(Math.min(56, Math.max(10, u.scalePx * 0.38)));
     // Buoyancy: flames decelerate downward, then drift back up as they die.
     this.pool.step(u.dtS, u.scalePx * 4.5, (c, lifeLeft) => c.multiplyScalar(lifeLeft * lifeLeft));
     this.pool.points.visible = !this.pool.idle();

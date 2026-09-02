@@ -44,6 +44,7 @@ export class PeaceBurst {
             color: RAINBOW[i],
             transparent: true,
             depthWrite: false,
+            depthTest: false, // over the mask, like the moving sparkles
           }),
         );
         star.visible = false;
@@ -93,8 +94,7 @@ export class PeaceBurst {
     }
 
     const sizeRef = active[0]?.sizePx ?? u.hands[0]?.sizePx ?? 40;
-    const mat = this.pool.points.material as THREE.PointsMaterial;
-    mat.size = Math.min(48, Math.max(12, sizeRef * 0.5));
+    this.pool.setSize(Math.min(48, Math.max(12, sizeRef * 0.5)));
     this.pool.step(u.dtS, -sizeRef * 3, (c, lifeLeft) => c.multiplyScalar(lifeLeft));
     this.pool.points.visible = !this.pool.idle();
   }
