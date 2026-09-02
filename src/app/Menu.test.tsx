@@ -15,16 +15,30 @@ function renderMenu() {
   );
 }
 
+/** What the wall prints a ticket for; the mirror has a door instead. */
+const LISTED = GAMES.filter((game) => !game.unlisted);
+
 describe('<Menu> — the arcade landing page', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => vi.restoreAllMocks());
 
-  it('lists every registry game (and Yahtzee) as a ticket', () => {
+  it('lists every listed registry game (and Yahtzee) as a ticket', () => {
     renderMenu();
     // Driven by the registry itself so a newly added game can't be missed.
-    for (const name of ['Yahtzee', ...GAMES.map((g) => g.title)]) {
+    for (const name of ['Yahtzee', ...LISTED.map((g) => g.title)]) {
       expect(screen.getAllByText(name).length).toBeGreaterThan(0);
     }
+  });
+
+  it('keeps an unlisted game off the wall, and gives it a door instead', () => {
+    renderMenu();
+    const unlisted = GAMES.filter((game) => game.unlisted);
+    expect(unlisted.map((game) => game.id)).toContain('mirror');
+    for (const game of unlisted) {
+      expect(screen.queryByTestId(`game-ticket-${game.id}`)).not.toBeInTheDocument();
+    }
+    // Still reachable: the camera toy's own row under the wall.
+    expect(screen.getByTestId('mirror-door')).toHaveAttribute('href', '/mirror');
   });
 
   describe('the poster behind every ticket', () => {
@@ -60,7 +74,7 @@ describe('<Menu> — the arcade landing page', () => {
 
     it('every registry game opens, with a Play link to its own path', () => {
       renderMenu();
-      for (const game of GAMES) {
+      for (const game of LISTED) {
         fireEvent.click(screen.getByTestId(`ticket-open-${game.id}`));
         const poster = screen.getByTestId(`ticket-poster-${game.id}`);
         expect(within(poster).getByRole('link', { name: new RegExp(`Play ${game.title}`) })).toHaveAttribute('href', game.path);
@@ -77,7 +91,7 @@ describe('<Menu> — the arcade landing page', () => {
 
   it('every ticket wears a player-count badge from its descriptor', () => {
     renderMenu();
-    for (const game of GAMES) {
+    for (const game of LISTED) {
       const ticket = document.querySelector(`.game-${game.id}`)!;
       const { min, max } = game.players;
       const label = min === max ? `For ${min} player${min === 1 ? '' : 's'}` : `For ${min}–${max} players`;
@@ -89,7 +103,7 @@ describe('<Menu> — the arcade landing page', () => {
 
   it('says "one player per device" exactly where the chairs are fewer than the players', () => {
     renderMenu();
-    for (const game of GAMES) {
+    for (const game of LISTED) {
       const ticket = document.querySelector(`.game-${game.id}`)!;
       const hint = ticket.querySelector('.tk-devices');
       if (game.seats.max < game.players.max) expect(hint, game.id).not.toBeNull();
