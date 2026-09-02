@@ -1,16 +1,15 @@
 /**
  * "Papa · Switch player ›" — the one line at the top of every lobby that says
- * whose ticket is playing. No game asks for a name; a ticket is the identity.
- * Switching drops the ticket list in place, so the wrong person at the iPad is
- * two taps from fixed, without leaving the game. One name, one verb: the gate,
- * this line and the Ticket Booth all say "Switch player" and open the same
- * picker (the UX pass, docs/mockups/20260831-party-ui).
+ * who is playing. No game asks for a name; the profile is the identity.
+ * Switching opens the picker over the page, so the wrong person at the iPad
+ * is two taps from fixed without the lobby moving under their thumb. One
+ * name, one verb: the gate, this line and the Ticket Booth all say "Switch
+ * player" and open the same picker (the UX pass, docs/mockups/20260831-party-ui).
  */
 
 import { useCallback, useRef, useState } from 'react';
-import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { Medal } from './Medal';
-import { TicketList } from './TicketList';
+import { PlayerPicker } from './PlayerPicker';
 import { useIdentity } from './useIdentity';
 import './player.css';
 
@@ -23,7 +22,6 @@ export function PlayingAs() {
     setOpen(false);
     changeRef.current?.focus();
   }, []);
-  useDismissOnEscape(open, close);
 
   // The gate handles "nobody signed in"; the party panel writes its own line.
   if (!active) return null;
@@ -42,29 +40,25 @@ export function PlayingAs() {
           aria-expanded={open}
           onClick={() => (open ? close() : setOpen(true))}
         >
-          {open ? 'Close' : 'Switch player ›'}
+          Switch player ›
         </button>
       </div>
 
       {open && (
-        <div className="pas-card" role="dialog" aria-label="Change player">
-          <TicketList
-            users={users}
-            activeId={active.id}
-            testIdPrefix="switch"
-            onPick={(id) => {
-              signIn(id);
-              close();
-            }}
-            onCreate={(name) => {
-              newPlayer(name);
-              close();
-            }}
-          />
-          <button type="button" className="pas-cancel" data-testid="playing-as-cancel" onClick={close}>
-            Cancel
-          </button>
-        </div>
+        <PlayerPicker
+          users={users}
+          activeId={active.id}
+          testIdPrefix="switch"
+          onPick={(id) => {
+            signIn(id);
+            close();
+          }}
+          onCreate={(name) => {
+            newPlayer(name);
+            close();
+          }}
+          onClose={close}
+        />
       )}
     </div>
   );

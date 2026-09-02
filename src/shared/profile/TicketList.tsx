@@ -1,11 +1,18 @@
 /**
  * The ticket list — the one way a player is picked anywhere in the arcade:
- * at the gate, behind "Change" in a lobby, at the booth's Switch. Saved
- * tickets are one tap; a single field filters them as you type and, when
- * nobody matches, makes a ticket for that name. No chip rows, no second form.
+ * at the gate, behind "Switch player" in a lobby, at the booth's Switch.
+ * Saved players are one tap; a single field filters them as you type and,
+ * when nobody matches, makes a profile for that name. No chip rows, no
+ * second form.
+ *
+ * The wording says "profile", not "ticket": tickets are the arcade's points,
+ * and a child reading "make a ticket for Mario" has to work out which of the
+ * two it means. The info button says where a profile lives, because that is
+ * the question a parent has at the moment a name is typed in.
  */
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { InfoIcon } from '@shared/ui/icons';
 import { playerColor } from './playerColors';
 import { canCreateTicket, initialOf, matchTickets } from './tickets';
 import type { StoredUser } from './users';
@@ -27,7 +34,9 @@ export function TicketList({
   testIdPrefix?: string;
 }) {
   const [query, setQuery] = useState('');
+  const [showWhere, setShowWhere] = useState(false);
   const fieldId = useId();
+  const whereId = useId();
   const fieldRef = useRef<HTMLInputElement>(null);
   // A brand-new browser has nothing to tap, so the field takes focus (and the
   // keyboard may come up); a returning player just taps their stub.
@@ -49,9 +58,29 @@ export function TicketList({
 
   return (
     <form className="tlist" onSubmit={submit}>
-      <label className="tlist-label" htmlFor={fieldId}>
-        Pick your player or type your name.
-      </label>
+      <div className="tlist-labelrow">
+        <label className="tlist-label" htmlFor={fieldId}>
+          Pick your player or type your name.
+        </label>
+        <button
+          type="button"
+          className="tlist-info"
+          data-testid={`${testIdPrefix}-info`}
+          aria-expanded={showWhere}
+          aria-controls={whereId}
+          onClick={() => setShowWhere((shown) => !shown)}
+        >
+          <InfoIcon size={18} />
+          <span className="sr-only">Where players are stored</span>
+        </button>
+      </div>
+
+      {showWhere && (
+        <p className="tlist-where" id={whereId} data-testid={`${testIdPrefix}-where`}>
+          Players are saved on this device, in this browser — never in the cloud. Nobody else can
+          see them, and clearing your browser data clears them too.
+        </p>
+      )}
       <input
         ref={fieldRef}
         id={fieldId}
@@ -101,7 +130,7 @@ export function TicketList({
             <p className="tlist-empty" data-testid={`${testIdPrefix}-empty`}>Nobody called that yet.</p>
           )}
           <button type="submit" className="tlist-create" data-testid={`${testIdPrefix}-create`}>
-            Make a ticket for {name}
+            Create a local profile for {name}
           </button>
         </>
       )}

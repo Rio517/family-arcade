@@ -12,7 +12,7 @@ import { useProfile } from '@shared/profile/useProfile';
 import { useIdentity } from '@shared/profile/useIdentity';
 import { playerColor } from '@shared/profile/playerColors';
 import { initialOf } from '@shared/profile/tickets';
-import { TicketList } from '@shared/profile/TicketList';
+import { PlayerPicker } from '@shared/profile/PlayerPicker';
 import { pronounCodePointLength, type GameHistoryEntry } from '@shared/profile/profile';
 import { arcadeNow } from '@shared/time/clock';
 import { GAMES } from './registry';
@@ -135,21 +135,20 @@ export function PlayerBooth() {
             </div>
 
             {mode === 'switch' && (
-              <div className="booth-roster">
-                <TicketList
-                  users={users}
-                  activeId={active.id}
-                  testIdPrefix="booth"
-                  onPick={(id) => {
-                    signIn(id);
-                    setMode('view');
-                  }}
-                  onCreate={(name) => {
-                    newPlayer(name);
-                    setMode('view');
-                  }}
-                />
-              </div>
+              <PlayerPicker
+                users={users}
+                activeId={active.id}
+                testIdPrefix="booth"
+                onPick={(id) => {
+                  signIn(id);
+                  setMode('view');
+                }}
+                onCreate={(name) => {
+                  newPlayer(name);
+                  setMode('view');
+                }}
+                onClose={() => setMode('view')}
+              />
             )}
 
             {mode === 'edit-profile' && (
