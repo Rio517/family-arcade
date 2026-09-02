@@ -184,45 +184,77 @@
   border: 1px solid var(--border);
 }
 .pas-who { font-weight: 800; }
-.pas-change {
+/* Doubled class on purpose: a game that squares off its own buttons
+   (`.caribbean-production button`) would otherwise square this one off too,
+   inside a pill with round ends. A control keeps the shape of the thing it
+   sits in. */
+.pas .pas-change {
   margin-left: auto;
   background: none;
   border: 0;
-  padding: 8px 6px;
-  border-radius: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
   color: var(--accent);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
   min-height: 44px;
 }
-.pas-change:focus-visible {
+.pas .pas-change:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.pas-card {
-  background: linear-gradient(180deg, #131c30, #0e1626);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px;
+/* The picker modal: the shared modal shell, with room for a roster that can
+   run longer than the window. */
+.ppicker-body {
+  padding: 14px 16px 16px;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+}
+
+/* Same reason as .pas .pas-change: inside a game that styles every button,
+   the picker's own controls keep their shape. */
+.ppicker .pstub,
+.ppicker .tlist-create,
+.ppicker .tlist-field {
+  border-radius: 12px;
+}
+
+.tlist-labelrow {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
 }
-.pas-cancel {
-  background: none;
+
+.tlist-info {
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px;
   border: 0;
-  padding: 10px;
+  border-radius: 999px;
+  background: none;
   color: var(--muted);
-  font: inherit;
-  font-weight: 700;
   cursor: pointer;
-  min-height: 44px;
 }
-.pas-cancel:focus-visible {
+.tlist-info:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.tlist-info:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 8px;
+}
+
+.tlist-where {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
 }
 .pmedal.sm {
   width: 30px;

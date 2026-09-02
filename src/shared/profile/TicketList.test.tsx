@@ -29,13 +29,13 @@ describe('<TicketList>', () => {
     expect(onPick).toHaveBeenCalledWith('c');
   });
 
-  it('offers to make a ticket only when nobody matches', () => {
+  it('offers to create a profile only when nobody matches', () => {
     const onCreate = vi.fn();
     render(<TicketList users={ROSTER} onPick={() => {}} onCreate={onCreate} />);
     const field = screen.getByTestId('ticket-name');
     fireEvent.change(field, { target: { value: '  Nana ' } });
     expect(screen.getByTestId('ticket-empty')).toBeInTheDocument();
-    expect(screen.getByTestId('ticket-create')).toHaveTextContent('Make a ticket for Nana');
+    expect(screen.getByTestId('ticket-create')).toHaveTextContent('Create a local profile for Nana');
     fireEvent.click(screen.getByTestId('ticket-create'));
     expect(onCreate).toHaveBeenCalledWith('Nana');
   });

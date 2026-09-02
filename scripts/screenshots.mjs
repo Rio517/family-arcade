@@ -74,8 +74,10 @@ const SHOTS = [
     },
   },
   {
+    // Hash route, like every other page: '/privacy' is served the SPA shell
+    // and lands on the front page, which is what this shot used to be.
     name: 'privacy',
-    path: '/privacy',
+    path: '/#/privacy',
     viewport: TABLET,
     fullPage: true,
   },

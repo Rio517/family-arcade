@@ -31,12 +31,15 @@ describe('<PlayingAs>', () => {
     expect(screen.queryByTestId('playing-as')).toBeNull();
   });
 
-  it('Change opens the ticket list; picking a ticket switches and closes', () => {
+  it('Switch player opens the picker over the page; picking switches and closes', () => {
     seed();
     render(<PlayingAs />);
     fireEvent.click(screen.getByTestId('playing-as-change'));
     expect(screen.getByTestId('playing-as-change')).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('dialog', { name: 'Change player' })).toBeInTheDocument();
+    // A modal over the page, so the lobby underneath doesn't move.
+    const dialog = screen.getByRole('dialog', { name: 'Choose who is playing' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(screen.getByTestId('switch-picker')).toBeInTheDocument();
     expect(screen.getByTestId('switch-user-u2')).toHaveTextContent(/you/i);
     fireEvent.click(screen.getByTestId('switch-user-u1'));
     expect(getUsersSnapshot().activeId).toBe('u1');
@@ -64,7 +67,7 @@ describe('<PlayingAs>', () => {
     expect(getUsersSnapshot().users.map((u) => u.profile.name)).toContain('Nana');
   });
 
-  it('Escape and Cancel close the list and hand focus back', () => {
+  it('Escape and Close shut the picker and hand focus back', () => {
     seed();
     render(<PlayingAs />);
     fireEvent.click(screen.getByTestId('playing-as-change'));
@@ -73,9 +76,18 @@ describe('<PlayingAs>', () => {
     expect(screen.getByTestId('playing-as-change')).toHaveFocus();
 
     fireEvent.click(screen.getByTestId('playing-as-change'));
-    fireEvent.click(screen.getByTestId('playing-as-cancel'));
+    fireEvent.click(screen.getByTestId('switch-picker-close'));
     expect(screen.queryByTestId('switch-name')).toBeNull();
     expect(screen.getByTestId('playing-as-change')).toHaveFocus();
+  });
+
+  it('says where a profile is kept, when asked', () => {
+    seed();
+    render(<PlayingAs />);
+    fireEvent.click(screen.getByTestId('playing-as-change'));
+    expect(screen.queryByTestId('switch-where')).toBeNull();
+    fireEvent.click(screen.getByTestId('switch-info'));
+    expect(screen.getByTestId('switch-where')).toHaveTextContent(/never in the cloud/i);
   });
 
   // The UX review's identity copy (docs/mockups/20260831-party-ui), now shipped: one name,

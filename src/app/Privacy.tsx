@@ -24,9 +24,10 @@ export function Privacy() {
       </header>
 
       <section className="pv-card pv-tldr">
-        <h2>The short version</h2>
+        <h2>The Short Version</h2>
         <ul>
           <li><b>No accounts, no sign-in, no ads, no tracking.</b></li>
+          <li><b>Local Profile.</b> Profiles are stored locally in your browser. Only you can access them.</li>
           <li><b>We have no server that stores your data.</b> Names and scores live only in your browser.</li>
           <li><b>Playing with a friend connects the two devices directly</b> using a short code you share.</li>
           <li><b>Video &amp; voice are off until you turn them on</b>, and nothing is ever recorded.</li>
@@ -35,7 +36,7 @@ export function Privacy() {
       </section>
 
       <section className="pv-card">
-        <h2>What we collect</h2>
+        <h2>What We Collect: Nothing. Nada. Zilch</h2>
         <p>
           Nothing leaves your device to us. There are no analytics, no advertising, and no third-party
           trackers. The player names you type and your game scores are saved in your browser's local
@@ -45,7 +46,7 @@ export function Privacy() {
       </section>
 
       <section className="pv-card">
-        <h2>Playing with a friend</h2>
+        <h2>Playing With a Friend</h2>
         <p>
           Two-player games (and the “party”) connect your two devices <b>directly to each other</b>
           {' '}using WebRTC — the same technology behind video calls. One person shares a short 4-letter
@@ -62,7 +63,7 @@ export function Privacy() {
       </section>
 
       <section className="pv-card">
-        <h2>Video &amp; voice</h2>
+        <h2>Video &amp; Voice</h2>
         <ul>
           <li><b>Off by default.</b> Your microphone and camera stay off until you tap to turn them on. The camera is a separate, extra opt-in from voice.</li>
           <li><b>Nothing is recorded or stored.</b> It's live and peer-to-peer — when you hang up or close the tab, it's gone.</li>
@@ -72,7 +73,7 @@ export function Privacy() {
       </section>
 
       <section className="pv-card pv-safety">
-        <h2>For grown-ups: keeping kids safe</h2>
+        <h2>For Grown-Ups: Keeping Kids Safe</h2>
         <ul>
           <li><b>Codes are the key.</b> Anyone who has your party or game code can connect to it while it's live. Only share it with a person you know and trust — a friend or family member — ideally set up together with an adult.</li>
           <li><b>Best on your home wifi.</b> Two devices on the same home network get the most reliable and private connection.</li>
