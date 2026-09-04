@@ -575,10 +575,21 @@
 /* Mid-battle the page opens up so two full-size boards and the log all fit —
    everywhere else the standard 1200px app column stays. */
 /* The battle owns the window: no app column cap, and the boards grow into
-   it — the 560px board cap left acres of dead margin on a desktop. */
+   it — the 560px board cap left acres of dead margin on a desktop. The radar
+   and the ocean wear the same cap, so the two boards always match. */
 .bs-app-wide { max-width: none; }
-.bs-app-wide .board { max-width: 760px; }
+.bs-app-wide .board,
+.bs-app-wide .bs3d-wrap { max-width: 760px; }
 .bs-app-wide .battle-wide .boards { gap: 20px; }
+
+/* A tall window is a monitor, not a tablet: let the boards keep growing until
+   the two of them, the rosters and the log fill the height. The 760px cap
+   left the bottom third of a 1440p screen empty. Never smaller than the cap —
+   a window just past 900px tall keeps today's boards. */
+@media (min-height: 900px) {
+  .bs-app-wide .board,
+  .bs-app-wide .bs3d-wrap { max-width: max(760px, calc(100dvh - 330px)); }
+}
 
 /* ── The 3D ocean pop-out ────────────────────────────────────────────────── */
 .bs3d-expand {
@@ -595,3 +606,27 @@
 }
 .bs3d-pop .bs3d-wrap { max-width: none; }
 .bs3d-holder { position: relative; }
+
+/* ── Nobody coming? A captain instead ─────────────────────────────────────
+   One line of captains under the invite and under the waiting placement, in
+   place of the lobby's full ladder. */
+.captain-chips {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid var(--surface-2);
+}
+.captain-chips-lead {
+  margin: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 14px; font-weight: 600; color: var(--muted);
+}
+.captain-chips-lead svg { color: #fbbf24; }
+.captain-chips-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.captain-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 40px; padding: 8px 14px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  font-size: 14px; cursor: pointer; touch-action: manipulation;
+}
+.captain-chip strong { color: #fbbf24; font-variant-numeric: tabular-nums; }
+.captain-chip:hover { border-color: #fbbf24; }
+.captain-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

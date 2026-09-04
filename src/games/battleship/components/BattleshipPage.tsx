@@ -13,6 +13,7 @@ import { Lobby } from './Lobby';
 import { FleetSelect } from './FleetSelect';
 import { Placement } from './Placement';
 import { Battle } from './Battle';
+import { CaptainChips } from './CaptainChips';
 import { Result } from './Result';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
@@ -134,6 +135,14 @@ export function BattleshipPage() {
     if (bs.code) party.closeTable(bs.code);
     bs.leave();
     navigate('/');
+  };
+
+  // Nobody took the invite: close the table for the party too, then hand the
+  // placed fleet to a computer captain.
+  const playComputerInstead = (personaId: string) => {
+    if (bs.code) party.closeTable(bs.code);
+    bs.switchToComputer(personaId);
+    setShareOpen(false);
   };
 
   // Sit down at an online table under this ticket: hosting draws a fresh
@@ -278,6 +287,7 @@ export function BattleshipPage() {
                 <button className="btn btn-primary" onClick={copyShare}>
                   {copied ? 'Link copied' : 'Copy invite link'}
                 </button>
+                {awaitingJoin && <CaptainChips onPick={playComputerInstead} />}
               </div>
             )}
           </div>
@@ -343,6 +353,7 @@ export function BattleshipPage() {
           onChange={bs.setFleet}
           onReady={bs.confirmReady}
           waiting={bs.phase === 'waiting'}
+          onPlayComputer={awaitingJoin ? playComputerInstead : undefined}
         />
       )}
 

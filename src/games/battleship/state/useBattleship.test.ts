@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { loadSession, saveSession, type GameSession } from '@games/battleship/storage/sessionStore';
 import type { Fleet, GameLog } from '@games/battleship/domain/types';
 
@@ -148,6 +148,63 @@ describe('useBattleship.startSoloGame', () => {
 
     expect(result.current.seatedUserId).toBeNull();
     expect(loadSession('SOLO')?.seatedUserId).toBeNull();
+  });
+});
+
+describe('useBattleship.switchToComputer', () => {
+  /** A host who has placed and readied up, and is waiting on an empty table. */
+  function hostWaiting() {
+    const hook = mount('Klara');
+    act(() => hook.result.current.startTable({ role: 'host', code: 'ABCD', seatedUserId: 'u-klara' }));
+    act(() => hook.result.current.confirmSkin());
+    act(() => hook.result.current.setFleet(FLEET));
+    act(() => hook.result.current.confirmReady());
+    expect(hook.result.current.phase).toBe('waiting');
+    return hook;
+  }
+
+  it('turns the empty table into a computer game with the fleet still placed and ready', () => {
+    const { result } = hostWaiting();
+    act(() => result.current.switchToComputer('bobble'));
+
+    expect(result.current.code).toBe('SOLO');
+    expect(result.current.side).toBe('host');
+    expect(result.current.myName).toBe('Klara');
+    expect(result.current.seatedUserId).toBe('u-klara');
+    // Nothing to place again: the fleet came across, readied.
+    expect(result.current.myFleet).toEqual(FLEET);
+    expect(result.current.myReady).toBe(true);
+    expect(result.current.phase).toBe('waiting'); // on the captain now, not a person
+  });
+
+  it('and the battle actually starts: the captain places, readies, and the host opens fire', async () => {
+    const { result } = hostWaiting();
+    act(() => result.current.switchToComputer('bobble'));
+    // Real loopback, real timers: the captain thinks for up to 1.2s, and the
+    // start lands 120ms of wire latency after that.
+    await waitFor(() => expect(result.current.phase).toBe('battle'), { timeout: 4000 });
+    expect(result.current.oppName).toBe('Deckhand Bobble');
+    expect(result.current.myFleet).toEqual(FLEET);
+  });
+
+  it('closes the online save, so the abandoned table is nothing to resume', () => {
+    const { result } = hostWaiting();
+    expect(loadSession('ABCD')).not.toBeNull();
+    act(() => result.current.switchToComputer('bobble'));
+    expect(loadSession('ABCD')).toBeNull();
+    expect(loadSession('SOLO')?.seatedUserId).toBe('u-klara');
+  });
+
+  it('is a no-op once shots have been fired', () => {
+    const { result } = mount('Rio');
+    saveSession({
+      code: 'ABCD', side: 'host', myName: 'Rio', mySkinId: 'aqua', seatedUserId: null,
+      oppName: 'Kai', oppSkinId: 'coral', myFleet: FLEET, myReady: true, log: MID_BATTLE,
+      epoch: 0, finished: false, updatedAt: 1,
+    } as GameSession);
+    act(() => result.current.resumeGame('ABCD'));
+    act(() => result.current.switchToComputer('bobble'));
+    expect(result.current.code).toBe('ABCD');
   });
 });
 
