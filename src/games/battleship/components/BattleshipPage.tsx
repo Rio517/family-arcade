@@ -187,7 +187,13 @@ export function BattleshipPage() {
   }, [hostWaiting, bs.phase]);
 
   return (
-    <div className={`app ${bs.phase === 'battle' ? 'bs-app-wide' : ''}`}>
+    <div
+      className={`app ${bs.phase === 'battle' ? 'bs-app-wide' : ''}`}
+      // The link's state, readable even when no badge shows it (a computer
+      // game hides the badge; the tests still need to know the captain is on).
+      data-conn={bs.side ? bs.status : undefined}
+      data-testid="battleship-page"
+    >
       <div className="topbar">
         <button className="back-link" onClick={goMenu} data-testid="back">
           ‹ Menu
@@ -213,7 +219,9 @@ export function BattleshipPage() {
             <strong data-testid="game-code">{bs.code}</strong>
           </button>
         )}
-        {bs.side && <ConnectionBadge status={bs.status} detail={bs.statusDetail} />}
+        {/* A computer captain is not a connection: "Connected" up here would
+            be claiming a link to nobody. */}
+        {bs.side && !solo && <ConnectionBadge status={bs.status} detail={bs.statusDetail} />}
         <FullscreenButton />
       </div>
 

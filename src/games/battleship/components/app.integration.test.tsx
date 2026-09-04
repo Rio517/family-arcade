@@ -413,7 +413,7 @@ function historyById() {
  */
 async function resumeAndWin(app: ReturnType<typeof within>, last: Coord) {
   fireEvent.click(app.getByTestId('resume-game'));
-  await waitFor(() => expect(app.getAllByText(/Connected/i).length).toBeGreaterThan(0));
+  await waitFor(() => expect(app.getByTestId('battleship-page')).toHaveAttribute('data-conn', 'connected'));
   fireEvent.click(app.getByTestId(`cell-enemy-${last.row}-${last.col}`));
   await app.findByText('You Win!', {}, { timeout: 4000 });
 }
@@ -439,6 +439,14 @@ describe('the result lands on the ticket that sat down', () => {
     expect(app.getByText(new RegExp(`You now have ${kai.points} points`))).toBeInTheDocument();
   });
 
+  it('shows no connection badge against a computer captain — there is no link to report', async () => {
+    seedNearWinSolo('u-kai');
+    const app = within(renderApp().container);
+    fireEvent.click(app.getByTestId('resume-game'));
+    await waitFor(() => expect(app.getByTestId('battleship-page')).toHaveAttribute('data-conn', 'connected'));
+    expect(app.queryByText(/Connected/i)).toBeNull();
+  });
+
   it('even when a different ticket is signed in by the time the game ends', async () => {
     const last = seedNearWinSolo('u-kai');
     const app = within(renderApp().container);
@@ -446,7 +454,7 @@ describe('the result lands on the ticket that sat down', () => {
 
     // Mid-game, the family taps Change: Rio is signed in when the last shot lands.
     switchTo('u-rio');
-    await waitFor(() => expect(app.getAllByText(/Connected/i).length).toBeGreaterThan(0));
+    await waitFor(() => expect(app.getByTestId('battleship-page')).toHaveAttribute('data-conn', 'connected'));
     fireEvent.click(app.getByTestId(`cell-enemy-${last.row}-${last.col}`));
     await app.findByText('You Win!', {}, { timeout: 4000 });
 
