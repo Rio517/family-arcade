@@ -576,19 +576,55 @@
    everywhere else the standard 1200px app column stays. */
 /* The battle owns the window: no app column cap, and the boards grow into
    it — the 560px board cap left acres of dead margin on a desktop. The radar
-   and the ocean wear the same cap, so the two boards always match. */
-.bs-app-wide { max-width: none; }
+   and the ocean wear the same cap, so the two boards always match.
+   (`.app.bs-app-wide`, two classes: this must beat `.app`'s 1200px cap
+   whichever order the stylesheets load in — the dev server loads this file
+   before the tokens, and a plain `.bs-app-wide` lost there.) */
+.app.bs-app-wide { max-width: none; }
 .bs-app-wide .board,
 .bs-app-wide .bs3d-wrap { max-width: 760px; }
 .bs-app-wide .battle-wide .boards { gap: 20px; }
 
-/* A tall window is a monitor, not a tablet: let the boards keep growing until
-   the two of them, the rosters and the log fill the height. The 760px cap
-   left the bottom third of a 1440p screen empty. Never smaller than the cap —
-   a window just past 900px tall keeps today's boards. */
+/* A tall window is a monitor, not a tablet: the boards take exactly the
+   height there is — growing until the two of them, the rosters and the log
+   fill it, and shrinking rather than scrolling. The 760px cap left the bottom
+   third of a 1440p screen empty and still ran off the bottom of a 1080p one.
+   (The floor keeps a barely-900px window from crushing the grid.) */
 @media (min-height: 900px) {
   .bs-app-wide .board,
-  .bs-app-wide .bs3d-wrap { max-width: max(760px, calc(100dvh - 330px)); }
+  .bs-app-wide .bs3d-wrap { max-width: max(520px, var(--bs-board-fit)); }
+  /* The bottom pad only needs to clear the party pill (44px, 12px off the
+     bottom); the standard column's extra breathing room is board height here. */
+  .app.bs-app-wide { padding-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 56px); }
+}
+.bs-app-wide {
+  /* Board height that leaves the top bar, the panel titles, the rosters and
+     the log strip on screen with nothing to scroll: the sum of that chrome,
+     measured, is 378px. */
+  --bs-board-fit: calc(100dvh - 380px);
+}
+/* The panels' own bottom margin doubled the gap above the log strip. */
+.bs-app-wide .battle-wide .boards .panel { margin-bottom: 0; }
+
+/* A monitor is wider than it is tall, and two square boards can't fill that
+   without scrolling. The ocean can: it is a camera, not a grid. On a wide
+   screen the radar takes the square the height allows and the ocean takes
+   every pixel of width that is left, at the same height — more sea either
+   side of the board, and nothing empty at the edges. The 2D fleet board
+   stays square inside the wider panel. */
+@media (min-height: 900px) and (min-aspect-ratio: 16/10) {
+  .bs-app-wide .battle-wide .boards {
+    /* The radar column is its board plus the panel's own padding and border. */
+    grid-template-columns: calc(max(520px, var(--bs-board-fit)) + 38px) minmax(0, 1fr);
+  }
+  .bs-app-wide .bs3d-wrap { max-width: none; position: relative; }
+  .bs-app-wide .bs3d { aspect-ratio: auto; height: max(520px, var(--bs-board-fit)); }
+  /* The orbit hint sits on the water rather than in a row of its own. */
+  .bs-app-wide .bs3d-hint {
+    position: absolute; right: 14px; bottom: 10px; margin: 0;
+    padding: 4px 10px; border-radius: 999px;
+    background: rgba(10, 16, 28, 0.6); color: var(--muted);
+  }
 }
 
 /* ── The 3D ocean pop-out ────────────────────────────────────────────────── */
