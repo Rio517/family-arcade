@@ -48,7 +48,8 @@ export class FleetScene {
   /** Ships an earlier update showed afloat — a sink after that is fresh news. */
   private seenAfloat = new Set<ShipId>();
   private water: THREE.Mesh;
-  private waterBase: Float32Array;
+  /** The sea's clock, read by its vertex shader; frozen under reduced motion. */
+  private seaTime = { value: 0 };
   private raf = 0;
   private resizeObs: ResizeObserver | null = null;
   private disposed = false;
@@ -106,45 +107,55 @@ export class FleetScene {
     rim.position.set(-6, 3, -6);
     this.scene.add(rim);
 
-    // ── The sea: a gently rolling plane ──
-    const waterGeo = new THREE.PlaneGeometry(13.5, 13.5, 26, 26);
+    // ── The sea: a night swell, rolled on the GPU ──
+    // The waves live in the vertex shader (see seaSwell) rather than a
+    // per-frame loop over the vertices: no CPU cost, so the mesh can be fine
+    // enough for the swell to read as water rather than a wobbling sheet. A
+    // standard material keeps the moon, the fog, and the ships' shadows.
+    const waterGeo = new THREE.PlaneGeometry(13.5, 13.5, 72, 72);
     waterGeo.rotateX(-Math.PI / 2);
-    this.waterBase = new Float32Array(waterGeo.attributes.position.array);
-    this.water = new THREE.Mesh(
-      waterGeo,
-      new THREE.MeshStandardMaterial({ color: '#14506e', roughness: 0.72, metalness: 0.08 }),
-    );
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: '#0f3d55',
+      roughness: 0.42,
+      metalness: 0.12,
+    });
+    waterMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = this.seaTime;
+      shader.vertexShader = seaSwell(shader.vertexShader);
+    };
+    this.water = new THREE.Mesh(waterGeo, waterMat);
     this.water.receiveShadow = true;
     this.scene.add(this.water);
 
-    // ── The targeting grid + glowing rim in the fleet's colour ──
+    // ── The targeting grid + a thin rim in the fleet's colour ──
     const grid = new THREE.GridHelper(BOARD_SIZE, BOARD_SIZE, '#3d6d8a', '#28546e');
     (grid.material as THREE.Material & { opacity: number; transparent: boolean }).transparent = true;
     (grid.material as THREE.Material & { opacity: number }).opacity = 0.5;
     grid.position.y = 0.06;
     this.scene.add(grid);
-    // A quiet frame, not a lamp. The rim slab sits at wave height, so the
-    // rolling sea laps over its lip — with the old bright emissive that read
-    // as an irritating flickering border. Kill the glow and the lapping goes
-    // back to being water. (The inner box is the board's dark floor; it must
-    // stay ABOVE the rim slab or the tint washes the whole board.)
-    const rimBar = new THREE.Mesh(
-      new THREE.BoxGeometry(BOARD_SIZE + 0.5, 0.06, BOARD_SIZE + 0.5),
-      new THREE.MeshStandardMaterial({
-        color: opts.skinColor,
-        emissive: opts.skinColor,
-        emissiveIntensity: 0.15,
-        transparent: true,
-        opacity: 0.75,
-      }),
-    );
-    rimBar.position.y = -0.02;
-    const rimHole = new THREE.Mesh(
-      new THREE.BoxGeometry(BOARD_SIZE + 0.1, 0.1, BOARD_SIZE + 0.1),
-      new THREE.MeshStandardMaterial({ color: '#0a1424' }),
-    );
-    rimHole.position.y = -0.021;
-    this.scene.add(rimBar, rimHole);
+    // The rim floats just above the crests, as four bars, so the swell rolls
+    // under it — the old slab sat at wave height and flickered as the sea
+    // lapped its lip, and the dark floor that hid the flicker hid the sea.
+    const rimMat = new THREE.MeshStandardMaterial({
+      color: opts.skinColor,
+      emissive: opts.skinColor,
+      emissiveIntensity: 0.22,
+      transparent: true,
+      opacity: 0.8,
+    });
+    const rimLen = BOARD_SIZE + 0.5;
+    const rimBar = new THREE.BoxGeometry(rimLen, 0.02, 0.1);
+    for (const [x, z, turn] of [
+      [0, rimLen / 2, 0],
+      [0, -rimLen / 2, 0],
+      [rimLen / 2, 0, Math.PI / 2],
+      [-rimLen / 2, 0, Math.PI / 2],
+    ]) {
+      const bar = new THREE.Mesh(rimBar, rimMat);
+      bar.position.set(x, 0.05, z);
+      bar.rotation.y = turn;
+      this.scene.add(bar);
+    }
 
     this.scene.add(this.shipsGroup, this.markGroup);
 
@@ -318,15 +329,8 @@ export class FleetScene {
     }
 
     if (!this.opts.reducedMotion) {
-      // Roll the sea.
-      const pos = this.water.geometry.attributes.position;
-      for (let i = 0; i < pos.count; i++) {
-        const bx = this.waterBase[i * 3];
-        const bz = this.waterBase[i * 3 + 2];
-        pos.setY(i, Math.sin(bx * 1.15 + now / 900) * Math.cos(bz * 0.95 + now / 1100) * 0.024);
-      }
-      pos.needsUpdate = true;
-      this.water.geometry.computeVertexNormals();
+      // Roll the sea: one number, the shader does the rest.
+      this.seaTime.value = now / 1000;
 
       // Ships ride the swell; fires gutter and dance.
       for (const g of this.bobbing) {
@@ -671,4 +675,43 @@ function buildWarship(id: ShipId, size: number, sunk: boolean, skinColor: string
     }
   }
   return g;
+}
+
+
+/**
+ * The night swell, spliced into three's standard vertex shader: two slow
+ * crossing waves carry the height, a third, smaller and quicker, breaks the
+ * surface into facets for the moon to catch. The normal is the analytic slope
+ * of the same sum, so the lighting agrees with the shape. Amplitude stays
+ * small — this is water seen under a targeting grid, not weather.
+ */
+function seaSwell(vertexShader: string): string {
+  const waves = /* glsl */ `
+    uniform float uTime;
+    // Height and slope of the swell at a point of the board plane.
+    vec3 swell(vec2 p) {
+      float a = sin(p.x * 0.95 + uTime * 0.55) * cos(p.y * 0.8 + uTime * 0.42);
+      float b = sin((p.x * 0.6 - p.y * 0.75) * 1.7 - uTime * 0.7);
+      float c = sin((p.x * 1.3 + p.y * 1.1) * 2.6 + uTime * 1.15);
+      float h = a * 0.028 + b * 0.014 + c * 0.005;
+      float dax = cos(p.x * 0.95 + uTime * 0.55) * 0.95 * cos(p.y * 0.8 + uTime * 0.42);
+      float day = -sin(p.x * 0.95 + uTime * 0.55) * sin(p.y * 0.8 + uTime * 0.42) * 0.8;
+      float db = cos((p.x * 0.6 - p.y * 0.75) * 1.7 - uTime * 0.7) * 1.7;
+      float dc = cos((p.x * 1.3 + p.y * 1.1) * 2.6 + uTime * 1.15) * 2.6;
+      float dx = dax * 0.028 + db * 0.6 * 0.014 + dc * 1.3 * 0.005;
+      float dy = day * 0.028 - db * 0.75 * 0.014 + dc * 1.1 * 0.005;
+      return vec3(h, dx, dy);
+    }
+  `;
+  return vertexShader
+    .replace('#include <common>', `#include <common>\n${waves}`)
+    // The plane was laid flat when it was built, so its normal is +y and its
+    // surface runs along x and z.
+    .replace(
+      '#include <beginnormal_vertex>',
+      `#include <beginnormal_vertex>
+       vec3 sw = swell(position.xz);
+       objectNormal = normalize(vec3(-sw.y, 1.0, -sw.z));`,
+    )
+    .replace('#include <begin_vertex>', `#include <begin_vertex>\n  transformed.y += sw.x;`);
 }

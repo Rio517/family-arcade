@@ -27,16 +27,12 @@ const log: GameLog = [
  * tall here made screenshots crop the board and stop representing the game.
  * For a ship filling the screen, use the per-ship inspector pages instead.
  */
-const HARNESS_CSS = `
-  .app { max-width: none !important; }
-`;
 
 function App() {
   // ?era=modern sails the modern navy — how the screenshot run captures both.
   const era = new URLSearchParams(location.search).get('era') === 'modern' ? 'modern' : 'classic';
   return (
-    <div className="app" style={{ maxWidth: 'none' }}>
-      <style>{HARNESS_CSS}</style>
+    <div className="app bs-app-wide">
       <p className="subtle center" style={{ margin: '0 0 8px' }}>
         Harness — the 3D tile is enlarged here. For one ship filling the screen, open{' '}
         <a href="/preview-ship.html">/preview-ship.html</a>.

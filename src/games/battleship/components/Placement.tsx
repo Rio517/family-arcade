@@ -1,5 +1,6 @@
 import { useMemo, useState, type PointerEvent } from 'react';
 import { Board, type BoardCell, type PlacedShip } from './Board';
+import { CaptainChips } from './CaptainChips';
 import { FLEET, shipSpec, skinById } from '@games/battleship/domain/constants';
 import {
   autoPlace,
@@ -22,10 +23,12 @@ interface PlacementProps {
   onChange: (fleet: Fleet) => void;
   onReady: () => void;
   waiting: boolean;
+  /** Set while the host waits on an empty table: a computer captain instead. */
+  onPlayComputer?: (personaId: string) => void;
 }
 
 /** Screen 2 of setup: position your ships on your own board. */
-export function Placement({ skinId, fleet, onChange, onReady, waiting }: PlacementProps) {
+export function Placement({ skinId, fleet, onChange, onReady, waiting, onPlayComputer }: PlacementProps) {
   const firstUnplaced = FLEET.find((s) => !fleet.some((p) => p.shipId === s.id))?.id ?? FLEET[0].id;
   const [selected, setSelected] = useState<ShipId>(firstUnplaced);
   const [orientation, setOrientation] = useState<Orientation>('H');
@@ -257,7 +260,12 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting }: Placeme
             {waiting ? 'Ready' : 'Ready to battle'}
           </button>
         </div>
-        {waiting && <p className="subtle center" style={{ marginTop: 10 }}>Waiting for your opponent to finish placing…</p>}
+        {waiting && (
+          <p className="subtle center" style={{ marginTop: 10 }}>
+            {onPlayComputer ? 'Waiting for your opponent to join…' : 'Waiting for your opponent to finish placing…'}
+          </p>
+        )}
+        {waiting && onPlayComputer && <CaptainChips onPick={onPlayComputer} />}
         <p className="subtle" style={{ marginTop: 10 }}>
           Selected: <strong>{shipSpec(selected).name}</strong>
           {selectedPlaced ? ' (already placed — tap it on the board to move it)' : ''}

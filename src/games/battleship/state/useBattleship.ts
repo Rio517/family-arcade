@@ -72,6 +72,12 @@ export interface UseBattleshipResult {
    * here just as at an online table, so a solo win is history like any other.
    */
   startSoloGame: (personaId: string, seatedUserId: string | null) => void;
+  /**
+   * Nobody came: turn the table you set into a game against a computer
+   * captain, fleet placed as it stands. For a host on an empty table; a
+   * guest, or a table with shots in it, is a no-op.
+   */
+  switchToComputer: (personaId: string) => void;
   resumeGame: (code: string) => void;
   chooseSkin: (skinId: string) => void;
   confirmSkin: () => void;
@@ -235,6 +241,26 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     conn.host('SOLO');
   }, [makeLoopback, setSessionState]);
 
+  const switchToComputer = useCallback((personaId: string) => {
+    const s = sessionRef.current;
+    // Only a host's table with no shots in it. Whether anyone has joined is
+    // the page's to check — it offers this only while the table is empty.
+    if (!s || s.side !== 'host' || s.log.length > 0) return;
+    // The online table is over: its save goes, and the loopback replaces the
+    // link (makeLoopback tears the old connection down).
+    clearSession(s.code);
+    const conn = makeLoopback(personaId);
+    // The same captain, skin and fleet, readied on the new table. The ready
+    // message this produces is dropped on purpose — the captain isn't
+    // listening yet — and it doesn't matter: the handshake the loopback asks
+    // for on open carries `myReady`, and the captain's own ready, when it
+    // lands, is what lets the host author the start.
+    const table = Session.createSession('host', 'SOLO', s.myName, s.mySkinId, s.seatedUserId);
+    const placed = Session.setFleet(Session.toPlacing(table), s.myFleet);
+    setSessionState(Session.confirmReady(placed).state);
+    conn.host('SOLO');
+  }, [makeLoopback, setSessionState]);
+
   const resumeGame = useCallback((code: string) => {
     const stored = loadSession(code);
     if (!stored) return;
@@ -331,6 +357,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     winnerSide: s ? Session.winnerSide(s) : null,
     startTable,
     startSoloGame,
+    switchToComputer,
     resumeGame,
     chooseSkin,
     confirmSkin,
