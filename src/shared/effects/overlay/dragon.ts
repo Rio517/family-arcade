@@ -1,11 +1,13 @@
 /**
  * The Fire Dragon head, in two forms.
  *
- * `buildDragonMask()` instances the modelled mask — hand-authored in Blender,
- * exported as a GLB and meshopt-compressed into the bundle (ADR 0010: nothing
- * is fetched at runtime; the file ships and precaches like the ship meshes).
- * It carries its own rig contract in node extras: `DragonJaw` opens with the
- * tracked `jawOpen`, and `FireSocket` marks where the breath leaves the mouth.
+ * `buildDragonMask()` instances the modelled mask — sculpted in Blender, cut
+ * down and rigged by `scripts/dragon-lod.mjs`, meshopt-compressed into the
+ * bundle (ADR 0010: nothing is fetched at runtime; the file ships and
+ * precaches like the ship meshes). It carries its rig contract in nodes:
+ * `EyeAperture_L/R` say where the wearer's eyes look out, `DragonJaw` opens
+ * with the tracked `jawOpen`, and `FireSocket` marks where the breath leaves
+ * the mouth.
  *
  * `buildDragonHead()` is the procedural head (ADR 0006), kept as the face worn
  * until the model arrives — and on any device where it never does.
@@ -18,7 +20,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import maskUrl from '../assets/fire-dragon-mask.glb';
+import maskUrl from '../assets/dragon-mask.glb';
 
 const SCALES_GREEN = 0x3d9c50;
 const BELLY_GREEN = 0x86d68f;
@@ -26,27 +28,22 @@ const HORN_CREAM = 0xf3e9c6;
 const DARK = 0x1c2a1e;
 
 /**
- * Ear to ear, in model units, of the head the mask was fitted to in Blender
- * (the wearer proxy in the review renders). Dividing by it turns the mask into
- * face widths, so it lands on a tracked face at any distance from the camera.
+ * How far apart the wearer's eyes are, in tracked face widths — centre to
+ * centre of the apertures they look out of. The tracker measures across the
+ * face oval (MediaPipe 234↔454), which runs inside the ears; this is the ratio
+ * that put a face's eyes in the middle of the holes on camera. A mask is
+ * scaled so its `EyeAperture_L/R` sit this far apart, whatever units it was
+ * sculpted in.
+ */
+const EYE_SPAN_FIT = 0.61;
+
+/**
+ * For a mask without eye anchors (the earlier hand-authored one): ear to ear
+ * of the head it was fitted to, in model units, how much head it is worn
+ * over in face widths, and the height of its apertures above its origin.
  */
 const DESIGN_FACE_WIDTH = 1.24;
-
-/**
- * How much head the mask is worn over, in tracked face widths. The tracker
- * measures across the face oval (MediaPipe 234↔454), which runs inside the
- * ears, so a mask cut to exactly that width sits high on the face and leaves
- * the chin out. Measured against a face on camera.
- */
 const HEAD_FIT = 1.1;
-
-/**
- * Where the wearer's eyes sit in the mask, in model units above its origin —
- * the height of the eye apertures, taken from the head the mask was fitted to.
- * The mask hangs from this line, because eyes looking out of the apertures are
- * what sells it. (The asset publishes the apertures as openings in the shell
- * rather than as a node, so the height lives here.)
- */
 const EYE_LINE = 0.12;
 
 /**
@@ -59,7 +56,20 @@ const ANCHOR_DROP = 0.027;
 /** The rig contract published by the asset, with the values it ships with. */
 const JAW_NODE = 'DragonJaw';
 const FIRE_SOCKET_NODE = 'FireSocket';
+const EYE_NODES = ['EyeAperture_L', 'EyeAperture_R'];
 const JAW_OPEN_RADIANS = 0.314159;
+
+/**
+ * How far the jaw swings when the mouth is fully open: `open_rotation_x` in
+ * radians, or `jaw_max_degrees`, whichever the asset published.
+ */
+function jawOpenRadians(jaw: THREE.Object3D | null): number {
+  const radians = jaw?.userData.open_rotation_x;
+  if (typeof radians === 'number') return radians;
+  const degrees = jaw?.userData.jaw_max_degrees;
+  if (typeof degrees === 'number') return (degrees * Math.PI) / 180;
+  return JAW_OPEN_RADIANS;
+}
 
 /** A dragon head ready to wear, plus the parts the scene animates. */
 export interface DragonHead {
@@ -104,9 +114,12 @@ export function buildDragonMask(): DragonHead | null {
 
   const model = source.clone(true);
 
-  // Hang the mask from its eye line, at the point the tracker anchors on.
-  const scale = HEAD_FIT / DESIGN_FACE_WIDTH;
-  model.position.y -= EYE_LINE + ANCHOR_DROP / scale;
+  // Size the mask so its eye apertures land on the wearer's eyes, then hang
+  // it from that line at the point the tracker anchors on.
+  const [eyeL, eyeR] = EYE_NODES.map((name) => model.getObjectByName(name));
+  const scale = eyeL && eyeR ? EYE_SPAN_FIT / Math.abs(eyeR.position.x - eyeL.position.x) : HEAD_FIT / DESIGN_FACE_WIDTH;
+  const eyeLine = eyeL && eyeR ? (eyeL.position.y + eyeR.position.y) / 2 : EYE_LINE;
+  model.position.y -= eyeLine + ANCHOR_DROP / scale;
 
   const group = new THREE.Group();
   group.add(model);
@@ -114,12 +127,11 @@ export function buildDragonMask(): DragonHead | null {
   group.userData.cachedResources = true;
 
   const jaw = model.getObjectByName(JAW_NODE) ?? null;
-  const open = jaw?.userData.open_rotation_x;
 
   return {
     group,
     jaw,
-    jawOpenRadians: typeof open === 'number' ? open : JAW_OPEN_RADIANS,
+    jawOpenRadians: jawOpenRadians(jaw),
     fireSocket: model.getObjectByName(FIRE_SOCKET_NODE) ?? null,
   };
 }

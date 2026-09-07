@@ -39,12 +39,20 @@ open an effect never download a byte of it, same as the three.js chunk.
 
 **Effects are drawn on top of the video, never burned into the stream.** A
 transparent three.js canvas overlays each `<video>` element and draws to the
-tracked face/hand. The Fire Dragon wears a modelled mask — hand-authored in
-Blender, meshopt-compressed and bundled like the ship meshes, with a jaw node
-that follows `jawOpen` and a socket that marks where the breath leaves the
-mouth. Everything else is procedural geometry (ADR 0006). Both are built in
-face widths, so a head lands on a face at any distance from the camera, and
-the procedural head stays as the fallback wherever the model can't be decoded.
+tracked face/hand. The Fire Dragon wears a modelled mask — sculpted in
+Blender as a reference master (1.2M triangles, colour as vertex data, no rig),
+and turned into the runtime asset by `scripts/dragon-lod.mjs`: decimated to
+300k triangles, quantised and meshopt-compressed like the ship meshes, with a
+rig read off the geometry — `EyeAperture_L/R` at the centres of the eye
+openings, a `DragonJaw` pivot at the jaw's rear-top edge that follows
+`jawOpen`, and a `FireSocket` at the bite line where the breath leaves the
+mouth. Everything else is procedural geometry (ADR 0006). The mask is scaled
+so its eye apertures sit on the wearer's eyes, in tracked face widths, so a
+head lands on a face at any distance from the camera; the procedural head
+stays as the fallback wherever the model can't be decoded. Triangle count is
+not the constraint it looks like: the 300k asset is 2.5 MB, decodes in tens of
+milliseconds, and is indistinguishable from the master at display size; the
+full master would fit the precache too.
 In a call, each device runs the
 tracker on whatever video it is *displaying* — its own preview and the remote
 stream alike — and the chosen effect travels as a tiny message on the

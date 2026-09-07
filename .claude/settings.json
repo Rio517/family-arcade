@@ -9,6 +9,8 @@
       "Bash(npm run build:*)",
       "Bash(npm run check:*)",
       "Bash(npm run dev:*)",
+      "Bash(npm run dragon-lod:*)",
+      "Bash(npm run glb:*)",
       "Bash(npm run knip:*)",
       "Bash(npm run lint:*)",
       "Bash(npm run new-game:*)",
