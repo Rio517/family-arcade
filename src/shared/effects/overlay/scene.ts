@@ -78,10 +78,13 @@ export function createEffectsScene(
   const camera = new THREE.OrthographicCamera(0, 2, 2, 0, 0.1, 4000);
   camera.position.z = 1000;
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-  const sun = new THREE.DirectionalLight(0xfff2dd, 1.4);
+  scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+  const sun = new THREE.DirectionalLight(0xfff2dd, 2.0);
   sun.position.set(200, 500, 800);
   scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xd6e8ff, 0.7);
+  fill.position.set(-400, -150, 600);
+  scene.add(fill);
 
   let effects = new Set(opts.effects);
   let width = 2;
