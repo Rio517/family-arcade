@@ -7,8 +7,9 @@ score logger, installable as an offline PWA:
   character, and race to 20 rainbow coins. Grab power-ups on the way!
 - **Rainbow Racer** — Mario Kart in the sky (1–2 players): fly anywhere over
   a sea of clouds as a unicorn or a fairy, or ride one — a princess on a
-  flying unicorn, a bunny on a cloud. First to 20 coins wins; rainbow rings
-  give a burst of speed and stars make you bigger and faster.
+  flying unicorn, a bunny on a cloud. A rainbow road leads the way. First to
+  20 coins wins; rainbow rings give a burst of speed, and power-ups make you
+  bigger, give you big wings, or lay a line of coins ahead.
 - **Ship Battle** — a two-player, cross-device naval guessing game (a
   Battleship-style game; "Battleship" is a trademark of Hasbro and is not
   affiliated). Two iPads, one shared code, no server — or play solo against a

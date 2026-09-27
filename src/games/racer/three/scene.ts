@@ -16,9 +16,20 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { disposeDeep } from '@shared/three/disposeDeep';
-import { CELL, RING_RADIUS, cellNoise, cellOf, islandsInCell, ringInCell } from '../domain/sky';
+import {
+  CELL,
+  RING_RADIUS,
+  TRAIL_RING_EVERY,
+  cellNoise,
+  cellOf,
+  islandsInCell,
+  ringInCell,
+  trailPoint,
+  trailRing,
+  type Ring,
+} from '../domain/sky';
 import type { Flyer } from '../domain/flight';
-import type { Coin, Star } from '../domain/pickups';
+import type { Coin, PowerKind, Star } from '../domain/pickups';
 import { createRider, preloadRiderAssets, type CharacterId, type Rider } from './riders';
 
 /** How many cells either side of the camera are built. */
@@ -27,12 +38,25 @@ const VIEW_CELLS = 3;
 const CLOUD_SEA_Y = -26;
 
 const RAINBOW = [0xff5a5a, 0xff9f45, 0xffe14a, 0x5fd08a, 0x4aa3ff, 0x9b6bff];
+
+/** How much of the rainbow road is drawn, in road points behind and ahead of me. */
+const ROAD_BEHIND = 4;
+const ROAD_AHEAD = 36;
+/** The road runs this far below the line racers fly along, and is this wide. */
+const ROAD_DROP = 4;
+const ROAD_WIDTH = 13;
+/** Curve samples per road point: enough that bends read smooth. */
+const ROAD_SAMPLES = 6;
+
+/** Each power-up's glow and sparkle colour, so a child learns them by colour. */
+const POWER_GLOW: Record<PowerKind, number> = { grow: 0xfff0a0, wings: 0x9fd8ff, coins: 0xff9ad5 };
+const POWER_SPARKLE: Record<PowerKind, number> = { grow: 0xffe066, wings: 0xa8e0ff, coins: 0xff8fd0 };
 const FLOWERS = [0xff5d8f, 0xffd23f, 0xff9f45, 0x9b6bff, 0xffffff, 0x53d0ff];
 const BALLOONS = [0xff5d6c, 0x4aa3ff, 0xffd23f, 0x53d08a, 0xc38bff];
 
 export interface RacerLook {
-  /** Shown in the HUD next to the score. */
-  emoji: string;
+  /** The racer's picture, shown in the HUD next to the score. */
+  portrait: string;
   /** The racer's colour: dress, wings, mane or cloud tint. */
   color: number;
   /** Which character flies. */
@@ -159,6 +183,41 @@ function starGeometry(): THREE.BufferGeometry {
   return geo;
 }
 
+/** One feathered wing, root at the origin, reaching out along +x. */
+function wingGeometry(): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.bezierCurveTo(1.5, 3.4, 5, 4.6, 7.6, 3.9);
+  // The trailing edge: three soft feather scallops back to the root.
+  shape.quadraticCurveTo(6.5, 2.6, 7.1, 1.7);
+  shape.quadraticCurveTo(5.5, 1.1, 5.8, 0.1);
+  shape.quadraticCurveTo(4.1, -0.1, 4.0, -1.1);
+  shape.quadraticCurveTo(2.0, -0.9, 0, 0);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.5,
+    bevelEnabled: true,
+    bevelThickness: 0.25,
+    bevelSize: 0.25,
+    bevelSegments: 2,
+    curveSegments: 10,
+  });
+  geo.translate(0, 0, -0.25);
+  return geo;
+}
+
+/** Shared geometry and materials for the three power-up kinds. */
+interface PowerKit {
+  star: THREE.BufferGeometry;
+  starMat: THREE.Material;
+  wing: THREE.BufferGeometry;
+  wingMat: THREE.Material;
+  heart: THREE.BufferGeometry;
+  heartMat: THREE.Material;
+  coin: THREE.BufferGeometry;
+  coinMat: THREE.Material;
+  glows: Record<PowerKind, THREE.SpriteMaterial>;
+}
+
 interface RacerObj {
   /** Positioned and turned by the scene. */
   holder: THREE.Group;
@@ -219,10 +278,14 @@ export class RacerScene {
   private cloudTex: THREE.Texture;
   private coinTemplate: THREE.Group;
   private coins = new Map<number, THREE.Group>();
-  private starGeo: THREE.BufferGeometry;
-  private starMat: THREE.MeshStandardMaterial;
-  private starGlowMat: THREE.SpriteMaterial;
+  private power: PowerKit;
   private stars = new Map<number, THREE.Group>();
+  /** The rainbow road near me, rebuilt as I move along it. */
+  private road: THREE.Mesh;
+  private roadFrom = -1;
+  private roadRings = new Map<string, THREE.Group>();
+  /** Points the way back to the road when I have flown off it. */
+  private roadArrow: THREE.Group;
   private sparkles: Array<{ sprite: THREE.Sprite; life: number; vel: THREE.Vector3 }> = [];
   private sparkleMat: THREE.SpriteMaterial;
   private resizeObs: ResizeObserver | null = null;
@@ -284,31 +347,47 @@ export class RacerScene {
     this.cloudSea.position.y = CLOUD_SEA_Y;
     this.scene.add(this.cloudSea);
 
+    // Uploaded premultiplied, as the canvas already holds it: un-premultiplying
+    // WebKit's dithered, nearly transparent gradient pixels scatters coloured
+    // specks across a sprite this large.
+    const sunTex = glowTexture();
+    sunTex.premultiplyAlpha = true;
     const sunDisc = new THREE.Sprite(
-      new THREE.SpriteMaterial({ color: 0xfff4cf, fog: false, transparent: true, opacity: 0.9 }),
+      new THREE.SpriteMaterial({
+        map: sunTex,
+        color: 0xfff4cf,
+        fog: false,
+        transparent: true,
+        premultipliedAlpha: true,
+        depthWrite: false,
+        // Tone-mapped, its warm centre would come out darker than its rim.
+        toneMapped: false,
+        opacity: 0.9,
+      }),
     );
-    sunDisc.scale.set(110, 110, 1);
+    sunDisc.scale.set(120, 120, 1);
     sunDisc.position.set(-500, 420, 900);
     sunDisc.name = 'sun';
     this.scene.add(sunDisc);
 
     this.kit = this.buildKit();
     this.coinTemplate = this.buildCoinTemplate();
-    this.starGeo = starGeometry();
-    this.starMat = new THREE.MeshStandardMaterial({
-      color: 0xffd34d,
-      emissive: 0xffb300,
-      emissiveIntensity: 0.9,
-      metalness: 0.3,
-      roughness: 0.35,
-    });
-    this.starGlowMat = new THREE.SpriteMaterial({
-      map: glowTexture(),
-      color: 0xfff0a0,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
+    this.power = this.buildPowerKit();
+    this.road = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      // Not tone-mapped: the stripes keep their full colour over white cloud.
+      new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    );
+    this.scene.add(this.road);
+    this.updateRoad(0);
+    this.roadArrow = this.buildRoadArrow();
+    this.scene.add(this.roadArrow);
     this.sparkleMat = new THREE.SpriteMaterial({
       map: glowTexture(),
       color: 0xffffff,
@@ -438,19 +517,163 @@ export class RacerScene {
     let ring: THREE.Group | null = null;
     const r = ringInCell(cx, cz);
     if (r) {
-      ring = new THREE.Group();
-      k.ringBands.forEach((geo, i) => ring!.add(new THREE.Mesh(geo, k.ringMats[i])));
-      const glow = new THREE.Sprite(k.ringGlow.clone());
-      glow.scale.set(RING_RADIUS * 5, RING_RADIUS * 5, 1);
-      glow.name = 'glow';
-      ring.add(glow);
-      ring.position.set(r.x, r.y, r.z);
-      ring.rotation.y = r.heading;
+      ring = this.makeRing(r);
       group.add(ring);
     }
 
     this.scene.add(group);
     return { group, ring, ringId: r?.id ?? null };
+  }
+
+  /** A rainbow ring: shared bands, its own glow (for its own flash). */
+  private makeRing(r: Ring): THREE.Group {
+    const k = this.kit;
+    const ring = new THREE.Group();
+    k.ringBands.forEach((geo, i) => ring.add(new THREE.Mesh(geo, k.ringMats[i])));
+    const glow = new THREE.Sprite(k.ringGlow.clone());
+    glow.scale.set(RING_RADIUS * 5, RING_RADIUS * 5, 1);
+    glow.name = 'glow';
+    ring.add(glow);
+    ring.position.set(r.x, r.y, r.z);
+    ring.rotation.y = r.heading;
+    return ring;
+  }
+
+  /** A fat pink arrow, flat, tip along +z, tilted up so the camera sees its face. */
+  private buildRoadArrow(): THREE.Group {
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 3.4);
+    shape.lineTo(2.8, 0.4);
+    shape.lineTo(1.1, 0.4);
+    shape.lineTo(1.1, -2.6);
+    shape.lineTo(-1.1, -2.6);
+    shape.lineTo(-1.1, 0.4);
+    shape.lineTo(-2.8, 0.4);
+    shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.6,
+      bevelEnabled: true,
+      bevelThickness: 0.2,
+      bevelSize: 0.2,
+      bevelSegments: 1,
+    });
+    geo.rotateX(Math.PI / 2);
+    const arrow = new THREE.Mesh(
+      geo,
+      new THREE.MeshBasicMaterial({ color: 0xff4fa3, transparent: true, opacity: 0, toneMapped: false }),
+    );
+    arrow.rotation.x = -0.55;
+    const group = new THREE.Group();
+    group.add(arrow);
+    group.visible = false;
+    return group;
+  }
+
+  /**
+   * Off the road, an arrow floats ahead of me pointing at where the road goes
+   * next; back on it, the arrow fades away.
+   */
+  private updateRoadArrow(me: Flyer, dt: number): void {
+    const near = trailPoint(me.trail);
+    const off = Math.hypot(near.x - me.x, near.z - me.z);
+    const ahead = trailPoint(me.trail + 3);
+    const arrow = this.roadArrow.children[0] as THREE.Mesh;
+    const mat = arrow.material as THREE.MeshBasicMaterial;
+    const want = off > 38 ? 0.95 : 0;
+    mat.opacity += (want - mat.opacity) * Math.min(1, dt * 4);
+    this.roadArrow.visible = mat.opacity > 0.02;
+    if (!this.roadArrow.visible) return;
+    const fx = Math.sin(me.heading);
+    const fz = Math.cos(me.heading);
+    const bob = this.reducedMotion ? 0 : Math.sin(this.time * 4) * 0.6;
+    this.roadArrow.position.set(me.x + fx * 15, me.y + 8 + bob, me.z + fz * 15);
+    this.roadArrow.rotation.y = Math.atan2(ahead.x - this.roadArrow.position.x, ahead.z - this.roadArrow.position.z);
+  }
+
+  /** Only a ring's glow material is its own; the bands are kit. */
+  private static freeRing(ring: THREE.Group): void {
+    ring.traverse((o) => {
+      if ((o as THREE.Sprite).isSprite) ((o as THREE.Sprite).material as THREE.Material).dispose();
+    });
+  }
+
+  /**
+   * The rainbow road: a six-stripe ribbon under the line the road rings sit
+   * on, from a little behind me to well ahead, faded at both ends. Rebuilt
+   * when I have moved a few road points along it, with the rings over it.
+   */
+  private updateRoad(at: number): void {
+    const from = Math.max(0, Math.floor(at) - ROAD_BEHIND);
+    if (this.roadFrom >= 0 && Math.abs(from - this.roadFrom) < 3) return;
+    this.roadFrom = from;
+    const span = ROAD_BEHIND + ROAD_AHEAD;
+    const to = from + span;
+    const pts: THREE.Vector3[] = [];
+    for (let i = from; i <= to; i++) {
+      const p = trailPoint(i);
+      pts.push(new THREE.Vector3(p.x, p.y - ROAD_DROP, p.z));
+    }
+    const curve = new THREE.CatmullRomCurve3(pts);
+    const n = span * ROAD_SAMPLES;
+    const stripes = RAINBOW.length;
+    const pos = new Float32Array((n + 1) * stripes * 2 * 3);
+    const col = new Float32Array((n + 1) * stripes * 2 * 4);
+    const index: number[] = [];
+    const colour = new THREE.Color();
+    const at3 = new THREE.Vector3();
+    const tan = new THREE.Vector3();
+    for (let s = 0; s <= n; s++) {
+      const u = s / n;
+      curve.getPointAt(u, at3);
+      curve.getTangentAt(u, tan);
+      // Across the road, level, whichever way it runs.
+      const len = Math.hypot(tan.x, tan.z) || 1;
+      const sx = tan.z / len;
+      const sz = -tan.x / len;
+      const d = u * span;
+      // The start of the road is solid; anywhere else it fades in behind me.
+      const fadeIn = from === 0 ? 1 : d / 2.5;
+      const alpha = 0.82 * Math.max(0, Math.min(1, fadeIn, (span - d) / 10));
+      for (let k = 0; k < stripes; k++) {
+        colour.setHex(RAINBOW[k]);
+        for (let e = 0; e < 2; e++) {
+          const across = ((k + e) / stripes - 0.5) * ROAD_WIDTH;
+          const v = (s * stripes + k) * 2 + e;
+          pos[v * 3] = at3.x + sx * across;
+          pos[v * 3 + 1] = at3.y;
+          pos[v * 3 + 2] = at3.z + sz * across;
+          col.set([colour.r, colour.g, colour.b, alpha], v * 4);
+        }
+        if (s > 0) {
+          const a = ((s - 1) * stripes + k) * 2;
+          const b = (s * stripes + k) * 2;
+          index.push(a, a + 1, b, a + 1, b + 1, b);
+        }
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
+    geo.setIndex(index);
+    this.road.geometry.dispose();
+    this.road.geometry = geo;
+
+    const want = new Set<string>();
+    for (let i = Math.ceil(from / TRAIL_RING_EVERY) * TRAIL_RING_EVERY; i <= to; i += TRAIL_RING_EVERY) {
+      const r = trailRing(i);
+      if (!r) continue;
+      want.add(r.id);
+      if (this.roadRings.has(r.id)) continue;
+      const ring = this.makeRing(r);
+      this.scene.add(ring);
+      this.roadRings.set(r.id, ring);
+    }
+    for (const [id, ring] of this.roadRings) {
+      if (want.has(id)) continue;
+      this.scene.remove(ring);
+      RacerScene.freeRing(ring);
+      this.roadRings.delete(id);
+    }
   }
 
   /** Build the cells near the camera and drop the ones left behind. */
@@ -468,10 +691,7 @@ export class RacerScene {
     for (const [key, cell] of this.cells) {
       if (want.has(key)) continue;
       this.scene.remove(cell.group);
-      // Only the ring glow's material is the cell's own; the rest is kit.
-      cell.ring?.traverse((o) => {
-        if ((o as THREE.Sprite).isSprite) ((o as THREE.Sprite).material as THREE.Material).dispose();
-      });
+      if (cell.ring) RacerScene.freeRing(cell.ring);
       this.cells.delete(key);
     }
   }
@@ -534,12 +754,80 @@ export class RacerScene {
     return g;
   }
 
+  private buildPowerKit(): PowerKit {
+    const glow = (color: number) =>
+      new THREE.SpriteMaterial({
+        map: glowTexture(),
+        color,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+    return {
+      star: starGeometry(),
+      starMat: new THREE.MeshStandardMaterial({
+        color: 0xffd34d,
+        emissive: 0xffb300,
+        emissiveIntensity: 0.9,
+        metalness: 0.3,
+        roughness: 0.35,
+      }),
+      wing: wingGeometry(),
+      wingMat: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0x7cc4ff,
+        emissiveIntensity: 0.55,
+        roughness: 0.5,
+      }),
+      heart: new THREE.SphereGeometry(1.3, 16, 12),
+      heartMat: new THREE.MeshStandardMaterial({ color: 0x9fd8ff, emissive: 0x4aa3ff, emissiveIntensity: 0.8 }),
+      coin: new THREE.CylinderGeometry(2.3, 2.3, 0.7, 24),
+      coinMat: new THREE.MeshStandardMaterial({
+        color: 0xffd54a,
+        emissive: 0xffa000,
+        emissiveIntensity: 0.45,
+        metalness: 0.35,
+        roughness: 0.35,
+      }),
+      glows: { grow: glow(POWER_GLOW.grow), wings: glow(POWER_GLOW.wings), coins: glow(POWER_GLOW.coins) },
+    };
+  }
+
+  /**
+   * A power-up, drawn by kind: a gold star (grow), a pair of white wings
+   * (wings), a fan of three coins (coins). Child 0 spins; child 1 is its glow.
+   */
   private makeStar(star: Star): THREE.Group {
+    const kind = star.kind ?? 'grow';
+    const k = this.power;
     const g = new THREE.Group();
-    g.add(new THREE.Mesh(this.starGeo, this.starMat));
-    const glow = new THREE.Sprite(this.starGlowMat);
-    glow.scale.set(18, 18, 1);
+    const body = new THREE.Group();
+    if (kind === 'wings') {
+      for (const side of [1, -1]) {
+        const wing = new THREE.Mesh(k.wing, k.wingMat);
+        wing.position.x = side * 0.6;
+        wing.scale.x = side;
+        wing.rotation.z = side * 0.15;
+        body.add(wing);
+      }
+      body.add(new THREE.Mesh(k.heart, k.heartMat));
+      body.position.y = -1.2;
+    } else if (kind === 'coins') {
+      [-1, 0, 1].forEach((i) => {
+        const coin = new THREE.Mesh(k.coin, k.coinMat);
+        coin.rotation.set(Math.PI / 2, 0, -i * 0.45);
+        coin.position.set(i * 2.6, i === 0 ? 1 : 0, i * -0.4);
+        body.add(coin);
+      });
+    } else {
+      body.add(new THREE.Mesh(k.star, k.starMat));
+    }
+    g.add(body);
+    const glow = new THREE.Sprite(k.glows[kind]);
+    glow.scale.set(16, 16, 1);
     g.add(glow);
+    g.userData.kind = kind;
     g.position.set(star.x, star.y, star.z);
     this.scene.add(g);
     return g;
@@ -577,8 +865,10 @@ export class RacerScene {
         climb: k.climb,
         tier: k.tier,
         boosting: k.burst > 0,
+        // Full wings until the last second, then they fold back.
+        wings: Math.min(1, k.wingTime),
       });
-      const glowing = k.burst > 0 ? 0.55 : k.tier > 0 ? 0.18 + 0.08 * k.tier : 0;
+      const glowing = k.burst > 0 ? 0.55 : k.tier > 0 ? 0.18 + 0.08 * k.tier : k.wingTime > 0 ? 0.14 : 0;
       const mat = obj.glow.material as THREE.SpriteMaterial;
       mat.opacity += (glowing - mat.opacity) * Math.min(1, dt * 6);
       obj.glow.scale.setScalar(26 + 8 * k.tier);
@@ -621,14 +911,18 @@ export class RacerScene {
       }
       mesh.position.set(star.x, star.y, star.z);
       if (!this.reducedMotion) {
-        mesh.children[0].rotation.y += dt * 2.2;
+        // A star spins; wings and coins sway, so their faces stay readable.
+        const body = mesh.children[0];
+        if (mesh.userData.kind === 'grow') body.rotation.y += dt * 2.2;
+        else body.rotation.y = Math.sin(this.time * 1.6 + star.id) * 0.55;
         mesh.position.y = star.y + Math.sin(this.time * 2 + star.id) * 1.2;
       }
     }
     for (const [id, mesh] of this.stars) {
       if (this.live.has(id)) continue;
       if (me && mesh.position.distanceTo(this.scratch.set(me.x, me.y, me.z)) < 40) {
-        this.burst(mesh.position, 0xffe066, 14);
+        const kind = (mesh.userData.kind ?? 'grow') as PowerKind;
+        this.burst(mesh.position, POWER_SPARKLE[kind], kind === 'coins' ? 20 : 14);
       }
       this.scene.remove(mesh);
       this.stars.delete(id);
@@ -653,14 +947,15 @@ export class RacerScene {
       this.lastRing = me.lastRing;
       this.ringFlash.set(me.lastRing, 1);
     }
-    for (const cell of this.cells.values()) {
-      if (!cell.ring) continue;
-      const flash = this.ringFlash.get(cell.ringId ?? '') ?? 0;
-      const glow = cell.ring.getObjectByName('glow') as THREE.Sprite | undefined;
+    const animate = (ring: THREE.Group, id: string) => {
+      const flash = this.ringFlash.get(id) ?? 0;
+      const glow = ring.getObjectByName('glow') as THREE.Sprite | undefined;
       if (glow) (glow.material as THREE.SpriteMaterial).opacity = 0.25 + flash * 0.75;
-      if (!this.reducedMotion) cell.ring.children.forEach((c, i) => (c.rotation.z = this.time * (0.4 + i * 0.05)));
-      cell.ring.scale.setScalar(1 + flash * 0.25);
-    }
+      if (!this.reducedMotion) ring.children.forEach((c, i) => (c.rotation.z = this.time * (0.4 + i * 0.05)));
+      ring.scale.setScalar(1 + flash * 0.25);
+    };
+    for (const cell of this.cells.values()) if (cell.ring) animate(cell.ring, cell.ringId ?? '');
+    for (const [id, ring] of this.roadRings) animate(ring, id);
     for (const [id, f] of this.ringFlash) {
       const next = f - dt * 1.5;
       if (next <= 0) this.ringFlash.delete(id);
@@ -668,6 +963,8 @@ export class RacerScene {
     }
 
     this.updateCells(me.x, me.z);
+    this.updateRoad(me.trail);
+    this.updateRoadArrow(me, dt);
 
     // Chase camera: behind, a little above, looking ahead. It leans into turns
     // and pulls back a touch at speed, so a burst feels fast.
@@ -729,10 +1026,13 @@ export class RacerScene {
       const list = Array.isArray(v) ? v : [v];
       for (const item of list) (item as { dispose?: () => void }).dispose?.();
     }
-    this.starGeo.dispose();
-    this.starMat.dispose();
-    this.starGlowMat.map?.dispose();
-    this.starGlowMat.dispose();
+    for (const ring of this.roadRings.values()) RacerScene.freeRing(ring);
+    const pk = this.power;
+    for (const v of [pk.star, pk.starMat, pk.wing, pk.wingMat, pk.heart, pk.heartMat, pk.coin, pk.coinMat]) v.dispose();
+    for (const glow of Object.values(pk.glows)) {
+      glow.map?.dispose();
+      glow.dispose();
+    }
     this.sparkleMat.map?.dispose();
     this.sparkleMat.dispose();
     this.renderer.dispose();
@@ -740,7 +1040,7 @@ export class RacerScene {
   }
 }
 
-/** A soft round glow, shared by stars, sparkles and burst halos. */
+/** A soft round glow, shared by the sun, stars, sparkles and burst halos. */
 function glowTexture(): THREE.Texture {
   const s = 64;
   const c = document.createElement('canvas');

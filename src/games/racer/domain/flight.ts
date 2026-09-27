@@ -39,6 +39,9 @@ const TIER_HOLD = 14;
 const TIER_FADE = 8;
 /** Seconds of burst a star gives on top of its tier. */
 const STAR_BURST = 1.2;
+/** How long a wings power-up lasts, and how much faster it makes you. */
+export const WINGS_TIME = 10;
+const WINGS_SPEED = 0.2;
 /** Seconds of burst a rainbow ring gives. */
 const RING_BURST = 1.6;
 
@@ -64,6 +67,10 @@ export interface Flyer {
   pace: number;
   /** The last rainbow ring this racer flew through, so one ring is one burst. */
   lastRing: string | null;
+  /** Seconds left of a wings power-up: bigger wings, and faster. */
+  wingTime: number;
+  /** The rainbow-road point nearest this racer, kept as a search hint. */
+  trail: number;
 }
 
 /** Per-frame stick input. */
@@ -88,6 +95,8 @@ export function createFlyer(x = 0, z = 0, heading = 0, y = CRUISE_ALTITUDE): Fly
     burst: 0,
     pace: 1,
     lastRing: null,
+    wingTime: 0,
+    trail: 0,
   };
 }
 
@@ -107,7 +116,8 @@ export function sizeOf(f: Pick<Flyer, 'tier'>): number {
 /** The speed a racer settles to right now. */
 export function goalSpeed(f: Flyer): number {
   const base = f.burst > 0 ? BURST_SPEED : CRUISE_SPEED;
-  return base * (1 + TIER_SPEED * f.tier) * f.pace;
+  const wings = f.wingTime > 0 ? 1 + WINGS_SPEED : 1;
+  return base * (1 + TIER_SPEED * f.tier) * wings * f.pace;
 }
 
 /** Advance one racer by `dt` seconds. Mutates and returns it. */
@@ -116,8 +126,9 @@ export function stepFlight(f: Flyer, dt: number, input: FlightInput): Flyer {
   const steer = clamp(Number.isFinite(input.steer) ? input.steer : 0, -1, 1);
   const lift = clamp(Number.isFinite(input.lift) ? input.lift : 0, -1, 1);
 
-  // Bursts and tiers run down.
+  // Bursts, wings and tiers run down.
   f.burst = Math.max(0, f.burst - t);
+  f.wingTime = Math.max(0, f.wingTime - t);
   if (f.tier > 0) {
     f.tierTime -= t;
     if (f.tierTime <= 0) {
@@ -127,7 +138,9 @@ export function stepFlight(f: Flyer, dt: number, input: FlightInput): Flyer {
   }
 
   f.speed = approach(f.speed, goalSpeed(f), ACCEL * t);
-  f.heading += steer * TURN_RATE * t;
+  // The camera sits behind the racer looking along +Z, which puts world +X
+  // on the left of the screen — so turning right means heading goes down.
+  f.heading -= steer * TURN_RATE * t;
   f.bank = approach(f.bank, steer, LEAN_RATE * t);
   f.climb = approach(f.climb, lift, LEAN_RATE * t);
 
@@ -143,6 +156,12 @@ export function stepFlight(f: Flyer, dt: number, input: FlightInput): Flyer {
 export function collectStar(f: Flyer): void {
   f.tier = Math.min(MAX_TIER, f.tier + 1);
   f.tierTime = TIER_HOLD;
+  f.burst = Math.max(f.burst, STAR_BURST);
+}
+
+/** A wings power-up: bigger wings and more speed for a while, plus a little burst. */
+export function collectWings(f: Flyer): void {
+  f.wingTime = WINGS_TIME;
   f.burst = Math.max(f.burst, STAR_BURST);
 }
 

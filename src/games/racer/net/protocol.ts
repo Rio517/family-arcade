@@ -19,7 +19,7 @@
  */
 
 import { CRUISE_ALTITUDE, MAX_TIER } from '../domain/flight';
-import type { Coin, Star } from '../domain/pickups';
+import { POWER_KINDS, type Coin, type Star } from '../domain/pickups';
 import type { WorldDelta, WorldSnapshot } from '../domain/race';
 
 export interface HelloMsg {
@@ -92,7 +92,10 @@ function isCoin(v: unknown): v is Coin {
 }
 
 function isStar(v: unknown): v is Star {
-  return typeof v === 'object' && v !== null && isPoint(v as Record<string, unknown>);
+  if (typeof v !== 'object' || v === null) return false;
+  const st = v as Record<string, unknown>;
+  // An unknown kind would make the renderer guess; refuse it at the door.
+  return isPoint(st) && (st.kind === undefined || (POWER_KINDS as readonly unknown[]).includes(st.kind));
 }
 
 const isCoinArray = (v: unknown): v is Coin[] => Array.isArray(v) && v.length <= MAX_COINS && v.every(isCoin);
@@ -102,6 +105,10 @@ const isOptStarArray = (v: unknown): boolean => v === undefined || isStarArray(v
 const isOptTiers = (v: unknown): boolean =>
   v === undefined ||
   (Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0 && n <= MAX_TIER));
+
+/** Two wings countdowns, in seconds, each a sane length. */
+const isOptWings = (v: unknown): boolean =>
+  v === undefined || (Array.isArray(v) && v.length === 2 && v.every((n) => isNum(n) && n >= 0 && n <= 60));
 
 /** Fill in what an older device leaves out, so the game only sees whole data. */
 function withHeight<T extends { y?: number }>(p: T): T & { y: number } {
@@ -141,12 +148,15 @@ export function isRacerMsg(value: unknown): value is RacerMsg {
     case 'pos':
       return isNum(m.x) && isOptNum(m.y) && isNum(m.z) && isNum(m.heading) && isNum(m.speed);
     case 'world':
-      return isCoinArray(m.coins) && isOptStarArray(m.stars) && isOptTiers(m.tiers) && isScoreboard(m);
+      return (
+        isCoinArray(m.coins) && isOptStarArray(m.stars) && isOptTiers(m.tiers) && isOptWings(m.wings) && isScoreboard(m)
+      );
     case 'worldDelta':
       return (
         isCoinArray(m.spawned) &&
         isOptStarArray(m.starSpawned) &&
         isOptTiers(m.tiers) &&
+        isOptWings(m.wings) &&
         Array.isArray(m.removed) &&
         m.removed.length <= MAX_COINS &&
         m.removed.every(isNum) &&
@@ -165,11 +175,12 @@ export function isRacerMsg(value: unknown): value is RacerMsg {
  * those in here so everything past this point can rely on them.
  */
 export function snapshotFrom(m: WorldMsg): WorldSnapshot {
-  const w = m as WorldMsg & Partial<Pick<WorldSnapshot, 'stars' | 'tiers'>>;
+  const w = m as WorldMsg & Partial<Pick<WorldSnapshot, 'stars' | 'tiers' | 'wings'>>;
   return {
     coins: w.coins.map(withHeight),
     stars: (w.stars ?? []).map(withHeight),
     tiers: w.tiers ?? [0, 0],
+    wings: w.wings ?? [0, 0],
     scores: w.scores,
     status: w.status,
     winner: w.winner,
@@ -178,12 +189,13 @@ export function snapshotFrom(m: WorldMsg): WorldSnapshot {
 }
 
 export function deltaFrom(m: WorldDeltaMsg): WorldDelta {
-  const d = m as WorldDeltaMsg & Partial<Pick<WorldDelta, 'starSpawned' | 'tiers'>>;
+  const d = m as WorldDeltaMsg & Partial<Pick<WorldDelta, 'starSpawned' | 'tiers' | 'wings'>>;
   return {
     spawned: d.spawned.map(withHeight),
     starSpawned: (d.starSpawned ?? []).map(withHeight),
     removed: d.removed,
     tiers: d.tiers ?? [0, 0],
+    wings: d.wings ?? [0, 0],
     scores: d.scores,
     status: d.status,
     winner: d.winner,

@@ -14,6 +14,7 @@
  */
 
 import { SKY_CEILING, SKY_FLOOR, sizeOf, type Flyer } from './flight';
+import { trailPoint } from './sky';
 
 export type Rng = () => number;
 
@@ -26,11 +27,21 @@ export interface Coin {
   hue: number;
 }
 
+/**
+ * What a power-up does. `grow`: a star, bigger and faster. `wings`: bigger
+ * wings and more speed for a while. `coins`: a line of coins appears
+ * straight ahead of you.
+ */
+export type PowerKind = 'grow' | 'wings' | 'coins';
+export const POWER_KINDS: readonly PowerKind[] = ['grow', 'wings', 'coins'];
+
 export interface Star {
   id: number;
   x: number;
   y: number;
   z: number;
+  /** Absent from an older host: a plain star. */
+  kind?: PowerKind;
 }
 
 export interface PickupField {
@@ -116,8 +127,19 @@ export function refillPickups(field: PickupField, anchors: Flyer[], racers: Flye
   };
 
   while (field.coins.length < COIN_TARGET) {
-    // Now and then a short curved row of coins, Mario-Kart style: a line
-    // worth steering along.
+    // Most coins line the rainbow road, a little ahead of whoever is on it:
+    // the track worth following. The rest are loose in the sky.
+    if (field.coins.length <= COIN_TARGET - 3 && rng() < 0.45) {
+      const anchor = anchors[Math.floor(rng() * anchors.length)];
+      const start = anchor.trail + 2 + Math.floor(rng() * 6);
+      const lane = (rng() - 0.5) * 6;
+      for (let i = 0; i < 3; i++) {
+        const p = alongTrail(start + i * 0.3, lane);
+        field.coins.push({ id: field.nextId++, ...p, hue: Math.floor(rng() * 360) });
+      }
+      continue;
+    }
+    // Now and then a short curved row of loose coins, Mario-Kart style.
     const row = field.coins.length <= COIN_TARGET - 4 && rng() < 0.25 ? 4 : 1;
     const p = place(60, 230);
     const bend = (rng() - 0.5) * 0.5;
@@ -134,11 +156,54 @@ export function refillPickups(field: PickupField, anchors: Flyer[], racers: Flye
     }
   }
   while (field.stars.length < STAR_TARGET) {
-    // Stars are worth a climb or a dive.
-    const p = place(70, 220, 22);
-    field.stars.push({ id: field.nextId++, ...p });
+    // Half the power-ups float over the road; the rest are worth a climb or a dive.
+    const p =
+      rng() < 0.5
+        ? alongTrail(anchors[Math.floor(rng() * anchors.length)].trail + 4 + Math.floor(rng() * 6), (rng() - 0.5) * 8)
+        : place(70, 220, 22);
+    const roll = rng();
+    const kind: PowerKind = roll < 0.45 ? 'grow' : roll < 0.75 ? 'wings' : 'coins';
+    field.stars.push({ id: field.nextId++, ...p, kind });
   }
   return gone;
+}
+
+/** A point on the rainbow road at fractional index `t`, `lane` units to one side. */
+function alongTrail(t: number, lane: number): { x: number; y: number; z: number } {
+  const i = Math.floor(t);
+  const a = trailPoint(i);
+  const b = trailPoint(i + 1);
+  const f = t - i;
+  return {
+    x: a.x + (b.x - a.x) * f + Math.cos(a.heading) * lane,
+    y: a.y + (b.y - a.y) * f,
+    z: a.z + (b.z - a.z) * f - Math.sin(a.heading) * lane,
+  };
+}
+
+/** How many coins a coins power-up lays out ahead. */
+export const COIN_SHOWER = 6;
+
+/**
+ * A coins power-up: a line of coins straight ahead of the racer, at its
+ * height, close enough to fly through. Returns the new coins.
+ */
+export function coinShower(field: PickupField, r: Flyer, rng: Rng): Coin[] {
+  const made: Coin[] = [];
+  const base = Math.floor(rng() * 360);
+  for (let i = 0; i < COIN_SHOWER; i++) {
+    const d = 22 + i * 11;
+    const coin = {
+      id: field.nextId++,
+      x: r.x + Math.sin(r.heading) * d,
+      y: Math.max(SKY_FLOOR + 3, Math.min(SKY_CEILING - 4, r.y)),
+      z: r.z + Math.cos(r.heading) * d,
+      hue: (base + i * 36) % 360,
+    };
+    field.coins.push(coin);
+    made.push(coin);
+  }
+  return made;
 }
 
 /** Touching a pickup: generous across, more generous still up and down. */
@@ -175,8 +240,8 @@ export function heightHelp(r: Flyer, pickups: Array<{ x: number; y: number; z: n
 export interface Pickups {
   /** Coins each racer scooped this step (parallel to `racers`). */
   coins: number[];
-  /** Stars each racer scooped this step. */
-  stars: number[];
+  /** The power-ups each racer scooped this step, by kind. */
+  stars: PowerKind[][];
   /** Ids that left the field (collected). */
   taken: number[];
 }
@@ -187,7 +252,7 @@ export interface Pickups {
  * flies through coins without taking them (stars still count).
  */
 export function collectPickups(field: PickupField, racers: Flyer[], noCoins: boolean[] = []): Pickups {
-  const out: Pickups = { coins: racers.map(() => 0), stars: racers.map(() => 0), taken: [] };
+  const out: Pickups = { coins: racers.map(() => 0), stars: racers.map(() => []), taken: [] };
   field.coins = field.coins.filter((c) => {
     const i = racers.findIndex((r, j) => !noCoins[j] && reaches(r, c));
     if (i < 0) return true;
@@ -198,7 +263,7 @@ export function collectPickups(field: PickupField, racers: Flyer[], noCoins: boo
   field.stars = field.stars.filter((s) => {
     const i = racers.findIndex((r) => reaches(r, s));
     if (i < 0) return true;
-    out.stars[i] += 1;
+    out.stars[i].push(s.kind ?? 'grow');
     out.taken.push(s.id);
     return false;
   });

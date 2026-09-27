@@ -81,6 +81,24 @@ describe('stepRace — solo', () => {
     expect(core.winner).toBe(0);
   });
 
+  it('a rival that draws level on the last coin gives the person a head start', () => {
+    const core = race('solo', 0, 2, { rivals: 1 });
+    const rival = core.karts[1];
+    plant(core, [coin(1, 0, 30, 1), coin(2, rival.x, rival.y, rival.z + 1)]);
+    tick(core);
+    expect(core.scores).toEqual([1, 1]);
+    // Straight through the winning coin, too soon: not taken.
+    plant(core, [coin(3, rival.x, rival.y, rival.z)]);
+    tick(core);
+    expect(core.scores[1]).toBe(1);
+    expect(core.status).toBe('racing');
+    // Once the head start is over, the rival may win.
+    core.elapsed += 5;
+    plant(core, [coin(4, rival.x, rival.y, rival.z)]);
+    tick(core);
+    expect(core.winner).toBe(1);
+  });
+
   it('stops simulating once the race is over', () => {
     const core = race('solo', 0, 1, { rivals: 0 });
     plant(core, [coin(1, 0, 30, 1)]);
@@ -131,11 +149,11 @@ describe('a one-player race is fair and fun', () => {
     return { over: core.status === 'over', won: core.winner === 0, seconds: core.elapsed, margin: core.scores[0] - best };
   }
 
-  it('a sharp player wins, in a race that still takes a while', () => {
+  it('a sharp player who follows the road always wins, and it is still a race', () => {
     const results = Array.from({ length: 8 }, (_, i) => playRace(i + 1, false));
     for (const r of results) {
       expect(r.won).toBe(true);
-      expect(r.seconds).toBeGreaterThan(25);
+      expect(r.seconds).toBeGreaterThan(12);
     }
   });
 
@@ -253,6 +271,7 @@ describe('stepRace — guest mirroring', () => {
       coins: [coin(1)],
       stars: [{ id: 2, x: 5, y: 30, z: 5 }],
       tiers: [0, 0],
+      wings: [0, 0],
       scores: [3, 4],
       status: 'racing',
       winner: null,
@@ -273,6 +292,7 @@ describe('stepRace — guest mirroring', () => {
       starSpawned: [],
       removed: [2],
       tiers: [0, 1],
+      wings: [0, 0],
       scores: [3, 4],
       status: 'racing',
       winner: null,
@@ -292,6 +312,7 @@ describe('stepRace — guest mirroring', () => {
       starSpawned: [],
       removed: [],
       tiers: [0, 0],
+      wings: [0, 0],
       scores: [0, 0],
       status: 'racing',
       winner: null,

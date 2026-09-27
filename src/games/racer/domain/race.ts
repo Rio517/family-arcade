@@ -24,6 +24,7 @@
 import {
   bumpRacers,
   collectStar,
+  collectWings,
   createFlyer,
   flyThroughRing,
   stepFlight,
@@ -31,6 +32,7 @@ import {
   type Flyer,
 } from './flight';
 import {
+  coinShower,
   collectPickups,
   createPickupField,
   heightHelp,
@@ -41,7 +43,7 @@ import {
   type Star,
 } from './pickups';
 import { createRivalBrain, steerRival, type RivalBrain } from './rivals';
-import { ringAt } from './sky';
+import { nearestTrailIndex, ringAt } from './sky';
 
 export type RaceMode = 'solo' | 'net';
 export type RaceStatus = 'racing' | 'over';
@@ -71,6 +73,8 @@ export interface WorldSnapshot {
   stars: Star[];
   /** [host, guest] power tiers. */
   tiers: [number, number];
+  /** [host, guest] seconds of wings power-up left. */
+  wings: [number, number];
   /** [hostScore, guestScore]. */
   scores: [number, number];
   status: RaceStatus;
@@ -86,6 +90,7 @@ export interface WorldDelta {
   /** Ids of coins and stars that left the field (they share one id space). */
   removed: number[];
   tiers: [number, number];
+  wings: [number, number];
   scores: [number, number];
   status: RaceStatus;
   winner: number | null;
@@ -97,6 +102,7 @@ export interface MirrorWorld {
   coins: Map<number, Coin>;
   stars: Map<number, Star>;
   tiers: [number, number];
+  wings: [number, number];
   scores: [number, number];
   status: RaceStatus;
   winner: number | null;
@@ -153,17 +159,25 @@ export interface RaceCore {
   /** Host: tiers last sent, so a change marks the world dirty. Guest: tiers
    * last mirrored, so a rise (a star I took) starts my burst once. */
   sentTiers: [number, number];
+  /** Wings seconds last sent (host) or mirrored (guest), the same way. */
+  sentWings: [number, number];
+  /** When each racer came within one coin of winning (Infinity until then). */
+  lastCoinSince: number[];
   // ── guest mirror bookkeeping ──
   /** Last MirrorWorld.seq folded in, so the clock only snaps on fresh data. */
   lastWorldSeq: number;
 }
 
 /** Start line: one racer at the origin, rivals just behind and to the sides. */
+/** Seconds a rival that draws level on the last coin waits before it may win. */
+const LAST_COIN_HEAD_START = 4;
+
 const SOLO_GRID = [
   { x: 0, z: 0 },
   { x: -16, z: -8 },
   { x: 16, z: -8 },
-  { x: 0, z: -18 },
+  // Off to one side, never straight behind: the camera sits there.
+  { x: -30, z: 4 },
 ];
 /** Two people, side by side. */
 const NET_GRID = [
@@ -204,6 +218,8 @@ export function createRaceCore(
     sinceWorldSend: 0,
     finalSent: false,
     sentTiers: [0, 0],
+    sentWings: [0, 0],
+    lastCoinSince: karts.map(() => Infinity),
     lastWorldSeq: 0,
   };
 }
@@ -238,6 +254,7 @@ export function stepRace(core: RaceCore, dt: number, input: FlightInput, remote:
       lift = heightHelp(me, ahead);
     }
     stepFlight(me, t, { steer: input.steer, lift });
+    me.trail = nearestTrailIndex(me.x, me.z, me.trail);
     checkRing(me);
     if (core.mode === 'solo') {
       const personScore = core.scores[core.myIndex];
@@ -265,7 +282,7 @@ export function stepRace(core: RaceCore, dt: number, input: FlightInput, remote:
       const turn = angleDiff(other.heading, rp.heading);
       other.heading += turn * k;
       // Lean the way they're turning, for the picture.
-      other.bank += (Math.max(-1, Math.min(1, turn * 3)) - other.bank) * k;
+      other.bank += (Math.max(-1, Math.min(1, -turn * 3)) - other.bank) * k;
       other.speed = rp.speed;
     }
     if (!core.field) return guestStep(core, t, remote?.world ?? null);
@@ -280,17 +297,28 @@ function ownerStep(core: RaceCore, t: number, flying: boolean): StepResult {
   const net = core.mode === 'net';
 
   if (flying) {
+    const prevNext = field.nextId;
     // The photo-finish rule: a rival one coin from winning, and ahead of the
     // person, flies through coins without taking them. A loss is always a
-    // close one, never a rout.
+    // close one, never a rout. A rival that draws level on the last coin
+    // gives the person a head start before it may take it.
     const person = core.scores[core.myIndex];
     const holdBack = core.karts.map(
-      (_, i) => !!core.brains[i] && core.scores[i] >= core.target - 1 && core.scores[i] > person,
+      (_, i) =>
+        !!core.brains[i] &&
+        core.scores[i] >= core.target - 1 &&
+        (core.scores[i] > person || core.elapsed - core.lastCoinSince[i] < LAST_COIN_HEAD_START),
     );
     const taken = collectPickups(field, core.karts, holdBack);
     for (let i = 0; i < core.karts.length; i++) {
       core.scores[i] += taken.coins[i];
-      for (let s = 0; s < taken.stars[i]; s++) collectStar(core.karts[i]);
+      if (core.scores[i] >= core.target - 1 && core.lastCoinSince[i] === Infinity) core.lastCoinSince[i] = core.elapsed;
+      for (const kind of taken.stars[i]) {
+        const k = core.karts[i];
+        if (kind === 'grow') collectStar(k);
+        else if (kind === 'wings') collectWings(k);
+        else coinShower(field, k, core.rng);
+      }
     }
     if (net && taken.taken.length) {
       for (const id of taken.taken) noteRemoved(core, id);
@@ -299,10 +327,15 @@ function ownerStep(core: RaceCore, t: number, flying: boolean): StepResult {
     // The guest's own flight runs its tier down on the guest; the host is the
     // authority, so it runs the guest's clock here too (the host's copy of the
     // guest racer is only ever moved by `pos`).
-    if (net) tickTier(core.karts[1 - core.myIndex], t);
+    if (net) {
+      const guest = core.karts[1 - core.myIndex];
+      tickTier(guest, t);
+      guest.wingTime = Math.max(0, guest.wingTime - t);
+    }
 
     const people = core.karts.filter((_, i) => !core.brains[i]);
-    const prevNext = field.nextId;
+    // Where each person is on the road (a friend's racer is moved by `pos`).
+    for (const person of people) person.trail = nearestTrailIndex(person.x, person.z, person.trail);
     const gone = refillPickups(field, people, core.karts, core.rng);
     if (net) {
       for (const id of gone) noteRemoved(core, id);
@@ -313,6 +346,8 @@ function ownerStep(core: RaceCore, t: number, flying: boolean): StepResult {
       if (gone.length || field.nextId !== prevNext) core.dirty = true;
       const tiers: [number, number] = [core.karts[0].tier, core.karts[1].tier];
       if (tiers[0] !== core.sentTiers[0] || tiers[1] !== core.sentTiers[1]) core.dirty = true;
+      // A fresh wings power-up is news; its countdown is not.
+      if (core.karts.some((k, i) => k.wingTime > (core.sentWings[i] ?? 0))) core.dirty = true;
     }
 
     core.elapsed += t;
@@ -375,6 +410,13 @@ function guestStep(core: RaceCore, t: number, world: MirrorWorld | null): StepRe
     // The host runs the tier clock; mine must never fade it locally.
     k.tier = world.tiers[i];
     k.tierTime = Infinity;
+    // Wings: a fresh power-up (the host's seconds jumped up) starts here;
+    // otherwise my own clock runs it down between messages.
+    if (world.wings[i] > core.sentWings[i] + 0.5) {
+      if (i === core.myIndex) collectWings(k);
+      k.wingTime = world.wings[i];
+    }
+    core.sentWings[i] = world.wings[i];
   }
   if (world.seq !== core.lastWorldSeq) {
     // Fresh word from the host: snap to the authoritative clock…
@@ -406,13 +448,19 @@ function tiersOf(core: RaceCore): [number, number] {
   return [core.karts[0]?.tier ?? 0, core.karts[1]?.tier ?? 0];
 }
 
+function wingsOf(core: RaceCore): [number, number] {
+  return [core.karts[0]?.wingTime ?? 0, core.karts[1]?.wingTime ?? 0];
+}
+
 function flushDelta(core: RaceCore): WorldDelta {
   const tiers = tiersOf(core);
+  const wings = wingsOf(core);
   const delta: WorldDelta = {
     spawned: core.pendingSpawned,
     starSpawned: core.pendingStars,
     removed: core.pendingRemoved,
     tiers,
+    wings,
     scores: [core.scores[0], core.scores[1]],
     status: core.status,
     winner: core.winner,
@@ -422,6 +470,7 @@ function flushDelta(core: RaceCore): WorldDelta {
   core.pendingStars = [];
   core.pendingRemoved = [];
   core.sentTiers = tiers;
+  core.sentWings = wings;
   core.dirty = false;
   core.sinceWorldSend = 0;
   if (core.status === 'over') core.finalSent = true;
@@ -437,10 +486,12 @@ function flushDelta(core: RaceCore): WorldDelta {
 export function takeWorldSnapshot(core: RaceCore): WorldSnapshot | null {
   if (!core.field) return null;
   const tiers = tiersOf(core);
+  const wings = wingsOf(core);
   core.pendingSpawned = [];
   core.pendingStars = [];
   core.pendingRemoved = [];
   core.sentTiers = tiers;
+  core.sentWings = wings;
   core.dirty = false;
   core.sinceWorldSend = 0;
   if (core.status === 'over') core.finalSent = true;
@@ -448,6 +499,7 @@ export function takeWorldSnapshot(core: RaceCore): WorldSnapshot | null {
     coins: [...core.field.coins],
     stars: [...core.field.stars],
     tiers,
+    wings,
     scores: [core.scores[0], core.scores[1]],
     status: core.status,
     winner: core.winner,
@@ -465,6 +517,7 @@ export function applyWorldSnapshot(prev: MirrorWorld | null, snap: WorldSnapshot
     coins,
     stars,
     tiers: [snap.tiers[0], snap.tiers[1]],
+    wings: [snap.wings[0], snap.wings[1]],
     scores: [snap.scores[0], snap.scores[1]],
     status: snap.status,
     winner: snap.winner,
@@ -487,6 +540,7 @@ export function applyWorldDelta(prev: MirrorWorld | null, delta: WorldDelta): Mi
     coins,
     stars,
     tiers: [delta.tiers[0], delta.tiers[1]],
+    wings: [delta.wings[0], delta.wings[1]],
     scores: [delta.scores[0], delta.scores[1]],
     status: delta.status,
     winner: delta.winner,
