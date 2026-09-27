@@ -16,7 +16,8 @@ import type { RacerNet } from '../net/useRacerNet';
 const mockParty = vi.hoisted(() => ({ value: null as any }));
 vi.mock('@shared/party/PartyContext', () => ({ useParty: () => mockParty.value }));
 
-import { DRIVERS, RacerLobby } from './RacerSetup';
+import { RacerLobby } from './RacerSetup';
+import { DRIVERS } from './cast';
 
 function makeNet(over: Partial<RacerNet> = {}): RacerNet {
   return {

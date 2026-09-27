@@ -15,7 +15,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GameConnection, type ConnStatus } from '@shared/net/peer';
-import { isRacerMsg, type RacerMsg } from './protocol';
+import { deltaFrom, isRacerMsg, snapshotFrom, type RacerMsg } from './protocol';
 import {
   applyWorldDelta,
   applyWorldSnapshot,
@@ -143,18 +143,18 @@ export function useRacerNet(opts: {
               setStartNonce((n) => n + 1);
               break;
             case 'pos':
-              remotePosRef.current = { x: msg.x, z: msg.z, heading: msg.heading, speed: msg.speed };
+              remotePosRef.current = { x: msg.x, y: msg.y, z: msg.z, heading: msg.heading, speed: msg.speed };
               break;
             case 'world':
               // Only the guest mirrors — the host is the authority and ignores
               // world claims a hostile peer might send.
               if (roleRef.current === 'guest') {
-                remoteWorldRef.current = applyWorldSnapshot(remoteWorldRef.current, msg);
+                remoteWorldRef.current = applyWorldSnapshot(remoteWorldRef.current, snapshotFrom(msg));
               }
               break;
             case 'worldDelta':
               if (roleRef.current === 'guest') {
-                remoteWorldRef.current = applyWorldDelta(remoteWorldRef.current, msg);
+                remoteWorldRef.current = applyWorldDelta(remoteWorldRef.current, deltaFrom(msg));
               }
               break;
             case 'rematch':

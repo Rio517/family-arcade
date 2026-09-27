@@ -74,18 +74,36 @@ vi.mock('@shared/net/peer', async (importOriginal) => {
   return { ...actual, GameConnection };
 });
 
-// Start both karts of a two-player race on the coin pile (with Math.random
-// pinned to 0 every coin spawns at the arena centre), so a driven host race
-// finishes in two frames. The host kart is listed first and wins every shared
-// coin. Solo races place their one kart directly and never call this.
-vi.mock('../domain/kart', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../domain/kart')>();
+// A race a test can finish in two frames: no countdown, and every coin in the
+// sky appears right on the first person racing (the solo player, or the
+// host), who is listed first and so wins every shared coin.
+vi.mock('../domain/race', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../domain/race')>();
   return {
     ...actual,
-    startPositions: () => [
-      { x: 0, z: 0, heading: 0 },
-      { x: 0.5, z: 0, heading: 0 },
-    ],
+    createRaceCore: (...args: Parameters<typeof actual.createRaceCore>) =>
+      actual.createRaceCore(args[0], args[1], args[2], args[3], { ...args[4], countdown: 0 }),
+  };
+});
+vi.mock('../domain/pickups', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../domain/pickups')>();
+  type Field = import('../domain/pickups').PickupField;
+  type Flyer = import('../domain/flight').Flyer;
+  const pile = (field: Field, anchors: Flyer[]) => {
+    const a = anchors[0];
+    while (field.coins.length < actual.COIN_TARGET) {
+      field.coins.push({ id: field.nextId++, x: a.x, y: a.y, z: a.z, hue: 0 });
+    }
+    return [];
+  };
+  return {
+    ...actual,
+    createPickupField: (anchors: Flyer[]) => {
+      const field: Field = { coins: [], stars: [], nextId: 1 };
+      pile(field, anchors);
+      return field;
+    },
+    refillPickups: (field: Field, anchors: Flyer[]) => pile(field, anchors),
   };
 });
 
@@ -183,7 +201,7 @@ describe('<RacerPage> — solo setup flow', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     renderRacer();
     goToPicker();
-    for (const id of ['unicorn', 'dragon', 'fairy', 'butterfly']) {
+    for (const id of ['unicorn', 'fairy', 'princess', 'bunny']) {
       expect(screen.getByTestId(`racer-driver-${id}`)).toBeInTheDocument();
     }
 
@@ -208,15 +226,18 @@ describe('<RacerPage> — solo setup flow', () => {
   it('shows the picked driver and a 0/20 coin count in the race HUD', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     renderRacer();
-    startSoloRace('dragon');
+    startSoloRace('fairy');
     await screen.findByTestId('racer3d-fallback', {}, { timeout: 5000 });
 
-    // The HUD scoreline: the dragon face, a bold coin count of 0, the /20 target,
-    // and the elapsed-time readout.
-    expect(screen.getByText('🐉')).toBeInTheDocument();
-    expect(screen.getByText('0', { selector: 'b' })).toBeInTheDocument();
-    expect(screen.getByText('/20')).toBeInTheDocument();
-    expect(screen.getByText('⏱ 0.0s')).toBeInTheDocument();
+    // The HUD: me and three computer rivals (everyone I didn't pick), each
+    // with a coin count of 0 out of 20, and the elapsed-time readout.
+    const mine = screen.getByTestId('racer-score-0');
+    expect(mine).toHaveTextContent('🧚');
+    expect(mine).toHaveTextContent('You');
+    expect(mine).toHaveTextContent('0/20');
+    for (const i of [1, 2, 3]) expect(screen.getByTestId(`racer-score-${i}`)).toHaveTextContent('0/20');
+    expect(screen.queryByText('🐉')).toBeNull();
+    expect(screen.getByText('0.0s')).toBeInTheDocument();
   });
 });
 
@@ -232,21 +253,18 @@ describe('<RacerPage> — solo win overlay', () => {
       return frames.length;
     });
     vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
-    // With rng pinned to 0 every coin spawns at the arena centre — right under
-    // the kart's start spot — so each loop tick scoops a full field of 16.
-    vi.spyOn(Math, 'random').mockReturnValue(0);
   });
 
   afterEach(() => {
     fake3d.enabled = false;
   });
 
-  /** Run the loop until the 20-coin target is passed (16 coins per tick). */
+  /** Run the loop until the 20-coin target is passed (a full sky per tick). */
   async function winTheRace() {
     await waitFor(() => expect(frames.length).toBeGreaterThan(0));
     await act(async () => {
-      frames.shift()!(0); // collects 16 coins, field refills in place
-      frames.shift()!(16); // collects 16 more → 32 ≥ 20 → race over
+      frames.shift()!(0); // collects every coin, the sky refills on top of me
+      frames.shift()!(16); // collects them again → past 20 → race over
     });
   }
 
@@ -256,8 +274,8 @@ describe('<RacerPage> — solo win overlay', () => {
     await winTheRace();
 
     expect(screen.getByTestId('racer-win')).toBeInTheDocument();
-    expect(screen.getByText('You got all 20 coins!')).toBeInTheDocument();
-    expect(screen.getByText(/Your time:/)).toBeInTheDocument();
+    expect(screen.getByText('You win!')).toBeInTheDocument();
+    expect(screen.getByText(/Time:/)).toBeInTheDocument();
   });
 
   it('starts a fresh race from the win overlay via Race again', async () => {
@@ -268,7 +286,7 @@ describe('<RacerPage> — solo win overlay', () => {
     fireEvent.click(screen.getByTestId('racer-again'));
     expect(screen.queryByTestId('racer-win')).toBeNull();
     // A brand-new race context: the coin count is back to 0.
-    expect(screen.getByText('0', { selector: 'b' })).toBeInTheDocument();
+    expect(screen.getByTestId('racer-score-0')).toHaveTextContent('0/20');
     // Wait for the remounted scene to build (still faked) so its async import
     // doesn't land after this test's mocks are torn down.
     await waitFor(() => expect(frames.length).toBeGreaterThan(0));
@@ -304,9 +322,6 @@ describe('<RacerPage> — a two-player finish credits the racer on this device',
       return frames.length;
     });
     vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
-    // Every coin spawns at the arena centre, where both karts start (see the
-    // kart mock above), so a host finishes in two frames.
-    vi.spyOn(Math, 'random').mockReturnValue(0);
     link.handlers = null;
     link.sent = [];
     localStorage.clear();
@@ -322,10 +337,10 @@ describe('<RacerPage> — a two-player finish credits the racer on this device',
     resetUsersStore();
   });
 
-  /** 2 Players → pick the dragon → take a seat at a table by code. Returns that code. */
+  /** 2 Players → pick the fairy → take a seat at a table by code. Returns that code. */
   function sitDown(role: 'host' | 'guest'): string {
     fireEvent.click(screen.getByTestId('racer-mode-net'));
-    fireEvent.click(screen.getByTestId('racer-driver-dragon'));
+    fireEvent.click(screen.getByTestId('racer-driver-fairy'));
     if (role === 'host') {
       fireEvent.click(screen.getByTestId('racer-create'));
       return screen.getByTestId('racer-code').textContent!.trim();
@@ -356,7 +371,7 @@ describe('<RacerPage> — a two-player finish credits the racer on this device',
     return { view, code };
   }
 
-  /** Host: the kart sits on the coin pile — two frames pass the 20-coin target. */
+  /** Host: every coin appears on the host — two frames pass the 20-coin target. */
   async function hostCollectsTwenty() {
     await act(async () => {
       frames.shift()!(0);
@@ -375,7 +390,7 @@ describe('<RacerPage> — a two-player finish credits the racer on this device',
   it('a race the host wins puts a racer win over the friend on the host ticket', async () => {
     const { code } = await startNetRace('host');
     await hostCollectsTwenty();
-    expect(screen.getByText('You win! 🏆')).toBeInTheDocument();
+    expect(screen.getByText('You win!')).toBeInTheDocument();
 
     const kai = ticket('u-kai');
     expect(kai.wins).toBe(1);
@@ -403,7 +418,7 @@ describe('<RacerPage> — a two-player finish credits the racer on this device',
   it('a guest that wins is credited the win — the seat, not the host, decides who "me" is', async () => {
     await startNetRace('guest');
     await hostSaysOver(1, [4, 20]);
-    expect(screen.getByText('You win! 🏆')).toBeInTheDocument();
+    expect(screen.getByText('You win!')).toBeInTheDocument();
 
     expect(ticket('u-kai').wins).toBe(1);
     expect(ticket('u-kai').history[0]).toMatchObject({ game: 'racer', opponent: 'Rio', result: 'win' });
@@ -486,7 +501,7 @@ describe('<RacerPage> — a two-player finish credits the racer on this device',
     startSoloRace('unicorn');
     await waitFor(() => expect(frames.length).toBeGreaterThan(0));
     await hostCollectsTwenty();
-    expect(screen.getByText('You got all 20 coins!')).toBeInTheDocument();
+    expect(screen.getByText('You win!')).toBeInTheDocument();
 
     expect(getUsersSnapshot()).toBe(before);
   });

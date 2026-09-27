@@ -59,20 +59,39 @@ vi.mock('../three/scene', () => {
     render(): void {}
     dispose(): void {}
   }
-  return { RacerScene };
+  return { RacerScene, loadRacerAssets: () => Promise.resolve() };
 });
 
-// Start both karts on the coin pile so a driven test race finishes in a couple
-// of frames (with Math.random pinned to 0, every coin spawns at the arena
-// centre). The host kart is listed first, so it wins every shared coin.
-vi.mock('../domain/kart', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../domain/kart')>();
+// A race a test can finish in a couple of frames: no countdown, and every coin
+// in the sky appears right on the first person racing (the solo player, or the
+// host), who is listed first and so wins every shared coin.
+vi.mock('../domain/race', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../domain/race')>();
   return {
     ...actual,
-    startPositions: () => [
-      { x: 0, z: 0, heading: 0 },
-      { x: 0.5, z: 0, heading: 0 },
-    ],
+    createRaceCore: (...args: Parameters<typeof actual.createRaceCore>) =>
+      actual.createRaceCore(args[0], args[1], args[2], args[3], { ...args[4], countdown: 0 }),
+  };
+});
+vi.mock('../domain/pickups', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../domain/pickups')>();
+  type Field = import('../domain/pickups').PickupField;
+  type Flyer = import('../domain/flight').Flyer;
+  const pile = (field: Field, anchors: Flyer[]) => {
+    const a = anchors[0];
+    while (field.coins.length < actual.COIN_TARGET) {
+      field.coins.push({ id: field.nextId++, x: a.x, y: a.y, z: a.z, hue: 0 });
+    }
+    return [];
+  };
+  return {
+    ...actual,
+    createPickupField: (anchors: Flyer[]) => {
+      const field: Field = { coins: [], stars: [], nextId: 1 };
+      pile(field, anchors);
+      return field;
+    },
+    refillPickups: (field: Field, anchors: Flyer[]) => pile(field, anchors),
   };
 });
 
@@ -221,7 +240,7 @@ function connectClients(): { host: Client; guest: Client; code: string } {
   fireEvent.click(host.getByTestId('racer-create'));
   const code = host.getByTestId('racer-code').textContent!.trim();
 
-  toNetLobby(guest, 'dragon');
+  toNetLobby(guest, 'fairy');
   fireEvent.click(guest.getByTestId('racer-show-join'));
   fireEvent.change(guest.getByTestId('racer-code-input'), { target: { value: code } });
   fireEvent.click(guest.getByTestId('racer-join'));
@@ -297,7 +316,7 @@ describe('two-player racer: lobby flows', () => {
   it('leaving the lobby destroys the connection and returns to the create/join choice', () => {
     const app = renderClient();
 
-    toNetLobby(app, 'butterfly');
+    toNetLobby(app, 'bunny');
     fireEvent.click(app.getByTestId('racer-create'));
     expect(app.getByTestId('racer-code')).toBeInTheDocument();
     const conn = bus.conns.at(-1)!;
@@ -331,7 +350,7 @@ describe('two-player racer: handshake and race start', () => {
       });
       expect(bus.wire.find((w) => w.from === 'guest' && w.msg.t === 'hello')!.msg).toMatchObject({
         name: 'Kai',
-        driver: 'dragon',
+        driver: 'fairy',
       });
 
       // The host answers the guest's hello with the authoritative go.
@@ -418,9 +437,6 @@ describe('two-player racer: reconnect re-sync', () => {
       return frames.length;
     });
     vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
-    // Every coin spawns at the arena centre — where both karts start (see the
-    // kart-module mock above) — so the host finishes in two frames.
-    vi.spyOn(Math, 'random').mockReturnValue(0);
   });
 
   afterEach(() => {
@@ -460,7 +476,7 @@ describe('two-player racer: reconnect re-sync', () => {
       // Weak wifi: the host's final "race over" message never arrives.
       bus.drop = (msg) => (msg.t === 'world' || msg.t === 'worldDelta') && msg.status === 'over';
 
-      // Drive the race until the host finishes (its kart sits on the coin pile).
+      // Drive the race until the host finishes (every coin appears on it).
       for (let i = 0; i < 40 && !host.queryByTestId('racer-win'); i++) await pump();
       expect(host.getByTestId('racer-win')).toBeInTheDocument();
 

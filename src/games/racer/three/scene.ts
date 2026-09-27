@@ -1,118 +1,239 @@
 /**
- * The three.js view for Rainbow Racer — a grassy arena, a rainbow sky, one or
- * two racing bunnies, spinning coins, and a camera that trails the player's
- * own steed. The animals race by themselves (the lead designer's decree); the
- * chosen character shows in the HUD, and 3D riders arrive with their models.
+ * The three.js view for Rainbow Racer — an open sky over a sea of clouds.
  *
- * Framework-free: the page builds one of these, then each frame hands it a plain
- * view (racer positions + coins) to mirror. The scenery is procedural; the
- * steed is a bundled artist-made GLB, precached so the PWA stays offline.
+ * There is no arena and no edge. The world is cut into the same cells the
+ * rules use (domain/sky.ts): each cell's floating islands, rainbow ring,
+ * clouds and balloons are rebuilt from its hash whenever the camera comes
+ * near and dropped when it leaves, so wherever a child flies there is more
+ * sky. The sky dome and the cloud sea travel with the camera.
+ *
+ * Framework-free: the page builds one of these, then each frame hands it a
+ * plain view (racers, coins, stars) to mirror. Everything is procedural apart
+ * from the artist-made bunny, which rides a cloud (see riders.ts), so the PWA
+ * stays offline.
  */
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { disposeDeep } from '@shared/three/disposeDeep';
-import { ARENA_RADIUS, type Coin } from '../domain/kart';
-import bunnyUrl from '../assets/bunny.glb?url';
+import { CELL, RING_RADIUS, cellNoise, cellOf, islandsInCell, ringInCell } from '../domain/sky';
+import type { Flyer } from '../domain/flight';
+import type { Coin, Star } from '../domain/pickups';
+import { createRider, preloadRiderAssets, type CharacterId, type Rider } from './riders';
 
-/** Nose-to-tail length the steed is scaled to (the old kart was ~9 long). */
-const STEED_LEN = 9.5;
-/** Materials tinted toward the player colour so the two steeds read apart. */
-const STEED_TINT = new Set(['BunnyCoat', 'LavenderFurLocks']);
+/** How many cells either side of the camera are built. */
+const VIEW_CELLS = 3;
+/** The cloud sea's height; racers never fly below SKY_FLOOR, well above it. */
+const CLOUD_SEA_Y = -26;
 
-// Scenery palettes (plain number lists — safe to share; materials are not, so
-// those are always built per scene so one race's teardown can't free another's).
-const BUNTING = [0xff5d6c, 0xffb14a, 0xffe14a, 0x53d08a, 0x4aa3ff, 0x9b6bff];
-const FLOWERS = [0xff5d8f, 0xffd23f, 0xff9f45, 0x9b6bff, 0xffffff, 0x53d0ff];
 const RAINBOW = [0xff5a5a, 0xff9f45, 0xffe14a, 0x5fd08a, 0x4aa3ff, 0x9b6bff];
-const BALLOONS = [0xff5d6c, 0x4aa3ff, 0xffd23f, 0x53d08a];
+const FLOWERS = [0xff5d8f, 0xffd23f, 0xff9f45, 0x9b6bff, 0xffffff, 0x53d0ff];
+const BALLOONS = [0xff5d6c, 0x4aa3ff, 0xffd23f, 0x53d08a, 0xc38bff];
 
 export interface RacerLook {
-  /** Shown in the HUD score pill (the steed itself carries no rider yet). */
+  /** Shown in the HUD next to the score. */
   emoji: string;
-  /** The player colour the steed's coat is tinted toward. */
+  /** The racer's colour: dress, wings, mane or cloud tint. */
   color: number;
-}
-
-export interface SceneKart {
-  x: number;
-  z: number;
-  heading: number;
-  speed: number;
+  /** Which character flies. */
+  character: CharacterId;
+  /** Shown over the racer's head (rivals and the friend); empty for me. */
+  label: string;
 }
 
 export interface SceneView {
-  karts: SceneKart[];
+  karts: Flyer[];
   coins: Coin[];
+  stars: Star[];
 }
 
-/** Deterministic 0–1 "noise" from an index — no Math.random, so scenery is
- *  identical every race (see the determinism invariant in CLAUDE.md). */
-function hash(i: number): number {
-  return Math.abs(Math.sin(i * 12.9898 + 1.17) * 43758.5453) % 1;
-}
-
-/** Soft grass with scattered lighter/darker patches — not a flat checker. */
-function grassTexture(): THREE.Texture {
-  const s = 512;
-  const c = document.createElement('canvas');
-  c.width = c.height = s;
-  const ctx = c.getContext('2d')!;
-  ctx.fillStyle = '#7cc457';
-  ctx.fillRect(0, 0, s, s);
-  const shades = ['#74bd4f', '#84cc5e', '#6fb84a', '#8ed267'];
-  for (let i = 0; i < 1400; i++) {
-    ctx.fillStyle = shades[Math.floor(hash(i * 7.7) * 4)];
-    ctx.beginPath();
-    ctx.arc(hash(i * 3.1) * s, hash(i * 1.9) * s, 4 + hash(i) * 16, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(8, 8);
-  return tex;
-}
-
-/** A soft pastel-rainbow gradient sky, drawn once to a canvas. */
+/** A soft pastel sky, horizon warm, zenith blue. */
 function skyTexture(): THREE.Texture {
   const c = document.createElement('canvas');
-  c.width = 16;
+  c.width = 8;
   c.height = 256;
   const ctx = c.getContext('2d')!;
   const g = ctx.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0.0, '#5aa9e6');
-  g.addColorStop(0.42, '#8f9fe6');
-  g.addColorStop(0.6, '#c07fdc');
-  g.addColorStop(0.78, '#e87fb0');
-  g.addColorStop(1.0, '#f0b488');
+  g.addColorStop(0.0, '#2f7fe0');
+  g.addColorStop(0.3, '#5fa6f2');
+  g.addColorStop(0.46, '#a9d2fb');
+  g.addColorStop(0.52, '#ffd6ec');
+  g.addColorStop(0.58, '#c9e2ff');
+  g.addColorStop(1.0, '#9ec8f4');
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 16, 256);
+  ctx.fillRect(0, 0, 8, 256);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
-interface KartObj {
+/** Soft white cloud tops with faint lilac hollows, tiling. */
+function cloudSeaTexture(): THREE.Texture {
+  const s = 512;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#dfe6fb';
+  ctx.fillRect(0, 0, s, s);
+  const puff = (x: number, y: number, r: number, col: string) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, col);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    // Draw wrapped so the tile repeats seamlessly.
+    for (const dx of [-s, 0, s]) {
+      for (const dy of [-s, 0, s]) {
+        ctx.beginPath();
+        ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  };
+  // Lilac hollows between the cloud tops, then the tops, then a bright rim
+  // on each top — enough shape that flying low reads as clouds, not a floor.
+  for (let i = 0; i < 120; i++) {
+    const n = (k: number) => cellNoise(i, k, 91);
+    puff(n(1) * s, n(2) * s, 30 + n(3) * 60, 'rgba(140,150,225,0.5)');
+  }
+  for (let i = 0; i < 150; i++) {
+    const n = (k: number) => cellNoise(i, k, 92);
+    puff(n(1) * s, n(2) * s, 16 + n(3) * 44, 'rgba(255,255,255,0.9)');
+  }
+  for (let i = 0; i < 150; i++) {
+    const n = (k: number) => cellNoise(i, k, 92);
+    puff(n(1) * s - 6, n(2) * s - 8, 8 + n(3) * 20, 'rgba(255,255,255,1)');
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+/** A name tag that always faces the camera. */
+function labelSprite(text: string, color: number): THREE.Sprite {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 64;
+  const ctx = c.getContext('2d')!;
+  ctx.font = '600 34px system-ui, -apple-system, sans-serif';
+  const w = Math.min(248, ctx.measureText(text).width + 36);
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.beginPath();
+  ctx.roundRect((256 - w) / 2, 8, w, 48, 24);
+  ctx.fill();
+  ctx.fillStyle = `#${new THREE.Color(color).multiplyScalar(0.7).getHexString()}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 33);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  // Screen-sized, so a rival right beside the camera doesn't fill it.
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }),
+  );
+  sprite.scale.set(0.16, 0.04, 1);
+  sprite.renderOrder = 10;
+  return sprite;
+}
+
+/** A five-pointed star shape, extruded. */
+function starGeometry(): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? 4.2 : 1.9;
+    const a = (i / 10) * Math.PI * 2 + Math.PI / 2;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: 1.2,
+    bevelEnabled: true,
+    bevelThickness: 0.5,
+    bevelSize: 0.5,
+    bevelSegments: 2,
+  });
+  geo.center();
+  return geo;
+}
+
+interface RacerObj {
+  /** Positioned and turned by the scene. */
+  holder: THREE.Group;
+  rider: Rider;
+  label: THREE.Sprite | null;
+  /** A soft glow while bursting or powered up. */
+  glow: THREE.Sprite;
+}
+
+/** Shared geometry and materials for everything built per cell. */
+interface Kit {
+  islandTop: THREE.BufferGeometry;
+  islandRock: THREE.BufferGeometry;
+  grass: THREE.Material;
+  rock: THREE.Material;
+  trunk: THREE.BufferGeometry;
+  trunkMat: THREE.Material;
+  canopy: THREE.BufferGeometry;
+  canopyMats: THREE.Material[];
+  flower: THREE.BufferGeometry;
+  flowerMats: THREE.Material[];
+  puff: THREE.BufferGeometry;
+  cloudMat: THREE.Material;
+  ringBands: THREE.BufferGeometry[];
+  ringMats: THREE.Material[];
+  ringGlow: THREE.SpriteMaterial;
+  balloon: THREE.BufferGeometry;
+  balloonMats: THREE.Material[];
+  basket: THREE.BufferGeometry;
+  basketMat: THREE.Material;
+}
+
+interface CellObj {
   group: THREE.Group;
-  /** Holds the bunny once its GLB lands; bobbed for the gallop. */
-  steed: THREE.Group;
+  /** The ring's group, if the cell has one, for its spin and flash. */
+  ring: THREE.Group | null;
+  ringId: string | null;
+}
+
+/**
+ * Load what the racers are made of (the bunny's model) before building a
+ * scene, so nobody starts the race as a stand-in. Never rejects: a model
+ * that fails to load leaves its procedural stand-in in place.
+ */
+export function loadRacerAssets(): Promise<void> {
+  return preloadRiderAssets();
 }
 
 export class RacerScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera: THREE.PerspectiveCamera;
-  private karts: KartObj[] = [];
+  private racers: RacerObj[] = [];
+  private kit: Kit;
+  private cells = new Map<string, CellObj>();
+  private skyDome: THREE.Mesh;
+  private cloudSea: THREE.Mesh;
+  private cloudTex: THREE.Texture;
   private coinTemplate: THREE.Group;
   private coins = new Map<number, THREE.Group>();
+  private starGeo: THREE.BufferGeometry;
+  private starMat: THREE.MeshStandardMaterial;
+  private starGlowMat: THREE.SpriteMaterial;
+  private stars = new Map<number, THREE.Group>();
+  private sparkles: Array<{ sprite: THREE.Sprite; life: number; vel: THREE.Vector3 }> = [];
+  private sparkleMat: THREE.SpriteMaterial;
   private resizeObs: ResizeObserver | null = null;
-  private camPos = new THREE.Vector3(0, 16, -30);
-  private camTarget = new THREE.Vector3(); // per-frame scratch, never allocated in sync()
-  private liveCoinIds = new Set<number>(); // per-frame scratch
+  private camPos = new THREE.Vector3(0, 40, -34);
+  private camLook = new THREE.Vector3(0, 30, 10);
+  private scratch = new THREE.Vector3();
+  private live = new Set<number>();
+  private lastRing: string | null = null;
+  private ringFlash = new Map<string, number>();
   private disposed = false;
-  private spin = 0;
+  private time = 0;
 
   constructor(
     private container: HTMLElement,
@@ -124,387 +245,272 @@ export class RacerScene {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.setSize(container.clientWidth, container.clientHeight || 400);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMappingExposure = 0.95;
     container.appendChild(this.renderer.domElement);
 
-    this.scene.background = skyTexture();
-    // Reaches far enough to keep the hills, peaks, and rainbow visible while
-    // hazing the horizon so distant scenery reads as depth, not clutter.
-    this.scene.fog = new THREE.Fog(0xdfe3ee, 340, 1050);
-
-    // A soft indoor-style environment gives every material gentle reflections
-    // and fill — the difference between "flat plastic" and "made". Baked once.
+    // Env light fills the soft shading; there are no shadow maps in an open
+    // sky — nothing is near enough the ground to cast one that reads.
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.3;
+    this.scene.environmentIntensity = 0.35;
+    pmrem.dispose();
 
-    this.camera = new THREE.PerspectiveCamera(
-      60,
-      container.clientWidth / (container.clientHeight || 400),
-      0.1,
-      1400,
-    );
+    // Fog the colour of the horizon, so far things melt into the sky.
+    this.scene.fog = new THREE.Fog(0xb9dcff, 300, 900);
+    this.camera = new THREE.PerspectiveCamera(62, container.clientWidth / (container.clientHeight || 400), 0.5, 1600);
 
-    // Env fills the shadows, so the hemisphere can come down; the sun casts
-    // real soft shadows and a cool rim light peels the karts off the sky.
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x4f8f4a, 0.55));
-    const sun = new THREE.DirectionalLight(0xfff3d0, 1.2);
-    sun.position.set(70, 130, 40);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    const sd = ARENA_RADIUS * 1.25;
-    sun.shadow.camera.left = -sd;
-    sun.shadow.camera.right = sd;
-    sun.shadow.camera.top = sd;
-    sun.shadow.camera.bottom = -sd;
-    sun.shadow.camera.far = 400;
-    sun.shadow.bias = -0.0004;
+    this.scene.add(new THREE.HemisphereLight(0xeaf4ff, 0xa9a6e6, 0.85));
+    const sun = new THREE.DirectionalLight(0xfff1d6, 1.5);
+    sun.position.set(80, 140, 60);
     this.scene.add(sun);
-    const rim = new THREE.DirectionalLight(0x9ec5ff, 0.5);
-    rim.position.set(-80, 50, -60);
+    const rim = new THREE.DirectionalLight(0xa9cbff, 0.55);
+    rim.position.set(-90, 40, -70);
     this.scene.add(rim);
 
-    this.buildGround();
-    this.buildFenceAndBunting();
-    this.buildTrees();
-    this.buildHillsAndPeaks();
-    this.buildFlowers();
-    this.buildClouds();
-    this.buildSkyDecor();
-    this.coinTemplate = this.buildCoinTemplate();
-    for (const look of looks) this.karts.push(this.buildKart(look));
+    this.skyDome = new THREE.Mesh(
+      new THREE.SphereGeometry(1400, 32, 16),
+      new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, fog: false, depthWrite: false }),
+    );
+    this.skyDome.renderOrder = -1;
+    this.scene.add(this.skyDome);
 
-    this.onResize = this.onResize.bind(this);
+    this.cloudTex = cloudSeaTexture();
+    this.cloudTex.repeat.set(14, 14);
+    this.cloudSea = new THREE.Mesh(
+      new THREE.PlaneGeometry(3000, 3000),
+      new THREE.MeshStandardMaterial({ map: this.cloudTex, roughness: 1, color: 0xf2f4ff }),
+    );
+    this.cloudSea.rotation.x = -Math.PI / 2;
+    this.cloudSea.position.y = CLOUD_SEA_Y;
+    this.scene.add(this.cloudSea);
+
+    const sunDisc = new THREE.Sprite(
+      new THREE.SpriteMaterial({ color: 0xfff4cf, fog: false, transparent: true, opacity: 0.9 }),
+    );
+    sunDisc.scale.set(110, 110, 1);
+    sunDisc.position.set(-500, 420, 900);
+    sunDisc.name = 'sun';
+    this.scene.add(sunDisc);
+
+    this.kit = this.buildKit();
+    this.coinTemplate = this.buildCoinTemplate();
+    this.starGeo = starGeometry();
+    this.starMat = new THREE.MeshStandardMaterial({
+      color: 0xffd34d,
+      emissive: 0xffb300,
+      emissiveIntensity: 0.9,
+      metalness: 0.3,
+      roughness: 0.35,
+    });
+    this.starGlowMat = new THREE.SpriteMaterial({
+      map: glowTexture(),
+      color: 0xfff0a0,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.sparkleMat = new THREE.SpriteMaterial({
+      map: glowTexture(),
+      color: 0xffffff,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+
+    // Riders are built from models already loaded — see `loadRacerAssets`.
+    looks.forEach((look, i) => this.racers.push(this.buildRacer(look, i)));
+
+    this.updateCells(0, 0);
+
     if (typeof ResizeObserver !== 'undefined') {
-      this.resizeObs = new ResizeObserver(this.onResize);
+      this.resizeObs = new ResizeObserver(() => this.resize());
       this.resizeObs.observe(container);
     }
   }
 
-  private buildGround() {
-    const floor = new THREE.Mesh(
-      new THREE.CircleGeometry(ARENA_RADIUS, 80),
-      new THREE.MeshStandardMaterial({ map: grassTexture(), roughness: 0.95 }),
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    this.scene.add(floor);
-
-    // A wide meadow beneath the hills so the world doesn't end at the fence.
-    const meadow = new THREE.Mesh(
-      new THREE.CircleGeometry(ARENA_RADIUS * 6, 64),
-      new THREE.MeshStandardMaterial({ color: 0x82c85a, roughness: 1 }),
-    );
-    meadow.rotation.x = -Math.PI / 2;
-    meadow.position.y = -0.1;
-    meadow.receiveShadow = true;
-    this.scene.add(meadow);
+  private buildKit(): Kit {
+    const std = (color: number, extra: THREE.MeshStandardMaterialParameters = {}) =>
+      new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...extra });
+    const ringBands = RAINBOW.map((_, i) => new THREE.TorusGeometry(RING_RADIUS + 1.6 - i * 0.55, 0.32, 8, 48));
+    return {
+      islandTop: new THREE.CylinderGeometry(1, 0.96, 1.4, 28),
+      islandRock: new THREE.ConeGeometry(0.96, 1.9, 9),
+      grass: std(0x8fd46a),
+      rock: std(0xc9b2a0, { flatShading: true }),
+      trunk: new THREE.CylinderGeometry(0.45, 0.6, 5, 7),
+      trunkMat: std(0x9a6b4a),
+      canopy: new THREE.SphereGeometry(3.2, 14, 10),
+      canopyMats: [std(0x67c46b), std(0xff9cc8), std(0x9fdc7a)],
+      flower: new THREE.SphereGeometry(0.7, 8, 6),
+      flowerMats: FLOWERS.map((c) => std(c, { roughness: 0.6 })),
+      puff: new THREE.SphereGeometry(1, 14, 10),
+      cloudMat: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, emissive: 0xf4f0ff, emissiveIntensity: 0.25 }),
+      ringBands,
+      ringMats: RAINBOW.map(
+        (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.55, roughness: 0.4 }),
+      ),
+      ringGlow: new THREE.SpriteMaterial({
+        map: glowTexture(),
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+      balloon: new THREE.SphereGeometry(6, 18, 14),
+      balloonMats: BALLOONS.map((c) => std(c, { roughness: 0.45 })),
+      basket: new RoundedBoxGeometry(2.4, 2.2, 2.4, 2, 0.4),
+      basketMat: std(0x9a6b3f),
+    };
   }
 
-  /** The pink boundary fence, strung with a ring of festival pennants. */
-  private buildFenceAndBunting() {
-    const fence = new THREE.Mesh(
-      new THREE.TorusGeometry(ARENA_RADIUS, 1.4, 12, 90),
-      new THREE.MeshStandardMaterial({ color: 0xff7fc4, roughness: 0.5 }),
-    );
-    fence.rotation.x = Math.PI / 2;
-    fence.position.y = 1.4;
-    fence.castShadow = true;
-    this.scene.add(fence);
+  /** Everything in one sky cell, from its hash. Shared kit, own group. */
+  private buildCell(cx: number, cz: number): CellObj {
+    const k = this.kit;
+    const group = new THREE.Group();
+    const n = (salt: number) => cellNoise(cx, cz, salt);
 
-    const N = 72;
-    const flags = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(0.9, 2.0, 3),
-      new THREE.MeshStandardMaterial({ roughness: 0.6, side: THREE.DoubleSide }),
-      N,
-    );
-    const cols = BUNTING.map((c) => new THREE.Color(c));
-    const d = new THREE.Object3D();
-    for (let i = 0; i < N; i++) {
-      const a = (i / N) * Math.PI * 2;
-      d.position.set(Math.cos(a) * ARENA_RADIUS, 5.4 + Math.sin(i * 1.7) * 0.3, Math.sin(a) * ARENA_RADIUS);
-      d.rotation.set(Math.PI, 0, 0); // point the pennant down
-      d.updateMatrix();
-      flags.setMatrixAt(i, d.matrix);
-      flags.setColorAt(i, cols[i % cols.length]);
-    }
-    flags.instanceMatrix.needsUpdate = true;
-    if (flags.instanceColor) flags.instanceColor.needsUpdate = true;
-    this.scene.add(flags);
-  }
-
-  /**
-   * Rounded low-poly trees ringing the arena. Every tree is a trunk under three
-   * faceted foliage blobs; rather than one Group per tree, each of the four
-   * parts is a single InstancedMesh across all trees (one draw call each), with
-   * per-tree position/scale/spin from the index — deterministic and cheap.
-   */
-  private buildTrees() {
-    const COUNT = 26;
-    const leaf = new THREE.MeshStandardMaterial({ color: 0x46a85a, roughness: 0.8 });
-    const parts: Array<{ geo: THREE.BufferGeometry; mat: THREE.Material; y: number }> = [
-      { geo: new THREE.CylinderGeometry(1.0, 1.7, 7, 8), mat: new THREE.MeshStandardMaterial({ color: 0x9a6b3f, roughness: 0.9 }), y: 3.5 },
-      { geo: new THREE.IcosahedronGeometry(6.2, 1), mat: leaf, y: 10 },
-      { geo: new THREE.IcosahedronGeometry(4.8, 1), mat: leaf, y: 13.6 },
-      { geo: new THREE.IcosahedronGeometry(3.4, 1), mat: leaf, y: 16.8 },
-    ];
-    const meshes = parts.map((p) => {
-      const im = new THREE.InstancedMesh(p.geo, p.mat, COUNT);
-      im.castShadow = true;
-      return im;
-    });
-    const d = new THREE.Object3D();
-    for (let i = 0; i < COUNT; i++) {
-      const a = (i / COUNT) * Math.PI * 2 + hash(i * 2) * 0.22;
-      const R = ARENA_RADIUS * (1.12 + hash(i * 4) * 0.5);
-      const s = 0.9 + hash(i) * 0.7;
-      const spin = hash(i * 3) * Math.PI * 2;
-      const px = Math.cos(a) * R;
-      const pz = Math.sin(a) * R;
-      d.rotation.set(0, spin, 0);
-      d.scale.setScalar(s);
-      parts.forEach((p, j) => {
-        d.position.set(px, p.y * s, pz);
-        d.updateMatrix();
-        meshes[j].setMatrixAt(i, d.matrix);
-      });
-    }
-    meshes.forEach((im) => {
-      im.instanceMatrix.needsUpdate = true;
-      this.scene.add(im);
-    });
-  }
-
-  /** Rolling green hills, then a further ring of hazy snow-capped peaks. */
-  private buildHillsAndPeaks() {
-    const d = new THREE.Object3D();
-
-    const HILLS = 22;
-    const hills = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(1, 16, 12),
-      new THREE.MeshStandardMaterial({ roughness: 1 }),
-      HILLS,
-    );
-    for (let i = 0; i < HILLS; i++) {
-      const a = (i / HILLS) * Math.PI * 2 + 0.2;
-      const R = ARENA_RADIUS * (1.7 + hash(i) * 0.5);
-      const rad = 30 + hash(i * 2) * 36;
-      d.rotation.set(0, hash(i * 7) * Math.PI, 0);
-      d.position.set(Math.cos(a) * R, -6, Math.sin(a) * R);
-      d.scale.set(rad, rad * (0.3 + hash(i * 5) * 0.16), rad);
-      d.updateMatrix();
-      hills.setMatrixAt(i, d.matrix);
-      hills.setColorAt(i, new THREE.Color().setHSL(0.28, 0.5, 0.42 + hash(i) * 0.12));
-    }
-    hills.instanceMatrix.needsUpdate = true;
-    if (hills.instanceColor) hills.instanceColor.needsUpdate = true;
-    this.scene.add(hills);
-
-    const MTN = 14;
-    const cone = new THREE.ConeGeometry(1, 1, 6); // unit cone, scaled per instance
-    const peaks = new THREE.InstancedMesh(cone, new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), MTN);
-    const caps = new THREE.InstancedMesh(cone, new THREE.MeshStandardMaterial({ color: 0xeef2f7, roughness: 0.95, flatShading: true }), MTN);
-    d.rotation.set(0, 0, 0);
-    for (let i = 0; i < MTN; i++) {
-      const a = (i / MTN) * Math.PI * 2 + 0.1;
-      const R = ARENA_RADIUS * 3.9;
-      const baseR = 95 + hash(i) * 55;
-      const hgt = 95 + hash(i * 3) * 70;
-      const cx = Math.cos(a) * R;
-      const cz = Math.sin(a) * R;
-      d.position.set(cx, 4, cz);
-      d.scale.set(baseR, hgt, baseR);
-      d.updateMatrix();
-      peaks.setMatrixAt(i, d.matrix);
-      peaks.setColorAt(i, new THREE.Color().setHSL(0.6, 0.22, 0.5 + hash(i) * 0.08));
-      const capH = hgt * 0.22;
-      const capR = baseR * 0.3;
-      d.position.set(cx, 4 + hgt / 2 - capH / 2 + 1, cz);
-      d.scale.set(capR, capH, capR);
-      d.updateMatrix();
-      caps.setMatrixAt(i, d.matrix);
-    }
-    peaks.instanceMatrix.needsUpdate = true;
-    if (peaks.instanceColor) peaks.instanceColor.needsUpdate = true;
-    caps.instanceMatrix.needsUpdate = true;
-    this.scene.add(peaks, caps);
-  }
-
-  /** Colourful blossoms scattered across the arena floor (two draw calls). */
-  private buildFlowers() {
-    const COUNT = 70;
-    const stems = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.12, 0.12, 1.6, 5),
-      new THREE.MeshStandardMaterial({ color: 0x4a9a4a, roughness: 0.9 }),
-      COUNT,
-    );
-    const heads = new THREE.InstancedMesh(
-      new THREE.IcosahedronGeometry(0.85, 0),
-      new THREE.MeshStandardMaterial({ roughness: 0.6 }),
-      COUNT,
-    );
-    heads.castShadow = true;
-    const cols = FLOWERS.map((c) => new THREE.Color(c));
-    const d = new THREE.Object3D();
-    for (let i = 0; i < COUNT; i++) {
-      const a = hash(i * 2.3) * Math.PI * 2;
-      const R = 14 + hash(i * 5.1) * (ARENA_RADIUS - 24);
-      const fx = Math.cos(a) * R;
-      const fz = Math.sin(a) * R;
-      const s = 0.8 + hash(i * 4) * 0.6;
-      d.rotation.set(0, hash(i * 9) * Math.PI * 2, 0);
-      d.scale.setScalar(s);
-      d.position.set(fx, 0.8 * s, fz);
-      d.updateMatrix();
-      stems.setMatrixAt(i, d.matrix);
-      d.position.set(fx, 1.7 * s, fz);
-      d.updateMatrix();
-      heads.setMatrixAt(i, d.matrix);
-      heads.setColorAt(i, cols[i % cols.length]);
-    }
-    stems.instanceMatrix.needsUpdate = true;
-    heads.instanceMatrix.needsUpdate = true;
-    if (heads.instanceColor) heads.instanceColor.needsUpdate = true;
-    this.scene.add(stems, heads);
-  }
-
-  /** Layered fluffy clouds — every puff is one instance of a single sphere. */
-  private buildClouds() {
-    const CLOUDS = 18;
-    const PUFFS = 5;
-    const puffs = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(1, 12, 10),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }),
-      CLOUDS * PUFFS,
-    );
-    const d = new THREE.Object3D();
-    let k = 0;
-    for (let i = 0; i < CLOUDS; i++) {
-      const a = hash(i * 2.7) * Math.PI * 2;
-      const R = ARENA_RADIUS * (1.6 + hash(i) * 3);
-      const cx = Math.cos(a) * R;
-      const cy = 90 + hash(i * 3) * 130;
-      const cz = Math.sin(a) * R;
-      const cs = 0.8 + hash(i * 9) * 1.4;
-      for (let j = 0; j < PUFFS; j++) {
-        d.position.set(cx + (j * 10 - 20) * cs, cy + (j % 2) * 4 * cs, cz);
-        d.scale.setScalar((7 + (j % 3) * 3) * cs);
-        d.updateMatrix();
-        puffs.setMatrixAt(k++, d.matrix);
+    for (const isl of islandsInCell(cx, cz)) {
+      const top = new THREE.Mesh(k.islandTop, k.grass);
+      top.scale.set(isl.radius, 3, isl.radius);
+      top.position.set(isl.x, isl.y, isl.z);
+      const rock = new THREE.Mesh(k.islandRock, k.rock);
+      rock.scale.set(isl.radius, isl.radius * 1.1, isl.radius);
+      rock.rotation.x = Math.PI;
+      rock.position.set(isl.x, isl.y - 2 - isl.radius * 1.0, isl.z);
+      group.add(top, rock);
+      const trees = 1 + Math.floor(isl.kind * 3);
+      for (let t = 0; t < trees; t++) {
+        const a = isl.kind * 20 + t * 2.1;
+        const r = isl.radius * 0.55 * ((t + 1) / (trees + 1));
+        const tx = isl.x + Math.cos(a) * r;
+        const tz = isl.z + Math.sin(a) * r;
+        const trunk = new THREE.Mesh(k.trunk, k.trunkMat);
+        trunk.position.set(tx, isl.y + 3.8, tz);
+        const canopy = new THREE.Mesh(k.canopy, k.canopyMats[(t + Math.floor(isl.kind * 7)) % k.canopyMats.length]);
+        canopy.position.set(tx, isl.y + 8, tz);
+        group.add(trunk, canopy);
+      }
+      for (let f = 0; f < 10; f++) {
+        const a = f * 2.39996 + isl.kind * 9;
+        const r = isl.radius * 0.85 * Math.sqrt((f + 0.5) / 10);
+        const flower = new THREE.Mesh(k.flower, k.flowerMats[(f + Math.floor(isl.kind * 5)) % k.flowerMats.length]);
+        flower.position.set(isl.x + Math.cos(a) * r, isl.y + 1.8, isl.z + Math.sin(a) * r);
+        group.add(flower);
       }
     }
-    puffs.instanceMatrix.needsUpdate = true;
-    this.scene.add(puffs);
-  }
 
-  /** A giant rainbow arc, a few hot-air balloons, and the sun. */
-  private buildSkyDecor() {
-    const rainbow = new THREE.Group();
-    RAINBOW.forEach((col, i) => {
-      const arc = new THREE.Mesh(
-        new THREE.TorusGeometry(150 - i * 5, 2.6, 10, 80, Math.PI),
-        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.8, fog: false }),
+    // Loose clouds in the racing band, and big soft ones below it.
+    const clouds = Math.floor(n(40) * 3);
+    for (let c = 0; c < clouds; c++) {
+      const cloud = new THREE.Group();
+      const puffs = 4 + Math.floor(n(41 + c) * 4);
+      for (let p = 0; p < puffs; p++) {
+        const puff = new THREE.Mesh(k.puff, k.cloudMat);
+        const s = 5 + cellNoise(cx * 7 + p, cz * 3 + c, 42) * 5;
+        puff.scale.set(s * 1.3, s, s);
+        puff.position.set((p - puffs / 2) * 6, cellNoise(cx + p, cz, 43) * 3, cellNoise(cx, cz + p, 44) * 5 - 2);
+        cloud.add(puff);
+      }
+      // Below the racers, or high above them — never in the band where a
+      // cloud would hide the child's own racer from the camera.
+      const low = n(45 + c) < 0.7;
+      cloud.position.set(
+        cx * CELL + n(46 + c) * CELL,
+        low ? -10 + n(47 + c) * 8 : 115 + n(48 + c) * 40,
+        cz * CELL + n(49 + c) * CELL,
       );
-      rainbow.add(arc);
-    });
-    rainbow.position.set(ARENA_RADIUS * 1.2, -8, ARENA_RADIUS * 3.2);
-    rainbow.rotation.y = -0.5;
-    this.scene.add(rainbow);
-
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2 + 0.6;
-      const R = ARENA_RADIUS * (2.2 + hash(i));
-      this.scene.add(this.buildBalloon(Math.cos(a) * R, 120 + hash(i * 2) * 90, Math.sin(a) * R, BALLOONS[i]));
+      cloud.rotation.y = n(50 + c) * Math.PI;
+      group.add(cloud);
     }
 
-    const sun = new THREE.Mesh(
-      new THREE.SphereGeometry(30, 24, 24),
-      new THREE.MeshBasicMaterial({ color: 0xfff2c8, fog: false }),
-    );
-    sun.position.set(-ARENA_RADIUS * 1.7, 165, ARENA_RADIUS * 5);
-    this.scene.add(sun);
-  }
+    if (n(60) < 0.18) {
+      const b = new THREE.Group();
+      const envelope = new THREE.Mesh(k.balloon, k.balloonMats[Math.floor(n(61) * k.balloonMats.length)]);
+      envelope.scale.y = 1.2;
+      const basket = new THREE.Mesh(k.basket, k.basketMat);
+      basket.position.y = -9.5;
+      b.add(envelope, basket);
+      b.position.set(cx * CELL + n(62) * CELL, 105 + n(63) * 40, cz * CELL + n(64) * CELL);
+      group.add(b);
+    }
 
-  private buildBalloon(x: number, y: number, z: number, col: number): THREE.Group {
-    const g = new THREE.Group();
-    const envelope = new THREE.Mesh(
-      new THREE.SphereGeometry(11, 20, 16),
-      new THREE.MeshStandardMaterial({ color: col, roughness: 0.5 }),
-    );
-    envelope.scale.y = 1.25;
-    envelope.position.y = 6;
-    const basket = new THREE.Mesh(
-      new RoundedBoxGeometry(4, 4, 4, 3, 0.5),
-      new THREE.MeshStandardMaterial({ color: 0x9a6b3f, roughness: 0.9 }),
-    );
-    basket.position.y = -12;
-    g.add(envelope, basket);
-    g.position.set(x, y, z);
-    return g;
-  }
+    let ring: THREE.Group | null = null;
+    const r = ringInCell(cx, cz);
+    if (r) {
+      ring = new THREE.Group();
+      k.ringBands.forEach((geo, i) => ring!.add(new THREE.Mesh(geo, k.ringMats[i])));
+      const glow = new THREE.Sprite(k.ringGlow.clone());
+      glow.scale.set(RING_RADIUS * 5, RING_RADIUS * 5, 1);
+      glow.name = 'glow';
+      ring.add(glow);
+      ring.position.set(r.x, r.y, r.z);
+      ring.rotation.y = r.heading;
+      group.add(ring);
+    }
 
-  /**
-   * A racing steed with its chosen character riding on top. The bunny (the
-   * girls' decree: you race ON an animal, never in a car) arrives async from
-   * its bundled GLB — one fetch, cloned per seat — and is tinted gently
-   * toward the player colour so the two racers read apart at a glance.
-   */
-  private buildKart(look: RacerLook): KartObj {
-    const group = new THREE.Group();
-    const steed = new THREE.Group();
-    group.add(steed);
-    this.mountSteed(steed, look);
     this.scene.add(group);
-
-    return { group, steed };
+    return { group, ring, ringId: r?.id ?? null };
   }
 
-  /** One shared GLB fetch; each seat gets a clone with its own tinted coat. */
-  private steedGltf: Promise<THREE.Group> | null = null;
+  /** Build the cells near the camera and drop the ones left behind. */
+  private updateCells(x: number, z: number): void {
+    const cx = cellOf(x);
+    const cz = cellOf(z);
+    const want = new Set<string>();
+    for (let dx = -VIEW_CELLS; dx <= VIEW_CELLS; dx++) {
+      for (let dz = -VIEW_CELLS; dz <= VIEW_CELLS; dz++) {
+        const key = `${cx + dx}:${cz + dz}`;
+        want.add(key);
+        if (!this.cells.has(key)) this.cells.set(key, this.buildCell(cx + dx, cz + dz));
+      }
+    }
+    for (const [key, cell] of this.cells) {
+      if (want.has(key)) continue;
+      this.scene.remove(cell.group);
+      // Only the ring glow's material is the cell's own; the rest is kit.
+      cell.ring?.traverse((o) => {
+        if ((o as THREE.Sprite).isSprite) ((o as THREE.Sprite).material as THREE.Material).dispose();
+      });
+      this.cells.delete(key);
+    }
+  }
 
-  private mountSteed(steed: THREE.Group, look: RacerLook): void {
-    this.steedGltf ??= new Promise((resolve, reject) => {
-      new GLTFLoader()
-        .setMeshoptDecoder(MeshoptDecoder)
-        .load(bunnyUrl, (gltf) => resolve(gltf.scene), undefined, reject);
-    });
-    this.steedGltf
-      .then((template) => {
-        if (this.disposed) return;
-        const model = template.clone(true);
-        const tint = new THREE.Color(look.color);
-        model.traverse((o) => {
-          const mesh = o as THREE.Mesh;
-          if (!mesh.isMesh) return;
-          mesh.castShadow = true;
-          const mat = mesh.material as THREE.MeshStandardMaterial;
-          if (mat && STEED_TINT.has(mat.name)) {
-            const own = mat.clone();
-            own.color.lerp(tint, 0.4);
-            mesh.material = own;
-          }
-        });
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
-        const s = STEED_LEN / size.z;
-        model.scale.setScalar(s);
-        model.position.y = -box.min.y * s;
-        steed.add(model);
-      })
-      .catch((err) => console.error('steed failed to load', err));
+  private buildRacer(look: RacerLook, i: number): RacerObj {
+    const holder = new THREE.Group();
+    const rider = createRider(look.character, look.color, { reducedMotion: this.reducedMotion, seed: i + 1 });
+    holder.add(rider.group);
+    let label: THREE.Sprite | null = null;
+    if (look.label) {
+      label = labelSprite(look.label, look.color);
+      label.position.y = 10;
+      holder.add(label);
+    }
+    const glow = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: glowTexture(),
+        color: look.color,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    glow.scale.set(30, 30, 1);
+    holder.add(glow);
+    this.scene.add(holder);
+    return { holder, rider, label, glow };
   }
 
   private buildCoinTemplate(): THREE.Group {
     const g = new THREE.Group();
     const disc = new THREE.Mesh(
-      new THREE.CylinderGeometry(2.6, 2.6, 0.6, 28),
-      new THREE.MeshStandardMaterial({ color: 0xffd54a, metalness: 0.75, roughness: 0.3 }),
+      new THREE.CylinderGeometry(3, 3, 0.7, 28),
+      new THREE.MeshStandardMaterial({ color: 0xffd54a, metalness: 0.35, roughness: 0.35 }),
     );
     disc.rotation.x = Math.PI / 2;
     const rim = new THREE.Mesh(
-      new THREE.TorusGeometry(2.6, 0.5, 10, 28),
+      new THREE.TorusGeometry(3, 0.55, 10, 28),
       new THREE.MeshStandardMaterial({ color: 0xffffff, emissiveIntensity: 0.6 }),
     );
     g.add(disc, rim);
@@ -516,71 +522,182 @@ export class RacerScene {
     const col = new THREE.Color().setHSL(coin.hue / 360, 0.9, 0.6);
     const disc = g.children[0] as THREE.Mesh;
     const rim = g.children[1] as THREE.Mesh;
-    disc.material = (disc.material as THREE.MeshStandardMaterial).clone();
-    (disc.material as THREE.MeshStandardMaterial).emissive = col.clone().multiplyScalar(0.45);
-    rim.material = (rim.material as THREE.MeshStandardMaterial).clone();
-    (rim.material as THREE.MeshStandardMaterial).color = col;
-    (rim.material as THREE.MeshStandardMaterial).emissive = col.clone().multiplyScalar(0.75);
-    g.position.set(coin.x, 4, coin.z);
+    const discMat = (disc.material as THREE.MeshStandardMaterial).clone();
+    discMat.emissive = col.clone().multiplyScalar(0.45);
+    disc.material = discMat;
+    const rimMat = (rim.material as THREE.MeshStandardMaterial).clone();
+    rimMat.color = col;
+    rimMat.emissive = col.clone().multiplyScalar(0.75);
+    rim.material = rimMat;
+    g.position.set(coin.x, coin.y, coin.z);
     this.scene.add(g);
     return g;
   }
 
+  private makeStar(star: Star): THREE.Group {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(this.starGeo, this.starMat));
+    const glow = new THREE.Sprite(this.starGlowMat);
+    glow.scale.set(18, 18, 1);
+    g.add(glow);
+    g.position.set(star.x, star.y, star.z);
+    this.scene.add(g);
+    return g;
+  }
+
+  /** A little burst of sparkles where something was collected. */
+  private burst(at: THREE.Vector3, color: number, count: number): void {
+    if (this.reducedMotion) return;
+    for (let i = 0; i < count; i++) {
+      const mat = this.sparkleMat.clone();
+      mat.color.set(color);
+      const sprite = new THREE.Sprite(mat);
+      sprite.position.copy(at);
+      sprite.scale.setScalar(3);
+      const a = (i / count) * Math.PI * 2;
+      const vel = new THREE.Vector3(Math.cos(a) * 18, 8 + (i % 3) * 5, Math.sin(a) * 18);
+      this.scene.add(sprite);
+      this.sparkles.push({ sprite, life: 0.6, vel });
+    }
+  }
+
   sync(view: SceneView, dt: number): void {
     if (this.disposed) return;
-    this.spin += dt;
+    this.time += dt;
+    const me = view.karts[this.followIndex] ?? view.karts[0];
 
     view.karts.forEach((k, i) => {
-      const obj = this.karts[i];
+      const obj = this.racers[i];
       if (!obj) return;
-      obj.group.position.set(k.x, 0, k.z);
-      obj.group.rotation.y = k.heading;
-      // Driving is gameplay; the gallop is decoration.
-      if (!this.reducedMotion) {
-        const gait = Math.min(1, k.speed / 34); // full stride at cruise speed
-        obj.steed.position.y = Math.abs(Math.sin(this.spin * 9 + i * 1.7)) * 0.55 * gait;
-      }
+      obj.holder.position.set(k.x, k.y, k.z);
+      obj.holder.rotation.y = k.heading;
+      obj.rider.update(dt, {
+        speed: k.speed,
+        bank: k.bank,
+        climb: k.climb,
+        tier: k.tier,
+        boosting: k.burst > 0,
+      });
+      const glowing = k.burst > 0 ? 0.55 : k.tier > 0 ? 0.18 + 0.08 * k.tier : 0;
+      const mat = obj.glow.material as THREE.SpriteMaterial;
+      mat.opacity += (glowing - mat.opacity) * Math.min(1, dt * 6);
+      obj.glow.scale.setScalar(26 + 8 * k.tier);
+      if (obj.label) obj.label.position.y = 10 + 2.5 * k.tier;
     });
 
-    const live = this.liveCoinIds;
-    live.clear();
+    // Coins: spin, bob, and a sparkle when one of them leaves near me.
+    this.live.clear();
     for (const coin of view.coins) {
-      live.add(coin.id);
+      this.live.add(coin.id);
       let mesh = this.coins.get(coin.id);
       if (!mesh) {
         mesh = this.makeCoin(coin);
         this.coins.set(coin.id, mesh);
       }
-      mesh.position.x = coin.x;
-      mesh.position.z = coin.z;
+      mesh.position.set(coin.x, coin.y, coin.z);
       if (!this.reducedMotion) {
         mesh.rotation.y += dt * 3;
-        mesh.position.y = 4 + Math.sin(this.spin * 2.5 + coin.id) * 0.6;
+        mesh.position.y = coin.y + Math.sin(this.time * 2.5 + coin.id) * 0.8;
       }
     }
     for (const [id, mesh] of this.coins) {
-      if (!live.has(id)) {
-        this.scene.remove(mesh);
-        this.coins.delete(id);
-        // Each coin owns cloned tinted materials (makeCoin) — free them.
-        for (const child of mesh.children) {
-          const m = (child as THREE.Mesh).material;
-          if (m && !Array.isArray(m)) m.dispose();
-        }
+      if (this.live.has(id)) continue;
+      if (me && mesh.position.distanceTo(this.scratch.set(me.x, me.y, me.z)) < 40) {
+        const rim = mesh.children[1] as THREE.Mesh;
+        this.burst(mesh.position, (rim.material as THREE.MeshStandardMaterial).color.getHex(), 8);
+      }
+      this.scene.remove(mesh);
+      this.coins.delete(id);
+      for (const child of mesh.children) ((child as THREE.Mesh).material as THREE.Material).dispose();
+    }
+
+    this.live.clear();
+    for (const star of view.stars) {
+      this.live.add(star.id);
+      let mesh = this.stars.get(star.id);
+      if (!mesh) {
+        mesh = this.makeStar(star);
+        this.stars.set(star.id, mesh);
+      }
+      mesh.position.set(star.x, star.y, star.z);
+      if (!this.reducedMotion) {
+        mesh.children[0].rotation.y += dt * 2.2;
+        mesh.position.y = star.y + Math.sin(this.time * 2 + star.id) * 1.2;
+      }
+    }
+    for (const [id, mesh] of this.stars) {
+      if (this.live.has(id)) continue;
+      if (me && mesh.position.distanceTo(this.scratch.set(me.x, me.y, me.z)) < 40) {
+        this.burst(mesh.position, 0xffe066, 14);
+      }
+      this.scene.remove(mesh);
+      this.stars.delete(id);
+    }
+
+    for (let i = this.sparkles.length - 1; i >= 0; i--) {
+      const s = this.sparkles[i];
+      s.life -= dt;
+      s.sprite.position.addScaledVector(s.vel, dt);
+      (s.sprite.material as THREE.SpriteMaterial).opacity = Math.max(0, s.life / 0.6);
+      if (s.life <= 0) {
+        this.scene.remove(s.sprite);
+        (s.sprite.material as THREE.Material).dispose();
+        this.sparkles.splice(i, 1);
       }
     }
 
-    // Chase camera: trail behind and above my own kart, looking a little ahead.
-    const me = view.karts[this.followIndex] ?? view.karts[0];
-    if (me) {
-      const fx = Math.sin(me.heading);
-      const fz = Math.cos(me.heading);
-      const desired = this.camTarget.set(me.x - fx * 30, 18, me.z - fz * 30);
-      const k = 1 - Math.pow(0.0001, dt);
-      this.camPos.lerp(desired, k);
-      this.camera.position.copy(this.camPos);
-      this.camera.lookAt(me.x + fx * 10, 4, me.z + fz * 10);
+    if (!me) return;
+
+    // Rings turn slowly and flash when I fly through one.
+    if (me.lastRing && me.lastRing !== this.lastRing) {
+      this.lastRing = me.lastRing;
+      this.ringFlash.set(me.lastRing, 1);
     }
+    for (const cell of this.cells.values()) {
+      if (!cell.ring) continue;
+      const flash = this.ringFlash.get(cell.ringId ?? '') ?? 0;
+      const glow = cell.ring.getObjectByName('glow') as THREE.Sprite | undefined;
+      if (glow) (glow.material as THREE.SpriteMaterial).opacity = 0.25 + flash * 0.75;
+      if (!this.reducedMotion) cell.ring.children.forEach((c, i) => (c.rotation.z = this.time * (0.4 + i * 0.05)));
+      cell.ring.scale.setScalar(1 + flash * 0.25);
+    }
+    for (const [id, f] of this.ringFlash) {
+      const next = f - dt * 1.5;
+      if (next <= 0) this.ringFlash.delete(id);
+      else this.ringFlash.set(id, next);
+    }
+
+    this.updateCells(me.x, me.z);
+
+    // Chase camera: behind, a little above, looking ahead. It leans into turns
+    // and pulls back a touch at speed, so a burst feels fast.
+    const fx = Math.sin(me.heading);
+    const fz = Math.cos(me.heading);
+    const back = 21 + me.tier * 3.5 + (me.burst > 0 ? 5 : 0);
+    this.scratch.set(me.x - fx * back, me.y + 6.5 + me.tier * 1.5 - me.climb * 3, me.z - fz * back);
+    const k = 1 - Math.pow(0.0005, dt);
+    this.camPos.lerp(this.scratch, k);
+    this.scratch.set(me.x + fx * 16, me.y + 2 + me.climb * 6, me.z + fz * 16);
+    this.camLook.lerp(this.scratch, k);
+    this.camera.position.copy(this.camPos);
+    // A small lean into turns: enough to feel, not enough to make anyone dizzy.
+    const roll = this.reducedMotion ? 0 : me.bank * 0.05;
+    this.camera.up.set(-roll * Math.cos(me.heading), 1, roll * Math.sin(me.heading));
+    this.camera.lookAt(this.camLook);
+    const fov = me.burst > 0 && !this.reducedMotion ? 72 : 62;
+    if (Math.abs(this.camera.fov - fov) > 0.05) {
+      this.camera.fov += (fov - this.camera.fov) * Math.min(1, dt * 4);
+      this.camera.updateProjectionMatrix();
+    }
+
+    // The dome and the cloud sea travel with the camera; the sea's texture
+    // moves the other way so the clouds stay where they are in the world.
+    this.skyDome.position.copy(this.camera.position);
+    this.cloudSea.position.x = this.camera.position.x;
+    this.cloudSea.position.z = this.camera.position.z;
+    this.cloudTex.offset.set(this.camera.position.x / 300, -this.camera.position.z / 300);
+    const sun = this.scene.getObjectByName('sun');
+    if (sun) sun.position.set(this.camera.position.x - 500, 420, this.camera.position.z + 900);
   }
 
   render(): void {
@@ -588,7 +705,7 @@ export class RacerScene {
     this.renderer.render(this.scene, this.camera);
   }
 
-  private onResize() {
+  private resize(): void {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight || 400;
     this.renderer.setSize(w, h);
@@ -597,16 +714,43 @@ export class RacerScene {
   }
 
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
     this.resizeObs?.disconnect();
-    // Every "Race again" builds a fresh scene, so teardown must genuinely
-    // free the old one — geometries, materials, canvas textures, and the
-    // WebGL context itself (browsers cap live contexts).
-    disposeDeep(this.scene);
-    this.renderer.dispose();
-    this.renderer.forceContextLoss();
-    if (this.renderer.domElement.parentNode === this.container) {
-      this.container.removeChild(this.renderer.domElement);
+    for (const r of this.racers) r.rider.dispose();
+    for (const mesh of this.coins.values()) {
+      for (const child of mesh.children) ((child as THREE.Mesh).material as THREE.Material).dispose();
     }
+    // Riders were freed by their own dispose; take them out before the sweep.
+    for (const r of this.racers) r.holder.remove(r.rider.group);
+    disposeDeep(this.scene);
+    const k = this.kit;
+    for (const v of Object.values(k)) {
+      const list = Array.isArray(v) ? v : [v];
+      for (const item of list) (item as { dispose?: () => void }).dispose?.();
+    }
+    this.starGeo.dispose();
+    this.starMat.dispose();
+    this.starGlowMat.map?.dispose();
+    this.starGlowMat.dispose();
+    this.sparkleMat.map?.dispose();
+    this.sparkleMat.dispose();
+    this.renderer.dispose();
+    this.renderer.domElement.remove();
   }
+}
+
+/** A soft round glow, shared by stars, sparkles and burst halos. */
+function glowTexture(): THREE.Texture {
+  const s = 64;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.45)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  return new THREE.CanvasTexture(c);
 }

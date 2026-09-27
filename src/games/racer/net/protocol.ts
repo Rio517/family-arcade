@@ -18,7 +18,8 @@
  * it reaches the game, so malformed or forged messages can't corrupt the race.
  */
 
-import type { Coin } from '../domain/kart';
+import { CRUISE_ALTITUDE, MAX_TIER } from '../domain/flight';
+import type { Coin, Star } from '../domain/pickups';
 import type { WorldDelta, WorldSnapshot } from '../domain/race';
 
 export interface HelloMsg {
@@ -40,10 +41,12 @@ export interface GoMsg {
   target: number;
 }
 
-/** Both ways, ~20/sec: where my kart is right now. */
+/** Both ways, ~20/sec: where my racer is right now. */
 export interface PosMsg {
   t: 'pos';
   x: number;
+  /** Height. Optional so a device from before the sky still pairs. */
+  y?: number;
   z: number;
   heading: number;
   speed: number;
@@ -74,13 +77,36 @@ const isStr = (v: unknown): v is string => typeof v === 'string';
  * `worldDelta` arrays. */
 const MAX_COINS = 64;
 
+const isOptNum = (v: unknown): boolean => v === undefined || isNum(v);
+
+/** A coin or star. Height is optional on the wire (an older host sends flat
+ * coins); `withHeight` fills it in before the game sees it. */
+function isPoint(c: Record<string, unknown>): boolean {
+  return isNum(c.id) && isNum(c.x) && isNum(c.z) && isOptNum(c.y);
+}
+
 function isCoin(v: unknown): v is Coin {
   if (typeof v !== 'object' || v === null) return false;
   const c = v as Record<string, unknown>;
-  return isNum(c.id) && isNum(c.x) && isNum(c.z) && isNum(c.hue);
+  return isPoint(c) && isNum(c.hue);
+}
+
+function isStar(v: unknown): v is Star {
+  return typeof v === 'object' && v !== null && isPoint(v as Record<string, unknown>);
 }
 
 const isCoinArray = (v: unknown): v is Coin[] => Array.isArray(v) && v.length <= MAX_COINS && v.every(isCoin);
+const isStarArray = (v: unknown): v is Star[] => Array.isArray(v) && v.length <= MAX_COINS && v.every(isStar);
+const isOptStarArray = (v: unknown): boolean => v === undefined || isStarArray(v);
+/** Two power tiers, each a whole number in range — they index the renderer's sizes. */
+const isOptTiers = (v: unknown): boolean =>
+  v === undefined ||
+  (Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0 && n <= MAX_TIER));
+
+/** Fill in what an older device leaves out, so the game only sees whole data. */
+function withHeight<T extends { y?: number }>(p: T): T & { y: number } {
+  return { ...p, y: isNum(p.y) ? p.y : CRUISE_ALTITUDE };
+}
 
 /** The scoreboard fields every world-ish message carries. */
 function isScoreboard(m: Record<string, unknown>): boolean {
@@ -113,12 +139,14 @@ export function isRacerMsg(value: unknown): value is RacerMsg {
     case 'go':
       return isNum(m.target);
     case 'pos':
-      return isNum(m.x) && isNum(m.z) && isNum(m.heading) && isNum(m.speed);
+      return isNum(m.x) && isOptNum(m.y) && isNum(m.z) && isNum(m.heading) && isNum(m.speed);
     case 'world':
-      return isCoinArray(m.coins) && isScoreboard(m);
+      return isCoinArray(m.coins) && isOptStarArray(m.stars) && isOptTiers(m.tiers) && isScoreboard(m);
     case 'worldDelta':
       return (
         isCoinArray(m.spawned) &&
+        isOptStarArray(m.starSpawned) &&
+        isOptTiers(m.tiers) &&
         Array.isArray(m.removed) &&
         m.removed.length <= MAX_COINS &&
         m.removed.every(isNum) &&
@@ -129,4 +157,36 @@ export function isRacerMsg(value: unknown): value is RacerMsg {
     default:
       return false;
   }
+}
+
+/**
+ * The world as the game should see it. A message that passed `isRacerMsg` may
+ * come from a device that predates the sky (no heights, stars or tiers); fill
+ * those in here so everything past this point can rely on them.
+ */
+export function snapshotFrom(m: WorldMsg): WorldSnapshot {
+  const w = m as WorldMsg & Partial<Pick<WorldSnapshot, 'stars' | 'tiers'>>;
+  return {
+    coins: w.coins.map(withHeight),
+    stars: (w.stars ?? []).map(withHeight),
+    tiers: w.tiers ?? [0, 0],
+    scores: w.scores,
+    status: w.status,
+    winner: w.winner,
+    elapsed: w.elapsed,
+  };
+}
+
+export function deltaFrom(m: WorldDeltaMsg): WorldDelta {
+  const d = m as WorldDeltaMsg & Partial<Pick<WorldDelta, 'starSpawned' | 'tiers'>>;
+  return {
+    spawned: d.spawned.map(withHeight),
+    starSpawned: (d.starSpawned ?? []).map(withHeight),
+    removed: d.removed,
+    tiers: d.tiers ?? [0, 0],
+    scores: d.scores,
+    status: d.status,
+    winner: d.winner,
+    elapsed: d.elapsed,
+  };
 }

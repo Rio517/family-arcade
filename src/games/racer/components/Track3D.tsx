@@ -5,9 +5,9 @@
  * only shuttles input in, frames out, and messages to the net layer.
  */
 import { useEffect, useRef, useState } from 'react';
-import { CoinIcon } from '@shared/ui/icons';
+import { CoinIcon, StarIcon } from '@shared/ui/icons';
 import { stepRace, takeWorldSnapshot, type RaceCore, type RemoteInput } from '../domain/race';
-import type { KartInput } from '../domain/kart';
+import type { FlightInput } from '../domain/flight';
 import type { RacerLook, RacerScene } from '../three/scene';
 import type { RacerNet } from '../net/useRacerNet';
 
@@ -17,21 +17,59 @@ export interface RaceCtx extends RaceCore {
   names: string[];
 }
 
+/**
+ * What the scoreboard shows, copied out of the live race a few times a
+ * second. The race itself lives in a ref and changes every frame; React
+ * renders this snapshot instead, so a render never reads the live race.
+ */
+interface Hud {
+  looks: RacerLook[];
+  names: string[];
+  myIndex: number;
+  mode: RaceCtx['mode'];
+  scores: number[];
+  target: number;
+  tier: number;
+  countdown: number;
+  elapsed: number;
+  racing: boolean;
+}
+
+function hudOf(c: RaceCtx): Hud {
+  return {
+    looks: c.looks,
+    names: c.names,
+    myIndex: c.myIndex,
+    mode: c.mode,
+    scores: [...c.scores],
+    target: c.target,
+    tier: c.karts[c.myIndex]?.tier ?? 0,
+    countdown: c.countdown > 0 ? Math.ceil(c.countdown) : 0,
+    elapsed: c.elapsed,
+    racing: c.status === 'racing',
+  };
+}
+
 export function Track3D({
   ctxRef,
+  start,
   net,
   onOver,
 }: {
   ctxRef: React.MutableRefObject<RaceCtx | null>;
+  /** The race as it began — the scoreboard's first picture. */
+  start: RaceCtx;
   net: RacerNet;
   onOver: () => void;
 }) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const keysRef = useRef<Set<string>>(new Set());
-  const pointerRef = useRef<{ active: boolean; nx: number }>({ active: false, nx: 0 });
-  const [, setHud] = useState(0);
+  const pointerRef = useRef<{ active: boolean; nx: number; ny: number }>({ active: false, nx: 0, ny: 0 });
+  const [hud, setHud] = useState<Hud>(() => hudOf(start));
   const onOverRef = useRef(onOver);
-  onOverRef.current = onOver;
+  useEffect(() => {
+    onOverRef.current = onOver;
+  }, [onOver]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -82,7 +120,7 @@ export function Track3D({
       const input = readInput(keysRef.current, pointerRef.current);
       const remote: RemoteInput | null =
         c.mode === 'net' ? { pos: net.remotePosRef.current, world: net.remoteWorldRef.current } : null;
-      const { coins, outbound } = stepRace(c, dt, input, remote);
+      const { coins, stars, outbound } = stepRace(c, dt, input, remote);
 
       if (c.mode === 'net') {
         // Tell my opponent where I am (~20/sec)…
@@ -90,19 +128,20 @@ export function Track3D({
         if (posBeat > 0.05) {
           posBeat = 0;
           const me = c.karts[c.myIndex];
-          net.sendPos({ x: me.x, z: me.z, heading: me.heading, speed: me.speed });
+          net.sendPos({ x: me.x, y: me.y, z: me.z, heading: me.heading, speed: me.speed });
         }
         // …and, as host, broadcast whatever the simulation says changed.
         if (outbound) net.sendWorldDelta(outbound);
       }
 
-      scene.sync({ karts: c.karts, coins }, t);
+      scene.sync({ karts: c.karts, coins, stars }, t);
       scene.render();
 
       hudBeat += t;
-      if (hudBeat > 0.1) {
+      // The countdown changes on the second; everything else can lag a tenth.
+      if (hudBeat > 0.1 || c.countdown > 0 || c.status === 'over') {
         hudBeat = 0;
-        setHud((h) => (h + 1) % 1_000_000);
+        setHud(hudOf(c));
       }
       if (c.status === 'over' && !overFired) {
         overFired = true;
@@ -120,7 +159,9 @@ export function Track3D({
     // three.js loads on demand, same as chess and battleship — visiting the
     // arcade menu (or racing later) must not front-load the 3D library.
     import('../three/scene')
-      .then(({ RacerScene: Scene }) => {
+      .then(async ({ RacerScene: Scene, loadRacerAssets }) => {
+        // The racers' models first; the countdown only starts once the loop does.
+        await loadRacerAssets();
         if (gone) return;
         const reducedMotion =
           typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -155,26 +196,50 @@ export function Track3D({
     if (e.type === 'pointerdown') pointerRef.current.active = true;
     const rect = e.currentTarget.getBoundingClientRect();
     const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    // Up the picture climbs, down it dives.
+    const ny = 1 - ((e.clientY - rect.top) / rect.height) * 2;
     pointerRef.current.nx = Math.max(-1, Math.min(1, nx));
+    pointerRef.current.ny = Math.max(-1, Math.min(1, ny));
   };
 
-  const c = ctxRef.current;
+  const showGo = hud.countdown === 0 && hud.elapsed < 0.8 && hud.racing;
 
   return (
     <div className="racer-stage">
-      {c && (
-        <div className="racer-hud">
-          {c.mode === 'net' && net.status !== 'connected' && net.status !== 'idle' && (
-            <span className="racer-hud-conn">⚠️ {net.statusDetail ?? 'reconnecting…'}</span>
-          )}
-          {c.looks.map((look, i) => (
-            <span key={i} className={`racer-score ${i === c.myIndex ? 'me' : ''}`}>
-              <span className="racer-score-face">{look.emoji}</span>
-              <CoinIcon size={18} /> <b>{c.scores[i]}</b>
-              <span className="racer-score-target">/{c.target}</span>
-            </span>
-          ))}
-          <span className="racer-hud-time">⏱ {c.elapsed.toFixed(1)}s</span>
+      <div className="racer-hud">
+        {hud.mode === 'net' && net.status !== 'connected' && net.status !== 'idle' && (
+          <span className="racer-hud-conn">⚠️ {net.statusDetail ?? 'reconnecting…'}</span>
+        )}
+        {hud.looks.map((look, i) => (
+          <span
+            key={i}
+            className={`racer-score ${i === hud.myIndex ? 'me' : ''}`}
+            style={{ borderColor: `#${look.color.toString(16).padStart(6, '0')}` }}
+            data-testid={`racer-score-${i}`}
+          >
+            <span className="racer-score-face">{look.emoji}</span>
+            <span className="racer-score-name">{i === hud.myIndex ? 'You' : hud.names[i]}</span>
+            <CoinIcon size={18} /> <b>{hud.scores[i]}</b>
+            <span className="racer-score-target">/{hud.target}</span>
+          </span>
+        ))}
+        {hud.tier > 0 && (
+          <span className="racer-power" data-testid="racer-power" aria-label={`Star power ${hud.tier} of 3`}>
+            {Array.from({ length: hud.tier }, (_, i) => (
+              <StarIcon key={i} size={18} />
+            ))}
+          </span>
+        )}
+        <span className="racer-hud-time">{hud.elapsed.toFixed(1)}s</span>
+      </div>
+      {hud.countdown > 0 && (
+        <div className="racer-countdown" data-testid="racer-countdown" aria-live="assertive">
+          {hud.countdown}
+        </div>
+      )}
+      {showGo && (
+        <div className="racer-countdown go" aria-live="assertive">
+          Go!
         </div>
       )}
       <div
@@ -187,7 +252,9 @@ export function Track3D({
         onPointerLeave={onPointer}
       />
       <p className="racer-hint">
-        Steer with the left and right arrows, hold up to zoom, or drag left and right on the picture.
+        Steer with the left and right arrows, climb and dive with up and down. On a tablet, touch the
+        picture: left and right to turn, high to climb, low to dive. Rainbow rings give you a burst of
+        speed; stars make you bigger and faster.
       </p>
     </div>
   );
@@ -197,12 +264,22 @@ export function Track3D({
 
 const STEER_KEYS = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd']);
 
-function readInput(keys: Set<string>, pointer: { active: boolean; nx: number }): KartInput {
+/** Touch near the middle of the picture does nothing up or down, so a thumb
+ * resting there only steers. */
+const LIFT_DEAD_ZONE = 0.25;
+
+function readInput(keys: Set<string>, pointer: { active: boolean; nx: number; ny: number }): FlightInput {
   let steer = 0;
   if (keys.has('arrowleft') || keys.has('a')) steer -= 1;
   if (keys.has('arrowright') || keys.has('d')) steer += 1;
-  const boostKey = keys.has('arrowup') || keys.has('w');
-  const brake = keys.has('arrowdown') || keys.has('s');
-  if (pointer.active && steer === 0) steer = pointer.nx;
-  return { steer, boost: boostKey || pointer.active, brake };
+  let lift = 0;
+  if (keys.has('arrowup') || keys.has('w')) lift += 1;
+  if (keys.has('arrowdown') || keys.has('s')) lift -= 1;
+  if (pointer.active) {
+    if (steer === 0) steer = pointer.nx;
+    if (lift === 0 && Math.abs(pointer.ny) > LIFT_DEAD_ZONE) {
+      lift = (pointer.ny - Math.sign(pointer.ny) * LIFT_DEAD_ZONE) / (1 - LIFT_DEAD_ZONE);
+    }
+  }
+  return { steer, lift };
 }

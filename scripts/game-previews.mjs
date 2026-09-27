@@ -23,7 +23,7 @@ const SHOTS = path.join(ROOT, 'docs', 'screenshots');
 const PREVIEWS = {
   chess: { from: 'chess-galaxy-3d.png', to: 'src/games/chess/assets/preview.webp' },
   battleship: { from: 'battle-fleet-3d.png', to: 'src/games/battleship/assets/preview.webp' },
-  racer: { from: 'racer-arena.png', to: 'src/games/racer/assets/preview.webp' },
+  racer: { from: 'racer-sky.png', to: 'src/games/racer/assets/preview.webp' },
   risk: { from: 'risk-board.png', to: 'src/games/risk/assets/preview.webp' },
   unicorn: { from: 'coins-sky.png', to: 'src/games/unicorn/assets/preview.webp' },
   mirror: { from: 'mirror-effects.png', to: 'src/games/mirror/assets/preview.webp' },
