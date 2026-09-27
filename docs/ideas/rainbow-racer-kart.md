@@ -178,6 +178,39 @@ the other) or WASD-vs-arrows on a keyboard.
 - **Shipping rhythm:** one phase = one or a few PRs, each leaving the game
   playable. No long-lived feature branch.
 
+## Decided (by the lead designer, 2026-09-27) — the sky replaces the arena
+
+The arena and its round fence are gone. The lead designer's brief:
+
+> Mario Kart in the sky. I don't want the circle — you can go wherever you
+> want. If you're a flying thing you fly; if you're a princess, you ride
+> something that flies, like a flying unicorn. Stars in the sky make you
+> bigger — or if you're riding, your animal gets faster.
+
+What that became (built, in `src/games/racer/`):
+
+- **An open sky with no edge.** The world is cells, each hashed from its
+  coordinates: floating islands, rainbow rings, clouds, balloons. Both devices
+  in a two-player race see the same sky without sending it (`domain/sky.ts`).
+- **Fly or ride.** Unicorn and fairy fly on their own; the princess rides a
+  flying unicorn; the bunny rides a cloud. No dragons (`three/riders.ts`).
+- **Stars are power.** Each one is a tier, up to three: bigger and faster for
+  a while, then back down a step at a time. The fairy's wings grow instead of
+  her. Bigger racers bump smaller ones aside (`domain/flight.ts`).
+- **Rainbow rings** give a burst of speed, once per ring.
+- **One player races three computer rivals** — everyone you didn't pick —
+  with a kindness rule: rivals ease off when ahead and push on when behind,
+  stay near the player, and never take their last coin while ahead. Tested
+  with a simulated clumsy child: they win more often than not, and every
+  loss is by one coin (`domain/rivals.ts`, `domain/race.test.ts`).
+- **Help with height**, the hard part of flying for a young child: coins
+  appear near your height, and with nothing pressed up or down your racer
+  eases toward the pickup ahead. Steering stays the child's.
+
+Not yet built, from the same brief: **shells underwater** as the sea-level
+power-up (and so an underwater world, and the mermaid). Earlier ideas still
+open: the six-animal growth ladder, and a Rainbow Road track.
+
 ## Decided (by the lead designer, 2026-08-23)
 
 - **Roster:** princess, fairy, mermaid + unicorn, bunny, horse, pig, dog,

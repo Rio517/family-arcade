@@ -15,46 +15,28 @@ import { PlayingAs } from '@shared/profile/PlayingAs';
 import { generateCode, normalizeCode } from '@shared/net/peer';
 import { useParty } from '@shared/party/PartyContext';
 import { usePartyDoor } from '@shared/party/usePartyDoor';
-import type { RacerLook } from '../three/scene';
+import { DRIVERS, type Driver } from './cast';
 import type { RaceMode } from '../domain/race';
 import type { RacerNet } from '../net/useRacerNet';
 
 /** The racer's id in the app registry — what the party's table names. */
 const GAME_ID = 'racer';
 
-export interface Driver {
-  id: string;
-  name: string;
-  emoji: string;
-  color: number;
-  css: string;
-}
-
-export const DRIVERS: Driver[] = [
-  { id: 'unicorn', name: 'Unicorn', emoji: '🦄', color: 0xff7fc4, css: '#ff7fc4' },
-  { id: 'dragon', name: 'Dragon', emoji: '🐉', color: 0x54c274, css: '#54c274' },
-  { id: 'fairy', name: 'Fairy', emoji: '🧚', color: 0xffcf4a, css: '#ffcf4a' },
-  { id: 'butterfly', name: 'Butterfly', emoji: '🦋', color: 0xa78bfa, css: '#a78bfa' },
-];
-
-export const driverById = (id: string): Driver => DRIVERS.find((d) => d.id === id) ?? DRIVERS[0];
-export const lookOf = (d: Driver): RacerLook => ({ emoji: d.emoji, color: d.color });
-
 export function ModeScreen({ onPick }: { onPick: (m: RaceMode) => void }) {
   return (
     <div className="racer-setup">
       <div className="racer-setup-head">
         <h1>Rainbow Racer</h1>
-        <p>Race around a 3D arena and collect 20 coins! 🪙</p>
+        <p>Fly anywhere in the sky and grab 20 coins first! Stars make you bigger and faster.</p>
       </div>
       <div className="racer-choices">
         <button className="racer-big-btn" onClick={() => onPick('solo')} data-testid="racer-mode-solo">
           <span className="racer-big-emoji">🦄</span>
           <span className="racer-big-label">1 Player</span>
-          <span className="racer-big-sub">Race on your own</span>
+          <span className="racer-big-sub">Race three sky racers</span>
         </button>
         <button className="racer-big-btn" onClick={() => onPick('net')} data-testid="racer-mode-net">
-          <span className="racer-big-emoji">🦄🐉</span>
+          <span className="racer-big-emoji">🦄🧚</span>
           <span className="racer-big-label">2 Players</span>
           <span className="racer-big-sub">Race a friend on another device</span>
         </button>
@@ -68,7 +50,7 @@ export function PickScreen({ mode, onPick }: { mode: RaceMode; onPick: (d: Drive
     <div className="racer-setup">
       <div className="racer-setup-head">
         <h1>Pick your racer</h1>
-        <p>{mode === 'net' ? 'Then connect with your friend.' : 'Then drive and collect 20 coins! 🪙'}</p>
+        <p>{mode === 'net' ? 'Then connect with your friend.' : 'Then fly, and grab 20 coins first!'}</p>
       </div>
       <div className="racer-cast">
         {DRIVERS.map((d) => (
@@ -81,6 +63,7 @@ export function PickScreen({ mode, onPick }: { mode: RaceMode; onPick: (d: Drive
           >
             <span className="racer-cast-emoji">{d.emoji}</span>
             <span className="racer-cast-name" style={{ color: d.css }}>{d.name}</span>
+            <span className="racer-cast-flies">{d.flies}</span>
           </button>
         ))}
       </div>

@@ -457,20 +457,29 @@ const SHOTS = [
     },
   },
   {
-    // The arena with the artist-made bunny steed (coins land randomly, so the
-    // pixels churn a little every regeneration — that's expected).
-    name: 'racer-arena',
+    // Who can race, and how each one flies.
+    name: 'racer-cast',
     path: '/#/racer',
     viewport: TABLET,
+    expect: '[data-testid="racer-driver-princess"]',
+    prep: async (page) => {
+      await page.getByTestId('racer-mode-solo').click();
+    },
+  },
+  {
+    // The open sky a few seconds after Go: the unicorn, three rivals, rings,
+    // islands. Pickups land randomly, so the pixels churn a little on every
+    // regeneration — that's expected.
+    name: 'racer-sky',
+    path: '/#/racer',
+    viewport: TABLET,
+    expect: '[data-testid="racer-score-3"]',
     prep: async (page) => {
       await page.getByTestId('racer-mode-solo').click();
       await page.getByTestId('racer-driver-unicorn').click();
       await page.waitForSelector('.racer-canvas canvas', { timeout: 20000 });
-      // Ride the brake while the scene and the steed GLB land — left alone,
-      // the racer cruises to the fence and the camera ends up in a hillside.
-      await page.keyboard.down('ArrowDown');
-      await page.waitForTimeout(2500);
-      await page.keyboard.up('ArrowDown');
+      // The countdown, then a moment of flight so the pack spreads out.
+      await page.waitForTimeout(5200);
     },
   },
   {

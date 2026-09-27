@@ -5,8 +5,10 @@ score logger, installable as an offline PWA:
 
 - **Magic Coins** — fly the sky or swim the sea (1–3 players), pick your
   character, and race to 20 rainbow coins. Grab power-ups on the way!
-- **Rainbow Racer** — drive your unicorn around a sunny 3D arena (1–2
-  players) and scoop up 20 rainbow coins as fast as you can.
+- **Rainbow Racer** — Mario Kart in the sky (1–2 players): fly anywhere over
+  a sea of clouds as a unicorn or a fairy, or ride one — a princess on a
+  flying unicorn, a bunny on a cloud. First to 20 coins wins; rainbow rings
+  give a burst of speed and stars make you bigger and faster.
 - **Ship Battle** — a two-player, cross-device naval guessing game (a
   Battleship-style game; "Battleship" is a trademark of Hasbro and is not
   affiliated). Two iPads, one shared code, no server — or play solo against a
@@ -47,7 +49,7 @@ game? `npm run new-game` puts a starter on the wall;
 
 | Magic Coins | Rainbow Racer |
 | --- | --- |
-| ![Magic Coins — the sky level](docs/screenshots/coins-sky.png) | ![Rainbow Racer's sunny 3D arena](docs/screenshots/racer-world-ingame.png) |
+| ![Magic Coins — the sky level](docs/screenshots/coins-sky.png) | ![Rainbow Racer's open sky: a unicorn, three rivals, rainbow rings](docs/screenshots/racer-sky.png) |
 
 ---
 
@@ -172,8 +174,11 @@ The little-kid corner of the console, and just as engineered as the rest:
 - **Magic Coins** (1–3 players) — pick a character and a world (sky, ocean, or
   rainbow), race to 20 coins, and grab power-ups along the way. Everyone plays
   on one screen at once.
-- **Rainbow Racer** (1–2 players) — drive a 3D unicorn around a sunny arena
-  scooping coins against the clock.
+- **Rainbow Racer** (1–2 players) — an open sky with no edge, built cell by
+  cell around the camera from a seeded hash, so both devices in a two-player
+  race see the same sky without sending it. One player races three computer
+  rivals whose pace follows the score, so a young child usually wins and
+  never by a mile.
 
 ---
 

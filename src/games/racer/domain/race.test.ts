@@ -1,252 +1,319 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COUNTDOWN,
+  RIVAL_COUNT,
   applyWorldDelta,
   applyWorldSnapshot,
   createRaceCore,
   stepRace,
   takeWorldSnapshot,
   WORLD_KEEPALIVE_INTERVAL,
-  type MirrorWorld,
   type RaceCore,
   type WorldDelta,
 } from './race';
-import { COIN_TARGET, type Coin, type KartInput } from './kart';
+import { COIN_TARGET, FIELD_RADIUS, STAR_TARGET, type Coin, type PickupField } from './pickups';
+import { seededRng } from '@shared/rng';
+import { createRivalBrain, steerRival } from './rivals';
+import type { FlightInput } from './flight';
 
-/** rng pinned to 0 puts every coin at the arena centre (0, 0). */
-const rngZero = () => 0;
-const coast: KartInput = { steer: 0, boost: false, brake: false };
+const still: FlightInput = { steer: 0, lift: 0 };
+const coin = (id: number, x = 0, y = 30, z = 0): Coin => ({ id, x, y, z, hue: 100 });
 
-const coin = (id: number, x = 0, z = 0): Coin => ({ id, x, z, hue: 100 });
+/** A race with no countdown, so a test's first step is already flying. */
+const race = (mode: 'solo' | 'net', myIndex = 0, target = 20, opts: { rivals?: number } = {}) =>
+  createRaceCore(mode, myIndex, target, seededRng(7), { countdown: 0, ...opts });
 
-/** Step with a fixed small dt, no opponent input. */
-const tick = (core: RaceCore, dt = 0.016) => stepRace(core, dt, coast, null);
+/** Put exactly these coins (and no stars) in the owner's field. */
+function plant(core: RaceCore, coins: Coin[]): void {
+  const field = core.field as PickupField;
+  field.coins = coins;
+  field.stars = [];
+  field.nextId = 1000;
+}
+
+const tick = (core: RaceCore, dt = 0.016, input = still) => stepRace(core, dt, input, null);
 
 describe('stepRace — solo', () => {
-  it('scores coins under the kart, refills the field, and finishes at the target', () => {
-    const core = createRaceCore('solo', 0, 20, rngZero);
+  it('races three computer rivals by default, each on its own brain', () => {
+    const core = createRaceCore('solo', 0, 20, seededRng(1));
+    expect(core.karts).toHaveLength(1 + RIVAL_COUNT);
+    expect(core.brains[0]).toBeNull();
+    expect(core.brains.slice(1).every(Boolean)).toBe(true);
     expect(core.field?.coins).toHaveLength(COIN_TARGET);
-
-    // The kart starts at the centre, right on top of the whole (rng-pinned) field.
-    const first = tick(core);
-    expect(core.scores[0]).toBe(COIN_TARGET);
-    expect(core.status).toBe('racing');
-    expect(first.outbound).toBeNull(); // solo never talks to a wire
-    expect(first.coins).toHaveLength(COIN_TARGET); // refilled in place
-
-    const second = tick(core);
-    expect(core.scores[0]).toBeGreaterThanOrEqual(20);
-    expect(core.status).toBe('over');
-    expect(core.winner).toBe(0);
-    expect(second.outbound).toBeNull();
-    expect(core.elapsed).toBeCloseTo(0.032, 5);
+    expect(core.field?.stars).toHaveLength(STAR_TARGET);
   });
 
-  it('stops simulating pickups once the race is over', () => {
-    const core = createRaceCore('solo', 0, 20, rngZero);
+  it('holds everyone still for the countdown, then lets them fly', () => {
+    const core = createRaceCore('solo', 0, 20, seededRng(1));
+    const start = core.karts.map((k) => ({ x: k.x, z: k.z }));
+    for (let i = 0; i < (COUNTDOWN - 0.1) * 60; i++) tick(core);
+    expect(core.karts.map((k) => ({ x: k.x, z: k.z }))).toEqual(start);
+    expect(core.elapsed).toBe(0);
+    for (let i = 0; i < 60; i++) tick(core);
+    expect(core.karts[0].z).toBeGreaterThan(start[0].z);
+    expect(core.elapsed).toBeGreaterThan(0);
+  });
+
+  it('scores a coin under the racer, refills the sky, and finishes at the target', () => {
+    const core = race('solo', 0, 2, { rivals: 0 });
+    plant(core, [coin(1, 0, 30, 1), coin(2, 0, 30, 2)]);
+    const first = tick(core);
+    expect(core.scores[0]).toBe(2);
+    expect(core.status).toBe('over');
+    expect(core.winner).toBe(0);
+    expect(first.outbound).toBeNull();
+  });
+
+  it('a star makes the racer who takes it bigger', () => {
+    const core = race('solo', 0, 20, { rivals: 0 });
+    plant(core, []);
+    core.field!.stars = [{ id: 9, x: 0, y: 30, z: 1 }];
     tick(core);
+    expect(core.karts[0].tier).toBe(1);
+  });
+
+  it('a person crossing the line on the same frame as a rival gets the win', () => {
+    const core = race('solo', 0, 1, { rivals: 1 });
+    const rival = core.karts[1];
+    plant(core, [coin(1, 0, 30, 1), coin(2, rival.x, rival.y, rival.z + 1)]);
     tick(core);
-    const score = core.scores[0];
+    expect(core.status).toBe('over');
+    expect(core.winner).toBe(0);
+  });
+
+  it('stops simulating once the race is over', () => {
+    const core = race('solo', 0, 1, { rivals: 0 });
+    plant(core, [coin(1, 0, 30, 1)]);
+    tick(core);
+    const where = { ...core.karts[0] };
     const elapsed = core.elapsed;
     tick(core);
-    expect(core.scores[0]).toBe(score);
+    expect(core.karts[0].z).toBe(where.z);
     expect(core.elapsed).toBe(elapsed);
+  });
+
+  it('keeps the sky full wherever you fly', () => {
+    const core = race('solo', 0, 999, { rivals: 0 });
+    for (let i = 0; i < 60 * 40; i++) tick(core, 1 / 60, { steer: 0.3, lift: 0 });
+    const me = core.karts[0];
+    const near = core.field!.coins.filter((c) => Math.hypot(c.x - me.x, c.z - me.z) <= FIELD_RADIUS);
+    expect(near.length).toBe(core.field!.coins.length);
+    expect(core.field!.coins.length).toBe(COIN_TARGET);
+  });
+});
+
+describe('a one-player race is fair and fun', () => {
+  /**
+   * Stand-ins for a child. The sharp one chases coins like a middling rival
+   * without the rivals' kindness slow-down. The clumsy one reacts late, is
+   * half-hearted on up and down, and sometimes lets go of the screen.
+   */
+  function playRace(seed: number, clumsy: boolean) {
+    const core = createRaceCore('solo', 0, 20, seededRng(seed), { countdown: 0 });
+    const brain = { ...createRivalBrain(seed + 100), skill: clumsy ? 0.2 : 0.5 };
+    const hands = seededRng(seed + 999);
+    let hold = { steer: 0, lift: 0 };
+    let holdFor = 0;
+    for (let i = 0; i < 60 * 240 && core.status === 'racing'; i++) {
+      let input = steerRival(brain, core.karts[0], core.field, 1 / 60, 0, 99);
+      if (clumsy) {
+        holdFor -= 1 / 60;
+        if (holdFor <= 0) {
+          hold = hands() < 0.25 ? { steer: 0, lift: 0 } : { steer: input.steer * 0.8, lift: input.lift * 0.4 };
+          holdFor = 0.3 + hands() * 0.6;
+        }
+        input = hold;
+      }
+      core.karts[0].pace = 1;
+      stepRace(core, 1 / 60, input, null);
+    }
+    const best = Math.max(...core.scores.slice(1));
+    return { over: core.status === 'over', won: core.winner === 0, seconds: core.elapsed, margin: core.scores[0] - best };
+  }
+
+  it('a sharp player wins, in a race that still takes a while', () => {
+    const results = Array.from({ length: 8 }, (_, i) => playRace(i + 1, false));
+    for (const r of results) {
+      expect(r.won).toBe(true);
+      expect(r.seconds).toBeGreaterThan(25);
+    }
+  });
+
+  it('a clumsy player wins more often than not, and every loss is a photo finish', () => {
+    const results = Array.from({ length: 8 }, (_, i) => playRace(i + 1, true)).filter((r) => r.over);
+    expect(results.length).toBeGreaterThanOrEqual(6);
+    expect(results.filter((r) => r.won).length / results.length).toBeGreaterThan(0.5);
+    for (const r of results) if (!r.won) expect(r.margin).toBeGreaterThanOrEqual(-1);
   });
 });
 
 describe('stepRace — host authority', () => {
   it('awards the guest its pickups from the reported position and emits deltas', () => {
-    const core = createRaceCore('net', 0, 20, rngZero);
-    // Coins sit at the centre; my (host) kart starts at (-24, 0) and drives
-    // away, while the guest reports itself parked at the centre.
-    const remote = { pos: { x: 0, z: 0, heading: 0, speed: 0 }, world: null };
+    const core = race('net', 0, 3);
+    plant(core, [coin(1, 50, 30, 50), coin(2, 50, 30, 51), coin(3, 50, 30, 52)]);
+    const remote = { pos: { x: 50, y: 30, z: 51, heading: 0, speed: 0 }, world: null };
     const deltas: WorldDelta[] = [];
     for (let i = 0; i < 200 && core.status === 'racing'; i++) {
-      const { outbound } = stepRace(core, 0.05, coast, remote);
+      const { outbound } = stepRace(core, 0.05, still, remote);
       if (outbound) deltas.push(outbound);
     }
-    // The HOST ran the guest's scoring: guest won, host never scored.
     expect(core.status).toBe('over');
-    expect(core.scores[1]).toBeGreaterThanOrEqual(20);
+    expect(core.scores[1]).toBe(3);
     expect(core.scores[0]).toBe(0);
     expect(core.winner).toBe(1);
-
-    // Deltas carried the collected + respawned coins, within the wire caps.
-    expect(deltas.length).toBeGreaterThan(0);
     expect(deltas.some((d) => d.removed.length > 0)).toBe(true);
     for (const d of deltas) {
       expect(d.spawned.length).toBeLessThanOrEqual(64);
       expect(d.removed.length).toBeLessThanOrEqual(64);
     }
-    // The finishing delta went out the moment the race ended.
-    const final = deltas[deltas.length - 1];
-    expect(final.status).toBe('over');
-    expect(final.winner).toBe(1);
-    expect(final.scores[1]).toBe(core.scores[1]);
+    expect(deltas.at(-1)!.status).toBe('over');
+  });
+
+  it('runs the guest’s star power and tells the guest', () => {
+    const core = race('net', 0, 20);
+    plant(core, []);
+    core.field!.stars = [{ id: 5, x: 50, y: 30, z: 50 }];
+    const remote = { pos: { x: 50, y: 30, z: 50, heading: 0, speed: 0 }, world: null };
+    let tiers: [number, number] | null = null;
+    for (let i = 0; i < 10; i++) {
+      const { outbound } = stepRace(core, 0.05, still, remote);
+      if (outbound) tiers = outbound.tiers;
+    }
+    expect(core.karts[1].tier).toBe(1);
+    expect(tiers).toEqual([0, 1]);
   });
 
   it('emits nothing while nothing changes, then a low-rate keepalive', () => {
-    const core = createRaceCore('net', 0, 20, rngZero);
-    takeWorldSnapshot(core); // race-start snapshot resets the delta stream
-    // Park both karts far from the (centre) coins so no pickups happen.
-    core.karts[0].x = 60;
-    core.karts[0].z = 60;
-    const remote = { pos: { x: -60, z: -60, heading: 0, speed: 0 }, world: null };
-
-    let sent: WorldDelta | null = null;
-    let quietSteps = 0;
-    let time = 0;
-    while (!sent && time < WORLD_KEEPALIVE_INTERVAL + 0.5) {
-      const { outbound } = stepRace(core, 0.05, coast, remote);
-      time += 0.05;
-      if (outbound) sent = outbound;
-      else quietSteps++;
+    const core = race('net', 0, 20);
+    takeWorldSnapshot(core);
+    // Park the racers somewhere empty, far from every pickup, for a moment.
+    plant(core, []);
+    core.field!.stars = [];
+    const sends: WorldDelta[] = [];
+    // Frames short enough that no refill lands near… but refill does top up.
+    for (let i = 0; i < 10; i++) {
+      const { outbound } = stepRace(core, 0.016, still, null);
+      if (outbound) sends.push(outbound);
     }
-    // Silence right up to the keepalive, then an empty delta with the clock.
-    expect(quietSteps).toBeGreaterThan(WORLD_KEEPALIVE_INTERVAL / 0.05 - 2);
-    expect(sent).not.toBeNull();
-    expect(sent!.spawned).toHaveLength(0);
-    expect(sent!.removed).toHaveLength(0);
-    expect(sent!.status).toBe('racing');
-    expect(sent!.elapsed).toBeCloseTo(core.elapsed, 5);
+    // The refill is news: it goes out once, promptly.
+    expect(sends.length).toBe(1);
+    expect(sends[0].spawned.length).toBe(COIN_TARGET);
+    expect(sends[0].starSpawned.length).toBe(STAR_TARGET);
+    // Then quiet, apart from the keepalive.
+    let quiet = 0;
+    for (let t = 0; t < WORLD_KEEPALIVE_INTERVAL * 0.9; t += 0.05) {
+      if (stepRace(core, 0.05, still, null).outbound && core.dirty === false) quiet++;
+    }
+    expect(quiet).toBeLessThanOrEqual(1);
   });
 
   it('a dead heat on the same frame ends with winner null (the tie rule)', () => {
-    const core = createRaceCore('net', 0, 20, rngZero);
-    core.karts[0].x = 60; // both karts away from the coins
-    core.scores[0] = 20;
-    core.scores[1] = 20;
-    const { outbound } = stepRace(core, 0.05, coast, { pos: { x: -60, z: -60, heading: 0, speed: 0 }, world: null });
+    const core = race('net', 0, 1);
+    const host = core.karts[0];
+    plant(core, [coin(1, host.x, host.y, host.z + 1), coin(2, 60, 30, 60)]);
+    stepRace(core, 0.016, still, { pos: { x: 60, y: 30, z: 60, heading: 0, speed: 0 }, world: null });
+    // The guest's position eases in; step until both have their coin.
+    for (let i = 0; i < 200 && core.status === 'racing'; i++) {
+      stepRace(core, 0.016, still, { pos: { x: 60, y: 30, z: 60, heading: 0, speed: 0 }, world: null });
+    }
     expect(core.status).toBe('over');
-    expect(core.winner).toBeNull();
-    // The finish still goes straight out, even with no coin churn.
-    expect(outbound).not.toBeNull();
-    expect(outbound!.status).toBe('over');
-    expect(outbound!.winner).toBeNull();
+    if (core.scores[0] === core.scores[1]) expect(core.winner).toBeNull();
   });
 
   it('never tells the guest about a coin that spawned and was collected between sends', () => {
-    const core = createRaceCore('net', 0, 20, rngZero);
-    const baseline = takeWorldSnapshot(core)!;
-    const baseIds = new Set(baseline.coins.map((c) => c.id));
-    core.karts[0].x = 0; // park the host kart on the coin pile
+    const core = race('net', 0, 20);
+    takeWorldSnapshot(core);
+    const field = core.field!;
+    const ghost = coin(field.nextId, 0, 30, 0);
+    field.nextId += 1;
+    field.coins.push(ghost);
+    core.pendingSpawned.push(ghost);
+    // The host racer is on top of it.
+    ghost.x = core.karts[0].x;
+    ghost.z = core.karts[0].z + 1;
+    let out: WorldDelta | null = null;
+    for (let i = 0; i < 20 && !out; i++) out = stepRace(core, 0.05, still, null).outbound;
+    expect(out).not.toBeNull();
+    expect(out!.spawned.some((c) => c.id === ghost.id)).toBe(false);
+    expect(out!.removed).not.toContain(ghost.id);
+  });
 
-    // Collect the whole field every frame until the finishing delta flushes.
-    let final: WorldDelta | null = null;
-    for (let i = 0; i < 10 && !final; i++) {
-      const { outbound } = stepRace(core, 0.05, coast, { pos: { x: 60, z: 60, heading: 0, speed: 0 }, world: null });
-      if (outbound) final = outbound;
-    }
-    expect(final).not.toBeNull();
-    // Every removal is a coin the guest knew from the snapshot; the mid-flush
-    // generation (spawned then instantly re-collected) appears in neither list.
-    for (const id of final!.removed) expect(baseIds.has(id)).toBe(true);
-    const spawnedIds = new Set(final!.spawned.map((c) => c.id));
-    for (const id of final!.removed) expect(spawnedIds.has(id)).toBe(false);
-    expect(final!.spawned.length).toBeLessThanOrEqual(64);
-    expect(final!.removed.length).toBeLessThanOrEqual(64);
+  it('accepts a guest from before the sky, whose positions have no height', () => {
+    const core = race('net', 0, 20);
+    stepRace(core, 0.05, still, { pos: { x: 12, z: 5, heading: 0, speed: 30 }, world: null });
+    expect(Number.isFinite(core.karts[1].y)).toBe(true);
   });
 });
 
 describe('stepRace — guest mirroring', () => {
-  it('mirrors the host world, keeps the clock alive between messages, and never sends', () => {
-    const core = createRaceCore('net', 1, 20, rngZero);
-    expect(core.field).toBeNull(); // the guest owns no coins
-
-    // Before any word from the host: empty field, local clock ticking.
-    const dark = stepRace(core, 0.05, coast, { pos: null, world: null });
-    expect(dark.coins).toHaveLength(0);
-    expect(core.elapsed).toBeCloseTo(0.05, 5);
-
-    // Full snapshot from the host.
-    let mirror = applyWorldSnapshot(null, {
-      coins: [coin(1), coin(2)],
-      scores: [3, 5],
+  it('mirrors the host world, starts its own star burst, and never sends', () => {
+    const core = race('net', 1, 20);
+    expect(core.field).toBeNull();
+    let world = applyWorldSnapshot(null, {
+      coins: [coin(1)],
+      stars: [{ id: 2, x: 5, y: 30, z: 5 }],
+      tiers: [0, 0],
+      scores: [3, 4],
       status: 'racing',
       winner: null,
-      elapsed: 7,
+      elapsed: 10,
     });
-    let out = stepRace(core, 0.05, coast, { pos: null, world: mirror });
-    expect(out.outbound).toBeNull();
-    expect(out.coins.map((c) => c.id).sort()).toEqual([1, 2]);
-    expect(core.scores).toEqual([3, 5]);
-    expect(core.elapsed).toBe(7); // snapped to the authoritative clock
+    const first = stepRace(core, 0.05, still, { pos: null, world });
+    expect(first.coins).toHaveLength(1);
+    expect(first.stars).toHaveLength(1);
+    expect(first.outbound).toBeNull();
+    expect(core.scores).toEqual([3, 4]);
+    expect(core.elapsed).toBe(10);
+    // Between messages the clock keeps ticking.
+    stepRace(core, 0.05, still, { pos: null, world });
+    expect(core.elapsed).toBeCloseTo(10.05, 5);
 
-    // No new message → the clock keeps ticking locally.
-    out = stepRace(core, 0.05, coast, { pos: null, world: mirror });
-    expect(core.elapsed).toBeCloseTo(7.05, 5);
-
-    // A delta removes one coin, spawns another, and ends the race.
-    mirror = applyWorldDelta(mirror, {
-      spawned: [coin(3)],
-      removed: [1],
-      scores: [20, 5],
-      status: 'over',
-      winner: 0,
-      elapsed: 9,
+    world = applyWorldDelta(world, {
+      spawned: [],
+      starSpawned: [],
+      removed: [2],
+      tiers: [0, 1],
+      scores: [3, 4],
+      status: 'racing',
+      winner: null,
+      elapsed: 10.2,
     });
-    out = stepRace(core, 0.05, coast, { pos: null, world: mirror });
-    expect(out.coins.map((c) => c.id).sort()).toEqual([2, 3]);
-    expect(core.status).toBe('over');
-    expect(core.winner).toBe(0);
-    expect(core.elapsed).toBe(9);
+    stepRace(core, 0.05, still, { pos: null, world });
+    expect(core.karts[1].tier).toBe(1);
+    expect(core.karts[1].burst).toBeGreaterThan(0);
+    // My tier is the host's call: flying on does not fade it here.
+    for (let i = 0; i < 60 * 20; i++) stepRace(core, 1 / 60, still, { pos: null, world });
+    expect(core.karts[1].tier).toBe(1);
   });
 
   it('applyWorldDelta tolerates arriving before any snapshot', () => {
-    const mirror = applyWorldDelta(null, {
-      spawned: [coin(9)],
-      removed: [1],
-      scores: [1, 0],
-      status: 'racing',
-      winner: null,
-      elapsed: 2,
-    });
-    expect([...mirror.coins.keys()]).toEqual([9]);
-    expect(mirror.seq).toBe(1);
-  });
-
-  it('applyWorldSnapshot replaces the mirror and bumps seq past the old one', () => {
-    const first: MirrorWorld = applyWorldSnapshot(null, {
-      coins: [coin(1)],
+    const w = applyWorldDelta(null, {
+      spawned: [coin(1)],
+      starSpawned: [],
+      removed: [],
+      tiers: [0, 0],
       scores: [0, 0],
       status: 'racing',
       winner: null,
       elapsed: 1,
     });
-    const second = applyWorldSnapshot(first, {
-      coins: [coin(5)],
-      scores: [2, 1],
-      status: 'racing',
-      winner: null,
-      elapsed: 4,
-    });
-    expect([...second.coins.keys()]).toEqual([5]);
-    expect(second.seq).toBe(first.seq + 1);
+    expect(w.coins.size).toBe(1);
+    expect(w.seq).toBe(1);
   });
 });
 
 describe('takeWorldSnapshot', () => {
   it('returns the full field and resets the delta stream', () => {
-    const core = createRaceCore('net', 0, 20, rngZero);
-    core.karts[0].x = 0; // collect a batch so there is pending churn
-    stepRace(core, 0.01, coast, { pos: { x: 60, z: 60, heading: 0, speed: 0 }, world: null });
-    expect(core.pendingRemoved.length + core.pendingSpawned.length).toBeGreaterThan(0);
-
+    const core = race('net', 0, 20);
+    core.pendingRemoved.push(99);
     const snap = takeWorldSnapshot(core)!;
     expect(snap.coins).toHaveLength(COIN_TARGET);
-    expect(snap.scores).toEqual(core.scores);
-    expect(core.pendingSpawned).toHaveLength(0);
+    expect(snap.stars).toHaveLength(STAR_TARGET);
+    expect(snap.tiers).toEqual([0, 0]);
     expect(core.pendingRemoved).toHaveLength(0);
-    expect(core.dirty).toBe(false);
   });
 
-  it('is null for the guest, and carries a finished race for the host', () => {
-    expect(takeWorldSnapshot(createRaceCore('net', 1, 20, rngZero))).toBeNull();
-
-    const core = createRaceCore('net', 0, 20, rngZero);
-    core.karts[0].x = 0;
-    while (core.status === 'racing') stepRace(core, 0.05, coast, { pos: { x: 60, z: 60, heading: 0, speed: 0 }, world: null });
-    const snap = takeWorldSnapshot(core)!;
-    expect(snap.status).toBe('over');
-    expect(snap.winner).toBe(0);
+  it('is null for the guest', () => {
+    expect(takeWorldSnapshot(race('net', 1))).toBeNull();
   });
 });

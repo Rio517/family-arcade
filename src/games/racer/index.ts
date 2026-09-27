@@ -12,12 +12,12 @@ export const racer: GameDescriptor = {
   path: '/racer',
   preview: {
     image: preview,
-    facts: ['1–2 players', 'One iPad each', 'About 3 min'],
+    facts: ['1–2 players', 'Fly anywhere in the sky', 'About 2 min'],
     blurb:
-      'Drive a unicorn, dragon, fairy or butterfly around a 3D arena and grab 20 rainbow coins first. Race a friend on their own iPad.',
+      'Fly a unicorn or a fairy, or ride one: a princess on a flying unicorn, a bunny on a cloud. Grab 20 coins first; stars make you bigger and faster.',
   },
   description:
-    'Drive your unicorn around a sunny 3D arena and scoop up 20 rainbow coins as fast as you can!',
+    'Mario Kart in the sky: fly anywhere, zoom through rainbow rings, and grab stars to grow bigger and faster. Race the computer or a friend.',
   Icon: BoltIcon,
   Page: RacerPage,
 };

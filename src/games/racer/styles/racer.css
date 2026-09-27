@@ -79,6 +79,7 @@
 .racer-cast-btn:hover { transform: translateY(-4px) scale(1.03); }
 .racer-cast-emoji { font-size: 58px; line-height: 1; }
 .racer-cast-name { font-size: 20px; font-weight: 900; }
+.racer-cast-flies { font-size: 14px; font-weight: 700; color: #6a7a8a; }
 
 /* ----- mode select ----- */
 .racer-choices {
@@ -177,7 +178,10 @@
   transform: translateX(-50%);
   z-index: 5;
   display: flex;
-  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100% - 24px);
+  gap: 8px;
   align-items: center;
   padding: 6px 16px;
   border-radius: 999px;
@@ -189,10 +193,34 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 20px;
+  font-size: 18px;
   color: #4a5a6a;
-  padding: 2px 8px;
+  padding: 2px 10px 2px 8px;
   border-radius: 999px;
+  border: 2px solid transparent;
+}
+.racer-score-name { font-size: 14px; font-weight: 800; max-width: 7em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.racer-power { display: inline-flex; gap: 2px; color: #f5a000; fill: #ffd54a; }
+.racer-power svg { fill: #ffd54a; }
+
+/* 3, 2, 1, Go! */
+.racer-countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-size: clamp(72px, 16vw, 160px);
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 6px 0 #ef6aab, 0 10px 30px rgba(120, 40, 120, 0.4);
+}
+.racer-countdown.go { color: #ffe14a; text-shadow: 0 6px 0 #ff7a3d, 0 10px 30px rgba(160, 80, 0, 0.4); }
+@media (prefers-reduced-motion: no-preference) {
+  .racer-countdown { animation: racer-count 1s ease-out infinite; }
+  .racer-countdown.go { animation: racer-rise 0.4s ease-out; }
+  @keyframes racer-count { from { transform: scale(1.25); opacity: 0.4; } 30% { transform: scale(1); opacity: 1; } }
 }
 .racer-score.me { background: #fff3c4; box-shadow: inset 0 0 0 2px #ffd54a; }
 .racer-score-face { font-size: 22px; }
@@ -238,7 +266,12 @@
 .racer-win-burst { font-size: 34px; letter-spacing: 4px; }
 .racer-win-card h2 { font-size: 30px; margin: 6px 0; color: #ef6aab; }
 .racer-win-face { font-size: 66px; }
-.racer-win-time { font-size: 18px; font-weight: 800; color: #4a5a6a; margin: 4px 0 18px; }
+.racer-win-time { font-size: 16px; font-weight: 700; color: #6a7a8a; margin: 4px 0 18px; }
+.racer-win-sub { font-size: 18px; font-weight: 800; color: #4a5a6a; margin: 2px 0 10px; }
+.racer-win-table { list-style: none; padding: 0; margin: 0 auto 6px; max-width: 280px; text-align: left; }
+.racer-win-table li { display: flex; align-items: center; gap: 10px; padding: 4px 10px; border-radius: 12px; font-size: 18px; color: #4a5a6a; }
+.racer-win-table li.me { background: #fff3c4; }
+.racer-win-name { flex: 1; font-weight: 800; }
 .racer-win-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .racer-primary, .racer-ghost {
   border: none;

@@ -13,7 +13,8 @@ import { recordResultFor } from '@shared/profile/results';
 import { useParty } from '@shared/party/PartyContext';
 import { createRaceCore, takeWorldSnapshot, type RaceMode } from '../domain/race';
 import { useRacerNet } from '../net/useRacerNet';
-import { DRIVERS, driverById, lookOf, ModeScreen, PickScreen, RacerLobby, type Driver } from './RacerSetup';
+import { DRIVERS, driverById, lookOf, rivalsFor, type Driver } from './cast';
+import { ModeScreen, PickScreen, RacerLobby } from './RacerSetup';
 import { Track3D, type RaceCtx } from './Track3D';
 import { WinOverlay } from './WinOverlay';
 
@@ -35,7 +36,11 @@ export function RacerPage() {
   // The ticket gate guarantees a signed-in name; no fallback of our own.
   const myName = profile.profile.name.trim();
 
+  // The live race: the loop mutates it every frame through the ref, and the
+  // same object sits in state so a render (the win card, the scoreboard's
+  // first picture) reads it without touching the ref.
   const ctxRef = useRef<RaceCtx | null>(null);
+  const [race, setRace] = useState<RaceCtx | null>(null);
   const net = useRacerNet({
     name: myName,
     driver: driver.id,
@@ -50,21 +55,25 @@ export function RacerPage() {
   const startRace = useCallback(
     (d: Driver, m: RaceMode) => {
       const myLook = lookOf(d);
+      let ctx: RaceCtx;
       if (m === 'solo') {
-        ctxRef.current = {
-          ...createRaceCore('solo', 0, TARGET, Math.random),
-          looks: [myLook],
-          names: [myName],
+        const rivals = rivalsFor(d);
+        ctx = {
+          ...createRaceCore('solo', 0, TARGET, Math.random, { rivals: rivals.length }),
+          looks: [myLook, ...rivals.map((r) => lookOf(r, r.rival))],
+          names: [myName, ...rivals.map((r) => r.rival)],
         };
       } else {
         const isHost = net.role === 'host';
-        const theirLook = lookOf(driverById(net.theirDriver ?? 'unicorn'));
-        ctxRef.current = {
+        const theirLook = lookOf(driverById(net.theirDriver ?? 'unicorn'), net.theirName);
+        ctx = {
           ...createRaceCore('net', isHost ? 0 : 1, TARGET, Math.random),
           looks: isHost ? [myLook, theirLook] : [theirLook, myLook],
           names: isHost ? [myName, net.theirName] : [net.theirName, myName],
         };
       }
+      ctxRef.current = ctx;
+      setRace(ctx);
       setRaceKey((k) => k + 1);
       setPhase('race');
     },
@@ -102,6 +111,7 @@ export function RacerPage() {
     if (net.code) party.closeTable(net.code);
     net.leave();
     ctxRef.current = null;
+    setRace(null);
     lastStartRef.current = 0;
     setPhase('mode');
   };
@@ -163,10 +173,8 @@ export function RacerPage() {
   // race | over
   return (
     <Shell onMenu={leaveToMenu}>
-      <Track3D key={raceKey} ctxRef={ctxRef} net={net} onOver={finishRace} />
-      {phase === 'over' && ctxRef.current && (
-        <WinOverlay ctx={ctxRef.current} onAgain={playAgain} onMenu={leaveToMenu} />
-      )}
+      {race && <Track3D key={raceKey} ctxRef={ctxRef} start={race} net={net} onOver={finishRace} />}
+      {phase === 'over' && race && <WinOverlay ctx={race} onAgain={playAgain} onMenu={leaveToMenu} />}
     </Shell>
   );
 }

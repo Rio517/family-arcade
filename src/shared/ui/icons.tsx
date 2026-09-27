@@ -285,6 +285,10 @@ export const SparkleIcon = (p: IconProps) =>
     p,
   );
 
+/** A five-pointed star — star power in Rainbow Racer. */
+export const StarIcon = (p: IconProps) =>
+  svg(<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.5Z" />, p);
+
 /** A coin with a star stamp — score counters in the kid games. */
 export const CoinIcon = (p: IconProps) =>
   svg(
