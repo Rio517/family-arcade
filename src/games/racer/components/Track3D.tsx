@@ -5,7 +5,7 @@
  * only shuttles input in, frames out, and messages to the net layer.
  */
 import { useEffect, useRef, useState } from 'react';
-import { CoinIcon, StarIcon } from '@shared/ui/icons';
+import { CoinIcon, StarIcon, WingIcon } from '@shared/ui/icons';
 import { stepRace, takeWorldSnapshot, type RaceCore, type RemoteInput } from '../domain/race';
 import type { FlightInput } from '../domain/flight';
 import type { RacerLook, RacerScene } from '../three/scene';
@@ -30,6 +30,8 @@ interface Hud {
   scores: number[];
   target: number;
   tier: number;
+  /** Whole seconds of wings power-up left (0 when off). */
+  wings: number;
   countdown: number;
   elapsed: number;
   racing: boolean;
@@ -44,6 +46,7 @@ function hudOf(c: RaceCtx): Hud {
     scores: [...c.scores],
     target: c.target,
     tier: c.karts[c.myIndex]?.tier ?? 0,
+    wings: Math.ceil(c.karts[c.myIndex]?.wingTime ?? 0),
     countdown: c.countdown > 0 ? Math.ceil(c.countdown) : 0,
     elapsed: c.elapsed,
     racing: c.status === 'racing',
@@ -206,6 +209,15 @@ export function Track3D({
 
   return (
     <div className="racer-stage">
+      <div
+        ref={mountRef}
+        className="racer-canvas"
+        onPointerDown={onPointer}
+        onPointerMove={onPointer}
+        onPointerUp={onPointer}
+        onPointerCancel={onPointer}
+        onPointerLeave={onPointer}
+      />
       <div className="racer-hud">
         {hud.mode === 'net' && net.status !== 'connected' && net.status !== 'idle' && (
           <span className="racer-hud-conn">⚠️ {net.statusDetail ?? 'reconnecting…'}</span>
@@ -217,17 +229,22 @@ export function Track3D({
             style={{ borderColor: `#${look.color.toString(16).padStart(6, '0')}` }}
             data-testid={`racer-score-${i}`}
           >
-            <span className="racer-score-face">{look.emoji}</span>
+            <img className="racer-score-face" src={look.portrait} alt="" />
             <span className="racer-score-name">{i === hud.myIndex ? 'You' : hud.names[i]}</span>
-            <CoinIcon size={18} /> <b>{hud.scores[i]}</b>
+            <CoinIcon size={16} /> <b>{hud.scores[i]}</b>
             <span className="racer-score-target">/{hud.target}</span>
           </span>
         ))}
         {hud.tier > 0 && (
           <span className="racer-power" data-testid="racer-power" aria-label={`Star power ${hud.tier} of 3`}>
             {Array.from({ length: hud.tier }, (_, i) => (
-              <StarIcon key={i} size={18} />
+              <StarIcon key={i} size={16} />
             ))}
+          </span>
+        )}
+        {hud.wings > 0 && (
+          <span className="racer-power racer-wings" data-testid="racer-wings" aria-label={`Big wings for ${hud.wings} more seconds`}>
+            <WingIcon size={18} /> {hud.wings}
           </span>
         )}
         <span className="racer-hud-time">{hud.elapsed.toFixed(1)}s</span>
@@ -242,19 +259,11 @@ export function Track3D({
           Go!
         </div>
       )}
-      <div
-        ref={mountRef}
-        className="racer-canvas"
-        onPointerDown={onPointer}
-        onPointerMove={onPointer}
-        onPointerUp={onPointer}
-        onPointerCancel={onPointer}
-        onPointerLeave={onPointer}
-      />
-      <p className="racer-hint">
-        Steer with the left and right arrows, climb and dive with up and down. On a tablet, touch the
-        picture: left and right to turn, high to climb, low to dive. Rainbow rings give you a burst of
-        speed; stars make you bigger and faster.
+      {/* Fades once the racer has had a few seconds to get their bearings —
+          driven by `hud.elapsed`, already sampled a few times a second above,
+          rather than a timer of its own. */}
+      <p className={`racer-hint${hud.racing && hud.elapsed > 4.5 ? ' racer-hint-faded' : ''}`}>
+        Touch left/right to turn · high to climb · low to dive · Keys: ←→ turn, ↑↓ climb/dive
       </p>
     </div>
   );

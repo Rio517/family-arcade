@@ -50,10 +50,10 @@ export function cellOf(v: number): number {
   return Math.floor(v / CELL);
 }
 
-/** The ring in a cell, if it has one (about two in five do). The start cell always does. */
+/** A loose ring in a cell, off the road, if it has one (about one in four do). The start cell always does. */
 export function ringInCell(cx: number, cz: number): Ring | null {
   const start = cx === 0 && cz === 0;
-  if (!start && cellNoise(cx, cz, 1) > 0.42) return null;
+  if (!start && cellNoise(cx, cz, 1) > 0.24) return null;
   if (start) {
     // A ring straight ahead of the start line, so the first thing a child
     // sees is something to fly through.
@@ -99,6 +99,7 @@ export function ringsNear(x: number, z: number, radius: number): Ring[] {
       if (ring && Math.hypot(ring.x - x, ring.z - z) <= radius) out.push(ring);
     }
   }
+  if (radius <= CELL) out.push(...trailRingsNear(x, z, radius));
   return out;
 }
 
@@ -108,4 +109,111 @@ export function ringAt(x: number, y: number, z: number): Ring | null {
     if (Math.hypot(ring.x - x, ring.y - y, ring.z - z) <= RING_RADIUS) return ring;
   }
   return null;
+}
+
+// ── the rainbow road ───────────────────────────────────────────────────────
+//
+// A track to follow through the open sky. It starts at the start line and
+// winds on forever: each point is a fixed step on from the last, turning a
+// little (the turn itself changes slowly, so the road sweeps rather than
+// zigzags) and rising and falling gently. Points are computed once, in
+// order, and kept, so the same index is the same point on every device.
+// Flying off the road is allowed; the road is where the coins and the
+// rings are thickest.
+
+/** Distance between road points. */
+export const TRAIL_STEP = 40;
+/** A rainbow ring hangs over the road every this many points. */
+export const TRAIL_RING_EVERY = 6;
+
+export interface TrailPoint {
+  x: number;
+  y: number;
+  z: number;
+  /** Direction of travel here. */
+  heading: number;
+}
+
+const trail: TrailPoint[] = [{ x: 0, y: CRUISE_ALTITUDE, z: 0, heading: 0 }];
+/** Road point indices by sky cell, so a position finds its road without a hint. */
+const trailCells = new Map<string, number[]>([['0:0', [0]]]);
+let trailTurn = 0;
+
+export function trailPoint(i: number): TrailPoint {
+  const n = Math.max(0, Math.floor(i));
+  while (trail.length <= n) {
+    const k = trail.length;
+    const prev = trail[k - 1];
+    // The first stretch runs straight and level out of the start, through
+    // the first ring; after that it sweeps left and right, up and down.
+    const wobble = k < 4 ? 0 : (cellNoise(k, 7, 31) - 0.5) * 0.24;
+    trailTurn = trailTurn * 0.82 + wobble;
+    const heading = prev.heading + trailTurn;
+    const ramp = Math.min(1, Math.max(0, (k - 3) / 6));
+    const swell = Math.sin(k * 0.17) * 14 + Math.sin(k * 0.071 + 1.3) * 10 - Math.sin(1.3) * 10;
+    const y = CRUISE_ALTITUDE + swell * ramp;
+    const point = {
+      x: prev.x + Math.sin(heading) * TRAIL_STEP,
+      y: Math.max(SKY_FLOOR + 6, Math.min(SKY_CEILING - 12, y)),
+      z: prev.z + Math.cos(heading) * TRAIL_STEP,
+      heading,
+    };
+    trail.push(point);
+    const key = `${cellOf(point.x)}:${cellOf(point.z)}`;
+    const list = trailCells.get(key);
+    if (list) list.push(k);
+    else trailCells.set(key, [k]);
+  }
+  return trail[n];
+}
+
+/** Road points built so far that lie in the cells around a position. */
+function trailIndicesNear(x: number, z: number): number[] {
+  const out: number[] = [];
+  const cx = cellOf(x);
+  const cz = cellOf(z);
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dz = -1; dz <= 1; dz++) out.push(...(trailCells.get(`${cx + dx}:${cz + dz}`) ?? []));
+  }
+  return out;
+}
+
+/**
+ * The road point nearest a position. `hint` is the index last found for the
+ * same racer; the road is built out to a little past it, and the search
+ * covers the points around the hint and every road point in nearby cells.
+ */
+export function nearestTrailIndex(x: number, z: number, hint = 0): number {
+  const h = Math.max(0, Math.floor(hint));
+  trailPoint(h + 40);
+  let best = h;
+  let bestD = Infinity;
+  const consider = (i: number) => {
+    const p = trail[i];
+    const d = (p.x - x) ** 2 + (p.z - z) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  };
+  for (let i = Math.max(0, h - 40); i <= h + 40; i++) consider(i);
+  for (const i of trailIndicesNear(x, z)) consider(i);
+  return best;
+}
+
+/** The ring over the road at point i, if there is one there. */
+export function trailRing(i: number): Ring | null {
+  if (i <= 0 || i % TRAIL_RING_EVERY !== 0) return null;
+  const p = trailPoint(i);
+  return { id: `t:${i}`, x: p.x, y: p.y, z: p.z, heading: p.heading };
+}
+
+/** Road rings already built near a position (the road is built ahead of racers). */
+function trailRingsNear(x: number, z: number, radius: number): Ring[] {
+  const out: Ring[] = [];
+  for (const i of trailIndicesNear(x, z)) {
+    const r = trailRing(i);
+    if (r && Math.hypot(r.x - x, r.z - z) <= radius) out.push(r);
+  }
+  return out;
 }

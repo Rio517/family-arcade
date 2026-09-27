@@ -198,9 +198,17 @@ What that became (built, in `src/games/racer/`):
   a while, then back down a step at a time. The fairy's wings grow instead of
   her. Bigger racers bump smaller ones aside (`domain/flight.ts`).
 - **Rainbow rings** give a burst of speed, once per ring.
+- **A rainbow road to follow.** An endless, gently winding road runs through
+  the open sky with a ring over it every few hundred metres. Most coins and
+  half the power-ups line it, and a pink arrow points back to it when you
+  stray. Flying anywhere else is still allowed (`domain/sky.ts`).
+- **Three power-ups:** a gold star (a tier, as above), big wings (bigger
+  wings and more speed for ten seconds; the bunny's cloud grows a pair), and
+  a coin fan (a line of coins appears straight ahead) (`domain/pickups.ts`).
 - **One player races three computer rivals** — everyone you didn't pick —
   with a kindness rule: rivals ease off when ahead and push on when behind,
-  stay near the player, and never take their last coin while ahead. Tested
+  stay near the player, never take their last coin while ahead, and give the
+  player a four-second head start when they draw level on it. Tested
   with a simulated clumsy child: they win more often than not, and every
   loss is by one coin (`domain/rivals.ts`, `domain/race.test.ts`).
 - **Help with height**, the hard part of flying for a young child: coins
@@ -208,8 +216,8 @@ What that became (built, in `src/games/racer/`):
   eases toward the pickup ahead. Steering stays the child's.
 
 Not yet built, from the same brief: **shells underwater** as the sea-level
-power-up (and so an underwater world, and the mermaid). Earlier ideas still
-open: the six-animal growth ladder, and a Rainbow Road track.
+power-up (and so an underwater world, and the mermaid). Still open from
+earlier: the six-animal growth ladder.
 
 ## Decided (by the lead designer, 2026-08-23)
 

@@ -232,7 +232,7 @@ describe('<RacerPage> — solo setup flow', () => {
     // The HUD: me and three computer rivals (everyone I didn't pick), each
     // with a coin count of 0 out of 20, and the elapsed-time readout.
     const mine = screen.getByTestId('racer-score-0');
-    expect(mine).toHaveTextContent('🧚');
+    expect(mine.querySelector('img')?.getAttribute('src')).toContain('fairy');
     expect(mine).toHaveTextContent('You');
     expect(mine).toHaveTextContent('0/20');
     for (const i of [1, 2, 3]) expect(screen.getByTestId(`racer-score-${i}`)).toHaveTextContent('0/20');

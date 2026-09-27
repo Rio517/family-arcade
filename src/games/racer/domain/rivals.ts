@@ -128,7 +128,8 @@ export function steerRival(
 function aim(brain: RivalBrain, me: Flyer, target: { x: number; y: number; z: number }): FlightInput {
   const want = Math.atan2(target.x - me.x, target.z - me.z);
   const wobble = Math.sin(brain.wander * 1.7) * (1 - brain.skill) * 0.5;
-  const steer = Math.max(-1, Math.min(1, angleDiff(me.heading, want) * (1.2 + brain.skill) + wobble));
+  // A positive steer is a right turn, which lowers the heading (see flight.ts).
+  const steer = Math.max(-1, Math.min(1, -angleDiff(me.heading, want) * (1.2 + brain.skill) + wobble));
   const ty = Math.max(SKY_FLOOR, Math.min(SKY_CEILING, target.y));
   const lift = Math.max(-1, Math.min(1, (ty - me.y) / 12));
   return { steer, lift };

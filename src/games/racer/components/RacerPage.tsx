@@ -182,12 +182,17 @@ export function RacerPage() {
 function Shell({ children, onMenu }: { children: React.ReactNode; onMenu: () => void }) {
   return (
     <div className="racer-root">
-      <div className="racer-topbar">
-        <button className="racer-back" onClick={onMenu} data-testid="racer-back">‹ Menu</button>
-        <span className="racer-title-mini">Rainbow Racer</span>
+      {/* Floating chrome, not a boxed top bar, so the race stage below can go
+          edge to edge. Kept un-positioned itself (see racer.css) so a
+          fixed-position win card can still bubble straight up past the
+          app-wide party pill. */}
+      <button className="racer-round-btn" onClick={onMenu} data-testid="racer-back" aria-label="Menu">
+        <span aria-hidden="true">‹</span>
+      </button>
+      <div className="racer-fs-slot">
         <FullscreenButton />
       </div>
-      {children}
+      <div className="racer-content">{children}</div>
     </div>
   );
 }

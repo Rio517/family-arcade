@@ -289,6 +289,16 @@ export const SparkleIcon = (p: IconProps) =>
 export const StarIcon = (p: IconProps) =>
   svg(<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.5Z" />, p);
 
+/** A feathered wing — the big-wings power-up in Rainbow Racer. */
+export const WingIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M4 17c1.5-6.5 6.5-11 16-12-1 3-2.6 5.2-4.8 6.6 1.3.1 2.3 0 3.3-.4-1.4 2.4-3.4 3.8-6 4.3.8.4 1.7.5 2.7.4-2.6 2-6.4 2.4-11.2 1.1Z" />
+      <path d="M7.5 15.2c2.6-2.6 5.6-4.8 9-6.4" />
+    </>,
+    p,
+  );
+
 /** A coin with a star stamp — score counters in the kid games. */
 export const CoinIcon = (p: IconProps) =>
   svg(

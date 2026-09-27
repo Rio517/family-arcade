@@ -1,91 +1,222 @@
 /* Rainbow Racer — a bright 3D kart game. Scoped under .racer- so it never
-   leaks into the rest of the console. */
+   leaks into the rest of the console.
+
+   Layout note: `.racer-root` and `.racer-content` are deliberately left
+   un-positioned (no `position`/`z-index`) so they never open a new stacking
+   context. `.racer-win` (z-index 60) and the race stage's fixed layers rely
+   on bubbling straight up to compare against the app-wide Party pill
+   (`.party-root`, z-index 40, rendered outside this game entirely) — wrap
+   either in a positioned ancestor with its own z-index and the win card can
+   silently end up UNDER the party pill again (this happened once already).
+*/
 
 .racer-root {
+  --r-ink: #2b2a45;
+  --r-muted: #5c6b85;
+  --r-pink: #ff5fa8;
+  --r-pink-text: #c6297d;
+  --r-purple: #8b5cf6;
+  --r-blue: #3fa9ff;
+  --r-blue-ink: #1f6fae;
+  --r-yellow: #ffcf3d;
+  --r-green: #34c973;
+  --r-sky-top: #7ec8ff;
+  --r-sky-mid: #bfe6ff;
+  --r-sky-low: #eafff3;
+
   min-height: 100vh;
-  padding: max(12px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom));
-  color: #34324f;
+  min-height: 100dvh;
+  color: var(--r-ink);
+  font-family: ui-rounded, 'SF Pro Rounded', 'Comic Sans MS', -apple-system, system-ui, sans-serif;
   background:
-    radial-gradient(900px 500px at 15% -10%, rgba(120, 200, 255, 0.55), transparent 60%),
-    radial-gradient(900px 500px at 100% 110%, rgba(120, 230, 160, 0.5), transparent 60%),
-    linear-gradient(160deg, #eaf6ff, #f0fff2);
-  font-family: 'Comic Sans MS', -apple-system, system-ui, sans-serif;
+    radial-gradient(130px 44px at 10% 14%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(100px 34px at 62% 9%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(120px 40px at 88% 20%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(90px 30px at 32% 28%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, var(--r-sky-top) 0%, var(--r-sky-mid) 55%, var(--r-sky-low) 100%);
+  background-repeat: no-repeat;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .racer-root { animation: racer-clouds-drift 70s linear infinite; }
+  @keyframes racer-clouds-drift {
+    from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0; }
+    to { background-position: -70px 12px, 90px -8px, -130px 6px, 80px 10px, 0 0; }
+  }
 }
 
-.racer-topbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 1040px;
-  margin: 0 auto 12px;
+.racer-content {
+  padding: max(64px, calc(env(safe-area-inset-top) + 56px)) 16px max(28px, env(safe-area-inset-bottom));
 }
 
-.racer-back {
+/* ----- floating chrome: menu (top-left) + fullscreen (top-right) -----
+   Fixed and above everything in the game (but below the app-wide party
+   pill), so they read the same on every screen — mode, picker, lobby, race. */
+.racer-round-btn {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 20;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.85);
-  color: #3f7ea0;
-  font-weight: 800;
-  font-size: 16px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(63, 126, 160, 0.18);
-}
-.racer-back:hover { background: #fff; }
-
-.racer-title-mini {
-  flex: 1;
-  text-align: center;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--r-blue-ink);
+  font-size: 24px;
   font-weight: 900;
-  font-size: 20px;
-  color: #ef6aab;
-  text-shadow: 0 1px 0 #fff;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(20, 40, 70, 0.28);
+  transition: transform 0.12s ease, background 0.12s ease;
 }
+.racer-round-btn:hover { background: #fff; transform: translateY(-1px); }
+.racer-round-btn:active { transform: translateY(1px) scale(0.96); }
 
-/* ----- pick screen ----- */
-.racer-setup { max-width: 900px; margin: 0 auto; text-align: center; }
+.racer-fs-slot {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 20;
+}
+.racer-fs-slot .fs-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--r-blue-ink);
+  opacity: 1;
+  box-shadow: 0 6px 16px rgba(20, 40, 70, 0.28);
+}
+.racer-fs-slot .fs-btn:hover { background: #fff; opacity: 1; }
+
+/* ----- shared setup head: title + subtitle (mode + pick screens) ----- */
+.racer-setup {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* The window, less the top and bottom padding and the party pill's row. */
+  min-height: calc(100vh - 170px);
+  min-height: calc(100dvh - 170px);
+}
+.racer-setup-head { margin-bottom: 6px; }
+.racer-arc {
+  width: min(420px, 86vw);
+  height: min(210px, 43vw);
+  margin: 0 auto -18px;
+  border-radius: 999px 999px 0 0;
+  /* Six concentric bands, red outside, like a real rainbow. */
+  background: radial-gradient(
+    circle farthest-side at 50% 100%,
+    transparent 0 56%,
+    var(--r-purple) 56% 63.5%,
+    var(--r-blue) 63.5% 71%,
+    var(--r-green) 71% 78.5%,
+    var(--r-yellow) 78.5% 86%,
+    #ff9a4a 86% 93.5%,
+    var(--r-pink) 93.5% 100%
+  );
+  opacity: 0.95;
+}
 .racer-setup-head h1 {
-  font-size: clamp(28px, 5vw, 46px);
-  margin: 8px 0 4px;
-  color: #ef6aab;
-  text-shadow: 0 2px 0 #fff, 0 4px 14px rgba(239, 106, 171, 0.25);
+  position: relative;
+  font-size: clamp(32px, 7vw, 58px);
+  font-weight: 900;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg, var(--r-pink), #ff8a3d, #f2b400, #1fa957, #2088e0, var(--r-purple));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.92);
+  paint-order: stroke fill;
+  filter: drop-shadow(0 8px 16px rgba(60, 90, 150, 0.3));
 }
 .racer-setup-head p {
-  font-size: clamp(15px, 2.4vw, 20px);
+  font-size: clamp(15px, 2.4vw, 19px);
   font-weight: 700;
-  color: #5a6a7a;
-  margin: 0 0 22px;
+  color: var(--r-muted);
+  margin: 0 0 26px;
 }
+
+/* ----- pick screen: collectible character cards ----- */
 .racer-cast {
+  /* Full width inside the centred column, so the grid can wrap. */
+  width: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 16px;
-  max-width: 720px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 18px;
+  max-width: 760px;
   margin: 0 auto;
 }
 .racer-cast-btn {
+  --rc: #6a7a8a;
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 22px 14px;
-  border: 4px solid;
-  border-radius: 24px;
-  background: linear-gradient(160deg, #fff, #f2f9ff);
+  min-height: 56px;
+  padding: 22px 14px 20px;
+  border: none;
+  border-radius: 26px;
+  background: linear-gradient(165deg, #fff 0%, color-mix(in srgb, var(--rc) 12%, #fff) 100%);
   cursor: pointer;
-  box-shadow: 0 8px 22px rgba(63, 100, 160, 0.16);
-  transition: transform 0.12s ease;
+  box-shadow:
+    inset 0 0 0 3px color-mix(in srgb, var(--rc) 55%, #fff),
+    0 8px 0 0 color-mix(in srgb, var(--rc) 35%, #cfd8e3),
+    0 18px 28px rgba(40, 60, 100, 0.2);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.racer-cast-btn:hover { transform: translateY(-4px) scale(1.03); }
-.racer-cast-emoji { font-size: 58px; line-height: 1; }
-.racer-cast-name { font-size: 20px; font-weight: 900; }
-.racer-cast-flies { font-size: 14px; font-weight: 700; color: #6a7a8a; }
+.racer-cast-btn::after {
+  content: '';
+  position: absolute;
+  top: -40%;
+  left: -20%;
+  width: 55%;
+  height: 180%;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 60%);
+  transform: rotate(20deg);
+  pointer-events: none;
+}
+.racer-cast-btn:hover { transform: translateY(-4px); }
+.racer-cast-btn:active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 0 0 3px color-mix(in srgb, var(--rc) 55%, #fff),
+    0 4px 0 0 color-mix(in srgb, var(--rc) 35%, #cfd8e3),
+    0 10px 16px rgba(40, 60, 100, 0.18);
+}
+.racer-cast-badge {
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 34% 28%, #fff, color-mix(in srgb, var(--rc) 55%, #fff) 72%);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15), inset 0 -4px 8px rgba(0, 0, 0, 0.08);
+}
+.racer-cast-pic {
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 6px rgba(40, 60, 100, 0.25));
+}
+.racer-cast-name { font-size: 20px; font-weight: 900; color: var(--rc); }
+.racer-cast-flies { font-size: 14px; font-weight: 700; color: var(--r-muted); }
 
-/* ----- mode select ----- */
+/* ----- mode select: chunky candy buttons ----- */
 .racer-choices {
+  width: 100%;
   display: flex;
   flex-wrap: wrap;
-  gap: 18px;
+  gap: 20px;
   justify-content: center;
 }
 .racer-big-btn {
@@ -93,23 +224,36 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  min-width: 240px;
-  padding: 26px 22px;
-  border: 4px solid #fff;
-  border-radius: 26px;
-  background: linear-gradient(160deg, #d7f0ff, #eafaff);
+  min-width: 220px;
+  min-height: 56px;
+  padding: 26px 22px 22px;
+  border: none;
+  border-radius: 28px;
+  background: linear-gradient(165deg, #fff, #eaf6ff);
   cursor: pointer;
-  box-shadow: 0 10px 26px rgba(63, 126, 160, 0.22);
-  transition: transform 0.12s ease;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.65), 0 8px 0 0 #bfe0f2, 0 18px 28px rgba(40, 80, 130, 0.22);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.racer-big-btn:hover { transform: translateY(-4px) scale(1.02); }
-.racer-big-emoji { font-size: 54px; line-height: 1; }
-.racer-big-label { font-size: 24px; font-weight: 900; color: #3f7ea0; }
-.racer-big-sub { font-size: 14px; font-weight: 700; color: #6a7a8a; }
+.racer-big-btn:hover { transform: translateY(-3px); }
+.racer-big-btn:active {
+  transform: translateY(3px);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.65), 0 4px 0 0 #bfe0f2, 0 10px 16px rgba(40, 80, 130, 0.2);
+}
+.racer-big-pics { display: flex; justify-content: center; }
+.racer-big-pic {
+  width: 104px;
+  height: 104px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 6px rgba(40, 80, 130, 0.25));
+}
+.racer-big-pic + .racer-big-pic { margin-left: -22px; }
+.racer-big-label { font-size: 22px; font-weight: 900; color: var(--r-blue-ink); }
+.racer-big-sub { font-size: 14px; font-weight: 700; color: var(--r-muted); }
 
 /* ----- lobby ----- */
+.racer-lobby-pic { display: block; width: 110px; height: 110px; margin: 0 auto 4px; object-fit: contain; }
 .racer-lobby {
-  max-width: 460px;
+  max-width: 440px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -119,24 +263,24 @@
 .racer-lobby-card {
   width: 100%;
   text-align: center;
-  background: linear-gradient(160deg, #fff, #eef7ff);
-  border: 4px solid #fff;
-  border-radius: 24px;
-  padding: 20px 22px;
-  box-shadow: 0 8px 22px rgba(63, 100, 160, 0.16);
+  background: linear-gradient(165deg, #fff, #eef8ff);
+  border: none;
+  border-radius: 26px;
+  padding: 22px 22px 24px;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.65), 0 8px 0 0 #d7e9f5, 0 16px 28px rgba(40, 80, 130, 0.18);
   display: flex;
   flex-direction: column;
   gap: 12px;
   align-items: center;
 }
-.racer-lobby-card h2 { margin: 0; color: #3f7ea0; font-size: 22px; }
-.racer-lobby-card p { margin: 0; font-size: 14px; font-weight: 700; color: #6a7a8a; }
-.racer-lobby-status { color: #ef6aab !important; }
+.racer-lobby-card h2 { margin: 0; color: var(--r-blue-ink); font-size: 22px; }
+.racer-lobby-card p { margin: 0; font-size: 14px; font-weight: 700; color: var(--r-muted); }
+.racer-lobby-status { color: var(--r-pink-text) !important; font-weight: 800; }
 .racer-code {
   font-size: 44px;
   font-weight: 900;
   letter-spacing: 10px;
-  color: #ef6aab;
+  color: var(--r-pink-text);
   background: #fff0f8;
   border-radius: 16px;
   padding: 10px 8px 10px 18px;
@@ -151,61 +295,127 @@
   padding: 10px 14px;
   width: 100%;
   max-width: 260px;
+  color: var(--r-ink);
+  background: #fff;
 }
 .racer-code-input { font-size: 32px; letter-spacing: 10px; text-transform: uppercase; }
 
-/* ----- race stage ----- */
-.racer-stage { max-width: 1040px; margin: 0 auto; position: relative; }
+/* ----- candy CTA buttons (lobby + win card) ----- */
+.racer-primary,
+.racer-ghost {
+  border: none;
+  font-family: inherit;
+  font-weight: 900;
+  font-size: 17px;
+  padding: 14px 26px;
+  border-radius: 999px;
+  cursor: pointer;
+  min-height: 56px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+.racer-primary {
+  background: linear-gradient(90deg, var(--r-pink), var(--r-purple));
+  color: #fff;
+  box-shadow: 0 6px 0 0 #a23e86, 0 14px 22px rgba(150, 80, 180, 0.35);
+}
+.racer-primary:hover { filter: brightness(1.06); }
+.racer-primary:active { transform: translateY(4px); box-shadow: 0 2px 0 0 #a23e86, 0 8px 14px rgba(150, 80, 180, 0.3); }
+.racer-ghost {
+  background: #eaf3ff;
+  color: var(--r-blue-ink);
+  box-shadow: 0 6px 0 0 #c8dcee;
+}
+.racer-ghost:hover { background: #dcecff; }
+.racer-ghost:active { transform: translateY(4px); box-shadow: 0 2px 0 0 #c8dcee; }
+
+/* ----- race stage: full-bleed canvas + floating overlays ----- */
+.racer-stage { position: relative; }
 
 .racer-canvas {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  border-radius: 26px;
-  overflow: hidden;
-  border: 6px solid #fff;
-  box-shadow: 0 16px 40px rgba(40, 80, 120, 0.28);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   touch-action: none;
   cursor: pointer;
-  background: #9fd8ff;
+  background: linear-gradient(180deg, #79c7ff 0%, #bfe6ff 55%, #eafff3 100%);
+  z-index: 0;
 }
 .racer-canvas canvas { display: block; width: 100% !important; height: 100% !important; }
 
 .racer-hud {
-  position: absolute;
-  top: 12px;
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;
+  pointer-events: none;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  max-width: calc(100% - 24px);
-  gap: 8px;
-  align-items: center;
-  padding: 6px 16px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-  font-weight: 800;
+  max-width: calc(100vw - 130px);
+  gap: 6px;
 }
 .racer-score {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 18px;
-  color: #4a5a6a;
-  padding: 2px 10px 2px 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--r-ink);
+  padding: 5px 10px 5px 6px;
   border-radius: 999px;
   border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px rgba(20, 40, 70, 0.18);
 }
-.racer-score-name { font-size: 14px; font-weight: 800; max-width: 7em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.racer-power { display: inline-flex; gap: 2px; color: #f5a000; fill: #ffd54a; }
+.racer-score.me { background: rgba(255, 244, 196, 0.92); box-shadow: 0 4px 12px rgba(20, 40, 70, 0.18), 0 0 0 2px #ffd54a; }
+.racer-score-face { width: 26px; height: 26px; object-fit: contain; }
+/* A phone upright: picture and coins only, so four racers fit in two rows. */
+@media (max-width: 520px) {
+  .racer-score-name,
+  .racer-score-target { display: none; }
+}
+.racer-wings { color: #2f8fe0; }
+.racer-score-name { font-size: 14px; font-weight: 800; max-width: 6.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.racer-score b { font-size: 16px; }
+.racer-score-target { font-size: 14px; color: #7c8aa0; }
+.racer-power {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  color: #f5a000;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  padding: 5px 8px;
+  box-shadow: 0 4px 12px rgba(20, 40, 70, 0.18);
+}
 .racer-power svg { fill: #ffd54a; }
+.racer-hud-time {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--r-ink);
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  padding: 5px 10px;
+}
+.racer-hud-conn {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(214, 60, 60, 0.88);
+  border-radius: 999px;
+  padding: 5px 10px;
+}
 
 /* 3, 2, 1, Go! */
 .racer-countdown {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 6;
   display: grid;
@@ -214,36 +424,52 @@
   font-size: clamp(72px, 16vw, 160px);
   font-weight: 900;
   color: #fff;
-  text-shadow: 0 6px 0 #ef6aab, 0 10px 30px rgba(120, 40, 120, 0.4);
+  text-shadow: 0 6px 0 var(--r-pink), 0 10px 30px rgba(120, 40, 120, 0.4);
 }
-.racer-countdown.go { color: #ffe14a; text-shadow: 0 6px 0 #ff7a3d, 0 10px 30px rgba(160, 80, 0, 0.4); }
+.racer-countdown.go { color: var(--r-yellow); text-shadow: 0 6px 0 #ff7a3d, 0 10px 30px rgba(160, 80, 0, 0.4); }
 @media (prefers-reduced-motion: no-preference) {
   .racer-countdown { animation: racer-count 1s ease-out infinite; }
   .racer-countdown.go { animation: racer-rise 0.4s ease-out; }
   @keyframes racer-count { from { transform: scale(1.25); opacity: 0.4; } 30% { transform: scale(1); opacity: 1; } }
 }
-.racer-score.me { background: #fff3c4; box-shadow: inset 0 0 0 2px #ffd54a; }
-.racer-score-face { font-size: 22px; }
-.racer-score b { font-size: 24px; }
-.racer-score-target { font-size: 14px; color: #94a3b8; }
-.racer-hud-time { font-size: 18px; color: #6a7a8a; }
-.racer-hud-conn { font-size: 14px; font-weight: 800; color: #ef6aab; }
 
+/* Small hint chip — replaces the old help paragraph. Fades once the racer
+   has had a few seconds to get their bearings, using `hud.elapsed` (already
+   sampled in the render loop) rather than a timer of its own. Kept above
+   ~70px off the bottom so it never collides with the app-wide "Play
+   together" pill. */
 .racer-hint {
+  position: fixed;
+  left: 50%;
+  bottom: max(76px, calc(env(safe-area-inset-bottom) + 64px));
+  transform: translateX(-50%);
+  z-index: 5;
+  pointer-events: none;
+  max-width: min(94vw, 560px);
   text-align: center;
   font-weight: 700;
   font-size: 14px;
-  color: #5a6a7a;
-  margin: 10px 6px 0;
+  line-height: 1.4;
+  color: #fff;
+  background: rgba(30, 50, 80, 0.55);
+  backdrop-filter: blur(6px);
+  border-radius: 999px;
+  padding: 8px 16px;
+  margin: 0;
+  opacity: 1;
+}
+.racer-hint.racer-hint-faded { opacity: 0.25; }
+@media (prefers-reduced-motion: no-preference) {
+  .racer-hint { transition: opacity 0.7s ease; }
 }
 
-/* ----- win overlay ----- */
+/* ----- win overlay: celebratory card ----- */
 .racer-win {
   position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(30, 50, 70, 0.5);
+  background: rgba(20, 40, 70, 0.55);
   backdrop-filter: blur(4px);
   /* Overlays sit above the app-wide Party pill (.party-root, z-index 40) —
      at 20 the victory card rendered UNDER it. 60 matches .modal-backdrop. */
@@ -251,51 +477,135 @@
   padding: 20px;
 }
 .racer-win-card {
+  position: relative;
+  overflow: hidden;
   text-align: center;
-  background: linear-gradient(160deg, #fff, #eaf6ff);
-  border: 6px solid #fff;
-  border-radius: 30px;
-  padding: 28px 34px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(165deg, #fff, #eef8ff);
+  border: none;
+  border-radius: 32px;
+  padding: 30px 30px 26px;
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.7), 0 10px 0 0 #d7e9f5, 0 30px 60px rgba(20, 40, 70, 0.4);
   max-width: 460px;
+  width: 100%;
 }
 @media (prefers-reduced-motion: no-preference) {
   .racer-win-card { animation: racer-rise 0.35s ease; }
 }
 @keyframes racer-rise { from { transform: translateY(20px) scale(0.95); opacity: 0; } to { transform: none; opacity: 1; } }
-.racer-win-burst { font-size: 34px; letter-spacing: 4px; }
-.racer-win-card h2 { font-size: 30px; margin: 6px 0; color: #ef6aab; }
-.racer-win-face { font-size: 66px; }
-.racer-win-time { font-size: 16px; font-weight: 700; color: #6a7a8a; margin: 4px 0 18px; }
-.racer-win-sub { font-size: 18px; font-weight: 800; color: #4a5a6a; margin: 2px 0 10px; }
-.racer-win-table { list-style: none; padding: 0; margin: 0 auto 6px; max-width: 280px; text-align: left; }
-.racer-win-table li { display: flex; align-items: center; gap: 10px; padding: 4px 10px; border-radius: 12px; font-size: 18px; color: #4a5a6a; }
-.racer-win-table li.me { background: #fff3c4; }
-.racer-win-name { flex: 1; font-weight: 800; }
-.racer-win-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-.racer-primary, .racer-ghost {
-  border: none;
-  font-family: inherit;
-  font-weight: 900;
-  font-size: 18px;
-  padding: 12px 22px;
-  border-radius: 999px;
-  cursor: pointer;
-}
-.racer-primary {
-  background: linear-gradient(90deg, #ff9ac6, #6ad0ff);
-  color: #fff;
-  box-shadow: 0 8px 20px rgba(106, 160, 200, 0.4);
-}
-.racer-primary:hover { filter: brightness(1.05); }
-.racer-ghost { background: #e6f0ff; color: #3f6ea0; }
-.racer-ghost:hover { background: #d8e8ff; }
 
-/* Accessibility floor: no animation for anyone who asked for calm.
-   (This stylesheet was forked from unicorn's and lost this block.) */
+.racer-win-arc {
+  position: absolute;
+  top: -46px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  height: 160px;
+  border-radius: 999px 999px 0 0;
+  /* Six concentric bands, red outside, like a real rainbow. */
+  background: radial-gradient(
+    circle farthest-side at 50% 100%,
+    transparent 0 56%,
+    var(--r-purple) 56% 63.5%,
+    var(--r-blue) 63.5% 71%,
+    var(--r-green) 71% 78.5%,
+    var(--r-yellow) 78.5% 86%,
+    #ff9a4a 86% 93.5%,
+    var(--r-pink) 93.5% 100%
+  );
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Confetti is invisible until reduced-motion is off, same as the shared
+   `.burst` trick in tokens.css — a pile of frozen mid-fall confetti reads as
+   a bug, not a celebration, so it simply never appears for anyone who asked
+   for calm. */
+.racer-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.racer-confetti-piece {
+  position: absolute;
+  top: -10%;
+  left: calc(var(--i) * 4.2%);
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: hsl(calc(var(--i) * 47), 85%, 60%);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .racer-confetti-piece { animation: racer-confetti-fall 2.6s ease-in var(--d, 0s) 1 both; }
+  @keyframes racer-confetti-fall {
+    0% { opacity: 0; transform: translateY(-20px) rotate(0deg); }
+    12% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(340px) rotate(340deg); }
+  }
+}
+
+.racer-win-card h2 { position: relative; z-index: 1; font-size: 30px; font-weight: 900; margin: 10px 0 4px; color: var(--r-pink-text); }
+.racer-win-face {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 8px rgba(40, 60, 100, 0.25));
+}
+.racer-win-time { position: relative; z-index: 1; font-size: 15px; font-weight: 700; color: var(--r-muted); margin: 4px 0 16px; }
+.racer-win-sub { position: relative; z-index: 1; font-size: 17px; font-weight: 800; color: #4a5a78; margin: 2px 0 14px; }
+.racer-win-table {
+  position: relative;
+  z-index: 1;
+  list-style: none;
+  padding: 0;
+  margin: 0 auto 8px;
+  max-width: 300px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.racer-win-table li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #3a3a5c;
+  background: rgba(255, 255, 255, 0.6);
+}
+.racer-win-table li.me { background: #fff3c4; box-shadow: inset 0 0 0 2px #ffd54a; }
+.racer-win-rank {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+  background: #9aa5bd;
+}
+.racer-win-table li:nth-child(1) .racer-win-rank { background: linear-gradient(160deg, #ffe27a, #e8ab1a); color: #5a3d00; }
+.racer-win-table li:nth-child(2) .racer-win-rank { background: linear-gradient(160deg, #e7edf5, #b9c3d1); color: #39424f; }
+.racer-win-table li:nth-child(3) .racer-win-rank { background: linear-gradient(160deg, #e8b489, #b9743e); color: #4a2a0d; }
+.racer-win-row-face { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; }
+.racer-win-name { flex: 1; font-weight: 800; }
+.racer-win-btns { position: relative; z-index: 1; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* Accessibility floor: no animation for anyone who asked for calm. */
 @media (prefers-reduced-motion: reduce) {
   .racer-win-card { animation: none; }
-  .racer-big-btn, .racer-cast-btn { transition: none; }
+  .racer-big-btn,
+  .racer-cast-btn,
+  .racer-round-btn,
+  .racer-primary,
+  .racer-ghost {
+    transition: none;
+  }
 }
 
 /* Accessibility floor: keyboard focus must be visible. These candy buttons
@@ -303,9 +613,9 @@
    them — without this, tabbing through the setup showed nothing at all. */
 .racer-big-btn:focus-visible,
 .racer-cast-btn:focus-visible,
-.racer-back:focus-visible,
+.racer-round-btn:focus-visible,
 .racer-primary:focus-visible,
 .racer-ghost:focus-visible {
-  outline: 3px solid #3f7ea0;
+  outline: 3px solid var(--r-blue-ink);
   outline-offset: 3px;
 }

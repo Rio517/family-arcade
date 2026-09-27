@@ -31,6 +31,8 @@ export interface RiderPose {
   tier: number;
   /** True during a speed burst. */
   boosting: boolean;
+  /** 0..1 while a wings power-up is on: bigger wings (the bunny's cloud grows a pair). */
+  wings?: number;
 }
 
 export interface Rider {
@@ -110,6 +112,7 @@ const FLAP_FREQ_BOOST = 9.5;
 const FLAP_AMP = 0.62;
 const TIER_GROWTH = 0.22; // default whole-character growth per tier
 const FAIRY_WING_GROWTH = 0.45; // fairy's wings-only growth per tier
+const WINGS_POWER_GROWTH = 0.65; // extra wing size while a wings power-up is on
 
 /** Clamp dt so a stalled tab or a huge test dt can't blow up the easing. */
 function clampDt(dt: number): number {
@@ -151,7 +154,9 @@ function stepRig(rig: Rig, dt: number, pose: RiderPose, reducedMotion: boolean, 
   rig.anim.advance(dtc);
   const k = 1 - Math.exp(-EASE_RATE * dtc);
 
-  rig.tilt.rotation.z = rig.anim.ease('roll', -clampUnit(pose.bank) * MAX_ROLL, k, reducedMotion);
+  // Lean into the turn. Seen from behind, world +X is on the screen's left,
+  // so a right turn (bank +1) lifts +X: a positive roll about Z.
+  rig.tilt.rotation.z = rig.anim.ease('roll', clampUnit(pose.bank) * MAX_ROLL, k, reducedMotion);
   rig.tilt.rotation.x = rig.anim.ease('pitch', -clampUnit(pose.climb) * MAX_PITCH, k, reducedMotion);
 
   const scale = rig.anim.ease('scale', 1 + growth * Math.max(0, pose.tier), k, reducedMotion);
@@ -284,7 +289,12 @@ function buildFairy(color: number, seed: number, reducedMotion: boolean, disp: D
     update(dt, pose) {
       // The fairy's body never tier-scales (growth 0) — only her wings do.
       const k = stepRig(rig, dt, pose, reducedMotion, 0);
-      const wingScale = rig.anim.ease('wingScale', 1 + FAIRY_WING_GROWTH * Math.max(0, pose.tier), k, reducedMotion);
+      const wingScale = rig.anim.ease(
+        'wingScale',
+        (1 + FAIRY_WING_GROWTH * Math.max(0, pose.tier)) * (1 + WINGS_POWER_GROWTH * (pose.wings ?? 0)),
+        k,
+        reducedMotion,
+      );
       wingsPivotGroup.scale.setScalar(wingScale);
 
       if (!reducedMotion) {
@@ -601,7 +611,9 @@ function buildUnicorn(color: number, seed: number, reducedMotion: boolean, disp:
   return {
     rig,
     update(dt, pose) {
-      stepRig(rig, dt, pose, reducedMotion);
+      const k = stepRig(rig, dt, pose, reducedMotion);
+      const big = rig.anim.ease('wingsPower', 1 + WINGS_POWER_GROWTH * (pose.wings ?? 0), k, reducedMotion);
+      for (const pivot of build.wingPivots) pivot.scale.setScalar(big);
       if (!reducedMotion) {
         const flap = Math.sin(rig.anim.t * flapFreq(pose)) * FLAP_AMP;
         build.wingPivots[0].rotation.z = flap;
@@ -676,7 +688,9 @@ function buildPrincess(color: number, seed: number, reducedMotion: boolean, disp
   return {
     rig,
     update(dt, pose) {
-      stepRig(rig, dt, pose, reducedMotion);
+      const k = stepRig(rig, dt, pose, reducedMotion);
+      const big = rig.anim.ease('wingsPower', 1 + WINGS_POWER_GROWTH * (pose.wings ?? 0), k, reducedMotion);
+      for (const pivot of mount.wingPivots) pivot.scale.setScalar(big);
       if (!reducedMotion) {
         const flap = Math.sin(rig.anim.t * flapFreq(pose)) * FLAP_AMP;
         mount.wingPivots[0].rotation.z = flap;
@@ -821,6 +835,31 @@ function buildBunny(color: number, seed: number, reducedMotion: boolean, disp: D
     puffs.push({ mesh: puff, base: r, phase: hash(seed + i * 5.7) * Math.PI * 2 });
   });
 
+  // Wings for the cloud: folded away to nothing, they open while a wings
+  // power-up is on — the bunny can't grow wings, so its ride does.
+  const cloudWingMat = mat(disp, { color: 0xffffff, roughness: 0.75, side: THREE.DoubleSide });
+  const cloudTipMat = mat(disp, { color: tint.getHex(), roughness: 0.5, side: THREE.DoubleSide });
+  const cloudExtrude = { depth: 0.1, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.035, bevelSegments: 1, curveSegments: 1 };
+  const cloudWingGeo = disp.track(new THREE.ExtrudeGeometry(shapeFromOutline(scaleOutline(wingOutline(), 2.6)), cloudExtrude));
+  const cloudTipGeo = disp.track(new THREE.ExtrudeGeometry(shapeFromOutline(scaleOutline(wingTipOutline(), 2.6)), cloudExtrude));
+  const cloudWings: THREE.Group[] = [];
+  for (const side of [-1, 1]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(1.7 * side, 0.4, -0.2);
+    const wing = new THREE.Group();
+    wing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(side, 0.62, -0.3).normalize());
+    wing.rotateY(0.3 * side);
+    wing.add(new THREE.Mesh(cloudWingGeo, cloudWingMat));
+    const tip = new THREE.Mesh(cloudTipGeo, cloudTipMat);
+    tip.position.z = -0.09;
+    wing.add(tip);
+    pivot.add(wing);
+    pivot.scale.setScalar(0.001);
+    pivot.visible = false;
+    cloudGroup.add(pivot);
+    cloudWings.push(pivot);
+  }
+
   // Sits into the fluff of the top puff (peaks at y≈2.0) rather than
   // perched above it.
   const rideHeight = 1.7;
@@ -831,7 +870,13 @@ function buildBunny(color: number, seed: number, reducedMotion: boolean, disp: D
   return {
     rig,
     update(dt, pose) {
-      stepRig(rig, dt, pose, reducedMotion);
+      const k = stepRig(rig, dt, pose, reducedMotion);
+      const open = rig.anim.ease('cloudWings', pose.wings ?? 0, k, reducedMotion);
+      cloudWings.forEach((pivot, i) => {
+        pivot.visible = open > 0.02;
+        pivot.scale.setScalar(Math.max(0.001, open));
+        pivot.rotation.z = reducedMotion ? 0 : Math.sin(rig.anim.t * flapFreq(pose)) * FLAP_AMP * (i === 0 ? 1 : -1);
+      });
       if (!reducedMotion) {
         for (const p of puffs) {
           const wobble = 1 + Math.sin(rig.anim.t * 1.3 + p.phase) * 0.045;

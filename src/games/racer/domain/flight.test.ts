@@ -32,9 +32,10 @@ describe('flight', () => {
     expect(f.z).toBeGreaterThan(2000);
   });
 
-  it('turns with the stick and leans into the turn', () => {
+  it('turns right with the stick right — toward screen right, which is world -X — and leans into it', () => {
     const f = fly(createFlyer(), 1, { steer: 1, lift: 0 });
-    expect(f.heading).toBeGreaterThan(1.5);
+    expect(f.heading).toBeLessThan(-1.5);
+    expect(f.x).toBeLessThan(0);
     expect(f.bank).toBeCloseTo(1, 5);
   });
 
