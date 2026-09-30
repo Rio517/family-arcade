@@ -901,7 +901,16 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-results-body { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
 .gulp-results-round,
 .gulp-results-family { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.gulp-results-round .gulp-stats { display: block; }
+.gulp-results-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.gulp-results-me { display: flex; flex-direction: column; gap: 8px; }
+.gulp-results-me .gulp-newbest { margin: 0; }
+/* The round in four big numbers, two by two. */
+.gulp-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.gulp-tiles li { display: flex; flex-direction: column; align-items: center; padding: 8px 6px; border-radius: 16px; background: #eef2fa; text-align: center; }
+.gulp-tiles b { font-size: 24px; font-weight: 900; line-height: 1.1; color: var(--g-ink); font-variant-numeric: tabular-nums; }
+.gulp-tiles span { font-size: 14px; font-weight: 800; color: var(--g-muted); }
+.gulp-bite { margin: 0; text-align: center; font-size: 16px; font-weight: 800; color: var(--g-muted); }
+.gulp-bite b { color: var(--g-ink); }
 .gulp-results-family { padding: 10px; border-radius: 20px; background: #fffaf0; box-shadow: inset 0 0 0 2px #ffe7a3; }
 .gulp-family-head {
   display: flex;
@@ -919,7 +928,6 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 @media (min-width: 760px) {
   .gulp-modal.results { width: min(820px, 100%); }
   .gulp-results-body { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; align-items: start; }
-  .gulp-results-round .gulp-stats { margin-bottom: 0; }
 }
 
 /* The Scores dialog, held near the top so its tabs stay put when the two
@@ -1089,7 +1097,8 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   .gulp-results-list li,
   .gulp-family-list li { padding: 3px 10px 3px 3px; font-size: 15px; }
   .gulp-results-family { padding: 8px; }
-  .gulp-results-round .gulp-stats { margin: 2px 0; font-size: 15px; }
+  .gulp-tiles li { padding: 5px 4px; }
+  .gulp-tiles b { font-size: 20px; }
   .gulp-my-list li { padding: 5px 12px; }
 }
 
