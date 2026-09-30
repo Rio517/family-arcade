@@ -541,7 +541,7 @@ describe('a round against the computer is fair and fun', () => {
     only(w, [makeProp(1, 'leaning', me.x, me.z, 0), makeProp(2, 'leaning', rival.x, rival.z, 0)]);
     const massBefore = me.mass;
     const events = stepWorld(w, 1 / 60, still);
-    expect(events).toContainEqual(expect.objectContaining({ type: 'wonder', hole: 0, name: 'the Leaning Tower' }));
+    expect(events).toContainEqual(expect.objectContaining({ type: 'wonder', hole: 0, name: 'the Leaning Tower of Pisa' }));
     expect(me.score).toBeGreaterThanOrEqual(10000);
     expect(me.wonders).toBe(1);
     expect(me.mass - massBefore).toBeLessThan(1000);

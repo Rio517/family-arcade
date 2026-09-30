@@ -63,7 +63,7 @@ describe('createCity', () => {
     }
   });
 
-  it('holds more wonders on bigger maps, and the Liberty Statue on its islet every time', () => {
+  it('holds more wonders on bigger maps, and the Statue of Liberty on its islet every time', () => {
     const wonders = (map: MapId) => createCity(seededRng(2), map).props.filter((p) => KINDS[p.kind].wonder);
     expect(wonders('town').length).toBe(5);
     expect(wonders('city').length).toBe(8);
