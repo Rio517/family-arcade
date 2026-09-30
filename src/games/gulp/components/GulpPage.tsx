@@ -121,7 +121,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
   const bannerId = useRef(0);
   const lastCount = useRef(0);
   /** Things said once a round (see feedback.ts). */
-  const said = useRef<Said>({ police: false });
+  const said = useRef<Said>({ police: false, combo: false });
   /** Set once a round's result is written, so it is written once. */
   const doneRef = useRef(false);
   const [touch] = useState(() => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
@@ -178,7 +178,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     setResult(null);
     setPaused(false);
     lastCount.current = 0;
-    said.current = { police: false };
+    said.current = { police: false, combo: false };
     doneRef.current = false;
     setPhase('play');
   };

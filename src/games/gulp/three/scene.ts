@@ -172,7 +172,7 @@ export class GulpScene {
     }
 
     this.pendingFor += dt;
-    if (this.pending > 0 && this.pendingFor > 0.25) {
+    if (this.pending > 0 && this.pendingFor > 0.15) {
       this.effects.popup(this.pending, this.pendingAt);
       this.pending = 0;
       this.pendingFor = 0;

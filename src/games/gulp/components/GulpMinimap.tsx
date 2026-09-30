@@ -2,11 +2,13 @@
  * A small map in the corner: the island, each block tinted by how many
  * points are still standing on it (pale for little, warm gold and orange
  * for a lot), gold stars on the wonders, and a dot for every hole (the
- * child's big and ringed in white). Redrawn twice a second: it is a guide,
+ * child's big and ringed in white). The sea on the shore sides, the airport
+ * and the quay are drawn once and reused. Redrawn twice a second: it is a guide,
  * not a mirror.
  */
 import { useEffect, useRef } from 'react';
 import { KINDS } from '../domain/catalog';
+import type { Rect } from '../domain/city';
 import type { World } from '../domain/world';
 import { SKINS } from './skins';
 
@@ -39,27 +41,66 @@ export function GulpMinimap({ world }: { world: World }) {
     canvas.height = SIZE * ratio;
     g.scale(ratio, ratio);
 
-    const draw = () => {
-      const city = world.city;
-      // Everything the map shows: the island and any land beyond it.
-      let reach = city.land;
-      for (const l of city.extraLand) reach = Math.max(reach, Math.abs(l.x0), Math.abs(l.x1), Math.abs(l.z0), Math.abs(l.z1));
-      reach += 6;
-      const k = SIZE / (reach * 2);
-      const px = (v: number) => (v + reach) * k;
+    // What never changes in a round is drawn once into two layers: the ground
+    // under the block tints, and the airport and quay over them.
+    const city = world.city;
+    // Everything the map shows: the island and any land beyond it.
+    let reach = city.land;
+    for (const l of city.extraLand) reach = Math.max(reach, Math.abs(l.x0), Math.abs(l.x1), Math.abs(l.z0), Math.abs(l.z1));
+    // A margin wide enough to show the sea when a side has one.
+    reach += Math.max(6, city.land * 0.16);
+    const k = SIZE / (reach * 2);
+    const px = (v: number) => (v + reach) * k;
+    const layer = () => {
+      const c = document.createElement('canvas');
+      c.width = SIZE * ratio;
+      c.height = SIZE * ratio;
+      const lg = c.getContext('2d');
+      lg?.scale(ratio, ratio);
+      return { c, lg };
+    };
+    const rect = (lg: CanvasRenderingContext2D, r: Rect) => lg.fillRect(px(r.x0), px(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
 
-      g.clearRect(0, 0, SIZE, SIZE);
-      g.fillStyle = '#7fcdf0';
-      g.fillRect(0, 0, SIZE, SIZE);
-      // The countryside, then the street grid on it.
-      g.fillStyle = '#a5d98a';
-      g.fillRect(px(-city.land), px(-city.land), city.land * 2 * k, city.land * 2 * k);
-      g.fillStyle = '#6b7280';
-      g.fillRect(px(-city.half), px(-city.half), city.half * 2 * k, city.half * 2 * k);
+    const under = layer();
+    if (under.lg) {
+      const u = under.lg;
+      // Land carries on past the island except on the sides that are sea.
+      u.fillStyle = '#a5d98a';
+      u.fillRect(0, 0, SIZE, SIZE);
+      u.fillStyle = '#7fcdf0';
+      const edge = px(-city.land);
+      const far = px(city.land);
+      if (city.shores.includes('n')) u.fillRect(0, 0, SIZE, edge);
+      if (city.shores.includes('s')) u.fillRect(0, far, SIZE, SIZE - far);
+      if (city.shores.includes('w')) u.fillRect(0, 0, edge, SIZE);
+      if (city.shores.includes('e')) u.fillRect(far, 0, SIZE - far, SIZE);
+      // The street grid on the countryside.
+      u.fillStyle = '#6b7280';
+      u.fillRect(px(-city.half), px(-city.half), city.half * 2 * k, city.half * 2 * k);
       for (const l of city.extraLand) {
-        g.fillStyle = l.kind === 'islet' ? '#9ad672' : '#6b7280';
-        g.fillRect(px(l.x0), px(l.z0), (l.x1 - l.x0) * k, (l.z1 - l.z0) * k);
+        u.fillStyle = l.kind === 'islet' ? '#9ad672' : '#6b7280';
+        rect(u, l);
       }
+    }
+    const over = layer();
+    if (over.lg) {
+      const o = over.lg;
+      const field = city.airfield;
+      if (field) {
+        o.fillStyle = '#d9dde3';
+        rect(o, field.area);
+        o.fillStyle = '#5b6170';
+        rect(o, field.runway);
+      }
+      if (city.port) {
+        o.fillStyle = '#c9a677';
+        rect(o, city.port.quay);
+      }
+    }
+
+    const draw = () => {
+      g.clearRect(0, 0, SIZE, SIZE);
+      if (under.lg) g.drawImage(under.c, 0, 0, SIZE, SIZE);
 
       // Points still standing on each block.
       const worth = city.blockList.map(() => 0);
@@ -80,6 +121,8 @@ export function GulpMinimap({ world }: { world: World }) {
         g.fillStyle = heat(Math.log1p(worth[i]) / Math.log1p(top));
         g.fillRect(px(b.x) + 0.5, px(b.z) + 0.5, b.size * k - 1, b.size * k - 1);
       });
+
+      if (over.lg) g.drawImage(over.c, 0, 0, SIZE, SIZE);
 
       // Wonders still standing.
       g.font = `bold ${Math.max(10, Math.round(SIZE / 12))}px system-ui, sans-serif`;
