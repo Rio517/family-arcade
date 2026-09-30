@@ -341,7 +341,9 @@ export class Effects {
       }
     }
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }));
-    sprite.scale.set(0.072 * look.scale, 0.036 * look.scale, 1);
+    // The texture is as wide as its number: keep the letters' height, widen the sprite to match.
+    const aspect = tex.image.width / tex.image.height;
+    sprite.scale.set(0.036 * aspect * look.scale, 0.036 * look.scale, 1);
     sprite.position.copy(at);
     sprite.renderOrder = 11;
     this.group.add(sprite);
@@ -705,19 +707,23 @@ function ringTexture(): THREE.Texture {
 }
 
 /** "+8" in chunky letters of the given colour with a dark edge. */
+/** Words or a number on a transparent strip 64 high, as wide as the text needs (never cut off). */
 function textTexture(text: string, fill: string): THREE.Texture {
   const c = document.createElement('canvas');
-  c.width = 128;
+  const font = '900 44px ui-rounded, system-ui, -apple-system, sans-serif';
+  const probe = c.getContext('2d')!;
+  probe.font = font;
+  c.width = Math.max(128, Math.ceil(probe.measureText(text).width) + 24);
   c.height = 64;
   const g = c.getContext('2d')!;
-  g.font = '900 44px ui-rounded, system-ui, -apple-system, sans-serif';
+  g.font = font;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.lineWidth = 8;
   g.strokeStyle = 'rgba(40,30,10,0.85)';
-  g.strokeText(text, 64, 34);
+  g.strokeText(text, c.width / 2, 34);
   g.fillStyle = fill;
-  g.fillText(text, 64, 34);
+  g.fillText(text, c.width / 2, 34);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;

@@ -79,12 +79,13 @@ const BURN = 3;
 /** How much of an item's worth healthy food adds on top, as a health bonus. */
 const HEALTH_BONUS = 0.5;
 /**
- * On Easy the child grows a third faster, and the computer holes get less
- * from each thing they eat, in size and in points: a young player wandering
- * between meals still climbs the levels and stays in the race.
+ * How fast the child grows, and what share of each thing's size and points
+ * a computer hole gets, by level. On Easy the child grows a third faster and
+ * the rivals get 70%: a young player wandering between meals still climbs
+ * the levels and stays in the race. Medium and Hard keep a little of that.
  */
-const EASY_GROWTH = 1.35;
-const EASY_RIVAL = 0.7;
+export const CHILD_GROWTH: Record<'easy' | 'medium' | 'hard', number> = { easy: 1.35, medium: 1.15, hard: 1.05 };
+const RIVAL_SHARE: Record<'easy' | 'medium' | 'hard', number> = { easy: 0.7, medium: 0.8, hard: 0.9 };
 
 export function newHole(id: number, name: string, skin: number, isPlayer: boolean, x: number, z: number): Hole {
   return {
@@ -151,11 +152,13 @@ export function gobble(w: World, h: Hole, p: Prop, events: WorldEvent[]): void {
   if (mult > was) events.push({ type: 'combo', hole: h.id, mult });
   // A wonder scores its big bonus but grows the hole like any big thing of
   // its tier: a statue is a treat, not a jump to the top of the map.
-  const easy = w.options.difficulty === 'easy';
-  const growth = easy ? (h.isPlayer ? EASY_GROWTH : EASY_RIVAL) : 1;
+  const level = w.options.difficulty;
+  const growth = h.isPlayer ? CHILD_GROWTH[level] : RIVAL_SHARE[level];
   h.mass += ((info.wonder ? worthOf(p.size) * 2 : p.points) + bonus) * growth;
-  const share = easy && !h.isPlayer ? EASY_RIVAL : 1;
-  const gained = Math.round((p.points + bonus) * mult * (h.doubleTime > 0 ? 2 : 1) * share);
+  const share = h.isPlayer ? 1 : RIVAL_SHARE[level];
+  // A wonder's bonus is a flat treat: combos and double points do not multiply it.
+  const boost = info.wonder ? 1 : mult * (h.doubleTime > 0 ? 2 : 1);
+  const gained = Math.round((p.points + bonus) * boost * share);
   h.score += gained;
   if (h.isPlayer && info.tier <= 5) w.police.eaten += 1;
   if (info.wonder) {

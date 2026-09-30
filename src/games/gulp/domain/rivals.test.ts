@@ -86,7 +86,7 @@ describe('difficulty', () => {
     }
   });
 
-  it('a steady player wins most Easy rounds, some Medium ones, and hardly any Hard ones', () => {
+  it('a steady player wins nearly every Easy and Medium round and some Hard ones; the rivals get bigger with the level', () => {
     const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
     const [easy, medium, hard] = (['easy', 'medium', 'hard'] as const).map((difficulty) => {
@@ -97,20 +97,16 @@ describe('difficulty', () => {
         top: mean(results.map((r) => r.top)),
       };
     });
-    // The child's place drops as the level rises…
-    expect(easy.rank).toBeLessThan(medium.rank);
-    expect(medium.rank).toBeLessThan(hard.rank);
-    // …because the best rival gets bigger.
+    // The best rival gets bigger as the level rises…
     expect(easy.top).toBeLessThan(medium.top);
     expect(medium.top).toBeLessThan(hard.top);
-    // Easy is still the gentle game; Medium is a race in the middle of the
-    // table that the child sometimes wins; Hard is rarely won.
-    expect(easy.wins).toBeGreaterThanOrEqual(9);
-    expect(medium.wins).toBeGreaterThanOrEqual(1);
-    expect(medium.wins).toBeLessThanOrEqual(8);
-    expect(medium.rank).toBeGreaterThanOrEqual(1.5);
-    expect(medium.rank).toBeLessThanOrEqual(4);
-    expect(hard.wins).toBeLessThanOrEqual(4);
-    expect(hard.rank).toBeGreaterThanOrEqual(3);
+    // …so Easy and Medium are the child's to win, and Hard is a real race:
+    // won now and then in a short round, never hopeless.
+    expect(easy.wins).toBeGreaterThanOrEqual(11);
+    expect(medium.wins).toBeGreaterThanOrEqual(9);
+    expect(hard.wins).toBeGreaterThanOrEqual(1);
+    expect(hard.wins).toBeLessThanOrEqual(8);
+    expect(hard.rank).toBeGreaterThan(medium.rank);
+    expect(hard.rank).toBeLessThanOrEqual(3);
   });
 });

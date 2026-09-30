@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { seededRng } from '@shared/rng';
-import { footSize, makeProp } from './catalog';
+import { KINDS, footSize, makeProp } from './catalog';
 import { MAPS } from './city';
 import { massFor } from './growth';
 import { createBrain, steerRival } from './rivals';
@@ -109,7 +109,7 @@ describe('a round against the computer is fair and fun', () => {
     const massBefore = me.mass;
     const events = stepWorld(w, 1 / 60, still);
     expect(events).toContainEqual(expect.objectContaining({ type: 'wonder', hole: 0, name: 'the Leaning Tower of Pisa' }));
-    expect(me.score).toBeGreaterThanOrEqual(10000);
+    expect(me.score).toBeGreaterThanOrEqual(KINDS.leaning.wonder!.bonus);
     expect(me.wonders).toBe(1);
     expect(me.mass - massBefore).toBeLessThan(1000);
     expect(w.props.has(2)).toBe(true);

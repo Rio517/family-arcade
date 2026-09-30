@@ -239,20 +239,20 @@ const TABLE: Record<PropKind, KindRow> = {
   hangar: { name: 'a hangar', tier: 7, w: 22.0, d: 18.0, h: 10.0, variants: 1 },
   // Never stands in the city: only flies over it (see three/effects.ts).
   bomber: { name: 'a bomber', tier: 8, w: 30.0, d: 24.0, h: 7.0, variants: 1 },
-  liberty: { tier: 8, w: 12.0, d: 12.0, h: 46.0, variants: 1, wonder: { name: 'the Statue of Liberty', bonus: 50000 } },
-  megaspire: { tier: 10, w: 24.0, d: 24.0, h: 220.0, variants: 1, wonder: { name: 'the Burj Khalifa', bonus: 45000 } },
-  irontower: { tier: 9, w: 26.0, d: 26.0, h: 90.0, variants: 1, wonder: { name: 'the Eiffel Tower', bonus: 30000 } },
-  pyramid: { tier: 9, w: 27.0, d: 27.0, h: 18.0, variants: 1, wonder: { name: 'the Great Pyramid of Giza', bonus: 25000 } },
-  pearlpalace: { tier: 9, w: 29.0, d: 29.0, h: 34.0, variants: 1, wonder: { name: 'the Taj Mahal', bonus: 25000 } },
-  buddha: { tier: 8, w: 24.0, d: 24.0, h: 34.0, variants: 1, wonder: { name: 'the Big Buddha', bonus: 20000 } },
-  reichstag: { tier: 8, w: 30.0, d: 22.0, h: 26.0, variants: 1, wonder: { name: 'the Reichstag', bonus: 18000 } },
-  opera: { tier: 8, w: 27.0, d: 20.0, h: 16.0, variants: 1, wonder: { name: 'the Sydney Opera House', bonus: 18000 } },
-  onion: { tier: 8, w: 22.0, d: 22.0, h: 30.0, variants: 1, wonder: { name: "St Basil's Cathedral", bonus: 15000 } },
-  clocktower: { tier: 7, w: 10.0, d: 10.0, h: 55.0, variants: 1, wonder: { name: 'Big Ben', bonus: 12000 } },
-  leaning: { tier: 7, w: 9.0, d: 9.0, h: 32.0, variants: 1, wonder: { name: 'the Leaning Tower of Pisa', bonus: 10000 } },
-  stonecircle: { tier: 6, w: 22.0, d: 22.0, h: 6.0, variants: 1, wonder: { name: 'Stonehenge', bonus: 8000 } },
+  liberty: { tier: 8, w: 12.0, d: 12.0, h: 46.0, variants: 1, wonder: { name: 'the Statue of Liberty', bonus: 12000 } },
+  megaspire: { tier: 10, w: 24.0, d: 24.0, h: 220.0, variants: 1, wonder: { name: 'the Burj Khalifa', bonus: 11000 } },
+  irontower: { tier: 9, w: 26.0, d: 26.0, h: 90.0, variants: 1, wonder: { name: 'the Eiffel Tower', bonus: 8000 } },
+  pyramid: { tier: 9, w: 27.0, d: 27.0, h: 18.0, variants: 1, wonder: { name: 'the Great Pyramid of Giza', bonus: 6000 } },
+  pearlpalace: { tier: 9, w: 29.0, d: 29.0, h: 34.0, variants: 1, wonder: { name: 'the Taj Mahal', bonus: 6000 } },
+  buddha: { tier: 8, w: 24.0, d: 24.0, h: 34.0, variants: 1, wonder: { name: 'the Big Buddha', bonus: 5000 } },
+  reichstag: { tier: 8, w: 30.0, d: 22.0, h: 26.0, variants: 1, wonder: { name: 'the Reichstag', bonus: 4500 } },
+  opera: { tier: 8, w: 27.0, d: 20.0, h: 16.0, variants: 1, wonder: { name: 'the Sydney Opera House', bonus: 4500 } },
+  onion: { tier: 8, w: 22.0, d: 22.0, h: 30.0, variants: 1, wonder: { name: "St Basil's Cathedral", bonus: 4000 } },
+  clocktower: { tier: 7, w: 10.0, d: 10.0, h: 55.0, variants: 1, wonder: { name: 'Big Ben', bonus: 3000 } },
+  leaning: { tier: 7, w: 9.0, d: 9.0, h: 32.0, variants: 1, wonder: { name: 'the Leaning Tower of Pisa', bonus: 2500 } },
+  stonecircle: { tier: 6, w: 22.0, d: 22.0, h: 6.0, variants: 1, wonder: { name: 'Stonehenge', bonus: 2000 } },
   // One head: a block holds four, each swallowed on its own (see city.ts).
-  moai: { tier: 5, w: 4.5, d: 4.5, h: 10.0, variants: 2, wonder: { name: 'an Easter Island Head', bonus: 2500 } },
+  moai: { tier: 5, w: 4.5, d: 4.5, h: 10.0, variants: 2, wonder: { name: 'an Easter Island Head', bonus: 400 } },
 };
 
 /** Every kind, each named: a wonder by its own name. */

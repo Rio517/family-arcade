@@ -849,8 +849,8 @@ export function runwayMarks(f: Airfield): Box[] {
 
 /**
  * The airport's ground, over its built-over streets: grass, the concrete
- * apron, the runway (darker), taxiways and the train's track bed, then the
- * paint and the sleepers, then the rails. Five meshes.
+ * apron, the runway (darker), taxiways and the shuttle's guideway, then the
+ * paint and the guideway's edge lines, then its guide beam. Five meshes.
  */
 function airfieldMeshes(f: Airfield, grass: THREE.Texture, concrete: THREE.Texture, asphalt: THREE.Texture): THREE.Mesh[] {
   const tint = (g: THREE.BufferGeometry, rgb: [number, number, number]) => {
@@ -859,24 +859,24 @@ function airfieldMeshes(f: Airfield, grass: THREE.Texture, concrete: THREE.Textu
     return g;
   };
   const a = f.area;
-  // The shuttle track: a gravel bed, sleepers across it, two steel rails.
+  // The shuttle's guideway, like a modern airport people-mover's: a smooth
+  // pale concrete bed with white edge lines, and down the middle a guide
+  // beam with a blue power stripe beside it. No sleepers, no rails.
   const t = f.track;
   const alongX = t.x1 - t.x0 > t.z1 - t.z0;
   const [t0, t1, c] = alongX ? [t.x0, t.x1, (t.z0 + t.z1) / 2] : [t.z0, t.z1, (t.x0 + t.x1) / 2];
   /** A strip given along the track (a0..a1) and across it (c0..c1). */
   const strip = (a0: number, a1: number, c0: number, c1: number, y: number) =>
     alongX ? quad(a0, c + c0, a1, c + c1, y, 4) : quad(c + c0, a0, c + c1, a1, y, 4);
-  const sleepers: THREE.BufferGeometry[] = [];
-  for (let s = t0 + 0.4; s < t1 - 0.4; s += 1.4) sleepers.push(tint(strip(s, s + 0.55, -1.35, 1.35, -0.038), [0.46, 0.34, 0.25]));
-  const rails = [-0.75, 0.75].map((o) => tint(strip(t0, t1, o - 0.12, o + 0.12, -0.036), [0.78, 0.8, 0.84]));
+  const edges = [-1.3, 1.3].map((o) => tint(strip(t0, t1, o - 0.1, o + 0.1, -0.038), [0.97, 0.97, 0.98]));
+  const beam = [tint(strip(t0, t1, -0.22, 0.22, -0.036), [0.6, 0.64, 0.72]), tint(strip(t0, t1, 0.3, 0.38, -0.036), [0.24, 0.56, 1])];
   const out: Array<THREE.Mesh | null> = [
     layer([sheet(a.x0 + 0.5, a.z0 + 0.5, a.x1 - 0.5, a.z1 - 0.5, -0.042, GRASS_TILE, 9)], unrepeat(flat(grass, 0xffffff, 5)), 5),
-    layer([quad(f.apron.x0, f.apron.z0, f.apron.x1, f.apron.z1, -0.041, 8)], flat(concrete, 0xffffff, 6), 6),
+    layer([quad(f.apron.x0, f.apron.z0, f.apron.x1, f.apron.z1, -0.041, 8), quad(t.x0, t.z0, t.x1, t.z1, -0.041, 3)], flat(concrete, 0xffffff, 6), 6),
     layer(
       [
         tint(quad(f.runway.x0, f.runway.z0, f.runway.x1, f.runway.z1, -0.04, 10), [0.7, 0.7, 0.74]),
         ...f.taxiways.map((w) => quad(w.x0, w.z0, w.x1, w.z1, -0.04, 10)),
-        tint(quad(t.x0, t.z0, t.x1, t.z1, -0.04, 10), [0.82, 0.76, 0.66]),
       ],
       flat(asphalt, 0xffffff, 7),
       7,
@@ -885,12 +885,12 @@ function airfieldMeshes(f: Airfield, grass: THREE.Texture, concrete: THREE.Textu
       [
         ...runwayMarks(f).map((m) => quad(m.x0, m.z0, m.x1, m.z1, -0.038, 4)),
         ...f.lines.map((m) => tint(quad(m.x0, m.z0, m.x1, m.z1, -0.038, 4), [1, 0.78, 0.16])),
-        ...sleepers,
+        ...edges,
       ],
       flat(null, 0xf4f4f0, 8),
       8,
     ),
-    layer(rails, flat(null, 0xffffff, 9), 9),
+    layer(beam, flat(null, 0xffffff, 9), 9),
   ];
   return out.filter((m): m is THREE.Mesh => m !== null);
 }

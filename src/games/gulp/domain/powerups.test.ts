@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeProp } from './catalog';
+import { CHILD_GROWTH } from './holes';
 import { POWER_TIME } from './powerups';
 import { only, round, still } from './testing';
 import { stepWorld } from './world';
@@ -36,13 +37,12 @@ describe('power-ups', () => {
   });
 
   it('double points doubles the score, not the size', () => {
-    // Medium: no growth boost, so the size is the plain one.
     const w = round(1, 0, { powerups: true, difficulty: 'medium' });
     const me = w.holes[0];
     only(w, [makeProp(1, 'bench', me.x + 3, me.z, 0)]);
     me.doubleTime = 5;
     for (let i = 0; i < 30; i++) stepWorld(w, 1 / 60, { x: 1, z: 0 });
     expect(me.score).toBe(4);
-    expect(me.mass).toBe(2);
+    expect(me.mass).toBeCloseTo(2 * CHILD_GROWTH.medium, 6);
   });
 });
