@@ -1,5 +1,5 @@
 /**
- * Gulp City — the page. The menu sits over a live city with computer holes
+ * Gulp Universe — the page. The menu sits over a live city with computer holes
  * roaming it; PLAY starts a round in the same place; the round ends on the
  * clock (or from the pause card in an endless round) with a results card.
  *

@@ -529,7 +529,7 @@ const SHOTS = [
     prep: waitForMask,
   },
   {
-    // Gulp City's menu over the live city, computer holes roaming it. The
+    // Gulp Universe's menu over the live city, computer holes roaming it. The
     // city is seeded fresh each load, so the picture behind the card churns.
     name: 'gulp',
     path: '/#/gulp',

@@ -1,5 +1,5 @@
 /**
- * The three.js view of a Gulp City round: a toy city on an island, holes
+ * The three.js view of a Gulp Universe round: a toy city on an island, holes
  * roaming it, things tipping into them, and (when switched on) power-ups and
  * a city that fights back.
  *

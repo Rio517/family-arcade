@@ -4,12 +4,12 @@ import { GulpIcon } from '@shared/ui/icons';
 import { GulpPage } from './components/GulpPage';
 
 /**
- * What the arcade knows about Gulp City: the ticket on the wall, the route,
+ * What the arcade knows about Gulp Universe: the ticket on the wall, the route,
  * who can play. The registry lists this and nothing else needs to.
  */
 export const gulp: GameDescriptor = {
   id: 'gulp',
-  title: 'Gulp City',
+  title: 'Gulp Universe',
   players: { min: 1, max: 1 },
   seats: { min: 1, max: 1 },
   computer: true,

@@ -1,5 +1,5 @@
 /**
- * Gulp City's maps: a square grid of blocks between roads, on an island.
+ * Gulp Universe's maps: a square grid of blocks between roads, on an island.
  *
  * Four maps, each bigger than the last and each with bigger things to aim
  * for. A map is built in rings from the middle: the tallest buildings at the
