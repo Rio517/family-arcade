@@ -1,18 +1,18 @@
 /**
- * Tall things standing between the camera and the child's hole are swapped
- * for see-through copies while they are in the way, so the hole is never
- * lost behind a building.
+ * Tall things standing between the camera and the child's hole, too big for
+ * it to swallow, are swapped for see-through copies while they are in the
+ * way, so the hole is never lost behind a building.
  */
 import * as THREE from 'three';
 import { KINDS, type Prop } from '../domain/catalog';
-import type { Hole, World } from '../domain/world';
+import { canEat, type Hole, type World } from '../domain/world';
 import { groundAt } from './ground';
 import { modelOf } from './models';
 
-/** How see-through a building standing in front of the child's hole goes. */
-const GHOST = 0.2;
+/** How see-through a building standing in front of the child's hole goes: faint, still there. */
+const GHOST = 0.3;
 /** Something taller than the camera is high would veil the whole screen: fainter still. */
-const GHOST_TOWERING = 0.08;
+const GHOST_TOWERING = 0.15;
 /** Seconds a see-through copy lingers after it was last in the way, so a
  * building doesn't flick between solid and faded at the edge of the view. */
 const LINGER = 0.6;
@@ -150,6 +150,9 @@ export class SeeThrough {
         if (!list) continue;
         for (const p of list) {
           if (!world.props.has(p.id)) continue;
+          // Food stays solid: a building the hole can swallow is what the
+          // child is steering for, and must not fade away just before it goes.
+          if (canEat(me, p)) continue;
           const info = KINDS[p.kind];
           const half = Math.max(info.w, info.d) / 2;
           if (p.z + half < me.z + me.r * 0.3) continue;
