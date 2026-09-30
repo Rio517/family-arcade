@@ -197,7 +197,7 @@ const TABLE: Record<PropKind, KindRow> = {
   shop: { name: 'a shop', tier: 5, w: 10.0, d: 8.0, h: 6.0, variants: 4, scales: true },
   apartment: { name: 'an apartment block', tier: 6, w: 12.0, d: 12.0, h: 18.0, variants: 4, scales: true },
   tower: { name: 'a tower', tier: 6, w: 12.0, d: 12.0, h: 30.0, variants: 3, scales: true },
-  office: { name: 'an office block', tier: 7, w: 16.0, d: 13.0, h: 16.0, variants: 3, scales: true },
+  office: { name: 'an office block', tier: 7, w: 13.0, d: 13.0, h: 16.0, variants: 3, scales: true },
   factory: { name: 'a factory', tier: 7, w: 20.0, d: 16.0, h: 12.0, variants: 2 },
   warehouse: { name: 'a warehouse', tier: 7, w: 24.0, d: 14.0, h: 9.0, variants: 3 },
   watertower: { name: 'a water tower', tier: 7, w: 9.0, d: 9.0, h: 22.0, variants: 2 },
@@ -316,11 +316,11 @@ const WORTH: Array<[number, number]> = (
     ['car', 8],
     ['bus', 20],
     ['house', 45],
-    ['tower', 120],
-    ['factory', 400],
-    ['skyscraper', 900],
-    ['stadium', 2500],
-    ['mountain', 6000],
+    ['tower', 150],
+    ['factory', 600],
+    ['skyscraper', 1600],
+    ['stadium', 5000],
+    ['mountain', 14000],
   ] as Array<[PropKind, number]>
 ).map(([kind, points]) => [Math.log(footSize(kind)), Math.log(points)]);
 

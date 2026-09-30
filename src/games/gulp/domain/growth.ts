@@ -20,7 +20,7 @@ export const radiusFor = (mass: number): number => START_R + GROW * Math.pow(Mat
 export const massFor = (r: number): number => Math.pow(Math.max(0, r - START_R) / GROW, 1 / GROW_POWER);
 
 /** Past the last tier, a new level for every step this much bigger. */
-const BEYOND = 1.35;
+const BEYOND = 1.2;
 
 /** Level 1 at the start; one more for each tier a hole can now swallow, and on past the top. */
 export function levelOf(r: number): number {
