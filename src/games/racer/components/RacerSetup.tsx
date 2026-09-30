@@ -1,7 +1,7 @@
 /**
  * Rainbow Racer's pre-race screens: the 1P/2P mode choice, the driver picker,
- * and the two-player lobby. RacerPage owns the phase machine and just picks
- * which of these to show.
+ * the ride picker (for a princess or a bunny), and the two-player lobby.
+ * RacerPage owns the phase machine and just picks which of these to show.
  *
  * The lobby stands on the party (ADR 0008): with no party it keeps its code
  * doors (create a code / join with a code); in a party the host gets one
@@ -15,7 +15,8 @@ import { PlayingAs } from '@shared/profile/PlayingAs';
 import { generateCode, normalizeCode } from '@shared/net/peer';
 import { useParty } from '@shared/party/PartyContext';
 import { usePartyDoor } from '@shared/party/usePartyDoor';
-import { DRIVERS, driverById, type Driver } from './cast';
+import { DRIVERS, MOUNTS, driverById, portraitOf, type Driver } from './cast';
+import type { MountId } from '../domain/mounts';
 import type { RaceMode } from '../domain/race';
 import type { RacerNet } from '../net/useRacerNet';
 
@@ -79,12 +80,52 @@ export function PickScreen({ mode, onPick }: { mode: RaceMode; onPick: (d: Drive
   );
 }
 
+/** A racer who can't fly picks what carries them: a cloud, a bird or a unicorn. */
+export function RideScreen({
+  driver,
+  mode,
+  onPick,
+}: {
+  driver: Driver;
+  mode: RaceMode;
+  onPick: (m: MountId) => void;
+}) {
+  return (
+    <div className="racer-setup">
+      <div className="racer-setup-head">
+        <h1>What will {driver.name} ride?</h1>
+        <p>{mode === 'net' ? 'Then connect with your friend.' : 'Then fly, and grab 20 coins first!'}</p>
+      </div>
+      <div className="racer-cast racer-rides">
+        {MOUNTS.map((m) => (
+          <button
+            key={m.id}
+            className="racer-cast-btn"
+            style={{ '--rc': driver.css } as React.CSSProperties}
+            onClick={() => onPick(m.id)}
+            data-testid={`racer-mount-${m.id}`}
+          >
+            <span className="racer-cast-badge">
+              <img className="racer-cast-pic" src={portraitOf(driver, m.id)} alt="" />
+            </span>
+            <span className="racer-cast-name">{m.name}</span>
+            <span className="racer-cast-flies">{m.blurb}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function RacerLobby({
   driver,
+  mount,
   net,
   seatedUserId,
 }: {
   driver: Driver;
+  /** The ride a princess or a bunny picked. */
+  mount: MountId | null;
   net: RacerNet;
   /** The signed-in ticket's id — who this device sits down as. */
   seatedUserId: string | null;
@@ -163,7 +204,7 @@ export function RacerLobby({
     <div className="racer-lobby">
       <PlayingAs />
       <div className="racer-lobby-card">
-        <img className="racer-lobby-pic" src={driver.portrait} alt="" />
+        <img className="racer-lobby-pic" src={portraitOf(driver, mount)} alt="" />
         <h2>Your racer: {driver.name}</h2>
       </div>
       {party.reconnecting ? (

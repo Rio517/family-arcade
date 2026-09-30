@@ -64,6 +64,29 @@ describe('useRacerNet handshake', () => {
     expect(result.current.startNonce).toBe(1);
   });
 
+  it('says which ride a princess or a bunny picked, and hears the friend\'s', () => {
+    const { result } = renderHook(() => useRacerNet({ name: 'Rio', driver: 'bunny', mount: 'bird', target: 20 }));
+    act(() => result.current.startTable({ role: 'host', code: 'ABCD', seatedUserId: 'u-rio' }));
+    act(() => h.state.handlers.onOpen());
+    expect(h.state.sent.find((m) => m.t === 'hello')).toMatchObject({ driver: 'bunny', mount: 'bird' });
+
+    act(() => h.state.handlers.onMessage({ t: 'hello', name: 'Kai', driver: 'princess', mount: 'cloud' }));
+    expect(result.current.theirMount).toBe('cloud');
+    // A ride this device doesn't know (a newer device's) means the usual one.
+    act(() => h.state.handlers.onMessage({ t: 'hello', name: 'Kai', driver: 'princess', mount: 'dragon' }));
+    expect(result.current.theirMount).toBeNull();
+    // An older device says nothing about rides.
+    act(() => h.state.handlers.onMessage({ t: 'hello', name: 'Kai', driver: 'princess' }));
+    expect(result.current.theirMount).toBeNull();
+  });
+
+  it('a racer who flies says nothing about a ride', () => {
+    const { result } = renderHook(() => useRacerNet({ name: 'Rio', driver: 'fairy', mount: null, target: 20 }));
+    act(() => result.current.startTable({ role: 'host', code: 'ABCD', seatedUserId: 'u-rio' }));
+    act(() => h.state.handlers.onOpen());
+    expect(h.state.sent.find((m) => m.t === 'hello')).not.toHaveProperty('mount');
+  });
+
   it('host: does NOT restart the race for a guest that reconnects mid-race', () => {
     const { result } = renderHook(() =>
       useRacerNet({ name: 'Rio', driver: 'unicorn', target: 20, inRace: () => false, getWorld: () => null }),

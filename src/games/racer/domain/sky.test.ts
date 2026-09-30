@@ -1,50 +1,46 @@
 import { describe, expect, it } from 'vitest';
 import { SKY_CEILING, SKY_FLOOR } from './flight';
 import {
-  CELL,
+  FIRST_RING,
   RING_RADIUS,
   TRAIL_RING_EVERY,
   TRAIL_STEP,
-  cellOf,
   islandsInCell,
   nearestTrailIndex,
   ringAt,
-  ringInCell,
-  ringsNear,
   trailPoint,
   trailRing,
 } from './sky';
 
 describe('the sky', () => {
-  it('is the same sky every time: a cell always holds the same ring and islands', () => {
+  it('is the same sky every time: a cell always holds the same islands', () => {
     for (const [cx, cz] of [[3, -7], [-40, 12], [100, 100]]) {
-      expect(ringInCell(cx, cz)).toEqual(ringInCell(cx, cz));
       expect(islandsInCell(cx, cz)).toEqual(islandsInCell(cx, cz));
     }
   });
 
-  it('puts a ring straight ahead of the start', () => {
-    const r = ringInCell(0, 0)!;
-    expect(r.x).toBe(0);
+  it('puts a ring straight ahead of the start, on the road', () => {
+    const r = trailRing(FIRST_RING)!;
+    expect(r.x).toBeCloseTo(0, 5);
     expect(r.z).toBeGreaterThan(0);
+    expect(trailRing(0)).toBeNull();
+    expect(trailRing(1)).toBeNull();
   });
 
-  it('keeps rings inside their cell and inside the flying band', () => {
-    let rings = 0;
-    for (let cx = -15; cx < 15; cx++) {
-      for (let cz = -15; cz < 15; cz++) {
-        const r = ringInCell(cx, cz);
-        if (!r) continue;
-        rings++;
-        expect(cellOf(r.x)).toBe(cx);
-        expect(cellOf(r.z)).toBe(cz);
-        expect(r.y).toBeGreaterThanOrEqual(SKY_FLOOR);
-        expect(r.y).toBeLessThanOrEqual(SKY_CEILING);
-      }
+  it('hangs every ring over the road, and nowhere else', () => {
+    for (let i = 0; i < 300; i++) {
+      const r = trailRing(i);
+      const expected = i === FIRST_RING || (i > 0 && i % TRAIL_RING_EVERY === 0);
+      expect(!!r).toBe(expected);
+      if (!r) continue;
+      const p = trailPoint(i);
+      expect([r.x, r.y, r.z]).toEqual([p.x, p.y, p.z]);
     }
-    // Loose rings are a scattering; the road carries its own.
-    expect(rings / 900).toBeGreaterThan(0.15);
-    expect(rings / 900).toBeLessThan(0.35);
+    // Well off the road, the sky holds no ring to fly through.
+    const p = trailPoint(TRAIL_RING_EVERY * 4);
+    for (const [dx, dz] of [[60, 0], [-90, 40], [0, 150]]) {
+      expect(ringAt(p.x + dx, p.y, p.z + dz)).toBeNull();
+    }
   });
 
   it('keeps islands below the racers', () => {
@@ -55,18 +51,17 @@ describe('the sky', () => {
     }
   });
 
-  it('knows when a racer is flying through a ring, even across a cell edge', () => {
-    const r = ringInCell(0, 0)!;
+  it('knows when a racer is flying through a ring', () => {
+    const r = trailRing(FIRST_RING)!;
     expect(ringAt(r.x, r.y, r.z)?.id).toBe(r.id);
     expect(ringAt(r.x + RING_RADIUS * 0.8, r.y, r.z)?.id).toBe(r.id);
     expect(ringAt(r.x + RING_RADIUS * 2, r.y, r.z)).toBeNull();
-    expect(ringsNear(r.x, r.z, CELL * 2).some((x) => x.id === r.id)).toBe(true);
   });
 });
 
 describe('the rainbow road', () => {
   it('starts at the start line and runs straight, level, through the first ring', () => {
-    const start = ringInCell(0, 0)!;
+    const start = trailRing(FIRST_RING)!;
     for (let i = 0; i <= 3; i++) {
       const p = trailPoint(i);
       expect(p.x).toBeCloseTo(0, 5);

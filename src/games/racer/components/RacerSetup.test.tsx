@@ -29,6 +29,7 @@ function makeNet(over: Partial<RacerNet> = {}): RacerNet {
     startNonce: 0,
     theirName: 'Friend',
     theirDriver: null,
+    theirMount: null,
     startTable: vi.fn(),
     leave: vi.fn(),
     sendPos: vi.fn(),
@@ -43,7 +44,7 @@ function makeNet(over: Partial<RacerNet> = {}): RacerNet {
 }
 
 const lobby = (net: RacerNet, seatedUserId: string | null = 'u1') => (
-  <RacerLobby driver={DRIVERS[0]} net={net} seatedUserId={seatedUserId} />
+  <RacerLobby driver={DRIVERS[0]} mount={null} net={net} seatedUserId={seatedUserId} />
 );
 
 /** Only characters the real generateCode can emit (no look-alikes O/0, I/1, L). */

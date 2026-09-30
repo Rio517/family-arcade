@@ -7,6 +7,7 @@ describe('isRacerMsg', () => {
   it('accepts well-formed messages', () => {
     expect(isRacerMsg({ t: 'hello', name: 'Klara', driver: 'unicorn' })).toBe(true);
     expect(isRacerMsg({ t: 'hello', name: 'Klara', driver: 'unicorn', inRace: true })).toBe(true);
+    expect(isRacerMsg({ t: 'hello', name: 'Klara', driver: 'bunny', mount: 'bird' })).toBe(true);
     expect(isRacerMsg({ t: 'go', target: 20 })).toBe(true);
     expect(isRacerMsg({ t: 'pos', x: 1, z: 2, heading: 0.5, speed: 30 })).toBe(true);
     expect(
@@ -53,6 +54,8 @@ describe('isRacerMsg', () => {
     // Oversized display strings are refused at the wire.
     expect(isRacerMsg({ t: 'hello', name: 'x'.repeat(101), driver: 'unicorn' })).toBe(false);
     expect(isRacerMsg({ t: 'hello', name: 'K', driver: 'x'.repeat(101) })).toBe(false);
+    expect(isRacerMsg({ t: 'hello', name: 'K', driver: 'bunny', mount: 7 })).toBe(false);
+    expect(isRacerMsg({ t: 'hello', name: 'K', driver: 'bunny', mount: 'x'.repeat(101) })).toBe(false);
     expect(isRacerMsg({ t: 'world', coins: 'x', scores: [1, 2], status: 'racing', winner: null, elapsed: 1 })).toBe(false);
     expect(isRacerMsg({ t: 'world', coins: [], scores: [1], status: 'racing', winner: null, elapsed: 1 })).toBe(false);
     expect(isRacerMsg({ t: 'world', coins: [], scores: [1, 2], status: 'racing', winner: 2, elapsed: 1 })).toBe(false);

@@ -2,12 +2,13 @@
  * Rainbow Racer — the shape of the open sky.
  *
  * The sky has no edge, so it cannot be built in advance: it is cut into square
- * cells, and whatever sits in a cell (a rainbow ring, floating islands, a
- * balloon) is decided by hashing the cell's coordinates. The same cell always
- * holds the same things, on every device and every race, so two players see
- * the same sky without sending it, and the scene only builds the cells near
- * the camera. Rings live here, not in the scene, because flying through one
- * is a rule (a speed burst), not just scenery.
+ * cells, and whatever sits in a cell (floating islands, clouds, a balloon) is
+ * decided by hashing the cell's coordinates. The same cell always holds the
+ * same things, on every device and every race, so two players see the same
+ * sky without sending it, and the scene only builds the cells near the
+ * camera. The rainbow road lives here too, with the rings that hang over it:
+ * flying through a ring is a rule (a speed burst), not just scenery. Every
+ * ring is on the road, so a ring always means "this way".
  */
 
 import { CRUISE_ALTITUDE, SKY_CEILING, SKY_FLOOR } from './flight';
@@ -18,7 +19,7 @@ export const CELL = 180;
 export const RING_RADIUS = 9;
 
 export interface Ring {
-  /** Stable across devices: `r:<cx>:<cz>`. */
+  /** Stable across devices: `t:<road point>`. */
   id: string;
   x: number;
   y: number;
@@ -50,25 +51,6 @@ export function cellOf(v: number): number {
   return Math.floor(v / CELL);
 }
 
-/** A loose ring in a cell, off the road, if it has one (about one in four do). The start cell always does. */
-export function ringInCell(cx: number, cz: number): Ring | null {
-  const start = cx === 0 && cz === 0;
-  if (!start && cellNoise(cx, cz, 1) > 0.24) return null;
-  if (start) {
-    // A ring straight ahead of the start line, so the first thing a child
-    // sees is something to fly through.
-    return { id: 'r:0:0', x: 0, y: CRUISE_ALTITUDE, z: 70, heading: 0 };
-  }
-  const margin = 30;
-  return {
-    id: `r:${cx}:${cz}`,
-    x: cx * CELL + margin + cellNoise(cx, cz, 2) * (CELL - 2 * margin),
-    y: SKY_FLOOR + 10 + cellNoise(cx, cz, 3) * (SKY_CEILING - SKY_FLOOR - 30),
-    z: cz * CELL + margin + cellNoise(cx, cz, 4) * (CELL - 2 * margin),
-    heading: cellNoise(cx, cz, 5) * Math.PI * 2,
-  };
-}
-
 /** The floating islands in a cell (zero to two). They sit below the racers. */
 export function islandsInCell(cx: number, cz: number): Island[] {
   const out: Island[] = [];
@@ -86,26 +68,9 @@ export function islandsInCell(cx: number, cz: number): Island[] {
   return out;
 }
 
-/** Every ring within `radius` of a point (for the rules and the scene). */
-export function ringsNear(x: number, z: number, radius: number): Ring[] {
-  const out: Ring[] = [];
-  const c0 = cellOf(x - radius);
-  const c1 = cellOf(x + radius);
-  const r0 = cellOf(z - radius);
-  const r1 = cellOf(z + radius);
-  for (let cx = c0; cx <= c1; cx++) {
-    for (let cz = r0; cz <= r1; cz++) {
-      const ring = ringInCell(cx, cz);
-      if (ring && Math.hypot(ring.x - x, ring.z - z) <= radius) out.push(ring);
-    }
-  }
-  if (radius <= CELL) out.push(...trailRingsNear(x, z, radius));
-  return out;
-}
-
 /** The ring a racer at this point is flying through, if any. */
 export function ringAt(x: number, y: number, z: number): Ring | null {
-  for (const ring of ringsNear(x, z, RING_RADIUS)) {
+  for (const ring of trailRingsNear(x, z, RING_RADIUS)) {
     if (Math.hypot(ring.x - x, ring.y - y, ring.z - z) <= RING_RADIUS) return ring;
   }
   return null;
@@ -118,13 +83,16 @@ export function ringAt(x: number, y: number, z: number): Ring | null {
 // little (the turn itself changes slowly, so the road sweeps rather than
 // zigzags) and rising and falling gently. Points are computed once, in
 // order, and kept, so the same index is the same point on every device.
-// Flying off the road is allowed; the road is where the coins and the
-// rings are thickest.
+// Flying off the road is allowed; the road is where the coins are thickest,
+// and the only place rings hang.
 
 /** Distance between road points. */
 export const TRAIL_STEP = 40;
-/** A rainbow ring hangs over the road every this many points. */
+/** A rainbow ring hangs over the road every this many points… */
 export const TRAIL_RING_EVERY = 6;
+/** …and one more on the straight out of the start, so the first thing a
+ * child sees is something to fly through. */
+export const FIRST_RING = 2;
 
 export interface TrailPoint {
   x: number;
@@ -203,7 +171,7 @@ export function nearestTrailIndex(x: number, z: number, hint = 0): number {
 
 /** The ring over the road at point i, if there is one there. */
 export function trailRing(i: number): Ring | null {
-  if (i <= 0 || i % TRAIL_RING_EVERY !== 0) return null;
+  if (i !== FIRST_RING && (i <= 0 || i % TRAIL_RING_EVERY !== 0)) return null;
   const p = trailPoint(i);
   return { id: `t:${i}`, x: p.x, y: p.y, z: p.z, heading: p.heading };
 }
