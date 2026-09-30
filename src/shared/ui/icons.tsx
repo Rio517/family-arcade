@@ -518,3 +518,35 @@ export function SkinGlyph({ id, size = 24, style }: { id: string } & IconProps) 
       );
   }
 }
+
+/** Gulp City — a hole seen from above, with its two googly eyes. */
+export const GulpIcon = (p: IconProps) =>
+  svg(
+    <>
+      <ellipse cx="12" cy="14.5" rx="9" ry="5.5" />
+      <ellipse cx="12" cy="15" rx="5.6" ry="3" />
+      <circle cx="9" cy="7.2" r="2" />
+      <circle cx="15" cy="7.2" r="2" />
+    </>,
+    p,
+  );
+
+/** Pause: two bars. */
+export const PauseIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M8.5 5.5v13" />
+      <path d="M15.5 5.5v13" />
+    </>,
+    { ...p, style: { strokeWidth: 3, ...p.style } },
+  );
+
+/** A speaker crossed out — sound off. */
+export const SpeakerOffIcon = (p: IconProps) =>
+  svg(
+    <>
+      <path d="M4 9.4h3.2L11.4 5.6v12.8L7.2 14.6H4V9.4Z" />
+      <path d="M15.5 9.5l5 5M20.5 9.5l-5 5" />
+    </>,
+    p,
+  );
