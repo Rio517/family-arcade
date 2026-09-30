@@ -459,7 +459,11 @@ describe('placement', () => {
       const heads = city.props.filter((p) => p.kind === 'moai');
       const block = city.blockList.find((b) => b.wonder === 'moai');
       if (!block) {
-        expect(heads).toEqual([]);
+        // On a map with countryside they stand out on a meadow instead: still four, outside the street grid.
+        if (heads.length) {
+          expect(heads.length, `${map}#${seed}`).toBe(4);
+          for (const h of heads) expect(Math.max(Math.abs(h.x), Math.abs(h.z))).toBeGreaterThan(city.half);
+        }
         continue;
       }
       expect(heads.length, `${map}#${seed}`).toBe(4);

@@ -14,13 +14,13 @@ import { SKINS } from './skins';
 
 const SIZE = 150;
 
-/** Pale green (little to eat) through yellow to orange (a feast). */
+/** Pale grey (little left to eat) through yellow and orange to red (a feast): nothing like the green land round it. */
 function heat(t: number): string {
   const stops: Array<[number, number, number]> = [
-    [205, 232, 190],
-    [250, 226, 120],
-    [255, 170, 70],
-    [240, 110, 60],
+    [222, 226, 236],
+    [255, 214, 80],
+    [255, 146, 40],
+    [226, 64, 48],
   ];
   const x = Math.max(0, Math.min(0.999, t)) * (stops.length - 1);
   const i = Math.floor(x);
@@ -65,9 +65,9 @@ export function GulpMinimap({ world }: { world: World }) {
     if (under.lg) {
       const u = under.lg;
       // Land carries on past the island except on the sides that are sea.
-      u.fillStyle = '#a5d98a';
+      u.fillStyle = '#6fbf4f';
       u.fillRect(0, 0, SIZE, SIZE);
-      u.fillStyle = '#7fcdf0';
+      u.fillStyle = '#2f9fe0';
       const edge = px(-city.land);
       const far = px(city.land);
       if (city.shores.includes('n')) u.fillRect(0, 0, SIZE, edge);
@@ -75,10 +75,10 @@ export function GulpMinimap({ world }: { world: World }) {
       if (city.shores.includes('w')) u.fillRect(0, 0, edge, SIZE);
       if (city.shores.includes('e')) u.fillRect(far, 0, SIZE - far, SIZE);
       // The street grid on the countryside.
-      u.fillStyle = '#6b7280';
+      u.fillStyle = '#343a48';
       u.fillRect(px(-city.half), px(-city.half), city.half * 2 * k, city.half * 2 * k);
       for (const l of city.extraLand) {
-        u.fillStyle = l.kind === 'islet' ? '#9ad672' : '#6b7280';
+        u.fillStyle = l.kind === 'islet' ? '#6fbf4f' : '#343a48';
         rect(u, l);
       }
     }
@@ -123,6 +123,20 @@ export function GulpMinimap({ world }: { world: World }) {
       });
 
       if (over.lg) g.drawImage(over.c, 0, 0, SIZE, SIZE);
+
+      // The countryside's big prizes (wind turbines, barns, mountains): a
+      // white-ringed orange dot each, a hint of the feast out of town.
+      g.lineWidth = 1;
+      g.strokeStyle = '#ffffff';
+      g.fillStyle = '#ff8a1f';
+      for (const p of world.props.values()) {
+        if (KINDS[p.kind].tier < 7 || KINDS[p.kind].wonder) continue;
+        if (Math.max(Math.abs(p.x), Math.abs(p.z)) < city.half) continue;
+        g.beginPath();
+        g.arc(px(p.x), px(p.z), 2, 0, Math.PI * 2);
+        g.fill();
+        g.stroke();
+      }
 
       // Wonders still standing.
       g.font = `bold ${Math.max(10, Math.round(SIZE / 12))}px system-ui, sans-serif`;
