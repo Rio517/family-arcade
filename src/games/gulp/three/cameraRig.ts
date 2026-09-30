@@ -43,6 +43,8 @@ export class CameraRig {
   /** Where the menu's camera is on its tour, where it is heading, and what it has shown. */
   private tourState = { at: null as Focus | null, to: 0, rest: 0, moving: 0, seen: new Set<number>() };
   private tourFocus: Focus = { x: 0, z: 0, r: 12 };
+  /** Looking round the city freely (a development tool): what the camera frames, or null to follow as usual. */
+  private free: Focus | null = null;
   private shadowReach = 0;
   /** From the sun's view to the world and back: fixed, since the sun never moves. */
   private lightBasis = new THREE.Matrix4().lookAt(SUN_DIR, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
@@ -72,13 +74,39 @@ export class CameraRig {
 
   /** Glide toward the hole being followed, or along the menu's tour. `time` is the scene's clock. */
   update(world: World, follow: Hole | undefined, time: number, dt: number): void {
-    if (this.menuTour) this.move(this.tourSpot(world, dt), time, dt);
+    if (this.free) {
+      const edge = world.city.land;
+      this.free.x = Math.max(-edge, Math.min(edge, this.free.x));
+      this.free.z = Math.max(-edge, Math.min(edge, this.free.z));
+      this.move(this.free, time, dt);
+    } else if (this.menuTour) this.move(this.tourSpot(world, dt), time, dt);
     else if (follow) this.move(follow, time, dt);
   }
 
   /** Zoom in (negative) or out (positive) by `steps`, within a comfortable range. */
   zoomBy(steps: number): void {
+    if (this.free) {
+      this.free.r = Math.max(1.6, Math.min(240, this.free.r * Math.pow(1.15, steps)));
+      return;
+    }
     this.zoom = Math.max(0.55, Math.min(2.2, this.zoom * Math.pow(1.12, steps)));
+  }
+
+  /** Start looking round the city freely from `from`, or go back to following the hole. */
+  explore(on: boolean, from: Focus | undefined): void {
+    this.free = on ? { x: from?.x ?? 0, z: from?.z ?? 0, r: Math.max(6, from?.r ?? 10) } : null;
+  }
+
+  /**
+   * Slide the free camera by a drag of (dx, dy) pixels on a screen `height`
+   * pixels tall: the ground follows the finger. The ground runs away from a
+   * tilted camera, so a drag up and down covers a little more of it.
+   */
+  pan(dx: number, dy: number, height: number): void {
+    if (!this.free) return;
+    const per = (this.camPos.distanceTo(this.camLook) * 2 * Math.tan((this.camera.fov * Math.PI) / 360)) / Math.max(1, height);
+    this.free.x -= dx * per;
+    this.free.z -= dy * per * 1.3;
   }
 
   /** Shake the camera for `seconds` (a blast nearby). */
