@@ -45,10 +45,11 @@ interface Temper {
 
 /**
  * Easy is the gentle game a young child plays. Medium rivals try properly,
- * keep half the slow-down and go after a child who is clearly ahead. Hard
- * rivals are quick and skilful, ease off only a little, and go after a child
- * who is level with them; a steady player wins about half of Hard's
- * four-minute City rounds and a casual one is rarely knocked out of lives.
+ * keep most of the slow-down and go after a child who is clearly ahead. Hard
+ * rivals are skilful, ease off less, and go after a child who is level with
+ * them. In simulated four-minute rounds a steady player wins at every level;
+ * one who wanders off now and then wins most Medium rounds and finishes
+ * about the middle of the table on Hard.
  * On every level they leave the wonders for the child and skip the
  * chemical works.
  */
@@ -56,8 +57,8 @@ const TEMPERS: Record<Difficulty, Temper> = {
   // On Easy a computer hole cannot swallow the child (see eatHoles), so it never chases one either.
   // Easy rivals also amble: a child who wanders off for a while can still catch up.
   easy: { skill: 0.55, spread: 0.35, kindness: 1, huntLead: Infinity, theirs: 0.5, speed: 0.75 },
-  medium: { skill: 0.7, spread: 0.2, kindness: 0.5, huntLead: 0.3, theirs: 0.5, speed: 0.9 },
-  hard: { skill: 0.8, spread: 0.15, kindness: 0.15, huntLead: 0, theirs: 0.8, speed: 1 },
+  medium: { skill: 0.7, spread: 0.2, kindness: 0.6, huntLead: 0.3, theirs: 0.5, speed: 0.85 },
+  hard: { skill: 0.8, spread: 0.15, kindness: 0.35, huntLead: 0, theirs: 0.8, speed: 0.92 },
 };
 
 const temperOf = (w: World): Temper => TEMPERS[w.options.difficulty];

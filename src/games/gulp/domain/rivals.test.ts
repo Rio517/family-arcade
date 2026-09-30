@@ -42,7 +42,7 @@ describe('difficulty', () => {
     expect(Math.max(...skills('hard'))).toBeLessThanOrEqual(1);
   });
 
-  it('a rival far ahead of the child crawls on Easy, eases off on Medium, and only a little on Hard', () => {
+  it('a rival far ahead of the child crawls on Easy, eases off on Medium, and less on Hard', () => {
     const pace = (difficulty: Difficulty) => {
       const { w, me, rival } = standoff(difficulty, 5000, 1000);
       const brain = w.brains[1]!;
@@ -51,9 +51,8 @@ describe('difficulty', () => {
     };
     // The runaway slow-down, on top of Easy's ambling speed.
     expect(pace('easy')).toBeCloseTo(0.35 * 0.75);
-    expect(pace('medium')).toBeGreaterThan(0.5);
-    expect(pace('medium')).toBeLessThan(0.8);
-    expect(pace('hard')).toBeGreaterThan(0.85);
+    expect(pace('medium')).toBeGreaterThan(pace('easy'));
+    expect(pace('hard')).toBeGreaterThan(pace('medium'));
     expect(pace('hard')).toBeLessThan(1);
   });
 
@@ -86,7 +85,7 @@ describe('difficulty', () => {
     }
   });
 
-  it('a steady player wins nearly every Easy and Medium round and some Hard ones; the rivals get bigger with the level', () => {
+  it('a steady player wins at every level; the rivals get bigger as the level rises', () => {
     const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
     const [easy, medium, hard] = (['easy', 'medium', 'hard'] as const).map((difficulty) => {
@@ -100,13 +99,10 @@ describe('difficulty', () => {
     // The best rival gets bigger as the level rises…
     expect(easy.top).toBeLessThan(medium.top);
     expect(medium.top).toBeLessThan(hard.top);
-    // …so Easy and Medium are the child's to win, and Hard is a real race:
-    // won now and then in a short round, never hopeless.
+    // …but a child who plays steadily wins at every level: Hard is harder
+    // for a child who wanders (they finish mid-table), never hopeless.
     expect(easy.wins).toBeGreaterThanOrEqual(11);
-    expect(medium.wins).toBeGreaterThanOrEqual(9);
-    expect(hard.wins).toBeGreaterThanOrEqual(1);
-    expect(hard.wins).toBeLessThanOrEqual(8);
-    expect(hard.rank).toBeGreaterThan(medium.rank);
-    expect(hard.rank).toBeLessThanOrEqual(3);
+    expect(medium.wins).toBeGreaterThanOrEqual(11);
+    expect(hard.wins).toBeGreaterThanOrEqual(9);
   });
 });
