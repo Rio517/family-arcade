@@ -513,6 +513,18 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   font-size: 18px;
   font-weight: 900;
 }
+.gulp-wonders {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 40px;
+  padding: 0 14px 0 10px;
+  border-radius: 999px;
+  background: rgba(29, 31, 51, 0.72);
+  color: var(--g-yellow);
+  font-size: 18px;
+  font-weight: 900;
+}
 .gulp-kills-icon {
   width: 22px;
   height: 14px;

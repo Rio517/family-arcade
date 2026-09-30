@@ -6,9 +6,27 @@ import { buildKindGeometry } from './props';
 /**
  * Kinds whose budget is not their tier's: people are instanced by the
  * hundred, so they get less; a building site stands in for the building that
- * will go up on its lot, so it gets about as much as that building.
+ * will go up on its lot, so it gets about as much as that building. Wonders
+ * are one of a kind in a city, so they get more, and the two lattice-and-glass
+ * giants the most.
  */
-const BUDGET: Partial<Record<PropKind, number>> = { person: 200, site: 900, bigsite: 2500 };
+const BUDGET: Partial<Record<PropKind, number>> = {
+  person: 200,
+  site: 900,
+  bigsite: 2500,
+  liberty: 6000,
+  megaspire: 8000,
+  irontower: 8000,
+  pyramid: 6000,
+  pearlpalace: 6000,
+  colosseum: 6000,
+  opera: 6000,
+  onion: 6000,
+  clocktower: 6000,
+  leaning: 6000,
+  stonecircle: 6000,
+  moai: 6000,
+};
 
 /** Triangle budgets by tier, so a city of instanced props stays fast on an iPad. */
 function budget(kind: PropKind, tier: number): number {

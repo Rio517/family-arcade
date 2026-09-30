@@ -130,6 +130,8 @@ export class GulpScene {
     /** The hole the camera follows: the child's, or a rival in attract mode. */
     private follow: number,
     private reducedMotion = false,
+    /** The menu's backdrop: a slow, steady glide over the city, following nobody. */
+    private tour = false,
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     // A little under the iPad's full density: the city is busy, and the
@@ -414,6 +416,9 @@ export class GulpScene {
     });
     // Above the eyes on the far rim, not over them.
     obj.label.position.set(0, 1.4 + r * 0.9, -r * 1.1);
+    // The child's own tag goes once their hole is big: it is plain which one
+    // is theirs, and the tag would sit up under the scoreboard.
+    if (h.isPlayer) obj.label.visible = r < 9;
 
     // Blinking while it is safe after coming back.
     const blink = h.safe > 0 && !this.reducedMotion ? 0.55 + 0.45 * Math.sin(this.time * 18) : 1;
@@ -509,13 +514,15 @@ export class GulpScene {
     this.stepBuilt(dt);
     this.syncPeople();
     this.stepBubble(world, dt);
-    if (me) this.wobble(world, me, dt);
+    if (me && !this.tour) this.wobble(world, me, dt);
     const scale = me ? Math.max(1, me.r / 2.5) : 1;
     this.effects.syncPowerups(world.powerups, scale);
     this.effects.syncAttacks(world.attacks, me ? me.r : 2);
     this.effects.step(dt);
 
-    if (me) {
+    if (this.tour) {
+      this.moveCamera(this.tourSpot(world), dt);
+    } else if (me) {
       this.moveCamera(me, dt);
       this.fadeInTheWay(world, me, dt);
       // Small things cast no shadow once the camera is high above them.
@@ -715,6 +722,18 @@ export class GulpScene {
     mat.opacity = Math.min(1, b.life * 3);
     // Up and to the right of the eyes, like a comic.
     b.sprite.position.set(h.x + h.r * 0.9, 1.5 + h.r * 0.8, h.z - h.r * 1.1);
+  }
+
+  /**
+   * A point gliding on a wide, slow circle round the city, dressed as a
+   * mid-size hole so the camera frames the streets from a pleasant height.
+   */
+  private tourSpot(world: World): Hole {
+    const a = this.time * 0.035;
+    const R = world.city.half * 0.45;
+    const x = Math.cos(a) * R;
+    const z = Math.sin(a) * R;
+    return { ...world.holes[0], x, z, r: 8, alive: true, vx: -Math.sin(a), vz: Math.cos(a) };
   }
 
   /** Where the camera sits for a hole: higher as the hole grows. */

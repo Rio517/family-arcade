@@ -149,8 +149,10 @@ function choose(b: Brain, me: Hole, w: World, player: Hole | null): Brain['targe
   let bestScore = 0;
   for (const p of propsNear(w, me.x, me.z, look)) {
     if (!canEat(me, p)) continue;
-    // A rival knows better than to eat the chemical plant.
+    // A rival knows better than to eat the chemical plant, and leaves the
+    // wonders for the child.
     if (w.options.fightBack && KINDS[p.kind].hazard) continue;
+    if (KINDS[p.kind].wonder) continue;
     const d = Math.hypot(p.x - me.x, p.z - me.z);
     if (d > look) continue;
     // Food right by the child is the child's: a rival values it at half.

@@ -93,7 +93,14 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
   const [banners, setBanners] = useState<Banner[]>([]);
   const [paused, setPaused] = useState(false);
   const [best, setBest] = useState<Record<string, number>>(loadBest);
-  const [result, setResult] = useState<{ rank: number; score: number; level: number; kills: number; newBest: boolean } | null>(null);
+  const [result, setResult] = useState<{
+    rank: number;
+    score: number;
+    level: number;
+    kills: number;
+    wonders: number;
+    newBest: boolean;
+  } | null>(null);
   const pausedRef = useRef(false);
   const soundsRef = useRef<Sounds | null>(null);
   const beatRef = useRef(0);
@@ -186,7 +193,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
           /* not saved: fine */
         }
       }
-      setResult({ rank, score: me.score, level: levelOf(me.r), kills: me.kills, newBest });
+      setResult({ rank, score: me.score, level: levelOf(me.r), kills: me.kills, wonders: me.wonders, newBest });
       setPhase('over');
       soundsRef.current?.play(rank === 1 ? 'win' : 'level');
       // The computer holes count as opponents, like Ship Battle's captains.
@@ -221,6 +228,12 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
           case 'news':
             sounds?.play('level');
             say({ kind: 'news', text: e.text });
+            break;
+          case 'wonder':
+            if (e.hole === 0) {
+              sounds?.play('win');
+              say({ kind: 'news', text: `You gulped ${e.name}! +${e.points.toLocaleString()}` });
+            }
             break;
           case 'combo':
             if (e.hole === 0) sounds?.play('power');
@@ -379,6 +392,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
             </ol>
             <p className="gulp-stats">
               Level {result.level} · {result.kills} {result.kills === 1 ? 'hole' : 'holes'} swallowed
+              {result.wonders > 0 && ` · ${result.wonders} ${result.wonders === 1 ? 'wonder' : 'wonders'}`}
               {result.newBest && <em className="gulp-newbest"> · New best!</em>}
             </p>
             <div className="gulp-modal-row">

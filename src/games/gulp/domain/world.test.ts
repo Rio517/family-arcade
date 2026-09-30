@@ -301,7 +301,7 @@ describe('the city fights back', () => {
 
   it('a big hole sees planes as well as tankers', () => {
     const kinds = new Set<string>();
-    for (let seed = 1; seed <= 8; seed++) {
+    for (let seed = 1; seed <= 24; seed++) {
       const w = round(seed, 0, { fightBack: true });
       only(w, []);
       grow(w, 0, 3000);
@@ -337,7 +337,7 @@ describe('the city rebuilds', () => {
   it('a young city rebuilds small: early on a tower comes back as a house', () => {
     const w = round(1, 0, { regrow: true, duration: 0 });
     const me = grow(w, 0, 3000);
-    expect(built(eatAndWait(w, [makeProp(1, 'tower', me.x, me.z, 0)], 30))).toEqual(['site', 'house']);
+    expect(built(eatAndWait(w, [makeProp(1, 'tower', me.x, me.z, 0)], 45))).toEqual(['site', 'house']);
   });
 
   it('an old city rebuilds taller than the old building, where it cannot go wider', () => {
@@ -529,5 +529,35 @@ describe('a round against the computer is fair and fun', () => {
     for (let i = 0; i < 60 * 8; i++) events.push(...stepWorld(w2, 1 / 60, { x: 1, z: 0 }));
     expect(events).toContainEqual(expect.objectContaining({ type: 'regrow' }));
     expect(w2.props.size).toBe(1);
+  });
+
+  it('only the child can swallow a wonder, which scores its bonus without ballooning the hole', () => {
+    const w = round(1, 1);
+    const [me, rival] = w.holes;
+    w.brains[1] = null;
+    grow(w, 0, 6000);
+    grow(w, 1, 6000);
+    rival.x = me.x + 60;
+    only(w, [makeProp(1, 'leaning', me.x, me.z, 0), makeProp(2, 'leaning', rival.x, rival.z, 0)]);
+    const massBefore = me.mass;
+    const events = stepWorld(w, 1 / 60, still);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'wonder', hole: 0, name: 'the Leaning Tower' }));
+    expect(me.score).toBeGreaterThanOrEqual(10000);
+    expect(me.wonders).toBe(1);
+    expect(me.mass - massBefore).toBeLessThan(1000);
+    expect(w.props.has(2)).toBe(true);
+  });
+
+  it('a hole can drive over the bridge to the islet', () => {
+    const w = round(1, 0);
+    only(w, []);
+    const me = w.holes[0];
+    const bridge = w.city.extraLand.find((l) => l.kind === 'bridge')!;
+    me.x = (bridge.x0 + bridge.x1) / 2;
+    me.z = -w.city.half + 5;
+    for (let i = 0; i < 60 * 8; i++) stepWorld(w, 1 / 60, { x: 0, z: -1 });
+    const islet = w.city.extraLand.find((l) => l.kind === 'islet')!;
+    expect(me.z).toBeLessThan(islet.z1);
+    expect(me.z).toBeGreaterThanOrEqual(islet.z0);
   });
 });

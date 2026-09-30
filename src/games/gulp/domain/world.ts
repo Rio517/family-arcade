@@ -193,6 +193,8 @@ export interface Hole {
   speedTime: number;
   doubleTime: number;
   stun: number;
+  /** Wonders swallowed this round. */
+  wonders: number;
   /** Things eaten in a row, each within COMBO_WINDOW of the last. */
   streak: number;
   comboTime: number;
@@ -207,6 +209,7 @@ export type WorldEvent =
   | { type: 'news'; text: string; x: number; z: number }
   | { type: 'food'; hole: number; food: 'treat' | 'healthy'; bonus: number }
   | { type: 'combo'; hole: number; mult: number }
+  | { type: 'wonder'; hole: number; name: string; points: number }
   | { type: 'gulp'; eater: number; eaten: number }
   | { type: 'level'; hole: number; level: number }
   | { type: 'respawn'; hole: number }
@@ -350,6 +353,7 @@ function newHole(id: number, name: string, skin: number, isPlayer: boolean, x: n
     stun: 0,
     streak: 0,
     comboTime: 0,
+    wonders: 0,
   };
 }
 
@@ -461,9 +465,30 @@ function move(w: World, h: Hole, want: Input, dt: number, pace: number): void {
   const ease = 1 - Math.exp(-dt * 8);
   h.vx += (tx - h.vx) * ease;
   h.vz += (tz - h.vz) * ease;
+  const nx = h.x + h.vx * dt;
+  const nz = h.z + h.vz * dt;
+  // Slide along the shore: try the whole step, then each axis on its own.
+  if (onLand(w, h, nx, nz)) {
+    h.x = nx;
+    h.z = nz;
+  } else if (onLand(w, h, nx, h.z)) {
+    h.x = nx;
+    h.vz = 0;
+  } else if (onLand(w, h, h.x, nz)) {
+    h.z = nz;
+    h.vx = 0;
+  } else {
+    const edge = Math.max(0, w.city.half - h.r * 0.5);
+    h.x = Math.max(-edge, Math.min(edge, h.x));
+    h.z = Math.max(-edge, Math.min(edge, h.z));
+  }
+}
+
+/** The main island (a hole may hang half over its shore), the bridge, or the islet. */
+function onLand(w: World, h: Hole, x: number, z: number): boolean {
   const edge = Math.max(0, w.city.half - h.r * 0.5);
-  h.x = Math.max(-edge, Math.min(edge, h.x + h.vx * dt));
-  h.z = Math.max(-edge, Math.min(edge, h.z + h.vz * dt));
+  if (Math.abs(x) <= edge && Math.abs(z) <= edge) return true;
+  return w.city.extraLand.some((l) => x >= l.x0 && x <= l.x1 && z >= l.z0 && z <= l.z1);
 }
 
 /** Things near a point, from the grid. */
@@ -493,6 +518,8 @@ function eatProps(w: World, h: Hole, events: WorldEvent[]): void {
   const before = levelOf(h.r);
   for (const p of propsNear(w, h.x, h.z, h.r + 1)) {
     if (!canEat(h, p)) continue;
+    // Wonders are the child's to find: computer holes pass over them.
+    if (KINDS[p.kind].wonder && !h.isPlayer) continue;
     if (Math.hypot(p.x - h.x, p.z - h.z) > h.r - p.size * 0.35) continue;
     w.props.delete(p.id);
     const info = KINDS[p.kind];
@@ -525,8 +552,15 @@ function gobble(w: World, h: Hole, p: Prop, events: WorldEvent[]): void {
   h.comboTime = COMBO_WINDOW;
   const mult = comboOf(h.streak);
   if (mult > was) events.push({ type: 'combo', hole: h.id, mult });
-  h.mass += p.points + bonus;
-  h.score += (p.points + bonus) * mult * (h.doubleTime > 0 ? 2 : 1);
+  // A wonder scores its big bonus but grows the hole like any big thing of
+  // its tier: a statue is a treat, not a jump to the top of the map.
+  h.mass += (info.wonder ? TIERS[info.tier].points * 2 : p.points) + bonus;
+  const gained = (p.points + bonus) * mult * (h.doubleTime > 0 ? 2 : 1);
+  h.score += gained;
+  if (info.wonder) {
+    h.wonders += 1;
+    events.push({ type: 'wonder', hole: h.id, name: info.wonder.name, points: gained });
+  }
   h.r = radiusFor(h.mass);
   if (bonus) h.stun = 0;
   events.push({ type: 'eat', prop: p, hole: h.id });
@@ -707,7 +741,7 @@ function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
         break;
       }
       // Running away: turn round if the hole is ahead.
-      if (d < h.r + 5 && p.panic <= 0) {
+      if (d < h.r + 9 && p.panic <= 0) {
         p.panic = 1.5;
         const ahead = (h.x - p.x) * Math.sin(p.heading) + (h.z - p.z) * Math.cos(p.heading);
         if (ahead > 0) p.dir = p.dir === 1 ? -1 : 1;
@@ -720,7 +754,7 @@ function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
       continue;
     }
     p.panic = Math.max(0, p.panic - dt);
-    p.t += (p.dir * p.speed * (p.panic > 0 ? 2.4 : 1) * dt) / around;
+    p.t += (p.dir * p.speed * (p.panic > 0 ? 3 : 1) * dt) / around;
     walkTo(w.city.blockList[p.block], p);
   }
 }

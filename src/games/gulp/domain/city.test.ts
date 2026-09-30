@@ -4,7 +4,9 @@ import { KINDS } from './catalog';
 import { MAPS, ROAD, createCity, type MapId } from './city';
 
 const ALL: MapId[] = ['town', 'city', 'mega', 'region'];
-const topTier = (map: MapId, seed = 1) => Math.max(...createCity(seededRng(seed), map).props.map((p) => KINDS[p.kind].tier));
+/** The biggest ordinary thing on a map (wonders are extra, and come in many sizes). */
+const topTier = (map: MapId, seed = 1) =>
+  Math.max(...createCity(seededRng(seed), map).props.filter((p) => !KINDS[p.kind].wonder).map((p) => KINDS[p.kind].tier));
 
 describe('createCity', () => {
   it('is the same city from the same seed', () => {
@@ -39,10 +41,12 @@ describe('createCity', () => {
     for (const k of ['terminal', 'jet', 'mountain', 'windturbine', 'barn', 'skyscraper'] as const) expect(region.has(k)).toBe(true);
   });
 
-  it('keeps everything on the island, and nothing in the middle of a crossing', () => {
+  it('keeps everything on land, and nothing in the middle of a crossing', () => {
     for (const map of ALL) {
       const city = createCity(seededRng(3), map);
       for (const p of city.props) {
+        const onIslet = city.extraLand.some((l) => l.kind === 'islet' && p.x >= l.x0 && p.x <= l.x1 && p.z >= l.z0 && p.z <= l.z1);
+        if (onIslet) continue;
         expect(Math.abs(p.x)).toBeLessThan(city.half);
         expect(Math.abs(p.z)).toBeLessThan(city.half);
         const onCrossing = city.roads.some((x) => Math.abs(p.x - x) < ROAD / 2) && city.roads.some((z) => Math.abs(p.z - z) < ROAD / 2);
@@ -56,6 +60,19 @@ describe('createCity', () => {
       const city = createCity(seededRng(9), map);
       const spots = new Set(city.props.map((p) => `${p.x.toFixed(1)}:${p.z.toFixed(1)}`));
       expect(spots.size).toBe(city.props.length);
+    }
+  });
+
+  it('holds more wonders on bigger maps, and the Liberty Statue on its islet every time', () => {
+    const wonders = (map: MapId) => createCity(seededRng(2), map).props.filter((p) => KINDS[p.kind].wonder);
+    expect(wonders('town').length).toBe(5);
+    expect(wonders('city').length).toBe(8);
+    expect(wonders('mega').length).toBe(12);
+    for (const map of ALL) {
+      const city = createCity(seededRng(4), map);
+      const liberty = city.props.find((p) => p.kind === 'liberty');
+      const islet = city.extraLand.find((l) => l.kind === 'islet');
+      expect(liberty && islet && liberty.z < islet.z1 && liberty.z > islet.z0).toBe(true);
     }
   });
 });

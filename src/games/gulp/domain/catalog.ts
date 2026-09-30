@@ -68,7 +68,20 @@ export type PropKind =
   | 'tvtower'
   | 'terminal'
   // Tier 10: mountains.
-  | 'mountain';
+  | 'mountain'
+  // Wonders: famous-landmark-inspired things worth a big bonus.
+  | 'liberty'
+  | 'megaspire'
+  | 'irontower'
+  | 'pyramid'
+  | 'clocktower'
+  | 'leaning'
+  | 'colosseum'
+  | 'opera'
+  | 'onion'
+  | 'pearlpalace'
+  | 'stonecircle'
+  | 'moai';
 
 export interface KindInfo {
   tier: number;
@@ -85,6 +98,8 @@ export interface KindInfo {
   hazard?: boolean;
   /** Food: a treat says "Yum!"; healthy food gives a health bonus. */
   food?: 'treat' | 'healthy';
+  /** A wonder: its name, and the bonus it scores (instead of its tier's points). */
+  wonder?: { name: string; bonus: number };
 }
 
 /** A hole swallows a thing when `thing.size <= hole.r * FIT`. */
@@ -138,6 +153,18 @@ export const KINDS: Record<PropKind, KindInfo> = {
   tvtower: { tier: 9, w: 14.0, d: 14.0, h: 140.0, variants: 1 },
   terminal: { tier: 9, w: 36.0, d: 30.0, h: 16.0, variants: 1 },
   mountain: { tier: 10, w: 38.0, d: 38.0, h: 45.0, variants: 2 },
+  liberty: { tier: 8, w: 12.0, d: 12.0, h: 46.0, variants: 1, wonder: { name: 'the Liberty Statue', bonus: 50000 } },
+  megaspire: { tier: 10, w: 24.0, d: 24.0, h: 220.0, variants: 1, wonder: { name: 'the Mega Spire', bonus: 45000 } },
+  irontower: { tier: 9, w: 26.0, d: 26.0, h: 90.0, variants: 1, wonder: { name: 'the Iron Tower', bonus: 30000 } },
+  pyramid: { tier: 9, w: 28.0, d: 28.0, h: 18.0, variants: 1, wonder: { name: 'the Great Pyramid', bonus: 25000 } },
+  pearlpalace: { tier: 9, w: 26.0, d: 26.0, h: 30.0, variants: 1, wonder: { name: 'the Pearl Palace', bonus: 25000 } },
+  colosseum: { tier: 8, w: 28.0, d: 24.0, h: 14.0, variants: 1, wonder: { name: 'the Colosseum', bonus: 20000 } },
+  opera: { tier: 8, w: 28.0, d: 20.0, h: 16.0, variants: 1, wonder: { name: 'the Opera Shells', bonus: 18000 } },
+  onion: { tier: 8, w: 22.0, d: 22.0, h: 30.0, variants: 1, wonder: { name: 'the Onion-Dome Palace', bonus: 15000 } },
+  clocktower: { tier: 7, w: 10.0, d: 10.0, h: 55.0, variants: 1, wonder: { name: 'the Clock Tower', bonus: 12000 } },
+  leaning: { tier: 7, w: 9.0, d: 9.0, h: 32.0, variants: 1, wonder: { name: 'the Leaning Tower', bonus: 10000 } },
+  stonecircle: { tier: 6, w: 22.0, d: 22.0, h: 6.0, variants: 1, wonder: { name: 'the Stone Circle', bonus: 8000 } },
+  moai: { tier: 6, w: 20.0, d: 10.0, h: 9.0, variants: 1, wonder: { name: 'the Stone Heads', bonus: 8000 } },
 };
 
 /**
@@ -198,7 +225,7 @@ export function makeProp(
     z,
     rot,
     size: tier.size * (1 + extra * 0.2),
-    points: Math.round(tier.points * (1 + extra)),
+    points: info.wonder ? info.wonder.bonus : Math.round(tier.points * (1 + extra)),
     hScale: info.scales ? hScale : 1,
   };
 }

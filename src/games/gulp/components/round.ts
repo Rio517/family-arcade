@@ -3,7 +3,7 @@
  * scoreboard snapshot copied out of the live world, and how the 3D scene is
  * loaded. Kept apart from the components so each file holds only components.
  */
-import { TIERS } from '../domain/catalog';
+import { KINDS, TIERS } from '../domain/catalog';
 import { MAPS, type MapId } from '../domain/city';
 import { POWER_TIME, comboOf, levelOf, levelProgress, nextLabel, standings, type World } from '../domain/world';
 import type { GulpScene } from '../three/scene';
@@ -59,6 +59,9 @@ export interface Hud {
   /** 0..1 of each power-up still to run, for the countdown bars. */
   speedLeft: number;
   doubleLeft: number;
+  /** Wonders swallowed, and how many the map has. */
+  wonders: number;
+  wondersTotal: number;
   /** The combo multiplier and the things eaten in the streak. */
   combo: number;
   streak: number;
@@ -104,6 +107,8 @@ export function hudOf(w: World, me: number): Hud {
     double: Math.ceil(h.doubleTime),
     speedLeft: h.speedTime / POWER_TIME.speed,
     doubleLeft: h.doubleTime / POWER_TIME.double,
+    wonders: h.wonders,
+    wondersTotal: w.city.props.filter((p) => KINDS[p.kind].wonder).length,
     combo: comboOf(h.streak),
     streak: h.streak,
     alive: h.alive,

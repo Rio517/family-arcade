@@ -30,6 +30,7 @@ const FLOOR: Record<BlockKind, Surface> = {
   airport: 'concrete',
   apron: 'concrete',
   mountain: 'rock',
+  wonder: 'plaza',
 };
 
 /**
@@ -214,6 +215,36 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   edge.position.y = -1.75;
   edge.receiveShadow = true;
   group.add(edge);
+
+  // The wonder islet (grass on a stone base) and the bridge out to it.
+  const stone = new THREE.MeshStandardMaterial({ color: 0xd9d2c3, roughness: 0.9 });
+  const extraGrass: THREE.BufferGeometry[] = [];
+  const extraRoad: THREE.BufferGeometry[] = [];
+  for (const land of city.extraLand) {
+    // Only the part over the water is drawn; the rest is the town's own road.
+    const l = { ...land, z1: Math.min(land.z1, -half) };
+    const w = l.x1 - l.x0;
+    const d = l.z1 - l.z0;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w + 1.5, 3, d + 1.5), stone);
+    base.position.set((l.x0 + l.x1) / 2, -1.75, (l.z0 + l.z1) / 2);
+    base.receiveShadow = true;
+    group.add(base);
+    if (l.kind === 'islet') extraGrass.push(quad(l.x0, l.z0, l.x1, l.z1, -0.08, 22));
+    else {
+      extraRoad.push(quad(l.x0, l.z0, l.x1, l.z1, -0.05, 10));
+      // Railings along both sides of the bridge.
+      for (const x of [l.x0 - 0.3, l.x1 + 0.3]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.9, d), new THREE.MeshStandardMaterial({ color: 0xe8452f, roughness: 0.6 }));
+        rail.position.set(x, 0.45, (l.z0 + l.z1) / 2);
+        rail.castShadow = true;
+        group.add(rail);
+      }
+    }
+  }
+  const isletMesh = layer(extraGrass, flat(surfaces.grass, 0xffffff, 1), 1);
+  if (isletMesh) group.add(isletMesh);
+  const bridgeMesh = layer(extraRoad, flat(asphalt, 0xffffff, 3), 3);
+  if (bridgeMesh) group.add(bridgeMesh);
 
   const water = tiling(drawWaves, 256, aniso);
   water.repeat.set(80, 80);
