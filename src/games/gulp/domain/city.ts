@@ -37,10 +37,10 @@ export type { MapId, PlayArea, Rect, Side } from './city/common';
 export type { Airfield } from './city/ports';
 
 export const MAPS: Record<MapId, { blocks: number; label: string; rivals: number; minutes: number; country: number }> = {
-  town: { blocks: 8, label: 'Town', rivals: 4, minutes: 3, country: 0 },
-  city: { blocks: 10, label: 'City', rivals: 5, minutes: 4, country: 60 },
-  mega: { blocks: 12, label: 'Megalopolis', rivals: 6, minutes: 5, country: 90 },
-  region: { blocks: 13, label: 'Region', rivals: 8, minutes: 6, country: 145 },
+  town: { blocks: 9, label: 'Town', rivals: 4, minutes: 3, country: 0 },
+  city: { blocks: 11, label: 'City', rivals: 5, minutes: 4, country: 60 },
+  mega: { blocks: 13, label: 'Megalopolis', rivals: 6, minutes: 5, country: 90 },
+  region: { blocks: 14, label: 'Region', rivals: 8, minutes: 6, country: 145 },
 };
 
 export type BlockKind =
@@ -464,7 +464,8 @@ function verge(b: Block, { add, rng, pick, variant }: Tools): void {
 }
 
 function alongEdges(b: Block, step: number, each: (x: number, z: number, rot: number, beat: number, t: number) => void): void {
-  const inset = SIDEWALK / 2;
+  // A little in from the middle of the pavement, so a tree's crown clears the road.
+  const inset = SIDEWALK / 2 + 0.2;
   const edges = [
     { x0: b.x, z0: b.z + inset, dx: 1, dz: 0, rot: 0 },
     { x0: b.x + b.size - inset, z0: b.z, dx: 0, dz: 1, rot: Math.PI / 2 },
@@ -551,22 +552,23 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
 
   switch (b.kind) {
     case 'skyline': {
-      // One supertall tower (now and then the TV tower), stalls at its feet,
-      // in the corners just clear of it.
+      // One supertall tower (now and then the TV tower), a bench or planter
+      // in each corner just clear of it.
       const kind: PropKind = rng() < 0.12 ? 'tvtower' : 'skyscraper';
       add(kind, cx, cz, turn(), variant(), 0.8 + rng() * 0.6);
+      const c = s / 2 - 0.9;
       for (const [dx, dz] of [
-        [-12.6, -12.6],
-        [12.6, -12.6],
-        [-12.6, 12.6],
-        [12.6, 12.6],
+        [-c, -c],
+        [c, -c],
+        [-c, c],
+        [c, c],
       ]) {
-        add(pick(['kiosk', 'planter', 'tree', 'bench'] as const), cx + dx, cz + dz, 0, variant());
+        add(pick(['planter', 'bench'] as const), cx + dx, cz + dz, 0, variant());
       }
       return false;
     }
     case 'downtown': {
-      // Tall blocks two by two with a narrow gap, a stall in the middle. Some
+      // Tall blocks two by two with a narrow gap. Some
       // blocks swap a pair of them for a wide office block facing its street:
       // the size between a tower and a factory, so there is always something
       // to grow into there.
@@ -574,14 +576,15 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
       const offices = rng();
       for (let j = 0; j < 2; j++) {
         if (offices < 0.33 * (j + 1)) {
-          add('office', cx, j === 0 ? z0 + 6.7 : z0 + 21.9, j === 0 ? Math.PI : 0, variant(), 0.9 + rng() * 0.5);
+          const half = KINDS.office.d / 2 + 0.05;
+          add('office', cx, j === 0 ? z0 + half : z0 + s - half, j === 0 ? Math.PI : 0, variant(), 0.9 + rng() * 0.5);
           continue;
         }
+        const at = (k: number) => (k === 0 ? 6.2 : s - 6.2);
         for (let i = 0; i < 2; i++) {
-          add(rng() < 0.45 ? 'tower' : 'apartment', x0 + 6.4 + i * 15.8, z0 + 6.4 + j * 15.8, faces[i + j * 2], variant(), 0.8 + rng() * 0.7);
+          add(rng() < 0.45 ? 'tower' : 'apartment', x0 + at(i), z0 + at(j), faces[i + j * 2], variant(), 0.8 + rng() * 0.7);
         }
       }
-      if (offices >= 0.66) add(pick(['kiosk', 'fruitstand', 'cafe'] as const), cx, cz, 0, variant());
       return false;
     }
     case 'town': {
@@ -636,6 +639,8 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
       // A spot on a path or the plaza is left out; one near their edges is
       // nudged back on to the grass, a tree's width clear.
       const room = 1.5;
+      // Nudged trees can bunch up: each keeps a tree's width from the last ones.
+      const trees: Array<[number, number]> = [];
       scatter(t, x0, z0, s, 7, (px, pz) => {
         let dx = px - cx;
         let dz = pz - cz;
@@ -648,7 +653,10 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
         if (d < PARK_PLAZA) return;
         const out = Math.max(1, (PARK_PLAZA + room * 1.4) / d);
         const r = rng();
-        add(r < 0.5 ? 'tree' : r < 0.7 ? 'pine' : r < 0.9 ? 'bush' : 'planter', cx + dx * out, cz + dz * out, turn(), variant());
+        const [x, z] = [cx + dx * out, cz + dz * out];
+        if (trees.some(([ox, oz]) => Math.max(Math.abs(ox - x), Math.abs(oz - z)) < 2.9)) return;
+        trees.push([x, z]);
+        add(r < 0.5 ? 'tree' : r < 0.7 ? 'pine' : r < 0.9 ? 'bush' : 'planter', x, z, turn(), variant());
       });
       return false;
     }
@@ -659,16 +667,17 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
       const deep = s - dn - 1;
       for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 3; j++) {
-          add((i + j) % 4 === 3 ? 'fruitstand' : 'cafe', x0 + 3.5 + i * 6.5, z0 + 2.5 + (j * (deep - 5)) / 2, 0, variant());
+          add((i + j) % 4 === 3 ? 'fruitstand' : 'cafe', x0 + 3 + i * 5.5, z0 + 2.5 + (j * (deep - 5)) / 2, 0, variant());
         }
       }
       // The play corner: slide, seesaw and sandpit together on one soft
       // surface, and now and then a pair of picnic tables beside it.
-      t.play.push({ kind: 'soft', x0: x0 + 18.5, z0: z0 + 1.5, x1: x0 + s - 0.5, z1: z0 + 8.5 });
-      add('slide', x0 + 20.6, z0 + 5, 0, variant());
-      add('seesaw', x0 + 23.3, z0 + 5, 0, variant());
-      add('sandbox', x0 + 25.9, z0 + 5, 0);
-      if (rng() < 0.5) for (const u of [20.8, 25.4]) add('picnic', x0 + u, z0 + 12.5, 0, variant());
+      const e = x0 + s;
+      t.play.push({ kind: 'soft', x0: e - 9.7, z0: z0 + 1.5, x1: e - 0.5, z1: z0 + 8.5 });
+      add('slide', e - 7.6, z0 + 5, 0, variant());
+      add('seesaw', e - 4.9, z0 + 5, 0, variant());
+      add('sandbox', e - 2.3, z0 + 5, 0);
+      if (rng() < 0.5) for (const u of [7.4, 2.8]) add('picnic', e - u, z0 + 12.5, 0, variant());
       return false;
     }
     case 'playpark': {
@@ -694,33 +703,33 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
       const beside = pick(['court', 'court', 'picnic', 'lawn'] as const);
       if (beside === 'court') {
         // Long side along z; a hoop at each end, its backboard facing in.
-        const court = { kind: 'court' as const, x0: x0 + 16.4, z0: z0 + 1.5, x1: x0 + s - 0.8, z1: z0 + s - 1.5 };
+        const court = { kind: 'court' as const, x0: x0 + 16.2, z0: z0 + 1.5, x1: x0 + s - 0.6, z1: z0 + s - 1.5 };
         t.play.push(court);
         const mid = (court.x0 + court.x1) / 2;
         add('hoop', mid, court.z0 + 1.1, 0);
         add('hoop', mid, court.z1 - 1.1, Math.PI);
       } else if (beside === 'picnic') {
         for (const [u, v] of [
-          [19.5, 5],
-          [25, 5],
-          [19.5, 12],
-          [25, 12],
+          [18.5, 5],
+          [s - 2.5, 5],
+          [18.5, 12],
+          [s - 2.5, 12],
         ]) {
           add('picnic', x0 + u, z0 + v, 0, variant());
         }
         for (const [u, v] of [
-          [19, 22],
-          [25, 25],
+          [18.5, s - 5],
+          [s - 2, s - 2],
         ]) {
           add(pick(['tree', 'tree', 'pine'] as const), x0 + u, z0 + v, turn(), variant());
         }
-      } else add('tree', x0 + 25, z0 + 25, turn(), variant());
+      } else add('tree', x0 + s - 2.5, z0 + s - 2.5, turn(), variant());
       return false;
     }
     case 'dogpark': {
       // A dog park: grass, jumps and a tunnel, benches, trees round the
       // edge. The dogs and their people walk round it (see domain/world.ts).
-      for (let i = 0; i < 4; i++) add('agility', x0 + 7 + (i % 2) * 14, z0 + 9 + Math.floor(i / 2) * 10, (i % 2) * (Math.PI / 2), i % 2);
+      for (let i = 0; i < 4; i++) add('agility', x0 + 7 + (i % 2) * (s - 14), z0 + 8 + Math.floor(i / 2) * (s - 17), (i % 2) * (Math.PI / 2), i % 2);
       for (const [dx, dz] of [
         [2, 2],
         [s - 2, 2],
@@ -746,12 +755,12 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
       // A factory (or the chemical plant) at the back, a yard of containers,
       // a tanker and a van at the front; now and then a water tower.
       if (rng() < 0.4) gasworks(t, lot);
-      else add('factory', cx, z0 + s - 9.5, 0, variant());
+      else add('factory', cx, z0 + s - KINDS.factory.d / 2 - 0.4, 0, variant());
       for (let i = 0; i < 4; i++) add('container', x0 + 1.6 + i * 3, z0 + 3.3, 0, variant());
       add('tanker', x0 + 15, z0 + 4.2, 0);
-      if (rng() < 0.5) add('watertower', x0 + s - 5, z0 + 5, 0, variant());
+      if (rng() < 0.5) add('watertower', x0 + s - 5, z0 + 4.5, 0, variant());
       else {
-        add('van', x0 + 19, z0 + 3, 0, variant());
+        add('van', x0 + s - 9, z0 + 3, 0, variant());
         for (let i = 0; i < 3; i++) add('cone', x0 + s - 5 + i * 1.8, z0 + 2, 0);
       }
       return false;
@@ -787,14 +796,13 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
       add('mountain', cx, cz, turn(), variant());
       return fills('mountain');
     case 'military': {
-      // The hangar at the back; barracks, two tanks and the radar along the
-      // front; lookouts down the side by the hangar.
+      // The hangar at the back; barracks and two tanks along the front;
+      // lookouts down the side by the hangar (the radar is on the helipad).
       add('hangar', x0 + 11, z0 + s - 9, 0);
       add('barracks', x0 + 6.2, z0 + 3.6, Math.PI, variant());
-      add('tank', x0 + 14.3, z0 + 3.4, 0, 0);
-      add('tank', x0 + 18, z0 + 3.4, 0, 1);
-      add('radar', x0 + s - 4.1, z0 + 4.8, 0);
-      add('watchtower', x0 + s - 2, z0 + 13, 0);
+      add('tank', x0 + 14.6, z0 + 3.4, 0, 0);
+      add('tank', x0 + 18.6, z0 + 3.4, 0, 1);
+      add('watchtower', x0 + s - 2, z0 + 3, 0);
       add('watchtower', x0 + s - 2, z0 + s - 2, 0);
       return false;
     }
@@ -812,13 +820,13 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
       // longer that way, and a mall turned the other way ran over the
       // pavements to the kerb.
       const kind: PropKind = rng() < 0.55 ? 'stadium' : 'mall';
-      add(kind, b.x + 20, b.z + BLOCK / 2, 0, variant());
+      add(kind, b.x + 19, b.z + BLOCK / 2, 0, variant());
       return true;
     }
     case 'parking': {
       // Rows of parked cars facing a middle aisle, a lamp at each end.
       const px0 = b.x + 3;
-      for (let i = 0; i < 9; i++) {
+      for (let i = 0; i < 8; i++) {
         for (const [row, rot] of [
           [b.z + 5, 0],
           [b.z + BLOCK - 5, Math.PI],
@@ -879,7 +887,7 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
 function scatter(t: Tools, x0: number, z0: number, s: number, n: number, each: (x: number, z: number) => void): void {
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
-      each(x0 + 1.5 + (i * (s - 3)) / (n - 1) + (t.rng() - 0.5) * 1.2, z0 + 1.5 + (j * (s - 3)) / (n - 1) + (t.rng() - 0.5) * 1.2);
+      each(x0 + 1.5 + (i * (s - 3)) / (n - 1) + (t.rng() - 0.5) * 0.9, z0 + 1.5 + (j * (s - 3)) / (n - 1) + (t.rng() - 0.5) * 0.9);
     }
   }
 }
@@ -896,8 +904,8 @@ function gasworks({ add, rng, variant }: Tools, { x0, z0, s }: Lot): void {
   add('gastank', cx + 2.5, back - 5, 0, variant());
   add('flarestack', cx + 9, back - 2.7, 0);
   add('plantshed', cx - 5.5, back - 14, 0);
-  if (rng() < 0.5) add('gastank', cx + 5.5, back - 14, 0, variant());
-  else for (const dx of [3, 6.2]) add('container', cx + dx, back - 14, 0, variant());
+  if (rng() < 0.5) add('gastank', cx + 5.5, back - 13.5, 0, variant());
+  else for (const dx of [3, 6.2]) add('container', cx + dx, back - 13.5, 0, variant());
 }
 
 /** Parked vehicles along the kerbs, and the odd cone in the road. */

@@ -56,18 +56,21 @@ function triangleTotals(map: MapId): { whole: number; near: number } {
 
 /**
  * Caps, each about 15% above what a fixed seed (7) measured on 2026-09-30
- * after the maps grew: whole map / within 90 units of the centre.
- *   town:   1,186,413 / 262,824
- *   city:   1,915,679 / 195,950
- *   mega:   2,825,687 / 175,964
- *   region: 3,143,489 / 205,960
+ * after the street grid tightened (a block more each way per map) and the
+ * countryside filled with trees: whole map / within 90 units of the centre.
+ *   town:   1,413,897 / 271,158
+ *   city:   2,160,963 / 221,030
+ *   mega:   3,249,619 / 188,420
+ *   region: 3,866,107 / 190,608
+ * Region frame times on an M-series Mac (`npm run perf:gulp -- --map=region
+ * --frames-only`) were the same before and after that change.
  * Measure first, then raise these if a deliberate change needs more room.
  */
 const TRIANGLE_CAPS: Record<MapId, { whole: number; near: number }> = {
-  town: { whole: 1_365_000, near: 303_000 },
-  city: { whole: 2_204_000, near: 226_000 },
-  mega: { whole: 3_250_000, near: 203_000 },
-  region: { whole: 3_616_000, near: 237_000 },
+  town: { whole: 1_626_000, near: 312_000 },
+  city: { whole: 2_485_000, near: 254_000 },
+  mega: { whole: 3_737_000, near: 217_000 },
+  region: { whole: 4_446_000, near: 237_000 },
 };
 
 describe('triangles per map', () => {

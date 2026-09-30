@@ -8,8 +8,8 @@ import { FIT, LEVELS } from './catalog';
 export const START_R = 1.6;
 // Growth tapers off as a hole gets big (a power below a half), so the
 // first levels come fast and the giant ones take a whole round.
-const GROW = 0.25;
-const GROW_POWER = 0.4;
+const GROW = 0.27;
+const GROW_POWER = 0.41;
 
 /** A hole swallows another this many times smaller than itself. */
 export const EAT_HOLE = 1.2;

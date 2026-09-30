@@ -40,7 +40,8 @@ export interface AirportSite {
 /**
  * Lay out the airport on its 4×4 blocks and build over its inner streets
  * (added to `lots`). Worked out in the airport's own frame: `u` runs along
- * the edge of town, `v` inward from it, both 0 to 166. From the edge in:
+ * the edge of town, `v` inward from it, both 0 to 166 (scaled to the four
+ * blocks' real span; the things themselves keep their size). From the edge in:
  * grass, the runway, grass, the taxiway, grass, then the apron: a terminal
  * at each end facing the other, a jet at each, a hangar and the radar
  * between, and the shuttle train's track along the back.
@@ -54,7 +55,7 @@ export function airport(site: AirportSite, half: number, t: Tools, lots: Rect[])
   const z1 = z0 + S;
   const { side } = site;
   // `u` along the edge of town, `v` in from it.
-  const { at, rect, facing } =
+  const frame =
     side === 'w'
       ? localFrame([x0, z0], [0, 1], [1, 0])
       : side === 'e'
@@ -62,7 +63,11 @@ export function airport(site: AirportSite, half: number, t: Tools, lots: Rect[])
         : side === 'n'
           ? localFrame([x0, z0], [1, 0], [0, 1])
           : localFrame([x0, z1], [1, 0], [0, -1]);
-  const uOf = (x: number, z: number) => (side === 'w' || side === 'e' ? z - z0 : x - x0);
+  const k = S / 166;
+  const at = (u: number, v: number) => frame.at(u * k, v * k);
+  const rect = (u0: number, v0: number, u1: number, v1: number) => frame.rect(u0 * k, v0 * k, u1 * k, v1 * k);
+  const { facing } = frame;
+  const uOf = (x: number, z: number) => (side === 'w' || side === 'e' ? z - z0 : x - x0) / k;
 
   // The inner streets, built over.
   for (let k = 1; k < 4; k++) {
@@ -91,7 +96,7 @@ export function airport(site: AirportSite, half: number, t: Tools, lots: Rect[])
     jets.push(jet);
   }
   add('hangar', ...at(83, 143), facing(0, -1));
-  add('hangar', ...at(17, 100), facing(0, -1));
+  add('hangar', ...at(17, 97.5), facing(0, -1));
   add('radar', ...at(156, 100), facing(0, -1));
   const track = rect(10, 155.5, 156, 158.5);
   for (const u of [40, 112]) add('train', ...at(u, 157), facing(1, 0));
@@ -114,7 +119,7 @@ export function airport(site: AirportSite, half: number, t: Tools, lots: Rect[])
     runway: rect(8, 12, 158, 28),
     along: side === 'n' || side === 's' ? 'x' : 'z',
     taxiways,
-    apron: rect(2.5, 90, 163.5, 163.5),
+    apron: rect(2.5, 87, 163.5, 163.5),
     lines,
     track,
   };

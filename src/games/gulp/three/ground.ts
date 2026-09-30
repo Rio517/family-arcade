@@ -278,22 +278,6 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   };
   const bySurface = new Map<Surface, THREE.BufferGeometry[]>();
   const paths: THREE.BufferGeometry[] = [];
-  const kerbs: THREE.BufferGeometry[] = [];
-  const shadows: THREE.BufferGeometry[] = [];
-  /** A bright kerb round a block, wide enough not to shimmer as a hairline
-   * from a height, with a shadow on the road side below. */
-  const kerb = (x0: number, z0: number, x1: number, z1: number) => {
-    const k = 0.5;
-    const o = 0.35;
-    shadows.push(quad(x0 - o, z0 - o, x1 + o, z0, -0.045, 4));
-    shadows.push(quad(x0 - o, z1, x1 + o, z1 + o, -0.045, 4));
-    shadows.push(quad(x0 - o, z0, x0, z1, -0.045, 4));
-    shadows.push(quad(x1, z0, x1 + o, z1, -0.045, 4));
-    kerbs.push(quad(x0, z0, x1, z0 + k, -0.06, 4));
-    kerbs.push(quad(x0, z1 - k, x1, z1, -0.06, 4));
-    kerbs.push(quad(x0, z0, x0 + k, z1, -0.06, 4));
-    kerbs.push(quad(x1 - k, z0, x1, z1, -0.06, 4));
-  };
   for (const b of city.blockList) {
     // The airport's blocks are drawn as one field (see below).
     if (b.kind === 'airport') continue;
@@ -302,7 +286,7 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
     const inset = surface === 'paving' || surface === 'plaza' ? SIDEWALK : SIDEWALK - 0.4;
     const list = bySurface.get(surface) ?? [];
     // Green ground: a big tile, turned and shifted per block so no two blocks
-    // repeat (the kerb hides the change), coloured by the same smooth field
+    // repeat (the pavement round it hides the change), coloured by the same smooth field
     // as the countryside. Paving keeps its neat grid.
     const x0 = b.x + inset;
     const z0 = b.z + inset;
@@ -322,10 +306,8 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
       paths.push(quad(b.x + SIDEWALK, b.z + c - w, b.x + b.size - SIDEWALK, b.z + c + w, -0.07, 4));
       paths.push(disc(b.x + c, b.z + c, PARK_PLAZA, -0.065, 4));
     }
-    kerb(b.x, b.z, b.x + b.size, b.z + b.size);
   }
   const field = city.airfield;
-  if (field) kerb(field.area.x0, field.area.z0, field.area.x1, field.area.z1);
   // The countryside: one meadow all the way round and on to the horizon,
   // its colour drifting smoothly, and ploughed fields on top (the farther
   // ones only scenery).
@@ -348,8 +330,6 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
     const quay = layer([quad(q.x0, q.z0, q.x1, q.z1, -0.07, 8)], flat(surfaces.concrete, 0xffffff, 2), 2);
     if (quay) group.add(quay);
   }
-  const kerbMesh = layer(kerbs, flat(null, 0xf3f1ea, 2), 2);
-  if (kerbMesh) group.add(kerbMesh);
 
   // Roads, then their markings.
   const asphalt = tex(drawAsphalt);
@@ -370,8 +350,6 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   const lots = city.lots.filter((l) => !inField(l)).map((l) => quad(l.x0, l.z0, l.x1, l.z1, -0.043, 8));
   const lotMesh = layer(lots, flat(surfaces.concrete, 0xffffff, 5), 5);
   if (lotMesh) group.add(lotMesh);
-  const shadowMesh = layer(shadows, flat(null, 0x3a3f4a, 4), 4);
-  if (shadowMesh) group.add(shadowMesh);
 
   // No centre lines: plain roads read calmer, and thin lines shimmer at a
   // distance. Zebra crossings stay.
