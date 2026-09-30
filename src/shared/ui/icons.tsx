@@ -289,6 +289,10 @@ export const SparkleIcon = (p: IconProps) =>
 export const StarIcon = (p: IconProps) =>
   svg(<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.5Z" />, p);
 
+/** A heart: a life left (Gulp Universe's lives). */
+export const HeartIcon = (p: IconProps) =>
+  svg(<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.2 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10Z" />, p);
+
 /** A feathered wing — the big-wings power-up in Rainbow Racer. */
 export const WingIcon = (p: IconProps) =>
   svg(

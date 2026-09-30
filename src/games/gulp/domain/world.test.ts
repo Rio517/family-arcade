@@ -191,4 +191,52 @@ describe('a round against the computer is fair and fun', () => {
     only(w2, [makeProp(1, 'van', h.x, h.z, 0)]);
     expect(stepWorld(w2, 1 / 60, still)).toContainEqual(expect.objectContaining({ type: 'eat' }));
   });
+
+  it('lives: three on Hard, five on Medium, none to lose on Easy; the last one puts a hole out for good', () => {
+    const lives = (difficulty: 'easy' | 'medium' | 'hard') => round(1, 2, { difficulty }).holes.map((h) => h.lives);
+    expect(lives('hard')).toEqual([3, 3, 3]);
+    expect(lives('medium')).toEqual([5, 5, 5]);
+    expect(lives('easy')).toEqual([Infinity, Infinity, Infinity]);
+
+    const w = round(1, 2, { difficulty: 'hard' });
+    only(w, []);
+    w.brains = w.brains.map(() => null);
+    const [, big, small] = w.holes;
+    grow(w, 1, 3000);
+    small.lives = 1;
+    small.x = big.x;
+    small.z = big.z;
+    const events = stepWorld(w, 1 / 60, still);
+    expect(events).toContainEqual({ type: 'out', hole: small.id });
+    expect(small.alive).toBe(false);
+    for (let i = 0; i < 60 * 10; i++) stepWorld(w, 1 / 60, still);
+    expect(small.alive).toBe(false);
+    expect(w.status).toBe('playing');
+  });
+
+  it('the child out of lives ends the round; every computer hole out, and the child has won it', () => {
+    const w = round(1, 1, { difficulty: 'hard' });
+    only(w, []);
+    w.brains = w.brains.map(() => null);
+    const [me, rival] = w.holes;
+    grow(w, 1, 3000);
+    me.lives = 1;
+    me.x = rival.x;
+    me.z = rival.z;
+    stepWorld(w, 1 / 60, still);
+    expect(w.status).toBe('over');
+    expect(w.endedBy).toBe('out');
+
+    const v = round(2, 1, { difficulty: 'medium' });
+    only(v, []);
+    v.brains = v.brains.map(() => null);
+    const [child, other] = v.holes;
+    grow(v, 0, 3000);
+    other.lives = 1;
+    other.x = child.x;
+    other.z = child.z;
+    stepWorld(v, 1 / 60, still);
+    expect(v.status).toBe('over');
+    expect(v.endedBy).toBe('last');
+  });
 });

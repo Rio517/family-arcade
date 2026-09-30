@@ -429,6 +429,12 @@ li:first-child > .gulp-rank { background: var(--g-yellow); color: #5a3d00; }
 li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-dot { flex-shrink: 0; width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
 .gulp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Lives left (Medium and Hard): a heart and a number; a hole out of lives is greyed. */
+.gulp-lives { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; color: #ff5d73; font-size: 14px; font-weight: 900; }
+.gulp-lives svg { fill: currentColor; }
+.gulp-lives.out { color: rgba(255, 255, 255, 0.75); text-transform: uppercase; letter-spacing: 0.05em; }
+.gulp-board li.out { opacity: 0.55; }
+.gulp-board li.out .gulp-name { text-decoration: line-through; }
 
 .gulp-center {
   position: absolute;
@@ -707,6 +713,8 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 }
 .gulp-eaten strong,
 .gulp-banner strong { font-size: 30px; font-weight: 900; line-height: 1.1; }
+.gulp-eaten-lives { display: inline-flex; align-items: center; gap: 4px; color: #e0344b; }
+.gulp-eaten-lives svg { fill: currentColor; }
 .gulp-eaten-kicker {
   padding: 3px 12px;
   border-radius: 999px;

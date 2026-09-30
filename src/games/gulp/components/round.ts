@@ -38,6 +38,10 @@ export interface HudRow {
   css: string;
   score: number;
   me: boolean;
+  /** Lives left, or null where there are none to lose (Easy). */
+  lives: number | null;
+  /** Out of lives: out of the round. */
+  out: boolean;
 }
 
 export interface Hud {
@@ -65,6 +69,8 @@ export interface Hud {
   combo: number;
   streak: number;
   alive: boolean;
+  /** The child's lives left, or null where there are none to lose (Easy). */
+  lives: number | null;
   eatenBy: string | null;
   respawnIn: number;
   elapsed: number;
@@ -109,6 +115,8 @@ export function hudOf(w: World, me: number): Hud {
     css: SKINS[h.skin % SKINS.length].css,
     score: h.score,
     me: h.id === me,
+    lives: Number.isFinite(h.lives) ? h.lives : null,
+    out: h.lives <= 0,
   }));
   const top = rows.slice(0, 5);
   const mine = top.some((r) => r.me) ? null : (rows.find((r) => r.me) ?? null);
@@ -134,6 +142,7 @@ export function hudOf(w: World, me: number): Hud {
     combo: comboOf(h.streak),
     streak: h.streak,
     alive: h.alive,
+    lives: Number.isFinite(h.lives) ? h.lives : null,
     eatenBy: h.eatenBy,
     respawnIn: Math.max(1, Math.ceil(h.respawnIn)),
     elapsed: w.elapsed,
