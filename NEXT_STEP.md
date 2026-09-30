@@ -26,11 +26,6 @@ exist nowhere else.
 
 - **Gulp Universe (live; the family is playing it and sending feedback).**
   Open:
-  - *How things fall into the mouth, and how buildings come back.* The
-    owner prefers Gulp City's: things tip over the rim on the side they
-    entered and drop, rather than twirl in; new buildings appear without our
-    yellow scaffold. A frame-by-frame study of both games is in progress; the
-    animations live in `three/propView.ts` (`swallow`, `raise`, `step`).
   - *The airport's middle hangar is the military one* (green, with a star).
     A civilian hangar would suit the terminals better.
   - *Lighthouse's mobile blocking time is noisy* (about 1.0–1.9 s between
