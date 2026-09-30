@@ -87,6 +87,8 @@ interface HoleObj {
   smear: { mesh: THREE.Mesh; kind: Smear | null; amount: number; base: THREE.Color; flameIn: number };
   /** 1 while visible, shrinking to 0 when swallowed. */
   shown: number;
+  /** How high it sits: it steps up and down kerbs smoothly. */
+  y: number;
   flash: number;
   blink: number;
 }
@@ -112,6 +114,8 @@ export class HoleViews {
   private bubble: { sprite: THREE.Sprite; life: number; hole: number } | null = null;
   private bubbleTex = new Map<string, THREE.Texture>();
   private time = 0;
+  /** The ground's height at a spot (a block stands a kerb above the road); the scene sets it. */
+  ground: (x: number, z: number) => number = () => 0;
 
   constructor(
     private scene: THREE.Scene,
@@ -292,7 +296,7 @@ export class HoleViews {
     smearMesh.visible = false;
     disc.add(smearMesh);
     const smear = { mesh: smearMesh, kind: null, amount: 0, base: new THREE.Color(look.color), flameIn: 0 };
-    const obj: HoleObj = { group, disc, body, rim, pupils, lids, eyes, label, materials, smear, shown: 1, flash: 0, blink: 2 + (group.id % 5) * 0.7 };
+    const obj: HoleObj = { group, disc, body, rim, pupils, lids, eyes, label, materials, smear, shown: 1, y: 0, flash: 0, blink: 2 + (group.id % 5) * 0.7 };
     if (mine) obj.power = buildPowerShow(group);
     return obj;
   }
@@ -304,7 +308,10 @@ export class HoleViews {
     const visible = obj.shown > 0.02;
     obj.group.visible = visible;
     if (!visible) return;
-    obj.group.position.set(h.x, 0, h.z);
+    // The mouth sits on the ground at its middle: on a pavement, a kerb up,
+    // stepping up and down quickly but not in a jump.
+    obj.y += (this.ground(h.x, h.z) - obj.y) * Math.min(1, dt * 12);
+    obj.group.position.set(h.x, obj.y, h.z);
     const r = h.r * obj.shown;
     obj.disc.scale.setScalar(r);
     obj.body.scale.setScalar(r);

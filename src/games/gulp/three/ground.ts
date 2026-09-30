@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { seededRng } from '@shared/rng';
-import { inside } from '../domain/city/common';
+import { PITCH, inside, type Rect } from '../domain/city/common';
 import { inRect } from '../domain/space';
 import { BLOCK, PARK_PATH, PARK_PLAZA, ROAD, SIDEWALK, type Airfield, type BlockKind, type City, type PlayArea, type Side } from '../domain/city';
 
@@ -55,6 +55,53 @@ function quad(x0: number, z0: number, x1: number, z1: number, y: number, tile: n
   for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / tile, pos.getZ(i) / tile);
   g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3).fill(1), 3));
   return g;
+}
+
+/** Four upright faces round a rectangle, from `y0` up to `y1`, facing out: the kerb round a raised block. */
+function kerbFaces(r: Rect, y0: number, y1: number): THREE.BufferGeometry[] {
+  const face = (len: number, turn: number, x: number, z: number) => {
+    const g = new THREE.PlaneGeometry(len, y1 - y0);
+    g.rotateY(turn);
+    g.translate(x, (y0 + y1) / 2, z);
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 3).fill(1), 3));
+    return g;
+  };
+  const cx = (r.x0 + r.x1) / 2;
+  const cz = (r.z0 + r.z1) / 2;
+  return [
+    face(r.x1 - r.x0, 0, cx, r.z1),
+    face(r.x1 - r.x0, Math.PI, cx, r.z0),
+    face(r.z1 - r.z0, Math.PI / 2, r.x1, cz),
+    face(r.z1 - r.z0, -Math.PI / 2, r.x0, cz),
+  ];
+}
+
+/**
+ * How high the blocks stand above the road: the street grid's blocks, the
+ * streets built over between two of them, and the airport. Everything
+ * standing there stands this much higher (see `groundAt`).
+ */
+export const CURB = 0.4;
+
+const heightsOf = new WeakMap<City, (x: number, z: number) => number>();
+
+/** The ground's height at a spot: `CURB` on a block (or built-over street, or the airport), 0 on the road and in the country. */
+export function groundAt(city: City, x: number, z: number): number {
+  let at = heightsOf.get(city);
+  if (!at) {
+    const { half, blocks } = city;
+    const more: Rect[] = [...city.lots, ...(city.airfield ? [city.airfield.area] : [])];
+    at = (px, pz) => {
+      const u = (px + half - ROAD) / PITCH;
+      const v = (pz + half - ROAD) / PITCH;
+      const i = Math.floor(u);
+      const j = Math.floor(v);
+      if (i >= 0 && j >= 0 && i < blocks && j < blocks && (u - i) * PITCH <= BLOCK && (v - j) * PITCH <= BLOCK) return CURB;
+      return more.some((r) => inRect(r, px, pz)) ? CURB : 0;
+    };
+    heightsOf.set(city, at);
+  }
+  return at(x, z);
 }
 
 /**
@@ -256,8 +303,9 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   };
   const half = city.half;
 
-  // Pavement under everything: the land itself.
-  const paving = tex(drawSlabs);
+  // Pavement under everything: the land itself (the blocks' own pavements
+  // stand a kerb higher, see below).
+  const paving = tex((g, s) => drawSlabs(g, s, 'both'));
   // Every layer sits just under y = 0, so no thing standing on the ground
   // shares a plane with it (a shared plane flickers).
   const land = layer([quad(-half, -half, half, half, -0.1, 4)], flat(paving, 0xffffff, 0), 0);
@@ -278,13 +326,33 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   };
   const bySurface = new Map<Surface, THREE.BufferGeometry[]>();
   const paths: THREE.BufferGeometry[] = [];
+  // Everything on the blocks, built over streets and the airport stands a
+  // kerb above the roads (`CURB`): drawn at road level into this group, and
+  // the group lifted.
+  const raised = new THREE.Group();
+  raised.position.y = CURB;
+  group.add(raised);
+  const onBlocks = new Map<Surface, THREE.BufferGeometry[]>();
+  // Pavements: each side of a block its own strip of slabs, jointed only
+  // across its width, and a kerb face down to the road all round.
+  const walkAlongX: THREE.BufferGeometry[] = [];
+  const walkAlongZ: THREE.BufferGeometry[] = [];
+  const kerbs: THREE.BufferGeometry[] = [];
+  const kerb = (r: Rect) => kerbs.push(...kerbFaces(r, -CURB - 0.06, -0.1));
+  for (const b of city.blockList) {
+    if (b.kind === 'airport') continue;
+    const [x1, z1] = [b.x + b.size, b.z + b.size];
+    walkAlongX.push(quad(b.x, b.z, x1, b.z + SIDEWALK, -0.1, 4), quad(b.x, z1 - SIDEWALK, x1, z1, -0.1, 4));
+    walkAlongZ.push(quad(b.x, b.z + SIDEWALK, b.x + SIDEWALK, z1 - SIDEWALK, -0.1, 4), quad(x1 - SIDEWALK, b.z + SIDEWALK, x1, z1 - SIDEWALK, -0.1, 4));
+    kerb({ x0: b.x, z0: b.z, x1, z1 });
+  }
   for (const b of city.blockList) {
     // The airport's blocks are drawn as one field (see below).
     if (b.kind === 'airport') continue;
     // The Easter Island heads stand on grass, not paving.
     const surface = b.wonder === 'moai' ? 'grass' : FLOOR[b.kind];
     const inset = surface === 'paving' || surface === 'plaza' ? SIDEWALK : SIDEWALK - 0.4;
-    const list = bySurface.get(surface) ?? [];
+    const list = onBlocks.get(surface) ?? [];
     // Green ground: a big tile, turned and shifted per block so no two blocks
     // repeat (the pavement round it hides the change), coloured by the same smooth field
     // as the countryside. Paving keeps its neat grid.
@@ -297,7 +365,7 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
       const look = { turn: Math.floor(r() * 4) * (Math.PI / 2), dx: r(), dz: r() };
       list.push(sheet(x0, z0, x1, z1, -0.08, GRASS_TILE, 9, look));
     } else list.push(quad(x0, z0, x1, z1, -0.08, 8));
-    bySurface.set(surface, list);
+    onBlocks.set(surface, list);
     if (b.kind === 'park') {
       // A cross of paths and a round plaza for the fountain.
       const c = BLOCK / 2;
@@ -317,14 +385,26 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   for (const f of [...city.fields, ...scene.fields]) fields.push(quad(f.x0, f.z0, f.x1, f.z1, -0.08, 8));
   bySurface.set('field', fields);
 
-  for (const [surface, parts] of bySurface) {
-    const m = flat(surfaces[surface], 0xffffff, 1);
-    const mesh = layer(parts, GREEN.has(surface) ? unrepeat(m) : m, 1);
-    if (mesh) group.add(mesh);
+  for (const [into, bySort] of [
+    [group, bySurface],
+    [raised, onBlocks],
+  ] as const) {
+    for (const [surface, parts] of bySort) {
+      const m = flat(surfaces[surface], 0xffffff, 1);
+      const mesh = layer(parts, GREEN.has(surface) ? unrepeat(m) : m, 1);
+      if (mesh) into.add(mesh);
+    }
+  }
+  for (const [parts, look] of [
+    [walkAlongX, 'x'],
+    [walkAlongZ, 'z'],
+  ] as const) {
+    const mesh = layer(parts, flat(tex((g, s) => drawSlabs(g, s, look)), 0xffffff, 0), 0);
+    if (mesh) raised.add(mesh);
   }
   const pathMesh = layer(paths, flat(surfaces.plaza, 0xf3e6cc, 2), 2);
-  if (pathMesh) group.add(pathMesh);
-  for (const mesh of playMeshes(city.play)) group.add(mesh);
+  if (pathMesh) raised.add(pathMesh);
+  for (const mesh of playMeshes(city.play)) raised.add(mesh);
   if (city.port) {
     const q = city.port.quay;
     const quay = layer([quad(q.x0, q.z0, q.x1, q.z1, -0.07, 8)], flat(surfaces.concrete, 0xffffff, 2), 2);
@@ -347,9 +427,17 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   // under its own field).
   const inField = (l: { x0: number; z0: number; x1: number; z1: number }) =>
     !!field && l.x0 >= field.area.x0 - 1 && l.x1 <= field.area.x1 + 1 && l.z0 >= field.area.z0 - 1 && l.z1 <= field.area.z1 + 1;
-  const lots = city.lots.filter((l) => !inField(l)).map((l) => quad(l.x0, l.z0, l.x1, l.z1, -0.043, 8));
-  const lotMesh = layer(lots, flat(surfaces.concrete, 0xffffff, 5), 5);
-  if (lotMesh) group.add(lotMesh);
+  const lots = city.lots.filter((l) => !inField(l));
+  for (const l of lots) kerb(l);
+  if (field) kerb(field.area);
+  const lotMesh = layer(
+    lots.map((l) => quad(l.x0, l.z0, l.x1, l.z1, -0.043, 8)),
+    flat(surfaces.concrete, 0xffffff, 5),
+    5,
+  );
+  if (lotMesh) raised.add(lotMesh);
+  const kerbMesh = layer(kerbs, flat(null, 0x98a2b1, 0), 0);
+  if (kerbMesh) raised.add(kerbMesh);
 
   // No centre lines: plain roads read calmer, and thin lines shimmer at a
   // distance. Zebra crossings stay.
@@ -374,7 +462,7 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   }
   const whiteMesh = layer(white, flat(null, 0xf4f4f0, 4), 4);
   if (whiteMesh) group.add(whiteMesh);
-  if (field) for (const mesh of airfieldMeshes(field, surfaces.meadow, surfaces.concrete, asphalt)) group.add(mesh);
+  if (field) for (const mesh of airfieldMeshes(field, surfaces.meadow, surfaces.concrete, asphalt)) raised.add(mesh);
 
   // A stone sea wall along each shore, standing out of the sea. Its top sits
   // below every ground layer (they run from -0.1 up to 0).
@@ -830,8 +918,12 @@ function speckle(g: CanvasRenderingContext2D, s: number, n: number, color: strin
   for (let i = 0; i < n; i++) g.fillRect(r() * s, r() * s, size, size);
 }
 
-/** The pavement: cool light-grey square slabs with clear joints. */
-function drawSlabs(g: CanvasRenderingContext2D, s: number): void {
+/**
+ * The pavement: cool light-grey slabs with clear joints. `both` joints them
+ * both ways (the land under everything); `x` and `z` only across a strip of
+ * pavement running along that axis, so each slab spans its whole width.
+ */
+function drawSlabs(g: CanvasRenderingContext2D, s: number, joints: 'both' | 'x' | 'z'): void {
   // Cool blue-grey, so it stays grey under the warm sun and reads apart
   // from the sandy paving inside the blocks.
   g.fillStyle = '#c3cdda';
@@ -840,21 +932,26 @@ function drawSlabs(g: CanvasRenderingContext2D, s: number): void {
   const shades = ['rgba(255,255,255,0.10)', 'rgba(0,0,0,0.035)', 'rgba(255,255,255,0.04)', 'rgba(0,0,0,0.06)'];
   for (let i = 0; i < 3; i++) {
     for (let j = 0; j < 3; j++) {
-      g.fillStyle = shades[(i * 2 + j * 3) % shades.length];
+      const k = joints === 'x' ? i : joints === 'z' ? j : i * 2 + j * 3;
+      g.fillStyle = shades[k % shades.length];
       g.fillRect((i * s) / 3, (j * s) / 3, s / 3, s / 3);
     }
   }
   speckle(g, s, 500, 'rgba(0,0,0,0.035)', 2, 1);
   g.strokeStyle = 'rgba(80,92,112,0.75)';
   g.lineWidth = 4;
-  // Four units of pavement: 3 x 3 slabs.
+  // Four units of pavement: 3 slabs each way.
   for (let i = 0; i <= 3; i++) {
     const p = (i * s) / 3;
     g.beginPath();
-    g.moveTo(p, 0);
-    g.lineTo(p, s);
-    g.moveTo(0, p);
-    g.lineTo(s, p);
+    if (joints !== 'z') {
+      g.moveTo(p, 0);
+      g.lineTo(p, s);
+    }
+    if (joints !== 'x') {
+      g.moveTo(0, p);
+      g.lineTo(s, p);
+    }
     g.stroke();
   }
 }

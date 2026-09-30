@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { seededRng } from '@shared/rng';
 import { createCity, type MapId } from '../domain/city';
-import { HORIZON, countryGrass, edgeOfPlay, grassTint, runwayMarks, scenery } from './ground';
+import { CURB, HORIZON, countryGrass, edgeOfPlay, grassTint, groundAt, runwayMarks, scenery } from './ground';
 
 describe('the grass', () => {
   it('changes colour smoothly everywhere: no step between two spots side by side', () => {
@@ -121,6 +121,24 @@ describe('the edge of play', () => {
           expect(gates.filter((g) => g.side === side).map((g) => g.at)).toEqual([mid]);
         }
       }
+    }
+  });
+});
+
+describe('the kerb', () => {
+  it('stands the blocks, built-over streets and the airport a kerb above the roads and the country', () => {
+    for (const map of ['city', 'region'] as MapId[]) {
+      const city = createCity(seededRng(1), map);
+      for (const b of city.blockList) expect(groundAt(city, b.x + b.size / 2, b.z + b.size / 2)).toBe(CURB);
+      // Every road's middle, and the countryside past the grid.
+      for (const r of city.roads) {
+        if (city.lots.some((l) => l.x0 <= r && r <= l.x1)) continue;
+        if (city.airfield && r >= city.airfield.area.x0 && r <= city.airfield.area.x1) continue;
+        expect(groundAt(city, r, city.blockList[0].z + 1)).toBe(0);
+      }
+      expect(groundAt(city, city.half + 20, 0)).toBe(0);
+      for (const l of city.lots) expect(groundAt(city, (l.x0 + l.x1) / 2, (l.z0 + l.z1) / 2)).toBe(CURB);
+      if (city.airfield) expect(groundAt(city, (city.airfield.area.x0 + city.airfield.area.x1) / 2, (city.airfield.area.z0 + city.airfield.area.z1) / 2)).toBe(CURB);
     }
   });
 });
