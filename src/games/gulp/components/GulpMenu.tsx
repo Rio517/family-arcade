@@ -5,6 +5,7 @@
  * behind Options, with the difficulty named on the Options button.
  */
 import { useState } from 'react';
+import { PlayingAs } from '@shared/profile/PlayingAs';
 import { CloseIcon } from '@shared/ui/icons';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { MAPS, type MapId } from '../domain/city';
@@ -15,7 +16,7 @@ import type { Settings } from './round';
 const MAP_ORDER: MapId[] = ['town', 'city', 'mega', 'region'];
 
 const MAP_BLURB: Record<MapId, string> = {
-  town: 'Houses, shops and a farm',
+  town: 'Houses, shops and parks',
   city: 'Towers, a stadium and factories',
   mega: 'Skyscrapers and power plants',
   region: 'Farms, an airport and mountains',
@@ -61,6 +62,8 @@ export function GulpMenu({
       </div>
 
       <div className="gulp-card">
+        {/* Who is playing, and "Switch player": the arcade's one identity, as in every game. */}
+        <PlayingAs />
         <div className="gulp-row">
           <span className="gulp-label" id="gulp-map-label">
             Map

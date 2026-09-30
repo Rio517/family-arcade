@@ -190,7 +190,8 @@ describe('createCity', () => {
       const city = createCity(seededRng(3), map);
       for (const p of city.props) {
         const onIslet = city.extraLand.some((l) => l.kind === 'islet' && p.x >= l.x0 && p.x <= l.x1 && p.z >= l.z0 && p.z <= l.z1);
-        if (onIslet) continue;
+        // Ships are moored in the sea (see the port test).
+        if (onIslet || p.kind === 'ship') continue;
         expect(Math.abs(p.x)).toBeLessThan(city.land);
         expect(Math.abs(p.z)).toBeLessThan(city.land);
         const onCrossing = city.roads.some((x) => Math.abs(p.x - x) < ROAD / 2) && city.roads.some((z) => Math.abs(p.z - z) < ROAD / 2);
@@ -280,6 +281,7 @@ describe('placement', () => {
       for (const p of city.props) {
         if (Math.abs(p.x) < city.half && Math.abs(p.z) < city.half) continue;
         if (city.extraLand.some((l) => l.kind === 'islet' && p.x >= l.x0 && p.x <= l.x1 && p.z >= l.z0 && p.z <= l.z1)) continue;
+        if (p.kind === 'ship') continue;
         for (const sh of outline(p)) {
           const b = bounds(sh);
           if (!within(b, { x0: -city.land, z0: -city.land, x1: city.land, z1: city.land })) bad.push(`${map}#${seed}: ${where(p)} over the shore`);
@@ -350,6 +352,66 @@ describe('placement', () => {
       const count = (k: PropKind) => city.props.filter((p) => p.kind === k).length;
       for (const k of ['cottage', 'house', 'villa'] as const) expect(count(k), `${map}#${seed} ${k}`).toBeGreaterThan(0);
       if (map === 'town') expect(count('cottage'), `town#${seed}`).toBeGreaterThan(count('house'));
+    }
+  });
+
+  it('has the sea to the north, a second shore on the bigger maps, and a port on it', () => {
+    for (const { map, seed, city } of cities) {
+      expect(city.shores[0]).toBe('n');
+      expect(new Set(city.shores).size).toBe(city.shores.length);
+      if (map === 'town') expect(city.shores).toEqual(['n']);
+      if (map === 'mega' || map === 'region') {
+        expect(city.shores.length, `${map}#${seed}`).toBe(2);
+        expect(city.port?.side).toBe(city.shores[1]);
+      } else expect(city.port).toBeNull();
+    }
+  });
+
+  it('builds the port on its shore: cranes on the quay, ships moored in the water alongside', () => {
+    for (const { map, seed, city } of cities.filter((c) => c.city.port)) {
+      const { quay, side } = city.port!;
+      const L = city.land;
+      expect(within(quay, { x0: -L, z0: -L, x1: L, z1: L })).toBe(true);
+      // The quay runs along the shore.
+      const edge = { n: quay.z0 + L, s: L - quay.z1, w: quay.x0 + L, e: L - quay.x1 }[side];
+      expect(edge).toBeCloseTo(0);
+      const ships = city.props.filter((p) => p.kind === 'ship');
+      const cranes = city.props.filter((p) => p.kind === 'crane');
+      expect(ships.length, `${map}#${seed}`).toBeGreaterThanOrEqual(1);
+      expect(cranes.length).toBe(3);
+      for (const c of cranes) expect(within(bounds(outline(c)[0]), quay), where(c)).toBe(true);
+      for (const p of ships) {
+        const b = bounds(outline(p)[0]);
+        // Clear of the sea wall (1.5 out), within a few units of it, and alongside the quay.
+        const out = { n: -L - b.z1, s: b.z0 - L, w: -L - b.x1, e: b.x0 - L }[side];
+        expect(out, where(p)).toBeGreaterThan(1.5);
+        expect(out, where(p)).toBeLessThan(4);
+        const along = side === 'n' || side === 's' ? [b.x0, b.x1, quay.x0, quay.x1] : [b.z0, b.z1, quay.z0, quay.z1];
+        expect(along[0] >= along[2] && along[1] <= along[3], where(p)).toBe(true);
+      }
+      expect(city.props.some((p) => p.kind === 'warehouse' && within(bounds(outline(p)[0]), quay))).toBe(true);
+    }
+  });
+
+  it('keeps each playground surface and court for its own pieces', () => {
+    const own = { soft: new Set<PropKind>(['swings', 'slide', 'seesaw', 'sandbox', 'climber', 'carousel']), court: new Set<PropKind>(['hoop']) };
+    let courts = 0;
+    for (const { map, seed, city } of cities) {
+      for (const a of city.play) {
+        if (a.kind === 'court') courts++;
+        const pieces = city.props.filter((p) => outline(p).some((sh) => cut(bounds(sh), a)));
+        for (const p of pieces) expect(own[a.kind].has(p.kind), `${map}#${seed}: ${where(p)} on a ${a.kind}`).toBe(true);
+        if (a.kind === 'court') expect(pieces.filter((p) => p.kind === 'hoop').length).toBe(2);
+        else expect(pieces.length).toBeGreaterThanOrEqual(3);
+      }
+    }
+    expect(courts).toBeGreaterThan(0);
+  });
+
+  it('keeps farms out of the street grid: they are only in the countryside', () => {
+    for (const { map, seed, city } of cities) {
+      const farm = city.props.filter((p) => (p.kind === 'barn' || p.kind === 'haybale' || p.kind === 'tractor') && Math.abs(p.x) < city.half && Math.abs(p.z) < city.half);
+      expect(farm.map(where), `${map}#${seed}`).toEqual([]);
     }
   });
 

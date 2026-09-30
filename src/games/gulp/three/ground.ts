@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { seededRng } from '@shared/rng';
-import { BLOCK, PARK_PATH, PARK_PLAZA, ROAD, SIDEWALK, type Airfield, type BlockKind, type City } from '../domain/city';
+import { BLOCK, PARK_PATH, PARK_PLAZA, ROAD, SIDEWALK, type Airfield, type BlockKind, type City, type PlayArea } from '../domain/city';
 
 type Surface = 'grass' | 'meadow' | 'forest' | 'paving' | 'plaza' | 'concrete' | 'field' | 'rock' | 'parking';
 
@@ -30,7 +30,6 @@ const FLOOR: Record<BlockKind, Surface> = {
   plaza: 'plaza',
   landmark: 'concrete',
   industrial: 'concrete',
-  farm: 'field',
   forest: 'forest',
   windfarm: 'meadow',
   airport: 'concrete',
@@ -132,21 +131,25 @@ function sheet(
 /** How far across one repeat of the grass texture is, in world units. */
 const GRASS_TILE = 22;
 
+/** How far the land runs out on its green sides: past the fog, to the horizon. */
+export const HORIZON = 3000;
+
 /**
- * The countryside's grass: the land between the street grid and the shore,
- * as one mesh (a square ring with shared vertices, so no joins and no
- * cracks) under one unturned texture mapping and one colour field.
+ * All the grass outside the street grid, as one mesh (shared vertices, so no
+ * joins and no cracks) under one unturned texture mapping and one colour
+ * field: the countryside ring, and past the edge of play the land that
+ * carries on to the horizon on every side that is not sea. Vertices are 9
+ * apart on the playable land and 60 apart beyond it.
  */
-export function countryGrass(city: City, y = -0.09): THREE.BufferGeometry | null {
-  const { half, land } = city;
-  if (land <= half) return null;
-  const step = 9;
-  const run = (a: number, b: number) => {
+export function countryGrass(city: City, y = -0.09): THREE.BufferGeometry {
+  const { half, land, shores } = city;
+  const run = (a: number, b: number, step: number) => {
+    if (b - a < 1e-6) return [];
     const n = Math.max(1, Math.ceil((b - a) / step));
     return Array.from({ length: n }, (_, i) => a + ((b - a) * i) / n);
   };
-  // Grid lines that land exactly on the street grid's edges.
-  const lines = [...run(-land, -half), ...run(-half, half), ...run(half, land), land];
+  // Grid lines that land exactly on the street grid's edges and the shore.
+  const lines = [...run(-HORIZON, -land, 60), ...run(-land, -half, 9), ...run(-half, half, 9), ...run(half, land, 9), ...run(land, HORIZON, 60), HORIZON];
   const n = lines.length;
   const pos: number[] = [];
   const uv: number[] = [];
@@ -158,12 +161,14 @@ export function countryGrass(city: City, y = -0.09): THREE.BufferGeometry | null
       col.push(...grassTint(x, z));
     }
   }
+  const sea = (x: number, z: number) =>
+    (x < -land && shores.includes('w')) || (x > land && shores.includes('e')) || (z < -land && shores.includes('n')) || (z > land && shores.includes('s'));
   const index: number[] = [];
   for (let j = 0; j < n - 1; j++) {
     for (let i = 0; i < n - 1; i++) {
-      // Only squares outside the street grid.
+      // Only squares outside the street grid, and not out over the sea.
       const inGrid = lines[i] >= -half && lines[i + 1] <= half && lines[j] >= -half && lines[j + 1] <= half;
-      if (inGrid) continue;
+      if (inGrid || sea((lines[i] + lines[i + 1]) / 2, (lines[j] + lines[j + 1]) / 2)) continue;
       const a = j * n + i;
       const b = a + 1;
       const c = a + n;
@@ -318,15 +323,15 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   }
   const field = city.airfield;
   if (field) kerb(field.area.x0, field.area.z0, field.area.x1, field.area.z1);
-  // The countryside: one meadow all the way round, its colour drifting
-  // smoothly, and ploughed fields on top.
-  if (edgeOf > half) {
-    const meadow = countryGrass(city);
-    if (meadow) bySurface.set('meadow', [...(bySurface.get('meadow') ?? []), meadow]);
-    const fields = bySurface.get('field') ?? [];
-    for (const f of city.fields) fields.push(quad(f.x0, f.z0, f.x1, f.z1, -0.08, 8));
-    bySurface.set('field', fields);
-  }
+  // The countryside: one meadow all the way round and on to the horizon,
+  // its colour drifting smoothly, and ploughed fields on top (the farther
+  // ones only scenery).
+  const scene = scenery(city);
+  bySurface.set('meadow', [...(bySurface.get('meadow') ?? []), countryGrass(city)]);
+  const fields = bySurface.get('field') ?? [];
+  for (const f of [...city.fields, ...scene.fields]) fields.push(quad(f.x0, f.z0, f.x1, f.z1, -0.08, 8));
+  bySurface.set('field', fields);
+
   for (const [surface, parts] of bySurface) {
     const m = flat(surfaces[surface], 0xffffff, 1);
     const mesh = layer(parts, GREEN.has(surface) ? unrepeat(m) : m, 1);
@@ -334,6 +339,12 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   }
   const pathMesh = layer(paths, flat(surfaces.plaza, 0xf3e6cc, 2), 2);
   if (pathMesh) group.add(pathMesh);
+  for (const mesh of playMeshes(city.play)) group.add(mesh);
+  if (city.port) {
+    const q = city.port.quay;
+    const quay = layer([quad(q.x0, q.z0, q.x1, q.z1, -0.07, 8)], flat(surfaces.concrete, 0xffffff, 2), 2);
+    if (quay) group.add(quay);
+  }
   const kerbMesh = layer(kerbs, flat(null, 0xf3f1ea, 2), 2);
   if (kerbMesh) group.add(kerbMesh);
 
@@ -345,6 +356,8 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
     roads.push(quad(r - ROAD / 2, -half, r + ROAD / 2, half, -0.05, 10));
   }
   for (const r of city.countryRoads) roads.push(quad(r.x0, r.z0, r.x1, r.z1, -0.05, 10));
+  // The middle roads run on out to the horizon on the green sides.
+  for (const r of scene.roads) roads.push(quad(r.x0, r.z0, r.x1, r.z1, -0.05, 10));
   const roadMesh = layer(roads, flat(asphalt, 0xffffff, 3), 3);
   if (roadMesh) group.add(roadMesh);
   // Streets built over to join an arena to its car park (the airport's are
@@ -382,15 +395,21 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   if (whiteMesh) group.add(whiteMesh);
   if (field) for (const mesh of airfieldMeshes(field, surfaces.meadow, surfaces.concrete, asphalt)) group.add(mesh);
 
-  // The island's edge, standing out of the sea, and the sea.
-  const edge = new THREE.Mesh(
-    new THREE.BoxGeometry(edgeOf * 2 + 3, 3, edgeOf * 2 + 3),
-    new THREE.MeshStandardMaterial({ color: 0xd9d2c3, roughness: 0.9 }),
-  );
-  // Its top sits below every ground layer (they run from -0.1 up to 0).
-  edge.position.y = -1.75;
-  edge.receiveShadow = true;
-  group.add(edge);
+  // A stone sea wall along each shore, standing out of the sea. Its top sits
+  // below every ground layer (they run from -0.1 up to 0).
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xd9d2c3, roughness: 0.9 });
+  const reach = (side: 'n' | 's' | 'e' | 'w') => (city.shores.includes(side) ? edgeOf : HORIZON);
+  for (const side of city.shores) {
+    const alongX = side === 'n' || side === 's';
+    const [a0, a1] = alongX ? [-reach('w'), reach('e')] : [-reach('n'), reach('s')];
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(alongX ? a1 - a0 + 3 : 3, 3, alongX ? 3 : a1 - a0 + 3), wallMat);
+    const out = side === 'n' || side === 'w' ? -edgeOf : edgeOf;
+    wall.position.set(alongX ? (a0 + a1) / 2 : out, -1.75, alongX ? out : (a0 + a1) / 2);
+    wall.receiveShadow = true;
+    group.add(wall);
+  }
+  const woods = trees(scene.trees);
+  if (woods) group.add(woods);
 
   // The wonder islet (grass on a stone base) and the bridge out to it.
   const stone = new THREE.MeshStandardMaterial({ color: 0xd9d2c3, roughness: 0.9 });
@@ -440,6 +459,146 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
       for (const t of textures) t.dispose();
     },
   };
+}
+
+// -------------------------------------------------------------------------
+// Playgrounds and courts
+// -------------------------------------------------------------------------
+
+/** Set every vertex of a flat piece to one colour (the material's colour is white). */
+function painted(g: THREE.BufferGeometry, rgb: [number, number, number]): THREE.BufferGeometry {
+  const c = g.attributes.color ?? new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 3), 3);
+  for (let i = 0; i < c.count; i++) c.setXYZ(i, ...rgb);
+  g.setAttribute('color', c);
+  return g;
+}
+
+/** A flat ring (or half of one) round (x, z), for court lines. `half` is -1 or 1 for the side it bulges to (z), 0 for whole. */
+function arc(x: number, z: number, r: number, width: number, y: number, half: -1 | 0 | 1): THREE.BufferGeometry {
+  // Before the turn to lie flat, +y becomes -z: a start of 0 bulges to -z, of pi to +z.
+  const g = new THREE.RingGeometry(r - width, r, 28, 1, half === 1 ? Math.PI : 0, half === 0 ? Math.PI * 2 : Math.PI);
+  g.rotateX(-Math.PI / 2);
+  g.translate(x, y, z);
+  return painted(g, [1, 1, 1]);
+}
+
+const RUBBER: [number, number, number] = [0.9, 0.47, 0.36];
+const RUBBER_EDGE: [number, number, number] = [0.66, 0.31, 0.25];
+const COURT: [number, number, number] = [0.27, 0.52, 0.74];
+const KEY: [number, number, number] = [0.87, 0.47, 0.31];
+
+/**
+ * Soft play surfaces (rubber, with a darker edge) and basketball courts
+ * (blue, orange keys, white lines, a hoop's three-point arc at each end).
+ * Three meshes for all of them: the surfaces, the edges and keys, the lines.
+ */
+function playMeshes(areas: readonly PlayArea[]): THREE.Mesh[] {
+  const base: THREE.BufferGeometry[] = [];
+  const mid: THREE.BufferGeometry[] = [];
+  const lines: THREE.BufferGeometry[] = [];
+  const band = (list: THREE.BufferGeometry[], a: PlayArea, w: number, y: number, rgb: [number, number, number]) => {
+    list.push(painted(quad(a.x0, a.z0, a.x1, a.z0 + w, y, 4), rgb));
+    list.push(painted(quad(a.x0, a.z1 - w, a.x1, a.z1, y, 4), rgb));
+    list.push(painted(quad(a.x0, a.z0 + w, a.x0 + w, a.z1 - w, y, 4), rgb));
+    list.push(painted(quad(a.x1 - w, a.z0 + w, a.x1, a.z1 - w, y, 4), rgb));
+  };
+  for (const a of areas) {
+    if (a.kind === 'soft') {
+      base.push(painted(quad(a.x0, a.z0, a.x1, a.z1, -0.07, 4), RUBBER));
+      band(mid, a, 0.5, -0.068, RUBBER_EDGE);
+      continue;
+    }
+    base.push(painted(quad(a.x0, a.z0, a.x1, a.z1, -0.07, 4), COURT));
+    const cx = (a.x0 + a.x1) / 2;
+    const cz = (a.z0 + a.z1) / 2;
+    // The boundary, the half-way line and the centre circle.
+    band(lines, { ...a, x0: a.x0 + 0.4, z0: a.z0 + 0.4, x1: a.x1 - 0.4, z1: a.z1 - 0.4 }, 0.3, -0.066, [1, 1, 1]);
+    lines.push(painted(quad(a.x0 + 0.4, cz - 0.15, a.x1 - 0.4, cz + 0.15, -0.066, 4), [1, 1, 1]));
+    lines.push(arc(cx, cz, 1.8, 0.3, -0.066, 0));
+    // At each end: the key, and the three-point arc round the hoop.
+    for (const end of [-1, 1] as const) {
+      const z = end < 0 ? a.z0 + 0.4 : a.z1 - 0.4;
+      const z2 = z - end * 5.2;
+      mid.push(painted(quad(cx - 2, Math.min(z, z2), cx + 2, Math.max(z, z2), -0.068, 4), KEY));
+      lines.push(arc(cx, z - end * 1.2, 4.4, 0.3, -0.066, end < 0 ? 1 : -1));
+    }
+  }
+  const out = [layer(base, flat(null, 0xffffff, 2), 2), layer(mid, flat(null, 0xffffff, 3), 3), layer(lines, flat(null, 0xf4f4f0, 4), 4)];
+  return out.filter((m): m is THREE.Mesh => m !== null);
+}
+
+// -------------------------------------------------------------------------
+// Scenery past the edge of play
+// -------------------------------------------------------------------------
+
+/**
+ * What stands on the green beyond the edge of play, near enough to see:
+ * ploughed fields, clumps of trees, and the middle roads running on to the
+ * horizon. Scenery only (nothing to eat), from a seeded random, the same
+ * every time for a map.
+ */
+export function scenery(city: City): { fields: Box[]; trees: Array<{ x: number; z: number; s: number }>; roads: Box[] } {
+  const { land, shores } = city;
+  const mid = city.roads[Math.floor(city.blocks / 2)];
+  const roads: Box[] = [];
+  if (!shores.includes('n')) roads.push({ x0: mid - ROAD / 2, z0: -HORIZON, x1: mid + ROAD / 2, z1: -land });
+  if (!shores.includes('s')) roads.push({ x0: mid - ROAD / 2, z0: land, x1: mid + ROAD / 2, z1: HORIZON });
+  if (!shores.includes('w')) roads.push({ x0: -HORIZON, z0: mid - ROAD / 2, x1: -land, z1: mid + ROAD / 2 });
+  if (!shores.includes('e')) roads.push({ x0: land, z0: mid - ROAD / 2, x1: HORIZON, z1: mid + ROAD / 2 });
+  const far = land + 520;
+  /** On the green past the edge of play, off the roads. */
+  const open = (x: number, z: number, pad: number) => {
+    if (Math.abs(x) < land + 12 + pad && Math.abs(z) < land + 12 + pad) return false;
+    if ((x < -land && shores.includes('w')) || (x > land && shores.includes('e')) || (z < -land && shores.includes('n')) || (z > land && shores.includes('s'))) return false;
+    return !roads.some((r) => x > r.x0 - 8 - pad && x < r.x1 + 8 + pad && z > r.z0 - 8 - pad && z < r.z1 + 8 + pad);
+  };
+  const r = seededRng(city.blocks * 7919 + Math.round(land));
+  const at = () => -far + r() * far * 2;
+  const fields: Box[] = [];
+  for (let i = 0; i < 260 && fields.length < 56; i++) {
+    const x = at();
+    const z = at();
+    const w = 24 + r() * 20;
+    const d = 20 + r() * 16;
+    const f = { x0: x - w / 2, z0: z - d / 2, x1: x + w / 2, z1: z + d / 2 };
+    const clear = [
+      [f.x0, f.z0],
+      [f.x1, f.z0],
+      [f.x0, f.z1],
+      [f.x1, f.z1],
+    ].every(([px, pz]) => open(px, pz, 0));
+    const apart = fields.every((o) => f.x1 + 6 < o.x0 || o.x1 + 6 < f.x0 || f.z1 + 6 < o.z0 || o.z1 + 6 < f.z0);
+    if (clear && apart) fields.push(f);
+  }
+  const trees: Array<{ x: number; z: number; s: number }> = [];
+  for (let i = 0; i < 420; i++) {
+    const cx = at();
+    const cz = at();
+    if (!open(cx, cz, 0)) continue;
+    const n = 6 + Math.floor(r() * 10);
+    for (let k = 0; k < n; k++) {
+      const x = cx + (r() - 0.5) * 30;
+      const z = cz + (r() - 0.5) * 30;
+      const onField = fields.some((f) => x > f.x0 - 2 && x < f.x1 + 2 && z > f.z0 - 2 && z < f.z1 + 2);
+      if (open(x, z, 2) && !onField) trees.push({ x, z, s: 0.8 + r() * 0.7 });
+    }
+  }
+  return { fields, trees, roads };
+}
+
+/** The scenery's trees: one instanced mesh of low pines, casting no shadow. */
+function trees(list: ReadonlyArray<{ x: number; z: number; s: number }>): THREE.InstancedMesh | null {
+  if (!list.length) return null;
+  const trunk = painted(new THREE.CylinderGeometry(0.3, 0.36, 1.4, 6).translate(0, 0.7, 0), [0.45, 0.31, 0.2]);
+  const low = painted(new THREE.ConeGeometry(1.8, 3.6, 7).translate(0, 2.8, 0), [0.24, 0.55, 0.3]);
+  const top = painted(new THREE.ConeGeometry(1.25, 2.8, 7).translate(0, 4.6, 0), [0.28, 0.62, 0.34]);
+  const geo = mergeGeometries([trunk, low, top]);
+  for (const g of [trunk, low, top]) g.dispose();
+  const mesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true }), list.length);
+  const m = new THREE.Matrix4();
+  list.forEach((t, i) => mesh.setMatrixAt(i, m.makeScale(t.s, t.s, t.s).setPosition(t.x, 0, t.z)));
+  mesh.computeBoundingSphere();
+  return mesh;
 }
 
 // -------------------------------------------------------------------------

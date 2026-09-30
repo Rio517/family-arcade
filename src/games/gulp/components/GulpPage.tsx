@@ -113,7 +113,9 @@ interface GulpPageProps {
 }
 
 export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps) {
-  const { userId } = useProfile();
+  const { userId, profile } = useProfile();
+  // The name from the arcade's "who's playing" screen, as in the racer.
+  const myName = profile.name.trim() || 'You';
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const [phase, setPhase] = useState<Phase>('menu');
   const [round, setRound] = useState<Round>(() => attract(0, rng));
@@ -172,7 +174,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     soundsRef.current?.unlock();
     const s = settings;
     const rivals = rivalsFor(s.skin, MAPS[s.map].rivals);
-    const world = createWorld(rng, { name: 'You', skin: s.skin }, rivals, {
+    const world = createWorld(rng, { name: myName, skin: s.skin }, rivals, {
       map: s.map,
       duration: durationOf(s),
       powerups: s.powerups,
@@ -182,7 +184,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
       wonders: dealRoundWonders(s.map, rng),
     });
     const looks: HoleLook[] = [
-      { color: SKINS[s.skin].color, label: 'You' },
+      { color: SKINS[s.skin].color, label: myName },
       ...rivals.map((r) => ({ color: SKINS[r.skin].color, label: r.name })),
     ];
     setRound((r) => ({ world, key: r.key + 1, looks, follow: 0, playing: true }));
@@ -431,7 +433,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
                 <li key={h.id} className={h.isPlayer ? 'me' : ''}>
                   <span className="gulp-rank">{i + 1}</span>
                   <span className="gulp-dot" style={{ background: SKINS[h.skin % SKINS.length].css }} aria-hidden="true" />
-                  <span className="gulp-name">{h.isPlayer ? 'You' : h.name}</span>
+                  <span className="gulp-name">{h.name}</span>
                   <small>LV {levelOf(h.r)}</small>
                   <b>{h.score.toLocaleString()}</b>
                 </li>

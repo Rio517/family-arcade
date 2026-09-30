@@ -47,6 +47,8 @@ export type PropKind =
   | 'icecreamvan'
   // A big construction site, where a stadium or a factory will go up.
   | 'bigsite'
+  // A tower going up: a frame and a crane, the step before a tall building.
+  | 'tallsite'
   // Tier 5: houses and shops (small, middling and big houses).
   | 'cottage'
   | 'house'
@@ -86,6 +88,11 @@ export type PropKind =
   | 'climber'
   | 'carousel'
   | 'agility'
+  | 'picnic'
+  | 'hoop'
+  // The port on a bigger map's shore.
+  | 'crane'
+  | 'ship'
   // A military base (Region), and the bomber that flies over big holes.
   | 'tank'
   | 'helicopter'
@@ -161,6 +168,7 @@ export const KINDS: Record<PropKind, KindInfo> = {
   garbagetruck: { tier: 4, w: 2.6, d: 7.0, h: 3.4, variants: 2 },
   icecreamvan: { tier: 4, w: 2.4, d: 5.6, h: 3.4, variants: 2, food: 'treat' },
   bigsite: { tier: 4, w: 20.0, d: 20.0, h: 12.0, variants: 1 },
+  tallsite: { tier: 6, w: 12.0, d: 12.0, h: 28.0, variants: 2 },
   cottage: { tier: 5, w: 6.0, d: 6.0, h: 5.0, variants: 4 },
   house: { tier: 5, w: 8.0, d: 8.0, h: 7.0, variants: 4, scales: true },
   villa: { tier: 5, w: 10.0, d: 9.5, h: 8.0, variants: 3 },
@@ -193,6 +201,10 @@ export const KINDS: Record<PropKind, KindInfo> = {
   climber: { tier: 2, w: 3.0, d: 3.0, h: 2.5, variants: 2 },
   carousel: { tier: 2, w: 3.2, d: 3.2, h: 1.6, variants: 2 },
   agility: { tier: 1, w: 3.0, d: 1.0, h: 1.2, variants: 2 },
+  picnic: { tier: 1, w: 2.2, d: 1.8, h: 0.9, variants: 2 },
+  hoop: { tier: 2, w: 1.2, d: 1.8, h: 3.4, variants: 1 },
+  crane: { tier: 7, w: 10.0, d: 12.0, h: 26.0, variants: 2 },
+  ship: { tier: 8, w: 12.0, d: 44.0, h: 14.0, variants: 2 },
   watchtower: { tier: 2, w: 3.0, d: 3.0, h: 7.0, variants: 1 },
   tank: { tier: 4, w: 3.4, d: 6.4, h: 2.6, variants: 2 },
   helicopter: { tier: 4, w: 10.0, d: 12.0, h: 3.4, variants: 1 },

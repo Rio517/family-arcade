@@ -7,7 +7,7 @@
  */
 import * as THREE from 'three';
 import type { PropKind } from '../domain/catalog';
-import { type Builder, type V3, FLUSH, Kit, ON_GROUND, PAL, darker, lighter, placement, translate } from './kit';
+import { type Builder, type Face, type V3, FLUSH, Kit, ON_GROUND, PAL, darker, lighter, placement, translate, walls } from './kit';
 
 export type ParkKind = Extract<
   PropKind,
@@ -25,6 +25,11 @@ export type ParkKind = Extract<
   | 'agility'
   | 'garbagetruck'
   | 'icecreamvan'
+  | 'tallsite'
+  | 'picnic'
+  | 'hoop'
+  | 'crane'
+  | 'ship'
 >;
 
 const HALF_PI = Math.PI / 2;
@@ -478,6 +483,315 @@ function icecreamvan(k: Kit, v: number): void {
 }
 
 // ---------------------------------------------------------------------------
+// Town extras: a tower going up, picnic tables, a basketball hoop, and the port
+
+/** Same site colours as `site` and `bigsite` in props.ts, so the three read as one family. */
+const SITE_YELLOW = 0xffc21a;
+const SITE_ORANGE = 0xff7a1a;
+const CONCRETE_GREY = 0xc9cdd3;
+const SITE_GLASS = 0x6fd8ff;
+
+/** Orange and white hoarding panels round a W x D lot, with a gate gap at the front, as the other sites have. */
+function hoarding(k: Kit, W: number, D: number, panel: number, h: number, gate: number): void {
+  let i = 0;
+  for (const wall of walls(W, D)) {
+    k.within(wall.m, () => {
+      const n = Math.round(wall.len / panel);
+      const pw = wall.len / n;
+      for (let j = 0; j < n; j++) {
+        const u = -wall.len / 2 + (j + 0.5) * pw;
+        if (wall.side === 'front' && Math.abs(u) < gate / 2) continue;
+        k.box(i++ % 2 ? PAL.white : SITE_ORANGE, pw - 0.08, h, 0.16, u, 0, -0.1, undefined, ON_GROUND);
+      }
+    });
+  }
+}
+
+const TALLSITES = [
+  { crane: SITE_YELLOW, net: 0x8fdc4a },
+  { crane: RED, net: 0x3aa0ff },
+] as const;
+
+/**
+ * A tower going up: the step between a building site and a skyscraper. A
+ * concrete core and bare floor slabs on columns, the lowest floors already
+ * glazed and the top ones still open with rebar showing; scaffolding with
+ * bright safety netting on two faces; hoarding round the lot; and a tall tower
+ * crane whose jib reaches out over the roof with a load on its hook.
+ */
+function tallsite(k: Kit, v: number): void {
+  const c = TALLSITES[v];
+  const dirt = 0xd9a066;
+  k.rbox(dirt, 11.8, 0.2, 11.8, 1.0, 0.08, 0, 0, 0, { seg: 1 });
+  hoarding(k, 11.8, 11.8, 1.6, 1.2, 3.0);
+  // The frame: floors of bare slabs on columns round a concrete core.
+  const S = 7.6;
+  const bx = -0.6;
+  const bz = -0.6;
+  const fh = 3.2;
+  const floors = 6;
+  const y0 = 0.2;
+  k.box(CONCRETE_GREY, 2.6, 21.2, 2.6, bx, y0, bz, undefined, ON_GROUND);
+  k.box(darker(CONCRETE_GREY, 0.2), 1.2, 2.2, 0.08, bx, y0 + 18.6, bz + 1.34, undefined, FLUSH);
+  for (let f = 0; f <= floors; f++) {
+    const y = y0 + f * fh;
+    const top = f === floors;
+    // The top slab is only half poured.
+    if (top) k.box(CONCRETE_GREY, S, 0.3, S / 2, bx, y, bz - S / 4);
+    else if (f > 0) k.box(CONCRETE_GREY, S, 0.3, S, bx, y, bz);
+    if (top) continue;
+    for (const px of [-1, 0, 1]) {
+      for (const pz of [-1, 0, 1]) {
+        if (px === 0 && pz === 0) continue;
+        k.box(lighter(CONCRETE_GREY, 0.1), 0.34, fh - (f === 0 ? 0 : 0.3), 0.34, bx + px * (S / 2 - 0.3), y + (f === 0 ? 0 : 0.3), bz + pz * (S / 2 - 0.3), undefined, ['py', 'ny']);
+      }
+    }
+    // The lowest two floors are already glazed.
+    if (f < 2) k.box(SITE_GLASS, S - 0.9, fh - 0.3, S - 0.9, bx, y + (f === 0 ? 0 : 0.3), bz, undefined, ['py', 'ny']);
+  }
+  // Rebar sticking up from the columns on the unfinished top.
+  const yt = y0 + floors * fh + 0.3;
+  for (const px of [-1, 1]) {
+    for (const pz of [-1, 1]) k.box(0xb5523b, 0.12, 1.3, 0.12, bx + px * (S / 2 - 0.3), yt, bz + pz * (S / 2 - 0.3), undefined, ['ny']);
+  }
+  // Scaffolding and netting on the front (+z) and right (+x) faces.
+  const out = S / 2 + 0.7;
+  const scaffH = floors * fh - 0.4;
+  for (const [nx, nz] of [
+    [0, 1],
+    [1, 0],
+  ] as const) {
+    const px = bx + nx * out;
+    const pz = bz + nz * out;
+    for (let i = 0; i < 5; i++) {
+      const u = -S / 2 + (i * S) / 4;
+      k.box(SITE_YELLOW, 0.14, scaffH, 0.14, px + nz * u, y0, pz + nx * u, undefined, ['ny']);
+    }
+    for (let f = 1; f < floors; f++) {
+      k.box(PAL.wood, nz ? S + 0.3 : 0.8, 0.1, nx ? S + 0.3 : 0.8, px - nx * 0.35, y0 + f * fh, pz - nz * 0.35);
+    }
+    // Netting panels between the poles over the upper floors, a hair outside
+    // them, with one bay left open so the bare frame still shows.
+    const ny0 = y0 + 3 * fh + 0.2;
+    for (let i = 0; i < 4; i++) {
+      if (i === (nx ? 1 : 2)) continue;
+      const u = -S / 2 + ((i + 0.5) * S) / 4;
+      k.box(c.net, nz ? S / 4 - 0.2 : 0.06, scaffH - 3 * fh - 0.2, nx ? S / 4 - 0.2 : 0.06, px + nz * u + nx * 0.12, ny0, pz + nx * u + nz * 0.12);
+    }
+  }
+  // Tower crane at the back corner, its jib reaching over the roof.
+  const mx = 4.6;
+  const mz = -4.6;
+  const top = 25.0;
+  k.rbox(CONCRETE_GREY, 2.0, 0.5, 2.0, 0.3, 0.1, mx, 0.2, mz, { seg: 1 });
+  k.box(c.crane, 0.8, top - 0.7, 0.8, mx, 0.7, mz, undefined, ['py', 'ny']);
+  for (let y = 2.0; y < top - 1; y += 2.2) k.box(PAL.ink, 0.86, 0.14, 0.86, mx, y, mz, undefined, ['py', 'ny']);
+  k.cbox(c.crane, 1.3, 1.0, 1.3, 0.12, mx, top - 1.0, mz + 0.9);
+  k.box(SITE_GLASS, 1.0, 0.45, 0.06, mx, top - 0.7, mz + 1.56, undefined, FLUSH);
+  const j0 = mx + 1.8;
+  const j1 = -5.6;
+  k.box(c.crane, j0 - j1, 0.55, 0.55, (j0 + j1) / 2, top, mz);
+  k.cbox(CONCRETE_GREY, 1.4, 1.1, 0.9, 0.1, j0 - 0.8, top - 1.0, mz);
+  k.hull(c.crane, [
+    [mx - 0.35, top + 0.55, mz - 0.35],
+    [mx + 0.35, top + 0.55, mz - 0.35],
+    [mx - 0.35, top + 0.55, mz + 0.35],
+    [mx + 0.35, top + 0.55, mz + 0.35],
+    [mx, 27.6, mz],
+  ]);
+  const ends: readonly Face[] = ['py', 'ny'];
+  k.beam(PAL.ink, [j1 + 2.4, top + 0.55, mz], [mx, 27.5, mz], 0.07, 0.07, ends);
+  k.beam(PAL.ink, [j0 - 0.3, top + 0.55, mz], [mx, 27.5, mz], 0.07, 0.07, ends);
+  // Trolley, cable and hook block with a bundle of steel beams.
+  const hx = -3.2;
+  k.box(PAL.ink, 0.7, 0.28, 0.7, hx, top - 0.28, mz);
+  k.box(PAL.ink, 0.06, 2.6, 0.06, hx, top - 2.88, mz, undefined, ['py', 'ny']);
+  k.cbox(RED, 0.4, 0.4, 0.4, 0.06, hx, top - 3.28, mz);
+  for (let i = 0; i < 3; i++) k.box(0x3a86ff, 2.4, 0.18, 0.2, hx, top - 3.62, mz - 0.24 + i * 0.24);
+  // Ground clutter: bricks, planks and cones by the gate.
+  k.box(PAL.wood, 1.4, 0.18, 1.1, 3.4, 0.2, 3.4);
+  k.box(0xd9483b, 1.2, 0.5, 0.9, 3.4, 0.38, 3.4);
+  for (const x of [-1.9, 1.9]) {
+    k.cyl(SITE_ORANGE, 0.05, 0.26, 0.7, 8, x, 0.2, 5.4);
+    k.cyl(PAL.white, 0.14, 0.19, 0.16, 8, x, 0.5, 5.4, { open: true });
+  }
+}
+
+const PICNICS = [
+  { top: PAL.wood, frame: darker(PAL.wood, 0.3) },
+  { top: 0x4f9d69, frame: darker(0x4f9d69, 0.35) },
+] as const;
+
+/** A picnic table with its two benches joined on, standing on crossed legs. */
+function picnic(k: Kit, v: number): void {
+  const c = PICNICS[v];
+  const ends: readonly Face[] = ['py', 'ny'];
+  for (const x of [-0.8, 0.8]) {
+    // Crossed legs from the bench rails up to the table top, drawn upward.
+    for (const s of [-1, 1]) k.beam(c.frame, [x, 0, s * 0.62], [x, 0.74, -s * 0.12], 0.08, 0.08, ends);
+    k.box(c.frame, 0.08, 0.08, 1.7, x, 0.34, 0);
+    k.box(c.frame, 0.08, 0.06, 0.74, x, 0.68, 0);
+  }
+  for (const z of [-0.26, 0, 0.26]) k.box(c.top, 2.1, 0.07, 0.24, 0, 0.74, z);
+  for (const z of [-0.7, 0.7]) k.box(c.top, 2.0, 0.07, 0.3, 0, 0.42, z);
+}
+
+/**
+ * A basketball hoop at the end of a court: a padded base, a pole and an arm
+ * reaching forward to a white backboard with its red square, and an orange
+ * rim with a white net below it, facing +z.
+ */
+function hoop(k: Kit): void {
+  const pz = -0.7;
+  k.cbox(0x2f6fd6, 0.56, 0.9, 0.56, 0.08, 0, 0, pz);
+  k.cyl(0x5d6470, 0.07, 0.07, 2.2, 6, 0, 0.9, pz, { open: true });
+  k.beam(0x5d6470, [0, 2.7, pz], [0, 2.95, 0.18], 0.1, 0.1, ['py', 'ny']);
+  const bz = 0.25;
+  k.box(PAL.white, 1.1, 0.72, 0.08, 0, 2.6, bz);
+  // The red square above the rim, drawn as four bars on the backboard.
+  const sy = 2.72;
+  for (const [w, h, x, y] of [
+    [0.44, 0.05, 0, sy],
+    [0.44, 0.05, 0, sy + 0.31],
+    [0.05, 0.36, -0.195, sy],
+    [0.05, 0.36, 0.195, sy],
+  ] as const) {
+    k.box(RED, w, h, 0.03, x, y, bz + 0.05, undefined, FLUSH);
+  }
+  k.box(0x5d6470, 0.1, 0.06, 0.12, 0, 2.72, bz + 0.1);
+  k.ring(ORANGE, 0.21, 0.025, [0, 2.76, bz + 0.34], { rx: HALF_PI }, 3, 10);
+  // The net: white strings hanging from the rim and drawing in below it.
+  for (let i = 0; i < 6; i++) {
+    const a = (i * Math.PI) / 3 + Math.PI / 6;
+    k.beam(PAL.white, [0.12 * Math.sin(a), 2.42, bz + 0.34 + 0.12 * Math.cos(a)], [0.2 * Math.sin(a), 2.76, bz + 0.34 + 0.2 * Math.cos(a)], 0.025, 0.025, ['py', 'ny']);
+  }
+}
+
+const CRANES = [
+  { frame: 0xe63946, trim: PAL.white },
+  { frame: 0x2f6fd6, trim: PAL.white },
+] as const;
+
+/**
+ * A port gantry crane: four legs on bogies running along rails (along x) on
+ * a strip of quay, a portal beam frame, a machinery house on top, and a long
+ * boom reaching out over the water (+z) with a trolley and a container
+ * spreader on its cables. Stays run from a tall A-frame to both boom ends.
+ */
+function crane(k: Kit, v: number): void {
+  const c = CRANES[v];
+  const ends: readonly Face[] = ['py', 'ny'];
+  // Quay strip with a yellow edge at the water side, and the two rails.
+  k.box(CONCRETE_GREY, 10.0, 0.12, 9.6, 0, 0, -1.2, undefined, ON_GROUND);
+  k.box(SITE_YELLOW, 10.0, 0.04, 0.3, 0, 0.12, 3.45, undefined, ON_GROUND);
+  const lx = 4.0;
+  const lz = 2.3;
+  for (const z of [-lz, lz]) k.box(PAL.ink, 10.0, 0.1, 0.25, 0, 0.12, z, undefined, ON_GROUND);
+  const portal = 15.5;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      k.box(PAL.chassis, 1.3, 0.6, 0.9, sx * lx, 0.22, sz * lz, undefined, ON_GROUND);
+      k.box(c.frame, 0.7, portal - 0.82, 0.7, sx * lx, 0.82, sz * lz, undefined, ['py', 'ny']);
+    }
+    // Side frame: a sill low down and a diagonal brace.
+    k.box(c.frame, 0.5, 0.6, 2 * lz, sx * lx, 7.0, 0, undefined, ['nz', 'pz']);
+    k.beam(c.frame, [sx * lx, 7.6, -lz + 0.3], [sx * lx, portal - 0.2, lz - 0.3], 0.35, 0.35, ends);
+  }
+  // Portal beams along x and z.
+  for (const sz of [-1, 1]) k.box(c.frame, 2 * lx + 0.7, 1.0, 0.7, 0, portal, sz * lz);
+  for (const sx of [-1, 1]) k.box(c.frame, 0.7, 1.0, 2 * lz - 0.7, sx * lx, portal, 0, undefined, ['pz', 'nz']);
+  // Machinery house with a stripe.
+  k.cbox(c.trim, 4.4, 2.4, 3.6, 0.15, 0, portal + 1.0, -1.4);
+  k.box(c.frame, 4.44, 0.35, 3.64, 0, portal + 2.0, -1.4);
+  // Boom: two girders from the back reach out over the water.
+  const by = portal + 3.4;
+  const z0 = -5.6;
+  const z1 = 6.4;
+  for (const sx of [-1, 1]) k.box(c.frame, 0.4, 0.9, z1 - z0, sx * 0.9, by, (z0 + z1) / 2);
+  for (const z of [z0 + 0.3, -1.5, 2.5, z1 - 0.3]) k.box(c.frame, 1.8, 0.2, 0.3, 0, by + 0.35, z);
+  // A-frame and stays.
+  const apex: V3 = [0, 25.6, -1.2];
+  for (const sx of [-1, 1]) k.beam(c.frame, [sx * 1.4, portal + 1.0, -1.2], apex, 0.4, 0.4, ends);
+  k.cbox(c.trim, 0.8, 0.5, 0.8, 0.1, 0, 25.4, -1.2);
+  k.beam(PAL.ink, [0, by + 0.9, z1 - 0.4], apex, 0.12, 0.12, ends);
+  k.beam(PAL.ink, [0, by + 0.9, z0 + 0.4], apex, 0.12, 0.12, ends);
+  // Trolley, cables and a spreader.
+  const tz = 3.8;
+  k.cbox(c.trim, 1.6, 0.8, 1.4, 0.1, 0, by - 0.6, tz);
+  for (const sx of [-1, 1]) k.box(PAL.ink, 0.05, by - 0.6 - 10.3, 0.05, sx * 0.4, 10.3, tz, undefined, ['py', 'ny']);
+  k.box(SITE_YELLOW, 1.2, 0.35, 3.2, 0, 9.95, tz);
+}
+
+const SHIPS = [
+  { hull: 0x22346b, stripe: PAL.white },
+  { hull: 0x2e8b57, stripe: PAL.white },
+] as const;
+
+const BOXES = [0xe63946, 0x3a86ff, 0xffc21a, 0x2ec4b6, 0xff8a1f, 0x8e5cd9, 0xf4f5f7, 0x3fa34d] as const;
+
+/**
+ * A cargo ship, bow to +z, sitting in the water from y = 0: a strong-coloured
+ * hull over a red waterline band, a white bridge and a funnel at the stern,
+ * and stacks of containers in many colours along the deck, which is what
+ * reads from the high camera.
+ */
+function ship(k: Kit, v: number): void {
+  const c = SHIPS[v];
+  const deck = 4.6;
+  const band = 1.6;
+  // The hull outline at a height: square stern, straight sides, pointed bow.
+  const outline = (y: number, inset: number, bowZ: number): V3[] => {
+    const hw = 5.8 - inset;
+    return [
+      [-hw, y, -21.2 + inset],
+      [hw, y, -21.2 + inset],
+      [-hw, y, 11.5],
+      [hw, y, 11.5],
+      [-hw * 0.72, y, 17.5],
+      [hw * 0.72, y, 17.5],
+      [0, y, bowZ - inset],
+    ];
+  };
+  k.hull(RED, [...outline(0, 0.7, 19.2), ...outline(band, 0.35, 20.6)]);
+  k.hull(c.hull, [...outline(band - 0.1, 0.4, 20.5), ...outline(deck, 0, 21.8)]);
+  k.hull(0x9aa1ab, [...outline(deck - 0.1, 0.45, 21.2), ...outline(deck + 0.06, 0.45, 21.2)]);
+  // A white line just under the deck edge, along both sides.
+  for (const sx of [-1, 1]) k.box(c.stripe, 0.06, 0.25, 32.5, sx * 5.8, deck - 0.6, -4.95, undefined, [sx > 0 ? 'nx' : 'px']);
+  // Container stacks: four bays of four rows, stacks of one to three.
+  const heights = [
+    [2, 3, 3, 2],
+    [3, 2, 3, 3],
+    [2, 3, 2, 3],
+    [1, 2, 2, 1],
+  ];
+  const h = 2.4;
+  const gap = 0.06;
+  heights.forEach((bay, b) => {
+    const z = -10.8 + b * 6.4;
+    bay.forEach((n, r) => {
+      const x = -3.75 + r * 2.5;
+      for (let i = 0; i < n; i++) {
+        const col = BOXES[(b * 5 + r * 3 + i * 2 + v) % BOXES.length];
+        k.box(col, 2.4, h, 6.1, x, deck + 0.06 + i * (h + gap), z, undefined, ON_GROUND);
+      }
+    });
+  });
+  // Superstructure at the stern: accommodation, bridge with wings, funnel.
+  const sz = -17.6;
+  k.cbox(PAL.white, 8.4, 6.2, 5.0, 0.2, 0, deck, sz);
+  k.box(PAL.white, 11.2, 1.3, 2.8, 0, deck + 5.6, sz + 0.9);
+  k.box(0x2d3142, 11.24, 0.5, 2.84, 0, deck + 6.0, sz + 0.9);
+  for (const y of [1.6, 3.2]) k.box(0x34506b, 7.0, 0.5, 0.08, 0, deck + y, sz + 2.5, undefined, FLUSH);
+  k.cbox(PAL.white, 5.6, 1.4, 3.4, 0.15, 0, deck + 6.9, sz - 0.2);
+  k.cbox(c.hull, 2.2, 2.6, 2.4, 0.3, 0, deck + 6.9, sz - 2.4);
+  k.box(RED, 2.24, 0.5, 2.44, 0, deck + 8.6, sz - 2.4);
+  k.box(PAL.ink, 1.6, 0.06, 1.8, 0, deck + 9.5, sz - 2.4, undefined, ON_GROUND);
+  // A mast on the bow.
+  k.box(0xe8e3da, 0.25, 3.2, 0.25, 0, deck, 18.2, undefined, ON_GROUND);
+  k.box(0xe8e3da, 1.8, 0.2, 0.2, 0, deck + 2.6, 18.2);
+}
+
+// ---------------------------------------------------------------------------
 // Playground
 
 const SWINGS = [
@@ -803,4 +1117,9 @@ export const PARK: Record<ParkKind, Builder> = {
   agility,
   garbagetruck,
   icecreamvan,
+  tallsite,
+  picnic,
+  hoop,
+  crane,
+  ship,
 };
