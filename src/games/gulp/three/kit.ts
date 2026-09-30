@@ -383,12 +383,252 @@ export class Kit {
   }
 
   build(): THREE.BufferGeometry {
+    separateFlush(this.parts);
     const merged = mergeGeometries(this.parts, false);
     for (const p of this.parts) p.dispose();
     this.parts.length = 0;
     merged.computeBoundingBox();
     merged.computeBoundingSphere();
     return merged;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Flush faces
+
+/** Faces closer than this, facing the same way, fight in the depth buffer and flicker. */
+const FLUSH_GAP = 0.015;
+/** How far a detail is lifted off the face it sat flush on. */
+const LIFT = 0.02;
+
+interface Facet {
+  part: number;
+  /** Outward normal, the plane's offset along it, and the facing rounded (for grouping). */
+  nx: number;
+  ny: number;
+  nz: number;
+  d: number;
+  facing: number;
+  /** The triangle flattened onto the plane it faces (x, y three times), and its bounds there. */
+  flat: number[];
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  rgb: number;
+}
+
+function facets(parts: readonly THREE.BufferGeometry[]): Facet[] {
+  const out: Facet[] = [];
+  parts.forEach((g, part) => {
+    const p = g.getAttribute('position').array;
+    const col = g.getAttribute('color');
+    for (let i = 0; i + 8 < p.length; i += 9) {
+      const ex = p[i + 3] - p[i];
+      const ey = p[i + 4] - p[i + 1];
+      const ez = p[i + 5] - p[i + 2];
+      const fx = p[i + 6] - p[i];
+      const fy = p[i + 7] - p[i + 1];
+      const fz = p[i + 8] - p[i + 2];
+      let nx = ey * fz - ez * fy;
+      let ny = ez * fx - ex * fz;
+      let nz = ex * fy - ey * fx;
+      const len = Math.hypot(nx, ny, nz);
+      if (len < 2e-5) continue;
+      nx /= len;
+      ny /= len;
+      nz /= len;
+      // Undersides sit on the ground or on another part: nobody sees them.
+      if (ny < -0.9) continue;
+      // Flatten onto the plane's strongest axis.
+      const ax = Math.abs(nx) > Math.abs(ny) ? (Math.abs(nx) > Math.abs(nz) ? 0 : 2) : Math.abs(ny) > Math.abs(nz) ? 1 : 2;
+      const u = ax === 0 ? 1 : 0;
+      const v = ax === 2 ? 1 : 2;
+      const flat = [p[i + u], p[i + v], p[i + 3 + u], p[i + 3 + v], p[i + 6 + u], p[i + 6 + v]];
+      const v3 = i / 3;
+      const rgb = col ? (Math.round(col.getX(v3) * 255) << 16) | (Math.round(col.getY(v3) * 255) << 8) | Math.round(col.getZ(v3) * 255) : 0;
+      out.push({
+        part,
+        nx,
+        ny,
+        nz,
+        d: nx * p[i] + ny * p[i + 1] + nz * p[i + 2],
+        facing: (Math.round(nx * 40) + 40) * 6561 + (Math.round(ny * 40) + 40) * 81 + (Math.round(nz * 40) + 40),
+        flat,
+        x0: Math.min(flat[0], flat[2], flat[4]),
+        y0: Math.min(flat[1], flat[3], flat[5]),
+        x1: Math.max(flat[0], flat[2], flat[4]),
+        y1: Math.max(flat[1], flat[3], flat[5]),
+        rgb,
+      });
+    }
+  });
+  return out;
+}
+
+/** Two flat triangles overlap by more than a sliver (separating-axis test). */
+function overlaps(A: readonly number[], B: readonly number[]): boolean {
+  return noEdgeSplits(A, A, B) && noEdgeSplits(B, A, B);
+}
+
+/** Whether no edge of T has A on one side and B on the other (by more than a sliver). */
+function noEdgeSplits(T: readonly number[], A: readonly number[], B: readonly number[]): boolean {
+  for (let i = 0; i < 6; i += 2) {
+    const x1 = T[i];
+    const y1 = T[i + 1];
+    const x2 = T[(i + 2) % 6];
+    const y2 = T[(i + 3) % 6];
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 1e-9) continue;
+    const ax = (y1 - y2) / len;
+    const ay = (x2 - x1) / len;
+    const a0 = A[0] * ax + A[1] * ay;
+    const a1 = A[2] * ax + A[3] * ay;
+    const a2 = A[4] * ax + A[5] * ay;
+    const b0 = B[0] * ax + B[1] * ay;
+    const b1 = B[2] * ax + B[3] * ay;
+    const b2 = B[4] * ax + B[5] * ay;
+    if (Math.min(Math.max(a0, a1, a2), Math.max(b0, b1, b2)) - Math.max(Math.min(a0, a1, a2), Math.min(b0, b1, b2)) < 0.01) return false;
+  }
+  return true;
+}
+
+interface Bounds {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+const apart = (a: Bounds, b: Bounds) => a.x0 > b.x1 - 0.01 || b.x0 > a.x1 - 0.01 || a.y0 > b.y1 - 0.01 || b.y0 > a.y1 - 0.01;
+
+/**
+ * Pairs of differently coloured faces that face the same way, lie in the
+ * same plane (or all but) and overlap: the depth buffer cannot tell which is
+ * in front, so they flicker. Each pair is (earlier facet, later facet).
+ */
+export function flushClashes(parts: readonly THREE.BufferGeometry[]): Array<[Facet, Facet]> {
+  // Group the facets by facing, part and plane first: a big part (a roof, a
+  // hull) has many triangles in one plane, and whole groups that are far
+  // apart or belong to the same part are skipped without looking inside.
+  interface Group extends Bounds {
+    part: number;
+    d: number;
+    facets: Facet[];
+  }
+  const byFacing = new Map<number, Map<number, Group>>();
+  for (const f of facets(parts)) {
+    let groups = byFacing.get(f.facing);
+    if (!groups) byFacing.set(f.facing, (groups = new Map()));
+    const key = f.part * 4194304 + Math.round(f.d * 200) + 2097152;
+    const g = groups.get(key);
+    if (g) {
+      g.facets.push(f);
+      g.x0 = Math.min(g.x0, f.x0);
+      g.y0 = Math.min(g.y0, f.y0);
+      g.x1 = Math.max(g.x1, f.x1);
+      g.y1 = Math.max(g.y1, f.y1);
+    } else {
+      groups.set(key, { part: f.part, d: f.d, x0: f.x0, y0: f.y0, x1: f.x1, y1: f.y1, facets: [f] });
+    }
+  }
+  const clashes: Array<[Facet, Facet]> = [];
+  for (const groupMap of byFacing.values()) {
+    if (groupMap.size < 2) continue;
+    const list = [...groupMap.values()].sort((p, q) => p.d - q.d);
+    for (let i = 0; i < list.length; i++) {
+      // Groups are 5 mm planes, so allow that much on top of the gap.
+      for (let j = i + 1; j < list.length && list[j].d - list[i].d < FLUSH_GAP + 0.005; j++) {
+        const [g, h] = list[i].part <= list[j].part ? [list[i], list[j]] : [list[j], list[i]];
+        if (g.part === h.part || apart(g, h)) continue;
+        for (const p of g.facets) {
+          for (const q of h.facets) {
+            if (p.rgb === q.rgb || Math.abs(q.d - p.d) >= FLUSH_GAP || apart(p, q)) continue;
+            if (overlaps(p.flat, q.flat)) clashes.push([p, q]);
+          }
+        }
+      }
+    }
+  }
+  return clashes;
+}
+
+/**
+ * Lift every part that sits flush on an earlier, differently coloured face a
+ * little way off it (a door on a wall, a stripe on a bus, a sign on a roof).
+ * The later part is the detail laid on top, so it is the one that moves, and
+ * it moves whole so it never cracks.
+ */
+function separateFlush(parts: readonly THREE.BufferGeometry[]): void {
+  const size = parts.map((g) => {
+    g.computeBoundingBox();
+    const v = g.boundingBox!.getSize(new THREE.Vector3());
+    return v.x * v.y + v.y * v.z + v.z * v.x;
+  });
+  // Where each part has moved so far: a part never moves back the way it came.
+  const moved = new Map<number, THREE.Vector3>();
+  // A lifted detail can land on another that was lifted too (a badge on a
+  // stripe on a door), so go again until nothing is flush, a few times at most.
+  for (let pass = 0; pass < 12; pass++) {
+    const clashes = flushClashes(parts);
+    if (!clashes.length) return;
+    // The last passes may move a part back the way it came: better than leaving a flicker.
+    liftClashes(parts, clashes, size, pass < 9 ? moved : new Map());
+  }
+}
+
+function liftClashes(
+  parts: readonly THREE.BufferGeometry[],
+  clashes: ReadonlyArray<[Facet, Facet]>,
+  size: readonly number[],
+  moved: Map<number, THREE.Vector3>,
+): void {
+  // Per part, the most it has to move each way.
+  const moves = new Map<number, Array<{ dir: THREE.Vector3; want: number }>>();
+  for (const [earlier, later] of clashes) {
+    // The smaller part is the detail (a door on a wall, a stripe on a bus):
+    // it moves, the later one when they are alike. It moves away from the
+    // other face, outward when the two are level.
+    const [mover, other] = size[later.part] <= size[earlier.part] * 1.05 ? [later, earlier] : [earlier, later];
+    const gap = mover.d - other.d;
+    const dir = new THREE.Vector3(mover.nx, mover.ny, mover.nz).multiplyScalar(gap >= 0 ? 1 : -1);
+    const past = moved.get(mover.part);
+    if (past && past.dot(dir) < -1e-6) continue;
+    const want = LIFT - Math.abs(gap);
+    const list = moves.get(mover.part) ?? [];
+    const same = list.find((m) => m.dir.dot(dir) > 0.95);
+    if (same) same.want = Math.max(same.want, want);
+    else list.push({ dir, want });
+    moves.set(mover.part, list);
+  }
+  for (const [part, list] of moves) {
+    const g = parts[part];
+    g.computeBoundingBox();
+    const box = g.boundingBox!;
+    const centre = box.getCenter(new THREE.Vector3());
+    const ext = box.getSize(new THREE.Vector3());
+    const shift = new THREE.Vector3();
+    const grow = new THREE.Vector3(1, 1, 1);
+    // A part that clashes on opposite sides wraps round what it sits on (a
+    // stripe round a van, a band round a bale): it grows a little about its
+    // centre. One that clashes on one side only just moves off. Every unit
+    // normal has a component of at least 0.58 on some axis, so slanted faces
+    // (a cone's side, a pitched roof) are covered too.
+    for (const axis of [0, 1, 2] as const) {
+      const on = (sign: number) => list.filter((m) => m.dir.getComponent(axis) * sign >= 0.5);
+      const w = (ms: typeof list) => Math.max(0, ...ms.map((m) => m.want * Math.abs(m.dir.getComponent(axis))));
+      const pos = on(1);
+      const neg = on(-1);
+      if (pos.length && neg.length) {
+        const e = Math.max(1e-3, ext.getComponent(axis));
+        grow.setComponent(axis, (e + 2 * Math.max(w(pos), w(neg))) / e);
+      } else if (pos.length || neg.length) {
+        shift.setComponent(axis, pos.length ? w(pos) : -w(neg));
+      }
+    }
+    g.translate(-centre.x, -centre.y, -centre.z);
+    g.scale(grow.x, grow.y, grow.z);
+    g.translate(centre.x + shift.x, centre.y + shift.y, centre.z + shift.z);
+    moved.set(part, (moved.get(part) ?? new THREE.Vector3()).add(shift));
   }
 }
 

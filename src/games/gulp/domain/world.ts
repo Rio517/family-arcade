@@ -9,9 +9,9 @@
  * car tipping into a hole, an explosion); the clock and the input come in as
  * arguments, randomness as `rng` (ADR 0005).
  */
-import { FIT, KINDS, TIERS, makeProp, type Prop, type PropKind } from './catalog';
+import { FIT, KINDS, LEVELS, footSize, makeProp, worthOf, type Prop, type PropKind } from './catalog';
 import { BLOCK, SIDEWALK, createCity, type Block, type City, type MapId } from './city';
-import { createBrain, steerRival, type Brain } from './rivals';
+import { createBrain, steerRival, type Brain, type Difficulty } from './rivals';
 
 type Rng = () => number;
 
@@ -71,11 +71,20 @@ interface Lot {
 }
 
 /** Someone walking round a block's pavement. */
+/** A walk round a square: the pavement round a block, or a path inside a park. */
+interface Loop {
+  x0: number;
+  z0: number;
+  side: number;
+}
+
 export interface Person {
   id: number;
+  /** A person, or a dog out for a walk. */
+  kind: 'person' | 'dog';
   variant: number;
-  block: number;
-  /** How far round the block, and which way round. */
+  loop: Loop;
+  /** How far round the loop, and which way round. */
   t: number;
   dir: 1 | -1;
   speed: number;
@@ -84,20 +93,50 @@ export interface Person {
   heading: number;
   alive: boolean;
   respawnIn: number;
-  /** Seconds of running away from a hole. */
+  /**
+   * `walk`: round the loop. `flee`: sprinting along the street away from a
+   * hole. `back`: walking back to the loop once it is safe.
+   */
+  state: 'walk' | 'flee' | 'back';
+  /** Seconds left of running away. */
   panic: number;
+  /** While fleeing: which way (a unit vector along the street). */
+  runX: number;
+  runZ: number;
 }
 
 /** People are 'person' things with ids above every building's. */
 const PERSON_ID = 1_000_000;
 const PEOPLE_PER_BLOCK = 2.5;
 const WALK = 1.4;
+/** How far off a hole is noticed, beyond its rim, and how fast people run. */
+const NOTICE = 10;
+const RUN = 7;
+
+/** Police who come to look when the child's hole has eaten a lot. */
+export interface Responder {
+  id: number;
+  kind: 'car' | 'officer';
+  x: number;
+  z: number;
+  heading: number;
+  /** A car drives to (tx, tz) and parks; an officer stands near the hole. */
+  tx: number;
+  tz: number;
+  state: 'drive' | 'stand' | 'leave';
+  /** Seconds in this state. */
+  t: number;
+}
+/** Things the child eats before someone calls the police, and seconds between calls. */
+const POLICE_AFTER = 35;
+const POLICE_COOL = 50;
+const POLICE_STAY = 25;
 
 /** A hole's radius at the start, and how it grows with what it has eaten. */
 export const START_R = 1.6;
 // Growth tapers off as a hole gets big (a power below a half), so the
 // first levels come fast and the giant ones take a whole round.
-const GROW = 0.34;
+const GROW = 0.25;
 const GROW_POWER = 0.4;
 /** Seconds a swallowed hole waits before it comes back. */
 export const RESPAWN = 3;
@@ -114,6 +153,8 @@ const KEEP_RIVAL = 0.7;
 const HURT_PLAYER = 0.85;
 const HURT_RIVAL = 0.8;
 const STUN = 1.2;
+/** How long a hole burns after a fuel truck crashes into it (it looks dramatic; the hurt is the same). */
+const BURN = 3;
 
 export type PowerKind = 'speed' | 'double';
 /** How long each power-up lasts, in seconds. */
@@ -147,6 +188,23 @@ export interface Bomb {
   radius: number;
   /** Seconds until it lands; the scene shows a target ring until then. */
   fuse: number;
+  /** A shell or rocket: where it was fired from, and its whole flight time (for the arc). */
+  from?: { x: number; z: number; y: number };
+  flight?: number;
+}
+
+/** A tank or a helicopter from the military base: it closes in, then fires. */
+interface Unit {
+  id: number;
+  target: number;
+  x: number;
+  z: number;
+  heading: number;
+  speed: number;
+  life: number;
+  /** Seconds until it fires again. */
+  reload: number;
+  shells: Bomb[];
 }
 
 export type Attack =
@@ -163,7 +221,9 @@ export type Attack =
       speed: number;
       life: number;
       bombs: Bomb[];
-    };
+    }
+  | (Unit & { kind: 'tank' })
+  | (Unit & { kind: 'heli' });
 
 export interface Hole {
   id: number;
@@ -193,6 +253,8 @@ export interface Hole {
   speedTime: number;
   doubleTime: number;
   stun: number;
+  /** Seconds left on fire after a fuel truck crashed into it. */
+  burn: number;
   /** Wonders swallowed this round. */
   wonders: number;
   /** Things eaten in a row, each within COMBO_WINDOW of the last. */
@@ -210,6 +272,7 @@ export type WorldEvent =
   | { type: 'food'; hole: number; food: 'treat' | 'healthy'; bonus: number }
   | { type: 'combo'; hole: number; mult: number }
   | { type: 'wonder'; hole: number; name: string; points: number }
+  | { type: 'police'; x: number; z: number }
   | { type: 'gulp'; eater: number; eaten: number }
   | { type: 'level'; hole: number; level: number }
   | { type: 'respawn'; hole: number }
@@ -232,7 +295,11 @@ export interface Options {
   fightBack: boolean;
   /** Small things grow back and eaten buildings are rebuilt, bigger as the round goes on. */
   regrow: boolean;
+  /** The wonders this round was dealt; left out, the city shows its whole set (the menu's backdrop). */
+  wonders?: readonly PropKind[];
   countdown?: number;
+  /** How hard the computer holes play; left out, they play Easy. */
+  difficulty?: Difficulty;
 }
 
 export interface World {
@@ -262,6 +329,8 @@ export interface World {
   nextPropId: number;
   people: Person[];
   lastNews: number;
+  responders: Responder[];
+  police: { eaten: number; cool: number };
 }
 
 const CELL = 12;
@@ -280,7 +349,7 @@ const DEFAULTS: Options = { map: 'city', duration: 120, powerups: true, fightBac
  */
 export function createWorld(rng: Rng, player: Racer | null, rivals: Racer[], opts: Partial<Options> = {}): World {
   const options = { ...DEFAULTS, ...opts };
-  const city = createCity(rng, options.map);
+  const city = createCity(rng, options.map, options.wonders);
   const props = new Map(city.props.map((p) => [p.id, p]));
   const grid = new Map<string, number[]>();
   for (const p of city.props) {
@@ -296,13 +365,14 @@ export function createWorld(rng: Rng, player: Racer | null, rivals: Racer[], opt
   // Start everyone on a crossing: the child in the middle, rivals spread out.
   const crossings = city.roads
     .flatMap((x) => city.roads.map((z) => ({ x, z })))
+    .filter((c) => !builtOver(city, c.x, c.z))
     .sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
   const holes: Hole[] = [];
   const brains: Array<Brain | null> = [];
   everyone.forEach((who, i) => {
     const spot = crossings[i === 0 ? 0 : 1 + ((i * 5) % (crossings.length - 1))];
     holes.push(newHole(i, who.name, who.skin, who.isPlayer, spot.x, spot.z));
-    brains.push(who.isPlayer ? null : createBrain(rng));
+    brains.push(who.isPlayer ? null : createBrain(rng, options.difficulty));
   });
   const countdown = options.countdown ?? (player ? COUNTDOWN : 0);
   return {
@@ -326,6 +396,8 @@ export function createWorld(rng: Rng, player: Racer | null, rivals: Racer[], opt
     lots: [],
     nextPropId: city.props.length + 1,
     people: createPeople(city, rng),
+    responders: [],
+    police: { eaten: 0, cool: POLICE_COOL / 2 },
     lastNews: -NEWS_GAP,
   };
 }
@@ -351,6 +423,7 @@ function newHole(id: number, name: string, skin: number, isPlayer: boolean, x: n
     speedTime: 0,
     doubleTime: 0,
     stun: 0,
+    burn: 0,
     streak: 0,
     comboTime: 0,
     wonders: 0,
@@ -368,28 +441,28 @@ const BEYOND = 1.35;
 /** Level 1 at the start; one more for each tier a hole can now swallow, and on past the top. */
 export function levelOf(r: number): number {
   const cap = r * FIT;
-  const fits = TIERS.filter((t) => t.size <= cap).length;
+  const fits = LEVELS.filter((t) => t.size <= cap).length;
   const base = Math.max(1, fits - 1);
-  if (fits < TIERS.length) return base;
-  return base + Math.floor(Math.log(cap / TIERS[TIERS.length - 1].size) / Math.log(BEYOND));
+  if (fits < LEVELS.length) return base;
+  return base + Math.floor(Math.log(cap / LEVELS[LEVELS.length - 1].size) / Math.log(BEYOND));
 }
 
 /** What the next level opens up, or null once everything fits. */
 export function nextLabel(r: number): string | null {
-  const fits = TIERS.filter((t) => t.size <= r * FIT).length;
-  return TIERS[fits]?.label ?? null;
+  const fits = LEVELS.filter((t) => t.size <= r * FIT).length;
+  return LEVELS[fits]?.label ?? null;
 }
 
 /** 0..1 of the way from this level to the next, for the level meter. */
 export function levelProgress(r: number): number {
   const cap = r * FIT;
-  const fits = TIERS.filter((t) => t.size <= cap).length;
-  const next = TIERS[fits];
+  const fits = LEVELS.filter((t) => t.size <= cap).length;
+  const next = LEVELS[fits];
   if (!next) {
-    const steps = Math.log(cap / TIERS[TIERS.length - 1].size) / Math.log(BEYOND);
+    const steps = Math.log(cap / LEVELS[LEVELS.length - 1].size) / Math.log(BEYOND);
     return steps - Math.floor(steps);
   }
-  const prev = TIERS[fits - 1]?.size ?? 0;
+  const prev = LEVELS[fits - 1]?.size ?? 0;
   const from = Math.max(START_R * FIT, prev);
   return Math.max(0, Math.min(1, (cap - from) / (next.size - from)));
 }
@@ -430,6 +503,7 @@ export function stepWorld(w: World, dt: number, input: Input | null): WorldEvent
     h.speedTime = Math.max(0, h.speedTime - dt);
     h.doubleTime = Math.max(0, h.doubleTime - dt);
     h.stun = Math.max(0, h.stun - dt);
+    h.burn = Math.max(0, h.burn - dt);
     h.comboTime = Math.max(0, h.comboTime - dt);
     if (h.comboTime === 0) h.streak = 0;
     const brain = w.brains[i];
@@ -440,6 +514,7 @@ export function stepWorld(w: World, dt: number, input: Input | null): WorldEvent
   }
   eatHoles(w, events);
   walkPeople(w, dt, events);
+  if (player) police(w, dt, player, events);
   if (w.options.regrow) {
     regrow(w, dt, events);
     rebuild(w, events);
@@ -478,7 +553,7 @@ function move(w: World, h: Hole, want: Input, dt: number, pace: number): void {
     h.z = nz;
     h.vx = 0;
   } else {
-    const edge = Math.max(0, w.city.half - h.r * 0.5);
+    const edge = Math.max(0, w.city.land - h.r * 0.5);
     h.x = Math.max(-edge, Math.min(edge, h.x));
     h.z = Math.max(-edge, Math.min(edge, h.z));
   }
@@ -486,7 +561,7 @@ function move(w: World, h: Hole, want: Input, dt: number, pace: number): void {
 
 /** The main island (a hole may hang half over its shore), the bridge, or the islet. */
 function onLand(w: World, h: Hole, x: number, z: number): boolean {
-  const edge = Math.max(0, w.city.half - h.r * 0.5);
+  const edge = Math.max(0, w.city.land - h.r * 0.5);
   if (Math.abs(x) <= edge && Math.abs(z) <= edge) return true;
   return w.city.extraLand.some((l) => x >= l.x0 && x <= l.x1 && z >= l.z0 && z <= l.z1);
 }
@@ -531,7 +606,8 @@ function eatProps(w: World, h: Hole, events: WorldEvent[]): void {
         lot.due = w.elapsed + SITE_AFTER * 2;
       }
     } else if (info.tier <= REGROW_TIER) w.eaten.push(p);
-    const rung = LADDER.indexOf(p.kind);
+    // A cottage comes back like a house, a big house like a shop: one step up from there.
+    const rung = p.kind === 'cottage' ? 0 : p.kind === 'villa' ? 1 : LADDER.indexOf(p.kind);
     if (rung >= 0 || BIG.includes(p.kind)) {
       const room = Math.max(info.w, info.d) + 4;
       w.lots.push({ x: p.x, z: p.z, rot: p.rot, room, rung, due: w.elapsed + SITE_AFTER + w.rng() * 6, site: null });
@@ -554,9 +630,10 @@ function gobble(w: World, h: Hole, p: Prop, events: WorldEvent[]): void {
   if (mult > was) events.push({ type: 'combo', hole: h.id, mult });
   // A wonder scores its big bonus but grows the hole like any big thing of
   // its tier: a statue is a treat, not a jump to the top of the map.
-  h.mass += (info.wonder ? TIERS[info.tier].points * 2 : p.points) + bonus;
+  h.mass += (info.wonder ? worthOf(p.size) * 2 : p.points) + bonus;
   const gained = (p.points + bonus) * mult * (h.doubleTime > 0 ? 2 : 1);
   h.score += gained;
+  if (h.isPlayer && info.tier <= 5) w.police.eaten += 1;
   if (info.wonder) {
     h.wonders += 1;
     events.push({ type: 'wonder', hole: h.id, name: info.wonder.name, points: gained });
@@ -587,7 +664,7 @@ function eatHoles(w: World, events: WorldEvent[]): void {
       b.mass *= b.isPlayer ? KEEP_PLAYER : KEEP_RIVAL;
       b.r = radiusFor(b.mass);
       b.vx = b.vz = 0;
-      b.speedTime = b.doubleTime = b.stun = 0;
+      b.speedTime = b.doubleTime = b.stun = b.burn = 0;
       b.streak = b.comboTime = 0;
       events.push({ type: 'gulp', eater: a.id, eaten: b.id });
       const after = levelOf(a.r);
@@ -659,13 +736,36 @@ function rebuild(w: World, events: WorldEvent[]): void {
 function ladderKind(w: World, lot: Lot): { kind: PropKind; hScale?: number } {
   const age = Math.floor(w.elapsed / AGE_STEP);
   let rung = Math.min(LADDER.length - 1, lot.rung + 1, age);
-  while (rung > 0 && Math.max(KINDS[LADDER[rung]].w, KINDS[LADDER[rung]].d) > lot.room) rung--;
+  while (rung > 0 && (Math.max(KINDS[LADDER[rung]].w, KINDS[LADDER[rung]].d) > lot.room || !clearFor(w, lot, LADDER[rung]))) rung--;
   return { kind: LADDER[rung] };
+}
+
+/**
+ * Whether a building of this kind fits on the lot without running into the
+ * buildings next door: in a terrace, an eaten house comes back as a taller
+ * house, not an apartment block through its neighbours' walls.
+ */
+function clearFor(w: World, lot: Lot, kind: PropKind): boolean {
+  const extent = (k: PropKind, rot: number): [number, number] => {
+    const info = KINDS[k];
+    return Math.abs(Math.sin(rot)) > 0.5 ? [info.d / 2, info.w / 2] : [info.w / 2, info.d / 2];
+  };
+  const [hw, hd] = extent(kind, lot.rot);
+  for (const p of w.props.values()) {
+    if (p.id === lot.site || KINDS[p.kind].tier < 5 || KINDS[p.kind].wonder) continue;
+    const dx = Math.abs(p.x - lot.x);
+    const dz = Math.abs(p.z - lot.z);
+    if (dx > 60 || dz > 60) continue;
+    const [pw, pd] = extent(p.kind, p.rot);
+    // A little overlap is fine: the models are rounded and stand inside their outlines.
+    if (dx < hw + pw - 0.5 && dz < hd + pd - 0.5) return false;
+  }
+  return true;
 }
 
 /** A big lot gets something big: the bigger the lot and the older the city, the grander. */
 function bigKind(w: World, lot: Lot): { kind: PropKind; hScale?: number } {
-  const fits = BIG.filter((k) => Math.max(KINDS[k].w, KINDS[k].d) <= lot.room && k !== 'chemplant');
+  const fits = BIG.filter((k) => Math.max(KINDS[k].w, KINDS[k].d) <= lot.room && k !== 'chemplant' && clearFor(w, lot, k));
   const grand = fits.filter((k) => KINDS[k].tier >= 8);
   const pool = w.elapsed > AGE_STEP * 2 && grand.length ? grand : fits.length ? fits : (['warehouse'] as PropKind[]);
   return { kind: pool[Math.floor(w.rng() * pool.length)] };
@@ -675,42 +775,71 @@ function bigKind(w: World, lot: Lot): { kind: PropKind; hScale?: number } {
 // People
 // -------------------------------------------------------------------------
 
-/** People for the town blocks: nobody walks round a farm or up a mountain. */
+/**
+ * Blocks nobody walks round: out of town, the airfield, or a stadium built
+ * out over the street, where the pavement would run straight through it.
+ */
+const NO_WALK = ['farm', 'forest', 'windfarm', 'mountain', 'military', 'helipad', 'airport', 'arena'];
+
+/** The pavement round a block. */
+const pavement = (b: Block): Loop => ({ x0: b.x + SIDEWALK / 2, z0: b.z + SIDEWALK / 2, side: BLOCK - SIDEWALK });
+/** A path inside a park, `inset` in from the block's edge. */
+const parkPath = (b: Block, inset: number): Loop => ({ x0: b.x + inset, z0: b.z + inset, side: BLOCK - inset * 2 });
+
+function newPerson(id: number, kind: Person['kind'], variant: number, loop: Loop, t: number, dir: 1 | -1, speed: number): Person {
+  const p: Person = {
+    id,
+    kind,
+    variant,
+    loop,
+    t,
+    dir,
+    speed,
+    x: 0,
+    z: 0,
+    heading: 0,
+    alive: true,
+    respawnIn: 0,
+    state: 'walk',
+    panic: 0,
+    runX: 0,
+    runZ: 0,
+  };
+  walkTo(p);
+  return p;
+}
+
+/**
+ * People on the pavements of the town blocks, and in the dog parks dogs out
+ * with their owners (each dog trotting just ahead of its person).
+ */
 function createPeople(city: City, rng: Rng): Person[] {
-  const blocks = city.blockList.map((b, i) => ({ b, i })).filter(({ b }) => !['farm', 'forest', 'windfarm', 'mountain', 'apron'].includes(b.kind));
+  const blocks = city.blockList.filter((b) => !NO_WALK.includes(b.kind));
   const count = Math.round(blocks.length * PEOPLE_PER_BLOCK);
   const people: Person[] = [];
+  let id = PERSON_ID;
   for (let n = 0; n < count; n++) {
-    const { i } = blocks[Math.floor(rng() * blocks.length)];
-    const p: Person = {
-      id: PERSON_ID + n,
-      variant: Math.floor(rng() * 8),
-      block: i,
-      t: rng(),
-      dir: rng() < 0.5 ? 1 : -1,
-      speed: WALK * (0.8 + rng() * 0.4),
-      x: 0,
-      z: 0,
-      heading: 0,
-      alive: true,
-      respawnIn: 0,
-      panic: 0,
-    };
-    walkTo(city.blockList[i], p);
-    people.push(p);
+    const b = blocks[Math.floor(rng() * blocks.length)];
+    people.push(newPerson(id++, 'person', Math.floor(rng() * 8), pavement(b), rng(), rng() < 0.5 ? 1 : -1, WALK * (0.8 + rng() * 0.4)));
+  }
+  for (const b of city.blockList.filter((x) => x.kind === 'dogpark')) {
+    for (let k = 0; k < 3; k++) {
+      const t = k / 3 + rng() * 0.1;
+      const dir: 1 | -1 = k % 2 ? 1 : -1;
+      const inset = 6 + k * 3;
+      people.push(newPerson(id++, 'person', Math.floor(rng() * 8), parkPath(b, inset), t, dir, WALK));
+      people.push(newPerson(id++, 'dog', Math.floor(rng() * 4), parkPath(b, inset), t + dir * 0.015, dir, WALK));
+    }
   }
   return people;
 }
 
-/** Put someone at their place round the block, facing the way they walk. */
-function walkTo(b: Block, p: Person): void {
-  const inset = SIDEWALK / 2;
-  const side = BLOCK - inset * 2;
+/** Put someone at their place round their loop, facing the way they walk. */
+function walkTo(p: Person): void {
+  const { x0, z0, side } = p.loop;
   const u = (((p.t % 1) + 1) % 1) * 4;
   const k = Math.floor(u);
   const f = (u - k) * side;
-  const x0 = b.x + inset;
-  const z0 = b.z + inset;
   // Anticlockwise from the south-west corner: along x, up z, back x, down z.
   const at = [
     [x0 + f, z0, 1, 0],
@@ -723,9 +852,25 @@ function walkTo(b: Block, p: Person): void {
   p.heading = Math.atan2(at[2] * p.dir, at[3] * p.dir);
 }
 
-/** Walk everyone round their block; they run from a hole close by, and one close enough falls in. */
+/** The point of a loop nearest to (x, z), as a distance round it (0..1). */
+function nearestOnLoop(loop: Loop, x: number, z: number): number {
+  const { x0, z0, side } = loop;
+  const cx = Math.max(x0, Math.min(x0 + side, x));
+  const cz = Math.max(z0, Math.min(z0 + side, z));
+  // Snap to the nearest edge, then turn that into a distance round.
+  const d = [cz - z0, x0 + side - cx, z0 + side - cz, cx - x0];
+  const edge = d.indexOf(Math.min(...d));
+  const f = [cx - x0, cz - z0, x0 + side - cx, z0 + side - cz][edge] / side;
+  return (edge + f) / 4;
+}
+
+/**
+ * Everyone walks round their loop. A hole close by sends them sprinting away
+ * along the street (they can't outrun it for long, but they try); when it
+ * has gone they walk back to their loop. One close enough falls in.
+ */
 function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
-  const around = 4 * (BLOCK - SIDEWALK);
+  const edge = w.city.half - 1;
   for (const p of w.people) {
     if (!p.alive) {
       p.respawnIn -= dt;
@@ -733,6 +878,8 @@ function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
       continue;
     }
     let eaten: Hole | null = null;
+    let threat: Hole | null = null;
+    let threatD = Infinity;
     for (const h of w.holes) {
       if (!h.alive) continue;
       const d = Math.hypot(h.x - p.x, h.z - p.z);
@@ -740,43 +887,195 @@ function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
         eaten = h;
         break;
       }
-      // Running away: turn round if the hole is ahead.
-      if (d < h.r + 9 && p.panic <= 0) {
-        p.panic = 1.5;
-        const ahead = (h.x - p.x) * Math.sin(p.heading) + (h.z - p.z) * Math.cos(p.heading);
-        if (ahead > 0) p.dir = p.dir === 1 ? -1 : 1;
+      if (d < h.r + NOTICE && d < threatD) {
+        threat = h;
+        threatD = d;
       }
     }
     if (eaten) {
       p.alive = false;
       p.respawnIn = 8 + w.rng() * 6;
-      gobble(w, eaten, makeProp(p.id, 'person', p.x, p.z, p.heading, p.variant), events);
+      gobble(w, eaten, makeProp(p.id, p.kind, p.x, p.z, p.heading, p.variant), events);
       continue;
     }
-    p.panic = Math.max(0, p.panic - dt);
-    p.t += (p.dir * p.speed * (p.panic > 0 ? 3 : 1) * dt) / around;
-    walkTo(w.city.blockList[p.block], p);
+    if (threat) {
+      // Run along the street, away from the hole: the axis it is further off on.
+      const ax = p.x - threat.x;
+      const az = p.z - threat.z;
+      if (p.state !== 'flee') {
+        const along = Math.abs(ax) > Math.abs(az);
+        p.runX = along ? Math.sign(ax) || 1 : 0;
+        p.runZ = along ? 0 : Math.sign(az) || 1;
+      }
+      p.state = 'flee';
+      p.panic = 1.6;
+    }
+    if (p.state === 'flee') {
+      p.panic -= dt;
+      p.x = Math.max(-edge, Math.min(edge, p.x + p.runX * RUN * dt));
+      p.z = Math.max(-edge, Math.min(edge, p.z + p.runZ * RUN * dt));
+      p.heading = Math.atan2(p.runX, p.runZ);
+      if (p.panic <= 0) p.state = 'back';
+      continue;
+    }
+    if (p.state === 'back') {
+      const t = nearestOnLoop(p.loop, p.x, p.z);
+      const tx = { ...p, t };
+      walkTo(tx);
+      const dx = tx.x - p.x;
+      const dz = tx.z - p.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.3) {
+        p.t = t;
+        p.state = 'walk';
+      } else {
+        const step = Math.min(d, p.speed * 1.5 * dt);
+        p.x += (dx / d) * step;
+        p.z += (dz / d) * step;
+        p.heading = Math.atan2(dx, dz);
+      }
+      continue;
+    }
+    p.t += (p.dir * p.speed * dt) / (4 * p.loop.side);
+    walkTo(p);
   }
 }
 
-/** Back into town, on a block well away from every hole. */
+/** Back into town, on a block well away from every hole (a dog goes back to its park). */
 function comeBack(w: World, p: Person): void {
   const blocks = w.city.blockList;
   for (let tries = 0; tries < 6; tries++) {
-    const i = Math.floor(w.rng() * blocks.length);
-    const b = blocks[i];
-    if (['farm', 'forest', 'windfarm', 'mountain', 'apron'].includes(b.kind)) continue;
+    const b = blocks[Math.floor(w.rng() * blocks.length)];
+    if (NO_WALK.includes(b.kind)) continue;
+    if (p.kind === 'dog' && b.kind !== 'dogpark') continue;
     const cx = b.x + b.size / 2;
     const cz = b.z + b.size / 2;
     if (w.holes.some((h) => h.alive && Math.hypot(h.x - cx, h.z - cz) < h.r + b.size)) continue;
-    p.block = i;
+    if (p.kind === 'person') p.loop = pavement(b);
     p.t = w.rng();
     p.alive = true;
+    p.state = 'walk';
     p.panic = 0;
-    walkTo(b, p);
+    walkTo(p);
     return;
   }
   p.respawnIn = 2;
+}
+
+// -------------------------------------------------------------------------
+// The police come to look
+// -------------------------------------------------------------------------
+
+/**
+ * When the child's hole has eaten a good few things, someone calls the
+ * police: two cars race down the nearest street and park near the hole, and
+ * the officers get out and stand round it, waving their batons. They do no
+ * harm; the cars and the officers are there to be swallowed.
+ */
+function police(w: World, dt: number, me: Hole, events: WorldEvent[]): void {
+  w.police.cool = Math.max(0, w.police.cool - dt);
+  const small = levelOf(me.r) <= 6;
+  if (me.alive && small && w.police.cool === 0 && w.police.eaten >= POLICE_AFTER && !w.responders.length) {
+    w.police.eaten = 0;
+    w.police.cool = POLICE_COOL;
+    callPolice(w, me, events);
+  }
+  const reach = (kind: PropKind, x: number, z: number) =>
+    w.holes.find((h) => h.alive && footSize(kind) <= h.r * FIT && Math.hypot(h.x - x, h.z - z) < h.r - 0.3);
+  for (const r of w.responders) {
+    r.t += dt;
+    if (r.kind === 'car') {
+      const dx = r.tx - r.x;
+      const dz = r.tz - r.z;
+      const d = Math.hypot(dx, dz);
+      const eater = reach('policecar', r.x, r.z);
+      if (eater) {
+        r.state = 'leave';
+        r.t = Infinity;
+        gobble(w, eater, makeProp(-r.id, 'policecar', r.x, r.z, r.heading), events);
+        continue;
+      }
+      if (d < 0.5) {
+        // Parked: now it's a car in the city like any other, and two officers get out.
+        r.state = 'leave';
+        r.t = Infinity;
+        place(w, makeProp(w.nextPropId++, 'policecar', r.tx, r.tz, r.heading));
+        for (const side of [-1, 1]) {
+          w.responders.push({
+            id: w.nextId++,
+            kind: 'officer',
+            x: r.tx + Math.cos(r.heading) * side * 1.8,
+            z: r.tz - Math.sin(r.heading) * side * 1.8,
+            heading: r.heading,
+            tx: 0,
+            tz: 0,
+            state: 'stand',
+            t: 0,
+          });
+        }
+        continue;
+      }
+      const step = Math.min(d, 18 * dt);
+      r.x += (dx / d) * step;
+      r.z += (dz / d) * step;
+      continue;
+    }
+    const eater = reach('police', r.x, r.z);
+    if (eater) {
+      r.state = 'leave';
+      r.t = Infinity;
+      gobble(w, eater, makeProp(-r.id, 'police', r.x, r.z, r.heading), events);
+      continue;
+    }
+    const dx = me.x - r.x;
+    const dz = me.z - r.z;
+    const d = Math.hypot(dx, dz) || 1;
+    if (r.state === 'stand') {
+      // Keep a careful distance from the rim, facing the hole.
+      const want = me.r + 5;
+      const step = Math.max(-2.2 * dt, Math.min(2.2 * dt, d - want));
+      r.x += (dx / d) * step;
+      r.z += (dz / d) * step;
+      r.heading = Math.atan2(dx, dz);
+      if (r.t > POLICE_STAY || !me.alive) {
+        r.state = 'leave';
+        r.t = 0;
+      }
+    } else if (r.state === 'leave' && r.t < 6) {
+      // Stroll off, and they're gone.
+      r.x -= (dx / d) * 2 * dt;
+      r.z -= (dz / d) * 2 * dt;
+      r.heading = Math.atan2(-dx, -dz);
+    }
+  }
+  w.responders = w.responders.filter((r) => !(r.state === 'leave' && r.t >= 6));
+}
+
+/** Two police cars, one down each way of the street nearest the hole. */
+function callPolice(w: World, me: Hole, events: WorldEvent[]): void {
+  const roads = w.city.roads;
+  const nearX = roads.reduce((a, b) => (Math.abs(b - me.x) < Math.abs(a - me.x) ? b : a));
+  const nearZ = roads.reduce((a, b) => (Math.abs(b - me.z) < Math.abs(a - me.z) ? b : a));
+  // The street running along z (at x = nearX) or along x (at z = nearZ), whichever is closer.
+  const alongZ = Math.abs(nearX - me.x) < Math.abs(nearZ - me.z);
+  const edge = w.city.half - 6;
+  for (const side of [-1, 1]) {
+    const stopAlong = (alongZ ? me.z : me.x) + side * (me.r + 9);
+    const startAlong = stopAlong + side * 70;
+    const lane = side * 2.4;
+    const clampE = (v: number) => Math.max(-edge, Math.min(edge, v));
+    const sx = alongZ ? nearX + lane : clampE(startAlong);
+    const sz = alongZ ? clampE(startAlong) : nearZ + lane;
+    const tx = alongZ ? nearX + lane : clampE(stopAlong);
+    const tz = alongZ ? clampE(stopAlong) : nearZ + lane;
+    w.responders.push({ id: w.nextId++, kind: 'car', x: sx, z: sz, heading: Math.atan2(tx - sx, tz - sz), tx, tz, state: 'drive', t: 0 });
+  }
+  events.push({ type: 'police', x: me.x, z: me.z });
+}
+
+/** A crossing under a stadium, an airfield or another built-over street is no crossing. */
+function builtOver(city: World['city'], x: number, z: number): boolean {
+  return city.lots.some((l) => x >= l.x0 && x <= l.x1 && z >= l.z0 && z <= l.z1);
 }
 
 /** Back on a crossing as far as can be from any bigger hole. */
@@ -786,6 +1085,7 @@ function respawn(w: World, h: Hole): void {
   for (let i = 0; i < 8; i++) {
     const x = w.city.roads[Math.floor(w.rng() * w.city.roads.length)];
     const z = w.city.roads[Math.floor(w.rng() * w.city.roads.length)];
+    if (builtOver(w.city, x, z)) continue;
     const d = threats.length ? Math.min(...threats.map((t) => Math.hypot(t.x - x, t.z - z))) : 999;
     if (d > best.d) best = { x, z, d };
   }
@@ -804,7 +1104,7 @@ function respawn(w: World, h: Hole): void {
 function spotNear(w: World, x: number, z: number, near: number, far: number): { x: number; z: number } {
   const a = w.rng() * Math.PI * 2;
   const d = near + w.rng() * (far - near);
-  const edge = w.city.half - 4;
+  const edge = w.city.land - 4;
   return {
     x: Math.max(-edge, Math.min(edge, x + Math.cos(a) * d)),
     z: Math.max(-edge, Math.min(edge, z + Math.sin(a) * d)),
@@ -842,14 +1142,18 @@ function takePowerups(w: World, h: Hole, events: WorldEvent[]): void {
 // The city fights back
 // -------------------------------------------------------------------------
 
-/** Tankers only bother holes big enough to swallow one. */
-const TANKER_SIZE = TIERS[KINDS.tanker.tier].size;
+/** A fuel truck's reach: it crashes when its nose touches the rim. */
+const TANKER_SIZE = footSize('tanker');
+const TANK_SIZE = footSize('tank');
+/** The base only sends tanks after holes this close; helicopters go anywhere. */
+const TANK_RANGE = 200;
 const MIN_ATTACK_LEVEL = 4;
 
 function hurt(h: Hole, cause: HurtCause, events: WorldEvent[]): void {
   h.mass *= h.isPlayer ? HURT_PLAYER : HURT_RIVAL;
   h.r = radiusFor(h.mass);
   h.stun = STUN;
+  if (cause === 'tanker') h.burn = BURN;
   events.push({ type: 'hurt', hole: h.id, cause });
   events.push({ type: 'boom', x: h.x, z: h.z, size: Math.max(3, h.r * 0.5) });
 }
@@ -861,7 +1165,8 @@ function fightBack(w: World, dt: number, events: WorldEvent[], player: Hole | nu
   for (const a of w.attacks) {
     a.life -= dt;
     if (a.kind === 'tanker') driveTanker(w, a, dt, events);
-    else flyBomber(w, a, dt, events);
+    else if (a.kind === 'bomber') flyBomber(w, a, dt, events);
+    else moveUnit(w, a, dt, events);
   }
   w.attacks = w.attacks.filter((a) => a.life > 0);
 }
@@ -876,6 +1181,31 @@ function launch(w: World, events: WorldEvent[], player: Hole | null): void {
   w.nextAttack = 16 + w.rng() * 10;
   const biggest = big.reduce((a, b) => (b.r > a.r ? b : a));
   const target = player && big.includes(player) && (player === biggest || w.rng() < 0.5) ? player : biggest;
+  // A map with a military base sends its army half the time.
+  const base = w.city.base;
+  if (base && w.rng() < 0.5) {
+    const near = Math.hypot(target.x - base.x, target.z - base.z) < TANK_RANGE;
+    const kind = near && w.rng() < 0.6 ? 'tank' : 'heli';
+    const count = kind === 'tank' ? 2 : 1;
+    for (let i = 0; i < count; i++) {
+      const heading = Math.atan2(target.x - base.x, target.z - base.z);
+      const unit: Unit = {
+        id: w.nextId++,
+        target: target.id,
+        x: base.x + (i - (count - 1) / 2) * 6 * Math.cos(heading),
+        z: base.z - (i - (count - 1) / 2) * 6 * Math.sin(heading),
+        heading,
+        // Tanks trundle; helicopters are quick, but never quicker than a hole can dodge.
+        speed: kind === 'tank' ? Math.max(6, speedOf(target.r) * 0.55) : Math.max(28, speedOf(target.r) * 1.3),
+        life: kind === 'tank' ? 45 : 35,
+        reload: 1.5 + i,
+        shells: [],
+      };
+      w.attacks.push(kind === 'tank' ? { ...unit, kind: 'tank' } : { ...unit, kind: 'heli' });
+    }
+    events.push({ type: 'incoming', target: target.id, kind });
+    return;
+  }
   const bomber = levelOf(target.r) >= 6 ? w.rng() < 0.75 : w.rng() < 0.2;
   const id = w.nextId++;
   if (bomber) {
@@ -916,14 +1246,75 @@ function driveTanker(w: World, a: Extract<Attack, { kind: 'tanker' }>, dt: numbe
   }
   a.x += Math.sin(a.heading) * a.speed * dt;
   a.z += Math.cos(a.heading) * a.speed * dt;
+  // It crashes into any hole it reaches, big or small, and goes up in flames.
   for (const h of w.holes) {
-    if (!h.alive || TANKER_SIZE > h.r * FIT) continue;
-    if (Math.hypot(h.x - a.x, h.z - a.z) > h.r - 1.5) continue;
+    if (!h.alive || h.safe > 0) continue;
+    if (Math.hypot(h.x - a.x, h.z - a.z) > h.r + TANKER_SIZE * 0.4) continue;
     a.life = 0;
     hurt(h, 'tanker', events);
     return;
   }
-  if (Math.abs(a.x) > w.city.half + 20 || Math.abs(a.z) > w.city.half + 20) a.life = 0;
+  if (Math.abs(a.x) > w.city.land + 20 || Math.abs(a.z) > w.city.land + 20) a.life = 0;
+}
+
+/**
+ * A tank or helicopter: head for its hole, stop at a distance (a helicopter
+ * circles), and fire every few seconds at the spot where the hole is now.
+ * Each shell shows its red target circle while it flies, so a moving hole
+ * gets away. A hole big enough simply swallows a tank that comes too close.
+ */
+function moveUnit(w: World, a: Extract<Attack, { kind: 'tank' | 'heli' }>, dt: number, events: WorldEvent[]): void {
+  const target = w.holes[a.target];
+  const tank = a.kind === 'tank';
+  if (target?.alive) {
+    const d = Math.hypot(target.x - a.x, target.z - a.z);
+    const stand = target.r + (tank ? 22 : 26);
+    const want = Math.atan2(target.x - a.x, target.z - a.z);
+    // Close in; a helicopter that is close enough circles round.
+    const aim = !tank && d < stand + 4 ? want + Math.PI / 2 : want;
+    let turn = aim - a.heading;
+    while (turn > Math.PI) turn -= Math.PI * 2;
+    while (turn < -Math.PI) turn += Math.PI * 2;
+    a.heading += Math.max(-1, Math.min(1, turn)) * (tank ? 1.2 : 2) * dt;
+    if (!tank || d > stand) {
+      a.x += Math.sin(a.heading) * a.speed * dt;
+      a.z += Math.cos(a.heading) * a.speed * dt;
+    }
+    a.reload -= dt;
+    if (a.reload <= 0 && d < stand + 30) {
+      a.reload = tank ? 2.8 : 2.2;
+      const flight = tank ? 1.5 : 1.1;
+      a.shells.push({
+        id: w.nextId++,
+        x: target.x,
+        z: target.z,
+        radius: Math.max(4, target.r * (tank ? 0.35 : 0.3)),
+        fuse: flight,
+        flight,
+        from: { x: a.x, z: a.z, y: tank ? 2.2 : 10 + target.r * 0.8 },
+      });
+    }
+  }
+  for (const b of a.shells) {
+    b.fuse -= dt;
+    if (b.fuse > 0) continue;
+    events.push({ type: 'boom', x: b.x, z: b.z, size: b.radius });
+    for (const h of w.holes) {
+      if (h.alive && h.safe <= 0 && Math.hypot(h.x - b.x, h.z - b.z) < b.radius + h.r * 0.25) hurt(h, 'bomb', events);
+    }
+  }
+  a.shells = a.shells.filter((b) => b.fuse > 0);
+  // A big hole swallows a tank that rolls into it.
+  if (tank) {
+    for (const h of w.holes) {
+      if (!h.alive || TANK_SIZE > h.r * FIT || Math.hypot(h.x - a.x, h.z - a.z) > h.r - 1.5) continue;
+      a.life = 0;
+      gobble(w, h, makeProp(-a.id, 'tank', a.x, a.z, a.heading), events);
+      return;
+    }
+  }
+  // Out of time: it stops firing and leaves once its last shell lands.
+  if (a.life <= 0 && a.shells.length) a.life = 0.01;
 }
 
 function flyBomber(w: World, a: Extract<Attack, { kind: 'bomber' }>, dt: number, events: WorldEvent[]): void {

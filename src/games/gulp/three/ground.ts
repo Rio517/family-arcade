@@ -6,13 +6,19 @@
  * world units, so the ground stays crisp at any map size: a Region map is
  * five times the width of a Town and needs no bigger textures. Layers are
  * kept apart by a little height and polygon offset, so nothing flickers.
+ * Grass is laid as a grid of vertices whose colour drifts with a smooth
+ * field of where they are, and its texture is read at two scales, so a
+ * meadow has no edges and no visible repeat.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { seededRng } from '@shared/rng';
-import { BLOCK, ROAD, SIDEWALK, type BlockKind, type City } from '../domain/city';
+import { BLOCK, PARK_PATH, PARK_PLAZA, ROAD, SIDEWALK, type Airfield, type BlockKind, type City } from '../domain/city';
 
-type Surface = 'grass' | 'meadow' | 'forest' | 'paving' | 'plaza' | 'concrete' | 'field' | 'rock';
+type Surface = 'grass' | 'meadow' | 'forest' | 'paving' | 'plaza' | 'concrete' | 'field' | 'rock' | 'parking';
+
+/** The grassy surfaces: soft colour, no straight edges, no visible repeat. */
+const GREEN: ReadonlySet<Surface> = new Set(['grass', 'meadow', 'forest', 'rock']);
 
 /** What each kind of block stands on inside its pavement ring. */
 const FLOOR: Record<BlockKind, Surface> = {
@@ -28,40 +34,170 @@ const FLOOR: Record<BlockKind, Surface> = {
   forest: 'forest',
   windfarm: 'meadow',
   airport: 'concrete',
-  apron: 'concrete',
   mountain: 'rock',
   wonder: 'plaza',
+  military: 'concrete',
+  helipad: 'concrete',
+  playpark: 'grass',
+  dogpark: 'meadow',
+  arena: 'concrete',
+  parking: 'parking',
 };
 
+/** One flat quad in world units, UVs in world units divided by `tile`. */
+function quad(x0: number, z0: number, x1: number, z1: number, y: number, tile: number): THREE.BufferGeometry {
+  const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0);
+  g.rotateX(-Math.PI / 2);
+  g.translate((x0 + x1) / 2, y, (z0 + z1) / 2);
+  const pos = g.attributes.position;
+  const uv = g.attributes.uv;
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / tile, pos.getZ(i) / tile);
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3).fill(1), 3));
+  return g;
+}
+
 /**
- * One flat quad in world units, UVs in world units divided by `tile`. `look`
- * turns and shifts the texture and tints it, so neighbouring blocks of grass
- * don't show the same pattern.
+ * Smooth value noise, 0..1: the same number at the same spot every time, and
+ * no steps anywhere, so colour drawn from it has no edges.
  */
-function quad(
+function hash(i: number, j: number): number {
+  let h = Math.imul(i, 374761393) + Math.imul(j, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+function valueNoise(x: number, z: number): number {
+  const i = Math.floor(x);
+  const j = Math.floor(z);
+  const fx = x - i;
+  const fz = z - j;
+  const u = fx * fx * (3 - 2 * fx);
+  const v = fz * fz * (3 - 2 * fz);
+  const a = hash(i, j) + (hash(i + 1, j) - hash(i, j)) * u;
+  const b = hash(i, j + 1) + (hash(i + 1, j + 1) - hash(i, j + 1)) * u;
+  return a + (b - a) * v;
+}
+
+/**
+ * The grass's colour at a spot, as a vertex colour: broad lighter and darker
+ * swathes, a little warmer where it is drier. It depends only on where the
+ * spot is, so two pieces of grass that meet always agree along the join.
+ */
+export function grassTint(x: number, z: number): [number, number, number] {
+  const broad = valueNoise(x / 95 + 11.3, z / 95 - 7.9);
+  const fine = valueNoise(x / 37 - 3.1, z / 37 + 21.7);
+  const t = 0.9 + 0.15 * (broad * 0.65 + fine * 0.35);
+  const dry = valueNoise(x / 140 + 40.2, z / 140 + 5.5) - 0.5;
+  return [t * (1 + dry * 0.1), t, t * (1 - dry * 0.14)];
+}
+
+/**
+ * Grass over a rectangle: a grid of vertices every `step` or so, so the
+ * colour can drift smoothly across it. UVs are world units over `tile`,
+ * turned and shifted by `look` (a block's own grass can be turned; the
+ * countryside is never turned, so its pieces join without a seam).
+ */
+function sheet(
   x0: number,
   z0: number,
   x1: number,
   z1: number,
   y: number,
   tile: number,
-  look: { turn: number; dx: number; dz: number; tint: number } = { turn: 0, dx: 0, dz: 0, tint: 1 },
+  step: number,
+  look: { turn: number; dx: number; dz: number } = { turn: 0, dx: 0, dz: 0 },
 ): THREE.BufferGeometry {
-  const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0);
+  const nx = Math.max(1, Math.ceil((x1 - x0) / step));
+  const nz = Math.max(1, Math.ceil((z1 - z0) / step));
+  const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0, nx, nz);
   g.rotateX(-Math.PI / 2);
   g.translate((x0 + x1) / 2, y, (z0 + z1) / 2);
   const pos = g.attributes.position;
   const uv = g.attributes.uv;
   const c = Math.cos(look.turn);
   const sn = Math.sin(look.turn);
+  const col = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
-    const u = pos.getX(i) / tile;
-    const v = pos.getZ(i) / tile;
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const u = x / tile;
+    const v = z / tile;
     uv.setXY(i, u * c - v * sn + look.dx, u * sn + v * c + look.dz);
+    col.set(grassTint(x, z), i * 3);
   }
-  const col = new Float32Array(pos.count * 3).fill(look.tint);
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return g;
+}
+
+/** How far across one repeat of the grass texture is, in world units. */
+const GRASS_TILE = 22;
+
+/**
+ * The countryside's grass: the land between the street grid and the shore,
+ * as one mesh (a square ring with shared vertices, so no joins and no
+ * cracks) under one unturned texture mapping and one colour field.
+ */
+export function countryGrass(city: City, y = -0.09): THREE.BufferGeometry | null {
+  const { half, land } = city;
+  if (land <= half) return null;
+  const step = 9;
+  const run = (a: number, b: number) => {
+    const n = Math.max(1, Math.ceil((b - a) / step));
+    return Array.from({ length: n }, (_, i) => a + ((b - a) * i) / n);
+  };
+  // Grid lines that land exactly on the street grid's edges.
+  const lines = [...run(-land, -half), ...run(-half, half), ...run(half, land), land];
+  const n = lines.length;
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const col: number[] = [];
+  for (const z of lines) {
+    for (const x of lines) {
+      pos.push(x, y, z);
+      uv.push(x / GRASS_TILE, z / GRASS_TILE);
+      col.push(...grassTint(x, z));
+    }
+  }
+  const index: number[] = [];
+  for (let j = 0; j < n - 1; j++) {
+    for (let i = 0; i < n - 1; i++) {
+      // Only squares outside the street grid.
+      const inGrid = lines[i] >= -half && lines[i + 1] <= half && lines[j] >= -half && lines[j + 1] <= half;
+      if (inGrid) continue;
+      const a = j * n + i;
+      const b = a + 1;
+      const c = a + n;
+      const d = c + 1;
+      // Wound to face up.
+      index.push(a, c, b, b, c, d);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(Array.from({ length: n * n }, () => [0, 1, 0]).flat(), 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(index);
+  return g;
+}
+
+/**
+ * The green textures repeat every few metres; sampling the texture a second
+ * time, larger and turned, and averaging the two stretches that repeat far
+ * beyond anything on screen. One extra texture read, no extra draw calls.
+ */
+function unrepeat(m: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+  m.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `#ifdef USE_MAP
+        vec4 grassNear = texture2D( map, vMapUv );
+        vec4 grassFar = texture2D( map, mat2( 0.6, -0.8, 0.8, 0.6 ) * vMapUv * 0.43 + vec2( 0.37, 0.71 ) );
+        diffuseColor *= mix( grassNear, grassFar, 0.5 );
+      #endif`,
+    );
+  };
+  return m;
 }
 
 function disc(x: number, z: number, r: number, y: number, tile: number): THREE.BufferGeometry {
@@ -119,6 +255,7 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   // shares a plane with it (a shared plane flickers).
   const land = layer([quad(-half, -half, half, half, -0.1, 4)], flat(paving, 0xffffff, 0), 0);
   if (land) group.add(land);
+  const edgeOf = city.land;
 
   // What each block stands on.
   const surfaces: Record<Surface, THREE.Texture> = {
@@ -129,45 +266,70 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
     paving: tex((g, s) => drawTiles(g, s, '#efcf9c', 'rgba(160,115,60,0.3)', 4)),
     plaza: tex((g, s) => drawTiles(g, s, '#ece0c8', 'rgba(150,120,90,0.25)', 6)),
     concrete: tex((g, s) => drawTiles(g, s, '#c9c8c3', 'rgba(90,90,90,0.22)', 2)),
+    parking: tex(drawParking),
     field: tex(drawField),
   };
   const bySurface = new Map<Surface, THREE.BufferGeometry[]>();
   const paths: THREE.BufferGeometry[] = [];
   const kerbs: THREE.BufferGeometry[] = [];
   const shadows: THREE.BufferGeometry[] = [];
+  /** A bright kerb round a block, wide enough not to shimmer as a hairline
+   * from a height, with a shadow on the road side below. */
+  const kerb = (x0: number, z0: number, x1: number, z1: number) => {
+    const k = 0.5;
+    const o = 0.35;
+    shadows.push(quad(x0 - o, z0 - o, x1 + o, z0, -0.045, 4));
+    shadows.push(quad(x0 - o, z1, x1 + o, z1 + o, -0.045, 4));
+    shadows.push(quad(x0 - o, z0, x0, z1, -0.045, 4));
+    shadows.push(quad(x1, z0, x1 + o, z1, -0.045, 4));
+    kerbs.push(quad(x0, z0, x1, z0 + k, -0.06, 4));
+    kerbs.push(quad(x0, z1 - k, x1, z1, -0.06, 4));
+    kerbs.push(quad(x0, z0, x0 + k, z1, -0.06, 4));
+    kerbs.push(quad(x1 - k, z0, x1, z1, -0.06, 4));
+  };
   for (const b of city.blockList) {
+    // The airport's blocks are drawn as one field (see below).
+    if (b.kind === 'airport') continue;
     const surface = FLOOR[b.kind];
     const inset = surface === 'paving' || surface === 'plaza' ? SIDEWALK : SIDEWALK - 0.4;
     const list = bySurface.get(surface) ?? [];
-    // Green ground: a big tile, turned, shifted and tinted per block, so no
-    // two blocks repeat. Paving keeps its neat grid.
-    const green = surface === 'grass' || surface === 'meadow' || surface === 'forest' || surface === 'rock';
-    const r = seededRng(Math.round(b.x * 131 + b.z * 7));
-    const look = green ? { turn: Math.floor(r() * 4) * (Math.PI / 2), dx: r(), dz: r(), tint: 0.93 + r() * 0.12 } : undefined;
-    list.push(quad(b.x + inset, b.z + inset, b.x + b.size - inset, b.z + b.size - inset, -0.08, green ? 22 : 8, look));
+    // Green ground: a big tile, turned and shifted per block so no two blocks
+    // repeat (the kerb hides the change), coloured by the same smooth field
+    // as the countryside. Paving keeps its neat grid.
+    const x0 = b.x + inset;
+    const z0 = b.z + inset;
+    const x1 = b.x + b.size - inset;
+    const z1 = b.z + b.size - inset;
+    if (GREEN.has(surface)) {
+      const r = seededRng(Math.round(b.x * 131 + b.z * 7));
+      const look = { turn: Math.floor(r() * 4) * (Math.PI / 2), dx: r(), dz: r() };
+      list.push(sheet(x0, z0, x1, z1, -0.08, GRASS_TILE, 9, look));
+    } else list.push(quad(x0, z0, x1, z1, -0.08, 8));
     bySurface.set(surface, list);
     if (b.kind === 'park') {
       // A cross of paths and a round plaza for the fountain.
       const c = BLOCK / 2;
-      paths.push(quad(b.x + c - 2.5, b.z + SIDEWALK, b.x + c + 2.5, b.z + b.size - SIDEWALK, -0.07, 4));
-      paths.push(quad(b.x + SIDEWALK, b.z + c - 2.5, b.x + b.size - SIDEWALK, b.z + c + 2.5, -0.07, 4));
-      paths.push(disc(b.x + c, b.z + c, 10, -0.065, 4));
+      const w = PARK_PATH / 2;
+      paths.push(quad(b.x + c - w, b.z + SIDEWALK, b.x + c + w, b.z + b.size - SIDEWALK, -0.07, 4));
+      paths.push(quad(b.x + SIDEWALK, b.z + c - w, b.x + b.size - SIDEWALK, b.z + c + w, -0.07, 4));
+      paths.push(disc(b.x + c, b.z + c, PARK_PLAZA, -0.065, 4));
     }
-    // A bright kerb round the block, wide enough not to shimmer as a
-    // hairline from a height, with a shadow on the road side below.
-    const k = 0.5;
-    const o = 0.35;
-    shadows.push(quad(b.x - o, b.z - o, b.x + b.size + o, b.z, -0.045, 4));
-    shadows.push(quad(b.x - o, b.z + b.size, b.x + b.size + o, b.z + b.size + o, -0.045, 4));
-    shadows.push(quad(b.x - o, b.z, b.x, b.z + b.size, -0.045, 4));
-    shadows.push(quad(b.x + b.size, b.z, b.x + b.size + o, b.z + b.size, -0.045, 4));
-    kerbs.push(quad(b.x, b.z, b.x + b.size, b.z + k, -0.06, 4));
-    kerbs.push(quad(b.x, b.z + b.size - k, b.x + b.size, b.z + b.size, -0.06, 4));
-    kerbs.push(quad(b.x, b.z, b.x + k, b.z + b.size, -0.06, 4));
-    kerbs.push(quad(b.x + b.size - k, b.z, b.x + b.size, b.z + b.size, -0.06, 4));
+    kerb(b.x, b.z, b.x + b.size, b.z + b.size);
+  }
+  const field = city.airfield;
+  if (field) kerb(field.area.x0, field.area.z0, field.area.x1, field.area.z1);
+  // The countryside: one meadow all the way round, its colour drifting
+  // smoothly, and ploughed fields on top.
+  if (edgeOf > half) {
+    const meadow = countryGrass(city);
+    if (meadow) bySurface.set('meadow', [...(bySurface.get('meadow') ?? []), meadow]);
+    const fields = bySurface.get('field') ?? [];
+    for (const f of city.fields) fields.push(quad(f.x0, f.z0, f.x1, f.z1, -0.08, 8));
+    bySurface.set('field', fields);
   }
   for (const [surface, parts] of bySurface) {
-    const mesh = layer(parts, flat(surfaces[surface], 0xffffff, 1), 1);
+    const m = flat(surfaces[surface], 0xffffff, 1);
+    const mesh = layer(parts, GREEN.has(surface) ? unrepeat(m) : m, 1);
     if (mesh) group.add(mesh);
   }
   const pathMesh = layer(paths, flat(surfaces.plaza, 0xf3e6cc, 2), 2);
@@ -182,8 +344,16 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
     roads.push(quad(-half, r - ROAD / 2, half, r + ROAD / 2, -0.05, 10));
     roads.push(quad(r - ROAD / 2, -half, r + ROAD / 2, half, -0.05, 10));
   }
+  for (const r of city.countryRoads) roads.push(quad(r.x0, r.z0, r.x1, r.z1, -0.05, 10));
   const roadMesh = layer(roads, flat(asphalt, 0xffffff, 3), 3);
   if (roadMesh) group.add(roadMesh);
+  // Streets built over to join an arena to its car park (the airport's are
+  // under its own field).
+  const inField = (l: { x0: number; z0: number; x1: number; z1: number }) =>
+    !!field && l.x0 >= field.area.x0 - 1 && l.x1 <= field.area.x1 + 1 && l.z0 >= field.area.z0 - 1 && l.z1 <= field.area.z1 + 1;
+  const lots = city.lots.filter((l) => !inField(l)).map((l) => quad(l.x0, l.z0, l.x1, l.z1, -0.043, 8));
+  const lotMesh = layer(lots, flat(surfaces.concrete, 0xffffff, 5), 5);
+  if (lotMesh) group.add(lotMesh);
   const shadowMesh = layer(shadows, flat(null, 0x3a3f4a, 4), 4);
   if (shadowMesh) group.add(shadowMesh);
 
@@ -197,18 +367,24 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
         const cx = x + side * (ROAD / 2 + 1.8);
         const cz = z + side * (ROAD / 2 + 1.8);
         for (let t = -ROAD / 2 + 1; t < ROAD / 2 - 0.5; t += 1.8) {
-          if (Math.abs(cx) < half - 1) white.push(quad(cx - 1.2, z + t, cx + 1.2, z + t + 0.9, -0.04, 4));
-          if (Math.abs(cz) < half - 1) white.push(quad(x + t, cz - 1.2, x + t + 0.9, cz + 1.2, -0.04, 4));
+          const built = (px: number, pz: number) =>
+            city.lots.some((l) => px >= l.x0 && px <= l.x1 && pz >= l.z0 && pz <= l.z1) ||
+            (!!field && px > field.area.x0 && px < field.area.x1 && pz > field.area.z0 && pz < field.area.z1);
+          // No crossing on a built-over street, or leading into the airport.
+          const reach = ROAD / 2 + 1;
+          if (Math.abs(cx) < half - 1 && !built(cx, z + t) && !built(cx, z - reach) && !built(cx, z + reach)) white.push(quad(cx - 1.2, z + t, cx + 1.2, z + t + 0.9, -0.04, 4));
+          if (Math.abs(cz) < half - 1 && !built(x + t, cz) && !built(x - reach, cz) && !built(x + reach, cz)) white.push(quad(x + t, cz - 1.2, x + t + 0.9, cz + 1.2, -0.04, 4));
         }
       }
     }
   }
   const whiteMesh = layer(white, flat(null, 0xf4f4f0, 4), 4);
   if (whiteMesh) group.add(whiteMesh);
+  if (field) for (const mesh of airfieldMeshes(field, surfaces.meadow, surfaces.concrete, asphalt)) group.add(mesh);
 
   // The island's edge, standing out of the sea, and the sea.
   const edge = new THREE.Mesh(
-    new THREE.BoxGeometry(half * 2 + 3, 3, half * 2 + 3),
+    new THREE.BoxGeometry(edgeOf * 2 + 3, 3, edgeOf * 2 + 3),
     new THREE.MeshStandardMaterial({ color: 0xd9d2c3, roughness: 0.9 }),
   );
   // Its top sits below every ground layer (they run from -0.1 up to 0).
@@ -229,7 +405,7 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
     base.position.set((l.x0 + l.x1) / 2, -1.75, (l.z0 + l.z1) / 2);
     base.receiveShadow = true;
     group.add(base);
-    if (l.kind === 'islet') extraGrass.push(quad(l.x0, l.z0, l.x1, l.z1, -0.08, 22));
+    if (l.kind === 'islet') extraGrass.push(sheet(l.x0, l.z0, l.x1, l.z1, -0.08, GRASS_TILE, 9));
     else {
       extraRoad.push(quad(l.x0, l.z0, l.x1, l.z1, -0.05, 10));
       // Railings along both sides of the bridge.
@@ -241,7 +417,7 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
       }
     }
   }
-  const isletMesh = layer(extraGrass, flat(surfaces.grass, 0xffffff, 1), 1);
+  const isletMesh = layer(extraGrass, unrepeat(flat(surfaces.grass, 0xffffff, 1)), 1);
   if (isletMesh) group.add(isletMesh);
   const bridgeMesh = layer(extraRoad, flat(asphalt, 0xffffff, 3), 3);
   if (bridgeMesh) group.add(bridgeMesh);
@@ -264,6 +440,131 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
       for (const t of textures) t.dispose();
     },
   };
+}
+
+// -------------------------------------------------------------------------
+// The airport's field
+// -------------------------------------------------------------------------
+
+type Box = { x0: number; z0: number; x1: number; z1: number };
+
+/** Seven-segment digits: which of a b c d e f g each one lights. */
+const DIGIT: Record<string, string> = {
+  '0': 'abcdef',
+  '1': 'bc',
+  '2': 'abdeg',
+  '3': 'abcdg',
+  '4': 'bcfg',
+  '5': 'acdfg',
+  '6': 'acdefg',
+  '7': 'abc',
+  '8': 'abcdefg',
+  '9': 'abcdfg',
+};
+
+/**
+ * The runway's white paint, as rectangles on the map: edge lines, the
+ * threshold stripes and the runway's number at each end (read by a pilot
+ * coming in to land there), and the dashed centreline between.
+ */
+export function runwayMarks(f: Airfield): Box[] {
+  const r = f.runway;
+  const alongX = f.along === 'x';
+  const [A0, A1, C0, C1] = alongX ? [r.x0, r.x1, r.z0, r.z1] : [r.z0, r.z1, r.x0, r.x1];
+  const cm = (C0 + C1) / 2;
+  const out: Box[] = [];
+  /** A rectangle given along the runway (a) and across it (c). */
+  const put = (a0: number, a1: number, c0: number, c1: number) =>
+    out.push(alongX ? { x0: Math.min(a0, a1), x1: Math.max(a0, a1), z0: Math.min(c0, c1), z1: Math.max(c0, c1) } : { x0: Math.min(c0, c1), x1: Math.max(c0, c1), z0: Math.min(a0, a1), z1: Math.max(a0, a1) });
+  // Edge lines.
+  put(A0 + 0.6, A1 - 0.6, C0 + 0.6, C0 + 1.3);
+  put(A0 + 0.6, A1 - 0.6, C1 - 1.3, C1 - 0.6);
+  // Centreline dashes, clear of the numbers.
+  for (let a = A0 + 25; a + 5 <= A1 - 25; a += 9) put(a, a + 5, cm - 0.35, cm + 0.35);
+  // Each end: seen from the approach, `up` points down the runway, `right` to the pilot's right.
+  // North is -z: a runway along x reads 09 from its west end and 27 from its east;
+  // one along z reads 18 from its north end and 36 from its south.
+  const ends: Array<{ start: number; dir: 1 | -1; num: string }> = alongX
+    ? [
+        { start: A0, dir: 1, num: '09' },
+        { start: A1, dir: -1, num: '27' },
+      ]
+    : [
+        { start: A0, dir: 1, num: '18' },
+        { start: A1, dir: -1, num: '36' },
+      ];
+  for (const { start, dir, num } of ends) {
+    const at = (d: number) => start + dir * d;
+    // Threshold stripes, three each side of the middle.
+    for (const side of [-1, 1]) {
+      for (let k = 0; k < 3; k++) put(at(2), at(10), cm + side * (1 + k * 2), cm + side * (2.2 + k * 2));
+    }
+    // The number: 4 wide, 7 long digits, strokes 0.9, from 13 to 20 in.
+    const upX = alongX ? dir : 0;
+    const upZ = alongX ? 0 : dir;
+    const rightX = -upZ;
+    const rightZ = upX;
+    const [W, H, t] = [4, 7, 0.9];
+    const seg: Record<string, [number, number, number, number]> = {
+      a: [0, W, H - t, H],
+      b: [W - t, W, H / 2, H],
+      c: [W - t, W, 0, H / 2],
+      d: [0, W, 0, t],
+      e: [0, t, 0, H / 2],
+      f: [0, t, H / 2, H],
+      g: [0, W, (H - t) / 2, (H + t) / 2],
+    };
+    [...num].forEach((ch, i) => {
+      const left = i === 0 ? -W - 0.6 : 0.6;
+      for (const s of DIGIT[ch]) {
+        const [r0, r1, h0, h1] = seg[s];
+        const pts = [
+          [r0, h0],
+          [r1, h1],
+        ].map(([rr, hh]) => {
+          const across = left + rr;
+          const down = 13 + hh;
+          // Along the runway `down` in from the end; across it `across` to the right.
+          const x = (alongX ? at(down) : cm) + across * rightX;
+          const z = (alongX ? cm : at(down)) + across * rightZ;
+          return [x, z];
+        });
+        out.push({ x0: Math.min(pts[0][0], pts[1][0]), x1: Math.max(pts[0][0], pts[1][0]), z0: Math.min(pts[0][1], pts[1][1]), z1: Math.max(pts[0][1], pts[1][1]) });
+      }
+    });
+  }
+  return out;
+}
+
+/**
+ * The airport's ground, over its built-over streets: grass, the concrete
+ * apron, the runway (darker) and taxiways, then the paint. Four meshes.
+ */
+function airfieldMeshes(f: Airfield, grass: THREE.Texture, concrete: THREE.Texture, asphalt: THREE.Texture): THREE.Mesh[] {
+  const tint = (g: THREE.BufferGeometry, rgb: [number, number, number]) => {
+    const c = g.attributes.color;
+    for (let i = 0; i < c.count; i++) c.setXYZ(i, ...rgb);
+    return g;
+  };
+  const a = f.area;
+  const out: Array<THREE.Mesh | null> = [
+    layer([sheet(a.x0 + 0.5, a.z0 + 0.5, a.x1 - 0.5, a.z1 - 0.5, -0.042, GRASS_TILE, 9)], unrepeat(flat(grass, 0xffffff, 5)), 5),
+    layer([quad(f.apron.x0, f.apron.z0, f.apron.x1, f.apron.z1, -0.041, 8)], flat(concrete, 0xffffff, 6), 6),
+    layer(
+      [tint(quad(f.runway.x0, f.runway.z0, f.runway.x1, f.runway.z1, -0.04, 10), [0.7, 0.7, 0.74]), ...f.taxiways.map((t) => quad(t.x0, t.z0, t.x1, t.z1, -0.04, 10))],
+      flat(asphalt, 0xffffff, 7),
+      7,
+    ),
+    layer(
+      [
+        ...runwayMarks(f).map((m) => quad(m.x0, m.z0, m.x1, m.z1, -0.038, 4)),
+        ...f.lines.map((m) => tint(quad(m.x0, m.z0, m.x1, m.z1, -0.038, 4), [1, 0.78, 0.16])),
+      ],
+      flat(null, 0xf4f4f0, 8),
+      8,
+    ),
+  ];
+  return out.filter((m): m is THREE.Mesh => m !== null);
 }
 
 // -------------------------------------------------------------------------
@@ -338,20 +639,47 @@ function drawTiles(g: CanvasRenderingContext2D, s: number, base: string, line: s
 function drawGrass(g: CanvasRenderingContext2D, s: number, base: string, dark: string, salt: number): void {
   g.fillStyle = base;
   g.fillRect(0, 0, s, s);
-  // Soft patches of every size, scattered at random, then fine speckle.
+  // Soft patches of every size, scattered at random, then fine speckle. A
+  // patch over the texture's edge is drawn again on the far side, each copy
+  // with its own gradient: a gradient belongs to where it was made, so one
+  // shared gradient left the copies blank and cut every edge patch straight
+  // across, which showed as hard lines where the texture repeats.
   const rnd = seededRng(salt * 313);
+  // Fading to the same green, not to transparent black, so a patch has no
+  // dark rim round it.
+  const n = parseInt(dark.slice(1), 16);
+  const clear = `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},0)`;
   for (let i = 0; i < 40; i++) {
     const x = rnd() * s;
     const y = rnd() * s;
     const r = 14 + rnd() * 60;
-    const grad = g.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, dark);
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = grad;
-    for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) g.fillRect(x + dx - r, y + dy - r, r * 2, r * 2);
+    for (const dx of [-s, 0, s]) {
+      for (const dy of [-s, 0, s]) {
+        const cx = x + dx;
+        const cy = y + dy;
+        if (cx + r < 0 || cx - r > s || cy + r < 0 || cy - r > s) continue;
+        const grad = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+        grad.addColorStop(0, dark);
+        grad.addColorStop(1, clear);
+        g.fillStyle = grad;
+        g.fillRect(cx - r, cy - r, r * 2, r * 2);
+      }
+    }
   }
   speckle(g, s, 1600, 'rgba(255,255,255,0.08)', 2, salt * 2 + 3);
   speckle(g, s, 1600, 'rgba(0,60,0,0.08)', 2, salt * 2 + 4);
+}
+
+/** Car-park tarmac with white bays across it. */
+function drawParking(g: CanvasRenderingContext2D, s: number): void {
+  drawAsphalt(g, s);
+  g.fillStyle = 'rgba(245,245,240,0.85)';
+  // Eight units of tarmac: bays 2.7 wide down each side, a clear aisle between.
+  for (let i = 0; i < 3; i++) {
+    const x = (i * s) / 3;
+    g.fillRect(x, 0, 3, s * 0.36);
+    g.fillRect(x, s * 0.64, 3, s * 0.36);
+  }
 }
 
 function drawField(g: CanvasRenderingContext2D, s: number): void {

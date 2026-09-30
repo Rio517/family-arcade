@@ -3,8 +3,9 @@
  * scoreboard snapshot copied out of the live world, and how the 3D scene is
  * loaded. Kept apart from the components so each file holds only components.
  */
-import { KINDS, TIERS } from '../domain/catalog';
+import { KINDS, LEVELS } from '../domain/catalog';
 import { MAPS, type MapId } from '../domain/city';
+import type { Difficulty } from '../domain/rivals';
 import { POWER_TIME, comboOf, levelOf, levelProgress, nextLabel, standings, type World } from '../domain/world';
 import type { GulpScene } from '../three/scene';
 import { SKINS } from './skins';
@@ -24,6 +25,8 @@ export interface Settings {
   fightBack: boolean;
   /** Things grow back and eaten buildings are rebuilt, bigger as the round goes on. */
   regrow: boolean;
+  /** How hard the computer holes play; settings saved before there was a choice play Easy. */
+  difficulty?: Difficulty;
   skin: number;
   muted: boolean;
 }
@@ -59,6 +62,8 @@ export interface Hud {
   /** 0..1 of each power-up still to run, for the countdown bars. */
   speedLeft: number;
   doubleLeft: number;
+  /** True when the child's hole is close to the edge of the world. */
+  nearEdge: boolean;
   /** Wonders swallowed, and how many the map has. */
   wonders: number;
   wondersTotal: number;
@@ -107,6 +112,8 @@ export function hudOf(w: World, me: number): Hud {
     double: Math.ceil(h.doubleTime),
     speedLeft: h.speedTime / POWER_TIME.speed,
     doubleLeft: h.doubleTime / POWER_TIME.double,
+    nearEdge: h.alive && Math.max(Math.abs(h.x), Math.abs(h.z)) > w.city.land - 24 &&
+      !w.city.extraLand.some((l) => h.x >= l.x0 && h.x <= l.x1 && h.z >= l.z0 && h.z <= l.z1),
     wonders: h.wonders,
     wondersTotal: w.city.props.filter((p) => KINDS[p.kind].wonder).length,
     combo: comboOf(h.streak),
@@ -120,5 +127,5 @@ export function hudOf(w: World, me: number): Hud {
 
 /** What a level newly lets you eat, for the level-up banner. */
 export function unlockedAt(level: number): string {
-  return level < TIERS.length ? TIERS[level].label : 'Anything!';
+  return level < LEVELS.length ? LEVELS[level].label : 'Anything!';
 }

@@ -79,6 +79,23 @@ describe('GulpPage', () => {
     expect(screen.queryByTestId('gulp-options-dialog')).not.toBeInTheDocument();
   });
 
+  it('the difficulty starts on Easy, is chosen under Options, remembered and named on the card', () => {
+    // Settings saved before there was a choice still play Easy.
+    localStorage.setItem('gulp:settings:v1', JSON.stringify({ map: 'town', length: 'short' }));
+    renderPage();
+    expect(screen.getByTestId('gulp-difficulty-shown')).toHaveTextContent('Easy');
+    fireEvent.click(screen.getByTestId('gulp-options'));
+    expect(screen.getByRole('radiogroup', { name: 'Difficulty' })).toBeInTheDocument();
+    expect(screen.getByTestId('gulp-difficulty-easy')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('gulp-difficulty-hard')).toHaveTextContent('They hunt you!');
+    fireEvent.click(screen.getByTestId('gulp-difficulty-hard'));
+    expect(screen.getByTestId('gulp-difficulty-hard')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('gulp-difficulty-easy')).toHaveAttribute('aria-checked', 'false');
+    expect(JSON.parse(localStorage.getItem('gulp:settings:v1') ?? '{}')).toMatchObject({ map: 'town', difficulty: 'hard' });
+    fireEvent.click(screen.getByTestId('gulp-options-done'));
+    expect(screen.getByTestId('gulp-difficulty-shown')).toHaveTextContent('Hard');
+  });
+
   it('PLAY starts a round: countdown, then the leaderboard with the rivals for the map', async () => {
     fake3d.enabled = true;
     renderPage();

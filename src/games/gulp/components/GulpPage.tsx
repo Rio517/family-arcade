@@ -16,12 +16,14 @@ import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { recordResultFor } from '@shared/profile/results';
 import { useProfile } from '@shared/profile/useProfile';
 import { SpeakerIcon, SpeakerOffIcon } from '@shared/ui/icons';
-import { KINDS } from '../domain/catalog';
-import { MAPS, type MapId } from '../domain/city';
+import { KINDS, type PropKind } from '../domain/catalog';
+import { MAPS, WONDER_COUNT, type MapId } from '../domain/city';
+import { dealWonders } from '../domain/wonders';
 import { createWorld, endRound, levelOf, standings, type World, type WorldEvent } from '../domain/world';
 import type { HoleLook } from '../three/scene';
 import { GulpHud } from './GulpHud';
 import { GulpMenu } from './GulpMenu';
+import { GulpMinimap } from './GulpMinimap';
 import { GulpStage } from './GulpStage';
 import { durationOf, hudOf, loadScene, unlockedAt, type Banner, type Hud, type SceneLoader, type Settings } from './round';
 import { SKINS, rivalsFor } from './skins';
@@ -31,6 +33,24 @@ import { Sounds } from './sounds';
 const GAME_ID = 'gulp';
 const SETTINGS_KEY = 'gulp:settings:v1';
 const BEST_KEY = 'gulp:best:v1';
+const DECK_KEY = 'gulp:wonder-deck:v1';
+
+/** Deal this round's wonders from the deck kept between rounds (see domain/wonders.ts). */
+function dealRoundWonders(map: MapId, rng: () => number): PropKind[] {
+  let deck: PropKind[] = [];
+  try {
+    deck = JSON.parse(localStorage.getItem(DECK_KEY) ?? '[]') as PropKind[];
+  } catch {
+    /* no deck yet */
+  }
+  const { dealt, deck: rest } = dealWonders(deck, WONDER_COUNT[map], rng);
+  try {
+    localStorage.setItem(DECK_KEY, JSON.stringify(rest));
+  } catch {
+    /* not saved: a fresh shuffle next time */
+  }
+  return dealt;
+}
 
 const DEFAULT_SETTINGS: Settings = {
   map: 'city',
@@ -40,6 +60,7 @@ const DEFAULT_SETTINGS: Settings = {
   regrow: true,
   skin: 0,
   muted: false,
+  difficulty: 'easy',
 };
 
 function loadSettings(): Settings {
@@ -70,8 +91,15 @@ interface Round {
 
 type Phase = 'menu' | 'play' | 'over';
 
-/** The menu's backdrop: the chosen map with only computer holes roaming. */
-function attract(map: MapId, key: number, rng: () => number): Round {
+/**
+ * The menu's backdrop: always the Region map with every wonder, the airport,
+ * stadiums and the countryside, whatever map is picked, so the menu shows off
+ * what the bigger maps hold. Only computer holes roam it.
+ */
+const SHOWCASE: MapId = 'region';
+
+function attract(key: number, rng: () => number): Round {
+  const map = SHOWCASE;
   const rivals = rivalsFor(-1, MAPS[map].rivals);
   const world = createWorld(rng, null, rivals, { map, duration: 0, powerups: false, fightBack: false });
   return { world, key, looks: rivals.map((r) => ({ color: SKINS[r.skin].color, label: r.name })), follow: 0, playing: false };
@@ -88,7 +116,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
   const { userId } = useProfile();
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const [phase, setPhase] = useState<Phase>('menu');
-  const [round, setRound] = useState<Round>(() => attract(loadSettings().map, 0, rng));
+  const [round, setRound] = useState<Round>(() => attract(0, rng));
   const [hud, setHud] = useState<Hud | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [paused, setPaused] = useState(false);
@@ -128,13 +156,11 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     pausedRef.current = paused;
   }, [paused]);
 
-  const bestKey = `${userId ?? 'guest'}:${settings.map}`;
+  // Easy keeps the key bests were saved under before there were levels.
+  const level = settings.difficulty ?? 'easy';
+  const bestKey = `${userId ?? 'guest'}:${settings.map}${level === 'easy' ? '' : `:${level}`}`;
 
-  // A new map in the menu: a new city behind it.
-  const changeSettings = (next: Settings) => {
-    if (next.map !== settings.map && phase === 'menu') setRound((r) => attract(next.map, r.key + 1, rng));
-    setSettings(next);
-  };
+  const changeSettings = (next: Settings) => setSettings(next);
 
   const say = useCallback((b: Omit<Banner, 'id'>) => {
     const id = ++bannerId.current;
@@ -152,6 +178,8 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
       powerups: s.powerups,
       fightBack: s.fightBack,
       regrow: s.regrow,
+      difficulty: s.difficulty,
+      wonders: dealRoundWonders(s.map, rng),
     });
     const looks: HoleLook[] = [
       { color: SKINS[s.skin].color, label: 'You' },
@@ -172,7 +200,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     setResult(null);
     setHud(null);
     setPhase('menu');
-    setRound((r) => attract(settings.map, r.key + 1, rng));
+    setRound((r) => attract(r.key + 1, rng));
   };
 
   const finish = useCallback(
@@ -229,6 +257,10 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
             sounds?.play('level');
             say({ kind: 'news', text: e.text });
             break;
+          case 'police':
+            sounds?.play('warn');
+            say({ kind: 'level', text: 'Nee-naw! The police are coming!', sub: 'They just want to take a look' });
+            break;
           case 'wonder':
             if (e.hole === 0) {
               sounds?.play('win');
@@ -256,14 +288,18 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
               say(
                 e.kind === 'tanker'
                   ? { kind: 'warn', text: 'Look out! A fuel truck!', sub: 'Swerve out of its way' }
-                  : { kind: 'warn', text: 'Planes overhead!', sub: 'Get out of the red circles' },
+                  : e.kind === 'tank'
+                    ? { kind: 'warn', text: 'Tanks are coming!', sub: 'Dodge the red circles, or gulp them!' }
+                    : e.kind === 'heli'
+                      ? { kind: 'warn', text: 'Helicopter!', sub: 'Keep moving, dodge the red circles' }
+                      : { kind: 'warn', text: 'Bombers overhead!', sub: 'Get out of the red circles' },
               );
             }
             break;
           case 'hurt':
             if (e.hole === 0) {
               sounds?.play('hurt');
-              say({ kind: 'hurt', text: e.cause === 'chem' ? 'Yuck! Chemicals!' : 'Boom! You shrank', sub: 'Ouch, a bit smaller' });
+              say({ kind: 'hurt', text: e.cause === 'chem' ? 'Yuck! Chemicals!' : e.cause === 'tanker' ? 'Hot hot hot!' : 'Boom! You shrank', sub: e.cause === 'tanker' ? 'The fuel truck burned you' : 'Ouch, a bit smaller' });
             }
             break;
           case 'boom': {
@@ -280,8 +316,10 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
         else if (lastCount.current > 0) sounds?.play('go');
         lastCount.current = count;
       }
+      // Ten HUD updates a second: a re-render on every frame something is
+      // eaten (nearly every frame for a big hole) costs frames for nothing.
       beatRef.current += dt;
-      if (beatRef.current > 0.1 || events.length) {
+      if (beatRef.current > 0.1) {
         beatRef.current = 0;
         setHud(hudOf(w, 0));
       }
@@ -300,7 +338,11 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
   useEffect(() => {
     if (phase !== 'play') return;
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPaused((p) => !p);
+      // Escape or the space bar pauses and resumes.
+      if (e.key === 'Escape' || e.key === ' ') {
+        e.preventDefault();
+        setPaused((p) => !p);
+      }
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
@@ -342,6 +384,11 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
 
       {phase !== 'menu' && hud && (
         <GulpHud hud={hud} banners={banners} muted={muted} onMute={toggleMute} onPause={() => setPaused(true)} touch={touch} />
+      )}
+      {phase === 'play' && (
+        <div className="gulp-minimap-slot">
+          <GulpMinimap world={round.world} />
+        </div>
       )}
 
       {paused && phase === 'play' && (

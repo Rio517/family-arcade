@@ -43,10 +43,14 @@ export type PropKind =
   | 'kiosk'
   | 'container'
   | 'tanker'
+  | 'garbagetruck'
+  | 'icecreamvan'
   // A big construction site, where a stadium or a factory will go up.
   | 'bigsite'
-  // Tier 5: houses and shops.
+  // Tier 5: houses and shops (small, middling and big houses).
+  | 'cottage'
   | 'house'
+  | 'villa'
   | 'shop'
   // Tier 6: tall buildings.
   | 'apartment'
@@ -69,7 +73,28 @@ export type PropKind =
   | 'terminal'
   // Tier 10: mountains.
   | 'mountain'
-  // Wonders: famous-landmark-inspired things worth a big bonus.
+  // People doing things: sitting on benches, walking dogs, police.
+  | 'sitter'
+  | 'dog'
+  | 'police'
+  | 'policecar'
+  // Playgrounds and the dog park.
+  | 'swings'
+  | 'slide'
+  | 'seesaw'
+  | 'sandbox'
+  | 'climber'
+  | 'carousel'
+  | 'agility'
+  // A military base (Region), and the bomber that flies over big holes.
+  | 'tank'
+  | 'helicopter'
+  | 'watchtower'
+  | 'barracks'
+  | 'radar'
+  | 'hangar'
+  | 'bomber'
+  // Wonders: famous landmarks worth a big bonus.
   | 'liberty'
   | 'megaspire'
   | 'irontower'
@@ -133,8 +158,12 @@ export const KINDS: Record<PropKind, KindInfo> = {
   kiosk: { tier: 4, w: 4.0, d: 3.2, h: 3.2, variants: 3 },
   container: { tier: 4, w: 2.6, d: 6.4, h: 2.6, variants: 4 },
   tanker: { tier: 4, w: 2.6, d: 8.0, h: 3.2, variants: 1 },
+  garbagetruck: { tier: 4, w: 2.6, d: 7.0, h: 3.4, variants: 2 },
+  icecreamvan: { tier: 4, w: 2.4, d: 5.6, h: 3.4, variants: 2, food: 'treat' },
   bigsite: { tier: 4, w: 20.0, d: 20.0, h: 12.0, variants: 1 },
+  cottage: { tier: 5, w: 6.0, d: 6.0, h: 5.0, variants: 4 },
   house: { tier: 5, w: 8.0, d: 8.0, h: 7.0, variants: 4, scales: true },
+  villa: { tier: 5, w: 10.0, d: 9.5, h: 8.0, variants: 3 },
   shop: { tier: 5, w: 10.0, d: 8.0, h: 6.0, variants: 4, scales: true },
   apartment: { tier: 6, w: 12.0, d: 12.0, h: 18.0, variants: 4, scales: true },
   tower: { tier: 6, w: 12.0, d: 12.0, h: 30.0, variants: 3, scales: true },
@@ -147,12 +176,31 @@ export const KINDS: Record<PropKind, KindInfo> = {
   powerplant: { tier: 8, w: 34.0, d: 26.0, h: 30.0, variants: 1 },
   mall: { tier: 8, w: 34.0, d: 28.0, h: 12.0, variants: 3 },
   // The rotor faces +z, so the blades set the width.
-  windturbine: { tier: 8, w: 23.0, d: 6.0, h: 48.0, variants: 1 },
+  windturbine: { tier: 8, w: 23.0, d: 12.0, h: 48.0, variants: 1 },
   jet: { tier: 8, w: 34.0, d: 36.0, h: 11.0, variants: 2 },
   skyscraper: { tier: 9, w: 22.0, d: 22.0, h: 110.0, variants: 3, scales: true },
-  tvtower: { tier: 9, w: 14.0, d: 14.0, h: 140.0, variants: 1 },
+  tvtower: { tier: 9, w: 22.0, d: 22.0, h: 140.0, variants: 1 },
   terminal: { tier: 9, w: 36.0, d: 30.0, h: 16.0, variants: 1 },
   mountain: { tier: 10, w: 38.0, d: 38.0, h: 45.0, variants: 2 },
+  sitter: { tier: 0, w: 0.8, d: 1.0, h: 1.3, variants: 6 },
+  dog: { tier: 0, w: 0.5, d: 1.0, h: 0.7, variants: 4 },
+  police: { tier: 0, w: 0.8, d: 0.6, h: 1.8, variants: 1 },
+  policecar: { tier: 3, w: 2.0, d: 4.2, h: 1.9, variants: 1 },
+  swings: { tier: 2, w: 4.0, d: 2.0, h: 2.6, variants: 2 },
+  slide: { tier: 2, w: 1.6, d: 4.5, h: 2.8, variants: 2 },
+  seesaw: { tier: 1, w: 0.6, d: 3.6, h: 0.9, variants: 2 },
+  sandbox: { tier: 1, w: 3.0, d: 3.0, h: 0.5, variants: 1 },
+  climber: { tier: 2, w: 3.0, d: 3.0, h: 2.5, variants: 2 },
+  carousel: { tier: 2, w: 3.2, d: 3.2, h: 1.6, variants: 2 },
+  agility: { tier: 1, w: 3.0, d: 1.0, h: 1.2, variants: 2 },
+  watchtower: { tier: 2, w: 3.0, d: 3.0, h: 7.0, variants: 1 },
+  tank: { tier: 4, w: 3.4, d: 6.4, h: 2.6, variants: 2 },
+  helicopter: { tier: 4, w: 10.0, d: 12.0, h: 3.4, variants: 1 },
+  barracks: { tier: 5, w: 12.0, d: 7.0, h: 5.0, variants: 2 },
+  radar: { tier: 6, w: 8.0, d: 8.0, h: 12.0, variants: 1 },
+  hangar: { tier: 7, w: 22.0, d: 18.0, h: 10.0, variants: 1 },
+  // Never stands in the city: only flies over it (see three/effects.ts).
+  bomber: { tier: 8, w: 30.0, d: 24.0, h: 7.0, variants: 1 },
   liberty: { tier: 8, w: 12.0, d: 12.0, h: 46.0, variants: 1, wonder: { name: 'the Statue of Liberty', bonus: 50000 } },
   megaspire: { tier: 10, w: 24.0, d: 24.0, h: 220.0, variants: 1, wonder: { name: 'the Burj Khalifa', bonus: 45000 } },
   irontower: { tier: 9, w: 26.0, d: 26.0, h: 90.0, variants: 1, wonder: { name: 'the Eiffel Tower', bonus: 30000 } },
@@ -168,23 +216,73 @@ export const KINDS: Record<PropKind, KindInfo> = {
 };
 
 /**
- * Each tier's `size`: the swallow size of every thing in it, and what the
- * level meter names when that tier is next. Tier 0 and 1 are open from the
- * start.
+ * How big a thing is to swallow: half the diagonal of its footprint (the
+ * smallest circle round it), a little under, since things tip in. A hole
+ * swallows a thing it covers on screen, whatever its tier: a thin lamp post
+ * fits a small mouth, a wide stadium needs a huge one.
  */
-export const TIERS: Array<{ size: number; points: number; label: string }> = [
-  { size: 0.6, points: 1, label: 'Cones' },
-  { size: 1.3, points: 2, label: 'Benches' },
-  { size: 2.0, points: 4, label: 'Trees' },
-  { size: 2.8, points: 8, label: 'Cars' },
-  { size: 5.0, points: 20, label: 'Buses' },
-  { size: 6.5, points: 45, label: 'Houses' },
-  { size: 9.5, points: 120, label: 'Towers' },
-  { size: 14.0, points: 400, label: 'Factories' },
-  { size: 23.0, points: 1200, label: 'Stadiums' },
-  { size: 27.0, points: 3500, label: 'Skyscrapers' },
-  { size: 33.0, points: 9000, label: 'Mountains' },
-];
+export function footSize(kind: PropKind, hScale = 1): number {
+  const info = KINDS[kind];
+  // A taller building is a little harder to swallow (and worth more) than a low one.
+  const tall = info.scales ? 1 + (hScale - 1) * 0.2 : 1;
+  return Math.hypot(info.w, info.d) * 0.5 * 0.85 * tall;
+}
+
+/**
+ * The level ladder: each rung opens when the hole can swallow the kind that
+ * names it. The rungs follow the same footprint measure as swallowing, so
+ * "Next: Buses" means the next bus will fit.
+ */
+export const LEVELS: Array<{ size: number; label: string }> = (
+  [
+    ['cone', 'Cones'],
+    ['bench', 'Benches'],
+    ['tree', 'Trees'],
+    ['car', 'Cars'],
+    ['van', 'Vans'],
+    ['cottage', 'Little houses'],
+    ['bus', 'Buses'],
+    ['house', 'Houses'],
+    ['villa', 'Big houses'],
+    ['tower', 'Towers'],
+    ['factory', 'Factories'],
+    ['skyscraper', 'Skyscrapers'],
+    ['stadium', 'Stadiums'],
+    ['mountain', 'Mountains'],
+  ] as Array<[PropKind, string]>
+)
+  .map(([kind, label]) => ({ size: footSize(kind), label }))
+  .sort((a, b) => a.size - b.size);
+
+/**
+ * What a thing is worth follows its swallow size: bigger is worth more, and
+ * the steps between kinds grow as they get bigger. Anchored on well-known
+ * kinds and filled in smoothly between them (on a log scale).
+ */
+const WORTH: Array<[number, number]> = (
+  [
+    ['cone', 1],
+    ['bench', 2],
+    ['tree', 4],
+    ['car', 8],
+    ['bus', 20],
+    ['house', 45],
+    ['tower', 120],
+    ['factory', 400],
+    ['skyscraper', 900],
+    ['stadium', 2500],
+    ['mountain', 6000],
+  ] as Array<[PropKind, number]>
+).map(([kind, points]) => [Math.log(footSize(kind)), Math.log(points)]);
+
+export function worthOf(size: number): number {
+  const x = Math.log(Math.max(0.05, size));
+  let i = 0;
+  while (i < WORTH.length - 2 && x > WORTH[i + 1][0]) i++;
+  const [x0, y0] = WORTH[i];
+  const [x1, y1] = WORTH[i + 1];
+  return Math.max(1, Math.round(Math.exp(y0 + ((x - x0) * (y1 - y0)) / (x1 - x0))));
+}
 
 /** One thing in the city. */
 export interface Prop {
@@ -203,7 +301,7 @@ export interface Prop {
   hScale: number;
 }
 
-/** A new thing of a kind, sized and scored by its tier. */
+/** A new thing of a kind: sized by its footprint, scored by its tier. */
 export function makeProp(
   id: number,
   kind: PropKind,
@@ -214,9 +312,7 @@ export function makeProp(
   hScale = 1,
 ): Prop {
   const info = KINDS[kind];
-  const tier = TIERS[info.tier];
-  // Taller buildings are worth a little more and need a slightly bigger hole.
-  const extra = info.scales ? (hScale - 1) * 0.5 : 0;
+  const size = footSize(kind, hScale);
   return {
     id,
     kind,
@@ -224,8 +320,8 @@ export function makeProp(
     x,
     z,
     rot,
-    size: tier.size * (1 + extra * 0.2),
-    points: info.wonder ? info.wonder.bonus : Math.round(tier.points * (1 + extra)),
+    size,
+    points: info.wonder ? info.wonder.bonus : worthOf(size),
     hScale: info.scales ? hScale : 1,
   };
 }
