@@ -92,9 +92,13 @@ export function smearTexture(kind: Smear): THREE.Texture {
 }
 
 /** A hole's name tag: white with the hole's colour for the child's own, dark glass for the others. */
-export function labelTexture(text: string, color: number, mine: boolean): THREE.Texture {
+export function labelTexture(name: string, color: number, mine: boolean): THREE.Texture {
   const { c, g } = canvas(256, 64);
   g.font = `700 30px ${FONT}`;
+  // A long name is cut short with an ellipsis, so it fits its tag.
+  let text = name;
+  while (text.length > 1 && g.measureText(text).width > 214) text = text.slice(0, -1);
+  if (text !== name) text = `${text.trimEnd()}…`;
   const w = Math.min(248, g.measureText(text).width + 34);
   g.fillStyle = mine ? '#ffffff' : 'rgba(20,24,36,0.7)';
   g.beginPath();

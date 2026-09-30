@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
+import { useDialogFocus } from './useDialogFocus';
 import { recordResultFor } from '@shared/profile/results';
 import { useProfile } from '@shared/profile/useProfile';
 import { SpeakerIcon, SpeakerOffIcon, TrophyIcon } from '@shared/ui/icons';
@@ -63,6 +64,12 @@ interface Round {
 }
 
 type Phase = 'menu' | 'play' | 'over';
+
+/** The results card's big line: how the round went for the child. */
+function headline(rank: number, endedBy: World['endedBy']): string {
+  if (endedBy === 'out') return rank === 1 ? 'Still the biggest hole!' : `You finished #${rank}`;
+  return rank === 1 ? 'You are the biggest hole!' : `#${rank} — great gulping!`;
+}
 
 /** What the results card says ended the round. */
 const KICKER: Record<NonNullable<World['endedBy']>, string> = {
@@ -295,6 +302,11 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     return () => window.removeEventListener('keydown', key);
   }, [phase]);
   useDismissOnEscape(phase === 'over', toMenu);
+  // The pause and results cards keep keyboard focus while they are open.
+  const pauseRef = useRef<HTMLDivElement | null>(null);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
+  useDialogFocus(paused && phase === 'play', pauseRef);
+  useDialogFocus(phase === 'over' && !!result, resultsRef);
 
   const muted = settings.muted;
   const toggleMute = () => setSettings((s) => ({ ...s, muted: !s.muted }));
@@ -347,7 +359,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
 
       {paused && phase === 'play' && (
         <div className="gulp-modal-backdrop">
-          <div className="gulp-modal" role="dialog" aria-modal="true" aria-label="Paused" data-testid="gulp-paused">
+          <div ref={pauseRef} className="gulp-modal" role="dialog" aria-modal="true" aria-label="Paused" data-testid="gulp-paused">
             <h2>Paused</h2>
             <button type="button" className="gulp-play small" onClick={() => setPaused(false)} data-testid="gulp-resume">
               Keep going
@@ -377,9 +389,9 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
 
       {phase === 'over' && result && (
         <div className="gulp-modal-backdrop">
-          <div className="gulp-modal results" role="dialog" aria-modal="true" aria-label="Results" data-testid="gulp-results">
+          <div ref={resultsRef} className="gulp-modal results" role="dialog" aria-modal="true" aria-label="Results" data-testid="gulp-results">
             <span className="gulp-kicker">{KICKER[round.world.endedBy ?? 'ended']}</span>
-            <h2>{result.rank === 1 ? 'You are the biggest hole!' : `#${result.rank} — great gulping!`}</h2>
+            <h2>{headline(result.rank, round.world.endedBy)}</h2>
             <div className="gulp-results-body">
               <section className="gulp-results-round" aria-label="This round">
                 <ol className="gulp-results-list">

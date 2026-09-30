@@ -267,18 +267,23 @@ export class Effects {
     });
   }
 
-  /** Green gas billowing out of a hole that ate the chemical plant. */
+  /**
+   * Green gas billowing out round the rim of a hole that ate the chemical
+   * works: low, spreading outward and see-through, so even a giant hole's
+   * cloud never hides the city or the rivals round it.
+   */
   gas(x: number, z: number, size: number): void {
     const n = this.reducedMotion ? 4 : 12;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
       this.puff(
-        new THREE.Vector3(x + Math.cos(a) * size * 0.4, 1, z + Math.sin(a) * size * 0.4),
+        new THREE.Vector3(x + Math.cos(a) * size * 0.9, 0.8, z + Math.sin(a) * size * 0.9),
         i % 2 ? 0x8fe36a : 0xc6f26a,
-        new THREE.Vector3(Math.cos(a) * size * 0.6, size * 0.5, Math.sin(a) * size * 0.6),
-        size * 0.8,
-        2.2,
-        size * 1.2,
+        new THREE.Vector3(Math.cos(a) * size * 0.35, size * 0.12, Math.sin(a) * size * 0.35),
+        size * 0.45,
+        1.8,
+        size * 0.5,
+        { opacity: 0.5 },
       );
     }
   }

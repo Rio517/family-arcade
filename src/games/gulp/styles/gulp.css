@@ -223,7 +223,7 @@
   color: var(--g-muted);
 }
 
-.gulp-skins { display: flex; flex-wrap: wrap; gap: 8px; }
+.gulp-skins { display: grid; grid-template-columns: repeat(5, max-content); gap: 8px; }
 .gulp-skin {
   --hole: #3d7bff;
   position: relative;
@@ -486,7 +486,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-lv b { min-width: 1.3em; font-size: 21px; font-weight: 900; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; }
 .gulp-meter { width: 120px; height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); overflow: hidden; }
 .gulp-meter-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7fd0ff, #fff); }
-.gulp-next { font-size: 14px; font-weight: 800; white-space: nowrap; }
+.gulp-next { min-width: 150px; font-size: 14px; font-weight: 800; white-space: nowrap; }
 .gulp-powers { display: flex; gap: 8px; }
 .gulp-power {
   display: flex;
@@ -717,6 +717,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 }
 .gulp-eaten strong,
 .gulp-banner strong { font-size: 30px; font-weight: 900; line-height: 1.1; }
+.gulp-eaten { top: max(22%, 190px); }
 .gulp-eaten-lives { display: inline-flex; align-items: center; gap: 4px; color: #e0344b; }
 .gulp-eaten-lives svg { fill: currentColor; }
 .gulp-eaten-kicker {
@@ -1046,7 +1047,12 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   .gulp-play { min-height: 56px; font-size: 28px; }
   .gulp-foot { display: none; }
 
-  .gulp-board { width: 140px; gap: 4px; }
+  .gulp-board { width: 156px; gap: 4px; }
+  .gulp-board .gulp-name { min-width: 3.2em; }
+  /* Power-ups go down the right side, under the stars and holes counters, clear of the leaderboard. */
+  /* Centred without a transform, so the power-ups below can sit against the screen's edge. */
+  .gulp-center { left: 0; right: 0; transform: none; }
+  .gulp-powers { position: fixed; top: max(118px, calc(env(safe-area-inset-top) + 106px)); right: max(12px, env(safe-area-inset-right)); flex-direction: column; align-items: flex-end; gap: 6px; }
   .gulp-board li { font-size: 14px; padding: 3px 8px 3px 3px; gap: 5px; }
   .gulp-board li:nth-child(n + 4):not(.me) { display: none; }
   .gulp-board .gulp-rank { width: 20px; height: 20px; font-size: 14px; }
