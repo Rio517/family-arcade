@@ -29,6 +29,15 @@ const LADDER: PropKind[] = ['house', 'shop', 'apartment', 'tower', 'office', 'sk
 /** Buildings that go up through a tall building site first. */
 const TALL: PropKind[] = ['tower', 'skyscraper'];
 const BIG: PropKind[] = ['factory', 'warehouse', 'mall', 'stadium', 'powerplant'];
+/**
+ * Buildings that come back as themselves, through a building site: the
+ * airport's (and the army base's) buildings, and out in the countryside the
+ * farms and homes, so no city block grows up in a wood or a field.
+ */
+const SAME_AGAIN: ReadonlySet<PropKind> = new Set(['terminal', 'hangar', 'radar', 'barracks']);
+const COUNTRY_SAME: ReadonlySet<PropKind> = new Set(['cottage', 'villa', 'barn', 'watertower']);
+/** Big vehicles that are put back where they stood, like small things: the airport's jets and its train. */
+const PUT_BACK: ReadonlySet<PropKind> = new Set(['jet', 'train']);
 /** Seconds from a building being eaten to its construction site appearing. */
 const SITE_AFTER = 6;
 /** Seconds a construction site stands before the building is finished. */
@@ -59,6 +68,8 @@ export interface Lot {
   room: number;
   /** Which rung of the ladder the old building stood on (-1 for a big building). */
   rung: number;
+  /** A building that comes back as itself (see `SAME_AGAIN`): its kind, look and height. */
+  same?: { kind: PropKind; variant: number; hScale: number };
   due: number;
   /** The construction site standing on it, once there is one. */
   site: number | null;
@@ -77,13 +88,18 @@ export function markEaten(w: World, p: Prop): void {
       lot.site = null;
       lot.due = w.elapsed + SITE_AFTER * 2;
     }
-  } else if (info.tier <= REGROW_TIER) w.eaten.push(p);
+  } else if (info.tier <= REGROW_TIER || PUT_BACK.has(p.kind)) w.eaten.push(p);
+  const room = Math.max(info.w, info.d) + 4;
+  const due = w.elapsed + SITE_AFTER + w.rng() * 6;
+  const country = Math.max(Math.abs(p.x), Math.abs(p.z)) > w.city.half;
+  if (SAME_AGAIN.has(p.kind) || (country && COUNTRY_SAME.has(p.kind))) {
+    w.lots.push({ x: p.x, z: p.z, rot: p.rot, room, rung: -1, due, site: null, same: { kind: p.kind, variant: p.variant, hScale: p.hScale } });
+    return;
+  }
+  if (country) return;
   // A cottage comes back like a house, a big house like a shop: one step up from there.
   const rung = p.kind === 'cottage' ? 0 : p.kind === 'villa' ? 1 : LADDER.indexOf(p.kind);
-  if (rung >= 0 || BIG.includes(p.kind)) {
-    const room = Math.max(info.w, info.d) + 4;
-    w.lots.push({ x: p.x, z: p.z, rot: p.rot, room, rung, due: w.elapsed + SITE_AFTER + w.rng() * 6, site: null });
-  }
+  if (rung >= 0 || BIG.includes(p.kind)) w.lots.push({ x: p.x, z: p.z, rot: p.rot, room, rung, due, site: null });
 }
 
 export function regrow(w: World, dt: number, events: WorldEvent[]): void {
@@ -124,7 +140,7 @@ export function rebuild(w: World, events: WorldEvent[]): void {
       w.lots.splice(i, 1);
       continue;
     }
-    const kind = lot.rung < 0 ? bigKind(w, lot) : ladderKind(w, lot);
+    const kind = lot.same ?? (lot.rung < 0 ? bigKind(w, lot) : ladderKind(w, lot));
     // A tall building goes up in stages: the building site, then a frame
     // with a crane on it, then the tower itself.
     if (TALL.includes(kind.kind) && site.kind !== 'tallsite') {
@@ -139,7 +155,8 @@ export function rebuild(w: World, events: WorldEvent[]): void {
     w.lots.splice(i, 1);
     w.props.delete(site.id);
     const extra = lot.rung < 0 ? 0 : Math.max(0, lot.rung + 1 - LADDER.indexOf(kind.kind));
-    const p = makeProp(w.nextPropId++, kind.kind, lot.x, lot.z, lot.rot, variant, kind.hScale ?? Math.min(2, 1 + 0.2 * extra));
+    const look = lot.same?.variant ?? variant;
+    const p = makeProp(w.nextPropId++, kind.kind, lot.x, lot.z, lot.rot, look, kind.hScale ?? Math.min(2, 1 + 0.2 * extra));
     placeProp(w, p);
     events.push({ type: 'rebuild', prop: p, replaces: site });
     const headline = HEADLINE[p.kind] ?? (p.kind === 'tower' && p.hScale >= 1.4 ? 'The city has a new skyscraper!' : undefined);

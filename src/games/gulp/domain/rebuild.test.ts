@@ -78,6 +78,24 @@ describe('the city rebuilds', () => {
     expect(events).toContainEqual(expect.objectContaining({ type: 'news' }));
   });
 
+  it('the airport comes back as it was: its terminal through a building site, its jet put back', () => {
+    const w = round(1, 0, { regrow: true, duration: 0 });
+    const me = grow(w, 0, 90000);
+    w.elapsed = 300;
+    const events = eatAndWait(w, [makeProp(1, 'terminal', me.x, me.z, 0), makeProp(2, 'jet', me.x + 2, me.z, 0, 1)], 60);
+    expect(built(events)).toEqual(['bigsite', 'terminal']);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'regrow', prop: expect.objectContaining({ kind: 'jet', variant: 1 }) }));
+  });
+
+  it('out in the country a home comes back as the same home, never a city building', () => {
+    const w = round(1, 0, { regrow: true, duration: 0, map: 'region' });
+    const me = grow(w, 0, 400);
+    w.elapsed = 400;
+    me.x = w.city.half + 40;
+    me.z = 0;
+    expect(built(eatAndWait(w, [makeProp(1, 'cottage', me.x, me.z, 0)], 45))).toEqual(['site', 'cottage']);
+  });
+
   it('with regrowth off, nothing comes back', () => {
     const w = round(1, 0, { regrow: false });
     const me = grow(w, 0, 400);

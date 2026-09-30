@@ -25,6 +25,14 @@ const TIP = 0.4;
 /** How far it has tipped (radians) when it goes over, and when it is gone. */
 const TIPPED = 1.05;
 const TUMBLED = 1.45;
+/**
+ * How far over a thing tips, as a share of the full tumble: a thing no taller
+ * than the mouth is wide topples right over, a tower much taller than that
+ * only leans in (its top reaches no further than about the mouth's far rim)
+ * and drops straight down, so it never lies across the street or sinks
+ * through the ground outside the mouth.
+ */
+const tiltShare = (height: number, r: number) => Math.min(1, Math.asin(Math.min(1, (r * 0.9) / height)) / TUMBLED);
 /** Buildings from this tier up can hide the child's hole, and fade. */
 const TALL_TIER = 5;
 /** Things are batched per square of this many units (two blocks), so the
@@ -62,6 +70,8 @@ interface Faller {
   ownMaterial: boolean;
   /** The ground it stood on (a block stands a kerb above the road). */
   y0: number;
+  /** How far over it tips, as a share of the full tumble (see `tiltShare`). */
+  tilt: number;
 }
 
 /** Something put up during the round; `t` runs 0..1 while it rises. */
@@ -147,7 +157,9 @@ export class PropView {
     // Half its footprint along the line from the hole's middle to it.
     const along = Math.atan2(offX, offZ) - p.rot;
     const half = Math.abs(Math.sin(along)) * (info.w / 2) + Math.abs(Math.cos(along)) * (info.d / 2);
-    this.fallers.push({ mesh, hole, t: 0, time: fallTime(p.size), offX, offZ, half, rot: p.rot, h: info.h * p.hScale, ownMaterial, y0: mesh.position.y });
+    const height = info.h * p.hScale;
+    const tilt = tiltShare(height, h?.r ?? height);
+    this.fallers.push({ mesh, hole, t: 0, time: fallTime(p.size), offX, offZ, half, rot: p.rot, h: height, ownMaterial, y0: mesh.position.y, tilt });
   }
 
   /**
@@ -392,7 +404,7 @@ export class PropView {
       // Tipping (accelerating), then over and dropping (under gravity).
       const tip = Math.min(1, k / TIP);
       const drop = Math.max(0, (k - TIP) / (1 - TIP));
-      const angle = TIPPED * tip * tip + (TUMBLED - TIPPED) * drop;
+      const angle = (TIPPED * tip * tip + (TUMBLED - TIPPED) * drop) * f.tilt;
       this.fallQ.setFromAxisAngle(this.fallAxis, angle);
       // Pivot on the outer edge of its footprint: the base swings in and down.
       const px = f.offX - inX * f.half;

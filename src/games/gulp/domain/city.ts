@@ -568,21 +568,16 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
       return false;
     }
     case 'downtown': {
-      // Tall blocks two by two with a narrow gap. Some
-      // blocks swap a pair of them for a wide office block facing its street:
-      // the size between a tower and a factory, so there is always something
-      // to grow into there.
+      // Tall blocks two by two with a narrow gap, each an apartment block, a
+      // tower or (now and then) an office block: the size between a tower and
+      // a factory, so there is always something to grow into there.
       const faces = [Math.PI, Math.PI, 0, 0];
-      const offices = rng();
+      const at = (k: number) => (k === 0 ? KINDS.office.w / 2 + 0.05 : s - KINDS.office.w / 2 - 0.05);
       for (let j = 0; j < 2; j++) {
-        if (offices < 0.33 * (j + 1)) {
-          const half = KINDS.office.d / 2 + 0.05;
-          add('office', cx, j === 0 ? z0 + half : z0 + s - half, j === 0 ? Math.PI : 0, variant(), 0.9 + rng() * 0.5);
-          continue;
-        }
-        const at = (k: number) => (k === 0 ? 6.2 : s - 6.2);
         for (let i = 0; i < 2; i++) {
-          add(rng() < 0.45 ? 'tower' : 'apartment', x0 + at(i), z0 + at(j), faces[i + j * 2], variant(), 0.8 + rng() * 0.7);
+          const r = rng();
+          const kind: PropKind = r < 0.3 ? 'office' : r < 0.6 ? 'tower' : 'apartment';
+          add(kind, x0 + at(i), z0 + at(j), faces[i + j * 2], variant(), kind === 'office' ? 0.9 + rng() * 0.5 : 0.8 + rng() * 0.7);
         }
       }
       return false;

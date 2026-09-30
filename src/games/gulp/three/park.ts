@@ -784,7 +784,7 @@ const OFFICES = [
 ] as const;
 
 /**
- * A wide, friendly mid-rise office block: soft rounded walls wrapped in long
+ * A square, friendly mid-rise office block: soft rounded walls wrapped in long
  * ribbons of glass, a coloured stripe under each floor, a glassy lobby tucked
  * under the first floor with a canopy over the entrance (+z), and a flat roof
  * with air-conditioning boxes, a water tank and a small garden. Taller ones
@@ -793,7 +793,7 @@ const OFFICES = [
 function office(k: Kit, v: number, s: number): void {
   const c = OFFICES[v];
   const H = 16 * s;
-  const W = 16.0;
+  const W = 13.0;
   const D = 13.0;
   const r = 1.4;
   const G = 4.2;
@@ -809,9 +809,6 @@ function office(k: Kit, v: number, s: number): void {
     k.plate(PAL.white, 3.4, 2.8, 0.4, 0.12, 0, 0.3, 0, 1);
     k.plate(0x2f7fb8, 2.8, 2.5, 0.3, 0.18, 0, 0.3, 0, 1);
   });
-  // Trimmed to stay inside the (now correct) 16x13 footprint: a fixed-size
-  // canopy that used to clear a too-narrow building now has less room to
-  // spare at the true width.
   k.rbox(c.stripe, 6.4, 0.35, 1.0, 0.5, 0.12, 0, G - 0.35, D / 2 + 0.1, { seg: 1 });
   // The floors: the wall block, and per floor a coloured stripe and a glass ribbon wrapping every side.
   k.rbox(c.wall, W, roofY - G + 0.05, D, r, 0, 0, G, 0, { seg: 2 });
@@ -824,7 +821,7 @@ function office(k: Kit, v: number, s: number): void {
   // Cream fins up the faces break the glass ribbons into panes, so they read as windows.
   for (const wall of walls(W, D)) {
     k.within(wall.m, () => {
-      const us = wall.len > 13 ? [-4.8, -1.6, 1.6, 4.8] : [-2.6, 0, 2.6];
+      const us = [-3.9, -1.3, 1.3, 3.9];
       for (const u of us) k.box(OFFICE_CREAM, 0.22, roofY - G, 0.3, u, G, 0.05, undefined, ['nz', 'py', 'ny']);
     });
   }
