@@ -18,6 +18,7 @@ export interface Feedback {
 /** What has been said already this round, for things said only once. */
 export interface Said {
   police: boolean;
+  combo: boolean;
 }
 
 const INCOMING: Record<'tanker' | 'tank' | 'heli' | 'bomber', Omit<Banner, 'id'>> = {
@@ -68,7 +69,11 @@ export function feedbackFor(e: WorldEvent, w: World, said: Said): Feedback | nul
     case 'wonder':
       return e.hole === ME ? { cue: 'win', banner: { kind: 'news', text: `You gulped ${e.name}! +${e.points.toLocaleString()}` } } : null;
     case 'combo':
-      return e.hole === ME ? { cue: 'power' } : null;
+      if (e.hole !== ME) return null;
+      // The first step up in a round says what the multiplier is; after that the sound is enough.
+      if (said.combo) return { cue: 'power' };
+      said.combo = true;
+      return { cue: 'power', banner: { kind: 'good', text: `Gulp fast! Points x${e.mult}`, sub: 'Keep gulping for bigger points' } };
     case 'power':
       return e.hole === ME ? { cue: 'power', banner: { kind: 'good', text: e.kind === 'speed' ? 'Speed boost!' : 'Double points!' } } : null;
     case 'gulp':

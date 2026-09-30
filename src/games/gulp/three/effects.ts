@@ -47,8 +47,30 @@ interface Mark {
 
 interface Popup {
   sprite: THREE.Sprite;
+  /** Seconds left. */
   life: number;
+  /** Seconds in all, longer for the bigger tiers. */
+  total: number;
+  /** Height gained over the whole pop. */
+  rise: number;
+  y0: number;
 }
+
+/**
+ * How a points pop looks by what it is worth: cream for an ordinary gulp,
+ * gold for a big one (a car park's worth, a tower), pink for a huge one
+ * (a skyscraper, a wonder). Bigger tiers are a little larger and linger longer.
+ */
+type PopupTier = 'normal' | 'big' | 'huge';
+/** Gold from about a tower (150), pink from about a skyscraper (1,600) or a wonder. */
+const POPUP_BIG = 150;
+const POPUP_HUGE = 1500;
+const popupTier = (points: number): PopupTier => (points >= POPUP_HUGE ? 'huge' : points >= POPUP_BIG ? 'big' : 'normal');
+const POPUP_LOOK: Record<PopupTier, { fill: string; scale: number; life: number }> = {
+  normal: { fill: '#fff3d1', scale: 1, life: 0.6 },
+  big: { fill: '#ffc41f', scale: 1.15, life: 0.75 },
+  huge: { fill: '#ff5cc8', scale: 1.35, life: 0.95 },
+};
 
 const POWER_COLOR: Record<PowerKind, number> = { speed: 0x39c6ff, double: 0xffc62e };
 
@@ -57,7 +79,7 @@ export class Effects {
   private puffTex = softTexture();
   private puffs: Puff[] = [];
   private popups: Popup[] = [];
-  private popupTex = new Map<number, THREE.Texture>();
+  private popupTex = new Map<string, THREE.Texture>();
   private orbs = new Map<number, THREE.Group>();
   /** Reused by syncPowerups every frame instead of a fresh Set, since it is only ever read there. */
   private livePowerupIds = new Set<number>();
@@ -299,10 +321,13 @@ export class Effects {
 
   /** "+8" rising over where the child just ate. */
   popup(points: number, at: THREE.Vector3): void {
-    let tex = this.popupTex.get(points);
+    const tier = popupTier(points);
+    const look = POPUP_LOOK[tier];
+    const key = `${tier}:${points}`;
+    let tex = this.popupTex.get(key);
     if (!tex) {
-      tex = textTexture(`+${points}`);
-      this.popupTex.set(points, tex);
+      tex = textTexture(`+${points}`, look.fill);
+      this.popupTex.set(key, tex);
       // A long round scores hundreds of different amounts: keep only the recent ones.
       if (this.popupTex.size > 64) {
         const [oldest, old] = this.popupTex.entries().next().value!;
@@ -311,11 +336,11 @@ export class Effects {
       }
     }
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }));
-    sprite.scale.set(0.11, 0.055, 1);
+    sprite.scale.set(0.072 * look.scale, 0.036 * look.scale, 1);
     sprite.position.copy(at);
     sprite.renderOrder = 11;
     this.group.add(sprite);
-    this.popups.push({ sprite, life: 1 });
+    this.popups.push({ sprite, life: look.life, total: look.life, rise: 4 * look.scale, y0: at.y });
   }
 
   /**
@@ -595,8 +620,11 @@ export class Effects {
     for (let i = this.popups.length - 1; i >= 0; i--) {
       const p = this.popups[i];
       p.life -= dt;
-      if (!this.reducedMotion) p.sprite.position.y += dt * 6;
-      (p.sprite.material as THREE.SpriteMaterial).opacity = Math.min(1, p.life * 2);
+      // Rises fast then settles (ease-out cubic), and fades over the last
+      // part instead of blinking out. Reduced motion keeps it in place.
+      const t = Math.min(1, Math.max(0, 1 - p.life / p.total));
+      if (!this.reducedMotion) p.sprite.position.y = p.y0 + p.rise * (1 - (1 - t) ** 3);
+      (p.sprite.material as THREE.SpriteMaterial).opacity = Math.min(1, (1 - t) * 2.5);
       if (p.life <= 0) {
         this.group.remove(p.sprite);
         (p.sprite.material as THREE.Material).dispose();
@@ -671,8 +699,8 @@ function ringTexture(): THREE.Texture {
   return t;
 }
 
-/** "+8" in chunky gold letters with a dark edge. */
-function textTexture(text: string): THREE.Texture {
+/** "+8" in chunky letters of the given colour with a dark edge. */
+function textTexture(text: string, fill: string): THREE.Texture {
   const c = document.createElement('canvas');
   c.width = 128;
   c.height = 64;
@@ -683,7 +711,7 @@ function textTexture(text: string): THREE.Texture {
   g.lineWidth = 8;
   g.strokeStyle = 'rgba(40,30,10,0.85)';
   g.strokeText(text, 64, 34);
-  g.fillStyle = '#ffd34d';
+  g.fillStyle = fill;
   g.fillText(text, 64, 34);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;

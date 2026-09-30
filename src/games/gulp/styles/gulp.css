@@ -511,8 +511,8 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-power.speed { --pc: rgba(57, 198, 255, 0.8); }
 .gulp-power.double { --pc: rgba(255, 198, 46, 0.8); }
 
-/* The combo: a big stroked multiplier on the right edge, hotter each step,
-   with the streak counted under it. */
+/* The combo: "POINTS x5" as a big stroked multiplier on the right edge,
+   hotter each step, with "10 gulps in a row" under it. */
 .gulp-combo {
   position: absolute;
   right: max(16px, env(safe-area-inset-right));
@@ -533,7 +533,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   filter: drop-shadow(0 4px 0 rgba(29, 31, 51, 0.45));
 }
 .gulp-combo b { font-size: 64px; color: var(--g-yellow); }
-.gulp-combo em { font-size: 20px; letter-spacing: 0.08em; -webkit-text-stroke-width: 4px; }
+.gulp-combo em { font-size: 22px; letter-spacing: 0.08em; -webkit-text-stroke-width: 4px; }
 .gulp-combo span {
   margin-top: 6px;
   padding: 3px 10px;
@@ -1106,6 +1106,12 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
     from { transform: scale(1.35); }
     to { transform: scale(1); }
   }
+  /* The child's own score gives a small 120 ms punch when points land. */
+  @keyframes gulp-score-punch {
+    from { transform: scale(1.18); }
+    to { transform: scale(1); }
+  }
+  .gulp-score-punch { display: inline-block; animation: gulp-score-punch 0.12s ease-out; }
   .gulp-banner { animation: gulp-pop 0.28s ease-out; }
   .gulp-countdown { animation: gulp-pop 0.3s ease-out; }
   @keyframes gulp-pop {

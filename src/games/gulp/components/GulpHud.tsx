@@ -32,7 +32,9 @@ export function GulpHud({
       <span className="gulp-rank">{r.rank}</span>
       <span className="gulp-dot" style={{ background: r.css }} aria-hidden="true" />
       <span className="gulp-name">{r.name}</span>
-      <b>{short(r.score)}</b>
+      <b key={r.me ? r.score : undefined} className={r.me ? 'gulp-score-punch' : undefined}>
+        {short(r.score)}
+      </b>
     </li>
   );
   const news = banners.filter((b) => b.kind === 'news').pop();
@@ -131,11 +133,11 @@ export function GulpHud({
         <div key={hud.combo} className={`gulp-combo c${hud.combo}`} data-testid="gulp-combo">
           {hud.combo > 1 && (
             <>
+              <em>POINTS</em>
               <b>x{hud.combo}</b>
-              <em>COMBO</em>
             </>
           )}
-          <span>{hud.streak} gulps!</span>
+          <span>{hud.streak} gulps in a row</span>
         </div>
       )}
 
