@@ -720,3 +720,14 @@
   /* …but the camera door sits at the foot of the column, under the booth. */
   .arcade-main .mirror-door { grid-area: mirror; max-width: none; }
 }
+
+/* A game loading its own code on the way in (see App.tsx). */
+.app-route-loading {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+  margin: 0;
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: 700;
+}

@@ -1,7 +1,10 @@
+import { lazy } from 'react';
 import type { GameDescriptor } from '@shared/game';
 import preview from './assets/preview.webp';
 import { GulpIcon } from '@shared/ui/icons';
-import { GulpPage } from './components/GulpPage';
+
+/** The game itself loads when its door is opened, not with the arcade's front page. */
+const GulpPage = lazy(() => import('./components/GulpPage').then((m) => ({ default: m.GulpPage })));
 
 /**
  * What the arcade knows about Gulp Universe: the ticket on the wall, the route,

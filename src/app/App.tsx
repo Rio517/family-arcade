@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { HashRouter, Route, Routes } from 'react-router-dom';
 import { Menu } from './Menu';
 import { Privacy } from './Privacy';
@@ -38,7 +39,16 @@ export function App() {
                     // The ticket booth at the game door: asks who's playing
                     // only when nobody is signed in on this browser.
                     <PlayerGate gameTitle={game.title}>
-                      <game.Page />
+                      {/* A game that loads its own code on the way in shows this for a moment. */}
+                      <Suspense
+                        fallback={
+                          <p className="app-route-loading" role="status">
+                            Loading {game.title}…
+                          </p>
+                        }
+                      >
+                        <game.Page />
+                      </Suspense>
                     </PlayerGate>
                   }
                 />
