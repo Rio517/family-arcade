@@ -6,6 +6,10 @@
  * anywhere and a joystick appears under the finger. Keys: arrows or WASD.
  * The world lives in a ref and changes every frame; the page gets what
  * happened through `onFrame` and renders its own snapshot.
+ *
+ * On the development server only, Explore (the chip, or the ` key) pauses
+ * the round and frees the camera to look round the whole city: drag to
+ * move, scroll or pinch to zoom, arrows to slide.
  */
 import { useEffect, useRef, useState } from 'react';
 import { stepWorld, type Input, type World, type WorldEvent } from '../domain/world';
@@ -63,12 +67,41 @@ export function GulpStage({
   const [failed, setFailed] = useState(false);
   /** Until the city's first frame is drawn, a loading card covers the stage. */
   const [building, setBuilding] = useState(true);
+  /** Looking round the city (development only): the round waits, the camera is free. */
+  const [exploring, setExploring] = useState(false);
+  const exploreRef = useRef(false);
+  /** Fingers (or the mouse button) down while exploring, for dragging and pinching. */
+  const dragRef = useRef(new Map<number, { x: number; y: number }>());
 
   useEffect(() => {
     onFrameRef.current = onFrame;
   }, [onFrame]);
 
   const sceneRef = useRef<GulpScene | null>(null);
+
+  const setExplore = (on: boolean) => {
+    exploreRef.current = on;
+    setExploring(on);
+    keysRef.current.clear();
+    pointerRef.current.kind = null;
+    dragRef.current.clear();
+    setStick(null);
+    sceneRef.current?.explore(on, world.holes[follow]);
+  };
+
+  // Explore's key: ` to go in and out, Escape to leave (development only).
+  useEffect(() => {
+    if (!import.meta.env.DEV || !playing) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.code === 'Backquote' || (e.key === 'Escape' && exploreRef.current)) {
+        e.preventDefault();
+        setExplore(!exploreRef.current && e.key !== 'Escape');
+      }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing]);
 
   // Zoom: the mouse wheel, or the plus and minus keys.
   useEffect(() => {
@@ -136,7 +169,11 @@ export function GulpStage({
       const dt = last ? Math.max(0, Math.min(0.05, (ts - last) / 1000)) : 0;
       last = ts;
       let events: WorldEvent[] = [];
-      if (!pausedRef.current) events = stepWorld(world, dt, playing ? readInput(keysRef.current, pointerRef.current) : null);
+      if (exploreRef.current) {
+        // The arrows slide the free camera; the round waits.
+        const { x, z } = readInput(keysRef.current, { kind: null, dx: 0, dy: 0, ox: 0, oy: 0, scale: 1 });
+        if (x || z) scene.pan(-x * 900 * dt, -z * 900 * dt);
+      } else if (!pausedRef.current) events = stepWorld(world, dt, playing ? readInput(keysRef.current, pointerRef.current) : null);
       scene.sync(world, events, pausedRef.current ? 0 : dt);
       scene.render();
       if (!drawn) {
@@ -184,6 +221,10 @@ export function GulpStage({
 
   const onPointer = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!playing) return;
+    if (exploreRef.current) {
+      onExplorePointer(e);
+      return;
+    }
     const p = pointerRef.current;
     const rect = e.currentTarget.getBoundingClientRect();
     if (e.pointerType === 'mouse') {
@@ -220,6 +261,33 @@ export function GulpStage({
     setStick((s) => (s ? { ...s, kx: p.dx * k, ky: p.dy * k } : s));
   };
 
+  /** Exploring: one finger (or the mouse, button down) drags the city along; two pinch to zoom. */
+  const onExplorePointer = (e: React.PointerEvent<HTMLDivElement>) => {
+    const down = dragRef.current;
+    if (e.type === 'pointerdown') {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      down.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      return;
+    }
+    if (e.type !== 'pointermove') {
+      down.delete(e.pointerId);
+      return;
+    }
+    const was = down.get(e.pointerId);
+    if (!was) return;
+    const scene = sceneRef.current;
+    if (down.size === 1) scene?.pan(e.clientX - was.x, e.clientY - was.y);
+    else {
+      const other = [...down].find(([id]) => id !== e.pointerId)?.[1];
+      if (other) {
+        const before = Math.hypot(was.x - other.x, was.y - other.y);
+        const after = Math.hypot(e.clientX - other.x, e.clientY - other.y);
+        if (before > 1 && after > 1) scene?.zoomBy(Math.log(before / after) / Math.log(1.15));
+      }
+    }
+    down.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  };
+
   return (
     <div
       ref={mountRef}
@@ -241,6 +309,22 @@ export function GulpStage({
           <span className="gulp-loading-hole" aria-hidden="true" />
           <span>Building the city…</span>
         </div>
+      )}
+      {import.meta.env.DEV && playing && !building && (
+        <button
+          type="button"
+          className={`gulp-explore${exploring ? ' on' : ''}`}
+          data-testid="gulp-explore"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => setExplore(!exploring)}
+        >
+          {exploring ? 'Back to the game' : 'Explore'}
+        </button>
+      )}
+      {exploring && (
+        <p className="gulp-explore-hint" data-testid="gulp-explore-hint">
+          Exploring: drag to move, scroll or pinch to zoom
+        </p>
       )}
       {stick && (
         <div className="gulp-stick" style={{ left: stick.x, top: stick.y }} aria-hidden="true">

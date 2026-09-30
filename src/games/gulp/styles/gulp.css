@@ -85,6 +85,38 @@
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
 }
 
+/* ----- Explore: looking round the city (development server only) ----- */
+.gulp-explore {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 60px);
+  z-index: 11;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  background: rgba(29, 31, 51, 0.72);
+  color: #fff;
+  font: 800 15px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.gulp-explore.on { background: var(--g-blue); }
+.gulp-explore:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.gulp-explore-hint {
+  position: fixed;
+  left: 50%;
+  top: calc(max(12px, env(safe-area-inset-top)) + 124px);
+  z-index: 11;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(29, 31, 51, 0.72);
+  color: #fff;
+  font: 700 15px/1.2 system-ui, sans-serif;
+  pointer-events: none;
+}
+
 /* ----- round buttons in the corners ----- */
 .gulp-corner {
   position: fixed;

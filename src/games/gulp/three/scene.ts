@@ -198,6 +198,16 @@ export class GulpScene {
   }
 
   /** Zoom in (negative) or out (positive) by `steps`, within a comfortable range. */
+  /** Look round the city freely from `from` (a development tool), or go back to following the hole. */
+  explore(on: boolean, from?: { x: number; z: number; r: number }): void {
+    this.rig.explore(on, from);
+  }
+
+  /** Slide the free camera by a drag of (dx, dy) pixels. */
+  pan(dx: number, dy: number): void {
+    this.rig.pan(dx, dy, this.renderer.domElement.clientHeight);
+  }
+
   zoomBy(steps: number): void {
     this.rig.zoomBy(steps);
   }

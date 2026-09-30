@@ -201,6 +201,7 @@ three.js in `src/games/gulp/three/`.
 | Where | What it shows |
 |---|---|
 | `/preview-gulp.html` | The asset gallery: every model standing over the smallest mouth that can swallow it, with its points and level, and a slider for a test mouth. `?kind=stadium` shows one kind in all its colours; `?tier=5` shows one tier. |
+| Explore, in a round on `/#/gulp` | The chip bottom left, or the `` ` `` key: pauses the round and frees the camera over the whole city. Drag to move, scroll or pinch to zoom, arrows to slide; `` ` `` or Escape to go back. |
 | `window.__gulp` on `/#/gulp` | The live world (holes, props, the city), for browser checks: jump to a giant hole, start an attack. |
 | `window.__gulpScene` on `/#/gulp` | The live 3D scene (renderer stats, effects, the camera tour). |
 | `npm run perf:gulp` | A local performance audit: Lighthouse on the Gulp menu, and frame times while playing a round. Run it from time to time; it prints a table against budgets. `-- --map=region --frames-only` times another map and skips Lighthouse. |
