@@ -252,7 +252,7 @@ const TABLE: Record<PropKind, KindRow> = {
   leaning: { tier: 7, w: 9.0, d: 9.0, h: 32.0, variants: 1, wonder: { name: 'the Leaning Tower of Pisa', bonus: 2500 } },
   stonecircle: { tier: 6, w: 22.0, d: 22.0, h: 6.0, variants: 1, wonder: { name: 'Stonehenge', bonus: 2000 } },
   // One head: a block holds four, each swallowed on its own (see city.ts).
-  moai: { tier: 5, w: 4.5, d: 4.5, h: 10.0, variants: 2, wonder: { name: 'an Easter Island Head', bonus: 400 } },
+  moai: { tier: 5, w: 6.1, d: 6.1, h: 13.5, variants: 2, wonder: { name: 'an Easter Island Head', bonus: 400 } },
 };
 
 /** Every kind, each named: a wonder by its own name. */

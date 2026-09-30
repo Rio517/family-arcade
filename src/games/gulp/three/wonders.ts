@@ -1212,11 +1212,15 @@ function moaiHead(k: Kit, x: number, z: number, y0: number, s: number, topknot: 
  * that once stood in a row; a block holds four of them. Variant 1 wears the
  * red topknot hat (pukao).
  */
+/** One Easter Island head on its stone platform, a third bigger than life on the toy scale, so it reads as a wonder. */
+const MOAI_SCALE = 1.35;
 const moai: Builder = (k, v) => {
-  k.box(GRASS, 4.5, 0.12, 4.5, 0, 0, 0, undefined, ON_GROUND);
-  k.rbox(0x8d877d, 4.2, 0.7, 3.8, 0.4, 0.15, 0, 0.12, -0.1);
-  k.box(0x7a746b, 0.14, 0.5, 0.08, 0, 0.25, 1.83);
-  moaiHead(k, 0, -0.35, 0.82, 1.15, v === 1);
+  k.within(placement(0, 0, 0, undefined, [MOAI_SCALE, MOAI_SCALE, MOAI_SCALE]), () => {
+    k.box(GRASS, 4.5, 0.12, 4.5, 0, 0, 0, undefined, ON_GROUND);
+    k.rbox(0x8d877d, 4.2, 0.7, 3.8, 0.4, 0.15, 0, 0.12, -0.1);
+    k.box(0x7a746b, 0.14, 0.5, 0.08, 0, 0.25, 1.83);
+    moaiHead(k, 0, -0.35, 0.82, 1.15, v === 1);
+  });
 };
 
 export const WONDERS_BUILDERS: Record<WonderKind, Builder> = {
