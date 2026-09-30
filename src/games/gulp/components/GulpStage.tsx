@@ -112,7 +112,7 @@ export function GulpStage({
         if (gone) return;
         const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
         try {
-          scene = new Scene(mount, world, looks, follow, reduced);
+          scene = new Scene(mount, world, looks, follow, reduced, !playing);
           // Development only, for browser checks; stripped from the build.
           if (import.meta.env.DEV) (window as unknown as { __gulpScene?: GulpScene }).__gulpScene = scene;
         } catch (err) {

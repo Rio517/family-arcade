@@ -39,13 +39,16 @@ export type BlockKind =
   | 'windfarm'
   | 'airport'
   | 'apron'
-  | 'mountain';
+  | 'mountain'
+  | 'wonder';
 
 /** Blocks out of town: green verges instead of pavements full of street things. */
 const RURAL: ReadonlySet<BlockKind> = new Set(['farm', 'forest', 'windfarm', 'mountain']);
 
 export interface Block {
   kind: BlockKind;
+  /** On a wonder block, which wonder stands there. */
+  wonder?: PropKind;
   /** The block's south-west corner and size (pavement included). */
   x: number;
   z: number;
@@ -62,7 +65,22 @@ export interface City {
   roads: number[];
   blockList: Block[];
   props: Prop[];
+  /** Land beyond the main square: the wonder islet and the bridge out to it. */
+  extraLand: Array<{ kind: 'islet' | 'bridge'; x0: number; z0: number; x1: number; z1: number }>;
 }
+
+/**
+ * The wonders each map holds (the Liberty Statue always stands on its own
+ * islet off the north shore). The bigger the map, the more of them.
+ */
+const MAP_WONDERS: Record<MapId, PropKind[]> = {
+  town: ['leaning', 'clocktower', 'stonecircle', 'moai'],
+  city: ['leaning', 'clocktower', 'stonecircle', 'moai', 'colosseum', 'opera', 'onion'],
+  mega: ['megaspire', 'irontower', 'pyramid', 'pearlpalace', 'colosseum', 'opera', 'onion', 'clocktower', 'leaning', 'stonecircle', 'moai'],
+  region: ['megaspire', 'irontower', 'pyramid', 'pearlpalace', 'colosseum', 'opera', 'onion', 'clocktower', 'leaning', 'stonecircle', 'moai'],
+};
+const ISLET = 30;
+const BRIDGE = 16;
 
 /** Road width, block size (pavement included) and pavement width. */
 export const ROAD = 10;
@@ -89,19 +107,37 @@ export function createCity(rng: Rng, map: MapId = 'city'): City {
   };
 
   const kinds = layout(map, rng);
+  const wonderAt = placeWonders(map, kinds, rng);
   const blockList: Block[] = [];
   for (let bx = 0; bx < blocks; bx++) {
     for (let bz = 0; bz < blocks; bz++) {
       const x = -half + ROAD + bx * PITCH;
       const z = -half + ROAD + bz * PITCH;
       const block: Block = { kind: kinds[bx][bz], x, z, size: BLOCK };
+      if (block.kind === 'wonder') block.wonder = wonderAt.get(`${bx}:${bz}`);
       blockList.push(block);
       const big = interior(block, tools);
       if (!big) (RURAL.has(block.kind) ? verge : sidewalk)(block, tools);
     }
   }
   roadside(roads, half, tools);
-  return { map, blocks, half, roads, blockList, props };
+  // The Liberty Statue's islet off the north shore, a bridge across to it.
+  const ix = roads[Math.floor(blocks / 2)];
+  const bridgeZ = -half - BRIDGE;
+  const islet = { kind: 'islet' as const, x0: ix - ISLET / 2, z0: bridgeZ - ISLET, x1: ix + ISLET / 2, z1: bridgeZ };
+  // The bridge's drivable strip reaches well into town, so a big hole (which
+  // keeps half its radius back from the shore) can still get on to it.
+  const bridge = { kind: 'bridge' as const, x0: ix - ROAD / 2, z0: bridgeZ - 1, x1: ix + ROAD / 2, z1: -half + BLOCK };
+  add('liberty', ix, bridgeZ - ISLET / 2 - 2, 0);
+  for (const [dx, dz] of [
+    [-11, -11],
+    [11, -11],
+    [-11, 11],
+    [11, 11],
+  ]) {
+    add(dz < 0 ? 'tree' : 'bench', ix + dx, bridgeZ - ISLET / 2 + dz, dz < 0 ? 0 : Math.PI, 1);
+  }
+  return { map, blocks, half, roads, blockList, props, extraLand: [bridge, islet] };
 }
 
 // -------------------------------------------------------------------------
@@ -109,6 +145,36 @@ export function createCity(rng: Rng, map: MapId = 'city'): City {
 // -------------------------------------------------------------------------
 
 /** Rings from the middle, as a fraction: 0 is the centre, 1 the edge. */
+/**
+ * Put the map's wonders on blocks of their own: the tall spire near the
+ * middle, the rest spread across town (never side by side with each other).
+ */
+function placeWonders(map: MapId, grid: BlockKind[][], rng: Rng): Map<string, PropKind> {
+  const n = grid.length;
+  const mid = (n - 1) / 2;
+  const at = new Map<string, PropKind>();
+  const taken = (bx: number, bz: number) => {
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (at.has(`${bx + dx}:${bz + dz}`)) return true;
+    return false;
+  };
+  for (const kind of MAP_WONDERS[map]) {
+    const spire = kind === 'megaspire';
+    const pool: Array<[number, number]> = [];
+    for (let bx = 0; bx < n; bx++) {
+      for (let bz = 0; bz < n; bz++) {
+        const f = Math.max(Math.abs(bx - mid), Math.abs(bz - mid)) / Math.max(1, mid);
+        const ok = spire ? f < 0.35 : f > 0.15 && f < 0.85;
+        if (ok && !SPECIAL.has(grid[bx][bz]) && grid[bx][bz] !== 'wonder' && !taken(bx, bz)) pool.push([bx, bz]);
+      }
+    }
+    if (!pool.length) continue;
+    const [bx, bz] = pool[Math.floor(rng() * pool.length)];
+    grid[bx][bz] = 'wonder';
+    at.set(`${bx}:${bz}`, kind);
+  }
+  return at;
+}
+
 function layout(map: MapId, rng: Rng): BlockKind[][] {
   const n = MAPS[map].blocks;
   const mid = (n - 1) / 2;
@@ -456,6 +522,22 @@ function interior(b: Block, t: Tools): boolean {
     case 'mountain':
       add('mountain', cx, cz, turn(), variant());
       return fills('mountain');
+    case 'wonder': {
+      const kind = b.wonder ?? 'stonecircle';
+      add(kind, cx, cz, 0);
+      // Small wonders get a little garden round them.
+      if (!fills(kind) && Math.max(KINDS[kind].w, KINDS[kind].d) < 16) {
+        for (const [dx, dz] of [
+          [-11, -11],
+          [11, -11],
+          [-11, 11],
+          [11, 11],
+        ]) {
+          add(pick(['tree', 'bench', 'planter', 'fruitstand'] as const), cx + dx, cz + dz, 0, variant());
+        }
+      }
+      return fills(kind);
+    }
   }
 }
 

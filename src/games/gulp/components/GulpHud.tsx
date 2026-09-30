@@ -4,7 +4,7 @@
  * warnings and being swallowed. It renders a snapshot the page copies out
  * of the live world a few times a second.
  */
-import { BoltIcon, ClockIcon, PauseIcon, SpeakerIcon, SpeakerOffIcon, WarningIcon } from '@shared/ui/icons';
+import { BoltIcon, ClockIcon, PauseIcon, SpeakerIcon, SpeakerOffIcon, StarIcon, WarningIcon } from '@shared/ui/icons';
 import type { Banner, Hud, HudRow } from './round';
 
 const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n.toLocaleString());
@@ -91,6 +91,10 @@ export function GulpHud({
       </div>
 
       <div className="gulp-right">
+        <span className="gulp-wonders" title="Wonders swallowed" data-testid="gulp-wonders">
+          <StarIcon size={18} />
+          {hud.wonders}/{hud.wondersTotal}
+        </span>
         <span className="gulp-kills" title="Holes swallowed" data-testid="gulp-kills">
           <span className="gulp-kills-icon" aria-hidden="true" />
           {hud.kills}

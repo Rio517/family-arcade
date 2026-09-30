@@ -29,6 +29,7 @@ import {
   walls,
 } from './kit';
 import { LANDMARKS, type LandmarkKind } from './landmarks';
+import { WONDERS_BUILDERS, type WonderKind } from './wonders';
 
 const HALF_PI = Math.PI / 2;
 
@@ -559,7 +560,8 @@ const CARS = [0xe63946, 0x3a86ff, 0x9ccc3c, 0xf4f5f7, 0x8e5cd9] as const;
 
 function car(k: Kit, v: number, taxi = false): void {
   const body = taxi ? 0xffc21a : CARS[v];
-  for (const x of [-0.8, 0.8]) for (const z of [-1.3, 1.3]) k.wheel(0.38, 0.3, [x, 0.38, z], 10);
+  // Tyres stand a little proud of the body: a tyre face flush with a body side flickers.
+  for (const x of [-0.88, 0.88]) for (const z of [-1.3, 1.3]) k.wheel(0.38, 0.3, [x, 0.38, z], 10);
   k.box(PAL.chassis, 1.7, 0.32, 3.5, 0, 0.18, 0);
   k.cbox(body, 1.9, 0.62, 4.1, 0.14, 0, 0.3, 0);
   // Cabin: a glass hull, a body-coloured roof and pillars so it reads as windows.
@@ -712,7 +714,7 @@ const VANS = [
 
 function van(k: Kit, v: number): void {
   const c = VANS[v];
-  for (const sx of [-1, 1]) for (const z of [-1.8, 1.75]) k.wheel(0.46, 0.34, [sx * 0.98, 0.46, z], 10);
+  for (const sx of [-1, 1]) for (const z of [-1.8, 1.75]) k.wheel(0.46, 0.34, [sx * 1.06, 0.46, z], 10);
   k.box(PAL.chassis, 2.0, 0.36, 5.1, 0, 0.26, 0);
   k.cbox(c.body, 2.3, 2.3, 3.7, 0.12, 0, 0.42, -0.95);
   k.cbox(c.body, 2.24, 0.9, 1.95, 0.12, 0, 0.42, 1.78);
@@ -754,7 +756,7 @@ const BUSES = [
 
 function bus(k: Kit, v: number): void {
   const c = BUSES[v];
-  for (const sx of [-1, 1]) for (const z of [-2.8, 2.9]) k.wheel(0.52, 0.36, [sx * 1.1, 0.52, z], 10);
+  for (const sx of [-1, 1]) for (const z of [-2.8, 2.9]) k.wheel(0.52, 0.36, [sx * 1.16, 0.52, z], 10);
   k.box(PAL.chassis, 2.2, 0.4, 8.4, 0, 0.25, 0);
   k.cbox(c.body, 2.5, 2.55, 8.9, 0.16, 0, 0.42, 0);
   // Window band with pillars; the front door breaks it on the kerb side (+x).
@@ -905,7 +907,7 @@ function tanker(k: Kit): void {
   const cab = 0xe63946;
   const tank = 0xd5dbe3;
   for (const sx of [-1, 1]) {
-    for (const z of [2.7, -1.6, -2.75]) k.wheel(0.5, 0.36, [sx * 1.08, 0.5, z], 8);
+    for (const z of [2.7, -1.6, -2.75]) k.wheel(0.5, 0.36, [sx * 1.13, 0.5, z], 8);
   }
   k.box(PAL.chassis, 2.0, 0.4, 7.8, 0, 0.3, 0);
   // Cab at the front.
@@ -1323,7 +1325,7 @@ function tower(k: Kit, v: number, s: number): void {
 
 // ---------------------------------------------------------------------------
 
-const STREET: Record<Exclude<PropKind, LandmarkKind>, Builder> = {
+const STREET: Record<Exclude<PropKind, LandmarkKind | WonderKind>, Builder> = {
   cone,
   hydrant,
   bin,
@@ -1358,7 +1360,7 @@ const STREET: Record<Exclude<PropKind, LandmarkKind>, Builder> = {
   tower,
 };
 
-const BUILDERS: Record<PropKind, Builder> = { ...STREET, ...LANDMARKS };
+const BUILDERS: Record<PropKind, Builder> = { ...STREET, ...LANDMARKS, ...WONDERS_BUILDERS };
 
 /**
  * One merged geometry (position, normal, colour) for a kind. Origin is the

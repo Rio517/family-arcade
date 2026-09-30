@@ -316,7 +316,8 @@ export class Kit {
   /** A wheel with a hub, axle along x. */
   wheel(r: number, width: number, c: V3, seg = 10, hub: number = PAL.metal): void {
     this.rod(PAL.ink, r, width, seg, c, { rz: Math.PI / 2 });
-    this.rod(hub, r * 0.5, width + 0.04, 6, c, { rz: Math.PI / 2 });
+    // The hub stands clear of the tyre's face, so the two never share a plane.
+    this.rod(hub, r * 0.5, width + 0.1, 6, c, { rz: Math.PI / 2 });
   }
 
   /** Low-poly blob: canopies, bushes, flowers, scoops. */
