@@ -158,7 +158,8 @@ export function GulpHud({
         <div
           key={p.key}
           className={`gulp-pointer ${p.kind === 'hole' ? 'danger' : 'attack'}`}
-          style={{ left: `${50 + Math.sin(p.angle) * 42}%`, top: `${50 - Math.cos(p.angle) * 36}%` }}
+          // Kept clear of the screen's sides, so the label is never cut off.
+          style={{ left: `clamp(96px, ${50 + Math.sin(p.angle) * 42}%, calc(100% - 96px))`, top: `${50 - Math.cos(p.angle) * 36}%` }}
           data-testid="gulp-pointer"
         >
           <span className="gulp-pointer-arrow" style={{ transform: `rotate(${p.angle}rad)` }} aria-hidden="true" />

@@ -13,6 +13,8 @@ import type { World, WorldEvent } from './world';
 const REGROW_TIER = 4;
 export const REGROW_EVERY = 0.4;
 const REGROW_BATCH = 3;
+/** At most this many small things wait to come back; past that the oldest are let go. */
+const EATEN_MAX = 1500;
 
 /**
  * With regrowth on, an eaten building's lot is built on again: first a
@@ -88,7 +90,10 @@ export function markEaten(w: World, p: Prop): void {
       lot.site = null;
       lot.due = w.elapsed + SITE_AFTER * 2;
     }
-  } else if (info.tier <= REGROW_TIER || PUT_BACK.has(p.kind)) w.eaten.push(p);
+  } else if (info.tier <= REGROW_TIER || PUT_BACK.has(p.kind)) {
+    w.eaten.push(p);
+    if (w.eaten.length > EATEN_MAX) w.eaten.shift();
+  }
   const room = Math.max(info.w, info.d) + 4;
   const due = w.elapsed + SITE_AFTER + w.rng() * 6;
   const country = Math.max(Math.abs(p.x), Math.abs(p.z)) > w.city.half;
