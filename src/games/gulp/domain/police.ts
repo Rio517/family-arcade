@@ -124,7 +124,8 @@ function callPolice(w: World, me: Hole, events: WorldEvent[]): void {
     const stopAlong = (alongZ ? me.z : me.x) + side * (me.r + 9);
     // From well out of sight up the street.
     const startAlong = stopAlong + side * (110 + me.r * 2);
-    const lane = side * 2.4;
+    // Down the middle of their side of the road, clear of the parked cars at the kerb.
+    const lane = side * 1.0;
     const clampE = (v: number) => Math.max(-edge, Math.min(edge, v));
     const sx = alongZ ? nearX + lane : clampE(startAlong);
     const sz = alongZ ? clampE(startAlong) : nearZ + lane;

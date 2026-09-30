@@ -4,7 +4,7 @@
  */
 import { makeProp } from './catalog';
 import { BLOCK, SIDEWALK, type Block, type City } from './city';
-import { gobble, type Hole } from './holes';
+import { gobble, isCrumb, type Hole } from './holes';
 import type { World, WorldEvent } from './world';
 
 type Rng = () => number;
@@ -171,7 +171,8 @@ export function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
         eaten = h;
         break;
       }
-      if (d < h.r + NOTICE && d < threatD) {
+      // Nobody runs from a giant: it is too big to notice (they just go).
+      if (d < h.r + NOTICE && d < threatD && !isCrumb(h, p.kind)) {
         threat = h;
         threatD = d;
       }
@@ -179,7 +180,7 @@ export function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
     if (eaten) {
       p.alive = false;
       p.respawnIn = 8 + w.rng() * 6;
-      gobble(w, eaten, makeProp(p.id, p.kind, p.x, p.z, p.heading, p.variant), events);
+      if (!isCrumb(eaten, p.kind)) gobble(w, eaten, makeProp(p.id, p.kind, p.x, p.z, p.heading, p.variant), events);
       continue;
     }
     if (threat) {

@@ -127,6 +127,11 @@ export class PropView {
     this.buildBatches(world);
   }
 
+  /** A tiny thing a giant took without a fuss: hide it where it stood, no fall. */
+  vanish(p: Prop): void {
+    this.setShown(p, false);
+  }
+
   /** A thing leaves the city: hide it where it stood, and start a copy falling. */
   swallow(p: Prop, hole: number): void {
     this.setShown(p, false);

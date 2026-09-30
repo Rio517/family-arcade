@@ -166,6 +166,9 @@ export class GulpScene {
         }
       } else if (e.type === 'park') {
         this.props.appear(e.prop);
+      } else if (e.type === 'crumb') {
+        // A giant took something tiny: it is just gone, no fall and no fuss.
+        this.props.vanish(e.prop);
       } else if (e.type === 'regrow') {
         this.props.show(e.prop);
       } else if (e.type === 'level') {

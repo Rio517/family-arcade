@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeProp } from './catalog';
-import { START_R, comboOf, massFor, radiusFor } from './growth';
-import { CHILD_GROWTH, RESPAWN } from './holes';
+import { START_R, comboOf, levelOf, massFor, radiusFor } from './growth';
+import { CHILD_GROWTH, GIANT_LEVEL, RESPAWN } from './holes';
 import { faceOff, grow, only, round, still } from './testing';
 import { stepWorld, type WorldEvent } from './world';
 
@@ -144,5 +144,18 @@ describe('food and combos', () => {
     expect(me.score).toBe(7 + 3 * 2);
     for (let i = 0; i < 60 * 2; i++) stepWorld(w, 1 / 60, still);
     expect(me.streak).toBe(0);
+  });
+
+  it('a giant (level 15 and up) takes tiny things without a fuss: no points, no gulp; a tree still counts', () => {
+    const w = round(1, 0);
+    const me = grow(w, 0, 200000);
+    expect(levelOf(me.r)).toBeGreaterThanOrEqual(GIANT_LEVEL);
+    only(w, [makeProp(1, 'cone', me.x, me.z, 0), makeProp(2, 'bench', me.x + 1, me.z, 0), makeProp(3, 'tree', me.x - 1, me.z, 0)]);
+    const score = me.score;
+    const events = stepWorld(w, 1 / 60, still);
+    expect(events.filter((e) => e.type === 'crumb').map((e) => (e.type === 'crumb' ? e.prop.kind : ''))).toEqual(['cone', 'bench']);
+    expect(events.filter((e) => e.type === 'eat').map((e) => (e.type === 'eat' ? e.prop.kind : ''))).toEqual(['tree']);
+    expect(w.props.size).toBe(0);
+    expect(me.score - score).toBeLessThan(20);
   });
 });

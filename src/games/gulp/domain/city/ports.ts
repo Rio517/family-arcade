@@ -129,6 +129,18 @@ export function airport(site: AirportSite, half: number, t: Tools, lots: Rect[])
 // The sea and the port
 // -------------------------------------------------------------------------
 
+/**
+ * The water off the port's quay where the ships moor: holes may go out over
+ * it (as far as `reach`), so the moored ships are in reach.
+ */
+export function berthOf(port: { quay: Rect; side: Side }, reach = 26): Rect {
+  const q = port.quay;
+  if (port.side === 'e') return { ...q, x1: q.x1 + reach };
+  if (port.side === 'w') return { ...q, x0: q.x0 - reach };
+  if (port.side === 's') return { ...q, z1: q.z1 + reach };
+  return { ...q, z0: q.z0 - reach };
+}
+
 /** A second shore: east, west or south (the north is always sea). */
 export function pick3(rng: Rng): Side {
   return (['e', 'w', 's'] as const)[Math.floor(rng() * 3)];

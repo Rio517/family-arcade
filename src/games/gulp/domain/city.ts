@@ -928,7 +928,8 @@ function roadside(roads: number[], half: number, { add, rng, pick, variant }: To
     'garbagetruck',
     'icecreamvan',
   ];
-  const kerb = ROAD / 2 - 1.4;
+  // Snug to the kerb, so a police car down the middle of its lane passes by.
+  const kerb = ROAD / 2 - 1.25;
   const SPOT = 6.5;
   const end = half - ROAD;
   for (const line of roads) {
