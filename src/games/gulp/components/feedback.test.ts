@@ -31,6 +31,8 @@ describe('feedback', () => {
       expect(feedbackFor({ type: 'incoming', target: 0, kind }, w, fresh())?.banner?.kind).toBe('warn');
     }
     expect(feedbackFor({ type: 'hurt', hole: 0, cause: 'tanker' }, w, fresh())?.banner?.text).toBe('Hot hot hot!');
+    // An attack on a computer hole is news, so the child sees the city fights everyone.
+    expect(feedbackFor({ type: 'incoming', target: 1, kind: 'tank' }, w, fresh())?.banner).toEqual({ kind: 'news', text: 'Tanks are after Big Gulp!' });
   });
 
   it('says the police are coming once a round', () => {

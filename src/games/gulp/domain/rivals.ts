@@ -39,6 +39,8 @@ interface Temper {
   huntLead: number;
   /** What food right by the child is worth to a rival. */
   theirs: number;
+  /** The rivals' top speed, as a share of a hole's own. */
+  speed: number;
 }
 
 /**
@@ -51,9 +53,10 @@ interface Temper {
  */
 const TEMPERS: Record<Difficulty, Temper> = {
   // On Easy a computer hole cannot swallow the child (see eatHoles), so it never chases one either.
-  easy: { skill: 0.55, spread: 0.35, kindness: 1, huntLead: Infinity, theirs: 0.5 },
-  medium: { skill: 0.75, spread: 0.2, kindness: 0.25, huntLead: 0, theirs: 0.5 },
-  hard: { skill: 0.85, spread: 0.15, kindness: 0, huntLead: -Infinity, theirs: 1 },
+  // Easy rivals also amble: a child who wanders off for a while can still catch up.
+  easy: { skill: 0.55, spread: 0.35, kindness: 1, huntLead: Infinity, theirs: 0.5, speed: 0.75 },
+  medium: { skill: 0.75, spread: 0.2, kindness: 0.25, huntLead: 0, theirs: 0.5, speed: 1 },
+  hard: { skill: 0.85, spread: 0.15, kindness: 0, huntLead: -Infinity, theirs: 1, speed: 1 },
 };
 
 const temperOf = (w: World): Temper => TEMPERS[w.options.difficulty];
@@ -75,8 +78,8 @@ export function steerRival(b: Brain, me: Hole, w: World, dt: number, player: Hol
     // A runaway lead eases right off: a big hole still eats plenty at a crawl.
     const pace = lead > 0.8 ? 0.35 : lead > 0.4 ? 0.5 : lead > 0.12 ? 0.6 : lead > 0 ? 0.7 : lead > -0.3 ? 0.85 : 1;
     // Harder rivals keep only part of that slow-down; Easy keeps the whole of it.
-    const { kindness } = temperOf(w);
-    b.pace = kindness === 1 ? pace : 1 - (1 - pace) * kindness;
+    const { kindness, speed } = temperOf(w);
+    b.pace = (kindness === 1 ? pace : 1 - (1 - pace) * kindness) * speed;
   } else {
     b.pace = 0.9;
   }
@@ -100,7 +103,8 @@ export function steerRival(b: Brain, me: Hole, w: World, dt: number, player: Hol
         for (const bomb of a.kind === 'bomber' ? a.bombs : a.shells) {
           const d = Math.hypot(me.x - bomb.x, me.z - bomb.z);
           const danger = bomb.radius + me.r + 3;
-          if (d < danger && bomb.fuse < 3) {
+          // A keener rival sees the red circle sooner; a slower one is often caught.
+          if (d < danger && bomb.fuse < 0.4 + b.skill) {
             const ux = d > 0.01 ? (me.x - bomb.x) / d : 1;
             const uz = d > 0.01 ? (me.z - bomb.z) / d : 0;
             fx += ux * (danger - d) * 2;

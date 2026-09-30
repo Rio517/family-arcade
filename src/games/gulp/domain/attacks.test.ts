@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeProp } from './catalog';
 import { grow, only, round, still } from './testing';
+import type { Difficulty } from './rivals';
 import { stepWorld, type WorldEvent } from './world';
 
 describe('the city fights back', () => {
@@ -82,5 +83,45 @@ describe('the city fights back', () => {
       for (const e of stepWorld(w, 1 / 60, still)) if (e.type === 'incoming') kinds.add(e.kind);
     }
     expect([...kinds].sort()).toEqual(['bomber', 'tanker']);
+  });
+
+  it('goes after the computer holes too: the child now and then on Easy, and always on Hard when in the lead', () => {
+    const picks = (difficulty: Difficulty) => {
+      let child = 0;
+      for (let seed = 1; seed <= 40; seed++) {
+        const w = round(seed, 1, { fightBack: true, difficulty });
+        only(w, []);
+        w.brains[1] = null;
+        grow(w, 0, 3000);
+        grow(w, 1, 2000);
+        w.holes[1].x = w.holes[0].x + 150;
+        w.nextAttack = 0;
+        for (const e of stepWorld(w, 1 / 60, still)) if (e.type === 'incoming' && e.target === 0) child += 1;
+      }
+      return child / 40;
+    };
+    expect(picks('easy')).toBeGreaterThan(0);
+    expect(picks('easy')).toBeLessThan(0.35);
+    expect(picks('hard')).toBe(1);
+  });
+
+  it('a wave of tanks goes home after one hit on Easy, and keeps firing on Hard', () => {
+    const hits = (difficulty: Difficulty) => {
+      const w = round(6, 0, { fightBack: true, difficulty });
+      only(w, []);
+      const me = grow(w, 0, 3000);
+      w.nextAttack = 999;
+      const tank = (id: number, dx: number) => ({
+        id, wave: 1, hits: 0, home: false, kind: 'tank' as const, target: 0,
+        x: me.x + dx, z: me.z + me.r + 22, heading: Math.PI, speed: 6, life: 40, reload: 0.5, shells: [],
+      });
+      w.attacks = [tank(1, -6), tank(2, 6)];
+      let n = 0;
+      for (let i = 0; i < 60 * 20; i++) for (const e of stepWorld(w, 1 / 60, still)) if (e.type === 'hurt') n += 1;
+      return { n, home: w.attacks.every((a) => a.kind === 'tank' && a.home) };
+    };
+    expect(hits('easy').n).toBe(1);
+    expect(hits('easy').home).toBe(true);
+    expect(hits('hard').n).toBeGreaterThanOrEqual(3);
   });
 });
