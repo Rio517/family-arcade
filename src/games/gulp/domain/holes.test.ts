@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeProp } from './catalog';
 import { START_R, comboOf, massFor, radiusFor } from './growth';
-import { RESPAWN } from './holes';
+import { CHILD_GROWTH, RESPAWN } from './holes';
 import { faceOff, grow, only, round, still } from './testing';
 import { stepWorld, type WorldEvent } from './world';
 
@@ -98,7 +98,7 @@ describe('holes eating holes', () => {
 });
 
 describe('food and combos', () => {
-  it('on Easy the child grows a third faster from the same meal; the score is the same', () => {
+  it('on Easy the child grows faster from the same meal than on Medium; the score is the same', () => {
     const grown = (difficulty: 'easy' | 'medium') => {
       const w = round(1, 0, { difficulty });
       const me = w.holes[0];
@@ -106,12 +106,11 @@ describe('food and combos', () => {
       stepWorld(w, 1 / 60, still);
       return { mass: me.mass, score: me.score };
     };
-    expect(grown('easy').mass).toBeCloseTo(grown('medium').mass * 1.35, 6);
+    expect(grown('easy').mass).toBeCloseTo((grown('medium').mass * CHILD_GROWTH.easy) / CHILD_GROWTH.medium, 6);
     expect(grown('easy').score).toBe(grown('medium').score);
   });
 
   it('a treat says yum; healthy food gives a health bonus and shakes off a knock', () => {
-    // Medium: no growth boost, so the sizes below are the plain ones.
     const w = round(1, 0, { difficulty: 'medium' });
     const me = grow(w, 0, 30);
     const start = me.mass;
@@ -126,7 +125,7 @@ describe('food and combos', () => {
     const bonus = healthy?.type === 'food' ? healthy.bonus : 0;
     expect(bonus).toBeGreaterThan(0);
     // The cart, the fruit stand, and the health bonus on top.
-    expect(me.mass).toBeCloseTo(start + cart.points + fruit.points + bonus, 6);
+    expect(me.mass).toBeCloseTo(start + (cart.points + fruit.points + bonus) * CHILD_GROWTH.medium, 6);
     expect(me.stun).toBe(0);
   });
 
