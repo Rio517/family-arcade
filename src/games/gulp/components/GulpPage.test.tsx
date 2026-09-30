@@ -50,25 +50,33 @@ describe('GulpPage', () => {
     renderPage();
     expect(screen.getByTestId('gulp-menu')).toBeInTheDocument();
     expect(screen.getByTestId('gulp-play')).toBeInTheDocument();
-    expect(screen.getAllByRole('radio', { name: /Blueberry|Bubblegum|Lime/ })).toHaveLength(3);
     for (const m of ['town', 'city', 'mega', 'region']) expect(screen.getByTestId(`gulp-map-${m}`)).toBeInTheDocument();
+    // Only the map and the time on the card: the rest is behind Options.
+    expect(screen.queryByTestId('gulp-skin-0')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('gulp-powerups')).not.toBeInTheDocument();
     expect(await screen.findByTestId('gulp3d-fallback', {}, { timeout: 5000 })).toBeInTheDocument();
   });
 
-  it('remembers the choices made on the menu', () => {
+  it('remembers the choices made on the menu and under Options', () => {
     renderPage();
     fireEvent.click(screen.getByTestId('gulp-map-region'));
+    fireEvent.click(screen.getByTestId('gulp-time-long'));
+    fireEvent.click(screen.getByTestId('gulp-options'));
+    expect(screen.getAllByRole('radio', { name: /Blueberry|Bubblegum|Lime/ })).toHaveLength(3);
     fireEvent.click(screen.getByTestId('gulp-skin-3'));
     fireEvent.click(screen.getByTestId('gulp-fightback'));
     fireEvent.click(screen.getByTestId('gulp-powerups'));
-    fireEvent.click(screen.getByTestId('gulp-time-long'));
+    fireEvent.click(screen.getByTestId('gulp-regrow'));
     expect(screen.getByTestId('gulp-map-region')).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId('gulp-fightback')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('gulp-powerups')).toHaveAttribute('aria-pressed', 'false');
-    // The Region's own round is 5 minutes, so the long one is 10.
-    expect(screen.getByTestId('gulp-time-long')).toHaveTextContent('10 min');
+    // The Region's own round is 6 minutes, so the long one is 12.
+    expect(screen.getByTestId('gulp-time-long')).toHaveTextContent('12 min');
     const saved = JSON.parse(localStorage.getItem('gulp:settings:v1') ?? '{}');
-    expect(saved).toMatchObject({ map: 'region', skin: 3, fightBack: true, powerups: false, length: 'long' });
+    expect(saved).toMatchObject({ map: 'region', skin: 3, fightBack: true, powerups: false, regrow: false, length: 'long' });
+    // Escape closes the options.
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByTestId('gulp-options-dialog')).not.toBeInTheDocument();
   });
 
   it('PLAY starts a round: countdown, then the leaderboard with the rivals for the map', async () => {
@@ -79,10 +87,10 @@ describe('GulpPage', () => {
     expect(screen.queryByTestId('gulp-menu')).not.toBeInTheDocument();
     expect(screen.getByTestId('gulp-hud')).toBeInTheDocument();
     expect(screen.getByTestId('gulp-countdown')).toHaveTextContent('3');
-    // Town: the child and three computer holes.
-    expect(screen.getByTestId('gulp-board').querySelectorAll('li')).toHaveLength(4);
+    // Town: the child and four computer holes.
+    expect(screen.getByTestId('gulp-board').querySelectorAll('li')).toHaveLength(5);
     expect(screen.getByTestId('gulp-board')).toHaveTextContent('You');
-    expect(screen.getByTestId('gulp-clock')).toHaveTextContent('2:00');
+    expect(screen.getByTestId('gulp-clock')).toHaveTextContent('3:00');
   });
 
   it('pauses from the button and from Escape, and goes back to the menu', async () => {
@@ -129,7 +137,7 @@ describe('GulpPage', () => {
     await pump(3);
     const results = screen.getByTestId('gulp-results');
     expect(results).toHaveTextContent('Round over');
-    expect(results.querySelectorAll('li')).toHaveLength(5);
+    expect(results.querySelectorAll('li')).toHaveLength(6);
     expect(rio()?.history?.filter((h) => h.game === 'gulp')).toHaveLength(1);
     // More frames go by: still one record.
     await pump(10);

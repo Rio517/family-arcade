@@ -110,6 +110,47 @@ function boxGeometry(w: number, h: number, d: number, omit: readonly Face[]): TH
   return g;
 }
 
+/**
+ * Outline of a w/2 x h/2 rectangle with corners rounded by r, `seg` steps per
+ * corner, counter-clockwise in the (a, b) plane.
+ */
+function roundRect(ha: number, hb: number, r: number, seg: number): Array<[number, number]> {
+  const pts: Array<[number, number]> = [];
+  const corners: ReadonlyArray<readonly [number, number]> = [
+    [1, 1],
+    [-1, 1],
+    [-1, -1],
+    [1, -1],
+  ];
+  corners.forEach(([sa, sb], c) => {
+    for (let i = 0; i <= seg; i++) {
+      const a = ((c + i / seg) * Math.PI) / 2;
+      pts.push([sa * (ha - r) + r * Math.cos(a), sb * (hb - r) + r * Math.sin(a)]);
+    }
+  });
+  return pts;
+}
+
+/**
+ * A rounded-rectangle panel facing +z, bottom edge on y = 0, from z = 0 to
+ * `depth`. It has no back face because it always sits on a wall.
+ */
+function plateGeometry(w: number, h: number, r: number, depth: number, seg: number): THREE.BufferGeometry {
+  const rr = Math.max(0.01, Math.min(r, Math.min(w, h) * 0.49));
+  const o = roundRect(w / 2, h / 2, rr, seg).map(([a, b]) => [a, b + h / 2] as const);
+  const pos: number[] = [];
+  for (let i = 1; i < o.length - 1; i++) pos.push(o[0][0], o[0][1], depth, o[i][0], o[i][1], depth, o[i + 1][0], o[i + 1][1], depth);
+  o.forEach((a, i) => {
+    const b = o[(i + 1) % o.length];
+    pos.push(a[0], a[1], 0, b[0], b[1], 0, b[0], b[1], depth);
+    pos.push(a[0], a[1], 0, b[0], b[1], depth, a[0], a[1], depth);
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
 /** Faces hidden when a part sits flat against a wall (local +z faces out). */
 export const FLUSH: readonly Face[] = ['nz'];
 /** Faces hidden when a part sits on the ground or on another part. */
@@ -196,6 +237,49 @@ export class Kit {
       }
     }
     this.add(new ConvexGeometry(pts), color, placement(x, y, z, rot));
+  }
+
+  /**
+   * Soft toy block: vertical edges rounded by r, the top edge rounded by b
+   * (and the bottom edge too when `under` is set). Base centred on (x, y, z).
+   * This is the main mass of every building, so they read as chunky toys
+   * rather than architecture.
+   */
+  rbox(
+    color: number,
+    w: number,
+    h: number,
+    d: number,
+    r: number,
+    b: number,
+    x: number,
+    y: number,
+    z: number,
+    o: { seg?: number; ry?: number; under?: boolean } = {},
+  ): void {
+    const seg = o.seg ?? 2;
+    const rr = Math.max(0.03, Math.min(r, w / 2 - 0.01, d / 2 - 0.01));
+    const bb = Math.max(0, Math.min(b, rr - 0.02, o.under ? h / 2 - 0.01 : h - 0.01));
+    // Each ring is (height, inset); two steps per rounded edge approximate a quarter circle.
+    const q = bb * (1 - Math.SQRT1_2);
+    const rings: Array<[number, number]> = [];
+    if (o.under && bb > 0) rings.push([0, bb], [q, q], [bb, 0]);
+    else rings.push([0, 0]);
+    if (bb > 0) rings.push([h - bb, 0], [h - q, q], [h, bb]);
+    else rings.push([h, 0]);
+    const pts: THREE.Vector3[] = [];
+    for (const [ry, inset] of rings) {
+      for (const [a, c] of roundRect(w / 2 - inset, d / 2 - inset, rr - inset, seg)) pts.push(new THREE.Vector3(a, ry, c));
+    }
+    this.add(new ConvexGeometry(pts), color, placement(x, y, z, { ry: o.ry ?? 0 }));
+  }
+
+  /**
+   * Rounded panel on the current wall frame (x along the wall, y up, +z out):
+   * windows, doors and signs. Bottom edge at y, standing out from z by `depth`.
+   */
+  plate(color: number, w: number, h: number, r: number, depth: number, u: number, y: number, z = 0, seg = 1): void {
+    this.add(plateGeometry(w, h, r, depth, seg), color, translate(u, y, z));
   }
 
   /** Cylinder or cone standing with its base centred on (x, y, z). */
@@ -364,6 +448,41 @@ export function windowAt(k: Kit, s: WindowStyle, u: number, y: number, w: number
   }
 }
 
+/**
+ * A chunky rounded window on the current wall frame, bottom of the glass at
+ * y: an optional soft frame, the glass, and an optional light glint in the
+ * top corner so it still reads as glass from far off. `seg` is the steps per
+ * rounded corner (1 is cheaper, for buildings with many windows).
+ */
+export function paneAt(
+  k: Kit,
+  glass: number,
+  frame: number | null,
+  u: number,
+  y: number,
+  w: number,
+  h: number,
+  glint = false,
+  seg = 2,
+): void {
+  // One step per corner can only chamfer, so it keeps the corners small to
+  // read as a rounded rectangle rather than an octagon.
+  const r = Math.min(w, h) * (seg > 1 ? 0.26 : 0.16);
+  if (frame !== null) k.plate(frame, w + 0.4, h + 0.4, r + 0.2, 0.1, u, y - 0.2, 0, seg);
+  k.plate(glass, w, h, r, frame !== null ? 0.18 : 0.14, u, y, 0, seg);
+  if (glint) k.plate(lighter(glass, 0.6), w * 0.16, h * 0.42, w * 0.08, 0.24, u - w * 0.26, y + h * 0.42);
+}
+
+/** A round-topped door on the current wall frame, standing on y. */
+export function archDoor(k: Kit, frame: number, door: number, u: number, y: number, w: number, h: number): void {
+  const fw = w + 0.4;
+  k.plate(frame, fw, h + 0.2, fw / 2, 0.1, u, y, 0, 2);
+  k.box(frame, fw, (h + 0.2) / 2, 0.1, u, y, 0, undefined, FLUSH);
+  k.plate(door, w, h, w / 2, 0.18, u, y, 0, 2);
+  k.box(door, w, h / 2, 0.18, u, y, 0, undefined, FLUSH);
+  k.gem(PAL.brass, 0.11, [u + w * 0.28, y + h * 0.42, 0.24]);
+}
+
 /** A door on the current wall frame, standing on y. */
 export function doorAt(k: Kit, frame: number, door: number, u: number, y: number, w: number, h: number): void {
   k.box(frame, w + 0.3, h + 0.15, 0.12, u, y, 0, undefined, FLUSH);
@@ -376,10 +495,4 @@ export function doorAt(k: Kit, frame: number, door: number, u: number, y: number
 export function parapet(k: Kit, color: number, W: number, D: number, y: number, h: number, t: number): void {
   for (const sz of [-1, 1]) k.box(color, W, h, t, 0, y, sz * (D / 2 - t / 2), undefined, ON_GROUND);
   for (const sx of [-1, 1]) k.box(color, t, h, D - 2 * t, sx * (W / 2 - t / 2), y, 0, undefined, ON_GROUND);
-}
-
-/** Rooftop air-conditioning unit with a fan on top. */
-export function acUnit(k: Kit, x: number, y: number, z: number, w = 1.3, h = 0.75, d = 1.0): void {
-  k.cbox(0xdde3ea, w, h, d, 0.06, x, y, z);
-  k.cyl(PAL.ink, 0.32 * Math.min(w, d), 0.32 * Math.min(w, d), 0.06, 10, x, y + h, z);
 }

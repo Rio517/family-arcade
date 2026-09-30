@@ -3,8 +3,17 @@ import { describe, expect, it } from 'vitest';
 import { KINDS, type PropKind } from '../domain/catalog';
 import { buildKindGeometry } from './props';
 
+/**
+ * Kinds whose budget is not their tier's: people are instanced by the
+ * hundred, so they get less; a building site stands in for the building that
+ * will go up on its lot, so it gets about as much as that building.
+ */
+const BUDGET: Partial<Record<PropKind, number>> = { person: 200, site: 900, bigsite: 2500 };
+
 /** Triangle budgets by tier, so a city of instanced props stays fast on an iPad. */
-function budget(tier: number): number {
+function budget(kind: PropKind, tier: number): number {
+  const own = BUDGET[kind];
+  if (own !== undefined) return own;
   if (tier <= 1) return 300;
   if (tier <= 4) return 900;
   if (tier <= 7) return 2500;
@@ -31,7 +40,7 @@ describe('buildKindGeometry', () => {
 
           const tris = pos.count / 3;
           expect(tris).toBeGreaterThan(0);
-          expect(tris).toBeLessThanOrEqual(budget(info.tier));
+          expect(tris).toBeLessThanOrEqual(budget(kind, info.tier));
 
           const box = new THREE.Box3().setFromBufferAttribute(pos as THREE.BufferAttribute);
           // Origin is the footprint centre, so each half-extent must fit half the footprint.

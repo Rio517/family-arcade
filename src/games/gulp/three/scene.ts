@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { disposeDeep } from '@shared/three/disposeDeep';
 import { KINDS, type Prop } from '../domain/catalog';
-import type { Hole, World, WorldEvent } from '../domain/world';
+import { BUILD_TIME, canEat, propsNear, type Hole, type Person, type World, type WorldEvent } from '../domain/world';
 import { Effects } from './effects';
 import { buildGround, type Ground } from './ground';
 import { buildKindGeometry } from './props';
@@ -30,6 +30,10 @@ export interface HoleLook {
 const FALL = 0.8;
 /** Buildings from this tier up can hide the child's hole, and fade. */
 const TALL_TIER = 5;
+/** The sun always comes from the same side; shadows are fitted around the camera. */
+const SUN_DIR = new THREE.Vector3(0.35, 1, 0.25).normalize();
+const SHADOW_MAP = 2048;
+
 /** Things are batched per square of this many units (two blocks), so the
  * squares off screen are skipped while the hole is small. */
 const CHUNK = 108;
@@ -58,6 +62,8 @@ interface HoleObj {
   rim: THREE.MeshStandardMaterial;
   pupils: THREE.Object3D[];
   lids: THREE.Object3D[];
+  /** The two eyes: they grow more slowly than the hole. */
+  eyes: THREE.Object3D[];
   label: THREE.Sprite;
   materials: THREE.Material[];
   /** 1 while visible, shrinking to 0 when swallowed. */
@@ -80,6 +86,24 @@ export class GulpScene {
   /** Tall things that might stand in the way, and the see-through copies in use. */
   private tall: Prop[] = [];
   private ghosts = new Map<number, THREE.Mesh>();
+  /** When each see-through copy was last needed: they linger a moment, so a
+   * building doesn't flick between solid and faded at the edge of the view. */
+  private ghostSeen = new Map<number, number>();
+  /** Buildings put up during the round, drawn one by one; `t` runs 0..1 while they rise. */
+  private built = new Map<number, { mesh: THREE.Mesh; scaffold: THREE.Group; t: number; time: number }>();
+  private scaffoldMat = new THREE.MeshStandardMaterial({ color: 0xffb81c, roughness: 0.6 });
+  private scaffoldGeo = new THREE.BoxGeometry(1, 1, 1);
+  private bubble: { sprite: THREE.Sprite; life: number; hole: number } | null = null;
+  private bubbleTex = new Map<string, THREE.Texture>();
+  private lastYum = -10;
+  private lightBasis = new THREE.Matrix4();
+  /** Things wobbling on the rim of the child's hole: too big to fall in yet. */
+  private wobbling = new Set<number>();
+  /** People: one batch per outfit, and where each person sits in it. */
+  private peopleSlots: Array<{ person: Person; mesh: THREE.InstancedMesh; index: number }> = [];
+  private wobbleDummy = new THREE.Object3D();
+  private tiltAxis = new THREE.Vector3();
+  private tiltQ = new THREE.Quaternion();
   private holes: HoleObj[] = [];
   private fallers: Faller[] = [];
   private camPos = new THREE.Vector3();
@@ -107,7 +131,8 @@ export class GulpScene {
     // difference is hard to see at arm's length.
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     this.renderer.setSize(container.clientWidth || 800, container.clientHeight || 600);
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    // Neutral tone mapping keeps the toy colours bold (filmic curves wash them out).
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -117,10 +142,11 @@ export class GulpScene {
     this.scene.fog = new THREE.Fog(0x8fd8f5, 260, 620);
     this.camera = new THREE.PerspectiveCamera(45, this.aspect(), 1, 1200);
 
-    this.scene.add(new THREE.HemisphereLight(0xf4f8ff, 0x9a8f7a, 1.25));
-    this.sun = new THREE.DirectionalLight(0xfff2de, 1.9);
+    // Less fill and a stronger sun: crisper shadows and more contrast.
+    this.scene.add(new THREE.HemisphereLight(0xf4f8ff, 0x8a8070, 0.95));
+    this.sun = new THREE.DirectionalLight(0xfff2de, 2.3);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
     this.sun.shadow.bias = -0.0006;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun, this.sun.target);
@@ -128,6 +154,7 @@ export class GulpScene {
     this.ground = buildGround(world.city, this.renderer);
     this.scene.add(this.ground.group);
     this.buildProps(world);
+    this.buildPeople(world);
     this.effects = new Effects(reducedMotion);
     this.scene.add(this.effects.group);
     looks.forEach((look, i) => this.holes.push(this.buildHole(look, i === follow)));
@@ -192,21 +219,73 @@ export class GulpScene {
 
   private setShown(p: Prop, shown: boolean): void {
     const slot = this.slots.get(p.id);
-    if (!slot) return;
+    if (!slot) {
+      const b = this.built.get(p.id);
+      if (b) b.mesh.visible = shown;
+      return;
+    }
     slot.mesh.setMatrixAt(slot.index, shown ? slot.matrix : this.hidden);
     slot.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private buildPeople(world: World): void {
+    const byLook = new Map<number, Person[]>();
+    for (const p of world.people) {
+      const v = p.variant % KINDS.person.variants;
+      byLook.set(v, [...(byLook.get(v) ?? []), p]);
+    }
+    for (const [v, list] of byLook) {
+      const geo = buildKindGeometry('person', v);
+      this.geometries.set(`person-walk:${v}`, geo);
+      const mesh = new THREE.InstancedMesh(geo, this.material, list.length);
+      mesh.castShadow = true;
+      // They move every frame, so their bounds are the whole island.
+      mesh.frustumCulled = false;
+      list.forEach((person, index) => this.peopleSlots.push({ person, mesh, index }));
+      this.scene.add(mesh);
+    }
+  }
+
+  /** Everyone where the world says, bobbing a little as they walk. */
+  private syncPeople(): void {
+    const d = this.wobbleDummy;
+    const touched = new Set<THREE.InstancedMesh>();
+    for (const { person: p, mesh, index } of this.peopleSlots) {
+      if (!p.alive) {
+        mesh.setMatrixAt(index, this.hidden);
+      } else {
+        const bob = this.reducedMotion ? 0 : Math.abs(Math.sin(this.time * (p.panic > 0 ? 16 : 8) + p.id)) * 0.12;
+        d.position.set(p.x, bob, p.z);
+        d.rotation.set(0, p.heading, 0);
+        d.scale.set(1, 1, 1);
+        d.updateMatrix();
+        mesh.setMatrixAt(index, d.matrix);
+      }
+      touched.add(mesh);
+    }
+    for (const m of touched) m.instanceMatrix.needsUpdate = true;
   }
 
   /** A thing leaves the city: hide it where it stood, and start a copy falling. */
   private swallow(p: Prop, hole: number): void {
     this.setShown(p, false);
     const ghost = this.ghosts.get(p.id);
+    const built = this.built.get(p.id);
+    if (built) {
+      this.built.delete(p.id);
+      this.scene.remove(built.scaffold);
+    }
     let mesh: THREE.Mesh;
     let ownMaterial = false;
     if (ghost) {
       this.ghosts.delete(p.id);
+      if (built) this.scene.remove(built.mesh);
       mesh = ghost;
       ownMaterial = true;
+    } else if (built) {
+      // A building still going up falls as it stands.
+      mesh = built.mesh;
+      mesh.visible = true;
     } else {
       mesh = new THREE.Mesh(this.geometry(p), this.material);
       mesh.position.set(p.x, 0, p.z);
@@ -267,6 +346,7 @@ export class GulpScene {
     const lidMat = keep(new THREE.MeshStandardMaterial({ color: look.color, roughness: 0.5 }));
     const pupils: THREE.Object3D[] = [];
     const lids: THREE.Object3D[] = [];
+    const eyes: THREE.Object3D[] = [];
     for (const side of [-1, 1]) {
       const eye = new THREE.Group();
       eye.position.set(side * 0.38, 0.4, -1.0);
@@ -278,15 +358,28 @@ export class GulpScene {
       lid.scale.y = 0.05;
       eye.add(ball, pupil, lid);
       body.add(eye);
+      eyes.push(eye);
       pupils.push(pupil);
       lids.push(lid);
     }
     group.add(body);
 
+    // The child's own hole shows through buildings as a glowing ring, so it
+    // is never lost behind a skyscraper.
+    if (mine) {
+      const xray = new THREE.Mesh(
+        new THREE.TorusGeometry(1, 0.07, 8, 56),
+        new THREE.MeshBasicMaterial({ color: look.color, transparent: true, opacity: 0.55, depthTest: false, fog: false }),
+      );
+      xray.rotation.x = Math.PI / 2;
+      xray.position.y = 0.06;
+      xray.renderOrder = 20;
+      body.add(xray);
+    }
     const label = labelSprite(look.label, look.color, mine);
     group.add(label);
     this.scene.add(group);
-    return { group, disc, body, rim, pupils, lids, label, materials, shown: 1, flash: 0, blink: 2 + (group.id % 5) * 0.7 };
+    return { group, disc, body, rim, pupils, lids, eyes, label, materials, shown: 1, flash: 0, blink: 2 + (group.id % 5) * 0.7 };
   }
 
   private syncHole(obj: HoleObj, h: Hole, dt: number): void {
@@ -299,6 +392,13 @@ export class GulpScene {
     const r = h.r * obj.shown;
     obj.disc.scale.set(r, r, 1);
     obj.body.scale.setScalar(r);
+    // The eyes grow with the square root of the hole, so a giant's eyes stay
+    // cute instead of filling the screen. They sit on the rim either way.
+    const eye = Math.min(1, Math.sqrt(2.4 / Math.max(0.1, r)));
+    obj.eyes.forEach((e, i) => {
+      e.scale.setScalar(eye);
+      e.position.set((i ? 1 : -1) * 0.38 * eye, 0.4 * eye, -1.0);
+    });
     // Above the eyes on the far rim, not over them.
     obj.label.position.set(0, 1.4 + r * 0.9, -r * 1.1);
 
@@ -318,10 +418,17 @@ export class GulpScene {
     obj.body.rotation.y = h.stun > 0 && !this.reducedMotion ? Math.sin(this.time * 30) * 0.12 : 0;
 
     // The pupils look where the hole is going; now and then the eyes blink.
+    // Eased, so they glide rather than snap when the hole turns or stops.
     const speed = Math.hypot(h.vx, h.vz);
-    const lx = speed > 0.5 ? (h.vx / speed) * 0.1 : 0;
-    const lz = speed > 0.5 ? (h.vz / speed) * 0.06 : 0;
-    for (const p of obj.pupils) p.position.set(lx, 0.03 - lz * 0.3, 0.21);
+    const look = Math.min(1, speed / 4);
+    const lx = speed > 0.01 ? (h.vx / speed) * 0.1 * look : 0;
+    const lz = speed > 0.01 ? (h.vz / speed) * 0.06 * look : 0;
+    const k = Math.min(1, dt * 8);
+    for (const p of obj.pupils) {
+      p.position.x += (lx - p.position.x) * k;
+      p.position.y += (0.03 - lz * 0.3 - p.position.y) * k;
+      p.position.z = 0.21;
+    }
     if (!this.reducedMotion) {
       obj.blink -= dt;
       const closing = obj.blink < 0.12 ? 1 - Math.abs(obj.blink - 0.06) / 0.06 : 0;
@@ -347,6 +454,15 @@ export class GulpScene {
           const h = world.holes[e.hole];
           this.pending += e.prop.points * (h && h.doubleTime > 0 ? 2 : 1);
           this.pendingAt.set(e.prop.x, 2 + KINDS[e.prop.kind].h, e.prop.z);
+        }
+      } else if (e.type === 'rebuild') {
+        if (e.replaces) this.clear(e.replaces);
+        this.raise(e.prop);
+      } else if (e.type === 'food' && e.hole === this.follow) {
+        if (e.food === 'healthy') this.say(`Healthy! +${e.bonus}`, true, e.hole);
+        else if (this.time - this.lastYum > 2.5) {
+          this.lastYum = this.time;
+          this.say('Yum!', false, e.hole);
         }
       } else if (e.type === 'regrow') {
         this.setShown(e.prop, true);
@@ -376,6 +492,10 @@ export class GulpScene {
     });
 
     this.stepFallers(world, dt);
+    this.stepBuilt(dt);
+    this.syncPeople();
+    this.stepBubble(world, dt);
+    if (me) this.wobble(world, me);
     const scale = me ? Math.max(1, me.r / 2.5) : 1;
     this.effects.syncPowerups(world.powerups, scale);
     this.effects.syncAttacks(world.attacks, me ? me.r : 2);
@@ -415,10 +535,167 @@ export class GulpScene {
     }
   }
 
+  /**
+   * Anything too big to swallow that sits over the rim of the child's hole
+   * rocks and leans in, as if it is about to go: a hint of what is next.
+   */
+  private wobble(world: World, me: Hole): void {
+    const now = new Set<number>();
+    if (me.alive && !this.reducedMotion) {
+      for (const p of propsNear(world, me.x, me.z, me.r + 12)) {
+        if (canEat(me, p) || this.ghosts.has(p.id)) continue;
+        const dx = me.x - p.x;
+        const dz = me.z - p.z;
+        const d = Math.hypot(dx, dz);
+        const reach = Math.max(KINDS[p.kind].w, KINDS[p.kind].d) / 2;
+        if (d > me.r + reach * 0.6) continue;
+        now.add(p.id);
+        // Lean toward the hole's middle, and rock a little around that lean.
+        const lean = 0.05 + 0.04 * Math.sin(this.time * 13 + p.id * 1.7);
+        this.tiltAxis.set(dz, 0, -dx).normalize();
+        if (d < 0.01) this.tiltAxis.set(1, 0, 0);
+        this.tiltQ.setFromAxisAngle(this.tiltAxis, lean);
+        const w = this.wobbleDummy;
+        w.position.set(p.x, 0, p.z);
+        w.rotation.set(0, p.rot, 0);
+        w.quaternion.premultiply(this.tiltQ);
+        w.updateMatrix();
+        this.place(p, w.matrix, w.quaternion);
+      }
+    }
+    // Anything that stopped wobbling (and still stands) goes back upright.
+    for (const id of this.wobbling) {
+      if (now.has(id)) continue;
+      const p = world.props.get(id);
+      if (p && !this.ghosts.has(id)) this.setShown(p, true);
+      const b = this.built.get(id);
+      if (b) b.mesh.quaternion.setFromEuler(new THREE.Euler(0, p ? p.rot : 0, 0));
+    }
+    this.wobbling = now;
+  }
+
+  /** Set where a thing is drawn: its batch slot, or its own mesh if it was built during the round. */
+  private place(p: Prop, matrix: THREE.Matrix4, q: THREE.Quaternion): void {
+    const slot = this.slots.get(p.id);
+    if (slot) {
+      slot.mesh.setMatrixAt(slot.index, matrix);
+      slot.mesh.instanceMatrix.needsUpdate = true;
+      return;
+    }
+    const b = this.built.get(p.id);
+    if (b && b.t >= 1) b.mesh.quaternion.copy(q);
+  }
+
+  /** A new building goes up: it rises out of a yellow scaffold over a few seconds. */
+  /** Take away something built during the round (a site whose building is done). */
+  private clear(p: Prop): void {
+    const b = this.built.get(p.id);
+    if (!b) return;
+    this.built.delete(p.id);
+    this.scene.remove(b.mesh, b.scaffold);
+    this.tall = this.tall.filter((t) => t.id !== p.id);
+  }
+
+  /**
+   * Something new goes up. A construction site pops up out of the ground; a
+   * finished building rises out of its site's scaffold over a few seconds.
+   */
+  private raise(p: Prop): void {
+    const mesh = new THREE.Mesh(this.geometry(p), this.material);
+    mesh.position.set(p.x, 0, p.z);
+    mesh.rotation.y = p.rot;
+    mesh.scale.y = 0.02;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+    if (p.kind === 'site' || p.kind === 'bigsite') {
+      // Sites pop up quickly, with no scaffold of their own.
+      this.built.set(p.id, { mesh, scaffold: new THREE.Group(), t: this.reducedMotion ? 1.4 : 0, time: 0.6 });
+      return;
+    }
+    const info = KINDS[p.kind];
+    const w = info.w + 0.6;
+    const d = info.d + 0.6;
+    const h = info.h * p.hScale + 1;
+    const scaffold = new THREE.Group();
+    scaffold.position.set(p.x, 0, p.z);
+    scaffold.rotation.y = p.rot;
+    const bar = (sx: number, sy: number, sz: number, x: number, y: number, z: number) => {
+      const m = new THREE.Mesh(this.scaffoldGeo, this.scaffoldMat);
+      m.scale.set(sx, sy, sz);
+      m.position.set(x, y, z);
+      scaffold.add(m);
+    };
+    const t = 0.35;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) bar(t, h, t, (sx * w) / 2, h / 2, (sz * d) / 2);
+    for (let y = h / 3; y <= h; y += h / 3) {
+      bar(w, t, t, 0, y, d / 2);
+      bar(w, t, t, 0, y, -d / 2);
+      bar(t, t, d, w / 2, y, 0);
+      bar(t, t, d, -w / 2, y, 0);
+    }
+    this.scene.add(scaffold);
+    this.built.set(p.id, { mesh, scaffold, t: this.reducedMotion ? 1 : 0, time: BUILD_TIME });
+    this.tall.push(p);
+  }
+
+  private stepBuilt(dt: number): void {
+    for (const b of this.built.values()) {
+      if (b.t >= 1.4) continue;
+      b.t += dt / b.time;
+      const k = Math.min(1, b.t);
+      // Up with a little overshoot, then settled.
+      const ease = 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2);
+      b.mesh.scale.y = Math.max(0.02, Math.min(1.04, ease));
+      if (b.t >= 1 || this.reducedMotion) b.mesh.scale.y = 1;
+      // The scaffold comes down once the building is up.
+      b.scaffold.scale.y = b.t < 1 ? 1 : Math.max(0.001, 1 - (b.t - 1) / 0.4);
+      if (b.t >= 1.4) this.scene.remove(b.scaffold);
+    }
+  }
+
+  /** A small speech bubble by the child's hole: "Yum!" or a health bonus. */
+  private say(text: string, healthy: boolean, hole: number): void {
+    const key = `${healthy ? 'h' : 't'}:${text}`;
+    let tex = this.bubbleTex.get(key);
+    if (!tex) {
+      tex = bubbleTexture(text, healthy);
+      this.bubbleTex.set(key, tex);
+    }
+    if (!this.bubble) {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }));
+      sprite.renderOrder = 12;
+      sprite.scale.set(0.12, 0.06, 1);
+      this.scene.add(sprite);
+      this.bubble = { sprite, life: 0, hole };
+    }
+    const mat = this.bubble.sprite.material as THREE.SpriteMaterial;
+    mat.map = tex;
+    mat.needsUpdate = true;
+    this.bubble.life = 1.3;
+    this.bubble.hole = hole;
+  }
+
+  private stepBubble(world: World, dt: number): void {
+    const b = this.bubble;
+    if (!b) return;
+    b.life -= dt;
+    const h = world.holes[b.hole];
+    const mat = b.sprite.material as THREE.SpriteMaterial;
+    if (b.life <= 0 || !h?.alive) {
+      mat.opacity = 0;
+      return;
+    }
+    mat.opacity = Math.min(1, b.life * 3);
+    // Up and to the right of the eyes, like a comic.
+    b.sprite.position.set(h.x + h.r * 0.9, 1.5 + h.r * 0.8, h.z - h.r * 1.1);
+  }
+
   /** Where the camera sits for a hole: higher as the hole grows. */
   private cameraFor(h: Hole): { pos: THREE.Vector3; look: THREE.Vector3 } {
-    const up = 24 + h.r * 3.4;
-    const back = 17 + h.r * 2.5;
+    // Close in, so the city's things look big and chunky around the hole.
+    const up = 16 + h.r * 3;
+    const back = 11.5 + h.r * 2.2;
     return { pos: new THREE.Vector3(h.x, up, h.z + back), look: new THREE.Vector3(h.x, 0, h.z - 2) };
   }
 
@@ -464,11 +741,19 @@ export class GulpScene {
       cam.top = reach;
       cam.bottom = -reach;
       cam.near = 1;
-      cam.far = 700 + h.r * 8;
+      cam.far = 700 + h.r * 14;
       cam.updateProjectionMatrix();
     }
-    this.sun.position.set(this.camLook.x + 60 + h.r, 200 + h.r * 3, this.camLook.z + 40 + h.r);
-    this.sun.target.position.copy(this.camLook);
+    // Snap the shadow camera to whole shadow-map texels, measured across the
+    // sun's view: otherwise shadows crawl and shimmer as the camera glides.
+    const texel = (2 * reach) / SHADOW_MAP;
+    this.lightBasis.lookAt(SUN_DIR, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
+    const snapped = this.camLook.clone().applyMatrix4(this.lightBasis.clone().transpose());
+    snapped.x = Math.round(snapped.x / texel) * texel;
+    snapped.y = Math.round(snapped.y / texel) * texel;
+    snapped.applyMatrix4(this.lightBasis);
+    this.sun.target.position.copy(snapped);
+    this.sun.position.copy(snapped).addScaledVector(SUN_DIR, 300 + h.r * 6);
   }
 
   /**
@@ -478,18 +763,29 @@ export class GulpScene {
   private fadeInTheWay(world: World, me: Hole): void {
     const want = new Set<number>();
     if (me.alive) {
+      // Sight lines from the camera to the hole's eyes and its near rim: a
+      // building fades only if one of them passes through it.
+      const eye = this.camera.position;
+      // The eyes and the middle of the mouth: fading for the whole rim turns
+      // a street of skyscrapers into a haze. The glowing ring shows the rest.
+      const targets = [new THREE.Vector3(me.x, 0.5 + me.r * 0.4, me.z - me.r), new THREE.Vector3(me.x, 0.3, me.z)];
+      const rays = targets.map((t) => ({ ray: new THREE.Ray(eye.clone(), t.clone().sub(eye).normalize()), far: eye.distanceTo(t) }));
+      const box = new THREE.Box3();
+      const hit = new THREE.Vector3();
       for (const p of this.tall) {
         if (!world.props.has(p.id)) continue;
         const info = KINDS[p.kind];
         const half = Math.max(info.w, info.d) / 2;
         const h = info.h * p.hScale;
-        // Toward the camera from the hole, and tall enough to hide it.
-        const dz = p.z - me.z;
-        if (dz > -half && dz < h * 0.9 + half && Math.abs(p.x - me.x) < half + me.r * 0.7 && h > me.r * 0.6) want.add(p.id);
+        box.min.set(p.x - half, 0, p.z - half);
+        box.max.set(p.x + half, h, p.z + half);
+        if (rays.some(({ ray, far }) => ray.intersectBox(box, hit) && eye.distanceTo(hit) < far - 0.5)) want.add(p.id);
       }
     }
+    for (const id of want) this.ghostSeen.set(id, this.time);
     for (const [id, ghost] of this.ghosts) {
-      if (want.has(id)) continue;
+      if (want.has(id) || this.time - (this.ghostSeen.get(id) ?? 0) < 0.5) continue;
+      this.ghostSeen.delete(id);
       this.scene.remove(ghost);
       (ghost.material as THREE.Material).dispose();
       this.ghosts.delete(id);
@@ -502,7 +798,7 @@ export class GulpScene {
       if (!p) continue;
       const mat = this.material.clone();
       mat.transparent = true;
-      mat.opacity = 0.28;
+      mat.opacity = 0.2;
       mat.depthWrite = false;
       const ghost = new THREE.Mesh(this.geometry(p), mat);
       ghost.position.set(p.x, 0, p.z);
@@ -532,6 +828,9 @@ export class GulpScene {
     this.resizeObs?.disconnect();
     this.effects.dispose();
     this.ground.dispose();
+    for (const t of this.bubbleTex.values()) t.dispose();
+    this.scaffoldGeo.dispose();
+    this.scaffoldMat.dispose();
     disposeDeep(this.scene);
     for (const g of this.geometries.values()) g.dispose();
     this.material.dispose();
@@ -596,4 +895,32 @@ function labelSprite(text: string, color: number, mine: boolean): THREE.Sprite {
   sprite.scale.set(0.15, 0.0375, 1);
   sprite.renderOrder = 10;
   return sprite;
+}
+
+/** A white speech bubble with a little tail; green words for healthy food. */
+function bubbleTexture(text: string, healthy: boolean): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 128;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#ffffff';
+  g.strokeStyle = 'rgba(29,31,51,0.85)';
+  g.lineWidth = 6;
+  g.beginPath();
+  g.roundRect(8, 8, 240, 86, 40);
+  g.moveTo(52, 90);
+  g.lineTo(36, 122);
+  g.lineTo(84, 92);
+  g.fill();
+  g.stroke();
+  // Cover the seam between the bubble and its tail.
+  g.fillRect(44, 84, 44, 10);
+  g.font = '900 44px ui-rounded, system-ui, -apple-system, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillStyle = healthy ? '#1a9c3c' : '#e0457b';
+  g.fillText(text, 128, 52);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }

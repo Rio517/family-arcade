@@ -113,8 +113,9 @@ export function steerRival(b: Brain, me: Hole, w: World, dt: number, player: Hol
   const dx = t.x - me.x;
   const dz = t.z - me.z;
   const d = Math.hypot(dx, dz) || 1;
-  // A clumsier rival wobbles more on the way.
-  const wob = (1 - b.skill) * 0.9 * Math.sin(b.wobble * 2.3);
+  // A clumsier rival weaves a little on the way: slow and gentle, so it
+  // reads as wandering, not wiggling.
+  const wob = (1 - b.skill) * 0.35 * Math.sin(b.wobble * 0.9);
   const c = Math.cos(wob);
   const s = Math.sin(wob);
   const ux = dx / d;

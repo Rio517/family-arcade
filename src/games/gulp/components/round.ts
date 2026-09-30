@@ -5,7 +5,7 @@
  */
 import { TIERS } from '../domain/catalog';
 import { MAPS, type MapId } from '../domain/city';
-import { levelOf, levelProgress, nextLabel, standings, type World } from '../domain/world';
+import { POWER_TIME, comboOf, levelOf, levelProgress, nextLabel, standings, type World } from '../domain/world';
 import type { GulpScene } from '../three/scene';
 import { SKINS } from './skins';
 
@@ -22,6 +22,8 @@ export interface Settings {
   length: 'short' | 'long' | 'endless';
   powerups: boolean;
   fightBack: boolean;
+  /** Things grow back and eaten buildings are rebuilt, bigger as the round goes on. */
+  regrow: boolean;
   skin: number;
   muted: boolean;
 }
@@ -54,6 +56,12 @@ export interface Hud {
   kills: number;
   speed: number;
   double: number;
+  /** 0..1 of each power-up still to run, for the countdown bars. */
+  speedLeft: number;
+  doubleLeft: number;
+  /** The combo multiplier and the things eaten in the streak. */
+  combo: number;
+  streak: number;
   alive: boolean;
   eatenBy: string | null;
   respawnIn: number;
@@ -62,7 +70,7 @@ export interface Hud {
 
 export interface Banner {
   id: number;
-  kind: 'level' | 'warn' | 'good' | 'hurt';
+  kind: 'level' | 'warn' | 'good' | 'hurt' | 'news';
   text: string;
   sub?: string;
 }
@@ -94,6 +102,10 @@ export function hudOf(w: World, me: number): Hud {
     kills: h.kills,
     speed: Math.ceil(h.speedTime),
     double: Math.ceil(h.doubleTime),
+    speedLeft: h.speedTime / POWER_TIME.speed,
+    doubleLeft: h.doubleTime / POWER_TIME.double,
+    combo: comboOf(h.streak),
+    streak: h.streak,
     alive: h.alive,
     eatenBy: h.eatenBy,
     respawnIn: Math.max(1, Math.ceil(h.respawnIn)),

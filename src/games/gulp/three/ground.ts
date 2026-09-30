@@ -9,6 +9,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { seededRng } from '@shared/rng';
 import { BLOCK, ROAD, SIDEWALK, type BlockKind, type City } from '../domain/city';
 
 type Surface = 'grass' | 'meadow' | 'forest' | 'paving' | 'plaza' | 'concrete' | 'field' | 'rock';
@@ -31,14 +32,34 @@ const FLOOR: Record<BlockKind, Surface> = {
   mountain: 'rock',
 };
 
-/** One flat quad in world units, UVs in world units divided by `tile`. */
-function quad(x0: number, z0: number, x1: number, z1: number, y: number, tile: number): THREE.BufferGeometry {
+/**
+ * One flat quad in world units, UVs in world units divided by `tile`. `look`
+ * turns and shifts the texture and tints it, so neighbouring blocks of grass
+ * don't show the same pattern.
+ */
+function quad(
+  x0: number,
+  z0: number,
+  x1: number,
+  z1: number,
+  y: number,
+  tile: number,
+  look: { turn: number; dx: number; dz: number; tint: number } = { turn: 0, dx: 0, dz: 0, tint: 1 },
+): THREE.BufferGeometry {
   const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0);
   g.rotateX(-Math.PI / 2);
   g.translate((x0 + x1) / 2, y, (z0 + z1) / 2);
   const pos = g.attributes.position;
   const uv = g.attributes.uv;
-  for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / tile, pos.getZ(i) / tile);
+  const c = Math.cos(look.turn);
+  const sn = Math.sin(look.turn);
+  for (let i = 0; i < pos.count; i++) {
+    const u = pos.getX(i) / tile;
+    const v = pos.getZ(i) / tile;
+    uv.setXY(i, u * c - v * sn + look.dx, u * sn + v * c + look.dz);
+  }
+  const col = new Float32Array(pos.count * 3).fill(look.tint);
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return g;
 }
 
@@ -49,6 +70,7 @@ function disc(x: number, z: number, r: number, y: number, tile: number): THREE.B
   const pos = g.attributes.position;
   const uv = g.attributes.uv;
   for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / tile, pos.getZ(i) / tile);
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3).fill(1), 3));
   return g;
 }
 
@@ -64,7 +86,7 @@ function layer(parts: THREE.BufferGeometry[], material: THREE.Material, order: n
 }
 
 function flat(map: THREE.Texture | null, color: number, offset: number): THREE.MeshStandardMaterial {
-  const m = new THREE.MeshStandardMaterial({ map, color, roughness: 0.95, metalness: 0 });
+  const m = new THREE.MeshStandardMaterial({ map, color, roughness: 0.95, metalness: 0, vertexColors: true });
   // Later layers win over earlier ones without needing much height between them.
   m.polygonOffset = true;
   m.polygonOffsetFactor = -offset;
@@ -92,15 +114,17 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
 
   // Pavement under everything: the land itself.
   const paving = tex(drawSlabs);
-  const land = layer([quad(-half, -half, half, half, 0, 4)], flat(paving, 0xffffff, 0), 0);
+  // Every layer sits just under y = 0, so no thing standing on the ground
+  // shares a plane with it (a shared plane flickers).
+  const land = layer([quad(-half, -half, half, half, -0.1, 4)], flat(paving, 0xffffff, 0), 0);
   if (land) group.add(land);
 
   // What each block stands on.
   const surfaces: Record<Surface, THREE.Texture> = {
-    grass: tex((g, s) => drawGrass(g, s, '#7fcb5c', '#6cb94b')),
-    meadow: tex((g, s) => drawGrass(g, s, '#98d56d', '#86c35c')),
-    forest: tex((g, s) => drawGrass(g, s, '#5fa84a', '#4d943b')),
-    rock: tex((g, s) => drawGrass(g, s, '#8fae6a', '#8a8f86')),
+    grass: tex((g, s) => drawGrass(g, s, '#7fcb5c', '#6cb94b', 1), 512),
+    meadow: tex((g, s) => drawGrass(g, s, '#98d56d', '#86c35c', 2), 512),
+    forest: tex((g, s) => drawGrass(g, s, '#5fa84a', '#4d943b', 3), 512),
+    rock: tex((g, s) => drawGrass(g, s, '#8fae6a', '#8a8f86', 4), 512),
     paving: tex((g, s) => drawTiles(g, s, '#ddd6c8', 'rgba(120,110,95,0.25)', 4)),
     plaza: tex((g, s) => drawTiles(g, s, '#ece0c8', 'rgba(150,120,90,0.25)', 6)),
     concrete: tex((g, s) => drawTiles(g, s, '#c9c8c3', 'rgba(90,90,90,0.22)', 2)),
@@ -113,21 +137,27 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
     const surface = FLOOR[b.kind];
     const inset = surface === 'paving' || surface === 'plaza' ? SIDEWALK : SIDEWALK - 0.4;
     const list = bySurface.get(surface) ?? [];
-    list.push(quad(b.x + inset, b.z + inset, b.x + b.size - inset, b.z + b.size - inset, 0.02, 8));
+    // Green ground: a big tile, turned, shifted and tinted per block, so no
+    // two blocks repeat. Paving keeps its neat grid.
+    const green = surface === 'grass' || surface === 'meadow' || surface === 'forest' || surface === 'rock';
+    const r = seededRng(Math.round(b.x * 131 + b.z * 7));
+    const look = green ? { turn: Math.floor(r() * 4) * (Math.PI / 2), dx: r(), dz: r(), tint: 0.93 + r() * 0.12 } : undefined;
+    list.push(quad(b.x + inset, b.z + inset, b.x + b.size - inset, b.z + b.size - inset, -0.08, green ? 22 : 8, look));
     bySurface.set(surface, list);
     if (b.kind === 'park') {
       // A cross of paths and a round plaza for the fountain.
       const c = BLOCK / 2;
-      paths.push(quad(b.x + c - 2.5, b.z + SIDEWALK, b.x + c + 2.5, b.z + b.size - SIDEWALK, 0.03, 4));
-      paths.push(quad(b.x + SIDEWALK, b.z + c - 2.5, b.x + b.size - SIDEWALK, b.z + c + 2.5, 0.03, 4));
-      paths.push(disc(b.x + c, b.z + c, 10, 0.035, 4));
+      paths.push(quad(b.x + c - 2.5, b.z + SIDEWALK, b.x + c + 2.5, b.z + b.size - SIDEWALK, -0.07, 4));
+      paths.push(quad(b.x + SIDEWALK, b.z + c - 2.5, b.x + b.size - SIDEWALK, b.z + c + 2.5, -0.07, 4));
+      paths.push(disc(b.x + c, b.z + c, 10, -0.065, 4));
     }
     // A kerb line round the block.
-    const k = 0.35;
-    kerbs.push(quad(b.x, b.z, b.x + b.size, b.z + k, 0.04, 4));
-    kerbs.push(quad(b.x, b.z + b.size - k, b.x + b.size, b.z + b.size, 0.04, 4));
-    kerbs.push(quad(b.x, b.z, b.x + k, b.z + b.size, 0.04, 4));
-    kerbs.push(quad(b.x + b.size - k, b.z, b.x + b.size, b.z + b.size, 0.04, 4));
+    // Wide enough not to shimmer as a hairline from a height.
+    const k = 0.6;
+    kerbs.push(quad(b.x, b.z, b.x + b.size, b.z + k, -0.06, 4));
+    kerbs.push(quad(b.x, b.z + b.size - k, b.x + b.size, b.z + b.size, -0.06, 4));
+    kerbs.push(quad(b.x, b.z, b.x + k, b.z + b.size, -0.06, 4));
+    kerbs.push(quad(b.x + b.size - k, b.z, b.x + b.size, b.z + b.size, -0.06, 4));
   }
   for (const [surface, parts] of bySurface) {
     const mesh = layer(parts, flat(surfaces[surface], 0xffffff, 1), 1);
@@ -142,25 +172,15 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   const asphalt = tex(drawAsphalt);
   const roads: THREE.BufferGeometry[] = [];
   for (const r of city.roads) {
-    roads.push(quad(-half, r - ROAD / 2, half, r + ROAD / 2, 0.05, 10));
-    roads.push(quad(r - ROAD / 2, -half, r + ROAD / 2, half, 0.05, 10));
+    roads.push(quad(-half, r - ROAD / 2, half, r + ROAD / 2, -0.05, 10));
+    roads.push(quad(r - ROAD / 2, -half, r + ROAD / 2, half, -0.05, 10));
   }
   const roadMesh = layer(roads, flat(asphalt, 0xffffff, 3), 3);
   if (roadMesh) group.add(roadMesh);
 
-  const yellow: THREE.BufferGeometry[] = [];
+  // No centre lines: plain roads read calmer, and thin lines shimmer at a
+  // distance. Zebra crossings stay.
   const white: THREE.BufferGeometry[] = [];
-  for (const r of city.roads) {
-    for (let i = 0; i < city.roads.length - 1; i++) {
-      const a = city.roads[i] + ROAD / 2 + 4;
-      const b = city.roads[i + 1] - ROAD / 2 - 4;
-      // Dashed centre lines, both ways.
-      for (let t = a; t < b - 2; t += 5) {
-        yellow.push(quad(t, r - 0.18, t + 2.6, r + 0.18, 0.07, 4));
-        yellow.push(quad(r - 0.18, t, r + 0.18, t + 2.6, 0.07, 4));
-      }
-    }
-  }
   // Zebra crossings on each side of every crossing.
   for (const x of city.roads) {
     for (const z of city.roads) {
@@ -168,14 +188,12 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
         const cx = x + side * (ROAD / 2 + 1.8);
         const cz = z + side * (ROAD / 2 + 1.8);
         for (let t = -ROAD / 2 + 1; t < ROAD / 2 - 0.5; t += 1.8) {
-          if (Math.abs(cx) < half - 1) white.push(quad(cx - 1.2, z + t, cx + 1.2, z + t + 0.9, 0.07, 4));
-          if (Math.abs(cz) < half - 1) white.push(quad(x + t, cz - 1.2, x + t + 0.9, cz + 1.2, 0.07, 4));
+          if (Math.abs(cx) < half - 1) white.push(quad(cx - 1.2, z + t, cx + 1.2, z + t + 0.9, -0.04, 4));
+          if (Math.abs(cz) < half - 1) white.push(quad(x + t, cz - 1.2, x + t + 0.9, cz + 1.2, -0.04, 4));
         }
       }
     }
   }
-  const yellowMesh = layer(yellow, flat(null, 0xf5c842, 4), 4);
-  if (yellowMesh) group.add(yellowMesh);
   const whiteMesh = layer(white, flat(null, 0xf4f4f0, 4), 4);
   if (whiteMesh) group.add(whiteMesh);
 
@@ -223,14 +241,12 @@ function tiling(draw: (g: CanvasRenderingContext2D, s: number) => void, size: nu
   return t;
 }
 
-/** Repeatable noise: the same speckles every time (no Math.random). */
+/** Repeatable noise: the same speckles every time, scattered by a seeded
+ * random (a simple multiply-and-wrap lines the dots up into stripes). */
 function speckle(g: CanvasRenderingContext2D, s: number, n: number, color: string, size: number, salt: number): void {
+  const r = seededRng(salt * 7717 + 11);
   g.fillStyle = color;
-  for (let i = 0; i < n; i++) {
-    const x = (((i * 7919 + salt * 131) % 1000) / 1000) * s;
-    const y = (((i * 104729 + salt * 977) % 1000) / 1000) * s;
-    g.fillRect(x, y, size, size);
-  }
+  for (let i = 0; i < n; i++) g.fillRect(r() * s, r() * s, size, size);
 }
 
 function drawSlabs(g: CanvasRenderingContext2D, s: number): void {
@@ -268,22 +284,23 @@ function drawTiles(g: CanvasRenderingContext2D, s: number, base: string, line: s
   }
 }
 
-function drawGrass(g: CanvasRenderingContext2D, s: number, base: string, dark: string): void {
+function drawGrass(g: CanvasRenderingContext2D, s: number, base: string, dark: string, salt: number): void {
   g.fillStyle = base;
   g.fillRect(0, 0, s, s);
-  // Soft patches, then blades.
-  for (let i = 0; i < 26; i++) {
-    const x = ((i * 37) % 100) / 100 * s;
-    const y = ((i * 61) % 100) / 100 * s;
-    const r = 10 + (i % 5) * 6;
+  // Soft patches of every size, scattered at random, then fine speckle.
+  const rnd = seededRng(salt * 313);
+  for (let i = 0; i < 40; i++) {
+    const x = rnd() * s;
+    const y = rnd() * s;
+    const r = 14 + rnd() * 60;
     const grad = g.createRadialGradient(x, y, 0, x, y, r);
     grad.addColorStop(0, dark);
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = grad;
     for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) g.fillRect(x + dx - r, y + dy - r, r * 2, r * 2);
   }
-  speckle(g, s, 900, 'rgba(255,255,255,0.10)', 1.5, 3);
-  speckle(g, s, 900, 'rgba(0,60,0,0.10)', 1.5, 4);
+  speckle(g, s, 1600, 'rgba(255,255,255,0.08)', 2, salt * 2 + 3);
+  speckle(g, s, 1600, 'rgba(0,60,0,0.08)', 2, salt * 2 + 4);
 }
 
 function drawField(g: CanvasRenderingContext2D, s: number): void {
@@ -300,19 +317,9 @@ function drawField(g: CanvasRenderingContext2D, s: number): void {
 function drawAsphalt(g: CanvasRenderingContext2D, s: number): void {
   g.fillStyle = '#5b616e';
   g.fillRect(0, 0, s, s);
-  speckle(g, s, 1400, 'rgba(255,255,255,0.06)', 2, 6);
-  speckle(g, s, 1400, 'rgba(0,0,0,0.08)', 2, 7);
-  // A crack or two.
-  g.strokeStyle = 'rgba(30,32,38,0.35)';
-  g.lineWidth = 1.5;
-  g.beginPath();
-  g.moveTo(s * 0.2, s * 0.3);
-  g.lineTo(s * 0.28, s * 0.36);
-  g.lineTo(s * 0.26, s * 0.45);
-  g.moveTo(s * 0.7, s * 0.72);
-  g.lineTo(s * 0.78, s * 0.7);
-  g.lineTo(s * 0.83, s * 0.78);
-  g.stroke();
+  // Just a faint grain: nothing that reads as lines from above.
+  speckle(g, s, 900, 'rgba(255,255,255,0.035)', 2, 6);
+  speckle(g, s, 900, 'rgba(0,0,0,0.05)', 2, 7);
 }
 
 function drawWaves(g: CanvasRenderingContext2D, s: number): void {
