@@ -587,7 +587,7 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
       for (let j = 0; j < 2; j++) {
         for (let i = 0; i < 2; i++) {
           const r = rng();
-          const kind: PropKind = r < 0.3 ? 'office' : r < 0.6 ? 'tower' : 'apartment';
+          const kind: PropKind = r < 0.2 ? 'office' : r < 0.55 ? 'tower' : 'apartment';
           add(kind, x0 + at(i), z0 + at(j), faces[i + j * 2], variant(), kind === 'office' ? 0.9 + rng() * 0.5 : 0.8 + rng() * 0.7);
         }
       }

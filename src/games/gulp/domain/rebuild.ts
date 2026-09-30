@@ -25,9 +25,17 @@ const EATEN_MAX = 1500;
  * the city's age allows. Big sites become stadiums, malls and power plants,
  * and each opening makes the news.
  */
-// An eaten tower may come back as a lower, wider office block: a city that
-// has been eaten can shrink.
-const LADDER: PropKind[] = ['house', 'shop', 'apartment', 'tower', 'office', 'skyscraper'];
+// Offices are not a rung: a lot too small for a skyscraper comes back as a
+// taller tower, and only now and then as an office block (see OFFICE_SHARE),
+// so a city rebuilt late in a round is not all offices.
+const LADDER: PropKind[] = ['house', 'shop', 'apartment', 'tower', 'skyscraper'];
+/**
+ * A lot that would go up as a tower becomes an office block now and then,
+ * and a tall apartment block a little more often, so a city rebuilt late in
+ * a round has a mix of buildings, not a row of the same tower.
+ */
+const OFFICE_SHARE = 0.15;
+const APARTMENT_SHARE = 0.25;
 /** Buildings that go up through a tall building site first. */
 const TALL: PropKind[] = ['tower', 'skyscraper'];
 const BIG: PropKind[] = ['factory', 'warehouse', 'mall', 'stadium', 'powerplant'];
@@ -72,6 +80,8 @@ export interface Lot {
   rung: number;
   /** A building that comes back as itself (see `SAME_AGAIN`): its kind, look and height. */
   same?: { kind: PropKind; variant: number; hScale: number };
+  /** What is going up, once decided (a tall building is decided before its frame goes up). */
+  plan?: { kind: PropKind; hScale?: number };
   due: number;
   /** The construction site standing on it, once there is one. */
   site: number | null;
@@ -103,7 +113,7 @@ export function markEaten(w: World, p: Prop): void {
   }
   if (country) return;
   // A cottage comes back like a house, a big house like a shop: one step up from there.
-  const rung = p.kind === 'cottage' ? 0 : p.kind === 'villa' ? 1 : LADDER.indexOf(p.kind);
+  const rung = p.kind === 'cottage' ? 0 : p.kind === 'villa' ? 1 : p.kind === 'office' ? LADDER.indexOf('tower') : LADDER.indexOf(p.kind);
   if (rung >= 0 || BIG.includes(p.kind)) w.lots.push({ x: p.x, z: p.z, rot: p.rot, room, rung, due, site: null });
 }
 
@@ -145,10 +155,11 @@ export function rebuild(w: World, events: WorldEvent[]): void {
       w.lots.splice(i, 1);
       continue;
     }
-    const kind = lot.same ?? (lot.rung < 0 ? bigKind(w, lot) : ladderKind(w, lot));
+    const kind = lot.same ?? lot.plan ?? (lot.rung < 0 ? bigKind(w, lot) : ladderKind(w, lot));
     // A tall building goes up in stages: the building site, then a frame
     // with a crane on it, then the tower itself.
     if (TALL.includes(kind.kind) && site.kind !== 'tallsite') {
+      lot.plan = kind;
       w.props.delete(site.id);
       const frame = makeProp(w.nextPropId++, 'tallsite', lot.x, lot.z, lot.rot, variant);
       placeProp(w, frame);
@@ -159,7 +170,9 @@ export function rebuild(w: World, events: WorldEvent[]): void {
     }
     w.lots.splice(i, 1);
     w.props.delete(site.id);
-    const extra = lot.rung < 0 ? 0 : Math.max(0, lot.rung + 1 - LADDER.indexOf(kind.kind));
+    // An office stands where a tower would: count it as that rung.
+    const onRung = LADDER.indexOf(kind.kind === 'office' ? 'tower' : kind.kind);
+    const extra = lot.rung < 0 ? 0 : Math.max(0, lot.rung + 1 - onRung);
     const look = lot.same?.variant ?? variant;
     const p = makeProp(w.nextPropId++, kind.kind, lot.x, lot.z, lot.rot, look, kind.hScale ?? Math.min(2, 1 + 0.2 * extra));
     placeProp(w, p);
@@ -177,6 +190,11 @@ function ladderKind(w: World, lot: Lot): { kind: PropKind; hScale?: number } {
   const age = Math.floor(w.elapsed / AGE_STEP);
   let rung = Math.min(LADDER.length - 1, lot.rung + 1, age);
   while (rung > 0 && (Math.max(KINDS[LADDER[rung]].w, KINDS[LADDER[rung]].d) > lot.room || !clearFor(w, lot, LADDER[rung]))) rung--;
+  if (LADDER[rung] === 'tower') {
+    const r = w.rng();
+    if (r < OFFICE_SHARE && KINDS.office.w <= lot.room && clearFor(w, lot, 'office')) return { kind: 'office' };
+    if (r < OFFICE_SHARE + APARTMENT_SHARE) return { kind: 'apartment' };
+  }
   return { kind: LADDER[rung] };
 }
 

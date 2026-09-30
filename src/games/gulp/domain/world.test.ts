@@ -152,7 +152,7 @@ describe('a round against the computer is fair and fun', () => {
     only(w, []);
     const me = grow(w, 0, 900);
     w.nextAttack = 999;
-    w.attacks = [{ id: 1, wave: 1, hits: 0, home: false, kind: 'tank', target: 0, x: me.x + 40, z: me.z, heading: -Math.PI / 2, speed: 6, life: 40, reload: 0.5, shells: [] }];
+    w.attacks = [{ id: 1, wave: 1, hits: 0, home: false, kind: 'tank', target: 0, shots: 3, x: me.x + 40, z: me.z, heading: -Math.PI / 2, speed: 6, life: 40, reload: 0.5, shells: [] }];
     const events: WorldEvent[] = [];
     for (let i = 0; i < 60 * 4; i++) events.push(...stepWorld(w, 1 / 60, still));
     expect(events).toContainEqual({ type: 'hurt', hole: 0, cause: 'bomb' });
@@ -169,7 +169,7 @@ describe('a round against the computer is fair and fun', () => {
     only(w, []);
     const me = grow(w, 0, 900);
     w.nextAttack = 999;
-    w.attacks = [{ id: 1, wave: 1, hits: 0, home: false, kind: 'heli', target: 0, x: me.x + 30, z: me.z, heading: 0, speed: 28, life: 12, reload: 0.3, shells: [] }];
+    w.attacks = [{ id: 1, wave: 1, hits: 0, home: false, kind: 'heli', target: 0, shots: 3, x: me.x + 30, z: me.z, heading: 0, speed: 28, life: 12, reload: 0.3, shells: [] }];
     const events: WorldEvent[] = [];
     // Weave back and forth across the road.
     for (let i = 0; i < 60 * 10; i++) events.push(...stepWorld(w, 1 / 60, { x: 0, z: Math.sin(i / 50) > 0 ? 1 : -1 }));
@@ -238,5 +238,20 @@ describe('a round against the computer is fair and fun', () => {
     stepWorld(v, 1 / 60, still);
     expect(v.status).toBe('over');
     expect(v.endedBy).toBe('last');
+
+    // An endless round goes on: the news, and the city is the child's until they end it.
+    const e = round(3, 1, { difficulty: 'medium', duration: 0 });
+    only(e, []);
+    e.brains = e.brains.map(() => null);
+    const [kid, last] = e.holes;
+    grow(e, 0, 3000);
+    last.lives = 1;
+    last.x = kid.x;
+    last.z = kid.z;
+    expect(stepWorld(e, 1 / 60, still)).toContainEqual(expect.objectContaining({ type: 'news', text: 'Every rival is out: the city is all yours!' }));
+    for (let i = 0; i < 60 * 5; i++) stepWorld(e, 1 / 60, still);
+    expect(e.status).toBe('playing');
+    endRound(e);
+    expect(e.endedBy).toBe('last');
   });
 });

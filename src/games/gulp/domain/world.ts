@@ -102,6 +102,8 @@ export interface World {
    * ran out of lives, or every computer hole did (the child is the last hole).
    */
   endedBy: 'time' | 'ended' | 'out' | 'last' | null;
+  /** Every computer hole is out of lives (an endless round carries on). */
+  allOut: boolean;
   rng: Rng;
   /** Things by grid cell, so a hole only checks what is near it. */
   grid: Map<string, number[]>;
@@ -166,6 +168,7 @@ export function createWorld(rng: Rng, player: Racer | null, rivals: Racer[], opt
     elapsed: 0,
     status: countdown > 0 ? 'countdown' : 'playing',
     endedBy: null,
+    allOut: false,
     rng,
     grid: new Map(),
     nextPower: 8,
@@ -232,10 +235,16 @@ export function stepWorld(w: World, dt: number, input: Input | null): WorldEvent
     return events;
   }
   const rivals = w.holes.filter((h) => !h.isPlayer);
-  if (player && rivals.length && rivals.every((h) => h.lives <= 0)) {
-    w.status = 'over';
-    w.endedBy = 'last';
-    return events;
+  if (player && rivals.length && !w.allOut && rivals.every((h) => h.lives <= 0)) {
+    w.allOut = true;
+    // A timed round is won there and then; an endless one goes on, the city
+    // all the child's, until the child ends it.
+    if (w.options.duration > 0) {
+      w.status = 'over';
+      w.endedBy = 'last';
+      return events;
+    }
+    events.push({ type: 'news', text: 'Every rival is out: the city is all yours!', x: player.x, z: player.z });
   }
   walkPeople(w, dt, events);
   if (player) police(w, dt, player, events);
@@ -251,7 +260,7 @@ export function stepWorld(w: World, dt: number, input: Input | null): WorldEvent
 /** End a round early (the endless round's "End round"). */
 export function endRound(w: World): void {
   w.status = 'over';
-  w.endedBy = 'ended';
+  w.endedBy = w.allOut ? 'last' : 'ended';
 }
 
 function move(w: World, h: Hole, want: Input, dt: number, pace: number): void {

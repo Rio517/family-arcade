@@ -38,6 +38,8 @@ interface Unit {
   life: number;
   /** Seconds until it fires again. */
   reload: number;
+  /** Shots it has left; with none, it goes home (see SHOTS). */
+  shots: number;
   shells: Bomb[];
 }
 
@@ -70,8 +72,17 @@ const MIN_ATTACK_LEVEL = 4;
  * goes after the next biggest instead.
  */
 const EASY_SPARE = 0.5;
-/** Hits a wave of tanks or helicopters lands before it heads home. */
-const WAVE_HITS: Record<Difficulty, number> = { easy: 1, medium: 2, hard: 3 };
+/** Hits a wave of tanks or helicopters lands before it heads home: one knock is enough, at any level. */
+const WAVE_HITS = 1;
+/** Shots each tank or helicopter fires before it gives up and heads home, hit or miss. */
+const SHOTS: Record<Difficulty, number> = { easy: 2, medium: 3, hard: 3 };
+/**
+ * How big a bomb's or a shell's blast is: the same for every hole, however
+ * big (a giant is hit by a bomb that lands near its middle, a small hole by
+ * one on top of it).
+ */
+const BOMB_RADIUS = 8;
+const SHELL_RADIUS = 5;
 
 export function fightBack(w: World, dt: number, events: WorldEvent[]): void {
   w.nextAttack -= dt;
@@ -126,6 +137,7 @@ function launch(w: World, events: WorldEvent[]): void {
         speed: kind === 'tank' ? Math.max(6, speedOf(target.r) * 0.55) : Math.max(28, speedOf(target.r) * 1.3),
         life: kind === 'tank' ? 45 : 35,
         reload: 1.5 + i,
+        shots: SHOTS[w.options.difficulty],
         shells: [],
       };
       w.attacks.push(kind === 'tank' ? { ...unit, kind: 'tank' } : { ...unit, kind: 'heli' });
@@ -141,7 +153,7 @@ function launch(w: World, events: WorldEvent[]): void {
     const dz = Math.sin(a);
     const reach = 140 + target.r * 4;
     const speed = 62 + target.r;
-    const radius = Math.max(5, target.r * 0.8);
+    const radius = BOMB_RADIUS;
     // Bombs along the plane's line, over where the hole is now. Each lands a
     // little after the plane passes, so its target ring shows for a while.
     const bombs: Bomb[] = [-1.3, 0, 1.3].map((k) => {
@@ -189,8 +201,8 @@ function driveTanker(w: World, a: Extract<Attack, { kind: 'tanker' }>, dt: numbe
  * circles), and fire every few seconds at the spot where the hole is now.
  * Each shell shows its red target circle while it flies, so a moving hole
  * gets away. A hole big enough simply swallows a tank that comes too close.
- * Once its wave has landed its hits (see WAVE_HITS), or its time is up, it
- * goes back to the base and stops there.
+ * Once its wave has landed a hit (see WAVE_HITS), or it has fired its
+ * shots (SHOTS), or its time is up, it goes back to the base and stops there.
  */
 function moveUnit(w: World, a: Extract<Attack, { kind: 'tank' | 'heli' }>, dt: number, events: WorldEvent[]): void {
   const target = w.holes[a.target];
@@ -226,11 +238,14 @@ function moveUnit(w: World, a: Extract<Attack, { kind: 'tank' | 'heli' }>, dt: n
         id: w.nextId++,
         x: target.x,
         z: target.z,
-        radius: Math.max(4, target.r * (tank ? 0.35 : 0.3)),
+        radius: SHELL_RADIUS,
         fuse: flight,
         flight,
         from: { x: a.x, z: a.z, y: tank ? 2.2 : 10 + target.r * 0.8 },
       });
+      // Out of shots: it heads home once this one lands, hit or miss.
+      a.shots -= 1;
+      if (a.shots <= 0) goHome(a, base);
     }
   }
   const { falling, hits } = fall(w, a.shells, dt, events);
@@ -239,7 +254,7 @@ function moveUnit(w: World, a: Extract<Attack, { kind: 'tank' | 'heli' }>, dt: n
     for (const o of w.attacks) {
       if ((o.kind !== 'tank' && o.kind !== 'heli') || o.wave !== a.wave) continue;
       o.hits += hits;
-      if (o.hits >= WAVE_HITS[w.options.difficulty] && !o.home) goHome(o, base);
+      if (o.hits >= WAVE_HITS && !o.home) goHome(o, base);
     }
   }
   // A big hole swallows a tank that rolls into it.

@@ -173,7 +173,8 @@ export class PropView {
     mesh.position.set(p.x, this.groundOf(p), p.z);
     mesh.rotation.y = p.rot;
     mesh.scale.y = 0.02;
-    mesh.castShadow = true;
+    // A building site is low: no shadow to draw.
+    mesh.castShadow = !isSite(p.kind);
     mesh.receiveShadow = true;
     this.scene.add(mesh);
     const time = p.kind === 'tallsite' ? 2.5 : isSite(p.kind) ? 0.6 : BUILD_TIME;

@@ -216,7 +216,10 @@ export function eatHoles(w: World, events: WorldEvent[]): void {
 export function hurt(w: World, h: Hole, cause: HurtCause, events: WorldEvent[]): void {
   // Still reeling from a gulp of chemicals: the rest of the works do no more harm.
   if (cause === 'chem' && h.stun > 0) return;
-  h.mass *= h.isPlayer ? HURT_PLAYER[w.options.difficulty] : HURT_RIVAL;
+  const keep = h.isPlayer ? HURT_PLAYER[w.options.difficulty] : HURT_RIVAL;
+  // A giant loses a smaller share: a knock is a setback, not minutes of eating gone.
+  const share = Math.min(1, Math.max(0.35, 15 / Math.max(1, h.r)));
+  h.mass *= 1 - (1 - keep) * share;
   h.r = radiusFor(h.mass);
   h.stun = STUN;
   if (cause === 'tanker') h.burn = BURN;

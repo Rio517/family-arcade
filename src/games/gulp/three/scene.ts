@@ -154,8 +154,10 @@ export class GulpScene {
       } else if (e.type === 'rebuild') {
         if (e.replaces) this.props.clear(e.replaces);
         this.props.raise(e.prop);
-        // A finished building rises out of its site in a puff of dust.
-        if (!isSite(e.prop.kind)) this.effects.dust(e.prop.x, e.prop.z, Math.max(KINDS[e.prop.kind].w, KINDS[e.prop.kind].d));
+        // A finished building rises out of its site in a puff of dust, where
+        // the child can see it (one out of sight goes up without).
+        const near = me && Math.hypot(e.prop.x - me.x, e.prop.z - me.z) < 70 + me.r * 3;
+        if (!isSite(e.prop.kind) && near) this.effects.dust(e.prop.x, e.prop.z, Math.max(KINDS[e.prop.kind].w, KINDS[e.prop.kind].d));
       } else if (e.type === 'food' && e.hole === this.follow) {
         if (e.food === 'healthy') this.holes.say(`Healthy! +${e.bonus}`, true, e.hole);
         else if (this.time - this.lastYum > 2.5) {

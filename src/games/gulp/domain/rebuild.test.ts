@@ -37,18 +37,29 @@ describe('the city rebuilds', () => {
     w.elapsed = 400;
     const events = eatAndWait(w, [makeProp(1, 'office', me.x, me.z, 0)], 60);
     const last = events.filter((e) => e.type === 'rebuild').pop();
-    // An office block's lot has no room for a skyscraper: it comes back taller instead.
-    expect(last?.type === 'rebuild' && last.prop.kind).toBe('office');
+    // An office block's lot has no room for a skyscraper: something goes up taller instead.
+    expect(['tower', 'apartment', 'office']).toContain(last?.type === 'rebuild' && last.prop.kind);
     expect(last?.type === 'rebuild' && last.prop.hScale).toBeGreaterThan(1);
   });
 
-  it('an eaten tower can come back as an office block', () => {
-    const w = round(1, 0, { regrow: true, duration: 0 });
-    const me = grow(w, 0, 3000);
-    w.elapsed = 400;
-    const events = eatAndWait(w, [makeProp(1, 'tower', me.x, me.z, 0)], 45);
-    const last = events.filter((e) => e.type === 'rebuild').pop();
-    expect(last?.type === 'rebuild' && last.prop.kind).toBe('office');
+  it('late in a round an eaten tower comes back mostly as a tower, sometimes a tall apartment block, now and then an office', () => {
+    const kinds: string[] = [];
+    for (let seed = 1; seed <= 24; seed++) {
+      const w = round(seed, 0, { regrow: true, duration: 0 });
+      const me = grow(w, 0, 3000);
+      w.elapsed = 400;
+      // A tower goes up in stages (a site, then a frame with a crane): give it time.
+      const last = eatAndWait(w, [makeProp(1, 'tower', me.x, me.z, 0)], 90)
+        .filter((e) => e.type === 'rebuild')
+        .pop();
+      if (last?.type === 'rebuild') kinds.push(last.prop.kind);
+    }
+    const offices = kinds.filter((k) => k === 'office').length;
+    expect(kinds.length).toBe(24);
+    expect(kinds.every((k) => k === 'tower' || k === 'office' || k === 'apartment')).toBe(true);
+    expect(new Set(kinds).size).toBe(3);
+    expect(kinds.filter((k) => k === 'tower').length).toBeGreaterThan(kinds.length / 3);
+    expect(offices).toBeLessThanOrEqual(8);
   });
 
   it('a construction site that is eaten starts again later', () => {
