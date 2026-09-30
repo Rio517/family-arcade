@@ -80,7 +80,10 @@ export function GulpHud({
         </div>
         <div className="gulp-level" data-testid="gulp-level">
           <span className="gulp-lv">
-            <small>LV</small>
+            <small>
+              <span className="gulp-lv-long">Level</span>
+              <span className="gulp-lv-short">Lv</span>
+            </small>
             <b>{hud.level}</b>
           </span>
           <span className="gulp-meter">

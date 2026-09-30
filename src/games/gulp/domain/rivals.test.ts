@@ -42,7 +42,7 @@ describe('difficulty', () => {
     expect(Math.max(...skills('hard'))).toBeLessThanOrEqual(1);
   });
 
-  it('a rival far ahead of the child crawls on Easy, eases off a little on Medium, and races on Hard', () => {
+  it('a rival far ahead of the child crawls on Easy, eases off on Medium, and only a little on Hard', () => {
     const pace = (difficulty: Difficulty) => {
       const { w, me, rival } = standoff(difficulty, 5000, 1000);
       const brain = w.brains[1]!;
@@ -51,22 +51,24 @@ describe('difficulty', () => {
     };
     // The runaway slow-down, on top of Easy's ambling speed.
     expect(pace('easy')).toBeCloseTo(0.35 * 0.75);
-    expect(pace('medium')).toBeGreaterThan(0.7);
-    expect(pace('medium')).toBeLessThan(1);
-    expect(pace('hard')).toBe(1);
+    expect(pace('medium')).toBeGreaterThan(0.5);
+    expect(pace('medium')).toBeLessThan(0.8);
+    expect(pace('hard')).toBeGreaterThan(0.85);
+    expect(pace('hard')).toBeLessThan(1);
   });
 
-  it('who goes after a smaller child: never on Easy, Medium once the child is level, Hard always', () => {
+  it('who goes after a smaller child: never on Easy, Medium once the child is clearly ahead, Hard once the child is level', () => {
     expect(hunts('easy', 1000, 1000)).toBe(false);
     expect(hunts('easy', 1000, 5000)).toBe(false);
-    expect(hunts('medium', 1000, 500)).toBe(false);
-    expect(hunts('medium', 1000, 1000)).toBe(true);
-    expect(hunts('hard', 1000, 100)).toBe(true);
+    expect(hunts('medium', 1000, 1000)).toBe(false);
+    expect(hunts('medium', 1000, 1500)).toBe(true);
+    expect(hunts('hard', 1000, 500)).toBe(false);
+    expect(hunts('hard', 1000, 1000)).toBe(true);
   });
 
-  it('on every level, rivals leave the wonders for the child and skip the chemical plant', () => {
+  it('on every level, rivals leave the wonders for the child and skip the chemical works', () => {
     for (const difficulty of ['easy', 'medium', 'hard'] as const) {
-      const w = round(1, 1, { difficulty, fightBack: true });
+      const w = round(1, 1, { difficulty });
       const [me, rival] = w.holes;
       grow(w, 1, 20000);
       me.x = rival.x + 200;
@@ -106,7 +108,7 @@ describe('difficulty', () => {
     expect(easy.wins).toBeGreaterThanOrEqual(9);
     expect(medium.wins).toBeGreaterThanOrEqual(1);
     expect(medium.wins).toBeLessThanOrEqual(8);
-    expect(medium.rank).toBeGreaterThanOrEqual(1.8);
+    expect(medium.rank).toBeGreaterThanOrEqual(1.5);
     expect(medium.rank).toBeLessThanOrEqual(4);
     expect(hard.wins).toBeLessThanOrEqual(4);
     expect(hard.rank).toBeGreaterThanOrEqual(3);

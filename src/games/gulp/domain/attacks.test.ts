@@ -5,21 +5,17 @@ import type { Difficulty } from './rivals';
 import { stepWorld, type WorldEvent } from './world';
 
 describe('the city fights back', () => {
-  it('eating the chemical plant shrinks the hole, only when switched on', () => {
+  it('eating the chemical works shrinks the hole, fight-back or not, and only once while it reels', () => {
     for (const fightBack of [true, false]) {
       const w = round(1, 0, { fightBack });
       const me = grow(w, 0, 8000);
       const before = me.mass;
       w.nextAttack = 999;
-      only(w, [makeProp(1, 'gastank', me.x, me.z, 0)]);
+      only(w, [makeProp(1, 'gastank', me.x, me.z, 0), makeProp(2, 'plantshed', me.x + 1, me.z, 0)]);
       const events = stepWorld(w, 1 / 60, still);
-      if (fightBack) {
-        expect(events).toContainEqual({ type: 'hurt', hole: 0, cause: 'chem' });
-        expect(me.mass).toBeLessThan(before);
-        expect(me.stun).toBeGreaterThan(0);
-      } else {
-        expect(me.mass).toBeGreaterThan(before);
-      }
+      expect(events.filter((e) => e.type === 'hurt')).toEqual([{ type: 'hurt', hole: 0, cause: 'chem' }]);
+      expect(me.mass).toBeLessThan(before);
+      expect(me.stun).toBeGreaterThan(0);
     }
   });
 
@@ -85,14 +81,14 @@ describe('the city fights back', () => {
     expect([...kinds].sort()).toEqual(['bomber', 'tanker']);
   });
 
-  it('goes after the computer holes too: the child now and then on Easy, and always on Hard when in the lead', () => {
-    const picks = (difficulty: Difficulty) => {
+  it('goes after the biggest mouth first; on Easy a child in the lead is spared half the time', () => {
+    const picks = (difficulty: Difficulty, childSize: number) => {
       let child = 0;
       for (let seed = 1; seed <= 40; seed++) {
         const w = round(seed, 1, { fightBack: true, difficulty });
         only(w, []);
         w.brains[1] = null;
-        grow(w, 0, 3000);
+        grow(w, 0, childSize);
         grow(w, 1, 2000);
         w.holes[1].x = w.holes[0].x + 150;
         w.nextAttack = 0;
@@ -100,9 +96,12 @@ describe('the city fights back', () => {
       }
       return child / 40;
     };
-    expect(picks('easy')).toBeGreaterThan(0);
-    expect(picks('easy')).toBeLessThan(0.35);
-    expect(picks('hard')).toBe(1);
+    // The child is the biggest: always the target on Hard, about half the time on Easy.
+    expect(picks('hard', 3000)).toBe(1);
+    expect(picks('easy', 3000)).toBeGreaterThan(0.25);
+    expect(picks('easy', 3000)).toBeLessThan(0.75);
+    // A computer hole is bigger: it is the target.
+    expect(picks('hard', 1200)).toBe(0);
   });
 
   it('a wave of tanks goes home after one hit on Easy, and keeps firing on Hard', () => {

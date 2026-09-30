@@ -482,7 +482,7 @@ describe('placement', () => {
     }
   });
 
-  it('builds gas works of separate pieces instead of a chemical plant', () => {
+  it('builds each chemical works of separate pieces', () => {
     let works = 0;
     for (const { city } of cities) {
       works += city.props.filter((p) => p.kind === 'flarestack').length;

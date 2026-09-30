@@ -183,7 +183,9 @@ export class GulpScene {
     this.walkers.sync(world, this.time, dt);
     const playing = me && !this.menuTour ? me : undefined;
     if (playing) this.props.wobble(world, playing, this.time, dt);
-    const scale = me ? Math.max(1, me.r / 2.5) : 1;
+    // Power-ups grow with the square root of the hole: big enough to spot from
+    // a giant's height, never towering over the city.
+    const scale = me ? Math.max(1, Math.sqrt(me.r / 2.5)) : 1;
     this.effects.syncPowerups(world.powerups, scale);
     this.effects.syncAttacks(world.attacks, me ? me.r : 2);
     this.effects.step(dt);

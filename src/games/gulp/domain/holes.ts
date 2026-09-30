@@ -71,7 +71,7 @@ const KEEP_RIVAL = 0.7;
  * reels. The child's knock depends on the level: a hit on Hard is a real
  * setback, a hit on Easy a small one.
  */
-const HURT_PLAYER: Record<'easy' | 'medium' | 'hard', number> = { easy: 0.85, medium: 0.75, hard: 0.6 };
+const HURT_PLAYER: Record<'easy' | 'medium' | 'hard', number> = { easy: 0.85, medium: 0.8, hard: 0.7 };
 const HURT_RIVAL = 0.8;
 const STUN = 1.2;
 /** How long a hole burns after a fuel truck crashes into it (it looks dramatic; the hurt is the same). */
@@ -170,7 +170,8 @@ export function gobble(w: World, h: Hole, p: Prop, events: WorldEvent[]): void {
   if (bonus) h.stun = 0;
   events.push({ type: 'eat', prop: p, hole: h.id, gained });
   if (info.food) events.push({ type: 'food', hole: h.id, food: info.food, bonus });
-  if (w.options.fightBack && info.hazard) hurt(w, h, 'chem', events);
+  // The chemical works hurt whoever eats them, fight-back or not.
+  if (info.hazard) hurt(w, h, 'chem', events);
 }
 
 /** Every hole swallows any hole it is much bigger than and nearly covers. */
@@ -210,6 +211,8 @@ export function eatHoles(w: World, events: WorldEvent[]): void {
 
 /** The city strikes a hole: it shrinks, reels for a moment, and a fuel truck sets it alight. */
 export function hurt(w: World, h: Hole, cause: HurtCause, events: WorldEvent[]): void {
+  // Still reeling from a gulp of chemicals: the rest of the works do no more harm.
+  if (cause === 'chem' && h.stun > 0) return;
   h.mass *= h.isPlayer ? HURT_PLAYER[w.options.difficulty] : HURT_RIVAL;
   h.r = radiusFor(h.mass);
   h.stun = STUN;

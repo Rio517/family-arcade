@@ -44,19 +44,20 @@ interface Temper {
 }
 
 /**
- * Easy is the gentle game a young child plays; Medium rivals try properly
- * and go for a child who is level with them; Hard rivals race flat out,
- * hunt the child whenever they can swallow it and take any food. On every
- * level they leave the wonders for the child and skip the chemical plant.
- * Medium keeps a quarter of the slow-down: with half of it, a steady child
- * still won nearly every round, as on Easy.
+ * Easy is the gentle game a young child plays. Medium rivals try properly,
+ * keep half the slow-down and go after a child who is clearly ahead. Hard
+ * rivals are quick and skilful, ease off only a little, and go after a child
+ * who is level with them; a steady player wins about half of Hard's
+ * four-minute City rounds and a casual one is rarely knocked out of lives.
+ * On every level they leave the wonders for the child and skip the
+ * chemical works.
  */
 const TEMPERS: Record<Difficulty, Temper> = {
   // On Easy a computer hole cannot swallow the child (see eatHoles), so it never chases one either.
   // Easy rivals also amble: a child who wanders off for a while can still catch up.
   easy: { skill: 0.55, spread: 0.35, kindness: 1, huntLead: Infinity, theirs: 0.5, speed: 0.75 },
-  medium: { skill: 0.75, spread: 0.2, kindness: 0.25, huntLead: 0, theirs: 0.5, speed: 1 },
-  hard: { skill: 0.85, spread: 0.15, kindness: 0, huntLead: -Infinity, theirs: 1, speed: 1 },
+  medium: { skill: 0.7, spread: 0.2, kindness: 0.5, huntLead: 0.3, theirs: 0.5, speed: 0.9 },
+  hard: { skill: 0.8, spread: 0.15, kindness: 0.15, huntLead: 0, theirs: 0.8, speed: 1 },
 };
 
 const temperOf = (w: World): Temper => TEMPERS[w.options.difficulty];
@@ -203,7 +204,7 @@ function choose(b: Brain, me: Hole, w: World, player: Hole | null): Brain['targe
     if (!canEat(me, p)) continue;
     // A rival knows better than to eat the chemical plant, and leaves the
     // wonders for the child.
-    if (w.options.fightBack && KINDS[p.kind].hazard) continue;
+    if (KINDS[p.kind].hazard) continue;
     if (KINDS[p.kind].wonder) continue;
     const d = Math.hypot(p.x - me.x, p.z - me.z);
     if (d > look) continue;
