@@ -175,7 +175,7 @@ function cypress(k: Kit, x: number, y: number, z: number, h: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// The Liberty Statue
+// The Statue of Liberty
 
 const COPPER = 0x52caa6;
 const COPPER_LIGHT = 0x8ae6c6;
@@ -287,7 +287,7 @@ const liberty: Builder = (k) => {
 };
 
 // ---------------------------------------------------------------------------
-// The Mega Spire
+// The Burj Khalifa
 
 const megaspire: Builder = (k) => {
   const glass = 0x9fd6f7;
@@ -336,7 +336,7 @@ const megaspire: Builder = (k) => {
 };
 
 // ---------------------------------------------------------------------------
-// The Iron Tower
+// The Eiffel Tower
 
 const irontower: Builder = (k) => {
   const iron = 0xc0703a;
@@ -479,7 +479,7 @@ const pyramid: Builder = (k) => {
 };
 
 // ---------------------------------------------------------------------------
-// The Pearl Palace
+// The Taj Mahal
 
 const pearlpalace: Builder = (k) => {
   const marble = 0xfbf7ef;
@@ -706,7 +706,7 @@ const colosseum: Builder = (k) => {
 };
 
 // ---------------------------------------------------------------------------
-// The Opera Shells
+// The Sydney Opera House
 
 /**
  * One sail roof: a glazed opening facing -dir at x0, the pointed crown
@@ -788,7 +788,7 @@ const opera: Builder = (k) => {
 };
 
 // ---------------------------------------------------------------------------
-// The Onion-Dome Palace
+// St Basil's Cathedral
 
 const onion: Builder = (k) => {
   const brick = 0xdc4b3e;
@@ -939,7 +939,7 @@ const leaning: Builder = (k) => {
 };
 
 // ---------------------------------------------------------------------------
-// The Stone Circle
+// Stonehenge
 
 const stonecircle: Builder = (k) => {
   const stones = [0xb6bcc6, 0xa5acb8, 0xc6cbd2] as const;
@@ -1003,7 +1003,7 @@ const stonecircle: Builder = (k) => {
 };
 
 // ---------------------------------------------------------------------------
-// The Stone Heads
+// The Easter Island heads
 
 function moaiHead(k: Kit, x: number, z: number, y0: number, s: number, topknot: boolean): void {
   const stone = 0xa89886;

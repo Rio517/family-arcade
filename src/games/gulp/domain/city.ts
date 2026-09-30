@@ -70,7 +70,7 @@ export interface City {
 }
 
 /**
- * The wonders each map holds (the Liberty Statue always stands on its own
+ * The wonders each map holds (the Statue of Liberty always stands on its own
  * islet off the north shore). The bigger the map, the more of them.
  */
 const MAP_WONDERS: Record<MapId, PropKind[]> = {
@@ -121,7 +121,7 @@ export function createCity(rng: Rng, map: MapId = 'city'): City {
     }
   }
   roadside(roads, half, tools);
-  // The Liberty Statue's islet off the north shore, a bridge across to it.
+  // The Statue of Liberty's islet off the north shore, a bridge across to it.
   const ix = roads[Math.floor(blocks / 2)];
   const bridgeZ = -half - BRIDGE;
   const islet = { kind: 'islet' as const, x0: ix - ISLET / 2, z0: bridgeZ - ISLET, x1: ix + ISLET / 2, z1: bridgeZ };
