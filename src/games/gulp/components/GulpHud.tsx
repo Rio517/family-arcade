@@ -32,7 +32,8 @@ export function GulpHud({
       <b>{short(r.score)}</b>
     </li>
   );
-  const top = banners[banners.length - 1];
+  const news = banners.filter((b) => b.kind === 'news').pop();
+  const top = banners.filter((b) => b.kind !== 'news').pop();
   return (
     <div className="gulp-hud" data-testid="gulp-hud">
       <ol className="gulp-board" aria-label="Leaderboard" data-testid="gulp-board">
@@ -65,13 +66,28 @@ export function GulpHud({
         {(hud.speed > 0 || hud.double > 0) && (
           <div className="gulp-powers" data-testid="gulp-powers">
             {hud.speed > 0 && (
-              <span className="gulp-power speed">
-                <BoltIcon size={16} /> {hud.speed}
+              <span className="gulp-power speed" aria-label={`Speed boost, ${hud.speed} seconds left`}>
+                <span className="gulp-power-top">
+                  <BoltIcon size={18} /> Speed <b>{hud.speed}s</b>
+                </span>
+                <span className="gulp-power-bar">
+                  <span style={{ width: `${Math.round(hud.speedLeft * 100)}%` }} />
+                </span>
               </span>
             )}
-            {hud.double > 0 && <span className="gulp-power double">x2 {hud.double}</span>}
+            {hud.double > 0 && (
+              <span className="gulp-power double" aria-label={`Double points, ${hud.double} seconds left`}>
+                <span className="gulp-power-top">
+                  x2 Points <b>{hud.double}s</b>
+                </span>
+                <span className="gulp-power-bar">
+                  <span style={{ width: `${Math.round(hud.doubleLeft * 100)}%` }} />
+                </span>
+              </span>
+            )}
           </div>
         )}
+
       </div>
 
       <div className="gulp-right">
@@ -86,6 +102,25 @@ export function GulpHud({
           <PauseIcon size={22} />
         </button>
       </div>
+
+      {hud.streak >= 3 && (
+        <div key={hud.combo} className={`gulp-combo c${hud.combo}`} data-testid="gulp-combo">
+          {hud.combo > 1 && (
+            <>
+              <b>x{hud.combo}</b>
+              <em>COMBO</em>
+            </>
+          )}
+          <span>{hud.streak} gulps!</span>
+        </div>
+      )}
+
+      {news && (
+        <div key={news.id} className="gulp-news" aria-live="polite" data-testid="gulp-news">
+          <span className="gulp-news-tag">Breaking news</span>
+          <span className="gulp-news-text">{news.text}</span>
+        </div>
+      )}
 
       {hud.countdown > 0 && (
         <div className="gulp-countdown" aria-live="assertive" data-testid="gulp-countdown">

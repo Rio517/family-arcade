@@ -18,17 +18,15 @@ import {
   Kit,
   ON_GROUND,
   PAL,
-  acUnit,
+  archDoor,
   cells,
   darker,
-  doorAt,
   lighter,
   mix,
-  parapet,
+  paneAt,
   placement,
   translate,
   walls,
-  windowAt,
 } from './kit';
 import { LANDMARKS, type LandmarkKind } from './landmarks';
 
@@ -127,6 +125,35 @@ function planter(k: Kit, v: number): void {
   }
 }
 
+/** Shirt, trousers, hair and skin for the people on the pavements; `long` hair falls down the back. */
+const PEOPLE = [
+  { shirt: 0xff4d4d, legs: 0x2f5fd0, hair: 0x3b2a20, skin: 0xf2c29b, long: false },
+  { shirt: 0xffc933, legs: 0x39476b, hair: 0x1f1a17, skin: 0x8d5a3b, long: true },
+  { shirt: 0x2ec4b6, legs: 0xe9e4da, hair: 0xf2c14e, skin: 0xffd9bd, long: true },
+  { shirt: 0x7a4de8, legs: 0x2f3b5c, hair: 0xc2562c, skin: 0xe8b48a, long: false },
+  { shirt: 0xff8fb8, legs: 0x3a7bff, hair: 0x2b1d14, skin: 0xc68642, long: true },
+  { shirt: 0x3cc95a, legs: 0x8a5a3b, hair: 0x6b4a2f, skin: 0x5c3a24, long: false },
+] as const;
+
+/**
+ * A blocky toy person facing +z: square legs, body and arms, a big cube head
+ * with a hair cap and two dot eyes. Seen small from above, the shirt and the
+ * hair carry it, so both are bold.
+ */
+function person(k: Kit, v: number): void {
+  const c = PEOPLE[v];
+  for (const sx of [-1, 1]) {
+    k.box(c.legs, 0.24, 0.72, 0.3, sx * 0.14, 0, 0, undefined, ON_GROUND);
+    k.box(c.shirt, 0.14, 0.52, 0.22, sx * 0.35, 0.74, 0, undefined, ['py']);
+    k.box(c.skin, 0.12, 0.13, 0.18, sx * 0.35, 0.6, 0, undefined, ['py']);
+  }
+  k.box(c.shirt, 0.56, 0.58, 0.36, 0, 0.7, 0, undefined, ON_GROUND);
+  k.cbox(c.skin, 0.46, 0.42, 0.42, 0.05, 0, 1.24, 0);
+  k.box(c.hair, 0.5, 0.14, 0.46, 0, 1.56, -0.01);
+  k.box(c.hair, 0.5, c.long ? 0.62 : 0.3, 0.1, 0, c.long ? 1.02 : 1.3, -0.23, undefined, ['py']);
+  for (const sx of [-1, 1]) k.box(PAL.ink, 0.08, 0.1, 0.03, sx * 0.1, 1.42, 0.21, undefined, FLUSH);
+}
+
 // ---------------------------------------------------------------------------
 // Tier 1
 
@@ -221,6 +248,175 @@ function haybale(k: Kit): void {
   k.rod(lighter(straw, 0.2), 0.48, 1.54, 10, [0, 0.7, 0], { rz: HALF_PI });
   k.rod(darker(straw, 0.06), 0.3, 1.56, 10, [0, 0.7, 0], { rz: HALF_PI });
   k.rod(lighter(straw, 0.3), 0.13, 1.58, 8, [0, 0.7, 0], { rz: HALF_PI });
+}
+
+// ---------------------------------------------------------------------------
+// Construction sites: what stands on an eaten lot until the new building is up.
+
+const SITE_YELLOW = 0xffc21a;
+const SITE_ORANGE = 0xff7a1a;
+const CONCRETE_GREY = 0xc9cdd3;
+
+/** Orange and white barrier panels round a W x D lot, leaving a gate gap at the front. */
+function barrier(k: Kit, W: number, D: number, panel: number, h: number, gate: number): void {
+  let i = 0;
+  for (const wall of walls(W, D)) {
+    k.within(wall.m, () => {
+      const n = Math.round(wall.len / panel);
+      const pw = wall.len / n;
+      for (let j = 0; j < n; j++) {
+        const u = -wall.len / 2 + (j + 0.5) * pw;
+        if (wall.side === 'front' && Math.abs(u) < gate / 2) continue;
+        k.box(i++ % 2 ? PAL.white : SITE_ORANGE, pw - 0.08, h, 0.16, u, 0, -0.1, undefined, ON_GROUND);
+      }
+    });
+  }
+}
+
+/** A traffic cone with a white band, simpler than the street cone. */
+function siteCone(k: Kit, x: number, z: number, s = 1): void {
+  k.cyl(SITE_ORANGE, 0.05 * s, 0.26 * s, 0.7 * s, 8, x, 0, z);
+  k.cyl(PAL.white, 0.14 * s, 0.19 * s, 0.16 * s, 8, x, 0.3 * s, z, { open: true });
+}
+
+/** A crate of red bricks on a wooden pallet. */
+function bricks(k: Kit, x: number, z: number): void {
+  k.box(PAL.wood, 1.4, 0.18, 1.1, x, 0, z);
+  for (const [dx, dz] of [
+    [-0.35, -0.25],
+    [0.35, -0.25],
+    [-0.35, 0.25],
+    [0.35, 0.25],
+  ]) {
+    k.box(0xd9483b, 0.64, 0.38, 0.46, x + dx, 0.18, z + dz);
+  }
+  k.box(0xe8604f, 0.64, 0.38, 0.46, x, 0.56, z);
+}
+
+const SITES = [0xeac27a, 0xdba56a] as const;
+
+/**
+ * A small building site: a sand pad inside barrier panels, bricks, planks and
+ * cones, and either a little yellow crane (variant 0) or a scaffold tower
+ * with a cement mixer (variant 1).
+ */
+function site(k: Kit, v: number): void {
+  const sand = SITES[v];
+  k.rbox(sand, 7.8, 0.16, 7.8, 0.8, 0.06, 0, 0, 0);
+  barrier(k, 7.8, 7.8, 1.3, 0.8, 2.4);
+  k.cyl(darker(sand, 0.14), 0.3, 1.1, 0.7, 7, 2.3, 0, 2.2);
+  bricks(k, 1.9, -2.3);
+  for (let i = 0; i < 3; i++) k.box(i === 1 ? lighter(PAL.wood, 0.15) : PAL.wood, 2.6, 0.16, 0.36, -1.7, 0.16 + i * 0.16, 2.5 - i * 0.05, { ry: 0.08 * (i - 1) });
+  siteCone(k, -0.9, 3.4);
+  siteCone(k, 0.9, 3.4);
+  if (v === 0) {
+    // A little crane: mast, cab, a jib across the lot, and a hook with a load.
+    const mx = -2.3;
+    const mz = -2.1;
+    k.rbox(CONCRETE_GREY, 1.3, 0.45, 1.3, 0.3, 0.1, mx, 0.16, mz);
+    k.box(SITE_YELLOW, 0.5, 3.8, 0.5, mx, 0.6, mz);
+    for (const y of [1.3, 2.3, 3.3]) k.box(PAL.ink, 0.54, 0.12, 0.54, mx, y, mz);
+    k.cbox(SITE_YELLOW, 0.9, 0.75, 0.9, 0.1, mx, 3.65, mz + 0.55);
+    k.box(GLASS, 0.7, 0.35, 0.06, mx, 3.95, mz + 1.01, undefined, FLUSH);
+    k.box(SITE_YELLOW, 6.2, 0.34, 0.34, mx + 1.7, 4.4, mz);
+    k.cbox(CONCRETE_GREY, 0.8, 0.7, 0.6, 0.08, mx - 1.1, 3.72, mz);
+    k.hull(SITE_YELLOW, [
+      [mx - 0.25, 4.74, mz - 0.25],
+      [mx + 0.25, 4.74, mz - 0.25],
+      [mx - 0.25, 4.74, mz + 0.25],
+      [mx + 0.25, 4.74, mz + 0.25],
+      [mx, 5.0, mz],
+    ]);
+    const hx = mx + 4.1;
+    k.box(PAL.ink, 0.06, 1.9, 0.06, hx, 2.5, mz);
+    k.cbox(0xe63946, 0.34, 0.36, 0.34, 0.06, hx, 2.2, mz);
+    k.box(0x3a86ff, 1.2, 0.3, 0.45, hx, 1.75, mz);
+  } else {
+    // A scaffold tower with a hoist arm, and a cement mixer.
+    const sx0 = -2.1;
+    const sz0 = -2.1;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(SITE_YELLOW, 0.16, 4.5, 0.16, sx0 + sx * 0.9, 0.16, sz0 + sz * 0.9);
+    for (const y of [1.6, 3.1, 4.5]) k.box(PAL.wood, 2.1, 0.14, 2.1, sx0, y, sz0);
+    for (const s of [-1, 1]) k.beam(SITE_YELLOW, [sx0 - 0.9 * s, 0.2, sz0 + 0.95], [sx0 + 0.9 * s, 1.6, sz0 + 0.95], 0.1);
+    k.box(SITE_YELLOW, 2.8, 0.2, 0.2, sx0 + 1.7, 4.64, sz0);
+    k.box(PAL.ink, 0.05, 1.3, 0.05, sx0 + 2.9, 3.34, sz0);
+    k.cbox(0xe63946, 0.3, 0.3, 0.3, 0.05, sx0 + 2.9, 3.05, sz0);
+    k.gem(0xe63946, 0.14, [sx0 - 0.9, 4.86, sz0 - 0.9]);
+    const cx = 1.6;
+    const czm = 1.0;
+    k.box(PAL.chassis, 1.2, 0.2, 0.8, cx, 0.5, czm);
+    for (const s of [-1, 1]) k.rod(PAL.ink, 0.3, 0.14, 6, [cx + s * 0.4, 0.3, czm + 0.48], { rx: HALF_PI });
+    k.rod(SITE_ORANGE, 0.55, 1.0, 10, [cx, 1.25, czm], { rz: 0.7 }, 0.4);
+    k.rod(darker(SITE_ORANGE, 0.2), 0.4, 0.35, 10, [cx + 0.56, 1.72, czm], { rz: 0.7 }, 0.22);
+  }
+}
+
+/**
+ * A big building site, where a stadium or factory will go: a dug pad with a
+ * concrete slab and rebar, a tall tower crane with its jib across the lot,
+ * a site office, a digger, barriers and cones.
+ */
+function bigsite(k: Kit): void {
+  const dirt = 0xd9a066;
+  k.rbox(dirt, 19.6, 0.2, 19.6, 1.6, 0.08, 0, 0, 0);
+  barrier(k, 19.6, 19.6, 2.4, 1.2, 5.0);
+  // Foundation slab with rebar sticking up.
+  k.rbox(CONCRETE_GREY, 11, 0.6, 8.6, 0.6, 0.15, -1.5, 0.2, -2.5);
+  for (let i = 0; i < 5; i++) {
+    for (let j = 0; j < 3; j++) k.box(0xb5523b, 0.14, 1.0, 0.14, -5.5 + i * 2.0, 0.8, -5.2 + j * 2.6);
+  }
+  // Tower crane: a banded mast, a peak with ties, a long jib and a counterweight.
+  const mx = -6.8;
+  const mz = 6.2;
+  const top = 10.2;
+  k.rbox(CONCRETE_GREY, 2.2, 0.6, 2.2, 0.4, 0.12, mx, 0.2, mz);
+  k.box(SITE_YELLOW, 0.9, top - 0.8, 0.9, mx, 0.8, mz);
+  for (let y = 1.8; y < top - 0.5; y += 1.6) k.box(PAL.ink, 0.96, 0.16, 0.96, mx, y, mz);
+  k.cbox(SITE_YELLOW, 1.4, 1.0, 1.4, 0.12, mx, top - 1.0, mz + 0.9);
+  k.box(GLASS, 1.1, 0.5, 0.06, mx, top - 0.7, mz + 1.62, undefined, FLUSH);
+  const j0 = mx - 3.2;
+  const j1 = 9.4;
+  k.box(SITE_YELLOW, j1 - j0, 0.6, 0.6, (j0 + j1) / 2, top, mz);
+  k.cbox(CONCRETE_GREY, 1.6, 1.2, 1.0, 0.1, j0 + 0.9, top - 1.0, mz);
+  k.hull(SITE_YELLOW, [
+    [mx - 0.4, top + 0.6, mz - 0.4],
+    [mx + 0.4, top + 0.6, mz - 0.4],
+    [mx - 0.4, top + 0.6, mz + 0.4],
+    [mx + 0.4, top + 0.6, mz + 0.4],
+    [mx, 12.0, mz],
+  ]);
+  k.beam(PAL.ink, [mx, 11.9, mz], [j1 - 3, top + 0.6, mz], 0.08);
+  k.beam(PAL.ink, [mx, 11.9, mz], [j0 + 0.3, top + 0.6, mz], 0.08);
+  const hx = 3.6;
+  k.box(PAL.ink, 0.8, 0.3, 0.8, hx, top - 0.3, mz);
+  k.box(PAL.ink, 0.08, 4.2, 0.08, hx, top - 4.5, mz);
+  k.cbox(0xe63946, 0.6, 0.6, 0.6, 0.08, hx, top - 5.1, mz);
+  k.box(0x3a86ff, 3.6, 0.45, 0.6, hx, top - 5.7, mz);
+  // Site office: a blue container with windows and a door.
+  const ox = 6.4;
+  const oz = 5.6;
+  k.cbox(0x2f7bff, 5.0, 2.4, 2.3, 0.12, ox, 0.2, oz);
+  k.box(PAL.white, 5.1, 0.2, 2.4, ox, 2.6, oz);
+  k.within(translate(ox, 0.2, oz + 1.15), () => {
+    for (const u of [-1.5, 0.4]) paneAt(k, GLASS, PAL.white, u, 1.0, 1.2, 0.8);
+    archDoor(k, PAL.white, SITE_YELLOW, 1.8, 0, 0.8, 1.8);
+  });
+  // A digger by the slab: tracks, a turning body, an arm and a bucket.
+  const dx = 5.2;
+  const dz = -3.2;
+  for (const s of [-1, 1]) k.cbox(PAL.ink, 0.7, 0.7, 3.0, 0.2, dx + s * 1.0, 0.2, dz);
+  k.cbox(SITE_YELLOW, 2.4, 1.2, 2.4, 0.2, dx, 0.9, dz + 0.2);
+  k.cbox(SITE_YELLOW, 1.1, 1.2, 1.1, 0.15, dx + 0.55, 2.1, dz + 0.6);
+  k.box(GLASS, 0.9, 0.7, 0.06, dx + 0.55, 2.4, dz + 1.16, undefined, FLUSH);
+  k.beam(SITE_YELLOW, [dx - 0.5, 1.8, dz - 0.2], [dx - 1.6, 4.0, dz - 1.8], 0.4);
+  k.beam(SITE_YELLOW, [dx - 1.6, 4.0, dz - 1.8], [dx - 2.4, 1.6, dz - 3.3], 0.34);
+  k.cbox(PAL.ink, 1.1, 0.7, 0.8, 0.12, dx - 2.4, 1.0, dz - 3.4, { rx: 0.4 });
+  // A heap of dirt, a stack of pipes and cones by the gate.
+  k.cyl(darker(dirt, 0.12), 0.6, 2.2, 1.4, 8, -6.2, 0, -6.6);
+  for (let i = 0; i < 3; i++) k.rod(0x3a86ff, 0.3, 4.0, 8, [-2.6 + i * 0.62, 0.5, 6.4], { rx: HALF_PI });
+  k.rod(0x3a86ff, 0.3, 4.0, 8, [-2.3, 1.02, 6.4], { rx: HALF_PI });
+  for (const x of [-2.2, 2.2]) siteCone(k, x, 9.2, 1.3);
+  bricks(k, 1.6, 6.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -404,6 +600,50 @@ function car(k: Kit, v: number, taxi = false): void {
         }
       }
     }
+  }
+}
+
+/** Awning colours for the fruit stand: green or orange stripes on white. */
+const STANDS = [0x3fae5a, 0xf28c28] as const;
+
+/**
+ * A fruit stand: a wooden counter with crates of apples, oranges, limes and
+ * bananas, under a striped awning. Healthy food, so it has to read as fruit.
+ */
+function fruitstand(k: Kit, v: number): void {
+  const col = STANDS[v];
+  // Counter, and the posts that hold the awning.
+  k.box(PAL.wood, 2.3, 0.9, 1.0, 0, 0, 0.2);
+  k.box(darker(PAL.wood, 0.2), 2.36, 0.08, 1.06, 0, 0.9, 0.2);
+  for (const sx of [-1, 1]) {
+    k.box(PAL.wood, 0.1, 2.1, 0.1, sx * 1.15, 0, -0.75);
+    k.box(PAL.wood, 0.1, 1.75, 0.1, sx * 1.15, 0, 0.75);
+  }
+  // Three crates, each heaped with one kind of fruit.
+  const crates: Array<{ x: number; fruit: number }> = [
+    { x: -0.75, fruit: 0xe23b3b },
+    { x: 0, fruit: 0xff9f1c },
+    { x: 0.75, fruit: 0x8ccf3a },
+  ];
+  for (const c of crates) {
+    k.box(lighter(PAL.wood, 0.15), 0.66, 0.22, 0.8, c.x, 0.98, 0.25);
+    for (const [dx, dz] of [
+      [-0.16, 0.05],
+      [0.16, 0.05],
+      [0, 0.4],
+      [-0.16, 0.45],
+      [0.16, 0.42],
+    ] as const) {
+      k.ico(c.fruit, 0.13, 0, [c.x + dx, 1.28, dz]);
+    }
+  }
+  // Bananas: a yellow bunch hanging at the front.
+  for (let i = 0; i < 3; i++) k.sphere(0xf7d94c, 0.09, [-0.3 + i * 0.12, 1.45, 0.72], 6, 4, { scale: [1, 2.6, 1], rot: { rz: 0.4 - i * 0.2 } });
+  // A striped awning, sloping down to the front.
+  const stripes = 6;
+  for (let i = 0; i < stripes; i++) {
+    const w = 2.5 / stripes;
+    k.box(i % 2 ? PAL.white : col, w, 0.06, 1.75, -1.25 + w * (i + 0.5), 1.9, 0, { rx: -0.2 });
   }
 }
 
@@ -711,12 +951,23 @@ function tanker(k: Kit): void {
 
 // ---------------------------------------------------------------------------
 // Tier 5: houses and shops
+//
+// Buildings are toys, not architecture: soft rounded masses in candy colours,
+// a few big windows, and thick simple roofs, so a street reads as friendly
+// and chunky from the high camera.
+
+/** Window glass on the small buildings: a bright sky blue, softer than real glass. */
+const GLASS = 0x6fd8ff;
+/** Glass doors, a shade deeper than the windows so they read as doors. */
+const DOOR_GLASS = 0x62b6ee;
+/** Warm off-white for plinths, steps and roof rims, gentler than pure white. */
+const CREAM = 0xfff6e6;
 
 const HOUSES = [
-  { wall: 0xfff0d4, roof: 0xe0533d, door: 0x3a86ff, shutter: 0x3a86ff, hip: false },
-  { wall: 0xcfe8f7, roof: 0x3f5f8f, door: 0xf28c38, shutter: 0xf28c38, hip: true },
-  { wall: 0xffe08a, roof: 0x9a5b3a, door: 0x2a9d8f, shutter: 0x2a9d8f, hip: false },
-  { wall: 0xd3efc4, roof: 0xd8683f, door: 0xe63946, shutter: 0xe63946, hip: true },
+  { wall: 0xffd23f, roof: 0xf2433a, door: 0x2f7bff, hip: false },
+  { wall: 0x52639a, roof: 0x17c3b2, door: 0xff8a1f, hip: true },
+  { wall: 0xfff1d6, roof: 0x3cc95a, door: 0xf2433a, hip: false },
+  { wall: 0x4aa8ff, roof: 0xff8a1f, door: 0xffd23f, hip: true },
 ] as const;
 
 function house(k: Kit, v: number, s: number): void {
@@ -725,102 +976,106 @@ function house(k: Kit, v: number, s: number): void {
   const W = 7;
   const D = 6.4;
   const cz = -0.3;
-  const roofH = 2.5;
-  const ridge = H - 0.25;
+  const halfW = W / 2;
+  const halfD = D / 2;
+  const roofH = 2.2;
+  const t = 0.5;
+  const roll = 0.38;
+  // The roof slabs lie on the gable line and a fat roll caps the ridge; the
+  // top of that roll is the house's full height.
+  const lift = (t * Math.hypot(halfW, roofH)) / halfW;
+  const ridge = H - roll - lift / 2;
   const eave = ridge - roofH;
-  const base = 0.3;
+  const base = 0.35;
   // Taller houses get more storeys at a normal storey height, not taller windows.
-  const floors = Math.max(1, Math.round((eave - base) / 2.1));
+  const floors = Math.max(1, Math.round((eave - base) / 2.3));
   const fh = (eave - base) / floors;
-  const winH = Math.min(1.15, fh - 0.75);
+  const winW = 1.3;
+  const winH = Math.min(1.3, fh - 0.85);
 
-  k.box(PAL.stoneDark, W + 0.24, base, D + 0.24, 0, 0, cz, undefined, ON_GROUND);
-  k.box(c.wall, W, eave - base, D, 0, base, cz, undefined, ON_GROUND);
-  for (let f = 1; f <= floors; f++) {
-    k.box(PAL.white, W + 0.12, 0.14, D + 0.12, 0, base + f * fh - 0.14, cz, undefined, ON_GROUND);
-  }
+  k.rbox(CREAM, W + 0.5, base, D + 0.5, 0.9, 0.12, 0, 0, cz);
+  k.rbox(c.wall, W, eave - base + 0.05, D, 0.6, 0, 0, base, cz, { seg: 3 });
 
   k.within(translate(0, 0, cz), () => {
     for (const wall of walls(W, D)) {
       k.within(wall.m, () => {
-        const cols = wall.len > 6.8 ? 3 : 2;
-        // Glazing bars and shutters only where the camera looks: the front.
         const front = wall.side === 'front';
-        const style = {
-          frame: PAL.white,
-          glass: PAL.glass,
-          cross: front,
-          shutters: front ? c.shutter : undefined,
-        };
+        const us = wall.side === 'left' || wall.side === 'right' ? [0] : [-1.9, 1.9];
         for (let f = 0; f < floors; f++) {
-          const y = base + f * fh + (fh - winH) / 2 + 0.02;
-          cells(cols, wall.len).forEach((u, i) => {
-            if (wall.side === 'front' && f === 0 && i === 1) return;
-            windowAt(k, style, u, y, 0.95, winH);
-          });
+          const y = base + f * fh + (fh - winH) / 2 + 0.08;
+          for (const u of us) paneAt(k, GLASS, PAL.white, u, y, winW, winH, front);
         }
-        if (wall.side === 'front') {
-          const doorH = Math.min(1.85, fh - 0.2);
-          doorAt(k, PAL.white, c.door, 0, base, 1.05, doorH);
-          k.box(PAL.stoneDark, 1.6, 0.18, 0.55, 0, 0, 0.3);
-          k.box(c.roof, 1.8, 0.12, 0.8, 0, base + doorH + 0.2, 0.36, { rx: 0.25 });
-        }
+        if (!front) return;
+        const doorH = Math.min(1.9, fh - 0.25);
+        archDoor(k, PAL.white, c.door, 0, base, 1.1, doorH);
+        k.rbox(CREAM, 1.9, base, 0.9, 0.3, 0.1, 0, 0, 0.45);
+        k.rbox(c.roof, 2.0, 0.24, 0.8, 0.3, 0.1, 0, base + doorH + 0.3, 0.3);
+        // Two round bushes at the front corners, one of them flowering.
+        for (const sx of [-1, 1]) k.ico(sx < 0 ? PAL.leaf : PAL.leafLight, 0.55, 0, [sx * 3.0, 0.45, 0.6], [1, 0.85, 1], sx);
+        k.gem(0xff8fb8, 0.16, [3.0, 0.94, 0.8]);
       });
     }
   });
 
-  const over = 0.45;
-  const halfD = D / 2;
+  const over = 0.5;
   if (c.hip) {
-    const rx = W / 2 + over;
+    // A plump hip roof: a thick lip at the eaves, rounded shoulders, a short ridge.
+    const rx = halfW + over;
     const rz = halfD + over;
-    const ridgeHalf = 1.0;
-    k.hull(c.roof, [
-      [-rx, eave - 0.05, cz - rz],
-      [rx, eave - 0.05, cz - rz],
-      [-rx, eave - 0.05, cz + rz],
-      [rx, eave - 0.05, cz + rz],
-      [-rx, eave + 0.2, cz - rz],
-      [rx, eave + 0.2, cz - rz],
-      [-rx, eave + 0.2, cz + rz],
-      [rx, eave + 0.2, cz + rz],
-      [-ridgeHalf, ridge + 0.1, cz],
-      [ridgeHalf, ridge + 0.1, cz],
-    ]);
+    const rh = 1.0;
+    const pts: V3[] = [];
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        pts.push([sx * rx, eave - 0.1, cz + sz * rz], [sx * rx, eave + 0.25, cz + sz * rz]);
+        pts.push([sx * (rx - 0.3), eave + 0.5, cz + sz * (rz - 0.3)]);
+        pts.push([sx * (rh + 0.35), H - 0.28, cz + sz * 0.5], [sx * rh, H, cz + sz * 0.16]);
+      }
+    }
+    k.hull(c.roof, pts);
   } else {
-    // Gable facing the street, the way a child draws a house: wall-coloured
-    // triangles front and back under two thick roof slabs.
-    const halfW = W / 2;
+    // Gable facing the street, the way a child draws a house: a wall-coloured
+    // triangle under two thick slabs with rounded edges.
     k.hull(c.wall, [
       [-halfW, eave, cz - halfD],
       [halfW, eave, cz - halfD],
       [-halfW, eave, cz + halfD],
       [halfW, eave, cz + halfD],
-      [0, ridge - 0.1, cz - halfD],
-      [0, ridge - 0.1, cz + halfD],
+      [0, ridge, cz - halfD],
+      [0, ridge, cz + halfD],
     ]);
-    const slope = roofH / halfW;
+    const len = D + 2 * over;
+    const dy = lift / 2;
     for (const sx of [-1, 1]) {
-      k.beam(c.roof, [sx * (halfW + over), eave + 0.12 - over * slope, cz], [0, ridge + 0.02, cz], 0.24, D + 0.7);
+      const x0 = sx * (halfW + over);
+      const y0 = eave - (over * roofH) / halfW + dy;
+      k.beam(c.roof, [x0, y0, cz], [0, ridge + dy, cz], t, len);
+      k.rod(c.roof, t * 0.56, len, 8, [x0, y0, cz], { rx: HALF_PI });
     }
-    k.box(darker(c.roof, 0.2), 0.36, 0.2, D + 0.8, 0, ridge - 0.04, cz);
+    k.rod(lighter(c.roof, 0.15), roll, len + 0.1, 10, [0, ridge + dy, cz], { rx: HALF_PI });
     // A round window in each gable.
     for (const sz of [-1, 1]) {
-      k.rod(PAL.white, 0.46, 0.1, 8, [0, eave + 0.95, cz + sz * (halfD + 0.02)], { rx: HALF_PI });
-      k.rod(PAL.glass, 0.34, 0.16, 8, [0, eave + 0.95, cz + sz * (halfD + 0.02)], { rx: HALF_PI });
+      const z = cz + sz * (halfD + 0.02);
+      k.rod(PAL.white, 0.52, 0.12, 10, [0, eave + 0.85, z], { rx: HALF_PI });
+      k.rod(GLASS, 0.38, 0.18, 10, [0, eave + 0.85, z], { rx: HALF_PI });
     }
   }
-  // Chimney on the slope the camera sees.
-  k.box(PAL.brick, 0.7, H - 0.18 - eave, 0.7, 1.9, eave, cz - 1.4);
-  k.box(0x5d6470, 0.9, 0.18, 0.9, 1.9, H - 0.18, cz - 1.4);
+  // A chubby chimney on the slope the camera sees.
+  k.rbox(0xf08c6c, 0.8, H - 0.3 - eave, 0.8, 0.22, 0, 1.9, eave, cz - 1.3);
+  k.rbox(CREAM, 1.05, 0.3, 1.05, 0.3, 0.12, 1.9, H - 0.3, cz - 1.3);
 }
 
 const SHOPS = [
-  { wall: 0xf6d5a8, accent: 0xe63946 },
-  { wall: 0xb9e2dc, accent: 0x2f6fd6 },
-  { wall: 0xf9c6d3, accent: 0x7b4fc9 },
-  { wall: 0xd9774f, accent: 0x2a9d8f },
+  { wall: 0x52639a, accent: 0xff8a1f },
+  { wall: 0x2ec4b6, accent: 0xf2433a },
+  { wall: 0xff8fb8, accent: 0x7a4de8 },
+  { wall: 0xffc933, accent: 0x2f7bff },
 ] as const;
+
+/** Two rounded panels back to back: a sign board that looks right from both sides. */
+function board(k: Kit, color: number, w: number, h: number, r: number, t: number): void {
+  k.plate(color, w, h, r, t / 2, 0, 0, 0, 2);
+  k.within(placement(0, 0, 0, { ry: Math.PI }), () => k.plate(color, w, h, r, t / 2, 0, 0, 0, 2));
+}
 
 function shop(k: Kit, v: number, s: number): void {
   const c = SHOPS[v];
@@ -829,101 +1084,94 @@ function shop(k: Kit, v: number, s: number): void {
   const D = 7.2;
   const cz = -0.35;
   const G = 3.3;
-  const parapetH = 0.45;
-  const roofY = H - 0.3 - parapetH;
+  const roofY = H - 1.0;
+  const rimH = 0.55;
   // A short shop is just its shopfront; taller ones gain whole upper floors.
   const upper = roofY - G;
-  const floors = upper < 1.9 ? 0 : Math.max(1, Math.round(upper / 2.4));
+  const floors = upper < 1.9 ? 0 : Math.max(1, Math.round(upper / 2.5));
   const fh = floors ? upper / floors : 0;
-  const winH = Math.min(1.3, fh - 0.8);
-  const accentDark = darker(c.accent, 0.2);
+  const winH = Math.min(1.4, fh - 0.8);
 
-  k.box(darker(c.wall, 0.25), W + 0.14, 0.35, D + 0.14, 0, 0, cz, undefined, ON_GROUND);
-  k.box(c.wall, W, roofY, D, 0, 0, cz, undefined, ON_GROUND);
-  for (let f = 1; f < floors; f++) k.box(PAL.white, W + 0.1, 0.12, D + 0.1, 0, G + f * fh - 0.1, cz, undefined, ON_GROUND);
-  k.box(PAL.white, W + 0.3, 0.22, D + 0.3, 0, roofY - 0.22, cz, undefined, ON_GROUND);
-  k.box(mix(c.wall, 0xe8eaed, 0.55), W - 0.4, 0.03, D - 0.4, 0, roofY, cz);
+  k.rbox(CREAM, W + 0.4, 0.3, D + 0.4, 1.0, 0.1, 0, 0, cz, { seg: 1 });
+  k.rbox(c.wall, W, roofY - 0.25, D, 0.8, 0, 0, 0.3, cz, { seg: 3 });
+  // A thick rounded roof rim in a bright colour, with the roof inside it.
+  k.rbox(c.accent, W + 0.5, rimH, D + 0.5, 1.0, 0.25, 0, roofY, cz, { seg: 3 });
+  const top = roofY + rimH;
+  k.rbox(mix(c.accent, 0xffffff, 0.3), W - 0.7, 0.05, D - 0.7, 0.6, 0, 0, top, cz);
 
   k.within(translate(0, 0, cz), () => {
-    parapet(k, c.wall, W, D, roofY, parapetH, 0.3);
-    parapet(k, PAL.white, W + 0.1, D + 0.1, roofY + parapetH, 0.08, 0.4);
     for (const wall of walls(W, D)) {
       k.within(wall.m, () => {
-        const style = { frame: PAL.white, glass: PAL.glass };
-        const cols = wall.len > 8 ? 4 : 3;
+        const front = wall.side === 'front';
+        const cols = wall.len > 8 ? 3 : 2;
         for (let f = 0; f < floors; f++) {
           const y = G + f * fh + (fh - winH) / 2;
-          for (const u of cells(cols, wall.len)) windowAt(k, style, u, y, 1.2, winH);
+          for (const u of cells(cols, wall.len - 1.6)) paneAt(k, GLASS, null, u, y, 1.8, winH, front);
         }
-        if (wall.side === 'front') {
-          shopfront(k, c.accent, accentDark, W);
+        if (front) {
+          shopfront(k, c.accent, W);
         } else if (wall.side === 'back') {
-          doorAt(k, PAL.white, 0x6c757d, -2.4, 0.35, 1.1, 2.1);
-          windowAt(k, style, 1.6, 1.2, 1.2, 1.1);
+          archDoor(k, PAL.white, lighter(c.accent, 0.2), -2.4, 0.3, 1.1, 2.1);
+          paneAt(k, GLASS, PAL.white, 1.6, 1.1, 1.8, 1.3);
         } else {
-          for (const u of cells(2, wall.len)) windowAt(k, style, u, 1.2, 1.2, 1.2);
+          paneAt(k, GLASS, PAL.white, 0, 1.0, 2.6, 1.4);
         }
       });
     }
   });
 
-  acUnit(k, -2.6, roofY, cz - 1.6);
-  acUnit(k, -0.8, roofY, cz - 2.0, 1.0, 0.6, 0.9);
-  k.box(PAL.metal, 1.8, 0.2, 1.3, 2.6, roofY, cz - 1.4);
-  k.box(PAL.glass, 1.5, 0.08, 1.0, 2.6, roofY + 0.2, cz - 1.4);
-  k.cyl(PAL.metal, 0.12, 0.12, 0.7, 6, 3.8, roofY, cz - 2.8);
-  // A sign standing on the front parapet: the camera looks down on roofs, so
-  // this is the part of the shop a player actually sees.
-  const signZ = cz + D / 2 - 0.5;
-  k.within(placement(0, roofY, signZ, { rx: -0.45 }), () => {
-    k.box(c.accent, 5.0, 1.2, 0.22, 0, 0, 0);
-    k.box(PAL.white, 4.4, 0.72, 0.06, 0, 0.36, 0.12, undefined, FLUSH);
-    [0.4, 0.52, 0.4, 0.52].forEach((h, i) =>
-      k.box(accentDark, 0.56, h, 0.06, -1.2 + i * 0.8, 0.72 - h / 2, 0.16, undefined, FLUSH),
-    );
+  // One rounded skylight on the roof.
+  k.rbox(CREAM, 2.4, 0.25, 1.7, 0.45, 0.1, 2.4, top, cz - 1.5, { seg: 1 });
+  k.rbox(GLASS, 2.0, 0.34, 1.3, 0.4, 0.12, 2.4, top, cz - 1.5, { seg: 1 });
+  // A sign standing on the front of the roof: the camera looks down on roofs,
+  // so this is the part of the shop a player actually sees.
+  k.within(placement(0, top, cz + D / 2 - 0.6, { rx: -0.35 }), () => {
+    board(k, PAL.white, 5.0, 1.1, 0.5, 0.3);
+    k.plate(c.wall, 4.3, 0.66, 0.3, 0.22, 0, 0.22, 0, 2);
+    [0.36, 0.46, 0.36, 0.46].forEach((h, i) => k.plate(PAL.white, 0.52, h, 0.16, 0.28, -1.2 + i * 0.8, 0.55 - h / 2));
   });
 }
 
 /** Ground-floor shopfront on the current (front) wall frame: windows, door, awning, sign. */
-function shopfront(k: Kit, accent: number, accentDark: number, W: number): void {
+function shopfront(k: Kit, accent: number, W: number): void {
   for (const side of [-1, 1]) {
     const u = side * 2.65;
-    k.box(accent, 3.5, 0.5, 0.18, u, 0.35, 0, undefined, FLUSH);
-    k.box(accentDark, 3.5, 1.85, 0.12, u, 0.85, 0, undefined, FLUSH);
-    k.box(PAL.glass, 3.2, 1.55, 0.16, u, 0.98, 0, undefined, FLUSH);
-    k.box(accentDark, 0.1, 1.55, 0.2, u, 0.98, 0, undefined, FLUSH);
+    k.plate(accent, 3.4, 2.1, 0.5, 0.12, u, 0.35, 0, 2);
+    k.plate(GLASS, 3.0, 1.7, 0.4, 0.2, u, 0.55, 0, 2);
+    k.plate(lighter(GLASS, 0.6), 0.36, 0.9, 0.16, 0.24, u - 1.0, 1.1);
   }
-  k.box(accentDark, 1.5, 2.3, 0.12, 0, 0.35, 0, undefined, FLUSH);
-  k.box(PAL.glassDeep, 1.2, 2.1, 0.16, 0, 0.35, 0, undefined, FLUSH);
-  k.box(PAL.metal, 0.08, 0.5, 0.26, 0.4, 1.2, 0, undefined, FLUSH);
-  // Striped awning, sloping out over the pavement, with a hanging valance.
-  const n = 10;
-  const sw = (W - 0.2) / n;
-  const depth = 1.05;
+  archDoor(k, accent, DOOR_GLASS, 0, 0.3, 1.2, 2.1);
+  // A chunky striped awning with a rounded scallop under each stripe.
+  const n = 6;
+  const aw = W - 0.2;
+  const sw = aw / n;
+  const depth = 1.0;
   const drop = 0.45;
   const len = Math.hypot(depth, drop);
+  const y0 = 2.8;
   for (let i = 0; i < n; i++) {
     const col = i % 2 ? PAL.white : accent;
-    const u = -(W - 0.2) / 2 + (i + 0.5) * sw;
-    k.box(col, sw, 0.06, len, u, 2.7 - drop / 2, depth / 2, { rx: Math.atan2(drop, depth) });
-    k.box(col, sw, 0.26, 0.05, u, 2.7 - drop - 0.22, depth);
+    const u = -aw / 2 + (i + 0.5) * sw;
+    k.box(col, sw, 0.14, len, u, y0 - drop / 2, depth / 2, { rx: Math.atan2(drop, depth) });
+    k.add(
+      new THREE.CylinderGeometry(sw * 0.5, sw * 0.5, 0.14, 6, 1, false, -HALF_PI, Math.PI),
+      col,
+      placement(u, y0 - drop + 0.02, depth - 0.02, { rx: HALF_PI }),
+    );
   }
-  // Sign board over the awning: a light panel with blocky "lettering".
-  k.box(accent, W + 0.1, 0.56, 0.28, 0, 2.74, 0.02, undefined, FLUSH);
-  k.box(PAL.white, 5.2, 0.38, 0.06, 0, 2.83, 0.18, undefined, FLUSH);
-  const letters = [0.24, 0.3, 0.24, 0.3, 0.24];
-  letters.forEach((h, i) => k.box(accentDark, 0.34, h, 0.06, -1.6 + i * 0.8, 2.87 + (0.3 - h) / 2, 0.22, undefined, FLUSH));
-  k.rod(PAL.brass, 0.3, 0.1, 10, [-3.3, 3.02, 0.24], { rx: HALF_PI });
+  // Sign board over the awning.
+  k.plate(accent, W - 0.8, 0.6, 0.28, 0.2, 0, y0 + 0.05, 0, 2);
+  k.plate(PAL.white, 4.6, 0.36, 0.18, 0.26, 0, y0 + 0.17, 0, 2);
 }
 
 // ---------------------------------------------------------------------------
 // Tier 6: tall buildings
 
 const APARTMENTS = [
-  { wall: 0xf4a261, base: 0xc97c4b, accent: 0x2a9d8f },
-  { wall: 0x9fd3c7, base: 0x5e9c8f, accent: 0xe76f51 },
-  { wall: 0xf2e8cf, base: 0xb08968, accent: 0xe63946 },
-  { wall: 0xc9b6e4, base: 0x8e7cc3, accent: 0xffd166 },
+  { wall: 0x52639a, base: 0x3e4c7a, accent: 0xff8a1f, roof: 0x3cc95a },
+  { wall: 0x22b8a8, base: 0x178f83, accent: 0xffc933, roof: 0xff8a1f },
+  { wall: 0xff6f5e, base: 0xd9503f, accent: 0x2ec4b6, roof: 0xfff1d6 },
+  { wall: 0x8a63e8, base: 0x6a45c8, accent: 0xffc933, roof: 0x17c3b2 },
 ] as const;
 
 function apartment(k: Kit, v: number, s: number): void {
@@ -931,165 +1179,146 @@ function apartment(k: Kit, v: number, s: number): void {
   const H = 18 * s;
   const L = 11.0;
   const G = 3.4;
-  const R = H - 3.0;
+  const R = H - 2.8;
   const U = R - G;
-  const floors = Math.max(2, Math.round(U / 2.9));
+  // Big storeys, so a block has a few rows of big windows rather than a grid.
+  const floors = Math.max(2, Math.round(U / 4.2));
   const fh = U / floors;
-  const winH = Math.min(1.7, fh * 0.56);
-  const spandrel = fh - winH;
-  const glass = PAL.glassDeep;
+  const winH = Math.min(2.0, fh * 0.52);
 
-  // Ground floor: a solid base with the entrance on the front.
-  k.box(c.base, L + 0.4, G, L + 0.4, 0, 0, 0, undefined, ON_GROUND);
-  k.box(darker(c.base, 0.2), L + 0.6, 0.3, L + 0.6, 0, G - 0.3, 0, undefined, ON_GROUND);
-  // Upper floors: a glass core wrapped by spandrels and pillars, which leaves
-  // a grid of recessed windows that stays right however many floors there are.
-  k.box(glass, L - 0.8, U, L - 0.8, 0, G, 0, undefined, ON_GROUND);
-  for (let f = 0; f < floors; f++) k.box(c.wall, L, spandrel, L, 0, G + f * fh, 0, undefined, ON_GROUND);
-  const cols = 4;
-  const corner = 1.0;
-  const pillar = 0.9;
-  const cell = (L - 2 * corner - (cols - 1) * pillar) / cols;
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(c.wall, corner, U, corner, sx * (L / 2 - corner / 2), G, sz * (L / 2 - corner / 2));
+  k.rbox(c.base, L + 0.6, G, L + 0.6, 1.6, 0.3, 0, 0, 0, { seg: 3 });
+  k.rbox(c.wall, L, U + 0.1, L, 1.3, 0, 0, G - 0.05, 0, { seg: 3 });
+  k.rbox(c.roof, L + 0.6, 0.6, L + 0.6, 1.6, 0.3, 0, R, 0, { seg: 3 });
+  const top = R + 0.6;
+  k.rbox(mix(c.roof, 0xffffff, 0.3), L - 0.6, 0.05, L - 0.6, 1.0, 0, 0, top, 0);
 
-  const cellU = (i: number) => -L / 2 + corner + cell / 2 + i * (cell + pillar);
   for (const wall of walls(L, L)) {
     k.within(wall.m, () => {
-      for (let j = 1; j < cols; j++) k.box(c.wall, pillar, U, 0.4, cellU(j) - (cell + pillar) / 2, G, -0.2, undefined, FLUSH);
-      if (wall.side === 'front') {
-        // Balconies on the middle two columns of every floor.
-        for (let f = 0; f < floors; f++) {
-          const y = G + f * fh + spandrel;
-          for (const i of [1, 2]) {
-            const u = cellU(i);
-            k.box(PAL.white, cell + 0.3, 0.14, 0.8, u, y - 0.14, 0.4);
-            k.box((f + i) % 3 === 0 ? c.accent : PAL.white, cell + 0.3, 0.55, 0.07, u, y, 0.77);
-            for (const e of [-1, 1]) k.box(PAL.white, 0.07, 0.55, 0.8, u + e * (cell / 2 + 0.12), y, 0.4);
-            if ((f * 2 + i) % 3 === 1) k.ico(PAL.leaf, 0.22, 0, [u + cell / 2 - 0.2, y + 0.2, 0.5]);
-          }
+      const front = wall.side === 'front';
+      for (let f = 0; f < floors; f++) {
+        const fy = G + f * fh;
+        const y = fy + (fh - winH) / 2 + 0.1;
+        if (!front) {
+          for (const u of [-2.3, 2.3]) paneAt(k, GLASS, null, u, y, 2.6, winH, false, 1);
+          continue;
         }
+        for (const u of [-3.1, 3.1]) paneAt(k, GLASS, null, u, y, 2.0, winH, true);
+      }
+      if (front) {
+        // The stairwell: one tall glass strip up the middle in an accent frame.
+        k.plate(c.accent, 2.4, U - 0.5, 0.8, 0.12, 0, G + 0.25, 0, 2);
+        k.plate(DOOR_GLASS, 1.6, U - 1.1, 0.5, 0.2, 0, G + 0.55, 0, 2);
       }
     });
   }
-  for (const wall of walls(L + 0.4, L + 0.4)) {
+  for (const wall of walls(L + 0.6, L + 0.6)) {
     k.within(wall.m, () => {
-      const style = { frame: PAL.white, glass: PAL.glass };
       if (wall.side === 'front') {
-        doorAt(k, PAL.white, glass, 0, 0, 2.0, 2.4);
-        k.box(c.accent, 3.4, 0.22, 0.8, 0, 2.7, 0.4);
-        for (const u of [-3.6, 3.6]) windowAt(k, style, u, 0.9, 1.8, 1.4);
+        archDoor(k, PAL.white, DOOR_GLASS, 0, 0, 2.0, 2.5);
+        k.rbox(c.accent, 3.6, 0.3, 0.7, 0.3, 0.12, 0, 2.9, 0.35, { seg: 1 });
+        for (const u of [-3.6, 3.6]) paneAt(k, GLASS, PAL.white, u, 0.9, 1.9, 1.5, true);
       } else {
-        for (const u of [-3.2, 0, 3.2]) windowAt(k, style, u, 0.9, 1.6, 1.4);
+        for (const u of [-2.6, 2.6]) paneAt(k, GLASS, null, u, 0.9, 2.4, 1.5, false, 1);
       }
     });
   }
 
-  // Roof: cornice, deck, parapet, water tank, stair hut and air-conditioning.
-  k.box(c.wall, L + 0.3, 0.4, L + 0.3, 0, R, 0, undefined, ON_GROUND);
-  k.box(mix(c.wall, 0xe8eaed, 0.55), L - 0.2, 0.02, L - 0.2, 0, R + 0.4, 0);
-  parapet(k, PAL.white, L + 0.3, L + 0.3, R + 0.4, 0.4, 0.3);
-  // A little roof garden: a splash of green where the camera looks.
-  k.box(0x8d6e4f, 3.0, 0.4, 1.3, -1.6, R + 0.4, 3.9);
-  k.box(0x6b4a33, 2.8, 0.04, 1.1, -1.6, R + 0.8, 3.9);
-  for (const [x, r] of [
-    [-2.6, 0.45],
-    [-1.6, 0.55],
-    [-0.6, 0.42],
-  ]) {
-    k.ico(x === -1.6 ? PAL.leafLight : PAL.leaf, r, 0, [x, R + 0.95, 3.9], [1, 0.85, 1], x);
-  }
+  // Roof: a round water tank on stubby legs, a stair hut and a planter.
   const tx = -2.6;
   const tz = -2.4;
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(PAL.ink, 0.14, 0.95, 0.14, tx + sx * 0.6, R + 0.4, tz + sz * 0.6);
-  k.cyl(0x9c6b4a, 0.95, 0.95, 1.2, 10, tx, R + 1.35, tz);
-  k.cyl(PAL.ink, 0.97, 0.97, 0.08, 10, tx, R + 1.75, tz, { open: true });
-  k.cyl(darker(0x9c6b4a, 0.25), 0.05, 1.05, 0.45, 10, tx, R + 2.55, tz);
-  k.box(c.wall, 2.4, 1.8, 2.0, 2.6, R + 0.4, -2.6);
-  k.box(c.base, 2.6, 0.14, 2.2, 2.6, R + 2.2, -2.6);
-  k.box(0x6c757d, 0.9, 1.4, 0.08, 2.6, R + 0.4, -1.6);
-  acUnit(k, 2.4, R + 0.4, 2.2);
-  acUnit(k, -2.0, R + 0.4, 2.4, 1.0, 0.6, 1.0);
+  k.cyl(c.accent, 1.1, 1.1, 1.8, 12, tx, top, tz);
+  k.cyl(lighter(c.accent, 0.3), 0.12, 1.2, 0.6, 12, tx, top + 1.8, tz);
+  k.rbox(c.wall, 2.4, 1.8, 2.0, 0.5, 0.25, 2.6, top, -2.6, { seg: 1 });
+  k.rbox(0xd9a06b, 3.2, 0.5, 1.4, 0.4, 0.12, -1.4, top, 3.4, { seg: 1 });
+  for (const [x, r] of [
+    [-2.4, 0.5],
+    [-1.4, 0.6],
+    [-0.4, 0.48],
+  ]) {
+    k.ico(x === -1.4 ? PAL.leafLight : PAL.leaf, r, 0, [x, top + 0.85, 3.4], [1, 0.85, 1], x);
+  }
 }
 
 const TOWERS = [
-  { glass: 0x57b8d9, glassTop: 0x8ad3ec, band: 0xeef2f6, podium: 0xd8d4cc, setback: false },
-  { glass: 0x3f6fb5, glassTop: 0x6a93d1, band: 0xc9d3de, podium: 0xb9c2cc, setback: true },
-  { glass: 0xe9b949, glassTop: 0xf5d27a, band: 0x5a4a3a, podium: 0xe2d6c0, setback: false },
+  { body: 0x4f6096, glass: 0x5fd8ff, trim: 0x3cc95a, setback: false },
+  { body: 0x3a6fe0, glass: 0xa6e6ff, trim: 0xffc933, setback: true },
+  { body: 0xffc933, glass: 0x3aa0f0, trim: 0xff5a4a, setback: false },
 ] as const;
 
 type TowerScheme = (typeof TOWERS)[number];
 
-/** A glass shaft of `floors` storeys: tinted core, floor bands and vertical fins. */
-function glassShaft(k: Kit, c: TowerScheme, S: number, y0: number, floors: number, fh: number): void {
-  const U = floors * fh;
-  // The core lightens towards the top, a cheap stand-in for sky reflection.
-  const split = Math.ceil(floors * 0.6);
-  k.box(c.glass, S, split * fh, S, 0, y0, 0, undefined, ON_GROUND);
-  k.box(c.glassTop, S, U - split * fh, S, 0, y0 + split * fh, 0, undefined, ON_GROUND);
-  for (let f = 0; f <= floors; f++) k.box(c.band, S + 0.3, 0.3, S + 0.3, 0, y0 + f * fh - 0.15, 0, undefined, ON_GROUND);
-  const fins = Math.max(3, Math.round(S / 1.8));
+/** A soft shaft of `floors` storeys with one wide rounded window band per floor on each face. */
+function shaft(k: Kit, c: TowerScheme, S: number, y0: number, floors: number, fh: number): void {
+  const r = 1.6;
+  k.rbox(c.body, S, floors * fh + 0.1, S, r, 0, 0, y0, 0, { seg: 3 });
+  const winH = Math.min(1.9, fh * 0.55);
   for (const wall of walls(S, S)) {
     k.within(wall.m, () => {
-      for (let i = 1; i < fins; i++) k.box(c.band, 0.18, U, 0.3, -S / 2 + (i * S) / fins, y0, 0, undefined, FLUSH);
+      for (let f = 0; f < floors; f++) {
+        k.plate(c.glass, S - 2 * r - 0.6, winH, winH * 0.32, 0.16, 0, y0 + f * fh + (fh - winH) / 2, 0, 2);
+      }
     });
   }
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(c.band, 0.4, U, 0.4, sx * S / 2, y0, sz * S / 2);
 }
 
 function tower(k: Kit, v: number, s: number): void {
   const c = TOWERS[v];
   const H = 30 * s;
   const G = 4.0;
-  const mast = 4.6;
+  const mast = 3.6;
   const R = H - mast;
-  const crown = 1.2;
+  const crown = 1.4;
   const U = R - crown - G;
-  const floors = Math.max(3, Math.round(U / 3.0));
+  const floors = Math.max(3, Math.round(U / 3.8));
   const fh = U / floors;
 
-  // Podium: glass lobby behind stone columns, with a canopy over the doors.
-  k.box(c.podium, 12, 0.25, 12, 0, 0, 0, undefined, ON_GROUND);
-  k.box(PAL.glassDeep, 11.2, 3.0, 11.2, 0, 0.25, 0, undefined, ON_GROUND);
-  for (const wall of walls(11.4, 11.4)) {
+  // Podium: a wide soft block with a big glass front door.
+  k.rbox(CREAM, 11.6, G, 11.6, 2.0, 0.35, 0, 0, 0, { seg: 3 });
+  for (const wall of walls(11.6, 11.6)) {
     k.within(wall.m, () => {
-      for (const u of [-5.4, -2.7, 0, 2.7, 5.4]) k.box(c.podium, 0.6, 3.0, 0.5, u, 0.25, 0, undefined, FLUSH);
+      if (wall.side === 'front') {
+        archDoor(k, c.trim, DOOR_GLASS, 0, 0, 2.4, 2.8);
+        for (const u of [-3.1, 3.1]) k.plate(c.glass, 2.2, 1.9, 0.6, 0.14, u, 0.9, 0, 2);
+      } else {
+        for (const u of [-2.0, 2.0]) k.plate(c.glass, 2.8, 1.9, 0.6, 0.14, u, 0.9, 0, 2);
+      }
     });
   }
-  k.box(c.podium, 12, 0.75, 12, 0, 3.25, 0, undefined, ON_GROUND);
-  k.box(c.band, 4.0, 0.2, 0.9, 0, 2.5, 6.05);
-  k.box(0x8fbf6a, 11.0, 0.05, 11.0, 0, G, 0);
 
-  // The setback scheme steps in to a slimmer shaft with a planted terrace.
-  const S = c.setback ? 7.6 : 9.4;
-  const top = R - crown;
+  // The setback scheme steps in to a slimmer shaft over a planted terrace.
+  const S = c.setback ? 7.8 : 9.4;
   if (c.setback) {
     const lower = Math.min(floors - 1, Math.max(2, Math.round(floors * 0.6)));
-    glassShaft(k, c, 9.8, G, lower, fh);
+    shaft(k, c, 10.0, G, lower, fh);
     const yb = G + lower * fh;
-    k.box(c.band, 10.4, 0.4, 10.4, 0, yb, 0, undefined, ON_GROUND);
-    k.box(0x8fbf6a, 9.4, 0.05, 9.4, 0, yb + 0.4, 0);
-    glassShaft(k, c, S, yb + 0.4, floors - lower, fh - 0.4 / (floors - lower));
+    k.rbox(CREAM, 10.6, 0.5, 10.6, 2.0, 0.2, 0, yb, 0);
+    k.rbox(0x8fd16a, 9.4, 0.06, 9.4, 1.6, 0, 0, yb + 0.5, 0);
+    for (const sx of [-1, 1]) k.ico(PAL.leaf, 0.7, 0, [sx * 4.2, yb + 1.1, 4.2], [1, 0.85, 1], sx);
+    shaft(k, c, S, yb + 0.5, floors - lower, fh - 0.5 / (floors - lower));
   } else {
-    glassShaft(k, c, S, G, floors, fh);
+    shaft(k, c, S, G, floors, fh);
   }
-  // Crown, roof deck, helipad and a mast with a red light.
-  k.box(c.band, S + 0.6, crown, S + 0.6, 0, top, 0, undefined, ON_GROUND);
-  k.box(PAL.roofDeck, S - 0.2, 0.02, S - 0.2, 0, R, 0);
-  const padR = S * 0.34;
-  k.cyl(0x4a4e5a, padR, padR, 0.3, 16, -0.3, R, 0.3);
-  k.lathe(PAL.white, [
-    [padR - 0.15, R + 0.32],
-    [padR - 0.5, R + 0.32],
-  ], 16, -0.3, 0.3);
-  const hy = R + 0.3;
-  for (const sx of [-1, 1]) k.box(0xffd166, 0.3, 0.05, 1.5, -0.3 + sx * 0.45, hy, 0.3);
-  k.box(0xffd166, 0.6, 0.05, 0.3, -0.3, hy, 0.3);
-  const mx = S / 2 - 0.7;
-  const mz = -S / 2 + 0.7;
-  k.cyl(PAL.metal, 0.06, 0.16, mast - 0.2, 6, mx, R, mz);
-  for (const y of [1.2, 2.4]) k.box(PAL.metal, 0.8, 0.06, 0.06, mx, R + y, mz);
-  k.gem(PAL.tail, 0.16, [mx, H - 0.16, mz]);
-  acUnit(k, -S / 2 + 1.2, R, -S / 2 + 1.1, 1.2, 0.7, 1.0);
+  // Crown: a thick rounded cap in the trim colour, a helipad and a mast.
+  k.rbox(c.trim, S + 0.6, crown, S + 0.6, 1.9, 0.45, 0, R - crown, 0, { seg: 3 });
+  const padR = S * 0.32;
+  k.cyl(0x6b7288, padR, padR, 0.2, 14, -0.3, R, 0.3);
+  k.lathe(
+    PAL.white,
+    [
+      [padR - 0.2, R + 0.22],
+      [padR - 0.6, R + 0.22],
+    ],
+    14,
+    -0.3,
+    0.3,
+  );
+  const hy = R + 0.2;
+  for (const sx of [-1, 1]) k.box(0xffd166, 0.4, 0.06, 1.7, -0.3 + sx * 0.5, hy, 0.3);
+  k.box(0xffd166, 0.7, 0.06, 0.4, -0.3, hy, 0.3);
+  const mx = S / 2 - 1.2;
+  const mz = -S / 2 + 1.2;
+  k.cyl(CREAM, 0.14, 0.3, mast - 0.6, 8, mx, R, mz);
+  k.sphere(0xff5d5d, 0.4, [mx, H - 0.4, mz], 6, 4);
 }
 
 // ---------------------------------------------------------------------------
@@ -1100,15 +1329,19 @@ const STREET: Record<Exclude<PropKind, LandmarkKind>, Builder> = {
   bin,
   mailbox,
   planter,
+  person,
   bench,
   bush,
   bike,
   haybale,
+  site,
+  bigsite,
   tree,
   pine,
   lamp,
   cafe,
   rock,
+  fruitstand,
   car: (k, v) => car(k, v),
   taxi: (k) => car(k, 0, true),
   cart,

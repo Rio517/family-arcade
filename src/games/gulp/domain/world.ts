@@ -9,8 +9,8 @@
  * car tipping into a hole, an explosion); the clock and the input come in as
  * arguments, randomness as `rng` (ADR 0005).
  */
-import { FIT, KINDS, TIERS, type Prop } from './catalog';
-import { createCity, type City, type MapId } from './city';
+import { FIT, KINDS, TIERS, makeProp, type Prop, type PropKind } from './catalog';
+import { BLOCK, SIDEWALK, createCity, type Block, type City, type MapId } from './city';
 import { createBrain, steerRival, type Brain } from './rivals';
 
 type Rng = () => number;
@@ -23,9 +23,82 @@ const REGROW_TIER = 4;
 const REGROW_EVERY = 0.4;
 const REGROW_BATCH = 3;
 
+/**
+ * With regrowth on, an eaten building's lot is built on again: first a
+ * construction site (cheap to eat) goes up, and if it survives, the new
+ * building. The city grows up as the round goes on: early on everything is
+ * rebuilt as houses, then shops, then apartment blocks, towers and at last
+ * skyscrapers, one rung above what stood there before and never above what
+ * the city's age allows. Big sites become stadiums, malls and power plants,
+ * and each opening makes the news.
+ */
+const LADDER: PropKind[] = ['house', 'shop', 'apartment', 'tower', 'skyscraper'];
+const BIG: PropKind[] = ['factory', 'warehouse', 'chemplant', 'mall', 'stadium', 'powerplant'];
+/** Seconds from a building being eaten to its construction site appearing. */
+const SITE_AFTER = 6;
+/** Seconds a construction site stands before the building is finished. */
+const SITE_TIME = 16;
+/** Every this many seconds of a round, one more rung of the ladder opens. */
+const AGE_STEP = 40;
+/** Seconds a new building takes to rise in the scene. */
+export const BUILD_TIME = 3;
+/** Seconds between two news stories, at least. */
+const NEWS_GAP = 12;
+
+const HEADLINE: Partial<Record<PropKind, string>> = {
+  stadium: 'A brand-new stadium just opened!',
+  mall: 'A giant shopping mall opens its doors!',
+  powerplant: 'A new power plant lights up the city!',
+  factory: 'A new factory starts work today!',
+  warehouse: 'A huge new warehouse is finished!',
+  skyscraper: 'The city has a new skyscraper!',
+};
+
+/** How much of an item's worth healthy food adds on top, as a health bonus. */
+const HEALTH_BONUS = 0.5;
+
+interface Lot {
+  x: number;
+  z: number;
+  rot: number;
+  /** The widest footprint that fits: the old building's, plus a little yard. */
+  room: number;
+  /** Which rung of the ladder the old building stood on (-1 for a big building). */
+  rung: number;
+  due: number;
+  /** The construction site standing on it, once there is one. */
+  site: number | null;
+}
+
+/** Someone walking round a block's pavement. */
+export interface Person {
+  id: number;
+  variant: number;
+  block: number;
+  /** How far round the block, and which way round. */
+  t: number;
+  dir: 1 | -1;
+  speed: number;
+  x: number;
+  z: number;
+  heading: number;
+  alive: boolean;
+  respawnIn: number;
+  /** Seconds of running away from a hole. */
+  panic: number;
+}
+
+/** People are 'person' things with ids above every building's. */
+const PERSON_ID = 1_000_000;
+const PEOPLE_PER_BLOCK = 2.5;
+const WALK = 1.4;
+
 /** A hole's radius at the start, and how it grows with what it has eaten. */
 export const START_R = 1.6;
-const GROW = 0.3;
+// Growth tapers off as a hole gets big (a power below a half), so the
+// first levels come fast and the giant ones take a whole round.
+const GROW = 0.34;
+const GROW_POWER = 0.4;
 /** Seconds a swallowed hole waits before it comes back. */
 export const RESPAWN = 3;
 /** Seconds a hole that just came back can't be swallowed. */
@@ -47,7 +120,16 @@ export type PowerKind = 'speed' | 'double';
 export const POWER_TIME: Record<PowerKind, number> = { speed: 8, double: 10 };
 const POWER_SPEED = 1.6;
 const POWER_LIFE = 20;
-const POWER_MAX = 3;
+const POWER_MAX = 2;
+
+/**
+ * Combos: eat again within this many seconds and the streak goes on; every
+ * COMBO_STEP things in a streak adds one to the multiplier, up to COMBO_MAX.
+ */
+const COMBO_WINDOW = 1.4;
+const COMBO_STEP = 8;
+const COMBO_MAX = 5;
+export const comboOf = (streak: number): number => Math.min(COMBO_MAX, 1 + Math.floor(streak / COMBO_STEP));
 
 export interface PowerUp {
   id: number;
@@ -111,6 +193,9 @@ export interface Hole {
   speedTime: number;
   doubleTime: number;
   stun: number;
+  /** Things eaten in a row, each within COMBO_WINDOW of the last. */
+  streak: number;
+  comboTime: number;
 }
 
 export type HurtCause = 'chem' | 'tanker' | 'bomb';
@@ -118,6 +203,10 @@ export type HurtCause = 'chem' | 'tanker' | 'bomb';
 export type WorldEvent =
   | { type: 'eat'; prop: Prop; hole: number }
   | { type: 'regrow'; prop: Prop }
+  | { type: 'rebuild'; prop: Prop; replaces: Prop | null }
+  | { type: 'news'; text: string; x: number; z: number }
+  | { type: 'food'; hole: number; food: 'treat' | 'healthy'; bonus: number }
+  | { type: 'combo'; hole: number; mult: number }
   | { type: 'gulp'; eater: number; eaten: number }
   | { type: 'level'; hole: number; level: number }
   | { type: 'respawn'; hole: number }
@@ -138,6 +227,8 @@ export interface Options {
   duration: number;
   powerups: boolean;
   fightBack: boolean;
+  /** Small things grow back and eaten buildings are rebuilt, bigger as the round goes on. */
+  regrow: boolean;
   countdown?: number;
 }
 
@@ -162,6 +253,12 @@ export interface World {
   /** Small things eaten so far, which the city slowly puts back. */
   eaten: Prop[];
   regrowIn: number;
+  /** Building lots waiting to be built on again. */
+  lots: Lot[];
+  /** Ids for things built during the round, above every map id. */
+  nextPropId: number;
+  people: Person[];
+  lastNews: number;
 }
 
 const CELL = 12;
@@ -172,7 +269,7 @@ export interface Racer {
   skin: number;
 }
 
-const DEFAULTS: Options = { map: 'city', duration: 120, powerups: true, fightBack: false };
+const DEFAULTS: Options = { map: 'city', duration: 120, powerups: true, fightBack: false, regrow: true };
 
 /**
  * A fresh round. `player` is null for the menu's attract mode: the city with
@@ -223,6 +320,10 @@ export function createWorld(rng: Rng, player: Racer | null, rivals: Racer[], opt
     nextId: 1,
     eaten: [],
     regrowIn: REGROW_EVERY,
+    lots: [],
+    nextPropId: city.props.length + 1,
+    people: createPeople(city, rng),
+    lastNews: -NEWS_GAP,
   };
 }
 
@@ -247,11 +348,15 @@ function newHole(id: number, name: string, skin: number, isPlayer: boolean, x: n
     speedTime: 0,
     doubleTime: 0,
     stun: 0,
+    streak: 0,
+    comboTime: 0,
   };
 }
 
 /** Radius from what a hole has eaten: area grows with the food, no ceiling. */
-export const radiusFor = (mass: number): number => START_R + GROW * Math.sqrt(Math.max(0, mass));
+export const radiusFor = (mass: number): number => START_R + GROW * Math.pow(Math.max(0, mass), GROW_POWER);
+/** The mass a hole needs to be this big (the inverse of `radiusFor`). */
+export const massFor = (r: number): number => Math.pow(Math.max(0, r - START_R) / GROW, 1 / GROW_POWER);
 
 /** Past the last tier, a new level for every step this much bigger. */
 const BEYOND = 1.35;
@@ -321,6 +426,8 @@ export function stepWorld(w: World, dt: number, input: Input | null): WorldEvent
     h.speedTime = Math.max(0, h.speedTime - dt);
     h.doubleTime = Math.max(0, h.doubleTime - dt);
     h.stun = Math.max(0, h.stun - dt);
+    h.comboTime = Math.max(0, h.comboTime - dt);
+    if (h.comboTime === 0) h.streak = 0;
     const brain = w.brains[i];
     const want = brain ? steerRival(brain, h, w, dt, player) : input ?? { x: 0, z: 0 };
     move(w, h, want, dt, brain ? brain.pace : 1);
@@ -328,7 +435,11 @@ export function stepWorld(w: World, dt: number, input: Input | null): WorldEvent
     if (w.options.powerups) takePowerups(w, h, events);
   }
   eatHoles(w, events);
-  regrow(w, dt, events);
+  walkPeople(w, dt, events);
+  if (w.options.regrow) {
+    regrow(w, dt, events);
+    rebuild(w, events);
+  }
   if (w.options.powerups) spawnPowerups(w, dt, player);
   if (w.options.fightBack) fightBack(w, dt, events, player);
   return events;
@@ -384,15 +495,43 @@ function eatProps(w: World, h: Hole, events: WorldEvent[]): void {
     if (!canEat(h, p)) continue;
     if (Math.hypot(p.x - h.x, p.z - h.z) > h.r - p.size * 0.35) continue;
     w.props.delete(p.id);
-    if (KINDS[p.kind].tier <= REGROW_TIER) w.eaten.push(p);
-    h.mass += p.points;
-    h.score += p.points * (h.doubleTime > 0 ? 2 : 1);
-    h.r = radiusFor(h.mass);
-    events.push({ type: 'eat', prop: p, hole: h.id });
-    if (w.options.fightBack && KINDS[p.kind].hazard) hurt(h, 'chem', events);
+    const info = KINDS[p.kind];
+    if (p.kind === 'site' || p.kind === 'bigsite') {
+      // The site was eaten: the lot waits a while and starts again.
+      const lot = w.lots.find((l) => l.site === p.id);
+      if (lot) {
+        lot.site = null;
+        lot.due = w.elapsed + SITE_AFTER * 2;
+      }
+    } else if (info.tier <= REGROW_TIER) w.eaten.push(p);
+    const rung = LADDER.indexOf(p.kind);
+    if (rung >= 0 || BIG.includes(p.kind)) {
+      const room = Math.max(info.w, info.d) + 4;
+      w.lots.push({ x: p.x, z: p.z, rot: p.rot, room, rung, due: w.elapsed + SITE_AFTER + w.rng() * 6, site: null });
+    }
+    gobble(w, h, p, events);
   }
   const after = levelOf(h.r);
   if (after > before) events.push({ type: 'level', hole: h.id, level: after });
+}
+
+/** Score a swallowed thing (or person) for a hole: size, points, combo, food. */
+function gobble(w: World, h: Hole, p: Prop, events: WorldEvent[]): void {
+  const info = KINDS[p.kind];
+  // Healthy food is worth half as much again, and shakes off a knock.
+  const bonus = info.food === 'healthy' ? Math.max(1, Math.round(p.points * HEALTH_BONUS)) : 0;
+  const was = comboOf(h.streak);
+  h.streak += 1;
+  h.comboTime = COMBO_WINDOW;
+  const mult = comboOf(h.streak);
+  if (mult > was) events.push({ type: 'combo', hole: h.id, mult });
+  h.mass += p.points + bonus;
+  h.score += (p.points + bonus) * mult * (h.doubleTime > 0 ? 2 : 1);
+  h.r = radiusFor(h.mass);
+  if (bonus) h.stun = 0;
+  events.push({ type: 'eat', prop: p, hole: h.id });
+  if (info.food) events.push({ type: 'food', hole: h.id, food: info.food, bonus });
+  if (w.options.fightBack && info.hazard) hurt(h, 'chem', events);
 }
 
 function eatHoles(w: World, events: WorldEvent[]): void {
@@ -415,6 +554,7 @@ function eatHoles(w: World, events: WorldEvent[]): void {
       b.r = radiusFor(b.mass);
       b.vx = b.vz = 0;
       b.speedTime = b.doubleTime = b.stun = 0;
+      b.streak = b.comboTime = 0;
       events.push({ type: 'gulp', eater: a.id, eaten: b.id });
       const after = levelOf(a.r);
       if (after > before) events.push({ type: 'level', hole: a.id, level: after });
@@ -435,6 +575,174 @@ function regrow(w: World, dt: number, events: WorldEvent[]): void {
     w.props.set(p.id, p);
     events.push({ type: 'regrow', prop: p });
   }
+}
+
+/** Add a thing to the city during the round: into the props and the grid. */
+function place(w: World, p: Prop): void {
+  w.props.set(p.id, p);
+  const key = cellKey(Math.floor(p.x / CELL), Math.floor(p.z / CELL));
+  const list = w.grid.get(key);
+  if (list) list.push(p.id);
+  else w.grid.set(key, [p.id]);
+}
+
+/**
+ * Work on the waiting lots, only while no hole is close by: put up a
+ * construction site, and later finish it as a new building.
+ */
+function rebuild(w: World, events: WorldEvent[]): void {
+  for (let i = w.lots.length - 1; i >= 0; i--) {
+    const lot = w.lots[i];
+    if (lot.due > w.elapsed) continue;
+    if (w.holes.some((h) => h.alive && Math.hypot(h.x - lot.x, h.z - lot.z) < h.r + lot.room / 2 + 14)) continue;
+    const variant = Math.floor(w.rng() * 8);
+    if (lot.site === null) {
+      const site = makeProp(w.nextPropId++, lot.rung < 0 && lot.room >= 20 ? 'bigsite' : 'site', lot.x, lot.z, lot.rot, variant);
+      place(w, site);
+      lot.site = site.id;
+      lot.due = w.elapsed + SITE_TIME + w.rng() * 8;
+      events.push({ type: 'rebuild', prop: site, replaces: null });
+      continue;
+    }
+    const site = w.props.get(lot.site);
+    w.lots.splice(i, 1);
+    if (!site) continue;
+    w.props.delete(site.id);
+    const kind = lot.rung < 0 ? bigKind(w, lot) : ladderKind(w, lot);
+    const extra = lot.rung < 0 ? 0 : Math.max(0, lot.rung + 1 - LADDER.indexOf(kind.kind));
+    const p = makeProp(w.nextPropId++, kind.kind, lot.x, lot.z, lot.rot, variant, kind.hScale ?? Math.min(2, 1 + 0.2 * extra));
+    place(w, p);
+    events.push({ type: 'rebuild', prop: p, replaces: site });
+    const headline = HEADLINE[p.kind] ?? (p.kind === 'tower' && p.hScale >= 1.4 ? 'The city has a new skyscraper!' : undefined);
+    if (headline && w.elapsed - w.lastNews >= NEWS_GAP) {
+      w.lastNews = w.elapsed;
+      events.push({ type: 'news', text: headline, x: p.x, z: p.z });
+    }
+  }
+}
+
+/** One rung above what stood here, no higher than the city's age allows, and it must fit. */
+function ladderKind(w: World, lot: Lot): { kind: PropKind; hScale?: number } {
+  const age = Math.floor(w.elapsed / AGE_STEP);
+  let rung = Math.min(LADDER.length - 1, lot.rung + 1, age);
+  while (rung > 0 && Math.max(KINDS[LADDER[rung]].w, KINDS[LADDER[rung]].d) > lot.room) rung--;
+  return { kind: LADDER[rung] };
+}
+
+/** A big lot gets something big: the bigger the lot and the older the city, the grander. */
+function bigKind(w: World, lot: Lot): { kind: PropKind; hScale?: number } {
+  const fits = BIG.filter((k) => Math.max(KINDS[k].w, KINDS[k].d) <= lot.room && k !== 'chemplant');
+  const grand = fits.filter((k) => KINDS[k].tier >= 8);
+  const pool = w.elapsed > AGE_STEP * 2 && grand.length ? grand : fits.length ? fits : (['warehouse'] as PropKind[]);
+  return { kind: pool[Math.floor(w.rng() * pool.length)] };
+}
+
+// -------------------------------------------------------------------------
+// People
+// -------------------------------------------------------------------------
+
+/** People for the town blocks: nobody walks round a farm or up a mountain. */
+function createPeople(city: City, rng: Rng): Person[] {
+  const blocks = city.blockList.map((b, i) => ({ b, i })).filter(({ b }) => !['farm', 'forest', 'windfarm', 'mountain', 'apron'].includes(b.kind));
+  const count = Math.round(blocks.length * PEOPLE_PER_BLOCK);
+  const people: Person[] = [];
+  for (let n = 0; n < count; n++) {
+    const { i } = blocks[Math.floor(rng() * blocks.length)];
+    const p: Person = {
+      id: PERSON_ID + n,
+      variant: Math.floor(rng() * 8),
+      block: i,
+      t: rng(),
+      dir: rng() < 0.5 ? 1 : -1,
+      speed: WALK * (0.8 + rng() * 0.4),
+      x: 0,
+      z: 0,
+      heading: 0,
+      alive: true,
+      respawnIn: 0,
+      panic: 0,
+    };
+    walkTo(city.blockList[i], p);
+    people.push(p);
+  }
+  return people;
+}
+
+/** Put someone at their place round the block, facing the way they walk. */
+function walkTo(b: Block, p: Person): void {
+  const inset = SIDEWALK / 2;
+  const side = BLOCK - inset * 2;
+  const u = (((p.t % 1) + 1) % 1) * 4;
+  const k = Math.floor(u);
+  const f = (u - k) * side;
+  const x0 = b.x + inset;
+  const z0 = b.z + inset;
+  // Anticlockwise from the south-west corner: along x, up z, back x, down z.
+  const at = [
+    [x0 + f, z0, 1, 0],
+    [x0 + side, z0 + f, 0, 1],
+    [x0 + side - f, z0 + side, -1, 0],
+    [x0, z0 + side - f, 0, -1],
+  ][k];
+  p.x = at[0];
+  p.z = at[1];
+  p.heading = Math.atan2(at[2] * p.dir, at[3] * p.dir);
+}
+
+/** Walk everyone round their block; they run from a hole close by, and one close enough falls in. */
+function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
+  const around = 4 * (BLOCK - SIDEWALK);
+  for (const p of w.people) {
+    if (!p.alive) {
+      p.respawnIn -= dt;
+      if (p.respawnIn <= 0) comeBack(w, p);
+      continue;
+    }
+    let eaten: Hole | null = null;
+    for (const h of w.holes) {
+      if (!h.alive) continue;
+      const d = Math.hypot(h.x - p.x, h.z - p.z);
+      if (d < h.r - 0.3) {
+        eaten = h;
+        break;
+      }
+      // Running away: turn round if the hole is ahead.
+      if (d < h.r + 5 && p.panic <= 0) {
+        p.panic = 1.5;
+        const ahead = (h.x - p.x) * Math.sin(p.heading) + (h.z - p.z) * Math.cos(p.heading);
+        if (ahead > 0) p.dir = p.dir === 1 ? -1 : 1;
+      }
+    }
+    if (eaten) {
+      p.alive = false;
+      p.respawnIn = 8 + w.rng() * 6;
+      gobble(w, eaten, makeProp(p.id, 'person', p.x, p.z, p.heading, p.variant), events);
+      continue;
+    }
+    p.panic = Math.max(0, p.panic - dt);
+    p.t += (p.dir * p.speed * (p.panic > 0 ? 2.4 : 1) * dt) / around;
+    walkTo(w.city.blockList[p.block], p);
+  }
+}
+
+/** Back into town, on a block well away from every hole. */
+function comeBack(w: World, p: Person): void {
+  const blocks = w.city.blockList;
+  for (let tries = 0; tries < 6; tries++) {
+    const i = Math.floor(w.rng() * blocks.length);
+    const b = blocks[i];
+    if (['farm', 'forest', 'windfarm', 'mountain', 'apron'].includes(b.kind)) continue;
+    const cx = b.x + b.size / 2;
+    const cz = b.z + b.size / 2;
+    if (w.holes.some((h) => h.alive && Math.hypot(h.x - cx, h.z - cz) < h.r + b.size)) continue;
+    p.block = i;
+    p.t = w.rng();
+    p.alive = true;
+    p.panic = 0;
+    walkTo(b, p);
+    return;
+  }
+  p.respawnIn = 2;
 }
 
 /** Back on a crossing as far as can be from any bigger hole. */
@@ -474,7 +782,8 @@ function spawnPowerups(w: World, dt: number, player: Hole | null): void {
   w.powerups = w.powerups.filter((p) => p.life > 0);
   w.nextPower -= dt;
   if (w.nextPower > 0) return;
-  w.nextPower = 10 + w.rng() * 6;
+  // Now and then, not all the time: a boost should feel like a treat.
+  w.nextPower = 18 + w.rng() * 10;
   if (w.powerups.length >= POWER_MAX) return;
   // Mostly within the child's sight, so the child finds most of them.
   const alive = w.holes.filter((h) => h.alive);

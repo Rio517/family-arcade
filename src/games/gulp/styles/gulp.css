@@ -221,7 +221,36 @@
 }
 .gulp-seg button.on { background: var(--g-blue); color: #fff; box-shadow: 0 3px 0 var(--g-blue-ink); }
 
-.gulp-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gulp-toggles { display: grid; grid-template-columns: 1fr; gap: 8px; }
+
+/* PLAY with Options beside it. */
+.gulp-play-row { display: flex; gap: 10px; }
+.gulp-play-row .gulp-play { flex: 1; }
+.gulp-options-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 20px;
+  background: #eef2f8;
+  color: var(--g-ink);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 5px 0 rgba(20, 40, 90, 0.14);
+}
+.gulp-options-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(20, 40, 90, 0.14); }
+.gulp-skin.mini { width: 28px; height: 28px; border-width: 4px; box-shadow: none; }
+.gulp-skin.mini .gulp-skin-eyes::before,
+.gulp-skin.mini .gulp-skin-eyes::after { width: 9px; height: 9px; top: -7px; }
+.gulp-skin.mini .gulp-skin-eyes::before { left: 3px; }
+.gulp-skin.mini .gulp-skin-eyes::after { right: 3px; }
+
+.gulp-modal.options { width: min(520px, 100%); text-align: left; gap: 14px; }
+.gulp-modal-head { display: flex; align-items: center; justify-content: space-between; }
+.gulp-modal-head h2 { margin: 0; }
 .gulp-toggle {
   display: flex;
   align-items: center;
@@ -375,19 +404,94 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-meter { width: 120px; height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); overflow: hidden; }
 .gulp-meter-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7fd0ff, #fff); }
 .gulp-next { font-size: 14px; font-weight: 800; white-space: nowrap; }
-.gulp-powers { display: flex; gap: 6px; }
+.gulp-powers { display: flex; gap: 8px; }
 .gulp-power {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 4px;
-  padding: 4px 12px;
-  border-radius: 999px;
+  min-width: 128px;
+  padding: 6px 12px 8px;
+  border-radius: 16px;
   font-size: 15px;
   font-weight: 900;
   color: #fff;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
 }
+.gulp-power-top { display: flex; align-items: center; gap: 5px; }
+.gulp-power-top b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.gulp-power-bar { height: 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.35); overflow: hidden; }
+.gulp-power-bar span { display: block; height: 100%; border-radius: 999px; background: #fff; transition: width 0.1s linear; }
 .gulp-power.speed { background: #1fa8e8; }
 .gulp-power.double { background: var(--g-yellow-deep); }
+
+/* The combo: a big stroked multiplier on the right edge, hotter each step,
+   with the streak counted under it. */
+.gulp-combo {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right));
+  top: 38%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #fff;
+  font-weight: 900;
+  line-height: 0.9;
+  text-align: center;
+}
+.gulp-combo b,
+.gulp-combo em {
+  font-style: normal;
+  -webkit-text-stroke: 5px #1d1f33;
+  paint-order: stroke fill;
+  filter: drop-shadow(0 4px 0 rgba(29, 31, 51, 0.45));
+}
+.gulp-combo b { font-size: 64px; color: var(--g-yellow); }
+.gulp-combo em { font-size: 20px; letter-spacing: 0.08em; -webkit-text-stroke-width: 4px; }
+.gulp-combo span {
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(29, 31, 51, 0.72);
+  font-size: 15px;
+  line-height: 1.3;
+}
+.gulp-combo.c3 b { color: #7cff6b; }
+.gulp-combo.c4 b { color: #6fe0ff; }
+.gulp-combo.c5 b { color: #ff7a5c; }
+
+/* Breaking news: a TV-style strip near the bottom. */
+.gulp-news {
+  position: absolute;
+  left: 50%;
+  bottom: max(84px, calc(env(safe-area-inset-bottom) + 76px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+  max-width: calc(100vw - 32px);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 6px 0 rgba(20, 30, 70, 0.2), var(--g-shadow);
+  font-weight: 900;
+}
+.gulp-news-tag {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: #e8322b;
+  color: #fff;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.gulp-news-text {
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  background: #fff;
+  color: var(--g-ink);
+  font-size: 17px;
+}
 
 .gulp-right {
   position: absolute;
@@ -567,7 +671,8 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   .gulp-maps { grid-template-columns: 1fr 1fr; gap: 6px; }
   .gulp-map { min-height: 0; padding: 6px 8px; }
   .gulp-seg button { min-height: 42px; }
-  .gulp-toggles { grid-template-columns: 1fr; gap: 6px; }
+  .gulp-toggles { gap: 6px; }
+  .gulp-options-btn { padding: 0 12px; font-size: 16px; }
   .gulp-toggle { min-height: 0; padding: 6px 10px; }
   .gulp-play { min-height: 56px; font-size: 28px; }
   .gulp-foot { display: none; }
@@ -596,6 +701,12 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .gulp-combo b { display: inline-block; animation: gulp-bump 0.3s ease-out; }
+  .gulp-news { animation: gulp-rise 0.3s ease-out; }
+  @keyframes gulp-bump {
+    from { transform: scale(1.35); }
+    to { transform: scale(1); }
+  }
   .gulp-banner { animation: gulp-pop 0.28s ease-out; }
   .gulp-countdown { animation: gulp-pop 0.3s ease-out; }
   @keyframes gulp-pop {

@@ -12,10 +12,11 @@ import {
   FLUSH,
   ON_GROUND,
   PAL,
-  acUnit,
   darker,
   doorAt,
   lighter,
+  mix,
+  paneAt,
   parapet,
   placement,
   translate,
@@ -53,6 +54,10 @@ const CONCRETE = 0xd4d0c8;
 const ASPHALT = 0x6f7580;
 const STEAM = 0xf3f6f9;
 const RED = 0xe63946;
+/** Bright window glass, the same sky blue the town's buildings use. */
+const GLASS = 0x6fd8ff;
+/** Warm white for podiums, ledges and spires on the soft skyscrapers. */
+const CREAM_WHITE = 0xfff6e6;
 
 // ---------------------------------------------------------------------------
 // Helpers only the big kinds need
@@ -208,8 +213,8 @@ function smallTree(k: Kit, x: number, y: number, z: number, r: number, color: nu
 // Tier 7: factories and farms
 
 const FACTORY = [
-  { wall: 0xc8643b, roof: 0x7d8796, trim: 0xf3e6cc, office: 0xf6ecd8, stack: [0xe63946, 0xf7f8fa] as Pair },
-  { wall: 0x6f9ccc, roof: 0xe3e7ec, trim: 0x2f4d73, office: 0xfff1d6, stack: [0xff8c42, 0xf7f8fa] as Pair },
+  { wall: 0x52639a, roof: 0x17c3b2, trim: 0xfff1d6, office: 0xffc933, stack: [0xf2433a, 0xf7f8fa] as Pair },
+  { wall: 0x2f7bff, roof: 0xffc933, trim: 0xfff1d6, office: 0xff8a4c, stack: [0xff8a1f, 0xf7f8fa] as Pair },
 ];
 
 const factory: Builder = (k, v) => {
@@ -225,8 +230,8 @@ const factory: Builder = (k, v) => {
   const cz = (hz0 + hz1) / 2;
   const top = 5.6;
   k.box(darker(c.wall, 0.3), W + 0.2, 0.35, D + 0.2, cx, 0, cz, undefined, ON_GROUND);
-  k.box(c.wall, W, top - 0.35, D, cx, 0.35, cz, undefined, ON_GROUND);
-  k.box(c.trim, W + 0.16, 0.25, D + 0.16, cx, top - 0.25, cz, undefined, ON_GROUND);
+  k.rbox(c.wall, W, top - 0.35, D, 0.8, 0, cx, 0.35, cz, { seg: 3 });
+  k.rbox(c.trim, W + 0.3, 0.3, D + 0.3, 0.95, 0, cx, top - 0.3, cz, { seg: 3 });
 
   // Saw-tooth roof: each tooth climbs toward the front and drops in a glazed
   // face, so the camera sees a row of bright north lights.
@@ -245,8 +250,8 @@ const factory: Builder = (k, v) => {
       [hx1, top + rise, z1],
     ]);
     k.box(PAL.glass, W - 0.4, rise - 0.35, 0.1, cx, top + 0.12, z1 + 0.04, undefined, FLUSH);
-    for (let j = 1; j < 5; j++) {
-      k.box(c.trim, 0.16, rise - 0.35, 0.14, hx0 + (j * W) / 5, top + 0.12, z1 + 0.06, undefined, FLUSH);
+    for (let j = 1; j < 3; j++) {
+      k.box(c.trim, 0.36, rise - 0.35, 0.16, hx0 + (j * W) / 3, top + 0.12, z1 + 0.06, undefined, FLUSH);
     }
   }
 
@@ -264,7 +269,7 @@ const factory: Builder = (k, v) => {
         const n = Math.floor(wall.len / 3.6);
         for (let i = 0; i < n; i++) {
           const u = -wall.len / 2 + ((i + 0.5) * wall.len) / n;
-          windowAt(k, { frame: c.trim, glass: PAL.glass, cross: true }, u, 1.7, 1.5, 2.4);
+          paneAt(k, GLASS, c.trim, u, 1.8, 1.7, 2.1);
         }
       });
     }
@@ -277,18 +282,17 @@ const factory: Builder = (k, v) => {
   const OD = 6.6;
   const OH = 6.2;
   k.box(darker(c.office, 0.2), OW + 0.2, 0.3, OD + 0.2, ox, 0, oz, undefined, ON_GROUND);
-  k.box(c.office, OW, OH - 0.3, OD, ox, 0.3, oz, undefined, ON_GROUND);
-  k.box(c.trim, OW + 0.3, 0.35, OD + 0.3, ox, OH, oz, undefined, ON_GROUND);
-  k.box(PAL.roofDeck, OW - 0.4, 0.04, OD - 0.4, ox, OH + 0.35, oz, undefined, ON_GROUND);
-  acUnit(k, ox - 0.8, OH + 0.35, oz - 1.4, 1.2, 0.7, 1.0);
+  k.rbox(c.office, OW, OH - 0.3, OD, 0.6, 0, ox, 0.3, oz, { seg: 3 });
+  k.rbox(c.trim, OW + 0.4, 0.45, OD + 0.4, 0.8, 0.18, ox, OH, oz, { seg: 3 });
+  k.box(c.roof, OW - 0.5, 0.04, OD - 0.5, ox, OH + 0.45, oz, undefined, ON_GROUND);
   k.within(translate(ox, 0, oz), () => {
     for (const wall of walls(OW, OD)) {
       k.within(wall.m, () => {
-        ribbon(k, PAL.glassDeep, c.trim, wall.len - 1.0, 3.7, 1.5, 3);
+        ribbon(k, GLASS, c.trim, wall.len - 1.6, 3.7, 1.5, 2);
         if (wall.side === 'front') {
           doorAt(k, c.trim, c.wall, 0, 0.3, 1.1, 2.2);
         } else {
-          ribbon(k, PAL.glassDeep, c.trim, wall.len - 1.0, 1.1, 1.5, 3);
+          ribbon(k, GLASS, c.trim, wall.len - 1.6, 1.1, 1.5, 2);
         }
       });
     }
@@ -308,9 +312,9 @@ const factory: Builder = (k, v) => {
 };
 
 const WAREHOUSE = [
-  { wall: 0xe8dcc2, roof: 0x4f86c6, trim: 0x2f5d8f, curved: true },
-  { wall: 0xa7d3b0, roof: 0xe2e6ea, trim: 0x2f7d5b, curved: true },
-  { wall: 0xf0b27a, roof: 0x8d99ae, trim: 0xb8572b, curved: false },
+  { wall: 0xfff1d6, roof: 0x2f7bff, trim: 0x2f7bff, curved: true },
+  { wall: 0x2ec4b6, roof: 0xff8a1f, trim: 0x178f83, curved: true },
+  { wall: 0xff7a5c, roof: 0xffc933, trim: 0xc9503a, curved: false },
 ];
 
 const warehouse: Builder = (k, v) => {
@@ -320,21 +324,21 @@ const warehouse: Builder = (k, v) => {
   const wallTop = c.curved ? 6.0 : 7.9;
   const rib = darker(c.wall, 0.12);
   k.box(darker(c.wall, 0.3), W + 0.2, 0.4, D + 0.2, 0, 0, 0, undefined, ON_GROUND);
-  k.box(c.wall, W, wallTop - 0.4, D, 0, 0.4, 0, undefined, ON_GROUND);
+  k.rbox(c.wall, W, wallTop - 0.4, D, 0.6, 0, 0, 0.4, 0, { seg: 3 });
   const doorsU = [-7.2, 0, 7.2];
   const doorW = 4.2;
   const doorH = 4.4;
   for (const wall of walls(W, D)) {
     k.within(wall.m, () => {
-      // Corrugated cladding: slim ribs everywhere except over the doors.
-      const n = Math.round(wall.len / 0.8);
+      // Cladding: a few chunky ribs, kept clear of the doors.
+      const n = Math.round(wall.len / 2.6);
       for (let i = 1; i < n; i++) {
         const u = -wall.len / 2 + (i * wall.len) / n;
         const overDoor = wall.side === 'front' && doorsU.some((d) => Math.abs(u - d) < doorW / 2 + 0.35);
         const y0 = overDoor ? 0.4 + doorH + 0.3 : 0.4;
-        k.box(rib, 0.16, wallTop - 0.1 - y0, 0.12, u, y0, 0, undefined, ['nz', 'ny']);
+        k.box(rib, 0.36, wallTop - 0.1 - y0, 0.16, u, y0, 0, undefined, ['nz', 'ny']);
       }
-      k.box(c.trim, wall.len + 0.1, 0.5, 0.3, 0, wallTop - 0.75, 0, undefined, FLUSH);
+      k.box(c.trim, wall.len - 1.0, 0.5, 0.3, 0, wallTop - 0.75, 0, undefined, FLUSH);
       if (wall.side === 'front') {
         for (const u of doorsU) {
           rollDoor(k, c.trim, u, 0.4, doorW, doorH);
@@ -344,7 +348,7 @@ const warehouse: Builder = (k, v) => {
         }
       } else if (wall.side === 'right') {
         doorAt(k, c.trim, c.trim, -2.5, 0.4, 1.0, 2.1);
-        windowAt(k, { frame: PAL.white, glass: PAL.glass }, 0.2, 1.6, 1.4, 1.1);
+        paneAt(k, GLASS, PAL.white, 0.4, 1.6, 1.6, 1.2);
       }
     });
   }
@@ -359,15 +363,13 @@ const warehouse: Builder = (k, v) => {
     }
   } else {
     parapet(k, c.trim, W, D, wallTop, 0.6, 0.3);
-    k.box(PAL.roofDeck, W - 0.6, 0.04, D - 0.6, 0, wallTop, 0, undefined, ON_GROUND);
+    k.box(c.roof, W - 0.6, 0.04, D - 0.6, 0, wallTop, 0, undefined, ON_GROUND);
     for (const x of [-7.5, 0, 7.5]) {
       for (const z of [-2.5, 2.5]) {
         k.box(PAL.white, 2.6, 0.3, 1.4, x, wallTop, z, undefined, ON_GROUND);
         k.box(PAL.glass, 2.3, 0.36, 1.1, x, wallTop, z, undefined, ON_GROUND);
       }
     }
-    acUnit(k, -10, wallTop, 0, 1.4, 0.8, 1.1);
-    acUnit(k, 10, wallTop, -0.5, 1.4, 0.8, 1.1);
   }
 };
 
@@ -831,15 +833,15 @@ const powerplant: Builder = (k) => {
   const hz = 7.0;
   const HW = 24;
   const HD = 10.4;
-  const hallWall = 0x8fb3d9;
+  const hallWall = 0x5aa0e8;
   k.box(darker(hallWall, 0.3), HW + 0.2, 0.4, HD + 0.2, hx, 0, hz, undefined, ON_GROUND);
   k.box(hallWall, HW, 8.6, HD, hx, 0.4, hz, undefined, ON_GROUND);
   k.within(translate(hx, 0, hz), () => {
     parapet(k, PAL.white, HW, HD, 9.0, 0.5, 0.3);
-    k.box(PAL.roofDeck, HW - 0.6, 0.04, HD - 0.6, 0, 9.0, 0, undefined, ON_GROUND);
+    k.box(0x17c3b2, HW - 0.6, 0.04, HD - 0.6, 0, 9.0, 0, undefined, ON_GROUND);
     for (const wall of walls(HW, HD)) {
       k.within(wall.m, () => {
-        ribbon(k, PAL.glassDeep, PAL.white, wall.len - 2, 5.6, 2.0, Math.round(wall.len / 2.4));
+        ribbon(k, GLASS, PAL.white, wall.len - 2, 5.6, 2.0, Math.round(wall.len / 6));
         if (wall.side === 'front') {
           rollDoor(k, PAL.white, -6, 0.4, 3.6, 4.0);
           rollDoor(k, PAL.white, 6, 0.4, 3.6, 4.0);
@@ -847,7 +849,6 @@ const powerplant: Builder = (k) => {
         }
       });
     }
-    for (const x of [-8, -2, 4]) acUnit(k, x, 9.0, -1.5, 1.6, 0.8, 1.2);
   });
   // Boiler house.
   const bx = 12.3;
@@ -858,13 +859,12 @@ const powerplant: Builder = (k) => {
   k.box(boiler, BW, 14.4, BD, bx, 0, bz, undefined, ON_GROUND);
   k.within(translate(bx, 0, bz), () => {
     parapet(k, PAL.white, BW, BD, 14.4, 0.5, 0.3);
-    k.box(PAL.roofDeck, BW - 0.6, 0.04, BD - 0.6, 0, 14.4, 0, undefined, ON_GROUND);
+    k.box(0xf2433a, BW - 0.6, 0.04, BD - 0.6, 0, 14.4, 0, undefined, ON_GROUND);
     for (const wall of walls(BW, BD)) {
       k.within(wall.m, () => {
-        for (const y of [3.0, 7.0, 11.0]) ribbon(k, PAL.glassDeep, PAL.white, wall.len - 1.6, y, 1.6, 3);
+        for (const y of [3.0, 7.0, 11.0]) ribbon(k, GLASS, PAL.white, wall.len - 1.6, y, 1.6, 2);
       });
     }
-    acUnit(k, 0, 14.4, 2, 2.0, 1.0, 1.6);
   });
   // Big pipes from the towers into the hall.
   for (const x of [-9.8, 3.6]) k.beam(PAL.metal, [x, 2.6, -0.6], [x, 2.6, 1.9], 1.0);
@@ -882,9 +882,9 @@ const powerplant: Builder = (k) => {
 };
 
 const MALL = [
-  { wall: 0xf2e8cf, accent: 0xe63946 },
-  { wall: 0xdfe6ee, accent: 0x2f7fe0 },
-  { wall: 0xf7d6e0, accent: 0x8e5cd9 },
+  { wall: 0xffd23f, accent: 0xf2433a },
+  { wall: 0x6fc3ff, accent: 0x2f7bff },
+  { wall: 0xff8fb8, accent: 0x7a4de8 },
 ];
 
 const mall: Builder = (k, v) => {
@@ -895,10 +895,10 @@ const mall: Builder = (k, v) => {
   const H = 8.4;
   const front = cz + D / 2;
   k.box(darker(c.wall, 0.25), W + 0.2, 0.4, D + 0.2, 0, 0, cz, undefined, ON_GROUND);
-  k.box(c.wall, W, H - 0.4, D, 0, 0.4, cz, undefined, ON_GROUND);
+  k.rbox(c.wall, W, H - 0.4, D, 1.2, 0, 0, 0.4, cz, { seg: 3 });
   k.within(translate(0, 0, cz), () => {
     parapet(k, PAL.white, W, D, H, 0.6, 0.35);
-    k.box(PAL.roofDeck, W - 0.7, 0.04, D - 0.7, 0, H, 0, undefined, ON_GROUND);
+    k.box(mix(c.accent, 0xffffff, 0.35), W - 0.7, 0.04, D - 0.7, 0, H, 0, undefined, ON_GROUND);
     for (const wall of walls(W, D)) {
       k.within(wall.m, () => {
         const n = Math.round(wall.len / 3.3);
@@ -907,7 +907,7 @@ const mall: Builder = (k, v) => {
           if (wall.side === 'front' && Math.abs(u) < 6) continue;
           k.box(PAL.white, 0.5, H - 0.4, 0.24, u, 0.4, 0, undefined, ['nz', 'ny']);
         }
-        k.box(c.accent, wall.len, 0.55, 0.3, 0, H - 1.25, 0, undefined, FLUSH);
+        k.box(c.accent, wall.len - 2.0, 0.55, 0.3, 0, H - 1.25, 0, undefined, FLUSH);
         if (wall.side === 'front') {
           for (const s of [-1, 1]) {
             k.box(c.accent, 8.4, 1.8, 0.36, s * 11, 4.4, 0, undefined, FLUSH);
@@ -966,7 +966,6 @@ const mall: Builder = (k, v) => {
     const row = i % 2 ? -3.1 : 3.1;
     toyCar(k, carColors[i], -13 + stall * 2.6, H + 0.06, pz + row, row > 0 ? 0 : Math.PI);
   });
-  for (const x of [-12, -6, 6, 12]) acUnit(k, x, H, front - 5.5, 1.6, 0.8, 1.2);
   for (const x of [-9, 9]) {
     k.box(PAL.white, 3.2, 0.3, 2.2, x, H, front - 9, undefined, ON_GROUND);
     k.box(PAL.glass, 2.9, 0.36, 1.9, x, H, front - 9, undefined, ON_GROUND);
@@ -1104,35 +1103,29 @@ const jet: Builder = (k, v) => {
 // Tier 9: skyscrapers and landmarks
 
 const SKY = [
-  { glass: 0x5ec4e6, band: 0xf1f5f9, accent: 0xf7f8fa, tiers: [18, 15, 11.5], rots: [0, 0, 0], crown: 'steps' },
-  { glass: 0x3a63b8, band: 0xc9d3de, accent: 0xf2c14e, tiers: [18, 13], rots: [0, 0], crown: 'pyramid' },
-  { glass: 0xe7b24c, band: 0x4a4f5c, accent: 0x4a4f5c, tiers: [18, 12, 8.4], rots: [0, Math.PI / 4, 0], crown: 'spire' },
+  { body: 0x4f6096, glass: 0x62d8ff, crown: 0x19c7b4, tiers: [18, 15, 11.5], rots: [0, 0, 0], top: 'steps' },
+  { body: 0x4aa8ff, glass: 0xc8f0ff, crown: 0xffc933, tiers: [18, 13], rots: [0, 0], top: 'dome' },
+  { body: 0x7c5ce6, glass: 0x9fe3ff, crown: 0xff6b5b, tiers: [18, 12, 8.4], rots: [0, Math.PI / 4, 0], top: 'spire' },
 ] as const;
 
-/** One glass tier: core, floor bands (a thicker plant floor every sixth), fins and corner piers. */
-function glassTier(k: Kit, S: number, y0: number, h: number, glass: number, band: number, ry: number): void {
-  const n = Math.max(2, Math.round(h / 4.2));
-  const fh = h / n;
-  const core = S - 0.5;
+/**
+ * One tier: a soft block with one wide rounded window band per floor on each
+ * face, under a thick rounded ledge. Big floors keep it a toy, not graph paper.
+ */
+function softTier(k: Kit, S: number, y0: number, h: number, body: number, glass: number, ry: number): void {
+  const ledge = 1.2;
+  const n = Math.max(2, Math.round((h - ledge) / 6.5));
+  const fh = (h - ledge) / n;
+  const r = S * 0.16;
+  const winH = Math.min(3.0, fh * 0.5);
   k.within(placement(0, y0, 0, { ry }), () => {
-    k.box(glass, core, h * 0.7, core, 0, 0, 0, undefined, ON_GROUND);
-    k.box(lighter(glass, 0.18), core, h * 0.3, core, 0, h * 0.7, 0, undefined, ON_GROUND);
-    k.box(band, S, 0.5, S, 0, 0, 0, undefined, ON_GROUND);
-    for (let i = 1; i < n; i++) {
-      const plant = i % 6 === 0;
-      k.box(band, S - 0.1, plant ? 1.0 : 0.38, S - 0.1, 0, i * fh - (plant ? 0.5 : 0.19), 0, undefined, ON_GROUND);
-    }
-    k.box(band, S + 0.3, 0.7, S + 0.3, 0, h - 0.7, 0, undefined, ON_GROUND);
-    const m = Math.max(3, Math.round(S / 2.8));
-    for (const wall of walls(core, core)) {
+    k.rbox(body, S, h - ledge + 0.1, S, r, 0, 0, 0, 0, { seg: 3 });
+    for (const wall of walls(S, S)) {
       k.within(wall.m, () => {
-        for (let j = 1; j < m; j++) k.box(band, 0.3, h, 0.4, -core / 2 + (j * core) / m, 0, 0, undefined, ['nz', 'ny']);
+        for (let i = 0; i < n; i++) k.plate(glass, S - 2 * r - 1.2, winH, winH * 0.2, 0.22, 0, i * fh + (fh - winH) / 2, 0, 1);
       });
     }
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) k.box(band, 0.8, h, 0.8, (sx * core) / 2, 0, (sz * core) / 2, undefined, ON_GROUND);
-    }
-    k.box(PAL.roofDeck, S - 0.6, 0.04, S - 0.6, 0, h, 0, undefined, ON_GROUND);
+    k.rbox(CREAM_WHITE, S + 0.8, ledge, S + 0.8, r + 0.4, 0.45, 0, h - ledge, 0, { seg: 3 });
   });
 }
 
@@ -1141,71 +1134,59 @@ const skyscraper: Builder = (k, v, s) => {
   const H = 110 * s;
   const P = 7;
   const roofY = H * 0.86;
-  // Podium: glass lobby behind stone piers, with a roof garden.
-  k.box(PAL.stone, 22, 0.35, 22, 0, 0, 0, undefined, ON_GROUND);
-  k.box(PAL.glassDeep, 20.6, 5.2, 20.6, 0, 0.35, 0, undefined, ON_GROUND);
-  for (const wall of walls(21.4, 21.4)) {
+  // Podium: a wide soft block with big round-topped glass doors and a garden on top.
+  k.rbox(CREAM_WHITE, 21.6, P, 21.6, 3.2, 0.6, 0, 0, 0, { seg: 3 });
+  for (const wall of walls(21.6, 21.6)) {
     k.within(wall.m, () => {
-      for (let i = 0; i <= 6; i++) k.box(PAL.stone, 0.8, 5.2, 0.8, -10.3 + (i * 20.6) / 6, 0.35, 0, undefined, ON_GROUND);
-      if (wall.side === 'front') k.box(c.accent === c.band ? 0x2f6fd6 : c.accent, 5, 0.35, 1.0, 0, 3.8, 0.5);
+      k.plate(c.glass, 4.2, 4.6, 2.1, 0.2, 0, 0, 0, 2);
+      k.box(c.glass, 4.2, 2.3, 0.2, 0, 0, 0, undefined, FLUSH);
+      for (const u of [-5.3, 5.3]) k.plate(c.glass, 3.6, 3.0, 1.0, 0.2, u, 1.6, 0, 2);
+      if (wall.side === 'front') k.rbox(c.crown, 6, 0.45, 1.0, 0.45, 0.15, 0, 4.9, 0.5);
     });
   }
-  k.box(PAL.stone, 22, 1.45, 22, 0, 5.55, 0, undefined, ON_GROUND);
   for (const [x, z] of [
-    [-9, -9],
-    [9, -9],
-    [-9, 9],
-    [9, 9],
+    [-8, -8],
+    [8, -8],
+    [-8, 8],
+    [8, 8],
   ] as const) {
-    k.box(0x6dbb5a, 3.2, 0.25, 3.2, x, P, z, undefined, ON_GROUND);
-    smallTree(k, x, P + 0.25, z, 1.0);
+    k.box(0x5ccf6a, 3.4, 0.25, 3.4, x, P, z, undefined, ON_GROUND);
+    smallTree(k, x, P + 0.25, z, 1.1);
   }
   // Tiers, each set back from the one below; ledges get a little greenery.
   const fr = c.tiers.length === 3 ? [0.42, 0.33, 0.25] : [0.58, 0.42];
   let y = P;
   c.tiers.forEach((S, i) => {
     const h = (roofY - P) * fr[i];
-    glassTier(k, S, y, h, lighter(c.glass, i * 0.07), c.band, c.rots[i]);
+    softTier(k, S, y, h, c.body, c.glass, c.rots[i]);
     y += h;
     const next = c.tiers[i + 1];
     if (next !== undefined && S - next > 3) {
-      const r = S / 2 - 1.1;
-      for (const sx of [-1, 1]) smallTree(k, sx * r, y, r * (i % 2 ? -1 : 1), 0.8);
+      const r = S / 2 - 1.3;
+      for (const sx of [-1, 1]) smallTree(k, sx * r, y, r * (i % 2 ? -1 : 1), 0.9);
     }
   });
   const top = c.tiers[c.tiers.length - 1];
+  // Every crown ends in a short spire with a fat red ball, the top of the city.
   const spireTip = (from: number, rBase: number) => {
-    k.cyl(PAL.metal, 0.1, rBase, H - from - 0.5, 8, 0, from, 0);
-    k.gem(RED, 0.45, [0, H - 0.45, 0]);
+    k.cyl(CREAM_WHITE, 0.2, rBase, H - from - 1.4, 8, 0, from, 0);
+    k.sphere(RED, 0.9, [0, H - 0.9, 0], 8, 5);
   };
-  if (c.crown === 'steps') {
-    k.box(c.band, top - 2.5, 2.4, top - 2.5, 0, roofY, 0, undefined, ON_GROUND);
-    k.box(lighter(c.glass, 0.35), top - 5, 2.6, top - 5, 0, roofY + 2.4, 0, undefined, ON_GROUND);
-    k.box(c.band, top - 4.4, 0.4, top - 4.4, 0, roofY + 5.0, 0, undefined, ON_GROUND);
-    spireTip(roofY + 5.4, 0.7);
-  } else if (c.crown === 'pyramid') {
-    const b = top / 2 - 0.3;
-    const apexY = roofY + (H - roofY) * 0.55;
-    k.hull(c.accent, [
-      [-b, roofY, -b],
-      [b, roofY, -b],
-      [-b, roofY, b],
-      [b, roofY, b],
-      [-0.6, apexY, -0.6],
-      [0.6, apexY, -0.6],
-      [-0.6, apexY, 0.6],
-      [0.6, apexY, 0.6],
-    ]);
-    spireTip(apexY, 0.5);
+  if (c.top === 'steps') {
+    k.rbox(c.crown, top - 2.5, 3.0, top - 2.5, 2.2, 0.6, 0, roofY, 0, { seg: 3 });
+    k.rbox(lighter(c.crown, 0.3), top - 6, 2.6, top - 6, 1.4, 0.5, 0, roofY + 3.0, 0, { seg: 3 });
+    spireTip(roofY + 5.6, 0.8);
+  } else if (c.top === 'dome') {
+    const b = top / 2 - 0.4;
+    const apexY = roofY + (H - roofY) * 0.5;
+    k.sphere(c.crown, b, [0, roofY, 0], 14, 5, { hemi: true, scale: [1, (apexY - roofY) / b, 1] });
+    spireTip(apexY - 0.4, 0.7);
   } else {
     const b = top / 2 - 0.4;
-    const crownY = roofY + (H - roofY) * 0.4;
-    k.box(c.accent, top - 1.5, 1.2, top - 1.5, 0, roofY, 0, undefined, ON_GROUND);
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) k.beam(c.accent, [sx * b, roofY, sz * b], [0, crownY, 0], 0.45);
-    }
-    k.cyl(lighter(c.glass, 0.3), 0.2, 1.6, crownY - roofY - 1.2, 8, 0, roofY + 1.2, 0);
-    spireTip(crownY, 0.6);
+    const crownY = roofY + 1.6;
+    k.rbox(c.crown, top - 1.0, 1.6, top - 1.0, 1.4, 0.5, 0, roofY, 0, { seg: 3, ry: c.rots[c.rots.length - 1] });
+    k.cyl(c.crown, 0.5, b, (H - crownY) * 0.55, 12, 0, crownY, 0);
+    spireTip(crownY + (H - crownY) * 0.5, 0.6);
   }
 };
 
@@ -1305,9 +1286,9 @@ const terminal: Builder = (k) => {
   k.within(translate(cx, 0, cz), () => {
     for (const wall of walls(W, D)) {
       k.within(wall.m, () => {
-        const n = Math.round(wall.len / 2.3);
+        const n = Math.round(wall.len / 4.6);
         for (let i = 1; i < n; i++) {
-          k.box(PAL.white, 0.22, top - 0.4, 0.26, -wall.len / 2 + (i * wall.len) / n, 0.4, 0, undefined, ['nz', 'ny']);
+          k.box(PAL.white, 0.44, top - 0.4, 0.3, -wall.len / 2 + (i * wall.len) / n, 0.4, 0, undefined, ['nz', 'ny']);
         }
         k.box(PAL.white, wall.len, 0.3, 0.26, 0, 4.2, 0, undefined, FLUSH);
         if (wall.side === 'back') k.box(PAL.glassDeep, 4, 2.6, 0.3, 0, 0.4, 0, undefined, FLUSH);

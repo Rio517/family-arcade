@@ -32,7 +32,15 @@ const GAME_ID = 'gulp';
 const SETTINGS_KEY = 'gulp:settings:v1';
 const BEST_KEY = 'gulp:best:v1';
 
-const DEFAULT_SETTINGS: Settings = { map: 'city', length: 'short', powerups: true, fightBack: false, skin: 0, muted: false };
+const DEFAULT_SETTINGS: Settings = {
+  map: 'city',
+  length: 'short',
+  powerups: true,
+  fightBack: false,
+  regrow: true,
+  skin: 0,
+  muted: false,
+};
 
 function loadSettings(): Settings {
   try {
@@ -124,7 +132,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
   const say = useCallback((b: Omit<Banner, 'id'>) => {
     const id = ++bannerId.current;
     setBanners((list) => [...list.slice(-2), { ...b, id }]);
-    window.setTimeout(() => setBanners((list) => list.filter((x) => x.id !== id)), 2400);
+    window.setTimeout(() => setBanners((list) => list.filter((x) => x.id !== id)), b.kind === 'news' ? 5000 : 2400);
   }, []);
 
   const play = () => {
@@ -136,6 +144,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
       duration: durationOf(s),
       powerups: s.powerups,
       fightBack: s.fightBack,
+      regrow: s.regrow,
     });
     const looks: HoleLook[] = [
       { color: SKINS[s.skin].color, label: 'You' },
@@ -208,6 +217,13 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
               sounds?.play('level');
               say({ kind: 'level', text: `Level ${e.level}!`, sub: e.level < 11 ? `Now you can eat ${unlockedAt(e.level).toLowerCase()}` : 'Bigger and bigger!' });
             }
+            break;
+          case 'news':
+            sounds?.play('level');
+            say({ kind: 'news', text: e.text });
+            break;
+          case 'combo':
+            if (e.hole === 0) sounds?.play('power');
             break;
           case 'power':
             if (e.hole === 0) {
