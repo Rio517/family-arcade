@@ -82,10 +82,10 @@ const HEALTH_BONUS = 0.5;
  * How fast the child grows, and what share of each thing's size and points
  * a computer hole gets, by level. On Easy the child grows a third faster and
  * the rivals get 70%: a young player wandering between meals still climbs
- * the levels and stays in the race. Medium and Hard keep a little of that.
+ * the levels and stays in the race. Medium and Hard keep most of that.
  */
-export const CHILD_GROWTH: Record<'easy' | 'medium' | 'hard', number> = { easy: 1.35, medium: 1.15, hard: 1.05 };
-const RIVAL_SHARE: Record<'easy' | 'medium' | 'hard', number> = { easy: 0.7, medium: 0.8, hard: 0.9 };
+export const CHILD_GROWTH: Record<'easy' | 'medium' | 'hard', number> = { easy: 1.4, medium: 1.25, hard: 1.15 };
+const RIVAL_SHARE: Record<'easy' | 'medium' | 'hard', number> = { easy: 0.6, medium: 0.65, hard: 0.75 };
 
 export function newHole(id: number, name: string, skin: number, isPlayer: boolean, x: number, z: number): Hole {
   return {
