@@ -1,16 +1,17 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
+import { MOUNT_IDS, type MountId } from '../domain/mounts';
 import { createRider, preloadRiderAssets, type CharacterId, type RiderPose } from './riders';
 
 const CHARACTERS: CharacterId[] = ['fairy', 'princess', 'unicorn', 'bunny'];
 
-const CRUISE: RiderPose = { speed: 36, bank: 0, climb: 0, tier: 0, boosting: false };
+const CRUISE: RiderPose = { speed: 26, bank: 0, climb: 0, tier: 0, boosting: false };
 
 function poses(): RiderPose[] {
   return [
-    { speed: 36, bank: 0, climb: 0, tier: 0, boosting: false },
-    { speed: 70, bank: 1, climb: 1, tier: 3, boosting: true },
+    { speed: 26, bank: 0, climb: 0, tier: 0, boosting: false },
+    { speed: 60, bank: 1, climb: 1, tier: 3, boosting: true },
     { speed: 12, bank: -1, climb: -1, tier: 1.6, boosting: false },
     { speed: 0, bank: 0, climb: 0, tier: 3, boosting: true },
   ];
@@ -143,6 +144,101 @@ describe('createRider', () => {
     for (const m of aMats) expect(bMats).not.toContain(m);
     a.dispose();
     b.dispose();
+  });
+});
+
+const RIDERS_WITH_MOUNTS = ['princess', 'bunny'] as const;
+
+describe('mounts', () => {
+  const combos = RIDERS_WITH_MOUNTS.flatMap((character) => MOUNT_IDS.map((mount) => [character, mount] as const));
+
+  it.each(combos)('%s on a %s builds, runs every pose finite, and disposes', (character, mount) => {
+    for (const reducedMotion of [false, true]) {
+      const rider = createRider(character, 0xffa94d, { reducedMotion, seed: 11, mount });
+      expect(countMeshes(rider.group)).toBeGreaterThan(0);
+      for (const pose of [...poses(), { ...CRUISE, wings: 1 }, { ...CRUISE, wings: 0.4, boosting: true }]) {
+        expect(() => rider.update(1 / 60, pose)).not.toThrow();
+        assertFiniteTree(rider.group);
+      }
+      expect(() => rider.update(5, CRUISE)).not.toThrow();
+      assertFiniteTree(rider.group);
+      expect(() => rider.dispose()).not.toThrow();
+    }
+  });
+
+  it.each(['fairy', 'unicorn'] as const)('%s ignores the mount option', (character) => {
+    const plain = createRider(character, 0xff7fc4, { reducedMotion: true, seed: 4 });
+    const plainCount = countMeshes(plain.group);
+    plain.dispose();
+    for (const mount of MOUNT_IDS) {
+      const rider = createRider(character, 0xff7fc4, { reducedMotion: true, seed: 4, mount });
+      expect(countMeshes(rider.group)).toBe(plainCount);
+      rider.dispose();
+    }
+  });
+
+  it('keeps the default rides: princess on a unicorn, bunny on a cloud', () => {
+    const count = (character: CharacterId, mount?: MountId): number => {
+      const rider = createRider(character, 0x6cc6ff, { reducedMotion: true, seed: 2, mount });
+      const n = countMeshes(rider.group);
+      rider.dispose();
+      return n;
+    };
+    expect(count('princess')).toBe(count('princess', 'unicorn'));
+    expect(count('bunny')).toBe(count('bunny', 'cloud'));
+    expect(count('princess', 'bird')).not.toBe(count('princess', 'unicorn'));
+  });
+
+  it('the bird is deterministic for a seed', () => {
+    const a = createRider('bunny', 0x6cc6ff, { reducedMotion: true, seed: 6, mount: 'bird' });
+    const b = createRider('bunny', 0x6cc6ff, { reducedMotion: true, seed: 6, mount: 'bird' });
+    a.update(1 / 60, CRUISE);
+    b.update(1 / 60, CRUISE);
+    a.group.updateWorldMatrix(true, true);
+    b.group.updateWorldMatrix(true, true);
+    const positions = (g: THREE.Object3D): number[] => {
+      const list: number[] = [];
+      g.traverse((o) => list.push(o.position.x, o.position.y, o.position.z));
+      return list;
+    };
+    expect(positions(a.group)).toEqual(positions(b.group));
+    a.dispose();
+    b.dispose();
+  });
+
+  /** Shoulder pivots: groups whose first child group carries extruded wing panels. */
+  function wingPivotsOf(group: THREE.Object3D): THREE.Object3D[] {
+    const pivots: THREE.Object3D[] = [];
+    group.traverse((o) => {
+      const panel = o.children[0];
+      const first = panel?.children[0] as THREE.Mesh | undefined;
+      if (first?.geometry?.type === 'ExtrudeGeometry') pivots.push(o);
+    });
+    return pivots;
+  }
+
+  it.each(RIDERS_WITH_MOUNTS)('the bird under a %s has two wing pivots that grow with the wings power-up', (character) => {
+    const scales = [0, 1].map((wings) => {
+      const rider = createRider(character, 0x6cc6ff, { reducedMotion: true, seed: 1, mount: 'bird' });
+      rider.update(1 / 60, { ...CRUISE, wings });
+      const pivots = wingPivotsOf(rider.group);
+      expect(pivots).toHaveLength(2);
+      const s = pivots[0].scale.x;
+      rider.dispose();
+      return s;
+    });
+    expect(scales[1]).toBeGreaterThan(scales[0]);
+  });
+
+  it('the cloud opens its wings with the wings power-up', () => {
+    const rider = createRider('bunny', 0x6cc6ff, { reducedMotion: true, seed: 1, mount: 'cloud' });
+    rider.update(1 / 60, { ...CRUISE, wings: 0 });
+    const closed = wingPivotsOf(rider.group).map((p) => p.visible);
+    rider.update(1 / 60, { ...CRUISE, wings: 1 });
+    const open = wingPivotsOf(rider.group).map((p) => p.visible);
+    expect(closed).toEqual([false, false]);
+    expect(open).toEqual([true, true]);
+    rider.dispose();
   });
 });
 

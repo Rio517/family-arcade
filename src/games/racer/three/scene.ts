@@ -2,10 +2,11 @@
  * The three.js view for Rainbow Racer — an open sky over a sea of clouds.
  *
  * There is no arena and no edge. The world is cut into the same cells the
- * rules use (domain/sky.ts): each cell's floating islands, rainbow ring,
- * clouds and balloons are rebuilt from its hash whenever the camera comes
- * near and dropped when it leaves, so wherever a child flies there is more
- * sky. The sky dome and the cloud sea travel with the camera.
+ * rules use (domain/sky.ts): each cell's floating islands, clouds and
+ * balloons are rebuilt from its hash whenever the camera comes near and
+ * dropped when it leaves, so wherever a child flies there is more sky. The
+ * rainbow road and its rings are built ahead of me as I fly. The sky dome
+ * and the cloud sea travel with the camera.
  *
  * Framework-free: the page builds one of these, then each frame hands it a
  * plain view (racers, coins, stars) to mirror. Everything is procedural apart
@@ -19,16 +20,15 @@ import { disposeDeep } from '@shared/three/disposeDeep';
 import {
   CELL,
   RING_RADIUS,
-  TRAIL_RING_EVERY,
   cellNoise,
   cellOf,
   islandsInCell,
-  ringInCell,
   trailPoint,
   trailRing,
   type Ring,
 } from '../domain/sky';
 import type { Flyer } from '../domain/flight';
+import type { MountId } from '../domain/mounts';
 import type { Coin, PowerKind, Star } from '../domain/pickups';
 import { createRider, preloadRiderAssets, type CharacterId, type Rider } from './riders';
 
@@ -61,6 +61,8 @@ export interface RacerLook {
   color: number;
   /** Which character flies. */
   character: CharacterId;
+  /** What a princess or a bunny rides; absent means their usual ride. */
+  mount?: MountId;
   /** Shown over the racer's head (rivals and the friend); empty for me. */
   label: string;
 }
@@ -225,6 +227,8 @@ interface RacerObj {
   label: THREE.Sprite | null;
   /** A soft glow while bursting or powered up. */
   glow: THREE.Sprite;
+  /** The racer the camera follows: its glow stays small and behind it. */
+  mine: boolean;
 }
 
 /** Shared geometry and materials for everything built per cell. */
@@ -243,7 +247,6 @@ interface Kit {
   cloudMat: THREE.Material;
   ringBands: THREE.BufferGeometry[];
   ringMats: THREE.Material[];
-  ringGlow: THREE.SpriteMaterial;
   balloon: THREE.BufferGeometry;
   balloonMats: THREE.Material[];
   basket: THREE.BufferGeometry;
@@ -252,9 +255,6 @@ interface Kit {
 
 interface CellObj {
   group: THREE.Group;
-  /** The ring's group, if the cell has one, for its spin and flash. */
-  ring: THREE.Group | null;
-  ringId: string | null;
 }
 
 /**
@@ -428,14 +428,6 @@ export class RacerScene {
       ringMats: RAINBOW.map(
         (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.55, roughness: 0.4 }),
       ),
-      ringGlow: new THREE.SpriteMaterial({
-        map: glowTexture(),
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
       balloon: new THREE.SphereGeometry(6, 18, 14),
       balloonMats: BALLOONS.map((c) => std(c, { roughness: 0.45 })),
       basket: new RoundedBoxGeometry(2.4, 2.2, 2.4, 2, 0.4),
@@ -514,26 +506,19 @@ export class RacerScene {
       group.add(b);
     }
 
-    let ring: THREE.Group | null = null;
-    const r = ringInCell(cx, cz);
-    if (r) {
-      ring = this.makeRing(r);
-      group.add(ring);
-    }
-
     this.scene.add(group);
-    return { group, ring, ringId: r?.id ?? null };
+    return { group };
   }
 
-  /** A rainbow ring: shared bands, its own glow (for its own flash). */
+  /**
+   * A rainbow ring: the six bands and nothing else. It has no glow of its
+   * own — the camera flies through every ring right behind the racer, and a
+   * glow filling the ring would white out the picture just then.
+   */
   private makeRing(r: Ring): THREE.Group {
     const k = this.kit;
     const ring = new THREE.Group();
     k.ringBands.forEach((geo, i) => ring.add(new THREE.Mesh(geo, k.ringMats[i])));
-    const glow = new THREE.Sprite(k.ringGlow.clone());
-    glow.scale.set(RING_RADIUS * 5, RING_RADIUS * 5, 1);
-    glow.name = 'glow';
-    ring.add(glow);
     ring.position.set(r.x, r.y, r.z);
     ring.rotation.y = r.heading;
     return ring;
@@ -588,13 +573,6 @@ export class RacerScene {
     const bob = this.reducedMotion ? 0 : Math.sin(this.time * 4) * 0.6;
     this.roadArrow.position.set(me.x + fx * 15, me.y + 8 + bob, me.z + fz * 15);
     this.roadArrow.rotation.y = Math.atan2(ahead.x - this.roadArrow.position.x, ahead.z - this.roadArrow.position.z);
-  }
-
-  /** Only a ring's glow material is its own; the bands are kit. */
-  private static freeRing(ring: THREE.Group): void {
-    ring.traverse((o) => {
-      if ((o as THREE.Sprite).isSprite) ((o as THREE.Sprite).material as THREE.Material).dispose();
-    });
   }
 
   /**
@@ -659,7 +637,7 @@ export class RacerScene {
     this.road.geometry = geo;
 
     const want = new Set<string>();
-    for (let i = Math.ceil(from / TRAIL_RING_EVERY) * TRAIL_RING_EVERY; i <= to; i += TRAIL_RING_EVERY) {
+    for (let i = from; i <= to; i++) {
       const r = trailRing(i);
       if (!r) continue;
       want.add(r.id);
@@ -671,7 +649,6 @@ export class RacerScene {
     for (const [id, ring] of this.roadRings) {
       if (want.has(id)) continue;
       this.scene.remove(ring);
-      RacerScene.freeRing(ring);
       this.roadRings.delete(id);
     }
   }
@@ -691,14 +668,17 @@ export class RacerScene {
     for (const [key, cell] of this.cells) {
       if (want.has(key)) continue;
       this.scene.remove(cell.group);
-      if (cell.ring) RacerScene.freeRing(cell.ring);
       this.cells.delete(key);
     }
   }
 
   private buildRacer(look: RacerLook, i: number): RacerObj {
     const holder = new THREE.Group();
-    const rider = createRider(look.character, look.color, { reducedMotion: this.reducedMotion, seed: i + 1 });
+    const rider = createRider(look.character, look.color, {
+      reducedMotion: this.reducedMotion,
+      seed: i + 1,
+      mount: look.mount,
+    });
     holder.add(rider.group);
     let label: THREE.Sprite | null = null;
     if (look.label) {
@@ -716,10 +696,13 @@ export class RacerScene {
         blending: THREE.AdditiveBlending,
       }),
     );
-    glow.scale.set(30, 30, 1);
+    const mine = i === this.followIndex;
+    // My own glow sits just beyond me, so from the chase camera my racer
+    // hides its middle and it reads as a halo, never a haze over the view.
+    if (mine) glow.position.set(0, 2, 5);
     holder.add(glow);
     this.scene.add(holder);
-    return { holder, rider, label, glow };
+    return { holder, rider, label, glow, mine };
   }
 
   private buildCoinTemplate(): THREE.Group {
@@ -760,7 +743,7 @@ export class RacerScene {
         map: glowTexture(),
         color,
         transparent: true,
-        opacity: 0.55,
+        opacity: 0.4,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       });
@@ -825,7 +808,7 @@ export class RacerScene {
     }
     g.add(body);
     const glow = new THREE.Sprite(k.glows[kind]);
-    glow.scale.set(16, 16, 1);
+    glow.scale.set(13, 13, 1);
     g.add(glow);
     g.userData.kind = kind;
     g.position.set(star.x, star.y, star.z);
@@ -849,6 +832,26 @@ export class RacerScene {
     }
   }
 
+  /**
+   * Rainbow sparkles thrown outward from a ring's rim, in the ring's own
+   * plane — out toward the edges of the picture, away from where I look.
+   */
+  private ringSparkles(ring: THREE.Group): void {
+    if (this.reducedMotion) return;
+    const count = 18;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const out = new THREE.Vector3(Math.cos(a), Math.sin(a), 0).applyQuaternion(ring.quaternion);
+      const mat = this.sparkleMat.clone();
+      mat.color.setHex(RAINBOW[i % RAINBOW.length]);
+      const sprite = new THREE.Sprite(mat);
+      sprite.position.copy(ring.position).addScaledVector(out, RING_RADIUS + 1);
+      sprite.scale.setScalar(2.5);
+      this.scene.add(sprite);
+      this.sparkles.push({ sprite, life: 0.6, vel: out.multiplyScalar(16) });
+    }
+  }
+
   sync(view: SceneView, dt: number): void {
     if (this.disposed) return;
     this.time += dt;
@@ -868,10 +871,13 @@ export class RacerScene {
         // Full wings until the last second, then they fold back.
         wings: Math.min(1, k.wingTime),
       });
-      const glowing = k.burst > 0 ? 0.55 : k.tier > 0 ? 0.18 + 0.08 * k.tier : k.wingTime > 0 ? 0.14 : 0;
+      const powered = k.tier > 0 || k.wingTime > 0;
+      const glowing = obj.mine
+        ? k.burst > 0 ? 0.3 : powered ? 0.1 + 0.05 * k.tier : 0
+        : k.burst > 0 ? 0.45 : powered ? 0.16 + 0.07 * k.tier : 0;
       const mat = obj.glow.material as THREE.SpriteMaterial;
       mat.opacity += (glowing - mat.opacity) * Math.min(1, dt * 6);
-      obj.glow.scale.setScalar(26 + 8 * k.tier);
+      obj.glow.scale.setScalar(obj.mine ? 11 + 3 * k.tier : 18 + 6 * k.tier);
       if (obj.label) obj.label.position.y = 10 + 2.5 * k.tier;
     });
 
@@ -942,20 +948,19 @@ export class RacerScene {
 
     if (!me) return;
 
-    // Rings turn slowly and flash when I fly through one.
+    // Rings turn slowly, and pop and throw rainbow sparkles off their rim
+    // when I fly through one.
     if (me.lastRing && me.lastRing !== this.lastRing) {
       this.lastRing = me.lastRing;
       this.ringFlash.set(me.lastRing, 1);
+      const ring = this.roadRings.get(me.lastRing);
+      if (ring) this.ringSparkles(ring);
     }
-    const animate = (ring: THREE.Group, id: string) => {
+    for (const [id, ring] of this.roadRings) {
       const flash = this.ringFlash.get(id) ?? 0;
-      const glow = ring.getObjectByName('glow') as THREE.Sprite | undefined;
-      if (glow) (glow.material as THREE.SpriteMaterial).opacity = 0.25 + flash * 0.75;
       if (!this.reducedMotion) ring.children.forEach((c, i) => (c.rotation.z = this.time * (0.4 + i * 0.05)));
-      ring.scale.setScalar(1 + flash * 0.25);
-    };
-    for (const cell of this.cells.values()) if (cell.ring) animate(cell.ring, cell.ringId ?? '');
-    for (const [id, ring] of this.roadRings) animate(ring, id);
+      ring.scale.setScalar(1 + flash * 0.2);
+    }
     for (const [id, f] of this.ringFlash) {
       const next = f - dt * 1.5;
       if (next <= 0) this.ringFlash.delete(id);
@@ -970,7 +975,7 @@ export class RacerScene {
     // and pulls back a touch at speed, so a burst feels fast.
     const fx = Math.sin(me.heading);
     const fz = Math.cos(me.heading);
-    const back = 21 + me.tier * 3.5 + (me.burst > 0 ? 5 : 0);
+    const back = 21 + me.tier * 3.5 + (me.burst > 0 ? 3 : 0);
     this.scratch.set(me.x - fx * back, me.y + 6.5 + me.tier * 1.5 - me.climb * 3, me.z - fz * back);
     const k = 1 - Math.pow(0.0005, dt);
     this.camPos.lerp(this.scratch, k);
@@ -981,7 +986,7 @@ export class RacerScene {
     const roll = this.reducedMotion ? 0 : me.bank * 0.05;
     this.camera.up.set(-roll * Math.cos(me.heading), 1, roll * Math.sin(me.heading));
     this.camera.lookAt(this.camLook);
-    const fov = me.burst > 0 && !this.reducedMotion ? 72 : 62;
+    const fov = me.burst > 0 && !this.reducedMotion ? 66 : 62;
     if (Math.abs(this.camera.fov - fov) > 0.05) {
       this.camera.fov += (fov - this.camera.fov) * Math.min(1, dt * 4);
       this.camera.updateProjectionMatrix();
@@ -1026,7 +1031,6 @@ export class RacerScene {
       const list = Array.isArray(v) ? v : [v];
       for (const item of list) (item as { dispose?: () => void }).dispose?.();
     }
-    for (const ring of this.roadRings.values()) RacerScene.freeRing(ring);
     const pk = this.power;
     for (const v of [pk.star, pk.starMat, pk.wing, pk.wingMat, pk.heart, pk.heartMat, pk.coin, pk.coinMat]) v.dispose();
     for (const glow of Object.values(pk.glows)) {

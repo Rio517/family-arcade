@@ -18,19 +18,19 @@ export const SKY_CEILING = 90;
 export const CRUISE_ALTITUDE = 30;
 
 /** Gentle and always moving, so a young child only has to steer. */
-export const CRUISE_SPEED = 36;
-/** A burst from a rainbow ring or a fresh star. */
-const BURST_SPEED = 66;
-const ACCEL = 40; // how fast speed eases toward its goal (units/s²)
+export const CRUISE_SPEED = 26;
+/** A burst from a rainbow ring or a fresh star: a lift, not a launch. */
+const BURST_SPEED = 40;
+const ACCEL = 30; // how fast speed eases toward its goal (units/s²)
 const TURN_RATE = 1.9; // radians/s at full lock
-const CLIMB_RATE = 22; // units/s at full lift
+const CLIMB_RATE = 17; // units/s at full lift
 /** How quickly the visible bank and climb follow the stick (1/s). */
 const LEAN_RATE = 5;
 
 /** Power tiers from stars: 0 plain … 3 biggest. */
 export const MAX_TIER = 3;
 /** Each tier is this much faster… */
-const TIER_SPEED = 0.1;
+const TIER_SPEED = 0.07;
 /** …and this much bigger (the renderer grows the model to match). */
 const TIER_SCALE = 0.22;
 /** A fresh tier lasts this long before it fades back one step… */
@@ -41,7 +41,7 @@ const TIER_FADE = 8;
 const STAR_BURST = 1.2;
 /** How long a wings power-up lasts, and how much faster it makes you. */
 export const WINGS_TIME = 10;
-const WINGS_SPEED = 0.2;
+const WINGS_SPEED = 0.15;
 /** Seconds of burst a rainbow ring gives. */
 const RING_BURST = 1.6;
 

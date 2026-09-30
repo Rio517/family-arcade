@@ -3,7 +3,8 @@
  *
  * Cloud Kingdom rules (the lead designer's decree): a character that can fly
  * flies by itself (fairy, unicorn); a character that can't fly rides
- * something that flies (princess on a unicorn, bunny on a cloud). Stars make
+ * something that flies: the princess and the bunny each ride a cloud, a bird
+ * or a unicorn (princess defaults to the unicorn, bunny to the cloud). Stars make
  * you bigger and faster — `RiderPose.tier` (0..3) drives that growth, eased
  * smoothly rather than snapping.
  *
@@ -17,11 +18,13 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import bunnyUrl from '../assets/bunny.glb?url';
+import { CRUISE_SPEED } from '../domain/flight';
+import type { MountId } from '../domain/mounts';
 
 export type CharacterId = 'fairy' | 'princess' | 'unicorn' | 'bunny';
 
 export interface RiderPose {
-  /** World units/s, cruise ~36, boosted up to ~70. */
+  /** World units/s, cruise ~26, boosted up to ~60. */
   speed: number;
   /** -1..1, current turning (negative = turning left). */
   bank: number;
@@ -31,7 +34,7 @@ export interface RiderPose {
   tier: number;
   /** True during a speed burst. */
   boosting: boolean;
-  /** 0..1 while a wings power-up is on: bigger wings (the bunny's cloud grows a pair). */
+  /** 0..1 while a wings power-up is on: bigger wings (a cloud mount opens a pair). */
   wings?: number;
 }
 
@@ -167,7 +170,7 @@ function stepRig(rig: Rig, dt: number, pose: RiderPose, reducedMotion: boolean, 
 }
 
 function gait(speed: number): number {
-  return Math.min(1.4, Math.max(0.25, speed / 36));
+  return Math.min(1.4, Math.max(0.25, speed / CRUISE_SPEED));
 }
 
 /** Flap speed for this frame, shared by every winged rider. */
@@ -315,7 +318,7 @@ function buildFairy(color: number, seed: number, reducedMotion: boolean, disp: D
 }
 
 // ---------------------------------------------------------------------------
-// Unicorn — flies by itself (also the mount for the princess)
+// Unicorn body (flies by itself, and is a mount for the princess and bunny)
 // ---------------------------------------------------------------------------
 
 const MANE_COLORS = [0xff6f91, 0xffb14a, 0xffe14a, 0x6fdc8c, 0x5cb8ff, 0xb68bff];
@@ -603,15 +606,34 @@ function buildUnicornBody(color: number, seed: number, disp: Disposables): Unico
   };
 }
 
-function buildUnicorn(color: number, seed: number, reducedMotion: boolean, disp: Disposables): Built {
-  const rig = makeRig();
-  const build = buildUnicornBody(color, seed, disp);
-  rig.scaleRoot.add(build.root);
+// ---------------------------------------------------------------------------
+// Mounts — what a princess or bunny can ride (cloud, bird, unicorn)
+// ---------------------------------------------------------------------------
 
+/** What a mount needs to animate itself each frame. */
+interface MountFrame {
+  rig: Rig;
+  /** Eased 0..1 step from `stepRig`. */
+  k: number;
+  pose: RiderPose;
+  reducedMotion: boolean;
+}
+
+interface Mount {
+  root: THREE.Group; // add under rig.scaleRoot
+  /** Where a seated rider's base sits, local to `root`. */
+  seat: THREE.Vector3;
+  /** Per-frame flap / sway / puff wobble and the wings-power response. */
+  animate(frame: MountFrame): void;
+}
+
+/** The unicorn's per-frame animation: flap, sway and the wings-power growth. */
+function unicornMount(color: number, seed: number, disp: Disposables): Mount {
+  const build = buildUnicornBody(color, seed, disp);
   return {
-    rig,
-    update(dt, pose) {
-      const k = stepRig(rig, dt, pose, reducedMotion);
+    root: build.root,
+    seat: build.backSeat,
+    animate({ rig, k, pose, reducedMotion }) {
       const big = rig.anim.ease('wingsPower', 1 + WINGS_POWER_GROWTH * (pose.wings ?? 0), k, reducedMotion);
       for (const pivot of build.wingPivots) pivot.scale.setScalar(big);
       if (!reducedMotion) {
@@ -624,26 +646,311 @@ function buildUnicorn(color: number, seed: number, reducedMotion: boolean, disp:
   };
 }
 
+/** A puffy cloud: a cluster of spheres, white on top with a faint
+ *  player-colour tint underneath, plus wings that fold away to nothing and
+ *  open while a wings power-up is on (a cloud can't grow wings, so it opens a pair). */
+function cloudMount(color: number, seed: number, disp: Disposables): Mount {
+  const root = new THREE.Group();
+  const tint = new THREE.Color(color);
+  const topColor = new THREE.Color(0xffffff);
+  const underColor = new THREE.Color(0xffffff).lerp(tint, 0.22);
+  const puffGeo = disp.track(new THREE.SphereGeometry(1, 10, 8));
+  const puffs: Array<{ mesh: THREE.Mesh; base: number; phase: number }> = [];
+  const puffLayout: Array<[number, number, number, number, boolean]> = [
+    [0, 0.1, 0, 1.9, false],
+    [1.5, -0.05, 0.4, 1.35, false],
+    [-1.5, -0.05, -0.3, 1.35, false],
+    [0.8, -0.25, -1.1, 1.15, true],
+    [-0.9, -0.3, 1.0, 1.1, true],
+    [0, -0.5, 0, 1.4, true],
+  ];
+  puffLayout.forEach(([x, y, z, r, under], i) => {
+    const m = mat(disp, { color: (under ? underColor : topColor).getHex(), roughness: 1 });
+    const puff = new THREE.Mesh(puffGeo, m);
+    puff.position.set(x, y, z);
+    puff.scale.setScalar(r);
+    puff.castShadow = !under;
+    puff.receiveShadow = true;
+    root.add(puff);
+    puffs.push({ mesh: puff, base: r, phase: hash(seed + i * 5.7) * Math.PI * 2 });
+  });
+
+  const wingMat = mat(disp, { color: 0xffffff, roughness: 0.75, side: THREE.DoubleSide });
+  const tipMat = mat(disp, { color: tint.getHex(), roughness: 0.5, side: THREE.DoubleSide });
+  const extrude = { depth: 0.1, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.035, bevelSegments: 1, curveSegments: 1 };
+  const wingGeo = disp.track(new THREE.ExtrudeGeometry(shapeFromOutline(scaleOutline(wingOutline(), 2.6)), extrude));
+  const tipGeo = disp.track(new THREE.ExtrudeGeometry(shapeFromOutline(scaleOutline(wingTipOutline(), 2.6)), extrude));
+  const wings: THREE.Group[] = [];
+  for (const side of [-1, 1]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(1.7 * side, 0.4, -0.2);
+    const wing = new THREE.Group();
+    wing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(side, 0.62, -0.3).normalize());
+    wing.rotateY(0.3 * side);
+    wing.add(new THREE.Mesh(wingGeo, wingMat));
+    const tip = new THREE.Mesh(tipGeo, tipMat);
+    tip.position.z = -0.09;
+    wing.add(tip);
+    pivot.add(wing);
+    pivot.scale.setScalar(0.001);
+    pivot.visible = false;
+    root.add(pivot);
+    wings.push(pivot);
+  }
+
+  return {
+    root,
+    // The top puff peaks at y≈2.0; a rider sits into the fluff, not above it.
+    seat: new THREE.Vector3(0, 1.7, 0),
+    animate({ rig, k, pose, reducedMotion }) {
+      const open = rig.anim.ease('cloudWings', pose.wings ?? 0, k, reducedMotion);
+      wings.forEach((pivot, i) => {
+        pivot.visible = open > 0.02;
+        pivot.scale.setScalar(Math.max(0.001, open));
+        pivot.rotation.z = reducedMotion ? 0 : Math.sin(rig.anim.t * flapFreq(pose)) * FLAP_AMP * (i === 0 ? 1 : -1);
+      });
+      if (!reducedMotion) {
+        for (const p of puffs) {
+          const wobble = 1 + Math.sin(rig.anim.t * 1.3 + p.phase) * 0.045;
+          p.mesh.scale.setScalar(p.base * wobble);
+        }
+      }
+    },
+  };
+}
+
+/** A friendly chunky toy bird in the unicorn's chibi style: round body, big
+ *  round head with big eyes, orange beak, a small crest, a cream belly, a fan
+ *  tail and big solid scalloped wings. About 5 units nose to tail, faces +Z. */
+function birdMount(color: number, seed: number, disp: Disposables): Mount {
+  const root = new THREE.Group();
+  const tint = new THREE.Color(color);
+  const bodyColor = tint.clone();
+  const deepColor = tint.clone().lerp(new THREE.Color(0x1a1040), 0.28);
+  const lightColor = tint.clone().lerp(new THREE.Color(0xffffff), 0.5);
+
+  const bodyMat = mat(disp, { color: bodyColor.getHex(), roughness: 0.6 });
+  const deepMat = mat(disp, { color: deepColor.getHex(), roughness: 0.6 });
+  const bellyMat = mat(disp, { color: 0xfff3da, roughness: 0.7 });
+  const beakMat = mat(disp, { color: 0xffa12e, roughness: 0.45 });
+  const footMat = mat(disp, { color: 0xff9320, roughness: 0.55 });
+  const eyeMat = mat(disp, { color: 0x2a2030, roughness: 0.4 });
+  const highlightMat = mat(disp, { color: 0xffffff, roughness: 0.3 });
+
+  const sphereGeo = disp.track(new THREE.SphereGeometry(1, 16, 12));
+
+  // Round, plump body.
+  const body = new THREE.Mesh(sphereGeo, bodyMat);
+  body.scale.set(1.12, 0.98, 1.3);
+  body.position.set(0, 1.5, -0.1);
+  body.castShadow = true;
+  root.add(body);
+
+  // Cream belly: a smaller sphere set low and forward so it shows as a chest.
+  const belly = new THREE.Mesh(sphereGeo, bellyMat);
+  belly.scale.set(0.9, 0.78, 1.05);
+  belly.position.set(0, 1.22, 0.32);
+  root.add(belly);
+
+  // Big round head, tucked onto the front of the body.
+  const head = new THREE.Mesh(sphereGeo, bodyMat);
+  head.scale.setScalar(0.84);
+  head.position.set(0, 2.5, 1.12);
+  head.castShadow = true;
+  root.add(head);
+  // Cream cheeks/face patch so the eyes and beak sit on a bright background.
+  const face = new THREE.Mesh(sphereGeo, bellyMat);
+  face.scale.set(0.64, 0.52, 0.42);
+  face.position.set(0, 2.36, 1.62);
+  root.add(face);
+
+  // Big friendly eyes with a highlight each, like the unicorn's.
+  const eyeGeo = disp.track(new THREE.SphereGeometry(0.19, 10, 8));
+  const highlightGeo = disp.track(new THREE.SphereGeometry(0.07, 6, 6));
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(eyeGeo, eyeMat);
+    eye.position.set(0.47 * side, 2.62, 1.8);
+    root.add(eye);
+    const hl = new THREE.Mesh(highlightGeo, highlightMat);
+    hl.position.set(0.52 * side, 2.7, 1.95);
+    root.add(hl);
+  }
+
+  // Orange beak: two stubby cones (upper slightly longer) pointing +Z.
+  const upperBeak = new THREE.Mesh(disp.track(new THREE.ConeGeometry(0.24, 0.6, 10)), beakMat);
+  upperBeak.rotation.x = Math.PI / 2;
+  upperBeak.scale.set(1.15, 1, 0.7);
+  upperBeak.position.set(0, 2.36, 2.08);
+  upperBeak.castShadow = true;
+  root.add(upperBeak);
+  const lowerBeak = new THREE.Mesh(disp.track(new THREE.ConeGeometry(0.2, 0.42, 10)), beakMat);
+  lowerBeak.rotation.x = Math.PI / 2;
+  lowerBeak.scale.set(1.05, 1, 0.55);
+  lowerBeak.position.set(0, 2.2, 2.02);
+  root.add(lowerBeak);
+
+  // A little crest of three feathers on top of the head.
+  const crestRoot = new THREE.Vector3(0, 3.22, 1.05);
+  const crestTips: Array<[number, number, number]> = [
+    [0, 4.05, 0.72],
+    [0.3, 3.95, 0.85],
+    [-0.3, 3.95, 0.85],
+  ];
+  crestTips.forEach(([x, y, z], i) => {
+    const rootPt = crestRoot.clone().add(new THREE.Vector3(x * 0.25, 0, 0));
+    const tipPt = new THREE.Vector3(x, y, z + (i === 0 ? 0 : 0.05));
+    root.add(strandLimb(disp, rootPt, tipPt, 0.13, 0.02, i === 0 ? deepMat : bodyMat));
+  });
+
+  // Fan tail: five flattened feathers streaming back and slightly up, the
+  // part the chase camera sees behind the bird.
+  const tailGroup = new THREE.Group();
+  root.add(tailGroup);
+  const tailRoot = new THREE.Vector3(0, 1.85, -1.2);
+  const featherCount = 5;
+  for (let i = 0; i < featherCount; i++) {
+    const f = i - (featherCount - 1) / 2; // -2..2
+    const len = 1.55 + (1 - Math.abs(f) / 2) * 0.55 + hash(seed + i * 3.3) * 0.15;
+    const dir = new THREE.Vector3(f * 0.3, 0.3 - Math.abs(f) * 0.05, -1).normalize();
+    const feather = new THREE.Mesh(sphereGeo, i % 2 === 0 ? deepMat : bodyMat);
+    feather.scale.set(0.3, 0.08, len / 2);
+    feather.position.copy(tailRoot).addScaledVector(dir, len / 2);
+    feather.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+    feather.castShadow = true;
+    tailGroup.add(feather);
+  }
+
+  // Tucked orange feet under the belly.
+  const footGeo = disp.track(new THREE.CapsuleGeometry(0.11, 0.3, 3, 6));
+  for (const side of [-1, 1]) {
+    const foot = new THREE.Mesh(footGeo, footMat);
+    foot.rotation.x = Math.PI / 2;
+    foot.position.set(0.42 * side, 0.55, 0.45);
+    root.add(foot);
+    for (const toe of [-1, 0, 1]) {
+      const t = new THREE.Mesh(footGeo, footMat);
+      t.scale.set(0.8, 0.45, 0.45);
+      t.rotation.x = Math.PI / 2;
+      t.rotation.z = toe * 0.45;
+      t.position.set(0.42 * side + toe * 0.14, 0.48, 0.78);
+      root.add(t);
+    }
+  }
+
+  // Big solid wings — the unicorn's extruded scalloped panels, in a lighter
+  // shade with a deeper tip patch, on shoulder pivots for the flap.
+  const wingMat = mat(disp, { color: lightColor.getHex(), roughness: 0.7, side: THREE.DoubleSide });
+  const covertMat = mat(disp, { color: bodyColor.getHex(), roughness: 0.65, side: THREE.DoubleSide });
+  const tipMat = mat(disp, { color: deepColor.getHex(), roughness: 0.5, side: THREE.DoubleSide });
+  const WING_SPAN = 3.0;
+  const extrude = { depth: 0.1, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.035, bevelSegments: 1, curveSegments: 1 };
+  const Y_AXIS = new THREE.Vector3(0, 1, 0);
+  const mainGeo = disp.track(new THREE.ExtrudeGeometry(shapeFromOutline(scaleOutline(wingOutline(), WING_SPAN)), extrude));
+  const covertGeo = disp.track(new THREE.ExtrudeGeometry(shapeFromOutline(scaleOutline(wingOutline(), WING_SPAN * 0.6)), extrude));
+  const tipGeo = disp.track(new THREE.ExtrudeGeometry(shapeFromOutline(scaleOutline(wingTipOutline(), WING_SPAN)), extrude));
+  const pivots: THREE.Group[] = [];
+  for (const side of [-1, 1]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.95 * side, 2.0, 0.2);
+    root.add(pivot);
+    pivots.push(pivot);
+
+    const wingGroup = new THREE.Group();
+    wingGroup.quaternion.setFromUnitVectors(Y_AXIS, new THREE.Vector3(side, 0.62, -0.3).normalize());
+    wingGroup.rotateY(0.3 * side);
+    pivot.add(wingGroup);
+    wingGroup.add(new THREE.Mesh(mainGeo, wingMat));
+    const covert = new THREE.Mesh(covertGeo, covertMat);
+    covert.position.z = -0.05;
+    wingGroup.add(covert);
+    const tip = new THREE.Mesh(tipGeo, tipMat);
+    tip.position.z = -0.09;
+    wingGroup.add(tip);
+  }
+
+  return {
+    root,
+    seat: new THREE.Vector3(0, 2.3, -0.5),
+    animate({ rig, k, pose, reducedMotion }) {
+      const big = rig.anim.ease('wingsPower', 1 + WINGS_POWER_GROWTH * (pose.wings ?? 0), k, reducedMotion);
+      for (const pivot of pivots) pivot.scale.setScalar(big);
+      if (!reducedMotion) {
+        const flap = Math.sin(rig.anim.t * flapFreq(pose)) * FLAP_AMP;
+        pivots[0].rotation.z = flap;
+        pivots[1].rotation.z = -flap;
+        tailGroup.rotation.y = Math.sin(rig.anim.t * 2.3) * 0.12;
+      }
+    },
+  };
+}
+
+function buildMount(id: MountId, color: number, seed: number, disp: Disposables): Mount {
+  switch (id) {
+    case 'cloud':
+      return cloudMount(color, seed, disp);
+    case 'bird':
+      return birdMount(color, seed, disp);
+    case 'unicorn':
+      return unicornMount(color, seed, disp);
+  }
+}
+
+/** Steps the shared rig then the mount's own animation. */
+function mountedUpdate(rig: Rig, mount: Mount, reducedMotion: boolean): Built['update'] {
+  return (dt, pose) => {
+    const k = stepRig(rig, dt, pose, reducedMotion);
+    mount.animate({ rig, k, pose, reducedMotion });
+  };
+}
+
 // ---------------------------------------------------------------------------
-// Princess — rides a flying unicorn
+// Unicorn — flies by itself
 // ---------------------------------------------------------------------------
 
-function buildPrincess(color: number, seed: number, reducedMotion: boolean, disp: Disposables): Built {
+function buildUnicorn(color: number, seed: number, reducedMotion: boolean, disp: Disposables): Built {
   const rig = makeRig();
-  const mount = buildUnicornBody(color, seed, disp);
+  const mount = unicornMount(color, seed, disp);
   rig.scaleRoot.add(mount.root);
+  return { rig, update: mountedUpdate(rig, mount, reducedMotion) };
+}
 
+// ---------------------------------------------------------------------------
+// Seated riders — the princess and the bunny, each placed per mount
+// ---------------------------------------------------------------------------
+
+/** Where and how big a seated rider is on each mount, relative to the mount's
+ *  seat: `scale` multiplies the rider, `dy`/`dz` nudge it from the seat. */
+interface Placement {
+  scale: number;
+  dy: number;
+  dz: number;
+}
+
+const PRINCESS_PLACEMENT: Record<MountId, Placement> = {
+  unicorn: { scale: 1, dy: 0, dz: 0 },
+  cloud: { scale: 1.3, dy: -0.45, dz: 0 },
+  bird: { scale: 1, dy: -0.1, dz: 0 },
+};
+
+/** Nose-to-tail length of the bunny, and its offsets, per mount. The cloud
+ *  values are the bunny's original ride. */
+const BUNNY_PLACEMENT: Record<MountId, { len: number; dy: number; dz: number }> = {
+  cloud: { len: 4.6, dy: 0, dz: 0 },
+  unicorn: { len: 2.8, dy: -0.25, dz: 0 },
+  bird: { len: 3, dy: -0.25, dz: -0.2 },
+};
+
+/** The seated princess: skirt, torso, head, crown, arms forward. Origin is
+ *  the seat (the skirt's hem), facing +Z. */
+function buildPrincessFigure(color: number, disp: Disposables): THREE.Group {
+  const rider = new THREE.Group();
   const tint = new THREE.Color(color);
   const skin = mat(disp, { color: 0xffdcc0, roughness: 0.7 });
   const dressMat = mat(disp, { color: tint.getHex(), roughness: 0.5 });
   const hairMat = mat(disp, { color: 0x5a3a24, roughness: 0.8 });
   const goldMat = mat(disp, { color: 0xffd54a, roughness: 0.3, metalness: 0.6 });
 
-  const rider = new THREE.Group();
-  rider.position.copy(mount.backSeat);
-  mount.root.add(rider);
-
-  // Seated skirt draping over the unicorn's back.
+  // Seated skirt draping over the mount's back.
   const skirt = new THREE.Mesh(disp.track(new THREE.CylinderGeometry(0.4, 0.85, 1.1, 10)), dressMat);
   skirt.position.set(0, 0.35, 0);
   skirt.castShadow = true;
@@ -680,32 +987,32 @@ function buildPrincess(color: number, seed: number, reducedMotion: boolean, disp
     crown.add(spike);
   }
 
-  // Arms forward, hands holding the mane.
+  // Arms forward, hands resting ahead of her.
   for (const side of [-1, 1]) {
     rider.add(limb(disp, new THREE.Vector3(0.32 * side, 1.15, 0.25), new THREE.Vector3(0.14 * side, 0.75, 0.95), 0.1, skin));
   }
-
-  return {
-    rig,
-    update(dt, pose) {
-      const k = stepRig(rig, dt, pose, reducedMotion);
-      const big = rig.anim.ease('wingsPower', 1 + WINGS_POWER_GROWTH * (pose.wings ?? 0), k, reducedMotion);
-      for (const pivot of mount.wingPivots) pivot.scale.setScalar(big);
-      if (!reducedMotion) {
-        const flap = Math.sin(rig.anim.t * flapFreq(pose)) * FLAP_AMP;
-        mount.wingPivots[0].rotation.z = flap;
-        mount.wingPivots[1].rotation.z = -flap;
-        swayAll(mount.swayStrands, rig.anim.t);
-      }
-    },
-  };
+  return rider;
 }
 
 // ---------------------------------------------------------------------------
-// Bunny — rides a cloud (GLB steed, with a procedural fallback)
+// Princess and bunny — ride a cloud, a bird or a unicorn
 // ---------------------------------------------------------------------------
 
-/** Nose-to-tail length the bunny GLB is scaled to when seated on its cloud. */
+function buildPrincess(color: number, seed: number, mountId: MountId, reducedMotion: boolean, disp: Disposables): Built {
+  const rig = makeRig();
+  const mount = buildMount(mountId, color, seed, disp);
+  rig.scaleRoot.add(mount.root);
+
+  const place = PRINCESS_PLACEMENT[mountId];
+  const figure = buildPrincessFigure(color, disp);
+  figure.position.copy(mount.seat).add(new THREE.Vector3(0, place.dy, place.dz));
+  figure.scale.setScalar(place.scale);
+  mount.root.add(figure);
+
+  return { rig, update: mountedUpdate(rig, mount, reducedMotion) };
+}
+
+/** Nose-to-tail length the bunny GLB is scaled to on its original cloud ride. */
 const RIDER_BUNNY_LEN = 4.6;
 /** Materials tinted toward the player colour — matches scene.ts's mountSteed. */
 const BUNNY_TINT = new Set(['BunnyCoat', 'LavenderFurLocks']);
@@ -744,7 +1051,7 @@ export function preloadRiderAssets(): Promise<void> {
   return bunnyPreload;
 }
 
-function mountBunnyGltf(color: number, disp: Disposables): THREE.Group | null {
+function mountBunnyGltf(color: number, length: number, disp: Disposables): THREE.Group | null {
   if (!bunnyTemplate) return null;
   const model = bunnyTemplate.clone(true);
   const tint = new THREE.Color(color);
@@ -763,7 +1070,7 @@ function mountBunnyGltf(color: number, disp: Disposables): THREE.Group | null {
   });
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
-  const s = size.z > 0.001 ? RIDER_BUNNY_LEN / size.z : 1;
+  const s = size.z > 0.001 ? length / size.z : 1;
   model.scale.setScalar(s);
   model.position.y = -box.min.y * s;
   return model;
@@ -804,94 +1111,34 @@ function buildProceduralBunny(color: number, disp: Disposables): THREE.Group {
   return g;
 }
 
-function buildBunny(color: number, seed: number, reducedMotion: boolean, disp: Disposables): Built {
+function buildBunny(color: number, seed: number, mountId: MountId, reducedMotion: boolean, disp: Disposables): Built {
   const rig = makeRig();
+  const mount = buildMount(mountId, color, seed, disp);
+  rig.scaleRoot.add(mount.root);
 
-  // Puffy cloud platform: a cluster of spheres, white on top with a faint
-  // player-colour tint underneath.
-  const cloudGroup = new THREE.Group();
-  rig.scaleRoot.add(cloudGroup);
-  const tint = new THREE.Color(color);
-  const topColor = new THREE.Color(0xffffff);
-  const underColor = new THREE.Color(0xffffff).lerp(tint, 0.22);
-  const puffGeo = disp.track(new THREE.SphereGeometry(1, 10, 8));
-  const puffs: Array<{ mesh: THREE.Mesh; base: number; phase: number }> = [];
-  const puffLayout: Array<[number, number, number, number, boolean]> = [
-    [0, 0.1, 0, 1.9, false],
-    [1.5, -0.05, 0.4, 1.35, false],
-    [-1.5, -0.05, -0.3, 1.35, false],
-    [0.8, -0.25, -1.1, 1.15, true],
-    [-0.9, -0.3, 1.0, 1.1, true],
-    [0, -0.5, 0, 1.4, true],
-  ];
-  puffLayout.forEach(([x, y, z, r, under], i) => {
-    const m = mat(disp, { color: (under ? underColor : topColor).getHex(), roughness: 1 });
-    const puff = new THREE.Mesh(puffGeo, m);
-    puff.position.set(x, y, z);
-    puff.scale.setScalar(r);
-    puff.castShadow = !under;
-    puff.receiveShadow = true;
-    cloudGroup.add(puff);
-    puffs.push({ mesh: puff, base: r, phase: hash(seed + i * 5.7) * Math.PI * 2 });
-  });
-
-  // Wings for the cloud: folded away to nothing, they open while a wings
-  // power-up is on — the bunny can't grow wings, so its ride does.
-  const cloudWingMat = mat(disp, { color: 0xffffff, roughness: 0.75, side: THREE.DoubleSide });
-  const cloudTipMat = mat(disp, { color: tint.getHex(), roughness: 0.5, side: THREE.DoubleSide });
-  const cloudExtrude = { depth: 0.1, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.035, bevelSegments: 1, curveSegments: 1 };
-  const cloudWingGeo = disp.track(new THREE.ExtrudeGeometry(shapeFromOutline(scaleOutline(wingOutline(), 2.6)), cloudExtrude));
-  const cloudTipGeo = disp.track(new THREE.ExtrudeGeometry(shapeFromOutline(scaleOutline(wingTipOutline(), 2.6)), cloudExtrude));
-  const cloudWings: THREE.Group[] = [];
-  for (const side of [-1, 1]) {
-    const pivot = new THREE.Group();
-    pivot.position.set(1.7 * side, 0.4, -0.2);
-    const wing = new THREE.Group();
-    wing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(side, 0.62, -0.3).normalize());
-    wing.rotateY(0.3 * side);
-    wing.add(new THREE.Mesh(cloudWingGeo, cloudWingMat));
-    const tip = new THREE.Mesh(cloudTipGeo, cloudTipMat);
-    tip.position.z = -0.09;
-    wing.add(tip);
-    pivot.add(wing);
-    pivot.scale.setScalar(0.001);
-    pivot.visible = false;
-    cloudGroup.add(pivot);
-    cloudWings.push(pivot);
+  const place = BUNNY_PLACEMENT[mountId];
+  let bunny = mountBunnyGltf(color, place.len, disp);
+  if (!bunny) {
+    bunny = buildProceduralBunny(color, disp);
+    bunny.scale.setScalar(place.len / RIDER_BUNNY_LEN);
   }
+  bunny.position.add(new THREE.Vector3(0, place.dy, place.dz)).add(mount.seat);
+  mount.root.add(bunny);
 
-  // Sits into the fluff of the top puff (peaks at y≈2.0) rather than
-  // perched above it.
-  const rideHeight = 1.7;
-  const bunnyGroup = mountBunnyGltf(color, disp) ?? buildProceduralBunny(color, disp);
-  bunnyGroup.position.y += rideHeight;
-  cloudGroup.add(bunnyGroup);
-
-  return {
-    rig,
-    update(dt, pose) {
-      const k = stepRig(rig, dt, pose, reducedMotion);
-      const open = rig.anim.ease('cloudWings', pose.wings ?? 0, k, reducedMotion);
-      cloudWings.forEach((pivot, i) => {
-        pivot.visible = open > 0.02;
-        pivot.scale.setScalar(Math.max(0.001, open));
-        pivot.rotation.z = reducedMotion ? 0 : Math.sin(rig.anim.t * flapFreq(pose)) * FLAP_AMP * (i === 0 ? 1 : -1);
-      });
-      if (!reducedMotion) {
-        for (const p of puffs) {
-          const wobble = 1 + Math.sin(rig.anim.t * 1.3 + p.phase) * 0.045;
-          p.mesh.scale.setScalar(p.base * wobble);
-        }
-      }
-    },
-  };
+  return { rig, update: mountedUpdate(rig, mount, reducedMotion) };
 }
 
 // ---------------------------------------------------------------------------
 // Public factory
 // ---------------------------------------------------------------------------
 
-export function createRider(character: CharacterId, color: number, opts: { reducedMotion: boolean; seed: number }): Rider {
+/** `mount` applies only to the princess (default unicorn) and the bunny
+ *  (default cloud); the fairy and unicorn fly by themselves and ignore it. */
+export function createRider(
+  character: CharacterId,
+  color: number,
+  opts: { reducedMotion: boolean; seed: number; mount?: MountId },
+): Rider {
   const disp = new Disposables();
   const { reducedMotion, seed } = opts;
 
@@ -904,10 +1151,10 @@ export function createRider(character: CharacterId, color: number, opts: { reduc
       built = buildUnicorn(color, seed, reducedMotion, disp);
       break;
     case 'princess':
-      built = buildPrincess(color, seed, reducedMotion, disp);
+      built = buildPrincess(color, seed, opts.mount ?? 'unicorn', reducedMotion, disp);
       break;
     case 'bunny':
-      built = buildBunny(color, seed, reducedMotion, disp);
+      built = buildBunny(color, seed, opts.mount ?? 'cloud', reducedMotion, disp);
       break;
   }
 

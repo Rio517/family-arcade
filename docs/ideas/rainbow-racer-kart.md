@@ -178,6 +178,21 @@ the other) or WASD-vs-arrows on a keyboard.
 - **Shipping rhythm:** one phase = one or a few PRs, each leaving the game
   playable. No long-lived feature branch.
 
+## Decided (2026-09-30) — gentler flying, a clear view, and a ride to pick
+
+- **Flying is gentle.** Cruise is 26 units a second and a ring or star burst
+  lifts it to 40; stars and wings add a little on top, never a launch. Races
+  last about as long as before, because coins are easier to line up.
+- **Nothing blocks the view ahead.** Rings have no glow of their own; flying
+  through one makes it pop and throws rainbow sparkles off its rim, out
+  toward the edges of the picture. Your own racer's glow is a small halo
+  behind it.
+- **Every rainbow ring is on the road**, so a ring always means "this way".
+  The first one hangs straight ahead of the start line.
+- **A princess or a bunny picks a ride**: a cloud, a bird or a unicorn. A
+  friend on another device sees the ride you picked; a computer rival rides
+  their usual (the princess a unicorn, the bunny a cloud).
+
 ## Decided (by the lead designer, 2026-09-27) — the sky replaces the arena
 
 The arena and its round fence are gone. The lead designer's brief:
@@ -190,10 +205,11 @@ The arena and its round fence are gone. The lead designer's brief:
 What that became (built, in `src/games/racer/`):
 
 - **An open sky with no edge.** The world is cells, each hashed from its
-  coordinates: floating islands, rainbow rings, clouds, balloons. Both devices
-  in a two-player race see the same sky without sending it (`domain/sky.ts`).
-- **Fly or ride.** Unicorn and fairy fly on their own; the princess rides a
-  flying unicorn; the bunny rides a cloud. No dragons (`three/riders.ts`).
+  coordinates: floating islands, clouds, balloons. Both devices in a
+  two-player race see the same sky without sending it (`domain/sky.ts`).
+- **Fly or ride.** Unicorn and fairy fly on their own; the princess and the
+  bunny ride a cloud, a bird or a unicorn, picked before the race. No dragons
+  (`three/riders.ts`).
 - **Stars are power.** Each one is a tier, up to three: bigger and faster for
   a while, then back down a step at a time. The fairy's wings grow instead of
   her. Bigger racers bump smaller ones aside (`domain/flight.ts`).
@@ -203,7 +219,7 @@ What that became (built, in `src/games/racer/`):
   half the power-ups line it, and a pink arrow points back to it when you
   stray. Flying anywhere else is still allowed (`domain/sky.ts`).
 - **Three power-ups:** a gold star (a tier, as above), big wings (bigger
-  wings and more speed for ten seconds; the bunny's cloud grows a pair), and
+  wings and more speed for ten seconds; a cloud ride grows a pair), and
   a coin fan (a line of coins appears straight ahead) (`domain/pickups.ts`).
 - **One player races three computer rivals** — everyone you didn't pick —
   with a kindness rule: rivals ease off when ahead and push on when behind,

@@ -214,10 +214,12 @@ function renderClient(ticket = '') {
 
 type Client = ReturnType<typeof renderClient>;
 
-/** 2 Players → pick a driver → arrive at the net lobby. */
-function toNetLobby(app: Client, driverId: string) {
+/** 2 Players → pick a driver (and a ride, for a princess or a bunny) → arrive at the net lobby. */
+function toNetLobby(app: Client, driverId: string, mount = 'cloud') {
   fireEvent.click(app.getByTestId('racer-mode-net'));
   fireEvent.click(app.getByTestId(`racer-driver-${driverId}`));
+  const ride = app.queryByTestId(`racer-mount-${mount}`);
+  if (ride) fireEvent.click(ride);
 }
 
 /**
@@ -316,7 +318,10 @@ describe('two-player racer: lobby flows', () => {
   it('leaving the lobby destroys the connection and returns to the create/join choice', () => {
     const app = renderClient();
 
-    toNetLobby(app, 'bunny');
+    toNetLobby(app, 'bunny', 'bird');
+    // The lobby pictures the racer on the ride they picked.
+    const card = app.getByText('Your racer: Bunny').parentElement!;
+    expect(card.querySelector('img')?.getAttribute('src')).toContain('bunny-bird');
     fireEvent.click(app.getByTestId('racer-create'));
     expect(app.getByTestId('racer-code')).toBeInTheDocument();
     const conn = bus.conns.at(-1)!;

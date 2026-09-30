@@ -1,7 +1,7 @@
 /**
  * Rainbow Racer's phase orchestrator: which screen is up (mode → pick →
- * lobby → race → over), who I am, and the wiring between the net layer and
- * the live race. The screens themselves live in RacerSetup / Track3D /
+ * ride, for a princess or a bunny → lobby → race → over), who I am, and the
+ * wiring between the net layer and the live race. The screens themselves live in RacerSetup / Track3D /
  * WinOverlay, and the race rules in domain/race.ts.
  */
 import '../styles/racer.css';
@@ -13,12 +13,13 @@ import { recordResultFor } from '@shared/profile/results';
 import { useParty } from '@shared/party/PartyContext';
 import { createRaceCore, takeWorldSnapshot, type RaceMode } from '../domain/race';
 import { useRacerNet } from '../net/useRacerNet';
+import type { MountId } from '../domain/mounts';
 import { DRIVERS, driverById, lookOf, rivalsFor, type Driver } from './cast';
-import { ModeScreen, PickScreen, RacerLobby } from './RacerSetup';
+import { ModeScreen, PickScreen, RacerLobby, RideScreen } from './RacerSetup';
 import { Track3D, type RaceCtx } from './Track3D';
 import { WinOverlay } from './WinOverlay';
 
-type Phase = 'mode' | 'pick' | 'lobby' | 'race' | 'over';
+type Phase = 'mode' | 'pick' | 'ride' | 'lobby' | 'race' | 'over';
 
 const TARGET = 20;
 /** The registry id — what the history row and the party's table name. */
@@ -29,6 +30,8 @@ export function RacerPage() {
   const [phase, setPhase] = useState<Phase>('mode');
   const [mode, setMode] = useState<RaceMode>('solo');
   const [driver, setDriver] = useState<Driver>(DRIVERS[0]);
+  /** What a princess or a bunny rides (null for a racer who flies). */
+  const [mount, setMount] = useState<MountId | null>(null);
   const profile = useProfile();
   const party = useParty();
   const [raceKey, setRaceKey] = useState(0);
@@ -44,6 +47,7 @@ export function RacerPage() {
   const net = useRacerNet({
     name: myName,
     driver: driver.id,
+    mount,
     target: TARGET,
     // Said in `hello` so a reconnect mid-race re-syncs instead of restarting.
     inRace: () => ctxRef.current !== null,
@@ -53,8 +57,8 @@ export function RacerPage() {
 
   /** Build a fresh race and switch to the race screen. */
   const startRace = useCallback(
-    (d: Driver, m: RaceMode) => {
-      const myLook = lookOf(d);
+    (d: Driver, ride: MountId | null, m: RaceMode) => {
+      const myLook = lookOf(d, '', ride);
       let ctx: RaceCtx;
       if (m === 'solo') {
         const rivals = rivalsFor(d);
@@ -65,7 +69,7 @@ export function RacerPage() {
         };
       } else {
         const isHost = net.role === 'host';
-        const theirLook = lookOf(driverById(net.theirDriver ?? 'unicorn'), net.theirName);
+        const theirLook = lookOf(driverById(net.theirDriver ?? 'unicorn'), net.theirName, net.theirMount);
         ctx = {
           ...createRaceCore('net', isHost ? 0 : 1, TARGET, Math.random),
           looks: isHost ? [myLook, theirLook] : [theirLook, myLook],
@@ -86,21 +90,33 @@ export function RacerPage() {
   useEffect(() => {
     if (mode === 'net' && startNonce > 0 && startNonce !== lastStartRef.current) {
       lastStartRef.current = startNonce;
-      startRace(driver, 'net');
+      startRace(driver, mount, 'net');
     }
-  }, [startNonce, mode, driver, startRace]);
+  }, [startNonce, mode, driver, mount, startRace]);
 
   const chooseMode = (m: RaceMode) => {
     setMode(m);
     setPhase('pick');
   };
 
+  /** Everything is picked: solo starts at once (with the choices passed in,
+   * no stale closure); two-player heads to the lobby for the host's "go". */
+  const ready = (d: Driver, ride: MountId | null) => {
+    if (mode === 'solo') startRace(d, ride, 'solo');
+    else setPhase('lobby');
+  };
+
   const pickDriver = (d: Driver) => {
     setDriver(d);
-    // Solo starts at once with the chosen driver (no stale-closure race);
-    // two-player heads to the lobby and waits for the host's "go".
-    if (mode === 'solo') startRace(d, 'solo');
-    else setPhase('lobby');
+    setMount(null);
+    // A racer who can't fly picks a ride first.
+    if (d.rides) setPhase('ride');
+    else ready(d, null);
+  };
+
+  const pickRide = (ride: MountId) => {
+    setMount(ride);
+    ready(driver, ride);
   };
 
   const leaveToMenu = () => {
@@ -140,7 +156,7 @@ export function RacerPage() {
   };
 
   const playAgain = () => {
-    if (mode === 'solo') startRace(driver, 'solo');
+    if (mode === 'solo') startRace(driver, mount, 'solo');
     else if (net.role === 'host') net.hostRestart();
     else net.requestRematch();
   };
@@ -162,10 +178,18 @@ export function RacerPage() {
     );
   }
 
+  if (phase === 'ride') {
+    return (
+      <Shell onMenu={() => setPhase('pick')}>
+        <RideScreen driver={driver} mode={mode} onPick={pickRide} />
+      </Shell>
+    );
+  }
+
   if (phase === 'lobby') {
     return (
       <Shell onMenu={leaveToMenu}>
-        <RacerLobby driver={driver} net={net} seatedUserId={profile.userId} />
+        <RacerLobby driver={driver} mount={mount} net={net} seatedUserId={profile.userId} />
       </Shell>
     );
   }

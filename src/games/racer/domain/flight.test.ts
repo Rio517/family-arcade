@@ -29,7 +29,7 @@ describe('flight', () => {
 
   it('has no edge: a racer can fly as far as it likes', () => {
     const f = fly(createFlyer(), 60);
-    expect(f.z).toBeGreaterThan(2000);
+    expect(f.z).toBeGreaterThan(CRUISE_SPEED * 55);
   });
 
   it('turns right with the stick right — toward screen right, which is world -X — and leans into it', () => {

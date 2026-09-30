@@ -28,6 +28,12 @@ export interface HelloMsg {
   /** The sender's chosen driver id (e.g. "unicorn"). */
   driver: string;
   /**
+   * What a princess or a bunny rides (e.g. "bird"). Absent from an older
+   * device and for a racer who flies; an id this device doesn't know means
+   * the usual ride, so a newer device's rides never break the handshake.
+   */
+  mount?: string;
+  /**
    * True when the sender already has a live race. A reconnecting mid-race
    * guest says so, and the host re-syncs it with a `world` snapshot instead of
    * restarting; a fresh guest (first join or reload) still gets a `go`.
@@ -141,6 +147,7 @@ export function isRacerMsg(value: unknown): value is RacerMsg {
         m.name.length <= 100 &&
         isStr(m.driver) &&
         m.driver.length <= 100 &&
+        (m.mount === undefined || (isStr(m.mount) && m.mount.length <= 100)) &&
         (m.inRace === undefined || typeof m.inRace === 'boolean')
       );
     case 'go':

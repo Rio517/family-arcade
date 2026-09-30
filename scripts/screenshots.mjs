@@ -467,6 +467,17 @@ const SHOTS = [
     },
   },
   {
+    // A princess or a bunny picks a ride: a cloud, a bird or a unicorn.
+    name: 'racer-rides',
+    path: '/#/racer',
+    viewport: TABLET,
+    expect: '[data-testid="racer-mount-bird"]',
+    prep: async (page) => {
+      await page.getByTestId('racer-mode-solo').click();
+      await page.getByTestId('racer-driver-bunny').click();
+    },
+  },
+  {
     // The open sky a few seconds after Go: the unicorn, three rivals, rings,
     // islands. Pickups land randomly, so the pixels churn a little on every
     // regeneration — that's expected.

@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GameConnection, type ConnStatus } from '@shared/net/peer';
 import { deltaFrom, isRacerMsg, snapshotFrom, type RacerMsg } from './protocol';
+import { isMountId, type MountId } from '../domain/mounts';
 import {
   applyWorldDelta,
   applyWorldSnapshot,
@@ -48,6 +49,8 @@ export interface RacerNet {
   startNonce: number;
   theirName: string;
   theirDriver: string | null;
+  /** The friend's ride, if they race as a princess or a bunny (null: their usual). */
+  theirMount: MountId | null;
   /** Open (host) or dial (guest) the table — the one way into a two-player race. */
   startTable: (opts: StartTableOpts) => void;
   leave: () => void;
@@ -67,6 +70,8 @@ export interface RacerNet {
 export function useRacerNet(opts: {
   name: string;
   driver: string;
+  /** My ride, for a princess or a bunny. */
+  mount?: MountId | null;
   target: number;
   /** Does this device have a live race right now? (Said in `hello`.) */
   inRace?: () => boolean;
@@ -82,6 +87,7 @@ export function useRacerNet(opts: {
   const [startNonce, setStartNonce] = useState(0);
   const [theirName, setTheirName] = useState('Friend');
   const [theirDriver, setTheirDriver] = useState<string | null>(null);
+  const [theirMount, setTheirMount] = useState<MountId | null>(null);
 
   const connRef = useRef<GameConnection<RacerMsg> | null>(null);
   const roleRef = useRef<Role | null>(null);
@@ -112,8 +118,8 @@ export function useRacerNet(opts: {
         onOpen: () => {
           // (Re)introduce ourselves on every fresh channel…
           sentGoRef.current = false;
-          const { name, driver, inRace, getWorld } = identityRef.current;
-          connRef.current?.send({ t: 'hello', name, driver, inRace: inRace?.() ?? false });
+          const { name, driver, mount, inRace, getWorld } = identityRef.current;
+          connRef.current?.send({ t: 'hello', name, driver, ...(mount ? { mount } : {}), inRace: inRace?.() ?? false });
           // …and the host re-syncs the guest with the authoritative world, so
           // even a finished race survives a dropped final packet + reconnect.
           if (roleRef.current === 'host') {
@@ -126,6 +132,7 @@ export function useRacerNet(opts: {
             case 'hello': {
               setTheirName(msg.name.slice(0, 24) || 'Friend');
               setTheirDriver(msg.driver);
+              setTheirMount(isMountId(msg.mount) ? msg.mount : null);
               // The host kicks the race off for a FRESH guest. A guest that is
               // already mid-race (a reconnect blip) is re-synced by the world
               // snapshot instead — restarting would throw the family's race away.
@@ -195,6 +202,7 @@ export function useRacerNet(opts: {
     setRole(null);
     setSeatedUserId(null);
     setTheirDriver(null);
+    setTheirMount(null);
     setCode('');
   }, []);
 
@@ -227,6 +235,7 @@ export function useRacerNet(opts: {
     startNonce,
     theirName,
     theirDriver,
+    theirMount,
     startTable,
     leave,
     sendPos,

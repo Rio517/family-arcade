@@ -22,12 +22,13 @@ import { RacerPage } from './RacerPage';
  * win-overlay tests flip `fake3d.enabled` to get an inert scene that lets the
  * loop drive the race to 20 coins.
  */
-const fake3d = vi.hoisted(() => ({ enabled: false }));
+const fake3d = vi.hoisted(() => ({ enabled: false, looks: null as unknown }));
 
 vi.mock('../three/scene', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../three/scene')>();
   class RacerScene {
     constructor(...args: ConstructorParameters<typeof actual.RacerScene>) {
+      fake3d.looks = args[1];
       if (!fake3d.enabled) {
         // The genuine no-WebGL failure path: the real constructor throws.
         return new actual.RacerScene(...args) as unknown as RacerScene;
@@ -221,6 +222,36 @@ describe('<RacerPage> — solo setup flow', () => {
     fireEvent.click(screen.getByTestId('racer-back'));
     expect(screen.getByTestId('racer-mode-solo')).toBeInTheDocument();
     expect(screen.queryByTestId('racer-driver-unicorn')).toBeNull();
+  });
+
+  it('a bunny picks a ride — a cloud, a bird or a unicorn — and races on it', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderRacer();
+    goToPicker();
+    fireEvent.click(screen.getByTestId('racer-driver-bunny'));
+    // Not racing yet: the ride picker is up.
+    expect(screen.getByText('What will Bunny ride?')).toBeInTheDocument();
+    for (const id of ['cloud', 'bird', 'unicorn']) expect(screen.getByTestId(`racer-mount-${id}`)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('racer-mount-bird'));
+    await screen.findByTestId('racer3d-fallback', {}, { timeout: 5000 });
+    expect(screen.getByTestId('racer-score-0').querySelector('img')?.getAttribute('src')).toContain('bunny-bird');
+    const looks = fake3d.looks as Array<{ character: string; mount?: string }>;
+    expect(looks[0]).toMatchObject({ character: 'bunny', mount: 'bird' });
+    // A computer princess keeps her usual unicorn; the fairy rides nothing.
+    expect(looks.find((l) => l.character === 'princess')).toMatchObject({ mount: 'unicorn' });
+    expect(looks.find((l) => l.character === 'fairy')?.mount).toBeUndefined();
+  });
+
+  it('steps back from the ride picker to the driver picker via the ‹ Menu button', () => {
+    renderRacer();
+    goToPicker();
+    fireEvent.click(screen.getByTestId('racer-driver-princess'));
+    expect(screen.getByText('What will Princess ride?')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('racer-back'));
+    expect(screen.getByTestId('racer-driver-princess')).toBeInTheDocument();
+    expect(screen.queryByTestId('racer-mount-cloud')).toBeNull();
   });
 
   it('shows the picked driver and a 0/20 coin count in the race HUD', async () => {

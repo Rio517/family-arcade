@@ -154,6 +154,8 @@
   max-width: 760px;
   margin: 0 auto;
 }
+/* Three rides: the same card size as the four racers, not three wide ones. */
+.racer-rides { max-width: 570px; }
 .racer-cast-btn {
   --rc: #6a7a8a;
   position: relative;
