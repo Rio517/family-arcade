@@ -6,6 +6,8 @@
  *
  *   npm run perf:gulp            # prints the table, exits 0 either way
  *   npm run perf:gulp -- --strict  # exits 1 if any budget is missed
+ *   npm run perf:gulp -- --map=region --frames-only
+ *                                # frame times on another map, no Lighthouse
  *
  * This is not a CI gate — `three/perf.test.ts` covers that with timing-free,
  * deterministic guards on triangle counts and build work. This script is for
@@ -48,6 +50,9 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = Number(process.env.PERF_GULP_PORT ?? 4329);
 const BASE = `http://localhost:${PORT}`;
 const STRICT = process.argv.includes('--strict');
+/** Which map the frame-time pass plays (the Town, City, Megalopolis or Region). */
+const MAP = (process.argv.find((a) => a.startsWith('--map=')) ?? '--map=city').slice('--map='.length);
+const FRAMES_ONLY = process.argv.includes('--frames-only');
 
 /** Past the "who's playing" gate: one family member, no history to load. */
 const ROSTER = { activeId: 'k', users: [{ id: 'k', profile: { name: 'Clara', points: 0, wins: 0, losses: 0 } }] };
@@ -186,6 +191,7 @@ async function frameTimePass(label, throttle) {
       await client.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     }
     await page.goto(`${BASE}/#/gulp`, { waitUntil: 'load' });
+    await page.getByTestId(`gulp-map-${MAP}`).click();
     await page.getByTestId('gulp-play').click();
     await page.waitForSelector('[data-testid="gulp-hud"]', { state: 'attached', timeout: 20_000 });
     // Drop the menu's own frames: only the round's gameplay counts.
@@ -259,24 +265,31 @@ async function main() {
   try {
     await waitForServer(BASE);
 
-    console.log('Running Lighthouse on the Gulp menu (mobile)…');
-    results.lighthouse.mobile = await lighthouseRun('mobile');
-    console.log('Running Lighthouse on the Gulp menu (desktop)…');
-    results.lighthouse.desktop = await lighthouseRun('desktop');
+    if (!FRAMES_ONLY) {
+      console.log('Running Lighthouse on the Gulp menu (mobile)…');
+      results.lighthouse.mobile = await lighthouseRun('mobile');
+      console.log('Running Lighthouse on the Gulp menu (desktop)…');
+      results.lighthouse.desktop = await lighthouseRun('desktop');
+    }
 
-    console.log('Playing a City round for ~20s (unthrottled)…');
+    console.log(`Playing a ${MAP} round for ~20s (unthrottled)…`);
     results.frames.normal = await frameTimePass('unthrottled', false);
-    console.log('Playing a City round for ~20s (slow CPU, 4x throttled)…');
+    console.log(`Playing a ${MAP} round for ~20s (slow CPU, 4x throttled)…`);
     results.frames.throttled = await frameTimePass('slow CPU (4x)', true);
   } finally {
     server.kill();
   }
 
+  const { mobile, desktop } = results.lighthouse;
   const budgeted = [
-    row('mobile total blocking time', results.lighthouse.mobile.totalBlockingTime, BUDGETS.mobileBlockingMs),
-    row('desktop total blocking time', results.lighthouse.desktop.totalBlockingTime, BUDGETS.desktopBlockingMs),
-    row('mobile time to interactive', results.lighthouse.mobile.interactive, BUDGETS.mobileInteractiveMs),
-    row('desktop time to interactive', results.lighthouse.desktop.interactive, BUDGETS.desktopInteractiveMs),
+    ...(FRAMES_ONLY
+      ? []
+      : [
+          row('mobile total blocking time', mobile.totalBlockingTime, BUDGETS.mobileBlockingMs),
+          row('desktop total blocking time', desktop.totalBlockingTime, BUDGETS.desktopBlockingMs),
+          row('mobile time to interactive', mobile.interactive, BUDGETS.mobileInteractiveMs),
+          row('desktop time to interactive', desktop.interactive, BUDGETS.desktopInteractiveMs),
+        ]),
     row('frame p95 (unthrottled)', results.frames.normal.p95, BUDGETS.p95FrameGapMs),
     row('frame p95 (slow CPU 4x)', results.frames.throttled.p95, BUDGETS.p95FrameGapThrottledMs),
   ];
@@ -286,14 +299,14 @@ async function main() {
   console.log('Budgets:');
   printTable(budgeted);
 
-  console.log('\nFor context (no budget, just reported):');
-  console.log(`  Lighthouse score — mobile ${results.lighthouse.mobile.score.toFixed(2)}, desktop ${results.lighthouse.desktop.score.toFixed(2)}`);
-  console.log(
-    `  max potential FID — mobile ${results.lighthouse.mobile.maxPotentialFID.toFixed(0)}ms, desktop ${results.lighthouse.desktop.maxPotentialFID.toFixed(0)}ms`,
-  );
-  for (const which of ['mobile', 'desktop']) {
-    const t = results.lighthouse[which].longestTask;
-    console.log(`  ${which} longest task — ${t ? `${t.durationMs.toFixed(0)}ms in ${t.url}` : 'none reported'}`);
+  console.log(`\nFor context (no budget, just reported; frames on the ${MAP} map):`);
+  if (!FRAMES_ONLY) {
+    console.log(`  Lighthouse score — mobile ${mobile.score.toFixed(2)}, desktop ${desktop.score.toFixed(2)}`);
+    console.log(`  max potential FID — mobile ${mobile.maxPotentialFID.toFixed(0)}ms, desktop ${desktop.maxPotentialFID.toFixed(0)}ms`);
+    for (const which of ['mobile', 'desktop']) {
+      const t = results.lighthouse[which].longestTask;
+      console.log(`  ${which} longest task — ${t ? `${t.durationMs.toFixed(0)}ms in ${t.url}` : 'none reported'}`);
+    }
   }
   for (const [label, f] of [
     ['unthrottled', results.frames.normal],

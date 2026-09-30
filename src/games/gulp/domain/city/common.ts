@@ -25,9 +25,9 @@ export interface PlayArea extends Rect {
 }
 
 /** Road width, block size (pavement included) and pavement width. */
-export const ROAD = 10;
-export const BLOCK = 34;
-export const SIDEWALK = 2.5;
+export const ROAD = 9;
+export const BLOCK = 31;
+export const SIDEWALK = 2;
 /** From one road's centre line to the next. */
 export const PITCH = ROAD + BLOCK;
 /** A mountain is round: the radius of its foot, a little inside its square footprint. */

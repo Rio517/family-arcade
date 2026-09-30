@@ -203,7 +203,7 @@ three.js in `src/games/gulp/three/`.
 | `/preview-gulp.html` | The asset gallery: every model standing over the smallest mouth that can swallow it, with its points and level, and a slider for a test mouth. `?kind=stadium` shows one kind in all its colours; `?tier=5` shows one tier. |
 | `window.__gulp` on `/#/gulp` | The live world (holes, props, the city), for browser checks: jump to a giant hole, start an attack. |
 | `window.__gulpScene` on `/#/gulp` | The live 3D scene (renderer stats, effects, the camera tour). |
-| `npm run perf:gulp` | A local performance audit: Lighthouse on the Gulp menu, and frame times while playing a round. Run it from time to time; it prints a table against budgets. |
+| `npm run perf:gulp` | A local performance audit: Lighthouse on the Gulp menu, and frame times while playing a round. Run it from time to time; it prints a table against budgets. `-- --map=region --frames-only` times another map and skips Lighthouse. |
 
 The preview page and the two globals exist on the dev server
 (`npm run dev:tidewave`, port 5178); the preview page is also in harness

@@ -435,7 +435,7 @@ const irontower: Builder = (k) => {
 const pyramid: Builder = (k) => {
   const sand = 0xf6dfa4;
   const steps = [0xf3c56c, 0xe8b457] as const;
-  k.box(sand, 28, 0.2, 28, 0, 0, 0, undefined, ON_GROUND);
+  k.box(sand, 27, 0.2, 27, 0, 0, 0, undefined, ON_GROUND);
   // Stepped pyramid: eleven courses, then a gold cap that carries the slope
   // on up to a point, so the whole reads as one big triangle.
   const n = 11;
@@ -451,7 +451,7 @@ const pyramid: Builder = (k) => {
     k.box(0xd9a24c, 1.9, 0.25, 0.2, 0, 1.1, 0, undefined, FLUSH);
   });
   // The sphinx lies along the left side, looking out over the front.
-  const sx = -12.5;
+  const sx = -12;
   const lion = 0xe9bf73;
   k.cbox(lion, 2.2, 1.5, 5.0, 0.35, sx, 0.2, 7.2);
   k.cbox(lion, 2.4, 1.4, 1.9, 0.35, sx, 0.2, 5.0);
@@ -928,7 +928,7 @@ const opera: Builder = (k) => {
       }),
     );
   }
-  for (let i = 0; i < 4; i++) k.box(0xf9dcc9, 1.2, 0.75 * (i + 1), 16.4, -13.4 + i * 1.0, 0, 0, undefined, ON_GROUND);
+  for (let i = 0; i < 4; i++) k.box(0xf9dcc9, 1.1, 0.75 * (i + 1), 16.4, -12.9 + i * 0.85, 0, 0, undefined, ON_GROUND);
   // Two halls of nested shells rising toward the harbour end, each met by a
   // smaller shell facing back the other way.
   const y0 = 3.0;

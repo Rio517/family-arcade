@@ -210,6 +210,8 @@ export function countryside(
   /** A small thing, only where nothing else stands, and off the roads (parked cars and vans excepted). */
   const add: Add = (kind, x, z, rot, variant, hScale) => {
     const r = Math.max(KINDS[kind].w, KINDS[kind].d) / 2;
+    // Never into the street grid (its outer road runs right along its edge).
+    if (Math.max(Math.abs(x), Math.abs(z)) - r < half + 0.5) return;
     // (A square's corner reaches √2 of its half-width into round ground.)
     if (!free(x, z, r * 1.42) || crowded(x, z, r)) return;
     if (!PARKS.has(kind) && inside(roads, x, z, r + 0.5)) return;
@@ -270,6 +272,19 @@ export function countryside(
     // The engineers' van.
     if (rng() < 0.4) add('van', cx - 9, cz + 8, 0, variant());
   }
+  // A line of trees along a field's south and west edges (the next field's
+  // closes the other two): mostly pines, which are light to draw, a bush or
+  // a leafy tree between them now and then.
+  const hedgerow = (cx: number, cz: number) => {
+    const e = CELL / 2;
+    for (let k = 0; k < 11; k++) {
+      const u = -e + 1.3 + k * 2.4;
+      const w = rng();
+      const kind: PropKind = w < 0.75 ? 'pine' : w < 0.9 ? 'bush' : 'tree';
+      add(kind, cx + u, cz + e, turn(), variant());
+      add(kind, cx - e, cz + u, turn(), variant());
+    }
+  };
   // Everything else, round them.
   for (const c of cells) {
     if (big.has(c)) continue;
@@ -288,10 +303,12 @@ export function countryside(
         add('cottage', cx - 5, cz + 8, Math.PI, variant());
       } else if (r < 0.8) {
         if (!free(cx, cz, CELL / 2) || crowded(cx, cz, CELL / 2 - 1) || inside(roads, cx, cz, CELL / 2)) continue;
-        fields.push({ x0: cx - CELL / 2 + 1, z0: cz - CELL / 2 + 1, x1: cx + CELL / 2 - 1, z1: cz + CELL / 2 - 1 });
+        // Fields stop short of the cell's edge, leaving room for a hedgerow between two.
+        fields.push({ x0: cx - CELL / 2 + 1.6, z0: cz - CELL / 2 + 1.6, x1: cx + CELL / 2 - 1.6, z1: cz + CELL / 2 - 1.6 });
         for (let a = 0; a < 4; a++) for (let b = 0; b < 3; b++) if (rng() < 0.8) add('haybale', cx - 8 + a * 5.5, cz - 6 + b * 6, 0);
         // The tractor at the end of the rows, clear of the bales.
         if (rng() < 0.3) add('tractor', cx + 8.5, cz + 9.6, turn(), variant());
+        hedgerow(cx, cz);
       } else if (rng() < 0.5) {
         // A big house out in the country: trees round its garden, a car in the drive.
         add('villa', cx - 2, cz, turn(), variant());
@@ -320,6 +337,17 @@ export function countryside(
       add(pick(['cottage', 'cottage', 'fruitstand'] as const), cx, cz, turn(), variant());
       if (rng() < 0.5) add(pick(['car', 'van'] as const), cx + 6, cz - 1, 0, variant());
       for (let k = 0; k < 3; k++) add(pick(['rock', 'bush', 'haybale', 'tree'] as const), cx + (rng() - 0.5) * CELL * 0.7, cz + (rng() - 0.5) * CELL * 0.7, 0, variant());
+    }
+  }
+  // Then green all over the open land: trees, bushes and the odd rock on
+  // whatever ground is still free (never on a field), so the country reads
+  // as lived-in, not a lawn with a few things on it. Woods are full already.
+  for (const c of cells) {
+    if (big.has(c) || (peaks && c.u > 0.72) || (c.u >= 0.4 && c.r < 0.75)) continue;
+    for (let k = 0; k < 11; k++) {
+      const w = rng();
+      const kind: PropKind = w < 0.6 ? 'pine' : w < 0.78 ? 'tree' : w < 0.9 ? 'bush' : 'rock';
+      add(kind, c.cx + (rng() - 0.5) * CELL * 0.9, c.cz + (rng() - 0.5) * CELL * 0.9, turn(), variant());
     }
   }
   // Nowhere without a meal: wherever a stretch of countryside has nothing a
