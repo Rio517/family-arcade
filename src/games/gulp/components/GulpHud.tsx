@@ -10,6 +10,7 @@ import type { Banner, Hud, HudRow } from './round';
 const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n.toLocaleString());
 
 export function GulpHud({
+  over = false,
   hud,
   banners,
   muted,
@@ -17,6 +18,8 @@ export function GulpHud({
   onPause,
   touch,
 }: {
+  /** The round is over: the results card is up, so the combo and danger arrows go. */
+  over?: boolean;
   hud: Hud;
   banners: Banner[];
   muted: boolean;
@@ -33,7 +36,11 @@ export function GulpHud({
     </li>
   );
   const news = banners.filter((b) => b.kind === 'news').pop();
-  const top = banners.filter((b) => b.kind !== 'news').pop();
+  // A warning always wins the banner spot: a police or level-up message
+  // arriving on top of "Look out!" must not hide it.
+  const top = banners
+    .filter((b) => b.kind !== 'news')
+    .reduce<Banner | undefined>((best, b) => (!best || BANNER_RANK[b.kind] >= BANNER_RANK[best.kind] ? b : best), undefined);
   return (
     <div className="gulp-hud" data-testid="gulp-hud">
       {(hud.speed > 0 || hud.double > 0) && (
@@ -98,10 +105,12 @@ export function GulpHud({
 
       <div className="gulp-right">
         <div className="gulp-stats">
-          <span className="gulp-wonders" title="Wonders swallowed" data-testid="gulp-wonders">
+          {hud.wondersTotal > 0 && (
+            <span className="gulp-wonders" title="Wonders swallowed" data-testid="gulp-wonders">
             <StarIcon size={18} />
             {hud.wonders}/{hud.wondersTotal}
           </span>
+          )}
           <span className="gulp-kills" title="Holes swallowed" data-testid="gulp-kills">
             <span className="gulp-kills-icon" aria-hidden="true" />
             {hud.kills}
@@ -118,7 +127,7 @@ export function GulpHud({
         </div>
       </div>
 
-      {hud.streak >= 3 && (
+      {!over && hud.streak >= 3 && (
         <div key={hud.combo} className={`gulp-combo c${hud.combo}`} data-testid="gulp-combo">
           {hud.combo > 1 && (
             <>
@@ -129,6 +138,18 @@ export function GulpHud({
           <span>{hud.streak} gulps!</span>
         </div>
       )}
+
+      {!over && hud.pointers.map((p) => (
+        <div
+          key={p.key}
+          className={`gulp-pointer ${p.kind === 'hole' ? 'danger' : 'attack'}`}
+          style={{ left: `${50 + Math.sin(p.angle) * 42}%`, top: `${50 - Math.cos(p.angle) * 36}%` }}
+          data-testid="gulp-pointer"
+        >
+          <span className="gulp-pointer-arrow" style={{ transform: `rotate(${p.angle}rad)` }} aria-hidden="true" />
+          <span className="gulp-pointer-label">{p.label}</span>
+        </div>
+      ))}
 
       {hud.nearEdge && (
         <div className="gulp-edge" role="status" data-testid="gulp-edge">
@@ -174,3 +195,5 @@ export function GulpHud({
     </div>
   );
 }
+
+const BANNER_RANK: Record<Banner['kind'], number> = { warn: 3, hurt: 3, level: 2, good: 1, news: 0 };

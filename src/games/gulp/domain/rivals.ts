@@ -9,8 +9,10 @@
  * is left: Easy is all of it, Hard none.
  */
 import { KINDS, type Prop } from './catalog';
-import type { Hole, Input, World } from './world';
-import { canEat, propsNear } from './world';
+import { EAT_HOLE } from './growth';
+import { canEat, type Hole } from './holes';
+import { propsNear } from './space';
+import type { Input, World } from './world';
 
 type Rng = () => number;
 
@@ -48,14 +50,15 @@ interface Temper {
  * still won nearly every round, as on Easy.
  */
 const TEMPERS: Record<Difficulty, Temper> = {
-  easy: { skill: 0.55, spread: 0.35, kindness: 1, huntLead: 0.5, theirs: 0.5 },
+  // On Easy a computer hole cannot swallow the child (see eatHoles), so it never chases one either.
+  easy: { skill: 0.55, spread: 0.35, kindness: 1, huntLead: Infinity, theirs: 0.5 },
   medium: { skill: 0.75, spread: 0.2, kindness: 0.25, huntLead: 0, theirs: 0.5 },
   hard: { skill: 0.85, spread: 0.15, kindness: 0, huntLead: -Infinity, theirs: 1 },
 };
 
-const temperOf = (w: World): Temper => TEMPERS[w.options.difficulty ?? 'easy'];
+const temperOf = (w: World): Temper => TEMPERS[w.options.difficulty];
 
-export function createBrain(rng: Rng, difficulty: Difficulty = 'easy'): Brain {
+export function createBrain(rng: Rng, difficulty: Difficulty): Brain {
   const t = TEMPERS[difficulty];
   return { skill: t.skill + rng() * t.spread, pace: 1, target: null, rethink: 0, wobble: rng() * 10 };
 }
@@ -83,7 +86,7 @@ export function steerRival(b: Brain, me: Hole, w: World, dt: number, player: Hol
     let fx = 0;
     let fz = 0;
     for (const o of w.holes) {
-      if (o === me || !o.alive || o.r < me.r * 1.2) continue;
+      if (o === me || !o.alive || o.r < me.r * EAT_HOLE) continue;
       const d = Math.hypot(me.x - o.x, me.z - o.z);
       const danger = o.r + 8 + me.r;
       if (d < danger && d > 0.01) {
@@ -129,7 +132,7 @@ export function steerRival(b: Brain, me: Hole, w: World, dt: number, player: Hol
       if (!w.powerups.some((p) => p.id === t.id)) b.target = null;
     } else if (t.kind === 'hole') {
       const h = w.holes[t.id];
-      if (!h || !h.alive || h.safe > 0 || h.r * 1.2 > me.r) b.target = null;
+      if (!h || !h.alive || h.safe > 0 || h.r * EAT_HOLE > me.r) b.target = null;
       else {
         t.x = h.x;
         t.z = h.z;
@@ -166,7 +169,7 @@ function choose(b: Brain, me: Hole, w: World, player: Hole | null): Brain['targe
   let prey: Hole | null = null;
   let preyD = 26 + me.r * 2;
   for (const o of w.holes) {
-    if (o === me || !o.alive || o.safe > 0 || o.r * 1.2 > me.r) continue;
+    if (o === me || !o.alive || o.safe > 0 || o.r * EAT_HOLE > me.r) continue;
     if (o.isPlayer && (!player || (player.score - me.score) / Math.max(100, me.score) < temper.huntLead)) continue;
     const d = Math.hypot(o.x - me.x, o.z - me.z);
     if (d < preyD) {

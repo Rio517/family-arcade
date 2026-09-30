@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { seededRng } from '@shared/rng';
 import { createCity, type MapId } from '../domain/city';
-import { HORIZON, countryGrass, grassTint, runwayMarks, scenery } from './ground';
+import { HORIZON, countryGrass, edgeOfPlay, grassTint, runwayMarks, scenery } from './ground';
 
 describe('the grass', () => {
   it('changes colour smoothly everywhere: no step between two spots side by side', () => {
@@ -93,6 +93,33 @@ describe('the land past the edge of play', () => {
         expect(Math.max(Math.abs(x), Math.abs(z))).toBeGreaterThan(city.land);
         const sea = { n: z < -city.land, s: z > city.land, w: x < -city.land, e: x > city.land };
         for (const side of city.shores) expect(sea[side]).toBe(false);
+      }
+    }
+  });
+});
+
+describe('the edge of play', () => {
+  it('runs a hedge along every green side, broken only by a gate at the road, and none along the sea', () => {
+    for (const map of ['town', 'city', 'mega', 'region'] as MapId[]) {
+      for (const seed of [1, 2, 3]) {
+        const city = createCity(seededRng(seed), map);
+        const { hedges, gates } = edgeOfPlay(city);
+        const mid = city.roads[Math.floor(city.blocks / 2)];
+        for (const side of ['n', 's', 'e', 'w'] as const) {
+          const mine = hedges.filter((h) => h.side === side).sort((a, b) => a.a0 - b.a0);
+          if (city.shores.includes(side)) {
+            expect(mine).toEqual([]);
+            continue;
+          }
+          // End to end along the side, with one gap round the road and a gate in it.
+          expect(mine[0].a0).toBeCloseTo(-city.land);
+          expect(mine[mine.length - 1].a1).toBeCloseTo(city.land);
+          expect(mine.length).toBe(2);
+          expect(mine[0].a1).toBeGreaterThan(mid - 10);
+          expect(mine[1].a0).toBeLessThan(mid + 10);
+          expect(mine[1].a0 - mine[0].a1).toBeGreaterThan(10);
+          expect(gates.filter((g) => g.side === side).map((g) => g.at)).toEqual([mid]);
+        }
       }
     }
   });

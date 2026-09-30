@@ -6,79 +6,52 @@
  * The world lives outside React and changes every frame (see GulpStage).
  * This page copies a snapshot out of it for the scoreboard a few times a
  * second, turns what happened into sounds and banners, and records the round
- * on the ticket that played it.
+ * on the ticket that played it and in the family's scores (see scores.ts).
  */
 import '../styles/gulp.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { recordResultFor } from '@shared/profile/results';
 import { useProfile } from '@shared/profile/useProfile';
-import { SpeakerIcon, SpeakerOffIcon } from '@shared/ui/icons';
-import { KINDS, type PropKind } from '../domain/catalog';
-import { MAPS, WONDER_COUNT, type MapId } from '../domain/city';
-import { dealWonders } from '../domain/wonders';
+import { SpeakerIcon, SpeakerOffIcon, TrophyIcon } from '@shared/ui/icons';
+import { KINDS } from '../domain/catalog';
+import { MAPS, type MapId } from '../domain/city';
 import { createWorld, endRound, levelOf, standings, type World, type WorldEvent } from '../domain/world';
 import type { HoleLook } from '../three/scene';
+import { feedbackFor, type Said } from './feedback';
 import { GulpHud } from './GulpHud';
 import { GulpMenu } from './GulpMenu';
 import { GulpMinimap } from './GulpMinimap';
 import { GulpStage } from './GulpStage';
-import { durationOf, hudOf, loadScene, unlockedAt, type Banner, type Hud, type SceneLoader, type Settings } from './round';
+import { DIFFICULTY_TITLE, durationOf, hudOf, loadScene, type Banner, type Hud, type SceneLoader, type Settings } from './round';
+import { FamilyBoard } from './ScoresDialog';
+import {
+  BOARD_SIZE,
+  addRound,
+  adoptLegacyBests,
+  bestOf,
+  familyTop,
+  loadLegacyBests,
+  loadScores,
+  sameRound,
+  saveScores,
+  type ScoreRound,
+} from '../storage/scores';
+import { dealRoundWonders, loadSettings, saveSettings } from '../storage/settings';
 import { SKINS, rivalsFor } from './skins';
 import { Sounds } from './sounds';
 
 /** The registry id — the `game` on a credited history row. */
 const GAME_ID = 'gulp';
-const SETTINGS_KEY = 'gulp:settings:v1';
-const BEST_KEY = 'gulp:best:v1';
-const DECK_KEY = 'gulp:wonder-deck:v1';
-
-/** Deal this round's wonders from the deck kept between rounds (see domain/wonders.ts). */
-function dealRoundWonders(map: MapId, rng: () => number): PropKind[] {
-  let deck: PropKind[] = [];
-  try {
-    deck = JSON.parse(localStorage.getItem(DECK_KEY) ?? '[]') as PropKind[];
-  } catch {
-    /* no deck yet */
-  }
-  const { dealt, deck: rest } = dealWonders(deck, WONDER_COUNT[map], rng);
-  try {
-    localStorage.setItem(DECK_KEY, JSON.stringify(rest));
-  } catch {
-    /* not saved: a fresh shuffle next time */
-  }
-  return dealt;
-}
-
-const DEFAULT_SETTINGS: Settings = {
-  map: 'city',
-  length: 'short',
-  powerups: true,
-  fightBack: false,
-  regrow: true,
-  skin: 0,
-  muted: false,
-  difficulty: 'easy',
-};
-
-function loadSettings(): Settings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
-  } catch {
-    /* private mode or bad data: defaults */
-  }
-  return DEFAULT_SETTINGS;
-}
-
-function loadBest(): Record<string, number> {
-  try {
-    return JSON.parse(localStorage.getItem(BEST_KEY) ?? '{}') as Record<string, number>;
-  } catch {
-    return {};
-  }
+/** What the results card says about the family board. */
+function familyLine(place: number, score: number, board: ScoreRound[]): string {
+  if (place === 1) return 'New family record!';
+  if (place > 1) return `You're #${place} in the family!`;
+  if (score <= 0) return 'Gulp something to join the board!';
+  const need = board[board.length - 1].score - score + 1;
+  return `${need.toLocaleString()} more to join the board!`;
 }
 
 interface Round {
@@ -122,7 +95,8 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
   const [hud, setHud] = useState<Hud | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [paused, setPaused] = useState(false);
-  const [best, setBest] = useState<Record<string, number>>(loadBest);
+  const [storedScores, setStoredScores] = useState(loadScores);
+  const [legacyBests] = useState(loadLegacyBests);
   const [result, setResult] = useState<{
     rank: number;
     score: number;
@@ -130,12 +104,24 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     kills: number;
     wonders: number;
     newBest: boolean;
+    /** The best before this round (0 if none), shown beside a new best. */
+    prevBest: number;
+    gulped: number;
+    /** What the biggest thing swallowed was, in words. */
+    biggest: string | null;
+    /** This round as kept in the scores, and the family board it was played for. */
+    entry: ScoreRound;
+    board: ScoreRound[];
+    /** Its place on that board, 0 when it did not make it. */
+    place: number;
   } | null>(null);
   const pausedRef = useRef(false);
   const soundsRef = useRef<Sounds | null>(null);
   const beatRef = useRef(0);
   const bannerId = useRef(0);
   const lastCount = useRef(0);
+  /** Things said once a round (see feedback.ts). */
+  const said = useRef<Said>({ police: false });
   /** Set once a round's result is written, so it is written once. */
   const doneRef = useRef(false);
   const [touch] = useState(() => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
@@ -146,11 +132,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    } catch {
-      /* not saved: fine */
-    }
+    saveSettings(settings);
     if (soundsRef.current) soundsRef.current.muted = settings.muted;
   }, [settings]);
 
@@ -158,16 +140,19 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     pausedRef.current = paused;
   }, [paused]);
 
-  // Easy keeps the key bests were saved under before there were levels.
   const level = settings.difficulty ?? 'easy';
-  const bestKey = `${userId ?? 'guest'}:${settings.map}${level === 'easy' ? '' : `:${level}`}`;
+  const player = userId ?? 'guest';
+  // The signed-in player's bests from before rounds were kept join the scores
+  // under their name; saved with the next round they finish.
+  const scores = useMemo(() => adoptLegacyBests(storedScores, legacyBests, player, myName), [storedScores, legacyBests, player, myName]);
 
   const changeSettings = (next: Settings) => setSettings(next);
 
   const say = useCallback((b: Omit<Banner, 'id'>) => {
     const id = ++bannerId.current;
     setBanners((list) => [...list.slice(-2), { ...b, id }]);
-    window.setTimeout(() => setBanners((list) => list.filter((x) => x.id !== id)), b.kind === 'news' ? 5000 : 2400);
+    // News lingers, and a warning stays up while the danger is on its way.
+    window.setTimeout(() => setBanners((list) => list.filter((x) => x.id !== id)), b.kind === 'news' ? 5000 : b.kind === 'warn' ? 4000 : 2400);
   }, []);
 
   const play = () => {
@@ -193,6 +178,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     setResult(null);
     setPaused(false);
     lastCount.current = 0;
+    said.current = { police: false };
     doneRef.current = false;
     setPhase('play');
   };
@@ -212,18 +198,31 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
       const order = standings(w);
       const me = w.holes[0];
       const rank = order.indexOf(me) + 1;
-      const prev = best[bestKey] ?? 0;
-      const newBest = me.score > prev;
-      if (newBest) {
-        const next = { ...best, [bestKey]: me.score };
-        setBest(next);
-        try {
-          localStorage.setItem(BEST_KEY, JSON.stringify(next));
-        } catch {
-          /* not saved: fine */
-        }
-      }
-      setResult({ rank, score: me.score, level: levelOf(me.r), kills: me.kills, wonders: me.wonders, newBest });
+      const map = w.options.map;
+      const difficulty = w.options.difficulty;
+      const now = Date.now();
+      const prevBest = bestOf(scores.rounds, player, map, difficulty);
+      const newBest = me.score > prevBest;
+      const entry: ScoreRound = { userId: player, name: myName, map, difficulty, score: me.score, level: levelOf(me.r), rank, at: now };
+      const next = addRound(scores, entry);
+      saveScores(next);
+      setStoredScores(next);
+      const board = familyTop(next.rounds, map, difficulty);
+      const place = board.findIndex((r) => sameRound(r, entry)) + 1;
+      setResult({
+        rank,
+        score: me.score,
+        level: entry.level,
+        kills: me.kills,
+        wonders: me.wonders,
+        gulped: me.gulped,
+        biggest: me.biggest ? KINDS[me.biggest.kind].name : null,
+        newBest,
+        prevBest,
+        entry,
+        board,
+        place,
+      });
       setPhase('over');
       soundsRef.current?.play(rank === 1 ? 'win' : 'level');
       // The computer holes count as opponents, like Ship Battle's captains.
@@ -233,10 +232,10 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
         code: GAME_ID,
         game: GAME_ID,
         opponent: 'Computer holes',
-        finishedAt: Date.now(),
+        finishedAt: now,
       });
     },
-    [best, bestKey, userId],
+    [scores, player, myName, userId],
   );
 
   const onFrame = useCallback(
@@ -245,71 +244,9 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
       if (!round.playing) return;
       const sounds = soundsRef.current;
       for (const e of events) {
-        switch (e.type) {
-          case 'eat':
-            if (e.hole === 0) sounds?.play('gulp', Math.min(1, KINDS[e.prop.kind].tier / 8));
-            break;
-          case 'level':
-            if (e.hole === 0) {
-              sounds?.play('level');
-              say({ kind: 'level', text: `Level ${e.level}!`, sub: e.level < 11 ? `Now you can eat ${unlockedAt(e.level).toLowerCase()}` : 'Bigger and bigger!' });
-            }
-            break;
-          case 'news':
-            sounds?.play('level');
-            say({ kind: 'news', text: e.text });
-            break;
-          case 'police':
-            sounds?.play('warn');
-            say({ kind: 'level', text: 'Nee-naw! The police are coming!', sub: 'They just want to take a look' });
-            break;
-          case 'wonder':
-            if (e.hole === 0) {
-              sounds?.play('win');
-              say({ kind: 'news', text: `You gulped ${e.name}! +${e.points.toLocaleString()}` });
-            }
-            break;
-          case 'combo':
-            if (e.hole === 0) sounds?.play('power');
-            break;
-          case 'power':
-            if (e.hole === 0) {
-              sounds?.play('power');
-              say({ kind: 'good', text: e.kind === 'speed' ? 'Speed boost!' : 'Double points!' });
-            }
-            break;
-          case 'gulp':
-            if (e.eater === 0) {
-              sounds?.play('gulp', 1);
-              say({ kind: 'good', text: `You swallowed ${w.holes[e.eaten].name}!` });
-            }
-            break;
-          case 'incoming':
-            if (e.target === 0) {
-              sounds?.play('warn');
-              say(
-                e.kind === 'tanker'
-                  ? { kind: 'warn', text: 'Look out! A fuel truck!', sub: 'Swerve out of its way' }
-                  : e.kind === 'tank'
-                    ? { kind: 'warn', text: 'Tanks are coming!', sub: 'Dodge the red circles, or gulp them!' }
-                    : e.kind === 'heli'
-                      ? { kind: 'warn', text: 'Helicopter!', sub: 'Keep moving, dodge the red circles' }
-                      : { kind: 'warn', text: 'Bombers overhead!', sub: 'Get out of the red circles' },
-              );
-            }
-            break;
-          case 'hurt':
-            if (e.hole === 0) {
-              sounds?.play('hurt');
-              say({ kind: 'hurt', text: e.cause === 'chem' ? 'Yuck! Chemicals!' : e.cause === 'tanker' ? 'Hot hot hot!' : 'Boom! You shrank', sub: e.cause === 'tanker' ? 'The fuel truck burned you' : 'Ouch, a bit smaller' });
-            }
-            break;
-          case 'boom': {
-            const me = w.holes[0];
-            if (Math.hypot(e.x - me.x, e.z - me.z) < 60 + me.r * 3) sounds?.play('boom');
-            break;
-          }
-        }
+        const f = feedbackFor(e, w, said.current);
+        if (f?.cue) sounds?.play(f.cue, f.size);
+        if (f?.banner) say(f.banner);
       }
       // Countdown beeps.
       const count = w.status === 'countdown' ? Math.ceil(w.countdown) : 0;
@@ -380,12 +317,19 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
             </button>
             <FullscreenButton />
           </div>
-          <GulpMenu settings={settings} onChange={changeSettings} onPlay={play} best={best[bestKey] ?? 0} />
+          <GulpMenu
+            settings={settings}
+            onChange={changeSettings}
+            onPlay={play}
+            best={bestOf(scores.rounds, player, settings.map, level)}
+            rounds={scores.rounds}
+            userId={player}
+          />
         </>
       )}
 
       {phase !== 'menu' && hud && (
-        <GulpHud hud={hud} banners={banners} muted={muted} onMute={toggleMute} onPause={() => setPaused(true)} touch={touch} />
+        <GulpHud over={phase === 'over'} hud={hud} banners={banners} muted={muted} onMute={toggleMute} onPause={() => setPaused(true)} touch={touch} />
       )}
       {phase === 'play' && (
         <div className="gulp-minimap-slot">
@@ -428,22 +372,51 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
           <div className="gulp-modal results" role="dialog" aria-modal="true" aria-label="Results" data-testid="gulp-results">
             <span className="gulp-kicker">{round.world.options.duration > 0 ? "Time's up!" : 'Round over'}</span>
             <h2>{result.rank === 1 ? 'You are the biggest hole!' : `#${result.rank} — great gulping!`}</h2>
-            <ol className="gulp-results-list">
-              {standings(round.world).map((h, i) => (
-                <li key={h.id} className={h.isPlayer ? 'me' : ''}>
-                  <span className="gulp-rank">{i + 1}</span>
-                  <span className="gulp-dot" style={{ background: SKINS[h.skin % SKINS.length].css }} aria-hidden="true" />
-                  <span className="gulp-name">{h.name}</span>
-                  <small>LV {levelOf(h.r)}</small>
-                  <b>{h.score.toLocaleString()}</b>
-                </li>
-              ))}
-            </ol>
-            <p className="gulp-stats">
-              Level {result.level} · {result.kills} {result.kills === 1 ? 'hole' : 'holes'} swallowed
-              {result.wonders > 0 && ` · ${result.wonders} ${result.wonders === 1 ? 'wonder' : 'wonders'}`}
-              {result.newBest && <em className="gulp-newbest"> · New best!</em>}
-            </p>
+            <div className="gulp-results-body">
+              <section className="gulp-results-round" aria-label="This round">
+                <ol className="gulp-results-list">
+                  {standings(round.world).map((h, i) => (
+                    <li key={h.id} className={h.isPlayer ? 'me' : ''}>
+                      <span className="gulp-rank">{i + 1}</span>
+                      <span className="gulp-dot" style={{ background: SKINS[h.skin % SKINS.length].css }} aria-hidden="true" />
+                      <span className="gulp-name">{h.name}</span>
+                      <small>LV {levelOf(h.r)}</small>
+                      <b>{h.score.toLocaleString()}</b>
+                    </li>
+                  ))}
+                </ol>
+                {result.newBest && (
+                  <p className="gulp-newbest" data-testid="gulp-newbest">
+                    <b>New best!</b>
+                    {result.prevBest > 0 && <span>was {result.prevBest.toLocaleString()}</span>}
+                  </p>
+                )}
+                <p className="gulp-stats">
+                  Level {result.level} · {result.gulped.toLocaleString()} {result.gulped === 1 ? 'thing' : 'things'} gulped
+                  {result.kills > 0 && ` · ${result.kills} ${result.kills === 1 ? 'hole' : 'holes'} swallowed`}
+                  {result.wonders > 0 && ` · ${result.wonders} ${result.wonders === 1 ? 'wonder' : 'wonders'}`}
+                  {result.biggest && (
+                    <>
+                      <br />
+                      Biggest bite: <b>{result.biggest}</b>
+                    </>
+                  )}
+                </p>
+              </section>
+              <section className="gulp-results-family" aria-labelledby="gulp-family-title" data-testid="gulp-results-family">
+                <h3 className="gulp-family-head" id="gulp-family-title">
+                  <TrophyIcon size={20} />
+                  Family top {BOARD_SIZE}
+                  <small>
+                    {MAPS[result.entry.map].label} · {DIFFICULTY_TITLE[result.entry.difficulty]}
+                  </small>
+                </h3>
+                <p className={`gulp-family-place${result.place > 0 ? ' made' : ''}`} data-testid="gulp-family-place">
+                  {familyLine(result.place, result.score, result.board)}
+                </p>
+                {result.board.length > 0 && <FamilyBoard rows={result.board} highlight={result.entry} testId="gulp-results-board" />}
+              </section>
+            </div>
             <div className="gulp-modal-row">
               <button type="button" className="gulp-play small" onClick={play} data-testid="gulp-again">
                 Play again

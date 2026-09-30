@@ -7,14 +7,12 @@
  */
 import * as THREE from 'three';
 import type { PropKind } from '../domain/catalog';
-import { type Builder, type V3, FLUSH, Kit, ON_GROUND, PAL, archDoor, darker, lighter, paneAt, placement } from './kit';
+import { type Builder, type V3, FLUSH, HALF_PI, Kit, ON_GROUND, PAL, archDoor, darker, lighter, paneAt, placement } from './kit';
 
 export type MilitaryKind = Extract<
   PropKind,
   'tank' | 'helicopter' | 'watchtower' | 'barracks' | 'radar' | 'hangar' | 'bomber'
 >;
-
-const HALF_PI = Math.PI / 2;
 
 const OLIVE = 0x7d9a45;
 const OLIVE_DARK = 0x5f7a34;

@@ -13,7 +13,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { seededRng } from '@shared/rng';
-import { BLOCK, PARK_PATH, PARK_PLAZA, ROAD, SIDEWALK, type Airfield, type BlockKind, type City, type PlayArea } from '../domain/city';
+import { inside } from '../domain/city/common';
+import { inRect } from '../domain/space';
+import { BLOCK, PARK_PATH, PARK_PLAZA, ROAD, SIDEWALK, type Airfield, type BlockKind, type City, type PlayArea, type Side } from '../domain/city';
 
 type Surface = 'grass' | 'meadow' | 'forest' | 'paving' | 'plaza' | 'concrete' | 'field' | 'rock' | 'parking';
 
@@ -295,7 +297,8 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   for (const b of city.blockList) {
     // The airport's blocks are drawn as one field (see below).
     if (b.kind === 'airport') continue;
-    const surface = FLOOR[b.kind];
+    // The Easter Island heads stand on grass, not paving.
+    const surface = b.wonder === 'moai' ? 'grass' : FLOOR[b.kind];
     const inset = surface === 'paving' || surface === 'plaza' ? SIDEWALK : SIDEWALK - 0.4;
     const list = bySurface.get(surface) ?? [];
     // Green ground: a big tile, turned and shifted per block so no two blocks
@@ -381,7 +384,7 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
         const cz = z + side * (ROAD / 2 + 1.8);
         for (let t = -ROAD / 2 + 1; t < ROAD / 2 - 0.5; t += 1.8) {
           const built = (px: number, pz: number) =>
-            city.lots.some((l) => px >= l.x0 && px <= l.x1 && pz >= l.z0 && pz <= l.z1) ||
+            city.lots.some((l) => inRect(l, px, pz)) ||
             (!!field && px > field.area.x0 && px < field.area.x1 && pz > field.area.z0 && pz < field.area.z1);
           // No crossing on a built-over street, or leading into the airport.
           const reach = ROAD / 2 + 1;
@@ -410,6 +413,8 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   }
   const woods = trees(scene.trees);
   if (woods) group.add(woods);
+  const edgeMesh = boundary(city);
+  if (edgeMesh) group.add(edgeMesh);
 
   // The wonder islet (grass on a stone base) and the bridge out to it.
   const stone = new THREE.MeshStandardMaterial({ color: 0xd9d2c3, roughness: 0.9 });
@@ -550,7 +555,7 @@ export function scenery(city: City): { fields: Box[]; trees: Array<{ x: number; 
   const open = (x: number, z: number, pad: number) => {
     if (Math.abs(x) < land + 12 + pad && Math.abs(z) < land + 12 + pad) return false;
     if ((x < -land && shores.includes('w')) || (x > land && shores.includes('e')) || (z < -land && shores.includes('n')) || (z > land && shores.includes('s'))) return false;
-    return !roads.some((r) => x > r.x0 - 8 - pad && x < r.x1 + 8 + pad && z > r.z0 - 8 - pad && z < r.z1 + 8 + pad);
+    return !inside(roads, x, z, 8 + pad);
   };
   const r = seededRng(city.blocks * 7919 + Math.round(land));
   const at = () => -far + r() * far * 2;
@@ -579,11 +584,92 @@ export function scenery(city: City): { fields: Box[]; trees: Array<{ x: number; 
     for (let k = 0; k < n; k++) {
       const x = cx + (r() - 0.5) * 30;
       const z = cz + (r() - 0.5) * 30;
-      const onField = fields.some((f) => x > f.x0 - 2 && x < f.x1 + 2 && z > f.z0 - 2 && z < f.z1 + 2);
+      const onField = inside(fields, x, z, 2);
       if (open(x, z, 2) && !onField) trees.push({ x, z, s: 0.8 + r() * 0.7 });
     }
   }
   return { fields, trees, roads };
+}
+
+/**
+ * The edge of play on the green sides: where the hedge runs (in stretches
+ * along each side, `a` measured along it) and where the gates stand, one
+ * where each middle road goes through. Sea sides have none: the sea wall is
+ * the edge there.
+ */
+export function edgeOfPlay(city: City): { hedges: Array<{ side: Side; a0: number; a1: number }>; gates: Array<{ side: Side; at: number }> } {
+  const { land, shores } = city;
+  const mid = city.roads[Math.floor(city.blocks / 2)];
+  const gap = ROAD / 2 + 2;
+  const hedges: Array<{ side: Side; a0: number; a1: number }> = [];
+  const gates: Array<{ side: Side; at: number }> = [];
+  for (const side of ['n', 's', 'e', 'w'] as const) {
+    if (shores.includes(side)) continue;
+    hedges.push({ side, a0: -land, a1: mid - gap }, { side, a0: mid + gap, a1: land });
+    gates.push({ side, at: mid });
+  }
+  return { hedges, gates };
+}
+
+const HEDGE: Array<[number, number, number]> = [
+  [0.2, 0.5, 0.22],
+  [0.24, 0.56, 0.25],
+  [0.18, 0.45, 0.2],
+];
+const RAIL: [number, number, number] = [0.93, 0.9, 0.84];
+const PILLAR: [number, number, number] = [0.84, 0.8, 0.72];
+
+/**
+ * The edge of play drawn: a low hedge standing on the line itself, a white
+ * post-and-rail fence just outside it, and at each road a pair of stone
+ * pillars with the gates swung open outwards. One mesh; scenery, not food.
+ */
+function boundary(city: City): THREE.Mesh | null {
+  const { land } = city;
+  const { hedges, gates } = edgeOfPlay(city);
+  if (!hedges.length) return null;
+  const parts: THREE.BufferGeometry[] = [];
+  const r = seededRng(Math.round(land) * 31 + city.blocks);
+  /** A box given along the side (a), out from the line (o) and up (y), for a side. */
+  const box = (side: Side, a: number, o: number, y: number, la: number, lo: number, h: number, rgb: [number, number, number]) => {
+    const out = side === 'e' || side === 's' ? 1 : -1;
+    const alongX = side === 'n' || side === 's';
+    const c = out * (land + o);
+    const g = new THREE.BoxGeometry(alongX ? la : lo, h, alongX ? lo : la);
+    g.translate(alongX ? a : c, y + h / 2, alongX ? c : a);
+    parts.push(painted(g, rgb));
+  };
+  for (const { side, a0, a1 } of hedges) {
+    // The hedge in clipped lengths of a few units, each a shade and a height of its own.
+    for (let a = a0; a < a1 - 0.5; ) {
+      const len = Math.min(a1 - a, 3 + r() * 5);
+      const h = 1.0 + r() * 0.4;
+      const rgb = HEDGE[Math.floor(r() * HEDGE.length)];
+      box(side, a + len / 2, 0, 0, len + 0.05, 1.6, h, rgb);
+      // A narrower, lighter top, so it reads clipped and soft rather than a slab.
+      box(side, a + len / 2, 0, h, len + 0.05, 1.1, 0.3, [rgb[0] * 1.15, rgb[1] * 1.15, rgb[2] * 1.1]);
+      a += len;
+    }
+    // Posts and two rails a step outside it.
+    for (let a = a0 + 0.2; a <= a1; a += 3.2) box(side, a, 1.6, 0, 0.26, 0.26, 1.15, RAIL);
+    for (const y of [0.45, 0.9]) box(side, (a0 + a1) / 2, 1.6, y, a1 - a0, 0.12, 0.12, RAIL);
+  }
+  for (const { side, at } of gates) {
+    for (const s of [-1, 1]) {
+      const a = at + s * (ROAD / 2 + 1.4);
+      box(side, a, 0, 0, 1.3, 1.3, 2.3, PILLAR);
+      box(side, a, 0, 2.3, 1.6, 1.6, 0.25, PILLAR);
+      // The gate, swung open outwards along the road: a frame of rails.
+      for (const y of [0.35, 1.25]) box(side, a - s * 0.3, 3.3, y, 0.12, 5.2, 0.14, RAIL);
+      box(side, a - s * 0.3, 5.8, 0.15, 0.16, 0.16, 1.3, RAIL);
+    }
+  }
+  const geo = mergeGeometries(parts);
+  for (const p of parts) p.dispose();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }));
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 /** The scenery's trees: one instanced mesh of low pines, casting no shadow. */
@@ -697,7 +783,8 @@ export function runwayMarks(f: Airfield): Box[] {
 
 /**
  * The airport's ground, over its built-over streets: grass, the concrete
- * apron, the runway (darker) and taxiways, then the paint. Four meshes.
+ * apron, the runway (darker), taxiways and the train's track bed, then the
+ * paint and the sleepers, then the rails. Five meshes.
  */
 function airfieldMeshes(f: Airfield, grass: THREE.Texture, concrete: THREE.Texture, asphalt: THREE.Texture): THREE.Mesh[] {
   const tint = (g: THREE.BufferGeometry, rgb: [number, number, number]) => {
@@ -706,11 +793,25 @@ function airfieldMeshes(f: Airfield, grass: THREE.Texture, concrete: THREE.Textu
     return g;
   };
   const a = f.area;
+  // The shuttle track: a gravel bed, sleepers across it, two steel rails.
+  const t = f.track;
+  const alongX = t.x1 - t.x0 > t.z1 - t.z0;
+  const [t0, t1, c] = alongX ? [t.x0, t.x1, (t.z0 + t.z1) / 2] : [t.z0, t.z1, (t.x0 + t.x1) / 2];
+  /** A strip given along the track (a0..a1) and across it (c0..c1). */
+  const strip = (a0: number, a1: number, c0: number, c1: number, y: number) =>
+    alongX ? quad(a0, c + c0, a1, c + c1, y, 4) : quad(c + c0, a0, c + c1, a1, y, 4);
+  const sleepers: THREE.BufferGeometry[] = [];
+  for (let s = t0 + 0.4; s < t1 - 0.4; s += 1.4) sleepers.push(tint(strip(s, s + 0.55, -1.35, 1.35, -0.038), [0.46, 0.34, 0.25]));
+  const rails = [-0.75, 0.75].map((o) => tint(strip(t0, t1, o - 0.12, o + 0.12, -0.036), [0.78, 0.8, 0.84]));
   const out: Array<THREE.Mesh | null> = [
     layer([sheet(a.x0 + 0.5, a.z0 + 0.5, a.x1 - 0.5, a.z1 - 0.5, -0.042, GRASS_TILE, 9)], unrepeat(flat(grass, 0xffffff, 5)), 5),
     layer([quad(f.apron.x0, f.apron.z0, f.apron.x1, f.apron.z1, -0.041, 8)], flat(concrete, 0xffffff, 6), 6),
     layer(
-      [tint(quad(f.runway.x0, f.runway.z0, f.runway.x1, f.runway.z1, -0.04, 10), [0.7, 0.7, 0.74]), ...f.taxiways.map((t) => quad(t.x0, t.z0, t.x1, t.z1, -0.04, 10))],
+      [
+        tint(quad(f.runway.x0, f.runway.z0, f.runway.x1, f.runway.z1, -0.04, 10), [0.7, 0.7, 0.74]),
+        ...f.taxiways.map((w) => quad(w.x0, w.z0, w.x1, w.z1, -0.04, 10)),
+        tint(quad(t.x0, t.z0, t.x1, t.z1, -0.04, 10), [0.82, 0.76, 0.66]),
+      ],
       flat(asphalt, 0xffffff, 7),
       7,
     ),
@@ -718,10 +819,12 @@ function airfieldMeshes(f: Airfield, grass: THREE.Texture, concrete: THREE.Textu
       [
         ...runwayMarks(f).map((m) => quad(m.x0, m.z0, m.x1, m.z1, -0.038, 4)),
         ...f.lines.map((m) => tint(quad(m.x0, m.z0, m.x1, m.z1, -0.038, 4), [1, 0.78, 0.16])),
+        ...sleepers,
       ],
       flat(null, 0xf4f4f0, 8),
       8,
     ),
+    layer(rails, flat(null, 0xffffff, 9), 9),
   ];
   return out.filter((m): m is THREE.Mesh => m !== null);
 }

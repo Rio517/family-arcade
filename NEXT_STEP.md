@@ -24,6 +24,43 @@ exist nowhere else.
 
 ### Code
 
+- **Gulp Universe (live; the family is playing it and sending feedback).**
+  Open:
+  - *How things fall into the mouth, and how buildings come back.* The
+    owner prefers Gulp City's: things tip over the rim on the side they
+    entered and drop, rather than twirl in; new buildings appear without our
+    yellow scaffold. A frame-by-frame study of both games is in progress; the
+    animations live in `three/propView.ts` (`swallow`, `raise`, `step`).
+  - *The airport's middle hangar is the military one* (green, with a star).
+    A civilian hangar would suit the terminals better.
+  - *Lighthouse's mobile blocking time is noisy* (about 1.0–1.9 s between
+    runs against a 1.5 s budget in `npm run perf:gulp`); frame times are
+    steady. Worth watching, not chasing.
+  - Decided, not doing: building the menu's city in stages. The loading card
+    covers the build.
+
+  Where things live: `domain/` is the simulation (`world.ts` is the facade
+  over `holes`, `growth`, `space`, `rebuild`, `people`, `police`,
+  `powerups`, `attacks`; `city.ts` over `city/`), `three/` draws it
+  (`scene.ts` over `holeView`, `propView`, `seeThrough`, `walkers`,
+  `cameraRig`, `models`, `canvasTextures`, plus the model builders),
+  `components/` is the page and HUD, `storage/` what the device keeps.
+  `preview-gulp.html` (dev, harness builds) shows every model over the
+  smallest mouth that can swallow it; `npm run perf:gulp` is the local
+  performance audit.
+
+- **The "Play together" pill during full-screen play.** It stays at the
+  bottom centre while a Gulp round runs, where an iPad tap can hit it by
+  mistake (found in the Gulp fun audit). The party bar (`src/shared/party/
+  PartyBar.tsx`) has no way for a game to tuck it away; a shared "in play"
+  signal would help every full-screen game (Gulp, the racer).
+
+- **Flaky test: Caribbean naval route.** `<CaribbeanPage> › unmounts an
+  unsupported naval route and automatically resumes a fresh tick-zero session
+  when support returns` failed once in CI (2026-09-30, PR #167) and passed on
+  a re-run, with no Caribbean change in between. It is timing-sensitive
+  (about 200 ms). Make it wait on the state it expects instead of on time.
+
 - **Caribbean Career.** All of it is on `main`. Nothing is parked on a branch
   or in a worktree. The production module is `src/games/caribbean/`, registered
   `under-construction · playable`. `src/games/caribbean-poc/` is a harness and
@@ -426,3 +463,12 @@ where the sync happens.
 - If the owner says "I don't see the change" after a merge: the deploy is
   probably fine — the service worker serves the old build until the app is
   fully closed and reopened. Check the deploy run, then explain that.
+- **Gulp Universe performance.** `npx vitest run src/games/gulp/three/perf.test.ts`
+  guards triangle counts per map and the model kit's flush-pass work in the
+  normal test run — timing-free, so it never flakes. `npm run perf:gulp`
+  (port 4329) is the tool for the real thing: it builds, serves the build,
+  runs Lighthouse on the Gulp menu (mobile + desktop) and drives a City round
+  with Playwright to record frame times, then prints a budget table. It's an
+  audit, not a gate — it exits 0 even on a miss; add `--strict` to exit 1.
+  Run it by hand after touching `three/scene.ts`, `three/kit.ts`, `three/props.ts`,
+  or the map generator in `domain/city.ts`.

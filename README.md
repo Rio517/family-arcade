@@ -187,6 +187,30 @@ The little-kid corner of the console, and just as engineered as the rest:
 
 ---
 
+## Gulp Universe
+
+Be a hungry hole and swallow a toy city, from cones to wonders. Four maps
+(Town, City, Megalopolis, Region), Easy / Medium / Hard, optional power-ups,
+and an option for the city to fight back. The computer holes follow plain
+rules (no AI), slowing down when they are ahead of the child. The world is
+pure, seeded rules in `src/games/gulp/domain/`; the 3D city is procedural
+three.js in `src/games/gulp/three/`.
+
+**Dev-only tools.** None of these ship in the installed app.
+
+| Where | What it shows |
+|---|---|
+| `/preview-gulp.html` | The asset gallery: every model standing over the smallest mouth that can swallow it, with its points and level, and a slider for a test mouth. `?kind=stadium` shows one kind in all its colours; `?tier=5` shows one tier. |
+| `window.__gulp` on `/#/gulp` | The live world (holes, props, the city), for browser checks: jump to a giant hole, start an attack. |
+| `window.__gulpScene` on `/#/gulp` | The live 3D scene (renderer stats, effects, the camera tour). |
+| `npm run perf:gulp` | A local performance audit: Lighthouse on the Gulp menu, and frame times while playing a round. Run it from time to time; it prints a table against budgets. |
+
+The preview page and the two globals exist on the dev server
+(`npm run dev:tidewave`, port 5178); the preview page is also in harness
+builds (`BUILD_HARNESS=1`, which `npm run shots` sets).
+
+---
+
 ## Development
 
 Requires **Node 20** (the version CI runs; Node 26's experimental
