@@ -177,12 +177,15 @@ export function countryside(
   t: Tools,
   keepOff: readonly Rect[],
   lanes: readonly Lane[],
+  wonders: readonly PropKind[] = [],
 ): void {
   const { rng, pick, variant, turn } = t;
   const margin = land - half;
   const CELL = 26;
   const n = Math.ceil((land * 2) / CELL);
-  const winds = map === 'mega' || map === 'region';
+  // Wind farms on every map with countryside: big, tall and worth a lot,
+  // seen from the edge of town, a reason to head out.
+  const winds = map !== 'town';
   const peaks = map === 'region';
   // Ground the big things stand on: nothing else goes there. Each entry says
   // whether a spot (with `pad` of room round it) is on that ground.
@@ -233,6 +236,28 @@ export function countryside(
     block(px, pz, KINDS.powerplant.w + 4, KINDS.powerplant.d + 4);
   }
 
+  // Wonders that belong out in the open, on a meadow a little way out of
+  // town: their gold star is a lure into the countryside.
+  for (const kind of wonders) {
+    const heads = kind === 'moai';
+    const [w, d] = heads ? [28, 16] : [KINDS[kind].w + 4, KINDS[kind].d + 4];
+    const r = Math.max(w, d) / 2;
+    for (let tries = 0; tries < 60; tries++) {
+      const side = Math.floor(rng() * 4);
+      const out = half + margin * (0.3 + rng() * 0.3);
+      const along = (rng() - 0.5) * 2 * (half - 30);
+      const [x, z] = side === 0 ? [along, -out] : side === 1 ? [out, along] : side === 2 ? [along, out] : [-out, along];
+      if (!free(x, z, r) || inside(roads, x, z, r + 2) || Math.max(Math.abs(x), Math.abs(z)) - r < half + 4) continue;
+      if (heads) {
+        // Four heads in a loose arc, two with the red topknot (as on a city block).
+        const tops = rng() < 0.5 ? [0, 1, 1, 0] : [1, 0, 0, 1];
+        [-9.6, -3.2, 3.2, 9.6].forEach((dx, i) => t.add('moai', x + dx, z + dx * dx * 0.05, (rng() - 0.5) * 0.3, tops[i]));
+      } else t.add(kind, x, z, 0);
+      block(x, z, w, d);
+      break;
+    }
+  }
+
   // Hamlets where the lanes cross the country roads, and homes, farms and
   // stalls along the lanes and roads: most of the countryside's food, so it
   // is thickest near the roads and thins out towards the shore.
@@ -264,7 +289,7 @@ export function countryside(
   }
   for (const c of cells) {
     const { cx, cz, u, r } = c;
-    if (!winds || (peaks && u > 0.72) || u < 0.4 || r >= 0.3 || !free(cx, cz, TURBINE_PAD) || crowded(cx, cz, TURBINE_PAD) || inside(roads, cx, cz, TURBINE_PAD)) continue;
+    if (!winds || (peaks && u > 0.72) || u < 0.2 || r >= 0.3 || !free(cx, cz, TURBINE_PAD) || crowded(cx, cz, TURBINE_PAD) || inside(roads, cx, cz, TURBINE_PAD)) continue;
     t.add('windturbine', cx, cz, 0);
     round(cx, cz, TURBINE_PAD);
     big.add(c);

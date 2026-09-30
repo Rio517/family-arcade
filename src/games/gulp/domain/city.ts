@@ -122,6 +122,12 @@ const MAP_WONDERS: Record<MapId, PropKind[]> = {
   mega: ['megaspire', 'irontower', 'pyramid', 'pearlpalace', 'buddha', 'reichstag', 'opera', 'onion', 'clocktower', 'leaning', 'stonecircle', 'moai'],
   region: ['megaspire', 'irontower', 'pyramid', 'pearlpalace', 'buddha', 'reichstag', 'opera', 'onion', 'clocktower', 'leaning', 'stonecircle', 'moai'],
 };
+/**
+ * Wonders that stand out in the open on a map with countryside, a lure out
+ * of town (their gold star shows the way): a stone circle and the Easter
+ * Island heads belong on a meadow, not a city block.
+ */
+const COUNTRY_WONDERS: ReadonlySet<PropKind> = new Set(['stonecircle', 'moai']);
 const ISLET = 30;
 const BRIDGE = 16;
 
@@ -159,7 +165,12 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
   };
 
   const { grid: kinds, airport: site } = layout(map, rng);
-  const { at: wonderAt, east: wonderEast } = placeWonders(list.filter((k) => k !== 'liberty'), kinds, rng);
+  const inCountry = MAPS[map].country > 0 ? list.filter((k) => COUNTRY_WONDERS.has(k)) : [];
+  const { at: wonderAt, east: wonderEast } = placeWonders(
+    list.filter((k) => k !== 'liberty' && !inCountry.includes(k)),
+    kinds,
+    rng,
+  );
   const blockList: Block[] = [];
   for (let bx = 0; bx < blocks; bx++) {
     for (let bz = 0; bz < blocks; bz++) {
@@ -202,7 +213,7 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
     );
     const lanes = countryLanes(half, land, mid, port?.side ?? null);
     countryRoads.push(...lanes.map((l) => l.rect));
-    countryside(map, half, land, countryRoads, fields, tools, port ? [port.yard] : [], lanes);
+    countryside(map, half, land, countryRoads, fields, tools, port ? [port.yard] : [], lanes, inCountry);
   }
   // The Statue of Liberty's islet off the north shore, a bridge across to it.
   const ix = mid;
