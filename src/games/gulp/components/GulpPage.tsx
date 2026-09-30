@@ -405,37 +405,53 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
                     </li>
                   ))}
                 </ol>
-                {result.newBest && (
-                  <p className="gulp-newbest" data-testid="gulp-newbest">
-                    <b>New best!</b>
-                    {result.prevBest > 0 && <span>was {result.prevBest.toLocaleString()}</span>}
-                  </p>
-                )}
-                <p className="gulp-stats">
-                  Level {result.level} · {result.gulped.toLocaleString()} {result.gulped === 1 ? 'thing' : 'things'} gulped
-                  {result.kills > 0 && ` · ${result.kills} ${result.kills === 1 ? 'hole' : 'holes'} swallowed`}
-                  {result.wonders > 0 && ` · ${result.wonders} ${result.wonders === 1 ? 'wonder' : 'wonders'}`}
-                  {result.biggest && (
-                    <>
-                      <br />
-                      Biggest bite: <b>{result.biggest}</b>
-                    </>
+              </section>
+              <div className="gulp-results-side">
+                <section className="gulp-results-me" aria-label="Your round" data-testid="gulp-results-me">
+                  {result.newBest && (
+                    <p className="gulp-newbest" data-testid="gulp-newbest">
+                      <b>New best!</b>
+                      {result.prevBest > 0 && <span>was {result.prevBest.toLocaleString()}</span>}
+                    </p>
                   )}
-                </p>
-              </section>
-              <section className="gulp-results-family" aria-labelledby="gulp-family-title" data-testid="gulp-results-family">
-                <h3 className="gulp-family-head" id="gulp-family-title">
-                  <TrophyIcon size={20} />
-                  Family top {BOARD_SIZE}
-                  <small>
-                    {MAPS[result.entry.map].label} · {DIFFICULTY_TITLE[result.entry.difficulty]}
-                  </small>
-                </h3>
-                <p className={`gulp-family-place${result.place > 0 ? ' made' : ''}`} data-testid="gulp-family-place">
-                  {familyLine(result.place, result.score, result.board)}
-                </p>
-                {result.board.length > 0 && <FamilyBoard rows={result.board} highlight={result.entry} testId="gulp-results-board" />}
-              </section>
+                  <ul className="gulp-tiles">
+                    <li>
+                      <b>{result.level}</b>
+                      <span>Level</span>
+                    </li>
+                    <li>
+                      <b>{result.gulped.toLocaleString()}</b>
+                      <span>{result.gulped === 1 ? 'Thing gulped' : 'Things gulped'}</span>
+                    </li>
+                    <li>
+                      <b>{result.kills}</b>
+                      <span>{result.kills === 1 ? 'Hole swallowed' : 'Holes swallowed'}</span>
+                    </li>
+                    <li>
+                      <b>{result.wonders}</b>
+                      <span>{result.wonders === 1 ? 'Wonder' : 'Wonders'}</span>
+                    </li>
+                  </ul>
+                  {result.biggest && (
+                    <p className="gulp-bite">
+                      Biggest bite: <b>{result.biggest}</b>
+                    </p>
+                  )}
+                </section>
+                <section className="gulp-results-family" aria-labelledby="gulp-family-title" data-testid="gulp-results-family">
+                  <h3 className="gulp-family-head" id="gulp-family-title">
+                    <TrophyIcon size={20} />
+                    Family top {BOARD_SIZE}
+                    <small>
+                      {MAPS[result.entry.map].label} · {DIFFICULTY_TITLE[result.entry.difficulty]}
+                    </small>
+                  </h3>
+                  <p className={`gulp-family-place${result.place > 0 ? ' made' : ''}`} data-testid="gulp-family-place">
+                    {familyLine(result.place, result.score, result.board)}
+                  </p>
+                  {result.board.length > 0 && <FamilyBoard rows={result.board} highlight={result.entry} testId="gulp-results-board" />}
+                </section>
+              </div>
             </div>
             <div className="gulp-modal-row">
               <button type="button" className="gulp-play small" onClick={play} data-testid="gulp-again">
