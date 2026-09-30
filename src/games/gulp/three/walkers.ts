@@ -10,6 +10,7 @@ import type { Person, World } from '../domain/world';
 import { modelFor } from './models';
 import { buildKindGeometry } from './props';
 import { alarmTexture } from './canvasTextures';
+import { groundAt } from './ground';
 
 /** How many "!" marks can show at once. */
 const ALARMS = 24;
@@ -64,7 +65,7 @@ export class Walkers {
 
   /** Everyone where the world says. `time` is the scene's clock. */
   sync(world: World, time: number, dt: number): void {
-    this.syncPeople(time, dt);
+    this.syncPeople(world, time, dt);
     this.syncResponders(world, time);
   }
 
@@ -76,7 +77,7 @@ export class Walkers {
   }
 
   /** Walkers bob gently; people running from a hole hop high and quick with a "!" over their heads. */
-  private syncPeople(time: number, dt: number): void {
+  private syncPeople(world: World, time: number, dt: number): void {
     const d = this.dummy;
     const touched = this.touched;
     touched.clear();
@@ -91,7 +92,8 @@ export class Walkers {
         let face = this.facing.get(p.id) ?? p.heading;
         face += wrapAngle(p.heading - face) * (this.reducedMotion ? 1 : Math.min(1, dt * (running ? 18 : 10)));
         this.facing.set(p.id, face);
-        d.position.set(p.x, bob, p.z);
+        const y = groundAt(world.city, p.x, p.z);
+        d.position.set(p.x, y + bob, p.z);
         d.rotation.set(0, face, 0);
         d.scale.set(1, 1, 1);
         d.updateMatrix();
@@ -99,7 +101,7 @@ export class Walkers {
         if (running && p.kind === 'person' && alarm < this.alarms.length) {
           const a = this.alarms[alarm++];
           a.visible = true;
-          a.position.set(p.x, 2.6 + bob, p.z);
+          a.position.set(p.x, y + 2.6 + bob, p.z);
         }
       }
       touched.add(mesh);
@@ -136,7 +138,7 @@ export class Walkers {
         view = { group, baton };
         this.responders.set(r.id, view);
       }
-      view.group.position.set(r.x, 0, r.z);
+      view.group.position.set(r.x, groundAt(world.city, r.x, r.z), r.z);
       view.group.rotation.y = r.heading;
       if (view.baton) view.baton.rotation.z = this.reducedMotion ? 0.3 : 0.3 + Math.sin(time * 9 + r.id) * 0.7;
     }

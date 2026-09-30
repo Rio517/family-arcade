@@ -24,7 +24,7 @@ import type { World, WorldEvent } from '../domain/world';
 import { CameraRig } from './cameraRig';
 import type { Smear } from './canvasTextures';
 import { Effects } from './effects';
-import { buildGround, type Ground } from './ground';
+import { buildGround, groundAt, type Ground } from './ground';
 import { GROUND_SHIFT, HoleViews, type HoleLook } from './holeView';
 import { ModelWarmup } from './models';
 import { PropView } from './propView';
@@ -107,6 +107,8 @@ export class GulpScene {
     this.effects = new Effects(reducedMotion);
     this.scene.add(this.effects.group);
     this.holes = new HoleViews(this.scene, this.effects, reducedMotion, looks, follow);
+    // Things on a block stand a kerb above the road.
+    this.holes.ground = this.effects.ground = (x, z) => groundAt(world.city, x, z);
 
     this.rig = new CameraRig(this.camera, this.sun, fog, menuTour, reducedMotion);
     this.rig.start(world, world.holes[follow]);

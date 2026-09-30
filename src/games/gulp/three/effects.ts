@@ -88,6 +88,9 @@ export class Effects {
   /** Small repeatable randomness for the look of explosions (never gameplay). */
   private seed = 1;
 
+  /** The ground's height at a spot (a block stands a kerb above the road); the scene sets it. */
+  ground: (x: number, z: number) => number = () => 0;
+
   constructor(private reducedMotion: boolean) {
     this.tankerGeo = buildKindGeometry('tanker', 0);
     this.bomberGeo = buildKindGeometry('bomber', 0);
@@ -204,7 +207,7 @@ export class Effects {
   private mark(x: number, z: number, from: number, to: number, life: number, peak: number, hold: number, material: THREE.MeshBasicMaterial): void {
     const mesh = new THREE.Mesh(this.markGeo, material.clone());
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(x, 0.08, z);
+    mesh.position.set(x, this.ground(x, z) + 0.08, z);
     mesh.scale.setScalar(from);
     mesh.renderOrder = 4;
     this.group.add(mesh);
@@ -347,7 +350,7 @@ export class Effects {
         this.orbs.set(p.id, orb);
         this.group.add(orb);
       }
-      orb.position.set(p.x, 0, p.z);
+      orb.position.set(p.x, this.ground(p.x, p.z), p.z);
       orb.scale.setScalar(scale);
       const body = orb.children[0];
       body.position.y = 1.6 + (this.reducedMotion ? 0 : Math.sin(this.time * 3 + p.id) * 0.25);
@@ -407,7 +410,7 @@ export class Effects {
       }
       const body = view.group.children[0];
       if (a.kind === 'tanker') {
-        body.position.set(a.x, 0, a.z);
+        body.position.set(a.x, this.ground(a.x, a.z), a.z);
         body.rotation.y = a.heading;
         const warn = view.group.children[1];
         warn.position.set(a.x, 6 + (this.reducedMotion ? 0 : Math.sin(this.time * 8) * 0.6), a.z);
@@ -418,7 +421,7 @@ export class Effects {
         body.rotation.y = Math.atan2(a.dx, a.dz);
         body.scale.setScalar(Math.max(0.6, r / 12));
       } else if (a.kind === 'tank') {
-        body.position.set(a.x, 0, a.z);
+        body.position.set(a.x, this.ground(a.x, a.z), a.z);
         body.rotation.y = a.heading;
       } else {
         // A helicopter hovers low enough to see, bobbing, its rotor spinning.
@@ -448,7 +451,8 @@ export class Effects {
           view.rings.set(b.id, ring);
           view.group.add(ring);
         }
-        ring.position.set(b.x, 0.3, b.z);
+        // Just over the kerb, so it shows across road and pavement alike.
+        ring.position.set(b.x, 0.4, b.z);
         ring.scale.setScalar(b.radius);
         const soon = Math.max(0, Math.min(1, 1 - b.fuse / 3));
         const pulse = this.reducedMotion ? 1 : 0.7 + 0.3 * Math.sin(this.time * (8 + soon * 14));

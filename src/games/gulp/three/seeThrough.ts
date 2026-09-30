@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { KINDS, type Prop } from '../domain/catalog';
 import type { Hole, World } from '../domain/world';
+import { groundAt } from './ground';
 import { modelOf } from './models';
 
 /** How see-through a building standing in front of the child's hole goes. */
@@ -104,7 +105,7 @@ export class SeeThrough {
       mat.opacity = 1;
       mat.depthWrite = false;
       const ghost = new THREE.Mesh(modelOf(p), mat);
-      ghost.position.set(p.x, 0, p.z);
+      ghost.position.set(p.x, groundAt(world.city, p.x, p.z), p.z);
       ghost.rotation.y = p.rot;
       ghost.renderOrder = 2;
       // The see-through copy still casts the building's shadow: without it

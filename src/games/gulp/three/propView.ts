@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { FIT, KINDS, isSite, type Prop } from '../domain/catalog';
 import { BUILD_TIME, canEat, propsNear, type Hole, type World } from '../domain/world';
 import { blobTexture } from './canvasTextures';
+import { groundAt } from './ground';
 import { modelOf } from './models';
 import { SeeThrough } from './seeThrough';
 
@@ -59,6 +60,8 @@ interface Faller {
   h: number;
   /** A see-through copy has its own material to free. */
   ownMaterial: boolean;
+  /** The ground it stood on (a block stands a kerb above the road). */
+  y0: number;
 }
 
 /** Something put up during the round; `t` runs 0..1 while it rises. */
@@ -132,7 +135,7 @@ export class PropView {
       mesh.visible = true;
     } else {
       mesh = new THREE.Mesh(modelOf(p), this.material);
-      mesh.position.set(p.x, 0, p.z);
+      mesh.position.set(p.x, this.groundOf(p), p.z);
       mesh.rotation.y = p.rot;
       mesh.castShadow = true;
       this.scene.add(mesh);
@@ -144,7 +147,7 @@ export class PropView {
     // Half its footprint along the line from the hole's middle to it.
     const along = Math.atan2(offX, offZ) - p.rot;
     const half = Math.abs(Math.sin(along)) * (info.w / 2) + Math.abs(Math.cos(along)) * (info.d / 2);
-    this.fallers.push({ mesh, hole, t: 0, time: fallTime(p.size), offX, offZ, half, rot: p.rot, h: info.h * p.hScale, ownMaterial });
+    this.fallers.push({ mesh, hole, t: 0, time: fallTime(p.size), offX, offZ, half, rot: p.rot, h: info.h * p.hScale, ownMaterial, y0: mesh.position.y });
   }
 
   /**
@@ -155,7 +158,7 @@ export class PropView {
    */
   raise(p: Prop): void {
     const mesh = new THREE.Mesh(modelOf(p), this.material);
-    mesh.position.set(p.x, 0, p.z);
+    mesh.position.set(p.x, this.groundOf(p), p.z);
     mesh.rotation.y = p.rot;
     mesh.scale.y = 0.02;
     mesh.castShadow = true;
@@ -249,7 +252,7 @@ export class PropView {
       this.tiltAxis.normalize();
       this.tiltQ.setFromAxisAngle(this.tiltAxis, lean);
       const w = this.dummy;
-      w.position.set(p.x, 0, p.z);
+      w.position.set(p.x, this.groundOf(p), p.z);
       w.rotation.set(0, p.rot, 0);
       w.scale.set(1, 1, 1);
       w.quaternion.premultiply(this.tiltQ);
@@ -296,7 +299,7 @@ export class PropView {
       // steadier and cheaper to draw.
       const blob = vehicle ? new THREE.InstancedMesh(this.blobGeometry(kind), this.blobMat, list.length) : undefined;
       list.forEach((p, i) => {
-        dummy.position.set(p.x, SINK[p.kind] ?? 0, p.z);
+        dummy.position.set(p.x, (SINK[p.kind] ?? 0) + groundAt(world.city, p.x, p.z), p.z);
         dummy.rotation.set(0, p.rot, 0);
         dummy.updateMatrix();
         const matrix = dummy.matrix.clone();
@@ -349,6 +352,11 @@ export class PropView {
   }
 
   /** Set where a thing is drawn: its batch slot, or its own mesh if it was built during the round. */
+  /** How high the ground is where a thing stands. */
+  private groundOf(p: Prop): number {
+    return groundAt(this.lastWorld.city, p.x, p.z);
+  }
+
   private place(p: Prop, matrix: THREE.Matrix4, q: THREE.Quaternion): void {
     const slot = this.slots.get(p.id);
     if (slot) {
@@ -391,7 +399,7 @@ export class PropView {
       const pz = f.offZ - inZ * f.half;
       up.set(inX * f.half, 0, inZ * f.half).applyQuaternion(this.fallQ);
       const sink = drop * drop * (f.h * 1.4 + 3);
-      f.mesh.position.set(cx + px + up.x + inX * drop * f.half, up.y - sink, cz + pz + up.z + inZ * drop * f.half);
+      f.mesh.position.set(cx + px + up.x + inX * drop * f.half, f.y0 + up.y - sink, cz + pz + up.z + inZ * drop * f.half);
       this.fallYaw.setFromAxisAngle(this.yAxis, f.rot);
       f.mesh.quaternion.copy(this.fallQ).multiply(this.fallYaw);
       if (f.t >= 1) {
