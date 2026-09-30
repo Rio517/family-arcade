@@ -848,8 +848,8 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
         // Four heads in a loose arc on the grass, facing the street to the
         // south, ends a little forward; two with the red topknot. Rocks behind.
         const tops = rng() < 0.5 ? [0, 1, 1, 0] : [1, 0, 0, 1];
-        [-9, -3, 3, 9].forEach((dx, i) => {
-          add('moai', cx + dx + (rng() - 0.5) * 0.8, cz + 2 + dx * dx * 0.05, (rng() - 0.5) * 0.3, tops[i]);
+        [-9.6, -3.2, 3.2, 9.6].forEach((dx, i) => {
+          add('moai', cx + dx + (rng() - 0.5) * 0.2, cz + 2 + dx * dx * 0.05, (rng() - 0.5) * 0.3, tops[i]);
         });
         for (const [dx, dz] of [
           [-10, -9],

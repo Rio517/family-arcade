@@ -23,7 +23,7 @@ import { isSite, KINDS } from '../domain/catalog';
 import type { World, WorldEvent } from '../domain/world';
 import { CameraRig } from './cameraRig';
 import type { Smear } from './canvasTextures';
-import { Effects } from './effects';
+import { Effects, type WonderSpot } from './effects';
 import { buildGround, groundAt, type Ground } from './ground';
 import { GROUND_SHIFT, HoleViews, type HoleLook } from './holeView';
 import { ModelWarmup } from './models';
@@ -47,6 +47,8 @@ export class GulpScene {
   private walkers: Walkers;
   private holes: HoleViews;
   private rig: CameraRig;
+  /** The round's wonders, found once, for their stars (see Effects.syncWonders). */
+  private wonders: WonderSpot[] = [];
   /** Builds the models a round may still need in spare frame time; the menu's tour needs none. */
   private warmup: ModelWarmup | null;
   private resizeObs: ResizeObserver | null = null;
@@ -102,6 +104,14 @@ export class GulpScene {
       o.renderOrder += GROUND_SHIFT;
     });
     this.scene.add(this.ground.group);
+    const byKind = new Map<string, WonderSpot>();
+    for (const p of world.city.props) {
+      if (!KINDS[p.kind].wonder) continue;
+      const spot = byKind.get(p.kind) ?? { kind: p.kind, members: [] };
+      spot.members.push({ id: p.id, x: p.x, z: p.z, top: groundAt(world.city, p.x, p.z) + KINDS[p.kind].h * p.hScale });
+      byKind.set(p.kind, spot);
+    }
+    this.wonders = [...byKind.values()];
     this.props = new PropView(this.scene, this.material, world, reducedMotion);
     this.walkers = new Walkers(this.scene, this.material, world, reducedMotion);
     this.effects = new Effects(reducedMotion);
@@ -187,6 +197,7 @@ export class GulpScene {
     // a giant's height, never towering over the city.
     const scale = me ? Math.max(1, Math.sqrt(me.r / 2.5)) : 1;
     this.effects.syncPowerups(world.powerups, scale);
+    if (!this.menuTour) this.effects.syncWonders(this.wonders, (id) => world.props.has(id), this.time);
     this.effects.syncAttacks(world.attacks, me ? me.r : 2);
     this.effects.step(dt);
 

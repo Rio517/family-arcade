@@ -45,6 +45,12 @@ interface Mark {
   hold: number;
 }
 
+/** A wonder for its star: its kind, and each piece of it with where its top is. */
+export interface WonderSpot {
+  kind: string;
+  members: Array<{ id: number; x: number; z: number; top: number }>;
+}
+
 interface Popup {
   sprite: THREE.Sprite;
   /** Seconds left. */
@@ -98,6 +104,9 @@ export class Effects {
   private shellMat = new THREE.MeshStandardMaterial({ color: 0x4a5a2a, roughness: 0.5, emissive: 0xff7a1a, emissiveIntensity: 0.35 });
   private kitMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 });
   private warnTex = iconTexture('warn');
+  /** A gold star over each wonder still standing (one shared material; see `syncWonders`). */
+  private starMat = new THREE.SpriteMaterial({ map: iconTexture('star'), transparent: true, depthWrite: false, sizeAttenuation: false });
+  private wonderStars = new Map<string, THREE.Sprite>();
   private bombGeo = new THREE.CapsuleGeometry(0.5, 1.4, 4, 8);
   private bombMat = new THREE.MeshStandardMaterial({ color: 0x33363d, roughness: 0.5 });
   private time = 0;
@@ -371,6 +380,43 @@ export class Effects {
   }
 
   /** Power-up orbs float and spin, sized so the child's hole can see them. */
+  /**
+   * A gold star bobbing over each wonder still standing, the same size on
+   * screen at any height, so a child spots a wonder from across the city. A
+   * wonder in pieces (the Easter Island heads) has one star over whatever
+   * of it is left; it goes when the last piece is swallowed.
+   */
+  syncWonders(wonders: ReadonlyArray<WonderSpot>, standing: (id: number) => boolean, time: number): void {
+    for (const w of wonders) {
+      let n = 0;
+      let x = 0;
+      let z = 0;
+      let top = 0;
+      for (const m of w.members) {
+        if (!standing(m.id)) continue;
+        n += 1;
+        x += m.x;
+        z += m.z;
+        top = Math.max(top, m.top);
+      }
+      let star = this.wonderStars.get(w.kind);
+      if (!n) {
+        if (star) star.visible = false;
+        continue;
+      }
+      if (!star) {
+        star = new THREE.Sprite(this.starMat);
+        star.scale.set(0.05, 0.05, 1);
+        star.renderOrder = 9;
+        this.wonderStars.set(w.kind, star);
+        this.group.add(star);
+      }
+      star.visible = true;
+      const bob = this.reducedMotion ? 0 : Math.sin(time * 2.2 + x * 0.1) * 0.8;
+      star.position.set(x / n, top + 4 + bob, z / n);
+    }
+  }
+
   syncPowerups(list: PowerUp[], scale: number): void {
     const live = this.livePowerupIds;
     live.clear();
@@ -652,6 +698,8 @@ export class Effects {
     for (const p of this.popups) (p.sprite.material as THREE.Material).dispose();
     for (const t of this.popupTex.values()) t.dispose();
     for (const t of Object.values(this.powerIcons)) t.dispose();
+    this.starMat.map?.dispose();
+    this.starMat.dispose();
     this.puffTex.dispose();
     this.warnTex.dispose();
     this.orbGeo.dispose();
@@ -730,13 +778,32 @@ function textTexture(text: string, fill: string): THREE.Texture {
 }
 
 /** The pictures on power-up orbs and the tanker's warning sign. */
-function iconTexture(kind: 'bolt' | 'x2' | 'warn'): THREE.Texture {
+function iconTexture(kind: 'bolt' | 'x2' | 'warn' | 'star'): THREE.Texture {
   const s = 128;
   const c = document.createElement('canvas');
   c.width = c.height = s;
   const g = c.getContext('2d')!;
   g.lineJoin = 'round';
-  if (kind === 'warn') {
+  if (kind === 'star') {
+    // A fat gold star with a white rim and a soft glow round it.
+    const glow = g.createRadialGradient(64, 66, 10, 64, 66, 62);
+    glow.addColorStop(0, 'rgba(255,230,120,0.55)');
+    glow.addColorStop(1, 'rgba(255,230,120,0)');
+    g.fillStyle = glow;
+    g.fillRect(0, 0, s, s);
+    g.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const r = i % 2 ? 22 : 50;
+      g.lineTo(64 + Math.cos(a) * r, 68 + Math.sin(a) * r);
+    }
+    g.closePath();
+    g.lineWidth = 9;
+    g.strokeStyle = '#ffffff';
+    g.stroke();
+    g.fillStyle = '#ffc61a';
+    g.fill();
+  } else if (kind === 'warn') {
     g.fillStyle = '#ff3b30';
     g.strokeStyle = '#ffffff';
     g.lineWidth = 10;
