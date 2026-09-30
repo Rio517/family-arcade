@@ -74,8 +74,9 @@ const POPUP_HUGE = 1500;
 const popupTier = (points: number): PopupTier => (points >= POPUP_HUGE ? 'huge' : points >= POPUP_BIG ? 'big' : 'normal');
 const POPUP_LOOK: Record<PopupTier, { fill: string; scale: number; life: number }> = {
   normal: { fill: '#fff3d1', scale: 1, life: 0.6 },
-  big: { fill: '#ffc41f', scale: 1.15, life: 0.75 },
-  huge: { fill: '#ff5cc8', scale: 1.35, life: 0.95 },
+  // A big gulp's points stay up long enough to read and enjoy.
+  big: { fill: '#ffc41f', scale: 1.15, life: 1.4 },
+  huge: { fill: '#ff5cc8', scale: 1.35, life: 2.4 },
 };
 
 const POWER_COLOR: Record<PowerKind, number> = { speed: 0x39c6ff, double: 0xffc62e };
@@ -252,7 +253,10 @@ export class Effects {
    * low, drifting outwards and up, gone in a couple of seconds.
    */
   dust(x: number, z: number, size: number): void {
-    const n = this.reducedMotion ? 4 : 14;
+    // A block going up all at once raises one cloud, not dozens: past this
+    // many puffs in the air, a new building rises without its own.
+    if (this.puffs.length > 90) return;
+    const n = this.reducedMotion ? 4 : 8;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + this.rand() * 0.4;
       const out = size * (0.25 + this.rand() * 0.2);

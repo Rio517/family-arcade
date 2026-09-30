@@ -104,14 +104,14 @@ describe('the city fights back', () => {
     expect(picks('hard', 1200)).toBe(0);
   });
 
-  it('a wave of tanks goes home after one hit on Easy, and keeps firing on Hard', () => {
+  it('a wave of tanks goes home after one hit at every level, and a helicopter that keeps missing gives up after a few shots', () => {
     const hits = (difficulty: Difficulty) => {
       const w = round(6, 0, { fightBack: true, difficulty });
       only(w, []);
       const me = grow(w, 0, 3000);
       w.nextAttack = 999;
       const tank = (id: number, dx: number) => ({
-        id, wave: 1, hits: 0, home: false, kind: 'tank' as const, target: 0,
+        id, wave: 1, hits: 0, home: false, kind: 'tank' as const, target: 0, shots: 3,
         x: me.x + dx, z: me.z + me.r + 22, heading: Math.PI, speed: 6, life: 40, reload: 0.5, shells: [],
       });
       w.attacks = [tank(1, -6), tank(2, 6)];
@@ -119,8 +119,27 @@ describe('the city fights back', () => {
       for (let i = 0; i < 60 * 20; i++) for (const e of stepWorld(w, 1 / 60, still)) if (e.type === 'hurt') n += 1;
       return { n, home: w.attacks.every((a) => a.kind === 'tank' && a.home) };
     };
-    expect(hits('easy').n).toBe(1);
-    expect(hits('easy').home).toBe(true);
-    expect(hits('hard').n).toBeGreaterThanOrEqual(3);
+    for (const d of ['easy', 'medium', 'hard'] as const) {
+      expect(hits(d).n, d).toBe(1);
+      expect(hits(d).home, d).toBe(true);
+    }
+
+    // A helicopter over a hole that keeps moving: a few shots, then home.
+    const w = round(5, 0, { map: 'region', fightBack: true, difficulty: 'hard' });
+    only(w, []);
+    const me = grow(w, 0, 900);
+    w.nextAttack = 999;
+    w.attacks = [{ id: 1, wave: 1, hits: 0, home: false, kind: 'heli', target: 0, shots: 3, x: me.x + 30, z: me.z, heading: 0, speed: 28, life: 40, reload: 0.3, shells: [] }];
+    // Each landing shell is a boom; a hit adds one more for the knock.
+    let booms = 0;
+    let hurts = 0;
+    for (let i = 0; i < 60 * 20; i++) {
+      for (const e of stepWorld(w, 1 / 60, { x: 0, z: Math.sin(i / 50) > 0 ? 1 : -1 })) {
+        if (e.type === 'boom') booms += 1;
+        if (e.type === 'hurt') hurts += 1;
+      }
+    }
+    expect(booms - hurts).toBeLessThanOrEqual(3);
+    expect(w.attacks.every((a) => a.kind !== 'heli' || a.home)).toBe(true);
   });
 });

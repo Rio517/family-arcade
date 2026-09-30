@@ -7,17 +7,36 @@ import { FIT, LEVELS } from './catalog';
 /** A hole's radius at the start, and how it grows with what it has eaten. */
 export const START_R = 1.6;
 // Growth tapers off as a hole gets big (a power below a half), so the
-// first levels come fast and the giant ones take a whole round.
+// first levels come fast. Past about a skyscraper's worth eaten
+// (GIANT_MASS) it tapers less and less, towards area growing with the food,
+// so a giant that keeps eating keeps visibly growing: in a long round the
+// leader can swallow three blocks by three at 25 minutes, six by six at 35.
 const GROW = 0.27;
 const GROW_POWER = 0.41;
+const GIANT_MASS = 20000;
+const GIANT_POWER = 0.12;
 
 /** A hole swallows another this many times smaller than itself. */
 export const EAT_HOLE = 1.2;
 
 /** Radius from what a hole has eaten: area grows with the food, no ceiling. */
-export const radiusFor = (mass: number): number => START_R + GROW * Math.pow(Math.max(0, mass), GROW_POWER);
-/** The mass a hole needs to be this big (the inverse of `radiusFor`). */
-export const massFor = (r: number): number => Math.pow(Math.max(0, r - START_R) / GROW, 1 / GROW_POWER);
+export const radiusFor = (mass: number): number => {
+  const m = Math.max(0, mass);
+  return START_R + GROW * Math.pow(m, GROW_POWER) * Math.pow(1 + m / GIANT_MASS, GIANT_POWER);
+};
+/** The mass a hole needs to be this big (the inverse of `radiusFor`, found by halving). */
+export function massFor(r: number): number {
+  if (r <= START_R) return 0;
+  let hi = 1;
+  while (radiusFor(hi) < r) hi *= 2;
+  let lo = 0;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (radiusFor(mid) < r) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
 
 /** Past the last tier, a new level for every step this much bigger. */
 const BEYOND = 1.2;
