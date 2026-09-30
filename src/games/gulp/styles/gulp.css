@@ -40,6 +40,29 @@
   font-size: 18px;
   font-weight: 700;
 }
+/* While a city is built: the sky, a hole, and what is happening. Over the
+   menu and the HUD too, which would otherwise float over a blank stage. */
+.gulp-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: radial-gradient(circle at 50% 42%, #c9efff 0%, #8fd8f5 60%);
+  color: var(--g-ink);
+  font-size: 24px;
+  font-weight: 900;
+}
+.gulp-loading-hole {
+  width: 120px;
+  height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 55%, #000 0%, #0b0b18 55%, #1a2a6c 100%);
+  box-shadow: 0 0 0 8px var(--g-blue), 0 10px 0 8px var(--g-blue-ink);
+}
 .gulp-stick {
   position: absolute;
   width: 112px;
@@ -90,6 +113,17 @@
   box-shadow: 0 5px 0 rgba(20, 40, 90, 0.18), var(--g-shadow);
   opacity: 1;
 }
+/* The pause button: labelled, in the game's yellow, easy to find. */
+.gulp-round.gulp-pause-btn {
+  width: auto;
+  gap: 6px;
+  padding: 0 16px 0 12px;
+  display: flex;
+  background: var(--g-yellow);
+  color: #5a3d00;
+  box-shadow: 0 5px 0 var(--g-yellow-deep), var(--g-shadow);
+}
+.gulp-pause-label { font-size: 17px; font-weight: 900; }
 .gulp-round:active { transform: translateY(2px); box-shadow: 0 3px 0 rgba(20, 40, 90, 0.18), var(--g-shadow); }
 
 /* ----- menu ----- */
@@ -220,6 +254,10 @@
   box-shadow: 0 3px 0 rgba(20, 40, 90, 0.12);
 }
 .gulp-seg button.on { background: var(--g-blue); color: #fff; box-shadow: 0 3px 0 var(--g-blue-ink); }
+/* The difficulty choices carry a short hint under the name. */
+.gulp-levels button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 4px; }
+.gulp-levels small { font-size: 14px; font-weight: 700; line-height: 1.2; color: var(--g-muted); }
+.gulp-levels button.on small { color: rgba(255, 255, 255, 0.85); }
 
 .gulp-toggles { display: grid; grid-template-columns: 1fr; gap: 8px; }
 
@@ -241,6 +279,9 @@
   cursor: pointer;
   box-shadow: 0 5px 0 rgba(20, 40, 90, 0.14);
 }
+/* The chosen difficulty sits under the word Options. */
+.gulp-options-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; }
+.gulp-options-text small { font-size: 14px; font-weight: 800; color: var(--g-muted); }
 .gulp-options-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(20, 40, 90, 0.14); }
 .gulp-skin.mini { width: 28px; height: 28px; border-width: 4px; box-shadow: none; }
 .gulp-skin.mini .gulp-skin-eyes::before,
@@ -424,6 +465,20 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-power.speed { background: #1fa8e8; }
 .gulp-power.double { background: var(--g-yellow-deep); }
 
+/* A power-up glows round the edges of the screen, in its colour. */
+.gulp-powerglow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 90px 26px var(--pg);
+}
+.gulp-powerglow.speed { --pg: rgba(57, 198, 255, 0.7); }
+.gulp-powerglow.double { --pg: rgba(255, 198, 46, 0.7); }
+.gulp-power.speed,
+.gulp-power.double { box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18), 0 0 18px 2px var(--pc); }
+.gulp-power.speed { --pc: rgba(57, 198, 255, 0.8); }
+.gulp-power.double { --pc: rgba(255, 198, 46, 0.8); }
+
 /* The combo: a big stroked multiplier on the right edge, hotter each step,
    with the streak counted under it. */
 .gulp-combo {
@@ -459,15 +514,30 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-combo.c4 b { color: #6fe0ff; }
 .gulp-combo.c5 b { color: #ff7a5c; }
 
-/* Breaking news: a TV-style strip near the bottom. */
-.gulp-news {
+/* Near the edge of the world: a red warning under the clock. */
+.gulp-edge {
   position: absolute;
+  top: 132px;
   left: 50%;
-  bottom: max(84px, calc(env(safe-area-inset-bottom) + 76px));
   transform: translateX(-50%);
   display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #e8322b;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 4px 0 #a51f1a, var(--g-shadow);
+}
+
+/* Breaking news: a TV-style strip near the bottom. */
+.gulp-news {
+  display: flex;
   align-items: stretch;
-  max-width: calc(100vw - 32px);
+  max-width: 100%;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 6px 0 rgba(20, 30, 70, 0.2), var(--g-shadow);
@@ -476,7 +546,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-news-tag {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  padding: 10px 16px;
   background: #e8322b;
   color: #fff;
   font-size: 14px;
@@ -487,10 +557,11 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-news-text {
   display: flex;
   align-items: center;
-  padding: 8px 14px;
+  padding: 10px 20px;
   background: #fff;
   color: var(--g-ink);
   font-size: 17px;
+  line-height: 1.3;
 }
 
 .gulp-right {
@@ -501,6 +572,8 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   align-items: center;
   gap: 8px;
 }
+.gulp-stats,
+.gulp-buttons { display: flex; align-items: center; gap: 8px; }
 .gulp-kills {
   display: flex;
   align-items: center;
@@ -579,24 +652,49 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
-.gulp-banner { top: auto; bottom: 18%; transform: translateX(-50%); }
+/* Banner, news and the first hint share one stack along the bottom: each
+   takes the width it needs up to the screen's, and they never overlap. */
+.gulp-messages {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left));
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(84px, calc(env(safe-area-inset-bottom) + 76px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.gulp-messages > * { max-width: min(620px, 100%); }
+.gulp-banner { position: static; transform: none; padding: 14px 32px; min-width: min(300px, 100%); }
 .gulp-banner.level strong { color: var(--g-blue); }
 .gulp-banner.good strong { color: #1a9c3c; }
 .gulp-banner.warn { background: #ffe9e6; box-shadow: 0 6px 0 #ffb3a8, var(--g-shadow); color: #b3261e; }
 .gulp-banner.hurt strong { color: #b3261e; }
 
 .gulp-hint {
-  position: absolute;
-  bottom: max(88px, calc(env(safe-area-inset-bottom) + 80px));
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 10px 18px;
+  padding: 10px 22px;
   border-radius: 999px;
   background: rgba(29, 31, 51, 0.78);
   color: #fff;
   font-size: 16px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+/* ----- the minimap, bottom right ----- */
+.gulp-minimap-slot {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 11;
+  pointer-events: none;
+}
+.gulp-minimap {
+  display: block;
+  border-radius: 16px;
+  border: 3px solid #fff;
+  box-shadow: 0 5px 0 rgba(20, 40, 90, 0.18), var(--g-shadow);
 }
 
 /* ----- pause and results ----- */
@@ -699,10 +797,20 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   .gulp-lv { width: 30px; height: 30px; }
   .gulp-meter { width: 56px; }
   .gulp-next { display: none; }
-  .gulp-kills { display: none; }
+  .gulp-right { flex-direction: column-reverse; align-items: flex-end; gap: 6px; }
+  .gulp-wonders,
+  .gulp-kills { height: 34px; font-size: 16px; padding: 0 12px 0 8px; }
+  .gulp-minimap { width: 104px !important; height: 104px !important; }
+  .gulp-minimap-slot { bottom: max(64px, env(safe-area-inset-bottom)); }
+  .gulp-pause-label { display: none; }
+  .gulp-round.gulp-pause-btn { padding: 0; width: 44px; justify-content: center; }
   .gulp-round,
   .gulp-corner .fs-btn { width: 44px; height: 44px; border-radius: 14px; }
-  .gulp-hint { bottom: 100px; white-space: normal; text-align: center; max-width: calc(100vw - 48px); }
+  /* Above the minimap, so a long message never runs under it. */
+  .gulp-messages { bottom: max(186px, calc(env(safe-area-inset-bottom) + 178px)); }
+  .gulp-hint { white-space: normal; text-align: center; }
+  .gulp-banner { padding: 12px 22px; }
+  .gulp-banner strong { font-size: 24px; }
 }
 
 /* Keyboard focus shows on every control. */
@@ -713,8 +821,23 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .gulp-loading-hole { animation: gulp-gulp 0.9s ease-in-out infinite alternate; }
+  @keyframes gulp-gulp {
+    from { transform: scale(0.85, 0.8); }
+    to { transform: scale(1.08, 1.12); }
+  }
   .gulp-combo b { display: inline-block; animation: gulp-bump 0.3s ease-out; }
-  .gulp-news { animation: gulp-rise 0.3s ease-out; }
+  .gulp-powerglow { animation: gulp-glow 1.2s ease-in-out infinite alternate; }
+  .gulp-powerglow.ending { animation-duration: 0.3s; }
+  @keyframes gulp-glow {
+    from { opacity: 0.45; }
+    to { opacity: 1; }
+  }
+  .gulp-news { animation: gulp-up 0.3s ease-out; }
+  @keyframes gulp-up {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: none; opacity: 1; }
+  }
   @keyframes gulp-bump {
     from { transform: scale(1.35); }
     to { transform: scale(1); }
@@ -725,9 +848,5 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
     from { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
     to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
   }
-  .gulp-banner { animation-name: gulp-rise; }
-  @keyframes gulp-rise {
-    from { transform: translate(-50%, 20px); opacity: 0; }
-    to { transform: translate(-50%, 0); opacity: 1; }
-  }
+  .gulp-banner { animation-name: gulp-up; }
 }

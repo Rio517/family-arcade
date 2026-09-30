@@ -36,6 +36,12 @@ export function GulpHud({
   const top = banners.filter((b) => b.kind !== 'news').pop();
   return (
     <div className="gulp-hud" data-testid="gulp-hud">
+      {(hud.speed > 0 || hud.double > 0) && (
+        <div
+          className={`gulp-powerglow ${hud.speed > 0 ? 'speed' : 'double'} ${Math.min(hud.speed || 99, hud.double || 99) <= 3 ? 'ending' : ''}`}
+          aria-hidden="true"
+        />
+      )}
       <ol className="gulp-board" aria-label="Leaderboard" data-testid="gulp-board">
         {hud.rows.map(row)}
         {hud.mine && (
@@ -91,20 +97,25 @@ export function GulpHud({
       </div>
 
       <div className="gulp-right">
-        <span className="gulp-wonders" title="Wonders swallowed" data-testid="gulp-wonders">
-          <StarIcon size={18} />
-          {hud.wonders}/{hud.wondersTotal}
-        </span>
-        <span className="gulp-kills" title="Holes swallowed" data-testid="gulp-kills">
-          <span className="gulp-kills-icon" aria-hidden="true" />
-          {hud.kills}
-        </span>
-        <button type="button" className="gulp-round" onClick={onMute} aria-label={muted ? 'Sound on' : 'Sound off'} data-testid="gulp-mute">
-          {muted ? <SpeakerOffIcon size={22} /> : <SpeakerIcon size={22} />}
-        </button>
-        <button type="button" className="gulp-round" onClick={onPause} aria-label="Pause" data-testid="gulp-pause">
-          <PauseIcon size={22} />
-        </button>
+        <div className="gulp-stats">
+          <span className="gulp-wonders" title="Wonders swallowed" data-testid="gulp-wonders">
+            <StarIcon size={18} />
+            {hud.wonders}/{hud.wondersTotal}
+          </span>
+          <span className="gulp-kills" title="Holes swallowed" data-testid="gulp-kills">
+            <span className="gulp-kills-icon" aria-hidden="true" />
+            {hud.kills}
+          </span>
+        </div>
+        <div className="gulp-buttons">
+          <button type="button" className="gulp-round" onClick={onMute} aria-label={muted ? 'Sound on' : 'Sound off'} data-testid="gulp-mute">
+            {muted ? <SpeakerOffIcon size={22} /> : <SpeakerIcon size={22} />}
+          </button>
+          <button type="button" className="gulp-round gulp-pause-btn" onClick={onPause} aria-label="Pause" title="Pause (space)" data-testid="gulp-pause">
+            <PauseIcon size={22} />
+            <span className="gulp-pause-label">Pause</span>
+          </button>
+        </div>
       </div>
 
       {hud.streak >= 3 && (
@@ -119,10 +130,10 @@ export function GulpHud({
         </div>
       )}
 
-      {news && (
-        <div key={news.id} className="gulp-news" aria-live="polite" data-testid="gulp-news">
-          <span className="gulp-news-tag">Breaking news</span>
-          <span className="gulp-news-text">{news.text}</span>
+      {hud.nearEdge && (
+        <div className="gulp-edge" role="status" data-testid="gulp-edge">
+          <WarningIcon size={20} />
+          <span>That's the edge of the world! Turn back</span>
         </div>
       )}
 
@@ -141,17 +152,25 @@ export function GulpHud({
         </div>
       )}
 
-      {top && hud.alive && (
-        <div key={top.id} className={`gulp-banner ${top.kind}`} aria-live="polite" data-testid="gulp-banner">
-          {top.kind === 'warn' && <WarningIcon size={22} />}
-          <strong>{top.text}</strong>
-          {top.sub && <span>{top.sub}</span>}
-        </div>
-      )}
-
-      {hud.elapsed < 5 && hud.countdown === 0 && (
-        <div className="gulp-hint">{touch ? 'Drag anywhere to move' : 'Point with the mouse, or use the arrow keys'}</div>
-      )}
+      {/* Messages stack at the bottom, one above the other, so they never overlap. */}
+      <div className="gulp-messages">
+        {top && hud.alive && (
+          <div key={top.id} className={`gulp-banner ${top.kind}`} aria-live="polite" data-testid="gulp-banner">
+            {top.kind === 'warn' && <WarningIcon size={22} />}
+            <strong>{top.text}</strong>
+            {top.sub && <span>{top.sub}</span>}
+          </div>
+        )}
+        {news && (
+          <div key={news.id} className="gulp-news" aria-live="polite" data-testid="gulp-news">
+            <span className="gulp-news-tag">Breaking news</span>
+            <span className="gulp-news-text">{news.text}</span>
+          </div>
+        )}
+        {hud.elapsed < 5 && hud.countdown === 0 && (
+          <div className="gulp-hint">{touch ? 'Drag anywhere to move' : 'Point with the mouse, or use the arrow keys'}</div>
+        )}
+      </div>
     </div>
   );
 }

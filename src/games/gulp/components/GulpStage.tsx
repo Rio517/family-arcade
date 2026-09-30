@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { stepWorld, type Input, type World, type WorldEvent } from '../domain/world';
 import type { GulpScene, HoleLook } from '../three/scene';
 import { loadScene, type SceneLoader } from './round';
+import { HOLD_60_GAP, PACING_SAMPLE, shouldHold60 } from './pacing';
 
 const KEYS: Record<string, [number, number]> = {
   arrowup: [0, -1],
@@ -60,10 +61,34 @@ export function GulpStage({
   const onFrameRef = useRef(onFrame);
   const [stick, setStick] = useState<{ x: number; y: number; kx: number; ky: number } | null>(null);
   const [failed, setFailed] = useState(false);
+  /** Until the city's first frame is drawn, a loading card covers the stage. */
+  const [building, setBuilding] = useState(true);
 
   useEffect(() => {
     onFrameRef.current = onFrame;
   }, [onFrame]);
+
+  const sceneRef = useRef<GulpScene | null>(null);
+
+  // Zoom: the mouse wheel, or the plus and minus keys.
+  useEffect(() => {
+    if (!playing) return;
+    const mount = mountRef.current;
+    const wheel = (e: WheelEvent) => {
+      e.preventDefault();
+      sceneRef.current?.zoomBy(Math.sign(e.deltaY) * Math.min(3, Math.abs(e.deltaY) / 60 + 0.5));
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === '+' || e.key === '=') sceneRef.current?.zoomBy(-1);
+      if (e.key === '-' || e.key === '_') sceneRef.current?.zoomBy(1);
+    };
+    mount?.addEventListener('wheel', wheel, { passive: false });
+    window.addEventListener('keydown', key);
+    return () => {
+      mount?.removeEventListener('wheel', wheel);
+      window.removeEventListener('keydown', key);
+    };
+  }, [playing]);
 
   useEffect(() => {
     if (!playing) return;
@@ -93,10 +118,20 @@ export function GulpStage({
     let gone = false;
     let raf = 0;
     let last = 0;
+    let lastBeat = 0;
+    const gaps: number[] = [];
+    let hold60 = false;
 
     const loop = (ts: number) => {
       raf = requestAnimationFrame(loop);
       if (!scene) return;
+      // Watch the screen's rhythm until it is clear whether to hold to 60 (see pacing.ts).
+      if (lastBeat && !hold60 && gaps.length < PACING_SAMPLE) {
+        gaps.push(ts - lastBeat);
+        hold60 = shouldHold60(gaps);
+      }
+      lastBeat = ts;
+      if (hold60 && last && ts - last < HOLD_60_GAP) return;
       // Never backwards, never a huge jump (after a hidden tab): 0 to 50 ms.
       const dt = last ? Math.max(0, Math.min(0.05, (ts - last) / 1000)) : 0;
       last = ts;
@@ -104,15 +139,25 @@ export function GulpStage({
       if (!pausedRef.current) events = stepWorld(world, dt, playing ? readInput(keysRef.current, pointerRef.current) : null);
       scene.sync(world, events, pausedRef.current ? 0 : dt);
       scene.render();
+      if (!drawn) {
+        drawn = true;
+        setBuilding(false);
+      }
       onFrameRef.current(events, dt);
     };
+    let drawn = false;
 
-    load()
-      .then(({ GulpScene: Scene }) => {
+    // Building a city takes the main thread for a moment: let the loading
+    // card paint first, so the screen says what is happening.
+    const painted = () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+
+    Promise.all([load(), painted()])
+      .then(([{ GulpScene: Scene }]) => {
         if (gone) return;
         const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
         try {
           scene = new Scene(mount, world, looks, follow, reduced, !playing);
+          sceneRef.current = scene;
           // Development only, for browser checks; stripped from the build.
           if (import.meta.env.DEV) (window as unknown as { __gulpScene?: GulpScene }).__gulpScene = scene;
         } catch (err) {
@@ -190,6 +235,12 @@ export function GulpStage({
         <p className="gulp-fallback" data-testid="gulp3d-fallback">
           Sorry, this device can’t show the 3D city.
         </p>
+      )}
+      {building && !failed && (
+        <div className="gulp-loading" role="status" data-testid="gulp-loading">
+          <span className="gulp-loading-hole" aria-hidden="true" />
+          <span>Building the city…</span>
+        </div>
       )}
       {stick && (
         <div className="gulp-stick" style={{ left: stick.x, top: stick.y }} aria-hidden="true">

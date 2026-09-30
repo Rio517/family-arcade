@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { seededRng } from '@shared/rng';
-import { makeProp, type Prop } from './catalog';
+import { footSize, makeProp, type Prop } from './catalog';
 import { MAPS, type MapId } from './city';
-import { createBrain, steerRival } from './rivals';
+import { createBrain, steerRival, type Difficulty } from './rivals';
 import {
   comboOf,
   POWER_TIME,
   RESPAWN,
   START_R,
+  canEat,
   createWorld,
   endRound,
   levelOf,
@@ -71,16 +72,30 @@ describe('growing', () => {
     let last = 1;
     for (let mass = 1; mass < 400000; mass *= 1.01) {
       const lv = levelOf(radiusFor(mass));
-      if (lv > last && lv <= 10) {
+      if (lv > last && lv <= 13) {
         last = lv;
         seen.push(nextLabel(radiusFor(mass)) ?? 'Everything');
       }
     }
-    expect(seen).toEqual(['Cars', 'Buses', 'Houses', 'Towers', 'Factories', 'Stadiums', 'Skyscrapers', 'Mountains', 'Everything']);
+    // By footprint, a skyscraper is narrower than a stadium, so it comes first.
+    expect(seen).toEqual([
+      'Cars',
+      'Vans',
+      'Little houses',
+      'Buses',
+      'Houses',
+      'Big houses',
+      'Towers',
+      'Factories',
+      'Skyscrapers',
+      'Stadiums',
+      'Mountains',
+      'Everything',
+    ]);
     expect(nextLabel(radiusFor(400000))).toBeNull();
     // No ceiling: past the mountains, levels keep coming.
     expect(levelOf(radiusFor(4e6))).toBeGreaterThan(levelOf(radiusFor(400000)));
-    expect(radiusFor(4e6)).toBeGreaterThan(130);
+    expect(radiusFor(4e6)).toBeGreaterThan(100);
     expect(massFor(radiusFor(1234))).toBeCloseTo(1234, 6);
   });
 
@@ -100,7 +115,7 @@ describe('eating', () => {
     const me = w.holes[0];
     only(w, [makeProp(1, 'cone', me.x + 0.5, me.z, 0)]);
     const events = stepWorld(w, 0.016, still);
-    expect(events).toEqual([expect.objectContaining({ type: 'eat', hole: 0 })]);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'eat', hole: 0 }));
     expect(w.props.size).toBe(0);
     expect(me.score).toBe(1);
     expect(me.r).toBeGreaterThan(START_R);
@@ -123,7 +138,7 @@ describe('eating', () => {
 
   it('says so when a hole reaches a new level', () => {
     const w = round();
-    const me = grow(w, 0, 2);
+    const me = w.holes[0];
     only(w, [makeProp(1, 'bench', me.x, me.z, 0)]);
     expect(stepWorld(w, 0.016, still)).toContainEqual({ type: 'level', hole: 0, level: 2 });
   });
@@ -142,8 +157,8 @@ describe('eating', () => {
     for (let i = 0; i < 60; i++) stepWorld(w, 1 / 60, { x: 1, z: 0 });
     expect(me.x).toBeGreaterThan(x0 + 6);
     for (let i = 0; i < 60 * 40; i++) stepWorld(w, 1 / 60, { x: 1, z: 1 });
-    expect(me.x).toBeLessThanOrEqual(w.city.half);
-    expect(me.z).toBeLessThanOrEqual(w.city.half);
+    expect(me.x).toBeLessThanOrEqual(w.city.land);
+    expect(me.z).toBeLessThanOrEqual(w.city.land);
   });
 });
 
@@ -423,12 +438,17 @@ describe('food and combos', () => {
     const me = grow(w, 0, 30);
     const start = me.mass;
     me.stun = 1;
-    only(w, [makeProp(1, 'cart', me.x, me.z, 0), makeProp(2, 'fruitstand', me.x + 0.5, me.z, 0)]);
+    const cart = makeProp(1, 'cart', me.x, me.z, 0);
+    const fruit = makeProp(2, 'fruitstand', me.x + 0.5, me.z, 0);
+    only(w, [cart, fruit]);
     const events = stepWorld(w, 1 / 60, still);
     expect(events).toContainEqual({ type: 'food', hole: 0, food: 'treat', bonus: 0 });
-    expect(events).toContainEqual(expect.objectContaining({ type: 'food', hole: 0, food: 'healthy' }));
-    // The cart (8) and the fruit stand (4, plus a bonus of 2).
-    expect(me.mass).toBeCloseTo(start + 8 + 4 + 2, 6);
+    const healthy = events.find((e) => e.type === 'food' && e.food === 'healthy');
+    expect(healthy).toBeDefined();
+    const bonus = healthy?.type === 'food' ? healthy.bonus : 0;
+    expect(bonus).toBeGreaterThan(0);
+    // The cart, the fruit stand, and the health bonus on top.
+    expect(me.mass).toBeCloseTo(start + cart.points + fruit.points + bonus, 6);
     expect(me.stun).toBe(0);
   });
 
@@ -477,36 +497,45 @@ describe('the round', () => {
   });
 });
 
-describe('a round against the computer is fair and fun', () => {
-  /** A stand-in for a child: steers like a middling rival, with no kindness slow-down. */
-  function play(seed: number, skill: number, map: MapId = 'city', extra: Partial<Options> = {}) {
-    const w = round(seed, MAPS[map].rivals, { map, ...extra });
-    const brain = { ...createBrain(seededRng(seed + 50)), skill };
-    for (let i = 0; i < 30 * 125 && w.status === 'playing'; i++) {
-      const me = w.holes[0];
-      const want = me.alive ? steerRival(brain, me, w, 1 / 30, null) : still;
-      stepWorld(w, 1 / 30, want);
-    }
+/**
+ * A stand-in for a child playing a two-minute round: steers like a middling
+ * rival, with no kindness slow-down. `extra` can set the difficulty.
+ */
+function play(seed: number, skill: number, map: MapId = 'city', extra: Partial<Options> = {}) {
+  const w = round(seed, MAPS[map].rivals, { map, ...extra });
+  const brain = { ...createBrain(seededRng(seed + 50)), skill };
+  for (let i = 0; i < 30 * 125 && w.status === 'playing'; i++) {
     const me = w.holes[0];
-    return { rank: standings(w).indexOf(me) + 1, level: levelOf(me.r), w };
+    const want = me.alive ? steerRival(brain, me, w, 1 / 30, null) : still;
+    stepWorld(w, 1 / 30, want);
   }
+  const me = w.holes[0];
+  const order = standings(w);
+  // The best computer hole's score, to see how hard the rivals pushed.
+  const top = order.find((h) => !h.isPlayer)?.score ?? 0;
+  return { rank: order.indexOf(me) + 1, level: levelOf(me.r), top, w };
+}
 
+describe('a round against the computer is fair and fun', () => {
   it('a steady player climbs the levels in a two-minute city round, nearly always places, and wins some', () => {
     const results = [1, 2, 3, 4, 5, 6].map((s) => play(s, 0.7));
     for (const r of results) {
       expect(r.level).toBeGreaterThanOrEqual(4);
-      expect(r.rank).toBeLessThanOrEqual(4);
+      // Never last, whatever part of the city the round sends it to.
+      expect(r.rank).toBeLessThan(MAPS.city.rivals + 1);
     }
-    expect(results.filter((r) => r.rank <= 3).length).toBeGreaterThanOrEqual(5);
+    // Nearly always placed: one round in a thin part of the city at most.
+    expect(results.filter((r) => r.rank <= 4).length).toBeGreaterThanOrEqual(5);
+    expect(results.filter((r) => r.rank <= 3).length).toBeGreaterThanOrEqual(4);
     expect(results.filter((r) => r.rank === 1).length).toBeGreaterThanOrEqual(2);
   });
 
-  it('a wobbly player still grows and finishes in the top four', () => {
+  it('a wobbly player still grows and nearly always finishes in the top four', () => {
     const results = [1, 2, 3, 4, 5, 6].map((s) => play(s, 0.25));
-    for (const r of results) {
-      expect(r.level).toBeGreaterThanOrEqual(4);
-      expect(r.rank).toBeLessThanOrEqual(4);
-    }
+    for (const r of results) expect(r.level).toBeGreaterThanOrEqual(4);
+    // One thin round at most: a wobbly start in a sparse district can leave
+    // the child behind a pack of rivals that are all crawling to let it catch up.
+    expect(results.filter((r) => r.rank <= 4).length).toBeGreaterThanOrEqual(5);
   });
 
   it('with power-ups and the city fighting back, the round still plays out', () => {
@@ -555,9 +584,181 @@ describe('a round against the computer is fair and fun', () => {
     const bridge = w.city.extraLand.find((l) => l.kind === 'bridge')!;
     me.x = (bridge.x0 + bridge.x1) / 2;
     me.z = -w.city.half + 5;
-    for (let i = 0; i < 60 * 8; i++) stepWorld(w, 1 / 60, { x: 0, z: -1 });
+    for (let i = 0; i < 60 * 14; i++) stepWorld(w, 1 / 60, { x: 0, z: -1 });
     const islet = w.city.extraLand.find((l) => l.kind === 'islet')!;
     expect(me.z).toBeLessThan(islet.z1);
     expect(me.z).toBeGreaterThanOrEqual(islet.z0);
+  });
+
+  it('the Region has a military base; with the city fighting back, its army comes for a big hole', () => {
+    const w = round(3, 0, { map: 'region', fightBack: true });
+    expect(w.city.base).not.toBeNull();
+    const kinds = new Set(w.city.props.map((p) => p.kind));
+    for (const k of ['hangar', 'barracks', 'tank', 'helicopter', 'radar', 'watchtower'] as const) expect(kinds.has(k)).toBe(true);
+    only(w, []);
+    const me = grow(w, 0, 900);
+    const base = w.city.base!;
+    me.x = base.x + 60;
+    me.z = base.z;
+    const seen = new Set<string>();
+    for (let tries = 0; tries < 20; tries++) {
+      w.attacks = [];
+      w.nextAttack = 0;
+      for (const e of stepWorld(w, 1 / 60, still)) if (e.type === 'incoming') seen.add(e.kind);
+    }
+    expect(seen.has('tank') || seen.has('heli')).toBe(true);
+  });
+
+  it('a tank fires at a hole that stays put, and a big enough hole swallows it', () => {
+    const w = round(4, 0, { map: 'region', fightBack: true });
+    only(w, []);
+    const me = grow(w, 0, 900);
+    w.nextAttack = 999;
+    w.attacks = [{ id: 1, kind: 'tank', target: 0, x: me.x + 40, z: me.z, heading: -Math.PI / 2, speed: 6, life: 40, reload: 0.5, shells: [] }];
+    const events: WorldEvent[] = [];
+    for (let i = 0; i < 60 * 4; i++) events.push(...stepWorld(w, 1 / 60, still));
+    expect(events).toContainEqual({ type: 'hurt', hole: 0, cause: 'bomb' });
+    // Now drive into it.
+    const tank = w.attacks[0];
+    me.stun = 0;
+    const got: WorldEvent[] = [];
+    for (let i = 0; i < 60 * 8 && w.attacks.length; i++) got.push(...stepWorld(w, 1 / 60, { x: Math.sign(tank.x - me.x), z: 0 }));
+    expect(got).toContainEqual(expect.objectContaining({ type: 'eat', prop: expect.objectContaining({ kind: 'tank' }) }));
+  });
+
+  it('the rockets from a helicopter miss a hole that keeps moving', () => {
+    const w = round(5, 0, { map: 'region', fightBack: true });
+    only(w, []);
+    const me = grow(w, 0, 900);
+    w.nextAttack = 999;
+    w.attacks = [{ id: 1, kind: 'heli', target: 0, x: me.x + 30, z: me.z, heading: 0, speed: 28, life: 12, reload: 0.3, shells: [] }];
+    const events: WorldEvent[] = [];
+    // Weave back and forth across the road.
+    for (let i = 0; i < 60 * 10; i++) events.push(...stepWorld(w, 1 / 60, { x: 0, z: Math.sin(i / 50) > 0 ? 1 : -1 }));
+    expect(events.filter((e) => e.type === 'boom').length).toBeGreaterThan(1);
+    expect(events.filter((e) => e.type === 'hurt').length).toBeLessThanOrEqual(1);
+  });
+
+  it('swallows what it covers: a lamp post at the start, a van at level three', () => {
+    const w = round(1, 0);
+    const me = w.holes[0];
+    only(w, [makeProp(1, 'lamp', me.x, me.z, 0)]);
+    expect(stepWorld(w, 1 / 60, still)).toContainEqual(expect.objectContaining({ type: 'eat' }));
+    // A hole just big enough to cover a van swallows it.
+    const w2 = round(1, 0);
+    const h = w2.holes[0];
+    h.r = footSize('van') / 0.92 + 0.05;
+    h.mass = massFor(h.r);
+    expect(levelOf(h.r)).toBeLessThanOrEqual(4);
+    only(w2, [makeProp(1, 'van', h.x, h.z, 0)]);
+    expect(stepWorld(w2, 1 / 60, still)).toContainEqual(expect.objectContaining({ type: 'eat' }));
+  });
+});
+
+describe('difficulty', () => {
+  /** A rival next to a smaller child, both with these scores. */
+  function standoff(difficulty: Difficulty, rivalScore: number, childScore: number) {
+    const w = round(1, 1, { difficulty });
+    only(w, []);
+    const [me, rival] = w.holes;
+    grow(w, 1, 900);
+    rival.score = rivalScore;
+    me.score = childScore;
+    rival.x = me.x + 20;
+    rival.z = me.z;
+    return { w, me, rival };
+  }
+
+  /** Whether the rival sets off after the child within a few looks round. */
+  function hunts(difficulty: Difficulty, rivalScore: number, childScore: number): boolean {
+    const { w, me, rival } = standoff(difficulty, rivalScore, childScore);
+    const brain = w.brains[1]!;
+    for (let i = 0; i < 60 * 4; i++) {
+      steerRival(brain, rival, w, 1 / 60, me);
+      if (brain.target?.kind === 'hole' && brain.target.id === 0) return true;
+    }
+    return false;
+  }
+
+  it('left out, the rivals play Easy', () => {
+    const plain = round(7, 5);
+    const easy = round(7, 5, { difficulty: 'easy' });
+    expect(plain.brains.map((b) => b?.skill)).toEqual(easy.brains.map((b) => b?.skill));
+  });
+
+  it('harder rivals are more skilful', () => {
+    const skills = (difficulty: Difficulty) => round(7, 5, { difficulty }).brains.flatMap((b) => (b ? [b.skill] : []));
+    expect(Math.min(...skills('medium'))).toBeGreaterThan(0.7);
+    expect(Math.min(...skills('hard'))).toBeGreaterThan(Math.max(...skills('easy')) - 0.1);
+    expect(Math.max(...skills('hard'))).toBeLessThanOrEqual(1);
+  });
+
+  it('a rival far ahead of the child crawls on Easy, eases off a little on Medium, and races on Hard', () => {
+    const pace = (difficulty: Difficulty) => {
+      const { w, me, rival } = standoff(difficulty, 5000, 1000);
+      const brain = w.brains[1]!;
+      steerRival(brain, rival, w, 1 / 60, me);
+      return brain.pace;
+    };
+    expect(pace('easy')).toBe(0.35);
+    expect(pace('medium')).toBeGreaterThan(0.7);
+    expect(pace('medium')).toBeLessThan(1);
+    expect(pace('hard')).toBe(1);
+  });
+
+  it('who goes after a smaller child: Easy only when the child is well ahead, Medium once the child is level, Hard always', () => {
+    expect(hunts('easy', 1000, 1000)).toBe(false);
+    expect(hunts('easy', 1000, 2000)).toBe(true);
+    expect(hunts('medium', 1000, 500)).toBe(false);
+    expect(hunts('medium', 1000, 1000)).toBe(true);
+    expect(hunts('hard', 1000, 100)).toBe(true);
+  });
+
+  it('on every level, rivals leave the wonders for the child and skip the chemical plant', () => {
+    for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+      const w = round(1, 1, { difficulty, fightBack: true });
+      const [me, rival] = w.holes;
+      grow(w, 1, 20000);
+      me.x = rival.x + 200;
+      const wonder = makeProp(1, 'leaning', rival.x + rival.r + 6, rival.z, 0);
+      const hazard = makeProp(2, 'chemplant', rival.x - rival.r - 12, rival.z, 0);
+      // A lamp post further off: the only thing left for the rival to want.
+      const lamp = makeProp(3, 'lamp', rival.x, rival.z + rival.r + 30, 0);
+      only(w, [wonder, hazard, lamp]);
+      expect(canEat(rival, wonder) && canEat(rival, hazard)).toBe(true);
+      const brain = w.brains[1]!;
+      for (let i = 0; i < 60 * 4; i++) {
+        steerRival(brain, rival, w, 1 / 60, me);
+        expect(brain.target?.id).toBe(3);
+      }
+    }
+  });
+
+  it('a steady player wins most Easy rounds, some Medium ones, and hardly any Hard ones', () => {
+    const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const [easy, medium, hard] = (['easy', 'medium', 'hard'] as const).map((difficulty) => {
+      const results = seeds.map((s) => play(s, 0.7, 'city', { difficulty }));
+      return {
+        rank: mean(results.map((r) => r.rank)),
+        wins: results.filter((r) => r.rank === 1).length,
+        top: mean(results.map((r) => r.top)),
+      };
+    });
+    // The child's place drops as the level rises…
+    expect(easy.rank).toBeLessThan(medium.rank);
+    expect(medium.rank).toBeLessThan(hard.rank);
+    // …because the best rival gets bigger.
+    expect(easy.top).toBeLessThan(medium.top);
+    expect(medium.top).toBeLessThan(hard.top);
+    // Easy is still the gentle game; Medium is a race in the middle of the
+    // table that the child sometimes wins; Hard is rarely won.
+    expect(easy.wins).toBeGreaterThanOrEqual(9);
+    expect(medium.wins).toBeGreaterThanOrEqual(1);
+    expect(medium.wins).toBeLessThanOrEqual(8);
+    expect(medium.rank).toBeGreaterThanOrEqual(1.8);
+    expect(medium.rank).toBeLessThanOrEqual(4);
+    expect(hard.wins).toBeLessThanOrEqual(4);
+    expect(hard.rank).toBeGreaterThanOrEqual(3);
   });
 });

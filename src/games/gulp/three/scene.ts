@@ -12,9 +12,10 @@
  * procedural, so the PWA stays offline.
  */
 import * as THREE from 'three';
+import { seededRng } from '@shared/rng';
 import { disposeDeep } from '@shared/three/disposeDeep';
-import { KINDS, type Prop } from '../domain/catalog';
-import { BUILD_TIME, canEat, propsNear, type Hole, type Person, type World, type WorldEvent } from '../domain/world';
+import { FIT, KINDS, type Prop } from '../domain/catalog';
+import { BUILD_TIME, POWER_TIME, canEat, propsNear, type Hole, type Person, type World, type WorldEvent } from '../domain/world';
 import { Effects } from './effects';
 import { buildGround, type Ground } from './ground';
 import { buildKindGeometry } from './props';
@@ -37,6 +38,9 @@ const SHADOW_MAP = 2048;
 /** How see-through a building standing in front of the child's hole goes. */
 const GHOST = 0.2;
 
+/** Each power-up's colour: the aura, the countdown ring and its number. */
+const POWER_COLOR = { speed: 0x39c6ff, double: 0xffc62e } as const;
+
 /** Things are batched per square of this many units (two blocks), so the
  * squares off screen are skipped while the hole is small. */
 const CHUNK = 108;
@@ -45,7 +49,43 @@ interface Slot {
   mesh: THREE.InstancedMesh;
   index: number;
   matrix: THREE.Matrix4;
+  /** A vehicle's soft shadow patch, drawn with the same matrix. */
+  blob?: THREE.InstancedMesh;
 }
+
+/**
+ * Vehicles cast no sun shadow: small, low shadows came out with a gap under
+ * the wheels. They sit on a soft dark patch instead, which is steadier and
+ * cheaper to draw.
+ */
+/** What a mouth can be left with, and what leaves it. */
+type Smear = 'burn' | 'poop' | 'icecream';
+const MESSY: Partial<Record<Prop['kind'], Smear>> = { garbagetruck: 'poop', icecreamvan: 'icecream', cart: 'icecream' };
+/** The rim leans toward this while the mess lasts. */
+const SMEAR_RIM: Record<Smear, THREE.Color> = {
+  burn: new THREE.Color(0x3a2a22),
+  poop: new THREE.Color(0x7a4a1e),
+  icecream: new THREE.Color(0xffa8cf),
+};
+/** Seconds for a full-strength mess to fade away. */
+const SMEAR_FADE = 5;
+
+/**
+ * Built models, kept for the whole visit: the menu's city and every round
+ * after it use the same ones, so starting a round does not build them all
+ * again. A scene's teardown frees their GPU copies; the next scene uploads
+ * them again, which is quick next to building them.
+ */
+const MODELS = new Map<string, THREE.BufferGeometry>();
+
+/** The menu's tour: seconds at each showpiece, and the share of that spent gliding there. */
+const TOUR_DWELL = 9;
+const TOUR_GLIDE = 0.4;
+
+/** Small street furniture: no shadows, to save the shadow pass drawing hundreds of them. */
+const CLUTTER: ReadonlySet<string> = new Set(['lamp', 'bin', 'hydrant', 'planter', 'cone', 'bike', 'mailbox']);
+
+const VEHICLES: ReadonlySet<string> = new Set(['car', 'taxi', 'van', 'bus', 'garbagetruck', 'icecreamvan', 'cart', 'tractor', 'tanker', 'container', 'policecar', 'tank', 'bike']);
 
 interface Faller {
   mesh: THREE.Mesh;
@@ -69,6 +109,16 @@ interface HoleObj {
   eyes: THREE.Object3D[];
   label: THREE.Sprite;
   materials: THREE.Material[];
+  /** The child's power-up show: a glowing aura, a draining ring, the seconds left. */
+  power?: {
+    aura: THREE.Mesh;
+    ring: THREE.Mesh;
+    ringTheta: number;
+    count: THREE.Sprite;
+    shown: string;
+  };
+  /** A mess in the mouth that fades: burnt by a fuel truck, a garbage truck, ice cream. */
+  smear: { mesh: THREE.Mesh; kind: Smear | null; amount: number; base: THREE.Color; flameIn: number };
   /** 1 while visible, shrinking to 0 when swallowed. */
   shown: number;
   flash: number;
@@ -85,7 +135,7 @@ export class GulpScene {
   private material = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8, metalness: 0 });
   private geometries = new Map<string, THREE.BufferGeometry>();
   private slots = new Map<number, Slot>();
-  private batches: Array<{ mesh: THREE.InstancedMesh; tier: number }> = [];
+  private batches: Array<{ mesh: THREE.InstancedMesh; tier: number; casts: boolean }> = [];
   /** Tall things that might stand in the way, and the see-through copies in use. */
   private tall: Prop[] = [];
   private ghosts = new Map<number, THREE.Mesh>();
@@ -102,9 +152,42 @@ export class GulpScene {
   private lightBasis = new THREE.Matrix4();
   /** Things wobbling on the rim of the child's hole: too big to fall in yet. */
   private wobbling = new Map<number, number>();
+  private shakeOf = new Map<number, number>();
   /** People: one batch per outfit, and where each person sits in it. */
   private facing = new Map<number, number>();
+  private alarms: THREE.Sprite[] = [];
+  private alarmTex: THREE.Texture | null = null;
+  private responderViews = new Map<number, { group: THREE.Group; baton?: THREE.Object3D }>();
+  private batonGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.8, 6);
+  private batonMat = new THREE.MeshStandardMaterial({ color: 0x1d1f33, roughness: 0.5 });
+  private blobTex = blobTexture();
+  private blobMat = new THREE.MeshBasicMaterial({
+    map: this.blobTex,
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.4,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -10,
+    polygonOffsetUnits: -40,
+  });
+
+  /** A flat soft patch a little bigger than the vehicle's footprint, just above the road. */
+  private blobGeometry(kind: string): THREE.BufferGeometry {
+    const key = `blob:${kind}`;
+    let geo = this.geometries.get(key);
+    if (!geo) {
+      const info = KINDS[kind as keyof typeof KINDS];
+      geo = new THREE.PlaneGeometry(info.w * 1.15 + 0.3, info.d * 1.08 + 0.3);
+      geo.rotateX(-Math.PI / 2);
+      geo.translate(0, 0.02, 0);
+      this.geometries.set(key, geo);
+    }
+    return geo;
+  }
   private frameDt = 0;
+  /** The child's zoom: 1 is the usual view; smaller is closer, bigger further out. */
+  private zoom = 1;
   private peopleSlots: Array<{ person: Person; mesh: THREE.InstancedMesh; index: number }> = [];
   private wobbleDummy = new THREE.Object3D();
   private tiltAxis = new THREE.Vector3();
@@ -114,6 +197,9 @@ export class GulpScene {
   private camPos = new THREE.Vector3();
   private camLook = new THREE.Vector3();
   private shake = 0;
+  private warmQueue: Array<[Prop['kind'], number, number]> = [];
+  private smearTex = new Map<Smear, THREE.Texture>();
+  private stops: Array<{ x: number; z: number; r: number }> | null = null;
   private resizeObs: ResizeObserver | null = null;
   private time = 0;
   private pending = 0;
@@ -166,8 +252,21 @@ export class GulpScene {
     this.scene.add(this.effects.group);
     looks.forEach((look, i) => this.holes.push(this.buildHole(look, i === follow)));
 
-    const first = world.holes[follow];
+    const first = tour ? this.tourSpot(world) : world.holes[follow];
     if (first) this.snapCamera(first);
+
+    // Heights a rebuilt building can come in (see the domain's rebuild).
+    // Biggest first, so the slow ones are built during the countdown. Wonders
+    // are never rebuilt, and the menu's slow tour never needs a new one.
+    const heights = [1, 1.25, 1.5, 1.75, 2];
+    const kinds = (Object.keys(KINDS) as Array<Prop['kind']>).filter((k) => !KINDS[k].wonder && !tour);
+    kinds.sort((a, b) => KINDS[a].tier - KINDS[b].tier);
+    for (const kind of kinds) {
+      const info = KINDS[kind];
+      for (let v = 0; v < info.variants; v++) for (const h of info.scales ? heights : [1]) this.warmQueue.push([kind, v, h]);
+    }
+    // Compile every shader an effect or a mess will use now, not on the frame it first shows.
+    this.renderer.compile(this.effects.prototypes(), this.camera, this.scene);
 
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObs = new ResizeObserver(() => this.resize());
@@ -185,15 +284,37 @@ export class GulpScene {
 
   private geometry(p: Prop): THREE.BufferGeometry {
     // Buildings come in a few heights; everything else in its colours.
-    const h = KINDS[p.kind].scales ? Math.round(p.hScale * 4) / 4 : 1;
-    const key = `${p.kind}:${p.variant}:${h}`;
-    let geo = this.geometries.get(key);
+    return this.geometryOf(p.kind, p.variant, KINDS[p.kind].scales ? Math.round(p.hScale * 4) / 4 : 1);
+  }
+
+  private geometryOf(kind: Prop['kind'], variant: number, h: number): THREE.BufferGeometry {
+    const key = `${kind}:${variant}:${h}`;
+    let geo = MODELS.get(key);
     if (!geo) {
-      geo = buildKindGeometry(p.kind, p.variant, h);
+      geo = buildKindGeometry(kind, variant, h);
       geo.computeBoundingSphere();
-      this.geometries.set(key, geo);
+      MODELS.set(key, geo);
     }
     return geo;
+  }
+
+  /**
+   * Every model the round might still need (a rebuilt lot, a police car, a
+   * taller tower), built a few at a time in spare frame time. Building one
+   * the moment it first appears stalls that frame.
+   */
+  private warmNext(budgetMs: number): void {
+    if (!this.warmQueue.length) return;
+    const until = performance.now() + budgetMs;
+    while (this.warmQueue.length && performance.now() < until) {
+      const [kind, variant, h] = this.warmQueue.pop()!;
+      // A kind without a model yet is never placed either; skip it rather than stop the frame.
+      try {
+        this.geometryOf(kind, variant, h);
+      } catch {
+        continue;
+      }
+    }
   }
 
   private buildProps(world: World): void {
@@ -207,20 +328,32 @@ export class GulpScene {
     }
     const dummy = new THREE.Object3D();
     for (const list of groups.values()) {
+      const kind = list[0].kind;
+      const vehicle = VEHICLES.has(kind);
       const mesh = new THREE.InstancedMesh(this.geometry(list[0]), this.material, list.length);
+      const blob = vehicle ? new THREE.InstancedMesh(this.blobGeometry(kind), this.blobMat, list.length) : undefined;
       list.forEach((p, i) => {
         dummy.position.set(p.x, 0, p.z);
         dummy.rotation.set(0, p.rot, 0);
         dummy.updateMatrix();
         const matrix = dummy.matrix.clone();
-        mesh.setMatrixAt(i, world.props.has(p.id) ? matrix : this.hidden);
-        this.slots.set(p.id, { mesh, index: i, matrix });
+        const m = world.props.has(p.id) ? matrix : this.hidden;
+        mesh.setMatrixAt(i, m);
+        blob?.setMatrixAt(i, m);
+        this.slots.set(p.id, { mesh, index: i, matrix, blob });
       });
-      mesh.castShadow = true;
+      if (blob) {
+        blob.renderOrder = 1;
+        blob.computeBoundingSphere();
+        this.scene.add(blob);
+      }
+      // Vehicles have their soft blob instead; small street clutter casts none (hundreds of them, for little look).
+      const casts = !vehicle && !CLUTTER.has(kind);
+      mesh.castShadow = casts;
       mesh.receiveShadow = true;
       mesh.computeBoundingSphere();
       this.scene.add(mesh);
-      this.batches.push({ mesh, tier: KINDS[list[0].kind].tier });
+      this.batches.push({ mesh, tier: KINDS[list[0].kind].tier, casts });
     }
   }
 
@@ -233,17 +366,21 @@ export class GulpScene {
     }
     slot.mesh.setMatrixAt(slot.index, shown ? slot.matrix : this.hidden);
     slot.mesh.instanceMatrix.needsUpdate = true;
+    if (slot.blob) {
+      slot.blob.setMatrixAt(slot.index, shown ? slot.matrix : this.hidden);
+      slot.blob.instanceMatrix.needsUpdate = true;
+    }
   }
 
   private buildPeople(world: World): void {
-    const byLook = new Map<number, Person[]>();
+    const byLook = new Map<string, Person[]>();
     for (const p of world.people) {
-      const v = p.variant % KINDS.person.variants;
-      byLook.set(v, [...(byLook.get(v) ?? []), p]);
+      const key = `${p.kind}:${p.variant % KINDS[p.kind].variants}`;
+      byLook.set(key, [...(byLook.get(key) ?? []), p]);
     }
-    for (const [v, list] of byLook) {
-      const geo = buildKindGeometry('person', v);
-      this.geometries.set(`person-walk:${v}`, geo);
+    for (const [key, list] of byLook) {
+      const geo = buildKindGeometry(list[0].kind, list[0].variant);
+      this.geometries.set(`walker:${key}`, geo);
       const mesh = new THREE.InstancedMesh(geo, this.material, list.length);
       mesh.castShadow = true;
       // They move every frame, so their bounds are the whole island.
@@ -251,34 +388,97 @@ export class GulpScene {
       list.forEach((person, index) => this.peopleSlots.push({ person, mesh, index }));
       this.scene.add(mesh);
     }
+    // A pool of "!" marks for people running away.
+    const tex = alarmTexture();
+    this.alarmTex = tex;
+    for (let i = 0; i < 24; i++) {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }));
+      sprite.scale.set(0.025, 0.035, 1);
+      sprite.renderOrder = 13;
+      sprite.visible = false;
+      this.scene.add(sprite);
+      this.alarms.push(sprite);
+    }
   }
 
-  /** Everyone where the world says, bobbing a little as they walk. */
+  /**
+   * Everyone where the world says. Walkers bob gently; people running from a
+   * hole hop high and quick with a "!" over their heads.
+   */
   private syncPeople(): void {
     const d = this.wobbleDummy;
     const touched = new Set<THREE.InstancedMesh>();
+    let alarm = 0;
     for (const { person: p, mesh, index } of this.peopleSlots) {
       if (!p.alive) {
         mesh.setMatrixAt(index, this.hidden);
       } else {
-        // A soft step bob, a little quicker when running.
-        const bob = this.reducedMotion ? 0 : Math.abs(Math.sin(this.time * (p.panic > 0 ? 10 : 6) + p.id)) * 0.07;
+        const running = p.state === 'flee';
+        const bob = this.reducedMotion
+          ? 0
+          : Math.abs(Math.sin(this.time * (running ? 14 : 6) + p.id)) * (running ? 0.45 : 0.07);
         // Turn smoothly toward the way they walk (corners and turn-rounds).
         let face = this.facing.get(p.id) ?? p.heading;
         let turn = p.heading - face;
         while (turn > Math.PI) turn -= Math.PI * 2;
         while (turn < -Math.PI) turn += Math.PI * 2;
-        face += turn * (this.reducedMotion ? 1 : Math.min(1, this.frameDt * 10));
+        face += turn * (this.reducedMotion ? 1 : Math.min(1, this.frameDt * (running ? 18 : 10)));
         this.facing.set(p.id, face);
         d.position.set(p.x, bob, p.z);
         d.rotation.set(0, face, 0);
         d.scale.set(1, 1, 1);
         d.updateMatrix();
         mesh.setMatrixAt(index, d.matrix);
+        if (running && p.kind === 'person' && alarm < this.alarms.length) {
+          const a = this.alarms[alarm++];
+          a.visible = true;
+          a.position.set(p.x, 2.6 + bob, p.z);
+        }
       }
       touched.add(mesh);
     }
+    for (let i = alarm; i < this.alarms.length; i++) this.alarms[i].visible = false;
     for (const m of touched) m.instanceMatrix.needsUpdate = true;
+  }
+
+  /** Police cars racing in, and officers waving their batons at the hole. */
+  private syncResponders(world: World): void {
+    const live = new Set<number>();
+    for (const r of world.responders) {
+      if (r.state === 'leave' && r.t === Infinity) continue;
+      if (r.kind === 'car' && r.state !== 'drive') continue;
+      live.add(r.id);
+      let view = this.responderViews.get(r.id);
+      if (!view) {
+        const kind = r.kind === 'car' ? 'policecar' : 'police';
+        const group = new THREE.Group();
+        const body = new THREE.Mesh(this.geometry({ id: 0, kind, variant: 0, x: 0, z: 0, rot: 0, size: 0, points: 0, hScale: 1 }), this.material);
+        body.castShadow = true;
+        group.add(body);
+        let baton: THREE.Object3D | undefined;
+        if (r.kind === 'officer') {
+          // A baton in the right hand, held up and waved.
+          const arm = new THREE.Group();
+          arm.position.set(-0.45, 1.25, 0.1);
+          const stick = new THREE.Mesh(this.batonGeo, this.batonMat);
+          stick.position.y = 0.4;
+          arm.add(stick);
+          group.add(arm);
+          baton = arm;
+        }
+        this.scene.add(group);
+        view = { group, baton };
+        this.responderViews.set(r.id, view);
+      }
+      view.group.position.set(r.x, 0, r.z);
+      view.group.rotation.y = r.heading;
+      if (view.baton) view.baton.rotation.z = this.reducedMotion ? 0.3 : 0.3 + Math.sin(this.time * 9 + r.id) * 0.7;
+    }
+    for (const [id, view] of this.responderViews) {
+      if (live.has(id)) continue;
+      this.scene.remove(view.group);
+      this.responderViews.delete(id);
+    }
   }
 
   /** A thing leaves the city: hide it where it stood, and start a copy falling. */
@@ -394,7 +594,149 @@ export class GulpScene {
     const label = labelSprite(look.label, look.color, mine);
     group.add(label);
     this.scene.add(group);
-    return { group, disc, body, rim, pupils, lids, eyes, label, materials, shown: 1, flash: 0, blink: 2 + (group.id % 5) * 0.7 };
+    // The mess layer, over the throat and under the teeth.
+    // Not in `materials`: the safe-blink sets their opacity every frame, and the mess fades on its own.
+    const smearMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, fog: false });
+    smearMat.polygonOffset = true;
+    smearMat.polygonOffsetFactor = -9;
+    smearMat.polygonOffsetUnits = -36;
+    // A child of the throat disc, so it lies flat and grows with it.
+    const smearMesh = new THREE.Mesh(new THREE.CircleGeometry(1, 56), smearMat);
+    smearMesh.position.z = 0.001;
+    smearMesh.renderOrder = 6;
+    smearMesh.visible = false;
+    disc.add(smearMesh);
+    const smear = { mesh: smearMesh, kind: null, amount: 0, base: new THREE.Color(look.color), flameIn: 0 };
+    const obj: HoleObj = { group, disc, body, rim, pupils, lids, eyes, label, materials, smear, shown: 1, flash: 0, blink: 2 + (group.id % 5) * 0.7 };
+    if (mine) obj.power = this.buildPowerShow(group);
+    return obj;
+  }
+
+  /** The aura, countdown ring and number that show round the child's hole during a power-up. */
+  private buildPowerShow(group: THREE.Group): NonNullable<HoleObj['power']> {
+    const aura = new THREE.Mesh(
+      new THREE.RingGeometry(0.95, 1.9, 64),
+      new THREE.MeshBasicMaterial({
+        map: auraTexture(),
+        transparent: true,
+        premultipliedAlpha: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        fog: false,
+      }),
+    );
+    aura.rotation.x = -Math.PI / 2;
+    aura.position.y = 0.2;
+    aura.renderOrder = 6;
+    aura.visible = false;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.14, 1.3, 64, 1, Math.PI / 2, Math.PI * 2),
+      new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, fog: false }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.25;
+    ring.renderOrder = 21;
+    ring.visible = false;
+    const count = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true, sizeAttenuation: false }));
+    count.scale.set(0.08, 0.08, 1);
+    count.renderOrder = 22;
+    count.visible = false;
+    group.add(aura, ring, count);
+    return { aura, ring, ringTheta: Math.PI * 2, count, shown: '' };
+  }
+
+  /**
+   * During a power-up the child's hole glows in its colour, a ring round the
+   * rim drains as the time runs out, and the seconds left float beside it.
+   * With both on, the one with less time left is counted.
+   */
+  private syncPowerShow(obj: HoleObj, h: Hole, r: number): void {
+    const p = obj.power;
+    if (!p) return;
+    const kind = h.speedTime > 0 && (h.doubleTime <= 0 || h.speedTime <= h.doubleTime) ? 'speed' : h.doubleTime > 0 ? 'double' : null;
+    const on = kind !== null && h.alive;
+    p.aura.visible = p.ring.visible = p.count.visible = on;
+    if (!on) return;
+    const left = kind === 'speed' ? h.speedTime / POWER_TIME.speed : h.doubleTime / POWER_TIME.double;
+    const secs = Math.ceil(kind === 'speed' ? h.speedTime : h.doubleTime);
+    const color = POWER_COLOR[kind];
+    // The aura pulses, faster in the last three seconds.
+    const hurry = secs <= 3;
+    const pulse = this.reducedMotion ? 0.8 : 0.65 + 0.35 * Math.sin(this.time * (hurry ? 14 : 6));
+    const auraMat = p.aura.material as THREE.MeshBasicMaterial;
+    auraMat.color.setHex(color);
+    auraMat.opacity = pulse;
+    p.aura.scale.setScalar(r * (1 + (this.reducedMotion ? 0 : 0.04 * Math.sin(this.time * 5))));
+    if (!this.reducedMotion) p.aura.rotation.z = this.time * 0.8;
+    // The ring: the whole way round when fresh, down to nothing.
+    const theta = Math.max(0.001, left * Math.PI * 2);
+    if (Math.abs(theta - p.ringTheta) > 0.01) {
+      p.ring.geometry.dispose();
+      p.ring.geometry = new THREE.RingGeometry(1.14, 1.3, 64, 1, Math.PI / 2, theta);
+      p.ringTheta = theta;
+    }
+    (p.ring.material as THREE.MeshBasicMaterial).color.setHex(color);
+    p.ring.scale.setScalar(r);
+    // The seconds left, beside the hole's right-hand rim.
+    const tag = `${kind}:${secs}`;
+    if (tag !== p.shown) {
+      p.shown = tag;
+      const mat = p.count.material as THREE.SpriteMaterial;
+      mat.map?.dispose();
+      mat.map = countTexture(secs, color);
+      mat.needsUpdate = true;
+    }
+    // Beside the left rim, clear of the combo on the right edge of the screen.
+    // A big hole's rim runs off screen; its ring and the HUD still count down.
+    p.count.visible = r < 12;
+    p.count.position.set(-r * 1.35, 1 + r * 0.3, 0);
+    const beat = hurry && !this.reducedMotion ? 1 + 0.25 * Math.max(0, Math.sin(this.time * 14)) : 1;
+    p.count.scale.set(0.08 * beat, 0.08 * beat, 1);
+  }
+
+  /** Mark a hole's mouth with a mess, as strong as `amount` (0 to 1). */
+  private smearHole(hole: number, kind: Smear, amount: number): void {
+    const obj = this.holes[hole];
+    if (!obj || amount < 0.08) return;
+    const s = obj.smear;
+    if (s.kind !== kind) {
+      const mat = s.mesh.material as THREE.MeshBasicMaterial;
+      let tex = this.smearTex.get(kind);
+      if (!tex) {
+        tex = smearTexture(kind);
+        this.smearTex.set(kind, tex);
+      }
+      mat.map = tex;
+      mat.needsUpdate = true;
+      s.kind = kind;
+      s.amount = 0;
+    }
+    s.amount = Math.min(1, Math.max(s.amount, amount));
+  }
+
+  /**
+   * The mess fades over a few seconds (a burn only once the flames are out),
+   * tinting the rim toward its colour while it lasts. A burning mouth throws
+   * flames off its rim.
+   */
+  private syncSmear(obj: HoleObj, h: Hole, r: number, dt: number): void {
+    const s = obj.smear;
+    if (h.burn > 0 && s.kind !== 'burn') this.smearHole(h.id, 'burn', 1);
+    if (h.burn <= 0) s.amount = Math.max(0, s.amount - dt / SMEAR_FADE);
+    const on = s.kind !== null && s.amount > 0.01;
+    s.mesh.visible = on;
+    obj.rim.color.copy(s.base);
+    if (!on) return;
+    (s.mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, s.amount * 1.15);
+    obj.rim.color.lerp(SMEAR_RIM[s.kind!], s.amount * 0.7);
+    if (h.burn > 0 && h.alive) {
+      s.flameIn -= dt;
+      if (s.flameIn <= 0) {
+        s.flameIn = this.reducedMotion ? 0.4 : 0.07;
+        const a = (this.time * 7.7) % (Math.PI * 2);
+        this.effects.flame(h.x + Math.cos(a) * r * 0.9, h.z + Math.sin(a) * r * 0.9, Math.max(1.2, r * 0.35));
+      }
+    }
   }
 
   private syncHole(obj: HoleObj, h: Hole, dt: number): void {
@@ -419,6 +761,7 @@ export class GulpScene {
     // The child's own tag goes once their hole is big: it is plain which one
     // is theirs, and the tag would sit up under the scoreboard.
     if (h.isPlayer) obj.label.visible = r < 9;
+    this.syncPowerShow(obj, h, r);
 
     // Blinking while it is safe after coming back.
     const blink = h.safe > 0 && !this.reducedMotion ? 0.55 + 0.45 * Math.sin(this.time * 18) : 1;
@@ -432,6 +775,7 @@ export class GulpScene {
     const powered = h.speedTime > 0 || h.doubleTime > 0;
     const shimmer = powered && !this.reducedMotion ? 0.35 + 0.25 * Math.sin(this.time * 10) : 0;
     obj.rim.emissiveIntensity = 0.12 + obj.flash * 1.2 + shimmer;
+    this.syncSmear(obj, h, r, dt);
     obj.rim.emissive.setHex(h.stun > 0 ? 0xff2a2a : h.speedTime > 0 ? 0x5fe3ff : h.doubleTime > 0 ? 0xffd34d : obj.rim.color.getHex());
     obj.body.rotation.y = h.stun > 0 && !this.reducedMotion ? Math.sin(this.time * 30) * 0.12 : 0;
 
@@ -462,6 +806,7 @@ export class GulpScene {
   /** Mirror the world, play what just happened, and move the camera. */
   sync(world: World, events: WorldEvent[], dt: number): void {
     if (this.disposed) return;
+    this.warmNext(2);
     this.time += dt;
     this.frameDt = dt;
     const me = world.holes[this.follow];
@@ -469,6 +814,10 @@ export class GulpScene {
     for (const e of events) {
       if (e.type === 'eat') {
         this.swallow(e.prop, e.hole);
+        // A garbage truck or ice cream leaves its mark, strongest when it only just fit.
+        const mess = MESSY[e.prop.kind];
+        const eater = world.holes[e.hole];
+        if (mess && eater) this.smearHole(e.hole, mess, Math.pow(e.prop.size / (eater.r * FIT), 0.7));
         if (e.hole === this.follow) {
           const h = world.holes[e.hole];
           this.pending += e.prop.points * (h && h.doubleTime > 0 ? 2 : 1);
@@ -491,6 +840,10 @@ export class GulpScene {
       } else if (e.type === 'boom') {
         this.effects.boom(e.x, e.z, Math.max(3, e.size));
         if (me && Math.hypot(e.x - me.x, e.z - me.z) < 30 + me.r * 3) this.shake = 0.5;
+      } else if (e.type === 'hurt' && e.cause === 'tanker') {
+        const h = world.holes[e.hole];
+        this.smearHole(e.hole, 'burn', 1);
+        if (h) this.effects.boom(h.x, h.z, Math.max(4, h.r * 0.9));
       } else if (e.type === 'hurt' && e.cause === 'chem') {
         const h = world.holes[e.hole];
         if (h) this.effects.gas(h.x, h.z, Math.max(3, h.r));
@@ -513,6 +866,7 @@ export class GulpScene {
     this.stepFallers(world, dt);
     this.stepBuilt(dt);
     this.syncPeople();
+    this.syncResponders(world);
     this.stepBubble(world, dt);
     if (me && !this.tour) this.wobble(world, me, dt);
     const scale = me ? Math.max(1, me.r / 2.5) : 1;
@@ -527,7 +881,7 @@ export class GulpScene {
       this.fadeInTheWay(world, me, dt);
       // Small things cast no shadow once the camera is high above them.
       const small = me.r > 14;
-      for (const b of this.batches) b.mesh.castShadow = !(small && b.tier <= 2);
+      for (const b of this.batches) b.mesh.castShadow = b.casts && !(small && b.tier <= 2);
     }
     if (!this.reducedMotion) this.ground.water.offset.set(this.time * 0.004, this.time * 0.006);
   }
@@ -569,6 +923,12 @@ export class GulpScene {
         if (canEat(me, p) || this.ghosts.has(p.id)) continue;
         const reach = Math.max(KINDS[p.kind].w, KINDS[p.kind].d) / 2;
         if (Math.hypot(me.x - p.x, me.z - p.z) > me.r + reach * 0.6) continue;
+        // How close the mouth is to fitting it: a third of the size and it
+        // stays still; nearly big enough and it rocks hard.
+        const q = (me.r * FIT) / p.size;
+        const strength = Math.max(0, Math.min(1, (q - 0.35) / 0.55));
+        if (strength < 0.05) continue;
+        this.shakeOf.set(p.id, strength);
         near.add(p.id);
         if (!this.wobbling.has(p.id)) this.wobbling.set(p.id, 0);
       }
@@ -588,8 +948,9 @@ export class GulpScene {
       // A gentle lean toward the hole and a slow rock around it. The angle is
       // capped by height, so a tower's top sways a little, not by metres.
       const h = KINDS[p.kind].h * p.hScale;
-      const cap = Math.min(0.08, 0.6 / Math.max(1, h));
-      const lean = next * cap * (0.6 + 0.4 * Math.sin(this.time * 7 + id * 1.7));
+      const strength = this.shakeOf.get(id) ?? 0.5;
+      const cap = Math.min(0.1, 0.8 / Math.max(1, h)) * strength;
+      const lean = next * cap * (0.55 + 0.45 * Math.sin(this.time * (5 + 9 * strength) + id * 1.7));
       const dx = me.x - p.x;
       const dz = me.z - p.z;
       this.tiltAxis.set(dz, 0, -dx);
@@ -729,18 +1090,59 @@ export class GulpScene {
    * mid-size hole so the camera frames the streets from a pleasant height.
    */
   private tourSpot(world: World): Hole {
-    const a = this.time * 0.035;
-    const R = world.city.half * 0.45;
-    const x = Math.cos(a) * R;
-    const z = Math.sin(a) * R;
-    return { ...world.holes[0], x, z, r: 8, alive: true, vx: -Math.sin(a), vz: Math.cos(a) };
+    const stops = this.tourStops(world);
+    if (!stops.length) {
+      const a = this.time * 0.035;
+      const R = world.city.half * 0.45;
+      return { ...world.holes[0], x: Math.cos(a) * R, z: Math.sin(a) * R, r: 12, alive: true, vx: -Math.sin(a), vz: Math.cos(a) };
+    }
+    // Glide to the next highlight, then drift slowly round it for a while.
+    const leg = this.time / TOUR_DWELL;
+    const i = Math.floor(leg) % stops.length;
+    // The first stop is where the tour starts, not somewhere to glide to.
+    const from = leg < 1 ? stops[0] : stops[(i + stops.length - 1) % stops.length];
+    const to = stops[i];
+    const t = Math.min(1, (leg - Math.floor(leg)) / TOUR_GLIDE);
+    const k = t * t * (3 - 2 * t);
+    const drift = this.time * 0.15;
+    const r = from.r + (to.r - from.r) * k;
+    // Aim a little in front of the showpiece, so it stands in the top of the
+    // screen, clear of the menu card in the middle.
+    const x = from.x + (to.x - from.x) * k + Math.cos(drift) * 4;
+    const z = from.z + (to.z - from.z) * k + Math.sin(drift) * 4 + r * 1.1;
+    return { ...world.holes[0], x, z, r, alive: true, vx: to.x - from.x, vz: to.z - from.z };
+  }
+
+  /**
+   * The showpieces the menu's camera visits, in order round the map: every
+   * wonder, the stadiums and the mall, the airport, one skyscraper, the power
+   * plant and a mountain. Each is framed to its size.
+   */
+  private tourStops(world: World): Array<{ x: number; z: number; r: number }> {
+    if (this.stops) return this.stops;
+    const once = new Set<string>(['skyscraper', 'mountain', 'powerplant', 'windturbine']);
+    const seen = new Set<string>();
+    const stops: Array<{ x: number; z: number; r: number; a: number }> = [];
+    for (const p of world.city.props) {
+      const info = KINDS[p.kind];
+      const show = info.wonder || ['stadium', 'mall', 'terminal'].includes(p.kind) || once.has(p.kind);
+      if (!show || (once.has(p.kind) && seen.has(p.kind))) continue;
+      seen.add(p.kind);
+      // Wide ones by their footprint, tall ones by their height, so the camera stays above them.
+      const r = Math.max(18, Math.min(64, Math.max(p.size * 1.3, info.h * p.hScale * 0.3)));
+      stops.push({ x: p.x, z: p.z, r, a: Math.atan2(p.z, p.x) });
+    }
+    stops.sort((a, b) => a.a - b.a);
+    this.stops = stops;
+    return stops;
   }
 
   /** Where the camera sits for a hole: higher as the hole grows. */
   private cameraFor(h: Hole): { pos: THREE.Vector3; look: THREE.Vector3 } {
     // Close in, so the city's things look big and chunky around the hole.
-    const up = 16 + h.r * 3;
-    const back = 11.5 + h.r * 2.2;
+    const z = this.tour ? 1 : this.zoom;
+    const up = (16 + h.r * 3) * z;
+    const back = (11.5 + h.r * 2.2) * z;
     return { pos: new THREE.Vector3(h.x, up, h.z + back), look: new THREE.Vector3(h.x, 0, h.z - 2) };
   }
 
@@ -776,29 +1178,71 @@ export class GulpScene {
     fog.near = dist * 2.6 + 150;
     fog.far = dist * 5 + 450;
 
-    // The sun's shadows cover what the camera sees, and grow with it.
-    const reach = Math.round(40 + h.r * 6);
-    if (reach !== this.shadowReach) {
-      this.shadowReach = reach;
-      const cam = this.sun.shadow.camera;
-      cam.left = -reach;
-      cam.right = reach;
-      cam.top = reach;
-      cam.bottom = -reach;
-      cam.near = 1;
-      cam.far = 700 + h.r * 14;
-      cam.updateProjectionMatrix();
-    }
-    // Snap the shadow camera to whole shadow-map texels, measured across the
-    // sun's view: otherwise shadows crawl and shimmer as the camera glides.
-    const texel = (2 * reach) / SHADOW_MAP;
+    this.fitShadows(h.r);
+  }
+
+  /**
+   * Fit the sun's shadow map to exactly the ground the camera can see (the
+   * four corners of the screen, traced down to the ground), plus a margin
+   * for tall things just off screen whose shadows fall into view. Without
+   * this, things near the top of the screen lay outside the shadow map and
+   * their shadows only appeared as the hole came close. The size moves in
+   * steps and the centre snaps to whole shadow-map texels, so shadows never
+   * crawl or shimmer as the camera glides.
+   */
+  private fitShadows(r: number): void {
+    this.camera.updateMatrixWorld();
+    const cam = this.camera.position;
+    const fog = this.scene.fog as THREE.Fog;
+    const cap = fog.far;
     this.lightBasis.lookAt(SUN_DIR, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
-    const snapped = this.camLook.clone().applyMatrix4(this.lightBasis.clone().transpose());
-    snapped.x = Math.round(snapped.x / texel) * texel;
-    snapped.y = Math.round(snapped.y / texel) * texel;
-    snapped.applyMatrix4(this.lightBasis);
-    this.sun.target.position.copy(snapped);
-    this.sun.position.copy(snapped).addScaledVector(SUN_DIR, 300 + h.r * 6);
+    const toLight = this.lightBasis.clone().transpose();
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    const v = new THREE.Vector3();
+    const add = (p: THREE.Vector3) => {
+      const q = p.clone().applyMatrix4(toLight);
+      minX = Math.min(minX, q.x);
+      maxX = Math.max(maxX, q.x);
+      minY = Math.min(minY, q.y);
+      maxY = Math.max(maxY, q.y);
+    };
+    for (const [nx, ny] of [
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1],
+      [0, 1],
+    ]) {
+      v.set(nx, ny, 0.5).unproject(this.camera).sub(cam).normalize();
+      const t = v.y < -0.01 ? Math.min(cap, -cam.y / v.y) : cap;
+      add(cam.clone().addScaledVector(v, t));
+    }
+    add(this.camLook);
+    const margin = 14 + r * 1.5;
+    const raw = Math.max(maxX - minX, maxY - minY) / 2 + margin;
+    // In steps of 16, and never more than the map can show sharply.
+    const size = Math.min(ceilTo(raw, 16), 180 + r * 6);
+    if (size !== this.shadowReach) {
+      this.shadowReach = size;
+      const sc = this.sun.shadow.camera;
+      sc.left = -size;
+      sc.right = size;
+      sc.top = size;
+      sc.bottom = -size;
+      sc.near = 1;
+      sc.far = 900 + r * 14;
+      sc.updateProjectionMatrix();
+    }
+    const texel = (2 * size) / SHADOW_MAP;
+    const centre = this.camLook.clone().applyMatrix4(toLight);
+    centre.x = Math.round((minX + maxX) / 2 / texel) * texel;
+    centre.y = Math.round((minY + maxY) / 2 / texel) * texel;
+    centre.applyMatrix4(this.lightBasis);
+    this.sun.target.position.copy(centre);
+    this.sun.position.copy(centre).addScaledVector(SUN_DIR, 400 + r * 6);
   }
 
   /**
@@ -856,12 +1300,20 @@ export class GulpScene {
       ghost.position.set(p.x, 0, p.z);
       ghost.rotation.y = p.rot;
       ghost.renderOrder = 2;
+      // The see-through copy still casts the building's shadow: without it
+      // the shadow vanished while faded and popped back late.
+      ghost.castShadow = true;
       this.scene.add(ghost);
       this.ghosts.set(id, ghost);
       this.setShown(p, false);
     }
   }
 
+
+  /** Zoom in (negative) or out (positive) by `steps`, within a comfortable range. */
+  zoomBy(steps: number): void {
+    this.zoom = Math.max(0.55, Math.min(2.2, this.zoom * Math.pow(1.12, steps)));
+  }
 
   render(): void {
     if (this.disposed) return;
@@ -883,7 +1335,13 @@ export class GulpScene {
     this.effects.dispose();
     this.ground.dispose();
     for (const t of this.bubbleTex.values()) t.dispose();
+    for (const t of this.smearTex.values()) t.dispose();
     this.scaffoldGeo.dispose();
+    this.batonGeo.dispose();
+    this.blobTex.dispose();
+    this.blobMat.dispose();
+    this.batonMat.dispose();
+    this.alarmTex?.dispose();
     this.scaffoldMat.dispose();
     disposeDeep(this.scene);
     for (const g of this.geometries.values()) g.dispose();
@@ -896,6 +1354,61 @@ export class GulpScene {
 // -------------------------------------------------------------------------
 // Painted textures
 // -------------------------------------------------------------------------
+
+/**
+ * A mess over the throat, strongest toward the rim (the middle is dark
+ * anyway): soot and embers, brown splodges, or scoops of ice cream with
+ * sprinkles. Blobs sit at fixed spots, so the same mess always looks the same.
+ */
+function smearTexture(kind: Smear): THREE.Texture {
+  const s = 512;
+  // Sizes below are for a 256 canvas; the texture is drawn at twice that so a giant's mouth stays crisp.
+  const k = s / 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const g = c.getContext('2d')!;
+  const rng = seededRng(kind === 'burn' ? 11 : kind === 'poop' ? 23 : 37);
+  const blob = (x: number, y: number, r: number, color: string) => {
+    g.fillStyle = color;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  };
+  const around = (n: number, draw: (x: number, y: number, i: number) => void) => {
+    for (let i = 0; i < n; i++) {
+      const a = rng() * Math.PI * 2;
+      const d = (0.5 + rng() * 0.42) * (s / 2);
+      draw(s / 2 + Math.cos(a) * d, s / 2 + Math.sin(a) * d, i);
+    }
+  };
+  if (kind === 'burn') {
+    const grad = g.createRadialGradient(s / 2, s / 2, s * 0.15, s / 2, s / 2, s / 2);
+    grad.addColorStop(0, 'rgba(20,14,12,0)');
+    grad.addColorStop(0.6, 'rgba(30,20,16,0.85)');
+    grad.addColorStop(1, 'rgba(40,26,20,0.95)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, s, s);
+    around(40, (x, y, i) => blob(x, y, (2 + rng() * 4) * k, i % 3 ? '#ff7a1a' : '#ffd23f'));
+  } else if (kind === 'poop') {
+    around(22, (x, y) => blob(x, y, (12 + rng() * 16) * k, rng() < 0.5 ? '#6b3f1a' : '#86532a'));
+    around(10, (x, y) => blob(x, y, (5 + rng() * 5) * k, '#a06a38'));
+  } else {
+    const scoops = ['#ffb3d1', '#fff1c9', '#9be3c4', '#8a5a3c', '#ffd0e4'];
+    around(20, (x, y, i) => blob(x, y, (14 + rng() * 14) * k, scoops[i % scoops.length]));
+    const sprinkles = ['#ff4d6d', '#3a86ff', '#ffd23f', '#2ec27e', '#ffffff'];
+    around(60, (x, y, i) => {
+      g.fillStyle = sprinkles[i % sprinkles.length];
+      g.save();
+      g.translate(x, y);
+      g.rotate(rng() * Math.PI);
+      g.fillRect(-4 * k, -1.2 * k, 8 * k, 2.4 * k);
+      g.restore();
+    });
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
 /** The inside of a hole: its colour at the rim, dark rings, black at the bottom. */
 function throatTexture(color: number): THREE.Texture {
@@ -977,4 +1490,95 @@ function bubbleTexture(text: string, healthy: boolean): THREE.Texture {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+/**
+ * A soft glow that fades out from the rim: the power-up aura. The ring's
+ * texture is laid over the whole square it spans, so the glow is drawn round:
+ * bright at the rim (half-way out) and gone at the edge.
+ */
+function auraTexture(): THREE.Texture {
+  const s = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.48, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.52, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.7, 'rgba(255,255,255,0.45)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, s, s);
+  const t = new THREE.CanvasTexture(c);
+  // Uploaded as the canvas holds it: WebKit speckles otherwise (see the racer's sun).
+  t.premultiplyAlpha = true;
+  return t;
+}
+
+/** The seconds left on a power-up: a big number in a coloured badge. */
+function countTexture(secs: number, color: number): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  g.fillStyle = `#${new THREE.Color(color).getHexString()}`;
+  g.strokeStyle = '#ffffff';
+  g.lineWidth = 8;
+  g.beginPath();
+  g.arc(64, 64, 54, 0, Math.PI * 2);
+  g.fill();
+  g.stroke();
+  g.font = '900 68px ui-rounded, system-ui, -apple-system, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineWidth = 8;
+  g.strokeStyle = 'rgba(29,31,51,0.85)';
+  g.strokeText(String(secs), 64, 68);
+  g.fillStyle = '#ffffff';
+  g.fillText(String(secs), 64, 68);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** A red "!" for someone running away. */
+function alarmTexture(): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = 48;
+  c.height = 64;
+  const g = c.getContext('2d')!;
+  g.font = '900 60px ui-rounded, system-ui, -apple-system, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineWidth = 8;
+  g.strokeStyle = '#ffffff';
+  g.strokeText('!', 24, 34);
+  g.fillStyle = '#e8322b';
+  g.fillText('!', 24, 34);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const ceilTo = (v: number, step: number): number => Math.ceil(v / step) * step;
+
+/** A soft rounded patch, dark in the middle and fading at the edges. */
+function blobTexture(): THREE.Texture {
+  const s = 64;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const g = c.getContext('2d')!;
+  // Stacked, shrinking rounded squares build up a soft edge (canvas blur
+  // filters are missing on older iPads).
+  g.fillStyle = 'rgba(255,255,255,0.14)';
+  for (let i = 0; i < 9; i++) {
+    const inset = 2 + i * 2.2;
+    g.beginPath();
+    g.roundRect(inset, inset, s - inset * 2, s - inset * 2, 14 - i);
+    g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  // Uploaded as the canvas holds it: WebKit speckles otherwise (see the racer's sun).
+  t.premultiplyAlpha = true;
+  return t;
 }

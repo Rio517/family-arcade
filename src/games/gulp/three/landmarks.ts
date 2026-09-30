@@ -194,12 +194,18 @@ function hazardKerb(k: Kit, W: number, D: number, y: number, h: number, t: numbe
   }
 }
 
-/** Little parked car for car parks and roads. */
+/**
+ * Little parked car for car parks and roads, standing on its tyres at y. The
+ * tyres sit a little proud of the body so they show from the high camera.
+ */
 function toyCar(k: Kit, color: number, x: number, y: number, z: number, ry = 0): void {
   k.within(placement(x, y, z, { ry }), () => {
-    k.cbox(color, 1.5, 0.55, 2.6, 0.14, 0, 0.12, 0);
-    k.box(PAL.carGlass, 1.2, 0.4, 1.3, 0, 0.67, -0.15, undefined, ON_GROUND);
-    k.box(color, 1.24, 0.1, 1.1, 0, 1.05, -0.15, undefined, ON_GROUND);
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) k.rod(PAL.ink, 0.26, 0.22, 8, [sx * 0.66, 0.26, sz * 0.82], { rz: Math.PI / 2 });
+    }
+    k.cbox(color, 1.5, 0.5, 2.6, 0.14, 0, 0.24, 0);
+    k.box(PAL.carGlass, 1.2, 0.38, 1.3, 0, 0.74, -0.15, undefined, ON_GROUND);
+    k.box(color, 1.24, 0.1, 1.1, 0, 1.12, -0.15, undefined, ON_GROUND);
   });
 }
 
@@ -692,9 +698,21 @@ const stadium: Builder = (k, v) => {
   const SX = 1.2;
   const seg = 36;
   const oval = (r: number, phi: number): [number, number] => [SX * r * Math.sin(phi), r * Math.cos(phi)];
+  // A paved apron and a dark plinth band, so the light facade meets the
+  // ground on something solid instead of a bright edge that reads as a gap.
+  latheOval(k, PAL.stone, [
+    [16.2, 0],
+    [16.2, 0.12],
+    [15, 0.12],
+  ], seg, { sx: SX });
   latheOval(k, c.facade, [
     [15, 0],
     [15, 8.6],
+  ], seg, { sx: SX });
+  latheOval(k, darker(c.facade, 0.3), [
+    [15.1, 0.12],
+    [15.1, 0.9],
+    [15, 0.9],
   ], seg, { sx: SX });
   latheOval(k, PAL.glassDeep, [
     [15.04, 5.4],
@@ -972,15 +990,58 @@ const mall: Builder = (k, v) => {
   }
 };
 
+/**
+ * A wind turbine on a big square foundation pad, so from above it reads as a
+ * whole site the size of its footprint rather than one thin pole: a hazard
+ * kerb and a fence round the pad, a service hut, a transformer box and a
+ * painted ring round the fat foot of the tower.
+ */
 const windturbine: Builder = (k) => {
   const white = 0xf4f6f8;
   const hubY = 35.0;
   const hubZ = 2.35;
   const blade = 12.8;
-  k.cyl(CONCRETE, 2.2, 2.4, 0.6, 12, 0, 0, 0);
-  k.cyl(white, 0.6, 1.1, hubY - 1.4, 14, 0, 0.6, 0);
-  k.cyl(0x55b35c, 1.11, 1.12, 0.7, 14, 0, 2.0, 0, { open: true });
-  k.box(0x5d6470, 0.8, 1.5, 0.3, 0, 0.6, 1.0, undefined, FLUSH);
+  const pad = 10.4;
+  const py = 0.4;
+  k.rbox(CONCRETE, pad, py, pad, 0.3, 0.08, 0, 0, 0, { seg: 1 });
+  hazardKerb(k, pad - 0.4, pad - 0.4, py, 0.2, 0.3, 1.2);
+  k.lathe(HAZARD_YELLOW, [
+    [3.1, py + 0.02],
+    [2.75, py + 0.02],
+  ], 16);
+  // A low white fence just inside the kerb, open at the front for the gate.
+  const f = pad / 2 - 0.65;
+  for (const [a, b] of [
+    [[-f, -f], [f, -f]],
+    [[-f, -f], [-f, f]],
+    [[f, -f], [f, f]],
+    [[-f, f], [-1.6, f]],
+    [[1.6, f], [f, f]],
+  ] as const) {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const n = Math.max(1, Math.round(len / 1.4));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      k.box(PAL.white, 0.14, 1.0, 0.14, a[0] + (b[0] - a[0]) * t, py, a[1] + (b[1] - a[1]) * t);
+    }
+    k.beam(PAL.white, [a[0], py + 0.8, a[1]], [b[0], py + 0.8, b[1]], 0.1);
+  }
+  // Service hut with a door and a window, and a green transformer box.
+  const hx = -3.2;
+  const hz = -3.3;
+  k.rbox(0x5aa0e6, 2.2, 2.0, 1.7, 0.3, 0, hx, py, hz, { seg: 1 });
+  k.rbox(RED, 2.6, 0.3, 2.1, 0.35, 0.12, hx, py + 2.0, hz, { seg: 1 });
+  k.within(translate(hx, py, hz + 0.85), () => {
+    doorAt(k, PAL.white, 0xffc933, -0.45, 0, 0.6, 1.5);
+    paneAt(k, GLASS, PAL.white, 0.55, 0.8, 0.5, 0.6, false, 1);
+  });
+  k.cbox(0x3fa34d, 1.6, 1.2, 1.1, 0.1, 3.0, py, -3.1);
+  k.box(HAZARD_YELLOW, 0.5, 0.4, 0.04, 3.0, py + 0.5, -2.53, undefined, FLUSH);
+  // A broad plinth and a thick foot, so the tower stands firmly on the pad.
+  k.cyl(CONCRETE, 2.4, 2.7, 0.8, 14, 0, py, 0);
+  k.cyl(white, 0.6, 1.5, hubY - 1.4 - py - 0.8, 14, 0, py + 0.8, 0);
+  k.cyl(0x55b35c, 1.46, 1.48, 0.7, 14, 0, py + 2.0, 0, { open: true });
+  k.box(0x5d6470, 0.8, 1.5, 0.3, 0, py + 0.8, 1.4, undefined, FLUSH);
   k.cbox(white, 1.7, 1.8, 4.3, 0.35, 0, hubY - 0.9, -0.4);
   k.rod(white, 0.85, 1.5, 10, [0, hubY, hubZ], { rx: Math.PI / 2 }, 0.2);
   for (let i = 0; i < 3; i++) {
@@ -1102,10 +1163,15 @@ const jet: Builder = (k, v) => {
 // ---------------------------------------------------------------------------
 // Tier 9: skyscrapers and landmarks
 
+/**
+ * The first tier is nearly as wide as the podium, so a skyscraper fills its
+ * lot from the ground up and never looks like a thin needle; the setbacks
+ * only start higher up.
+ */
 const SKY = [
-  { body: 0x4f6096, glass: 0x62d8ff, crown: 0x19c7b4, tiers: [18, 15, 11.5], rots: [0, 0, 0], top: 'steps' },
-  { body: 0x4aa8ff, glass: 0xc8f0ff, crown: 0xffc933, tiers: [18, 13], rots: [0, 0], top: 'dome' },
-  { body: 0x7c5ce6, glass: 0x9fe3ff, crown: 0xff6b5b, tiers: [18, 12, 8.4], rots: [0, Math.PI / 4, 0], top: 'spire' },
+  { body: 0x4f6096, glass: 0x62d8ff, crown: 0x19c7b4, tiers: [20.4, 16.5, 13], rots: [0, 0, 0], top: 'steps' },
+  { body: 0x4aa8ff, glass: 0xc8f0ff, crown: 0xffc933, tiers: [20.4, 15.5], rots: [0, 0], top: 'dome' },
+  { body: 0x7c5ce6, glass: 0x9fe3ff, crown: 0xff6b5b, tiers: [20.4, 15, 11], rots: [0, Math.PI / 4, 0], top: 'spire' },
 ] as const;
 
 /**
@@ -1162,8 +1228,14 @@ const skyscraper: Builder = (k, v, s) => {
     y += h;
     const next = c.tiers[i + 1];
     if (next !== undefined && S - next > 3) {
+      // Corners of this tier's ledge, turned with the tier so the trees stay on it.
       const r = S / 2 - 1.3;
-      for (const sx of [-1, 1]) smallTree(k, sx * r, y, r * (i % 2 ? -1 : 1), 0.9);
+      const a = c.rots[i];
+      for (const sx of [-1, 1]) {
+        const px = sx * r;
+        const pz = r * (i % 2 ? -1 : 1);
+        smallTree(k, px * Math.cos(a) + pz * Math.sin(a), y, pz * Math.cos(a) - px * Math.sin(a), 0.9);
+      }
     }
   });
   const top = c.tiers[c.tiers.length - 1];
@@ -1190,37 +1262,75 @@ const skyscraper: Builder = (k, v, s) => {
   }
 };
 
+/**
+ * A TV tower on a broad round visitor building with a plaza ring and trees,
+ * so its foot fills the lot and it never looks like a needle you could
+ * swallow early. Fins and a thick lower shaft carry it up to the pod.
+ */
 const tvtower: Builder = (k) => {
   const conc = 0xe8e3da;
+  const pb = 5.2;
+  k.cyl(PAL.stone, 10.9, 11.0, 0.2, 24, 0, 0, 0);
+  k.lathe(PAL.stoneDark, [
+    [10.5, 0.22],
+    [9.9, 0.22],
+  ], 24);
   k.lathe(conc, [
-    [7, 0],
-    [7, 0.6],
-    [6.6, 3.8],
-    [0, 3.8],
+    [9.2, 0.2],
+    [9.2, 1.0],
+    [8.7, pb],
+    [0, pb],
   ], 20);
   k.lathe(PAL.glassDeep, [
-    [6.96, 1.2],
-    [6.74, 3.0],
+    [9.16, 1.5],
+    [8.84, 4.2],
   ], 20);
+  // A red rim round the roof edge and a ring of skylights, so from above it reads as a building.
+  k.lathe(RED, [
+    [9.5, pb - 0.3],
+    [9.5, pb + 0.1],
+    [8.3, pb + 0.1],
+    [8.3, pb],
+  ], 20);
+  k.lathe(PAL.glass, [
+    [7.2, pb],
+    [7.2, pb + 0.25],
+    [5.2, pb + 0.25],
+    [5.2, pb],
+  ], 20);
+  // Round-topped glass doors on four sides, under little red canopies.
+  for (let i = 0; i < 4; i++) {
+    k.within(placement(0, 0.2, 0, { ry: (i * Math.PI) / 2 }), () => {
+      k.within(translate(0, 0, 9.1), () => {
+        k.plate(PAL.glassDeep, 2.2, 2.6, 1.1, 0.2, 0, 0, 0, 2);
+        k.box(RED, 3.0, 0.2, 1.0, 0, 2.9, 0.4);
+      });
+    });
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = ((i + 0.5) * Math.PI) / 6;
+    if (i % 3 === 1) continue;
+    smallTree(k, 10.2 * Math.sin(a), 0.2, 10.2 * Math.cos(a), 0.55);
+  }
   // Three buttress fins give the shaft a sturdy toy footing.
   for (let i = 0; i < 3; i++) {
     const a = (i * Math.PI * 2) / 3 + Math.PI / 6;
     const dx = Math.sin(a);
     const dz = Math.cos(a);
-    const px = dz * 0.4;
-    const pz = -dx * 0.4;
+    const px = dz * 0.6;
+    const pz = -dx * 0.6;
     const pts: V3[] = [];
     for (const s of [-1, 1]) {
-      pts.push([dx * 2.4 + s * px, 3.8, dz * 2.4 + s * pz]);
-      pts.push([dx * 5.8 + s * px, 3.8, dz * 5.8 + s * pz]);
-      pts.push([dx * 1.9 + s * px, 26, dz * 1.9 + s * pz]);
+      pts.push([dx * 3.4 + s * px, pb, dz * 3.4 + s * pz]);
+      pts.push([dx * 7.4 + s * px, pb, dz * 7.4 + s * pz]);
+      pts.push([dx * 2.6 + s * px, 34, dz * 2.6 + s * pz]);
     }
     k.hull(conc, pts);
   }
-  k.cyl(conc, 1.6, 3.0, 92, 14, 0, 3.8, 0);
+  k.cyl(conc, 1.8, 4.0, 92 - pb, 14, 0, pb, 0);
   // Main pod: white underside, glass ring, balcony and a red cap.
   k.lathe(PAL.white, [
-    [1.7, 92],
+    [1.9, 92],
     [5.0, 97],
     [5.6, 99.2],
   ], 20);

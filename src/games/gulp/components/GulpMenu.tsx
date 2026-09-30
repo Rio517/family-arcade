@@ -1,12 +1,14 @@
 /**
  * The title screen, over the live city with computer holes roaming it. The
  * card asks two things, which map and how long, then PLAY. Everything else
- * (the hole's colour and the three switches) sits behind Options.
+ * (the hole's colour, how hard the rivals play and the three switches) sits
+ * behind Options, with the difficulty named on the Options button.
  */
 import { useState } from 'react';
 import { CloseIcon } from '@shared/ui/icons';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { MAPS, type MapId } from '../domain/city';
+import type { Difficulty } from '../domain/rivals';
 import { SKINS } from './skins';
 import type { Settings } from './round';
 
@@ -25,6 +27,12 @@ const SWITCHES: Array<{ key: 'powerups' | 'fightBack' | 'regrow'; title: string;
   { key: 'fightBack', title: 'The city fights back', blurb: 'Fuel trucks, planes and a gassy factory' },
 ];
 
+const DIFFICULTIES: Array<{ key: Difficulty; title: string; blurb: string }> = [
+  { key: 'easy', title: 'Easy', blurb: 'Friendly holes' },
+  { key: 'medium', title: 'Medium', blurb: 'They try hard' },
+  { key: 'hard', title: 'Hard', blurb: 'They hunt you!' },
+];
+
 export function GulpMenu({
   settings,
   onChange,
@@ -41,6 +49,8 @@ export function GulpMenu({
   const set = (patch: Partial<Settings>) => onChange({ ...settings, ...patch });
   const minutes = MAPS[settings.map].minutes;
   const skin = SKINS[settings.skin % SKINS.length];
+  const difficulty = settings.difficulty ?? 'easy';
+  const level = DIFFICULTIES.find((d) => d.key === difficulty) ?? DIFFICULTIES[0];
 
   return (
     <div className="gulp-menu" data-testid="gulp-menu">
@@ -105,7 +115,10 @@ export function GulpMenu({
             <span className="gulp-skin mini" style={{ '--hole': skin.css } as React.CSSProperties} aria-hidden="true">
               <span className="gulp-skin-eyes" />
             </span>
-            Options
+            <span className="gulp-options-text">
+              Options
+              <small data-testid="gulp-difficulty-shown">{level.title}</small>
+            </span>
           </button>
           <button type="button" className="gulp-play" onClick={onPlay} data-testid="gulp-play">
             PLAY
@@ -113,7 +126,9 @@ export function GulpMenu({
         </div>
         {best > 0 && (
           <p className="gulp-foot">
-            Best on {MAPS[settings.map].label}: <b data-testid="gulp-best">{best.toLocaleString()}</b>
+            Best on {MAPS[settings.map].label}
+            {settings.difficulty && settings.difficulty !== 'easy' ? ` (${settings.difficulty === 'hard' ? 'Hard' : 'Medium'})` : ''}:{' '}
+            <b data-testid="gulp-best">{best.toLocaleString()}</b>
           </p>
         )}
       </div>
@@ -161,6 +176,28 @@ export function GulpMenu({
                     data-testid={`gulp-skin-${i}`}
                   >
                     <span className="gulp-skin-eyes" aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="gulp-row">
+              <span className="gulp-label" id="gulp-difficulty-label">
+                Difficulty
+              </span>
+              <div className="gulp-seg gulp-levels" role="radiogroup" aria-labelledby="gulp-difficulty-label">
+                {DIFFICULTIES.map((d) => (
+                  <button
+                    key={d.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={difficulty === d.key}
+                    className={difficulty === d.key ? 'on' : ''}
+                    onClick={() => set({ difficulty: d.key })}
+                    data-testid={`gulp-difficulty-${d.key}`}
+                  >
+                    <b>{d.title}</b>
+                    <small>{d.blurb}</small>
                   </button>
                 ))}
               </div>

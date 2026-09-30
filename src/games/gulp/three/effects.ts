@@ -6,6 +6,7 @@
  */
 import * as THREE from 'three';
 import type { Attack, PowerKind, PowerUp } from '../domain/world';
+import { buildHeliBodyGeometry, buildRotorGeometry } from './military';
 import { buildKindGeometry } from './props';
 
 interface Puff {
@@ -36,16 +37,24 @@ export class Effects {
   private powerIcons: Record<PowerKind, THREE.Texture> = { speed: iconTexture('bolt'), double: iconTexture('x2') };
   private attackViews = new Map<number, { group: THREE.Group; rings: Map<number, THREE.Mesh>; bombs: Map<number, THREE.Mesh> }>();
   private tankerGeo: THREE.BufferGeometry;
-  private jetGeo: THREE.BufferGeometry;
+  private bomberGeo: THREE.BufferGeometry;
+  private tankGeo: THREE.BufferGeometry;
+  private heliGeo: THREE.BufferGeometry;
+  private rotorGeo: THREE.BufferGeometry;
+  private shellMat = new THREE.MeshStandardMaterial({ color: 0x4a5a2a, roughness: 0.5, emissive: 0xff7a1a, emissiveIntensity: 0.35 });
   private kitMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 });
   private warnTex = iconTexture('warn');
   private bombGeo = new THREE.CapsuleGeometry(0.5, 1.4, 4, 8);
   private bombMat = new THREE.MeshStandardMaterial({ color: 0x33363d, roughness: 0.5 });
   private time = 0;
+  private protos = new THREE.Group();
 
   constructor(private reducedMotion: boolean) {
     this.tankerGeo = buildKindGeometry('tanker', 0);
-    this.jetGeo = buildKindGeometry('jet', 1);
+    this.bomberGeo = buildKindGeometry('bomber', 0);
+    this.tankGeo = buildKindGeometry('tank', 0);
+    this.heliGeo = buildHeliBodyGeometry();
+    this.rotorGeo = buildRotorGeometry();
   }
 
   /** A fiery burst: a quick flash, then orange fire and grey smoke rolling out. */
@@ -64,6 +73,12 @@ export class Effects {
       );
     }
     this.puff(new THREE.Vector3(x, 2, z), 0xffe9a0, new THREE.Vector3(0, 0, 0), size * 1.1, 0.25, size);
+  }
+
+  /** A lick of flame off a burning rim: it rises, flickers orange to yellow, and goes. */
+  flame(x: number, z: number, size: number): void {
+    const hot = (this.time * 13) % 1 < 0.5;
+    this.puff(new THREE.Vector3(x, 0.6, z), hot ? 0xffb02e : 0xff5a24, new THREE.Vector3(0, size * 1.6, 0), size * 0.6, 0.55, size * 0.4);
   }
 
   /** Green gas billowing out of a hole that ate the chemical plant. */
@@ -99,6 +114,12 @@ export class Effects {
     if (!tex) {
       tex = textTexture(`+${points}`);
       this.popupTex.set(points, tex);
+      // A long round scores hundreds of different amounts: keep only the recent ones.
+      if (this.popupTex.size > 64) {
+        const [oldest, old] = this.popupTex.entries().next().value!;
+        old.dispose();
+        this.popupTex.delete(oldest);
+      }
     }
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }));
     sprite.scale.set(0.11, 0.055, 1);
@@ -106,6 +127,24 @@ export class Effects {
     sprite.renderOrder = 11;
     this.group.add(sprite);
     this.popups.push({ sprite, life: 1 });
+  }
+
+  /**
+   * One of everything this class draws, never shown: the scene compiles
+   * their shaders up front, so the first explosion, orb or bomber of a
+   * round does not stall the frame it appears in.
+   */
+  prototypes(): THREE.Group {
+    // Kept (and disposed with the rest): freeing their materials would free the shaders too.
+    const g = this.protos;
+    if (g.children.length) return g;
+    g.add(this.makeOrb('speed'));
+    for (const kind of ['tanker', 'bomber', 'tank', 'heli'] as const) g.add(this.makeAttack({ kind } as Attack));
+    const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: 0xff2d20, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+    g.add(ring, new THREE.Mesh(this.bombGeo, this.shellMat), new THREE.Mesh(this.bombGeo, this.bombMat));
+    g.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: this.puffTex, transparent: true, depthWrite: false, premultipliedAlpha: true })));
+    g.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: this.warnTex, depthTest: false, transparent: true, sizeAttenuation: false })));
+    return g;
   }
 
   /** Power-up orbs float and spin, sized so the child's hole can see them. */
@@ -166,6 +205,8 @@ export class Effects {
    */
   syncAttacks(list: Attack[], r: number): void {
     const live = new Set<number>();
+    // Over the rooftops but under the camera, and big enough to read against a giant hole.
+    const alt = 14 + r * 1.3;
     for (const a of list) {
       live.add(a.id);
       let view = this.attackViews.get(a.id);
@@ -182,14 +223,25 @@ export class Effects {
         warn.position.set(a.x, 6 + (this.reducedMotion ? 0 : Math.sin(this.time * 8) * 0.6), a.z);
         continue;
       }
-      // Over the rooftops but under the camera, and big enough to read
-      // against a giant hole.
-      const alt = 14 + r * 1.3;
-      body.position.set(a.x, alt, a.z);
-      body.rotation.y = Math.atan2(a.dx, a.dz);
-      body.scale.setScalar(Math.max(0.6, r / 12));
-      const bombsNow = new Set(a.bombs.map((b) => b.id));
-      for (const b of a.bombs) {
+      if (a.kind === 'bomber') {
+        body.position.set(a.x, alt, a.z);
+        body.rotation.y = Math.atan2(a.dx, a.dz);
+        body.scale.setScalar(Math.max(0.6, r / 12));
+      } else if (a.kind === 'tank') {
+        body.position.set(a.x, 0, a.z);
+        body.rotation.y = a.heading;
+      } else {
+        // A helicopter hovers low enough to see, bobbing, its rotor spinning.
+        const hover = 9 + r * 0.8 + (this.reducedMotion ? 0 : Math.sin(this.time * 2 + a.id) * 0.5);
+        body.position.set(a.x, hover, a.z);
+        body.rotation.y = a.heading;
+        body.scale.setScalar(Math.max(1, r / 14));
+        const rotor = body.getObjectByName('rotor');
+        if (rotor && !this.reducedMotion) rotor.rotation.y = this.time * 18;
+      }
+      const shells = a.kind === 'bomber' ? a.bombs : a.shells;
+      const now = new Set(shells.map((b) => b.id));
+      for (const b of shells) {
         let ring = view.rings.get(b.id);
         if (!ring) {
           // A red rim with a see-through red floor: the danger zone.
@@ -210,21 +262,32 @@ export class Effects {
         (ring.material as THREE.MeshBasicMaterial).opacity = (0.6 + soon * 0.4) * pulse;
         const fill = ring.getObjectByName('fill') as THREE.Mesh;
         (fill.material as THREE.MeshBasicMaterial).opacity = (0.15 + soon * 0.25) * pulse;
-        // The bomb itself falls for the last moment.
-        if (b.fuse < 1.2) {
+        // A bomb falls for its last moment; a shell or rocket arcs all the way.
+        const shell = b.from && b.flight;
+        if (shell || b.fuse < 1.2) {
           let bomb = view.bombs.get(b.id);
           if (!bomb) {
-            bomb = new THREE.Mesh(this.bombGeo, this.bombMat);
+            bomb = new THREE.Mesh(this.bombGeo, shell ? this.shellMat : this.bombMat);
             bomb.castShadow = true;
             view.bombs.set(b.id, bomb);
             view.group.add(bomb);
           }
-          bomb.scale.setScalar(Math.max(1, r / 8));
-          bomb.position.set(b.x, alt * (b.fuse / 1.2), b.z);
+          if (b.from && b.flight) {
+            const k = 1 - b.fuse / b.flight;
+            const x = b.from.x + (b.x - b.from.x) * k;
+            const z = b.from.z + (b.z - b.from.z) * k;
+            const y = b.from.y * (1 - k) + Math.sin(k * Math.PI) * (4 + r * 0.3);
+            bomb.position.set(x, y, z);
+            bomb.scale.setScalar(Math.max(0.7, r / 14));
+            bomb.rotation.set(Math.PI / 2, Math.atan2(b.x - b.from.x, b.z - b.from.z), 0, 'YXZ');
+          } else {
+            bomb.scale.setScalar(Math.max(1, r / 8));
+            bomb.position.set(b.x, alt * (b.fuse / 1.2), b.z);
+          }
         }
       }
       for (const [id, ring] of view.rings) {
-        if (bombsNow.has(id)) continue;
+        if (now.has(id)) continue;
         view.group.remove(ring);
         ring.traverse((o) => ((o as THREE.Mesh).material as THREE.Material | undefined)?.dispose());
         view.rings.delete(id);
@@ -251,10 +314,25 @@ export class Effects {
       warn.scale.set(0.06, 0.06, 1);
       warn.renderOrder = 12;
       g.add(warn);
-    } else {
-      const plane = new THREE.Mesh(this.jetGeo, this.kitMat);
+    } else if (a.kind === 'bomber') {
+      const plane = new THREE.Mesh(this.bomberGeo, this.kitMat);
       plane.castShadow = true;
       g.add(plane);
+    } else if (a.kind === 'tank') {
+      const tank = new THREE.Mesh(this.tankGeo, this.kitMat);
+      tank.castShadow = true;
+      g.add(tank);
+    } else {
+      // The parked helicopter's model, with a spinning rotor laid over its own.
+      const heli = new THREE.Group();
+      const body = new THREE.Mesh(this.heliGeo, this.kitMat);
+      body.castShadow = true;
+      const rotor = new THREE.Mesh(this.rotorGeo, this.kitMat);
+      rotor.name = 'rotor';
+      // Over the model's own hub (see three/military.ts).
+      rotor.position.set(0, 3.4, 1.0);
+      heli.add(body, rotor);
+      g.add(heli);
     }
     return g;
   }
@@ -290,6 +368,7 @@ export class Effects {
   }
 
   dispose(): void {
+    this.protos.traverse((o) => ((o as THREE.Mesh).material as THREE.Material | undefined)?.dispose());
     for (const p of this.puffs) (p.sprite.material as THREE.Material).dispose();
     for (const p of this.popups) (p.sprite.material as THREE.Material).dispose();
     for (const t of this.popupTex.values()) t.dispose();
@@ -302,7 +381,11 @@ export class Effects {
     this.bombGeo.dispose();
     this.bombMat.dispose();
     this.tankerGeo.dispose();
-    this.jetGeo.dispose();
+    this.bomberGeo.dispose();
+    this.tankGeo.dispose();
+    this.heliGeo.dispose();
+    this.rotorGeo.dispose();
+    this.shellMat.dispose();
     this.kitMat.dispose();
   }
 }
