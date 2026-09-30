@@ -17,6 +17,7 @@
 import { fightBack, type Attack } from './attacks';
 import type { Prop, PropKind } from './catalog';
 import { createCity, type City, type MapId } from './city';
+import { berthOf } from './city/ports';
 import { EAT_HOLE, speedOf } from './growth';
 import { LIVES, eatHoles, eatProps, newHole, type Hole, type HurtCause } from './holes';
 import { createPeople, walkPeople, type Person } from './people';
@@ -45,6 +46,8 @@ export type WorldEvent =
   /** A hole swallowed a thing; `gained` is what it scored, with combo, double points and health bonus. */
   | { type: 'eat'; prop: Prop; hole: number; gained: number }
   | { type: 'regrow'; prop: Prop }
+  /** A giant took something tiny without a fuss (see GIANT_LEVEL): gone, no points. */
+  | { type: 'crumb'; prop: Prop }
   | { type: 'rebuild'; prop: Prop; replaces: Prop | null }
   /** Something new stands in the city as it is, with no building-up (a police car that has parked). */
   | { type: 'park'; prop: Prop }
@@ -297,6 +300,8 @@ function move(w: World, h: Hole, want: Input, dt: number, pace: number): void {
 function onLand(w: World, h: Hole, x: number, z: number): boolean {
   const edge = Math.max(0, w.city.land - h.r * 0.5);
   if (Math.abs(x) <= edge && Math.abs(z) <= edge) return true;
+  // Out over the water off the quay, where the ships moor.
+  if (w.city.port && inRect(berthOf(w.city.port), x, z)) return true;
   return w.city.extraLand.some((l) => inRect(l, x, z));
 }
 

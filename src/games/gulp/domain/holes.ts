@@ -2,7 +2,7 @@
  * Holes eating: what fits, how a swallowed thing scores and grows a hole,
  * holes swallowing smaller holes, and a hole hurt by the city.
  */
-import { FIT, KINDS, worthOf, type Prop, type PropKind } from './catalog';
+import { FIT, KINDS, isSite, worthOf, type Prop, type PropKind } from './catalog';
 import { COMBO_WINDOW, EAT_HOLE, START_R, comboOf, levelOf, radiusFor } from './growth';
 import { markEaten } from './rebuild';
 import type { Difficulty } from './rivals';
@@ -119,6 +119,16 @@ export function newHole(id: number, name: string, skin: number, isPlayer: boolea
   };
 }
 
+/**
+ * From this level a hole is a giant, and tiny things (people, cones,
+ * benches, bins…) go into it without a fuss: no points, no "+1", no fall,
+ * no sound, so a giant's screen is not a snowstorm of crumbs. Trees and
+ * anything bigger still count.
+ */
+export const GIANT_LEVEL = 15;
+const CRUMB_TIER = 1;
+export const isCrumb = (h: Hole, kind: PropKind): boolean => KINDS[kind].tier <= CRUMB_TIER && !isSite(kind) && levelOf(h.r) >= GIANT_LEVEL;
+
 /** A thing falls in when it fits and its middle is well inside the hole. */
 export const canEat = (h: Hole, p: Prop): boolean => p.size <= h.r * FIT;
 
@@ -132,7 +142,8 @@ export function eatProps(w: World, h: Hole, events: WorldEvent[]): void {
     if (Math.hypot(p.x - h.x, p.z - h.z) > h.r - p.size * 0.35) continue;
     w.props.delete(p.id);
     markEaten(w, p);
-    gobble(w, h, p, events);
+    if (isCrumb(h, p.kind)) events.push({ type: 'crumb', prop: p });
+    else gobble(w, h, p, events);
   }
   const after = levelOf(h.r);
   if (after > before) events.push({ type: 'level', hole: h.id, level: after });

@@ -254,4 +254,19 @@ describe('a round against the computer is fair and fun', () => {
     endRound(e);
     expect(e.endedBy).toBe('last');
   });
+
+  it('a hole can go out over the water off the port quay, so the moored ships are in reach', () => {
+    const w = round(2, 0, { map: 'mega' });
+    const port = w.city.port!;
+    const ship = [...w.props.values()].find((p) => p.kind === 'ship')!;
+    const me = grow(w, 0, 40000);
+    me.x = ship.x;
+    me.z = ship.z;
+    only(w, [ship]);
+    // Standing right on the ship, out on the water: allowed, and it goes down.
+    const events = stepWorld(w, 1 / 60, still);
+    expect(Math.hypot(me.x - ship.x, me.z - ship.z)).toBeLessThan(1);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'eat', prop: expect.objectContaining({ kind: 'ship' }) }));
+    expect(port.side).toBeDefined();
+  });
 });
