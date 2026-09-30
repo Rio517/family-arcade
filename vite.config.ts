@@ -69,7 +69,10 @@ export default defineConfig({
   ],
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    // No source maps in the published site: they doubled what a deploy
+    // uploads and published every dev-only branch in readable form. Set
+    // BUILD_SOURCEMAP=1 to get them when debugging a production build.
+    sourcemap: process.env.BUILD_SOURCEMAP === '1',
     // `preview-b.html` is the mid-battle harness the screenshot run uses to
     // reach the Ship Battle board without playing a whole game. It is built
     // only when BUILD_HARNESS is set (npm run shots does that), so the

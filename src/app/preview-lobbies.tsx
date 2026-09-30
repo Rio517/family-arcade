@@ -11,6 +11,7 @@
  *   /preview-lobbies.html?scene=knock#/          host; Kai knocked on Rainbow Racer
  *   /preview-lobbies.html?scene=call#/           host; voice and camera on, wearing the dragon
  */
+import { Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HashRouter, Route, Routes } from 'react-router-dom';
 import '@shared/styles/tokens.css';
@@ -85,7 +86,15 @@ createRoot(document.getElementById('root')!).render(
             }
           />
           {GAMES.map((game) => (
-            <Route key={game.id} path={game.path} element={<game.Page />} />
+            <Route
+              key={game.id}
+              path={game.path}
+              element={
+                <Suspense fallback={null}>
+                  <game.Page />
+                </Suspense>
+              }
+            />
           ))}
         </Routes>
       </main>
