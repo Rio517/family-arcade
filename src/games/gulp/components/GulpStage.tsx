@@ -97,7 +97,8 @@ export function GulpStage({
     const loop = (ts: number) => {
       raf = requestAnimationFrame(loop);
       if (!scene) return;
-      const dt = last ? Math.min(0.05, (ts - last) / 1000) : 0;
+      // Never backwards, never a huge jump (after a hidden tab): 0 to 50 ms.
+      const dt = last ? Math.max(0, Math.min(0.05, (ts - last) / 1000)) : 0;
       last = ts;
       let events: WorldEvent[] = [];
       if (!pausedRef.current) events = stepWorld(world, dt, playing ? readInput(keysRef.current, pointerRef.current) : null);
@@ -112,6 +113,8 @@ export function GulpStage({
         const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
         try {
           scene = new Scene(mount, world, looks, follow, reduced);
+          // Development only, for browser checks; stripped from the build.
+          if (import.meta.env.DEV) (window as unknown as { __gulpScene?: GulpScene }).__gulpScene = scene;
         } catch (err) {
           console.error(err);
           setFailed(true);
