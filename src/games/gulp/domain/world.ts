@@ -18,7 +18,7 @@ import { fightBack, type Attack } from './attacks';
 import type { Prop, PropKind } from './catalog';
 import { createCity, type City, type MapId } from './city';
 import { EAT_HOLE, speedOf } from './growth';
-import { eatHoles, eatProps, newHole, type Hole, type HurtCause } from './holes';
+import { LIVES, eatHoles, eatProps, newHole, type Hole, type HurtCause } from './holes';
 import { createPeople, walkPeople, type Person } from './people';
 import { POLICE_COOL, police, type Responder } from './police';
 import { POWER_SPEED, spawnPowerups, takePowerups, type PowerKind, type PowerUp } from './powerups';
@@ -56,6 +56,8 @@ export type WorldEvent =
   | { type: 'gulp'; eater: number; eaten: number }
   | { type: 'level'; hole: number; level: number }
   | { type: 'respawn'; hole: number }
+  /** A hole swallowed with no lives left: out of the round. */
+  | { type: 'out'; hole: number }
   | { type: 'power'; hole: number; kind: PowerKind }
   | { type: 'hurt'; hole: number; cause: HurtCause }
   | { type: 'boom'; x: number; z: number; size: number }
@@ -95,6 +97,11 @@ export interface World {
   countdown: number;
   elapsed: number;
   status: 'countdown' | 'playing' | 'over';
+  /**
+   * Why the round is over: its time ran out, it was ended early, the child
+   * ran out of lives, or every computer hole did (the child is the last hole).
+   */
+  endedBy: 'time' | 'ended' | 'out' | 'last' | null;
   rng: Rng;
   /** Things by grid cell, so a hole only checks what is near it. */
   grid: Map<string, number[]>;
@@ -141,7 +148,9 @@ export function createWorld(rng: Rng, player: Racer | null, rivals: Racer[], opt
   const brains: Array<Brain | null> = [];
   everyone.forEach((who, i) => {
     const spot = crossings[i === 0 ? 0 : 1 + ((i * 5) % (crossings.length - 1))];
-    holes.push(newHole(i, who.name, who.skin, who.isPlayer, spot.x, spot.z));
+    const hole = newHole(i, who.name, who.skin, who.isPlayer, spot.x, spot.z);
+    hole.lives = LIVES[options.difficulty];
+    holes.push(hole);
     brains.push(who.isPlayer ? null : createBrain(rng, options.difficulty));
   });
   const countdown = options.countdown ?? (player ? COUNTDOWN : 0);
@@ -156,6 +165,7 @@ export function createWorld(rng: Rng, player: Racer | null, rivals: Racer[], opt
     countdown,
     elapsed: 0,
     status: countdown > 0 ? 'countdown' : 'playing',
+    endedBy: null,
     rng,
     grid: new Map(),
     nextPower: 8,
@@ -186,6 +196,7 @@ export function stepWorld(w: World, dt: number, input: Input | null): WorldEvent
   w.elapsed += dt;
   if (w.options.duration > 0 && w.elapsed >= w.options.duration) {
     w.status = 'over';
+    w.endedBy = 'time';
     return events;
   }
 
@@ -214,6 +225,18 @@ export function stepWorld(w: World, dt: number, input: Input | null): WorldEvent
     if (w.options.powerups) takePowerups(w, h, events);
   }
   eatHoles(w, events);
+  // Out of lives: the child's round is over; with every computer hole out, the child has won it.
+  if (player && player.lives <= 0) {
+    w.status = 'over';
+    w.endedBy = 'out';
+    return events;
+  }
+  const rivals = w.holes.filter((h) => !h.isPlayer);
+  if (player && rivals.length && rivals.every((h) => h.lives <= 0)) {
+    w.status = 'over';
+    w.endedBy = 'last';
+    return events;
+  }
   walkPeople(w, dt, events);
   if (player) police(w, dt, player, events);
   if (w.options.regrow) {
@@ -228,6 +251,7 @@ export function stepWorld(w: World, dt: number, input: Input | null): WorldEvent
 /** End a round early (the endless round's "End round"). */
 export function endRound(w: World): void {
   w.status = 'over';
+  w.endedBy = 'ended';
 }
 
 function move(w: World, h: Hole, want: Input, dt: number, pace: number): void {

@@ -4,7 +4,7 @@
  * warnings and being swallowed. It renders a snapshot the page copies out
  * of the live world a few times a second.
  */
-import { BoltIcon, ClockIcon, PauseIcon, SpeakerIcon, SpeakerOffIcon, StarIcon, WarningIcon } from '@shared/ui/icons';
+import { BoltIcon, ClockIcon, HeartIcon, PauseIcon, SpeakerIcon, SpeakerOffIcon, StarIcon, WarningIcon } from '@shared/ui/icons';
 import type { Banner, Hud, HudRow } from './round';
 
 const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n.toLocaleString());
@@ -28,10 +28,20 @@ export function GulpHud({
   touch: boolean;
 }) {
   const row = (r: HudRow) => (
-    <li key={r.id} className={r.me ? 'me' : ''}>
+    <li key={r.id} className={`${r.me ? 'me' : ''}${r.out ? ' out' : ''}`}>
       <span className="gulp-rank">{r.rank}</span>
       <span className="gulp-dot" style={{ background: r.css }} aria-hidden="true" />
       <span className="gulp-name">{r.name}</span>
+      {r.out ? (
+        <span className="gulp-lives out">Out</span>
+      ) : (
+        r.lives !== null && (
+          <span className="gulp-lives" aria-label={`${r.lives} ${r.lives === 1 ? 'life' : 'lives'} left`}>
+            <HeartIcon size={14} />
+            {r.lives}
+          </span>
+        )
+      )}
       <b key={r.me ? r.score : undefined} className={r.me ? 'gulp-score-punch' : undefined}>
         {short(r.score)}
       </b>
@@ -172,6 +182,11 @@ export function GulpHud({
           <span className="gulp-eaten-kicker">Swallowed by</span>
           <strong>{hud.eatenBy}</strong>
           <span>Back in {hud.respawnIn}</span>
+          {hud.lives !== null && (
+            <span className="gulp-eaten-lives">
+              <HeartIcon size={18} /> {hud.lives} {hud.lives === 1 ? 'life' : 'lives'} left
+            </span>
+          )}
         </div>
       )}
 

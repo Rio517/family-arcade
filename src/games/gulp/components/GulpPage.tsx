@@ -64,6 +64,14 @@ interface Round {
 
 type Phase = 'menu' | 'play' | 'over';
 
+/** What the results card says ended the round. */
+const KICKER: Record<NonNullable<World['endedBy']>, string> = {
+  time: "Time's up!",
+  ended: 'Round over',
+  out: 'Out of lives!',
+  last: 'Last hole standing!',
+};
+
 /**
  * The menu's backdrop: always the Region map with every wonder, the airport,
  * stadiums and the countryside, whatever map is picked, so the menu shows off
@@ -370,7 +378,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
       {phase === 'over' && result && (
         <div className="gulp-modal-backdrop">
           <div className="gulp-modal results" role="dialog" aria-modal="true" aria-label="Results" data-testid="gulp-results">
-            <span className="gulp-kicker">{round.world.options.duration > 0 ? "Time's up!" : 'Round over'}</span>
+            <span className="gulp-kicker">{KICKER[round.world.endedBy ?? 'ended']}</span>
             <h2>{result.rank === 1 ? 'You are the biggest hole!' : `#${result.rank} — great gulping!`}</h2>
             <div className="gulp-results-body">
               <section className="gulp-results-round" aria-label="This round">

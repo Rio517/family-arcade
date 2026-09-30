@@ -5,6 +5,7 @@
 import { FIT, KINDS, worthOf, type Prop, type PropKind } from './catalog';
 import { COMBO_WINDOW, EAT_HOLE, START_R, comboOf, levelOf, radiusFor } from './growth';
 import { markEaten } from './rebuild';
+import type { Difficulty } from './rivals';
 import { propsNear } from './space';
 import type { World, WorldEvent } from './world';
 
@@ -26,8 +27,10 @@ export interface Hole {
   /** Holes it has swallowed. */
   kills: number;
   alive: boolean;
-  /** Seconds until it comes back, while swallowed. */
+  /** Seconds until it comes back, while swallowed (for ever once out of lives). */
   respawnIn: number;
+  /** Times it can still be swallowed and come back (Infinity where there are none to lose). */
+  lives: number;
   /** Seconds of safety left after coming back. */
   safe: number;
   /** Who swallowed it last. */
@@ -54,6 +57,12 @@ export type HurtCause = 'chem' | 'tanker' | 'bomb';
 
 /** Seconds a swallowed hole waits before it comes back. */
 export const RESPAWN = 3;
+/**
+ * Lives each hole starts a round with: on Medium five, on Hard three, for
+ * the child and every computer hole alike. Easy has none to lose (no one
+ * swallows the child there).
+ */
+export const LIVES: Record<Difficulty, number> = { easy: Infinity, medium: 5, hard: 3 };
 /** How much of its size a swallowed hole keeps: the child keeps more. */
 const KEEP_PLAYER = 0.85;
 const KEEP_RIVAL = 0.7;
@@ -93,6 +102,7 @@ export function newHole(id: number, name: string, skin: number, isPlayer: boolea
     kills: 0,
     alive: true,
     respawnIn: 0,
+    lives: Infinity,
     safe: 0,
     eatenBy: null,
     speedTime: 0,
@@ -181,7 +191,9 @@ export function eatHoles(w: World, events: WorldEvent[]): void {
       a.kills += 1;
       a.r = radiusFor(a.mass);
       b.alive = false;
-      b.respawnIn = RESPAWN;
+      // One life gone; the last one, and it is out of the round.
+      b.lives -= 1;
+      b.respawnIn = b.lives > 0 ? RESPAWN : Infinity;
       b.eatenBy = a.name;
       b.mass *= b.isPlayer ? KEEP_PLAYER : KEEP_RIVAL;
       b.r = radiusFor(b.mass);
@@ -189,6 +201,7 @@ export function eatHoles(w: World, events: WorldEvent[]): void {
       b.speedTime = b.doubleTime = b.stun = b.burn = 0;
       b.streak = b.comboTime = 0;
       events.push({ type: 'gulp', eater: a.id, eaten: b.id });
+      if (b.lives <= 0) events.push({ type: 'out', hole: b.id });
       const after = levelOf(a.r);
       if (after > before) events.push({ type: 'level', hole: a.id, level: after });
     }
