@@ -15,10 +15,26 @@
  * food. Everything comes from the `rng` passed in (ADR 0005).
  */
 import { KINDS, makeProp, type Prop, type PropKind } from './catalog';
+import {
+  BLOCK,
+  PITCH,
+  ROAD,
+  SIDEWALK,
+  inside,
+  type Add,
+  type MapId,
+  type PlayArea,
+  type Rect,
+  type Rng,
+  type Side,
+  type Tools,
+} from './city/common';
+import { countryLanes, countryside } from './city/countryside';
+import { airport, harbour, pick3, type Airfield, type AirportSite } from './city/ports';
 
-type Rng = () => number;
-
-export type MapId = 'town' | 'city' | 'mega' | 'region';
+export { BLOCK, MOUNTAIN_FOOT, ROAD, SIDEWALK } from './city/common';
+export type { MapId, PlayArea, Rect, Side } from './city/common';
+export type { Airfield } from './city/ports';
 
 export const MAPS: Record<MapId, { blocks: number; label: string; rivals: number; minutes: number; country: number }> = {
   town: { blocks: 8, label: 'Town', rivals: 4, minutes: 3, country: 0 },
@@ -61,13 +77,6 @@ export interface Block {
   size: number;
 }
 
-export interface Rect {
-  x0: number;
-  z0: number;
-  x1: number;
-  z1: number;
-}
-
 export interface City {
   map: MapId;
   /** Blocks per side. */
@@ -103,61 +112,22 @@ export interface City {
   play: PlayArea[];
 }
 
-export type Side = 'n' | 's' | 'e' | 'w';
-
-/** A playground's soft surface, or a small basketball court (long side along z). */
-export interface PlayArea extends Rect {
-  kind: 'soft' | 'court';
-}
-
-/**
- * The airport: a 4×4 square of blocks on one edge of town, its inner streets
- * built over (they are in `City.lots`). The runway runs along the outer
- * edge; a taxiway parallel to it leads across the grass to the apron, where
- * the terminal, its jets and the hangars stand. The ground draws these; the things on them
- * are ordinary props.
- */
-export interface Airfield {
-  area: Rect;
-  runway: Rect;
-  /** Which way the runway runs. */
-  along: 'x' | 'z';
-  taxiways: Rect[];
-  apron: Rect;
-  /** Yellow lines painted on the taxiways and the apron: centrelines and lead-ins to the stands. */
-  lines: Rect[];
-}
-
-/** The side of town the airport stands on, and its south-west block. */
-interface AirportSite {
-  bx: number;
-  bz: number;
-  side: Side;
-}
-
 /**
  * The wonders each map holds (the Statue of Liberty always stands on its own
  * islet off the north shore). The bigger the map, the more of them.
  */
 const MAP_WONDERS: Record<MapId, PropKind[]> = {
   town: ['leaning', 'clocktower', 'stonecircle', 'moai'],
-  city: ['leaning', 'clocktower', 'stonecircle', 'moai', 'colosseum', 'opera', 'onion'],
-  mega: ['megaspire', 'irontower', 'pyramid', 'pearlpalace', 'colosseum', 'opera', 'onion', 'clocktower', 'leaning', 'stonecircle', 'moai'],
-  region: ['megaspire', 'irontower', 'pyramid', 'pearlpalace', 'colosseum', 'opera', 'onion', 'clocktower', 'leaning', 'stonecircle', 'moai'],
+  city: ['leaning', 'clocktower', 'stonecircle', 'moai', 'buddha', 'opera', 'onion', 'reichstag'],
+  mega: ['megaspire', 'irontower', 'pyramid', 'pearlpalace', 'buddha', 'reichstag', 'opera', 'onion', 'clocktower', 'leaning', 'stonecircle', 'moai'],
+  region: ['megaspire', 'irontower', 'pyramid', 'pearlpalace', 'buddha', 'reichstag', 'opera', 'onion', 'clocktower', 'leaning', 'stonecircle', 'moai'],
 };
 const ISLET = 30;
 const BRIDGE = 16;
 
-/** Road width, block size (pavement included) and pavement width. */
-export const ROAD = 10;
-export const BLOCK = 34;
-export const SIDEWALK = 2.5;
 /** A park's cross of paths (their width) and the round plaza at its middle (its radius). */
 export const PARK_PATH = 5;
 export const PARK_PLAZA = 8;
-/** A mountain is round: the radius of its foot, a little inside its square footprint. */
-export const MOUNTAIN_FOOT = 18;
-const PITCH = ROAD + BLOCK;
 
 /** How many wonders a round on each map gets (the menu's backdrop shows every one it can). */
 export const WONDER_COUNT: Record<MapId, number> = { town: 0, city: 1, mega: 2, region: 3 };
@@ -189,7 +159,7 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
   };
 
   const { grid: kinds, airport: site } = layout(map, rng);
-  const wonderAt = placeWonders(list.filter((k) => k !== 'liberty'), kinds, rng);
+  const { at: wonderAt, east: wonderEast } = placeWonders(list.filter((k) => k !== 'liberty'), kinds, rng);
   const blockList: Block[] = [];
   for (let bx = 0; bx < blocks; bx++) {
     for (let bz = 0; bz < blocks; bz++) {
@@ -200,7 +170,7 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
       blockList.push(block);
       const mid = (blocks - 1) / 2;
       const ring = Math.max(Math.abs(bx - mid), Math.abs(bz - mid)) / Math.max(1, mid);
-      const big = interior(block, tools, ring);
+      const big = interior(block, tools, ring, wonderEast.has(`${bx}:${bz}`));
       if (!big) (RURAL.has(block.kind) ? verge : sidewalk)(block, tools);
     }
   }
@@ -208,7 +178,9 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
   // and so are the airport's inner streets.
   const lots: Rect[] = [];
   for (const b of blockList) {
-    if (b.kind === 'arena') lots.push({ x0: b.x + BLOCK - 0.5, z0: b.z, x1: b.x + PITCH + 0.5, z1: b.z + BLOCK });
+    if (b.kind === 'arena' || (b.wonder && double(b.wonder) && blockList.some((o) => o.wonder === b.wonder && o.x > b.x))) {
+      lots.push({ x0: b.x + BLOCK - 0.5, z0: b.z, x1: b.x + PITCH + 0.5, z1: b.z + BLOCK });
+    }
   }
   const field = site ? airport(site, half, tools, lots) : null;
   roadside(roads, half, tools, lots);
@@ -228,7 +200,9 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
       { x0: -land, z0: mid - ROAD / 2, x1: -half, z1: mid + ROAD / 2 },
       { x0: half, z0: mid - ROAD / 2, x1: land, z1: mid + ROAD / 2 },
     );
-    countryside(map, half, land, countryRoads, fields, tools, port ? [port.yard] : []);
+    const lanes = countryLanes(half, land, mid, port?.side ?? null);
+    countryRoads.push(...lanes.map((l) => l.rect));
+    countryside(map, half, land, countryRoads, fields, tools, port ? [port.yard] : [], lanes);
   }
   // The Statue of Liberty's islet off the north shore, a bridge across to it.
   const ix = mid;
@@ -280,31 +254,44 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
  * Put the map's wonders on blocks of their own: the tall spire near the
  * middle, the rest spread across town (never side by side with each other).
  */
-function placeWonders(wonders: readonly PropKind[], grid: BlockKind[][], rng: Rng): Map<string, PropKind> {
+function placeWonders(wonders: readonly PropKind[], grid: BlockKind[][], rng: Rng): { at: Map<string, PropKind>; east: Set<string> } {
   const n = grid.length;
   const mid = (n - 1) / 2;
   const at = new Map<string, PropKind>();
+  const east = new Set<string>();
+  const open = (bx: number, bz: number) => bx < n && !SPECIAL.has(grid[bx][bz]) && grid[bx][bz] !== 'wonder';
   const taken = (bx: number, bz: number) => {
     for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (at.has(`${bx + dx}:${bz + dz}`)) return true;
     return false;
   };
   for (const kind of wonders) {
     const spire = kind === 'megaspire';
+    const wide = double(kind);
     const pool: Array<[number, number]> = [];
     for (let bx = 0; bx < n; bx++) {
       for (let bz = 0; bz < n; bz++) {
         const f = Math.max(Math.abs(bx - mid), Math.abs(bz - mid)) / Math.max(1, mid);
         const ok = spire ? f < 0.35 : f > 0.15 && f < 0.85;
-        if (ok && !SPECIAL.has(grid[bx][bz]) && grid[bx][bz] !== 'wonder' && !taken(bx, bz)) pool.push([bx, bz]);
+        if (ok && open(bx, bz) && !taken(bx, bz) && (!wide || (open(bx + 1, bz) && !taken(bx + 1, bz)))) pool.push([bx, bz]);
       }
     }
     if (!pool.length) continue;
     const [bx, bz] = pool[Math.floor(rng() * pool.length)];
     grid[bx][bz] = 'wonder';
     at.set(`${bx}:${bz}`, kind);
+    if (wide) {
+      // Too wide for one block: it takes the block to the east too, the
+      // street between built over.
+      grid[bx + 1][bz] = 'wonder';
+      at.set(`${bx + 1}:${bz}`, kind);
+      east.add(`${bx + 1}:${bz}`);
+    }
   }
-  return at;
+  return { at, east };
 }
+
+/** A wonder wider than a block's inside stands across two blocks. */
+const double = (kind: PropKind) => Math.max(KINDS[kind].w, KINDS[kind].d) > BLOCK - 2 * SIDEWALK;
 
 function layout(map: MapId, rng: Rng): { grid: BlockKind[][]; airport: AirportSite | null } {
   const n = MAPS[map].blocks;
@@ -451,19 +438,6 @@ function ringKind(map: MapId, f: number, rng: Rng): BlockKind {
 // What stands where
 // -------------------------------------------------------------------------
 
-type Add = (kind: PropKind, x: number, z: number, rot?: number, variant?: number, hScale?: number) => void;
-
-interface Tools {
-  map: MapId;
-  /** Where interiors record their playground surfaces and courts. */
-  play: PlayArea[];
-  rng: Rng;
-  add: Add;
-  pick: <T>(list: readonly T[]) => T;
-  variant: () => number;
-  turn: () => number;
-}
-
 /** Lamps and trees at a steady beat round the block, street things between them. */
 function sidewalk(b: Block, { add: put, rng, pick, variant }: Tools): void {
   const street: PropKind[] = ['hydrant', 'bin', 'mailbox', 'planter', 'bench', 'bike', 'cone', 'bin', 'planter'];
@@ -556,8 +530,9 @@ function terrace(
  * What stands inside the pavement ring. Returns true when one thing fills
  * the whole block (a stadium, a mountain), which then has no pavement things.
  * `ring` is how far out the block is: 0 at the centre, 1 on the edge of town.
+ * `eastHalf` marks the second block of a wonder that stands across two.
  */
-function interior(b: Block, t: Tools, ring: number): boolean {
+function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
   const { add, rng, pick, variant, turn } = t;
   const x0 = b.x + SIDEWALK + 0.4;
   const z0 = b.z + SIDEWALK + 0.4;
@@ -591,14 +566,22 @@ function interior(b: Block, t: Tools, ring: number): boolean {
       return false;
     }
     case 'downtown': {
-      // Tall blocks two by two with a narrow gap, a stall in the middle.
+      // Tall blocks two by two with a narrow gap, a stall in the middle. Some
+      // blocks swap a pair of them for a wide office block facing its street:
+      // the size between a tower and a factory, so there is always something
+      // to grow into there.
       const faces = [Math.PI, Math.PI, 0, 0];
-      for (let i = 0; i < 2; i++) {
-        for (let j = 0; j < 2; j++) {
+      const offices = rng();
+      for (let j = 0; j < 2; j++) {
+        if (offices < 0.33 * (j + 1)) {
+          add('office', cx, j === 0 ? z0 + 6.7 : z0 + 21.9, j === 0 ? Math.PI : 0, variant(), 0.9 + rng() * 0.5);
+          continue;
+        }
+        for (let i = 0; i < 2; i++) {
           add(rng() < 0.45 ? 'tower' : 'apartment', x0 + 6.4 + i * 15.8, z0 + 6.4 + j * 15.8, faces[i + j * 2], variant(), 0.8 + rng() * 0.7);
         }
       }
-      add(pick(['kiosk', 'fruitstand', 'cafe'] as const), cx, cz, 0, variant());
+      if (offices >= 0.66) add(pick(['kiosk', 'fruitstand', 'cafe'] as const), cx, cz, 0, variant());
       return false;
     }
     case 'town': {
@@ -762,7 +745,8 @@ function interior(b: Block, t: Tools, ring: number): boolean {
     case 'industrial': {
       // A factory (or the chemical plant) at the back, a yard of containers,
       // a tanker and a van at the front; now and then a water tower.
-      add(rng() < 0.4 ? 'chemplant' : 'factory', cx, z0 + s - 9.5, 0, variant());
+      if (rng() < 0.4) gasworks(t, lot);
+      else add('factory', cx, z0 + s - 9.5, 0, variant());
       for (let i = 0; i < 4; i++) add('container', x0 + 1.6 + i * 3, z0 + 3.3, 0, variant());
       add('tanker', x0 + 15, z0 + 4.2, 0);
       if (rng() < 0.5) add('watertower', x0 + s - 5, z0 + 5, 0, variant());
@@ -849,6 +833,31 @@ function interior(b: Block, t: Tools, ring: number): boolean {
     }
     case 'wonder': {
       const kind = b.wonder ?? 'stonecircle';
+      if (double(kind)) {
+        // Across the built-over street to the east, a lawn and trees at
+        // each outer end.
+        if (!eastHalf) add(kind, b.x + BLOCK + ROAD / 2, cz, 0);
+        const u = eastHalf ? x0 + s - 3 : x0 + 3;
+        for (const dz of [-10, -3.5, 3.5, 10]) add(pick(['tree', 'tree', 'bench', 'planter'] as const), u, cz + dz, eastHalf ? -Math.PI / 2 : Math.PI / 2, variant());
+        return true;
+      }
+      if (kind === 'moai') {
+        // Four heads in a loose arc on the grass, facing the street to the
+        // south, ends a little forward; two with the red topknot. Rocks behind.
+        const tops = rng() < 0.5 ? [0, 1, 1, 0] : [1, 0, 0, 1];
+        [-9, -3, 3, 9].forEach((dx, i) => {
+          add('moai', cx + dx + (rng() - 0.5) * 0.8, cz + 2 + dx * dx * 0.05, (rng() - 0.5) * 0.3, tops[i]);
+        });
+        for (const [dx, dz] of [
+          [-10, -9],
+          [-2, -10],
+          [7, -9],
+          [11, -3],
+        ]) {
+          add('rock', cx + dx + (rng() - 0.5) * 2, cz + dz + (rng() - 0.5) * 2, turn(), variant());
+        }
+        return true;
+      }
       add(kind, cx, cz, 0);
       // Small wonders get a little garden round them.
       if (!fills(kind) && Math.max(KINDS[kind].w, KINDS[kind].d) < 16) {
@@ -875,10 +884,23 @@ function scatter(t: Tools, x0: number, z0: number, s: number, n: number, each: (
   }
 }
 
-/** Parked vehicles along the kerbs, and the odd cone in the road. */
-const inside = (rects: readonly Rect[], x: number, z: number, pad = 0) =>
-  rects.some((r) => x >= r.x0 - pad && x <= r.x1 + pad && z >= r.z0 - pad && z <= r.z1 + pad);
+/**
+ * A gas works on the back of an industrial lot, where a factory would
+ * stand: two or three gas holders, a flare stack, the control shed, and
+ * containers when there is room for them.
+ */
+function gasworks({ add, rng, variant }: Tools, { x0, z0, s }: Lot): void {
+  const cx = x0 + s / 2;
+  const back = z0 + s;
+  add('gastank', cx - 6.5, back - 5, 0, variant());
+  add('gastank', cx + 2.5, back - 5, 0, variant());
+  add('flarestack', cx + 9, back - 2.7, 0);
+  add('plantshed', cx - 5.5, back - 14, 0);
+  if (rng() < 0.5) add('gastank', cx + 5.5, back - 14, 0, variant());
+  else for (const dx of [3, 6.2]) add('container', cx + dx, back - 14, 0, variant());
+}
 
+/** Parked vehicles along the kerbs, and the odd cone in the road. */
 function roadside(roads: number[], half: number, { add, rng, pick, variant }: Tools, lots: readonly Rect[]): void {
   // Mostly cars; a garbage truck or an ice-cream van now and then.
   const vehicles: PropKind[] = [
@@ -927,270 +949,3 @@ function roadside(roads: number[], half: number, { add, rng, pick, variant }: To
   }
 }
 
-// -------------------------------------------------------------------------
-// The airport
-// -------------------------------------------------------------------------
-
-/**
- * Lay out the airport on its 4×4 blocks and build over its inner streets
- * (added to `lots`). Worked out in the airport's own frame: `u` runs along
- * the edge of town, `v` inward from it, both 0 to 166. From the edge in:
- * grass, the runway, grass, the taxiway, grass, then the apron with the jets at
- * their stands and, at the back, the hangars, the terminal and the radar.
- */
-function airport(site: AirportSite, half: number, t: Tools, lots: Rect[]): Airfield {
-  const { add, variant } = t;
-  const S = 4 * BLOCK + 3 * ROAD;
-  const x0 = -half + ROAD + site.bx * PITCH;
-  const z0 = -half + ROAD + site.bz * PITCH;
-  const x1 = x0 + S;
-  const z1 = z0 + S;
-  const { side } = site;
-  /** From the airport's frame to the map. */
-  const at = (u: number, v: number): [number, number] =>
-    side === 'w' ? [x0 + v, z0 + u] : side === 'e' ? [x1 - v, z0 + u] : side === 'n' ? [x0 + u, z0 + v] : [x0 + u, z1 - v];
-  const uOf = (x: number, z: number) => (side === 'w' || side === 'e' ? z - z0 : x - x0);
-  const rect = (u0: number, v0: number, u1: number, v1: number): Rect => {
-    const [ax, az] = at(u0, v0);
-    const [bx, bz] = at(u1, v1);
-    return { x0: Math.min(ax, bx), z0: Math.min(az, bz), x1: Math.max(ax, bx), z1: Math.max(az, bz) };
-  };
-  /** The turn that faces a thing's front along (du, dv). */
-  const facing = (du: number, dv: number) => {
-    const [ax, az] = at(0, 0);
-    const [bx, bz] = at(du, dv);
-    return Math.atan2(bx - ax, bz - az);
-  };
-
-  // The inner streets, built over.
-  for (let k = 1; k < 4; k++) {
-    const a = k * PITCH - ROAD;
-    lots.push({ x0: x0 + a - 0.5, z0, x1: x0 + a + ROAD + 0.5, z1 });
-    lots.push({ x0, z0: z0 + a - 0.5, x1, z1: z0 + a + ROAD + 0.5 });
-  }
-
-  // The terminal at the back, its gates towards the runway, one jet at the
-  // middle gate (nose up to the jet bridge) and one on a stand of its own.
-  const [tx, tz] = at(83, 147);
-  const tRot = facing(0, -1);
-  add('terminal', tx, tz, tRot);
-  const fx = Math.sin(tRot);
-  const fz = Math.cos(tRot);
-  const nose: [number, number] = [tx - 3.5 * fz + 12.5 * fx, tz + 3.5 * fx + 12.5 * fz];
-  const jets: Array<[number, number]> = [[nose[0] + 18 * fx, nose[1] + 18 * fz], at(135, 116.5)];
-  for (const [x, z] of jets) add('jet', x, z, tRot + Math.PI, variant());
-  // Hangars beside the terminal, doors to the apron, and the radar in the far corner.
-  for (const u of [20, 46]) add('hangar', ...at(u, 150), facing(0, -1));
-  add('radar', ...at(152, 152), facing(0, -1));
-
-  // Yellow lines: down the taxiway and its links, and in to each stand.
-  const w = 0.35;
-  // The links to the runway join it just past the numbers at each end.
-  const lines = [rect(36, 44 - w, 130, 44 + w), rect(36 - w, 28, 36 + w, 44), rect(130 - w, 28, 130 + w, 44)];
-  // A taxiway from the parallel one across the grass to each stand.
-  const taxiways = [rect(32, 40, 134, 48), rect(32, 28, 40, 40), rect(126, 28, 134, 40)];
-  for (const [x, z] of jets) {
-    const u = uOf(x, z);
-    lines.push(rect(u - w, 44, u + w, 134));
-    taxiways.push(rect(u - 4, 48, u + 4, 92));
-  }
-  return {
-    area: { x0, z0, x1, z1 },
-    runway: rect(8, 12, 158, 28),
-    along: side === 'n' || side === 's' ? 'x' : 'z',
-    taxiways,
-    apron: rect(2.5, 92, 163.5, 163.5),
-    lines,
-  };
-}
-
-// -------------------------------------------------------------------------
-// The sea and the port
-// -------------------------------------------------------------------------
-
-/** A second shore: east, west or south (the north is always sea). */
-function pick3(rng: Rng): Side {
-  return (['e', 'w', 's'] as const)[Math.floor(rng() * 3)];
-}
-
-/**
- * The port on a shore, in the countryside ring beside the country road that
- * reaches that shore. Worked out along the shore (`u`) and inland from it
- * (`v`): a concrete quay with cranes at its edge, their booms out over the
- * water, ships moored alongside, rows of containers and warehouses behind.
- * Returns the quay (for the ground) and the ground it takes (for the
- * countryside to keep off).
- */
-function harbour(side: Side, land: number, mid: number, t: Tools): { quay: Rect; yard: Rect; side: Side } {
-  const { add, rng, variant } = t;
-  const L = 150;
-  const D = 56;
-  // Beside the country road, to one side or the other.
-  const u0 = rng() < 0.5 ? mid + 14 : mid - 14 - L;
-  const at = (u: number, v: number): [number, number] =>
-    side === 'e' ? [land - v, u] : side === 'w' ? [-land + v, u] : side === 's' ? [u, land - v] : [u, -land + v];
-  const rect = (a0: number, b0: number, a1: number, b1: number): Rect => {
-    const [ax, az] = at(a0, b0);
-    const [bx, bz] = at(a1, b1);
-    return { x0: Math.min(ax, bx), z0: Math.min(az, bz), x1: Math.max(ax, bx), z1: Math.max(az, bz) };
-  };
-  const facing = (du: number, dv: number) => {
-    const [ax, az] = at(0, 0);
-    const [bx, bz] = at(du, dv);
-    return Math.atan2(bx - ax, bz - az);
-  };
-  const toSea = facing(0, -1);
-  const alongShore = facing(1, 0);
-  // Cranes on the quay's edge, facing the sea; a ship or two moored alongside.
-  for (const u of [30, 72, 114]) add('crane', ...at(u0 + u, 6.5), toSea, variant());
-  const ships = t.map === 'region' ? [44, 106] : [70];
-  for (const u of ships) add('ship', ...at(u0 + u, -8), alongShore, variant());
-  // Containers in rows behind, a gap between each run of six.
-  for (let run = 0; run < 5; run++) {
-    for (let i = 0; i < 6; i++) {
-      for (const v of [18.5, 26]) {
-        if (rng() < 0.85) add('container', ...at(u0 + 8 + run * 28 + i * 3, v), toSea, variant());
-      }
-    }
-  }
-  // Warehouses at the back, doors to the quay.
-  for (const u of [38, 110]) add('warehouse', ...at(u0 + u, 45), toSea, variant());
-  return { quay: rect(u0, 0, u0 + L, D), yard: rect(u0 - 4, 0, u0 + L + 4, D + 4), side };
-}
-
-// -------------------------------------------------------------------------
-// The countryside round the bigger maps
-// -------------------------------------------------------------------------
-
-/**
- * The open land between the street grid and the shore, in rings: farmland
- * nearest town, then woods and (on the bigger maps) wind farms on the open
- * meadows, and on the Region mountains along the far edge. Things keep off
- * the country roads, and fields are recorded so the ground can plough them.
- */
-function countryside(map: MapId, half: number, land: number, roads: readonly Rect[], fields: Rect[], t: Tools, keepOff: readonly Rect[]): void {
-  const { rng, pick, variant, turn } = t;
-  const margin = land - half;
-  const CELL = 26;
-  const n = Math.ceil((land * 2) / CELL);
-  const winds = map === 'mega' || map === 'region';
-  const peaks = map === 'region';
-  // Ground the big things stand on: nothing else goes there. Each entry says
-  // whether a spot (with `pad` of room round it) is on that ground.
-  const taken: Array<(x: number, z: number, pad: number) => boolean> = [];
-  const block = (x: number, z: number, w: number, d: number) =>
-    taken.push((px, pz, pad) => Math.abs(px - x) < w / 2 + pad && Math.abs(pz - z) < d / 2 + pad);
-  const round = (x: number, z: number, r: number) => taken.push((px, pz, pad) => Math.hypot(px - x, pz - z) < r + pad);
-  // Small things already put down, by 8-unit square, so scattered trees,
-  // rocks and bales never land on one another (two squares round a spot
-  // cover the widest pair, a barn and its neighbour).
-  const small = new Map<string, Array<{ x: number; z: number; r: number }>>();
-  const SQ = 8;
-  const crowded = (x: number, z: number, r: number) => {
-    for (let i = Math.floor(x / SQ) - 2; i <= Math.floor(x / SQ) + 2; i++) {
-      for (let j = Math.floor(z / SQ) - 2; j <= Math.floor(z / SQ) + 2; j++) {
-        if (small.get(`${i}:${j}`)?.some((o) => Math.max(Math.abs(o.x - x), Math.abs(o.z - z)) < o.r + r)) return true;
-      }
-    }
-    return false;
-  };
-  const free = (x: number, z: number, pad: number) => !taken.some((on) => on(x, z, pad));
-  /** A small thing, only where nothing else stands. */
-  const add: Add = (kind, x, z, rot, variant, hScale) => {
-    const r = Math.max(KINDS[kind].w, KINDS[kind].d) / 2;
-    if (!free(x, z, r) || crowded(x, z, r)) return;
-    t.add(kind, x, z, rot, variant, hScale);
-    const key = `${Math.floor(x / SQ)}:${Math.floor(z / SQ)}`;
-    small.set(key, [...(small.get(key) ?? []), { x, z, r }]);
-  };
-
-  for (const r of keepOff) block((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2, r.x1 - r.x0, r.z1 - r.z0);
-
-  // One power plant out on the Region's countryside, on its own ground.
-  if (map === 'region') {
-    const px = land - margin * 0.45;
-    const pz = -land + margin * 0.5;
-    t.add('powerplant', px, pz, 0);
-    block(px, pz, KINDS.powerplant.w + 4, KINDS.powerplant.d + 4);
-  }
-
-  // Which cells of open land get what (all drawn from the rng first, so the
-  // big things can claim their ground before anything small is put down).
-  const cells: Array<{ i: number; j: number; cx: number; cz: number; u: number; r: number }> = [];
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      const cx = -land + (i + 0.5) * CELL;
-      const cz = -land + (j + 0.5) * CELL;
-      const d = Math.max(Math.abs(cx), Math.abs(cz)) - half;
-      // Only the countryside ring, clear of the shore and the roads.
-      if (d < CELL * 0.6 || Math.max(Math.abs(cx), Math.abs(cz)) > land - CELL * 0.55) continue;
-      if (inside(roads, cx, cz, CELL / 2)) continue;
-      cells.push({ i, j, cx, cz, u: d / margin, r: rng() });
-    }
-  }
-  // Mountains along the Region's far edge, and wind turbines on the open
-  // meadows, where they have room: clear of the roads and the power plant.
-  const TURBINE_PAD = 7;
-  const big = new Set<(typeof cells)[number]>();
-  const mountain = (c: (typeof cells)[number]) => peaks && c.u > 0.72 && c.r < 0.5 && (c.i + c.j) % 2 === 0;
-  for (const c of cells) {
-    if (!mountain(c) || !free(c.cx, c.cz, MOUNTAIN_FOOT) || inside(roads, c.cx, c.cz, MOUNTAIN_FOOT + 2)) continue;
-    t.add('mountain', c.cx, c.cz, turn(), variant());
-    round(c.cx, c.cz, MOUNTAIN_FOOT);
-    big.add(c);
-  }
-  for (const c of cells) {
-    const { cx, cz, u, r } = c;
-    if (!winds || (peaks && u > 0.72) || u < 0.4 || r >= 0.3 || !free(cx, cz, TURBINE_PAD)) continue;
-    t.add('windturbine', cx, cz, 0);
-    round(cx, cz, TURBINE_PAD);
-    big.add(c);
-    if (rng() < 0.5) add('rock', cx + 9, cz + 8, 0);
-  }
-  // Everything else, round them.
-  for (const c of cells) {
-    if (big.has(c)) continue;
-    const { cx, cz, u, r } = c;
-    if (peaks && u > 0.72) {
-      // Pines at the mountains' feet.
-      for (let k = 0; k < 5; k++) add('pine', cx + (rng() - 0.5) * CELL * 0.8, cz + (rng() - 0.5) * CELL * 0.8, 0, variant());
-    } else if (u < 0.4) {
-      // Farmland: fields of hay or crops, now and then a farmyard.
-      if (r < 0.2) {
-        // A farmyard: the barn, the tractor, a stall and the farmer's little house.
-        add('barn', cx - 4, cz - 4, turn(), variant());
-        add('tractor', cx + 7, cz + 6, turn(), variant());
-        add('fruitstand', cx + 7, cz - 8, 0, variant());
-        add('cottage', cx - 5, cz + 8, Math.PI, variant());
-      } else if (r < 0.8) {
-        if (!free(cx, cz, CELL / 2)) continue;
-        fields.push({ x0: cx - CELL / 2 + 1, z0: cz - CELL / 2 + 1, x1: cx + CELL / 2 - 1, z1: cz + CELL / 2 - 1 });
-        for (let a = 0; a < 4; a++) for (let b = 0; b < 3; b++) if (rng() < 0.55) add('haybale', cx - 8 + a * 5.5, cz - 6 + b * 6, 0);
-        // The tractor at the end of the rows, clear of the bales.
-        if (rng() < 0.3) add('tractor', cx + 8.5, cz + 9.6, turn(), variant());
-      } else if (rng() < 0.5) {
-        // A big house out in the country: trees round its garden, a car in the drive.
-        add('villa', cx - 2, cz, turn(), variant());
-        add(pick(['car', 'car', 'van'] as const), cx + 6, cz, 0, variant());
-        for (const [dx, dz] of [
-          [7, -7],
-          [7, 7],
-          [-9, 8],
-          [-9, -8],
-        ]) {
-          add(pick(['tree', 'tree', 'pine', 'bush'] as const), cx + dx, cz + dz, turn(), variant());
-        }
-      } else {
-        for (let k = 0; k < 4; k++) add(pick(['tree', 'bush', 'rock'] as const), cx + (rng() - 0.5) * CELL * 0.8, cz + (rng() - 0.5) * CELL * 0.8, turn(), variant());
-      }
-    } else if (r < 0.75) {
-      // Woods.
-      for (let k = 0; k < 9; k++) {
-        const kind = rng() < 0.6 ? 'pine' : rng() < 0.8 ? 'tree' : 'bush';
-        add(kind, cx - CELL / 2 + 2 + (k % 3) * 8 + rng() * 3, cz - CELL / 2 + 2 + Math.floor(k / 3) * 8 + rng() * 3, turn(), variant());
-      }
-    } else {
-      for (let k = 0; k < 3; k++) add(pick(['rock', 'bush', 'haybale'] as const), cx + (rng() - 0.5) * CELL * 0.7, cz + (rng() - 0.5) * CELL * 0.7, 0, variant());
-    }
-  }
-}

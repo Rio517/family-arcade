@@ -7,7 +7,26 @@
  */
 import * as THREE from 'three';
 import type { PropKind } from '../domain/catalog';
-import { type Builder, type Face, type V3, FLUSH, Kit, ON_GROUND, PAL, darker, lighter, placement, translate, walls } from './kit';
+import {
+  type Builder,
+  type Face,
+  type V3,
+  CONCRETE_GREY,
+  FLUSH,
+  HALF_PI,
+  Kit,
+  ON_GROUND,
+  PAL,
+  SITE_ORANGE,
+  SITE_YELLOW,
+  barrier,
+  carBody,
+  darker,
+  lighter,
+  placement,
+  translate,
+  walls,
+} from './kit';
 
 export type ParkKind = Extract<
   PropKind,
@@ -30,9 +49,8 @@ export type ParkKind = Extract<
   | 'hoop'
   | 'crane'
   | 'ship'
+  | 'office'
 >;
-
-const HALF_PI = Math.PI / 2;
 
 const RED = 0xe63946;
 const YELLOW = 0xffc233;
@@ -267,36 +285,16 @@ function dog(k: Kit, v: number): void {
  */
 function policecar(k: Kit): void {
   const body = NAVY;
-  // Tyres stand a little proud of the body: a tyre face flush with a body side flickers.
-  for (const x of [-0.88, 0.88]) for (const z of [-1.3, 1.3]) k.wheel(0.38, 0.3, [x, 0.38, z], 10);
-  k.box(PAL.chassis, 1.7, 0.32, 3.5, 0, 0.18, 0);
-  k.cbox(body, 1.9, 0.62, 4.1, 0.14, 0, 0.3, 0);
-  k.hull(PAL.carGlass, [
-    [-0.84, 0.9, -1.2],
-    [0.84, 0.9, -1.2],
-    [-0.84, 0.9, 0.95],
-    [0.84, 0.9, 0.95],
-    [-0.72, 1.48, -0.88],
-    [0.72, 1.48, -0.88],
-    [-0.72, 1.48, 0.45],
-    [0.72, 1.48, 0.45],
-  ]);
-  k.cbox(PAL.white, 1.52, 0.12, 1.44, 0.05, 0, 1.46, -0.22);
+  // The town's `car` (props.ts) shares this same body; here the roof and
+  // pillars come out white for the black-and-white livery.
+  carBody(k, body, PAL.white);
   for (const sx of [-1, 1]) {
-    k.beam(PAL.white, [sx * 0.8, 0.9, 0.92], [sx * 0.71, 1.49, 0.44], 0.1);
-    k.beam(PAL.white, [sx * 0.8, 0.9, -1.18], [sx * 0.71, 1.49, -0.86], 0.12);
-    k.beam(PAL.white, [sx * 0.83, 0.9, -0.14], [sx * 0.72, 1.49, -0.2], 0.1);
-    k.box(PAL.head, 0.36, 0.16, 0.06, sx * 0.58, 0.62, 2.05);
-    k.box(PAL.tail, 0.34, 0.14, 0.06, sx * 0.62, 0.66, -2.05);
-    k.box(body, 0.14, 0.1, 0.12, sx * 0.94, 0.98, 0.78);
     // White doors on the flat of the side, between the wheel arches, with the stripe across them.
     const away = sx > 0 ? 'nx' : 'px';
     k.box(PAL.white, 0.04, 0.34, 1.84, sx * 0.96, 0.44, -0.05, undefined, [away]);
     k.box(BLUE, 0.04, 0.1, 1.84, sx * 0.975, 0.56, -0.05, undefined, [away]);
     k.box(PAL.brass, 0.03, 0.14, 0.14, sx * 0.99, 0.64, 0.45, undefined, [away]);
   }
-  k.box(darker(body, 0.35), 0.62, 0.14, 0.05, 0, 0.47, 2.05);
-  for (const sz of [-1, 1]) k.box(PAL.metal, 1.92, 0.16, 0.14, 0, 0.3, sz * 2.03);
   // A white stripe down the bonnet so it still reads as a police car from above.
   k.box(PAL.white, 0.5, 0.02, 0.9, 0, 0.92, 1.4, undefined, ON_GROUND);
   // Light bar: red on one side, blue on the other, on a dark base.
@@ -485,27 +483,8 @@ function icecreamvan(k: Kit, v: number): void {
 // ---------------------------------------------------------------------------
 // Town extras: a tower going up, picnic tables, a basketball hoop, and the port
 
-/** Same site colours as `site` and `bigsite` in props.ts, so the three read as one family. */
-const SITE_YELLOW = 0xffc21a;
-const SITE_ORANGE = 0xff7a1a;
-const CONCRETE_GREY = 0xc9cdd3;
+/** This tower's own glass, bluer than the small buildings' so a site under wraps still stands out. */
 const SITE_GLASS = 0x6fd8ff;
-
-/** Orange and white hoarding panels round a W x D lot, with a gate gap at the front, as the other sites have. */
-function hoarding(k: Kit, W: number, D: number, panel: number, h: number, gate: number): void {
-  let i = 0;
-  for (const wall of walls(W, D)) {
-    k.within(wall.m, () => {
-      const n = Math.round(wall.len / panel);
-      const pw = wall.len / n;
-      for (let j = 0; j < n; j++) {
-        const u = -wall.len / 2 + (j + 0.5) * pw;
-        if (wall.side === 'front' && Math.abs(u) < gate / 2) continue;
-        k.box(i++ % 2 ? PAL.white : SITE_ORANGE, pw - 0.08, h, 0.16, u, 0, -0.1, undefined, ON_GROUND);
-      }
-    });
-  }
-}
 
 const TALLSITES = [
   { crane: SITE_YELLOW, net: 0x8fdc4a },
@@ -523,7 +502,7 @@ function tallsite(k: Kit, v: number): void {
   const c = TALLSITES[v];
   const dirt = 0xd9a066;
   k.rbox(dirt, 11.8, 0.2, 11.8, 1.0, 0.08, 0, 0, 0, { seg: 1 });
-  hoarding(k, 11.8, 11.8, 1.6, 1.2, 3.0);
+  barrier(k, 11.8, 11.8, 1.6, 1.2, 3.0);
   // The frame: floors of bare slabs on columns round a concrete core.
   const S = 7.6;
   const bx = -0.6;
@@ -789,6 +768,93 @@ function ship(k: Kit, v: number): void {
   // A mast on the bow.
   k.box(0xe8e3da, 0.25, 3.2, 0.25, 0, deck, 18.2, undefined, ON_GROUND);
   k.box(0xe8e3da, 1.8, 0.2, 0.2, 0, deck + 2.6, 18.2);
+}
+
+// ---------------------------------------------------------------------------
+// Office block
+
+/** Warm off-white for plinths and roof rims, as the town's other buildings use. */
+const OFFICE_CREAM = 0xfff6e6;
+const OFFICE_DOOR_GLASS = 0x62b6ee;
+
+const OFFICES = [
+  { wall: 0xf4f1ea, glass: 0x3cc7c0, stripe: 0xff8a1f },
+  { wall: 0x3e4c7a, glass: 0x4aa8ff, stripe: PAL.white },
+  { wall: 0xf4f1ea, glass: 0x5cc98a, stripe: 0xffc933 },
+] as const;
+
+/**
+ * A wide, friendly mid-rise office block: soft rounded walls wrapped in long
+ * ribbons of glass, a coloured stripe under each floor, a glassy lobby tucked
+ * under the first floor with a canopy over the entrance (+z), and a flat roof
+ * with air-conditioning boxes, a water tank and a small garden. Taller ones
+ * gain floors; the lobby and roof stay the same.
+ */
+function office(k: Kit, v: number, s: number): void {
+  const c = OFFICES[v];
+  const H = 16 * s;
+  const W = 16.0;
+  const D = 13.0;
+  const r = 1.4;
+  const G = 4.2;
+  const rimH = 0.6;
+  const roofY = H - rimH - 1.2;
+  const floors = Math.max(2, Math.round((roofY - G) / 3.4));
+  const fh = (roofY - G) / floors;
+  k.rbox(OFFICE_CREAM, W + 0.4, 0.3, D + 0.4, r + 0.2, 0.1, 0, 0, 0, { seg: 2 });
+  // Lobby: a glass box set back under the first floor, with two bright pillars at the door.
+  k.rbox(OFFICE_DOOR_GLASS, W - 1.6, G - 0.3, D - 1.6, r - 0.5, 0, 0, 0.3, 0, { seg: 2 });
+  for (const sx of [-1, 1]) k.cyl(c.stripe, 0.3, 0.3, G - 0.3, 8, sx * 2.6, 0.3, D / 2 - 0.4);
+  k.within(translate(0, 0, D / 2 - 0.8), () => {
+    k.plate(PAL.white, 3.4, 2.8, 0.4, 0.12, 0, 0.3, 0, 1);
+    k.plate(0x2f7fb8, 2.8, 2.5, 0.3, 0.18, 0, 0.3, 0, 1);
+  });
+  // Trimmed to stay inside the (now correct) 16x13 footprint: a fixed-size
+  // canopy that used to clear a too-narrow building now has less room to
+  // spare at the true width.
+  k.rbox(c.stripe, 6.4, 0.35, 1.0, 0.5, 0.12, 0, G - 0.35, D / 2 + 0.1, { seg: 1 });
+  // The floors: the wall block, and per floor a coloured stripe and a glass ribbon wrapping every side.
+  k.rbox(c.wall, W, roofY - G + 0.05, D, r, 0, 0, G, 0, { seg: 2 });
+  const winH = Math.min(2.3, fh * 0.62);
+  for (let f = 0; f < floors; f++) {
+    const y = G + f * fh;
+    k.rbox(c.stripe, W + 0.12, 0.45, D + 0.12, r + 0.06, 0, 0, y + 0.1, 0, { seg: 2 });
+    k.rbox(c.glass, W + 0.08, winH, D + 0.08, r + 0.04, 0, 0, y + 0.1 + 0.45 + (fh - 0.45 - winH) / 2, 0, { seg: 2 });
+  }
+  // Cream fins up the faces break the glass ribbons into panes, so they read as windows.
+  for (const wall of walls(W, D)) {
+    k.within(wall.m, () => {
+      const us = wall.len > 13 ? [-4.8, -1.6, 1.6, 4.8] : [-2.6, 0, 2.6];
+      for (const u of us) k.box(OFFICE_CREAM, 0.22, roofY - G, 0.3, u, G, 0.05, undefined, ['nz', 'py', 'ny']);
+    });
+  }
+  // Roof: a thick soft rim, a pale deck, and the rooftop plant.
+  k.rbox(OFFICE_CREAM, W + 0.4, rimH, D + 0.4, r + 0.2, 0.2, 0, roofY, 0, { seg: 2 });
+  const top = roofY + rimH;
+  k.rbox(0xd7dce2, W - 0.8, 0.05, D - 0.8, r - 0.2, 0, 0, top, 0, { seg: 1 });
+  for (const [x, z] of [
+    [-4.6, -3.2],
+    [-2.4, -3.2],
+    [-4.6, -1.2],
+  ] as const) {
+    k.cbox(0xb8c0cc, 1.7, 0.9, 1.3, 0.12, x, top + 0.05, z);
+    k.cyl(0x5d6470, 0.42, 0.42, 0.06, 8, x, top + 0.95, z);
+  }
+  k.cyl(c.stripe, 1.0, 1.0, 0.95, 10, 4.4, top + 0.05, -2.8);
+  k.cyl(lighter(c.stripe, 0.3), 0.1, 1.05, 0.2, 10, 4.4, top + 1.0, -2.8);
+  // Solar panels, tilted to the sun.
+  for (const x of [3.9, 5.4]) {
+    for (const z of [0.6, 2.4]) k.box(0x2f4f9e, 1.3, 0.08, 1.4, x, top + 0.35, z, { rx: -0.3 });
+  }
+  k.rbox(0x8a5a3b, 4.2, 0.35, 2.4, 0.5, 0.1, 1.0, top + 0.05, 2.8, { seg: 1 });
+  k.rbox(0x5cbf5a, 3.9, 0.06, 2.1, 0.4, 0, 1.0, top + 0.4, 2.8, { seg: 1 });
+  for (const [x, rr] of [
+    [-0.2, 0.55],
+    [1.0, 0.65],
+    [2.2, 0.5],
+  ] as const) {
+    k.ico(x === 1.0 ? PAL.leafLight : PAL.leaf, rr, 0, [x, top + 0.46 + rr * 0.6, 2.8], [1, 0.85, 1], x);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1122,4 +1188,5 @@ export const PARK: Record<ParkKind, Builder> = {
   hoop,
   crane,
   ship,
+  office,
 };

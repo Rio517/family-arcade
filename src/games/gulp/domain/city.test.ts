@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { seededRng } from '@shared/rng';
-import { KINDS, type Prop, type PropKind } from './catalog';
+import { inRect } from './space';
+import { FIT, KINDS, type Prop, type PropKind } from './catalog';
 import { BLOCK, MAPS, MOUNTAIN_FOOT, PARK_PATH, PARK_PLAZA, ROAD, SIDEWALK, createCity, type City, type MapId, type Rect } from './city';
 
 const ALL: MapId[] = ['town', 'city', 'mega', 'region'];
@@ -180,7 +181,7 @@ describe('createCity', () => {
 
   it('has a chemical plant in the city and up, and an airport and mountains in the region', () => {
     const kinds = (map: MapId) => new Set(createCity(seededRng(6), map).props.map((p) => p.kind));
-    expect(kinds('mega').has('chemplant') || kinds('mega').has('factory')).toBe(true);
+    expect(kinds('mega').has('gastank') || kinds('mega').has('factory')).toBe(true);
     const region = kinds('region');
     for (const k of ['terminal', 'jet', 'mountain', 'windturbine', 'barn', 'skyscraper'] as const) expect(region.has(k)).toBe(true);
   });
@@ -189,7 +190,7 @@ describe('createCity', () => {
     for (const map of ALL) {
       const city = createCity(seededRng(3), map);
       for (const p of city.props) {
-        const onIslet = city.extraLand.some((l) => l.kind === 'islet' && p.x >= l.x0 && p.x <= l.x1 && p.z >= l.z0 && p.z <= l.z1);
+        const onIslet = city.extraLand.some((l) => l.kind === 'islet' && inRect(l, p.x, p.z));
         // Ships are moored in the sea (see the port test).
         if (onIslet || p.kind === 'ship') continue;
         expect(Math.abs(p.x)).toBeLessThan(city.land);
@@ -211,10 +212,11 @@ describe('createCity', () => {
   });
 
   it('holds more wonders on bigger maps, and the Statue of Liberty on its islet every time', () => {
-    const wonders = (map: MapId) => createCity(seededRng(2), map).props.filter((p) => KINDS[p.kind].wonder);
-    expect(wonders('town').length).toBe(5);
-    expect(wonders('city').length).toBe(8);
-    expect(wonders('mega').length).toBe(12);
+    // One entry per wonder: the Easter Island heads are four props but one wonder.
+    const wonders = (map: MapId) => new Set(createCity(seededRng(2), map).props.filter((p) => KINDS[p.kind].wonder).map((p) => p.kind));
+    expect(wonders('town').size).toBe(5);
+    expect(wonders('city').size).toBe(9);
+    expect(wonders('mega').size).toBe(13);
     for (const map of ALL) {
       const city = createCity(seededRng(4), map);
       const liberty = city.props.find((p) => p.kind === 'liberty');
@@ -280,7 +282,7 @@ describe('placement', () => {
     for (const { map, seed, city } of cities) {
       for (const p of city.props) {
         if (Math.abs(p.x) < city.half && Math.abs(p.z) < city.half) continue;
-        if (city.extraLand.some((l) => l.kind === 'islet' && p.x >= l.x0 && p.x <= l.x1 && p.z >= l.z0 && p.z <= l.z1)) continue;
+        if (city.extraLand.some((l) => l.kind === 'islet' && inRect(l, p.x, p.z))) continue;
         if (p.kind === 'ship') continue;
         for (const sh of outline(p)) {
           const b = bounds(sh);
@@ -328,12 +330,12 @@ describe('placement', () => {
             [r, u - f.area.x0 + f.area.z0],
           ]) {
             const onField = x > f.area.x0 && x < f.area.x1 && z > f.area.z0 && z < f.area.z1;
-            if (onField) expect(city.lots.some((l) => x >= l.x0 && x <= l.x1 && z >= l.z0 && z <= l.z1), `${x},${z}`).toBe(true);
+            if (onField) expect(city.lots.some((l) => inRect(l, x, z)), `${x},${z}`).toBe(true);
           }
         }
       }
       // The runway, taxiways and apron lie on the field; the runway is clear.
-      for (const r of [f.runway, f.apron, ...f.taxiways, ...f.lines]) expect(within(r, f.area)).toBe(true);
+      for (const r of [f.runway, f.apron, f.track, ...f.taxiways, ...f.lines]) expect(within(r, f.area)).toBe(true);
       for (const p of city.props) {
         for (const sh of outline(p)) {
           const b = bounds(sh);
@@ -343,7 +345,16 @@ describe('placement', () => {
         }
       }
       const kinds = city.props.filter((p) => p.x > f.area.x0 && p.x < f.area.x1 && p.z > f.area.z0 && p.z < f.area.z1).map((p) => p.kind);
-      expect(kinds.sort()).toEqual(['hangar', 'hangar', 'jet', 'jet', 'radar', 'terminal']);
+      expect(kinds.sort()).toEqual(['hangar', 'hangar', 'jet', 'jet', 'radar', 'terminal', 'terminal', 'train', 'train']);
+      // The two terminals face each other across the apron.
+      const [a, b] = city.props.filter((p) => p.kind === 'terminal');
+      const toB = Math.atan2(b.x - a.x, b.z - a.z);
+      expect(Math.abs(Math.cos(a.rot - toB) - 1)).toBeLessThan(1e-6);
+      expect(Math.abs(Math.cos(b.rot - toB) + 1)).toBeLessThan(1e-6);
+      // The trains run on the track, end to end on it, lengthwise.
+      for (const t of city.props.filter((p) => p.kind === 'train')) {
+        expect(within(bounds(outline(t)[0]), f.track), where(t)).toBe(true);
+      }
     }
   });
 
@@ -415,13 +426,81 @@ describe('placement', () => {
     }
   });
 
+  it('keeps the countryside worth wandering: food in view, and a real meal within two screens, everywhere', () => {
+    // A hole at level 7 (r ≈ 6) swallows things up to 6 × FIT across; a meal
+    // is a van, a little house or bigger. The view is roughly what the play
+    // camera frames round such a hole.
+    const r = 6 * FIT;
+    for (const map of ['city', 'mega', 'region'] as MapId[]) {
+      const counts: number[] = [];
+      for (const seed of [1, 2, 3]) {
+        const city = createCity(seededRng(seed), map);
+        const food = city.props.filter((p) => p.size <= r);
+        const L = city.land - 30;
+        for (let x = -L; x <= L; x += 20) {
+          for (let z = -L; z <= L; z += 20) {
+            if (Math.max(Math.abs(x), Math.abs(z)) < city.half + 15) continue;
+            const q = city.port?.quay;
+            if (q && x > q.x0 - 10 && x < q.x1 + 10 && z > q.z0 - 10 && z < q.z1 + 10) continue;
+            counts.push(food.filter((p) => Math.abs(p.x - x) < 45 && p.z - z > -48 && p.z - z < 20).length);
+            const meal = food.some((p) => p.size >= 2.5 && Math.hypot(p.x - x, p.z - z) < 70);
+            expect(meal, `${map}#${seed} at ${x},${z}`).toBe(true);
+          }
+        }
+      }
+      counts.sort((a, b) => a - b);
+      expect(counts[Math.floor(counts.length / 2)], map).toBeGreaterThanOrEqual(30);
+      expect(counts[Math.floor(counts.length / 10)], map).toBeGreaterThanOrEqual(12);
+    }
+  });
+
+  it('stands the Easter Island heads four to a green block, facing the street, mixed topknots', () => {
+    for (const { map, seed, city } of cities) {
+      const heads = city.props.filter((p) => p.kind === 'moai');
+      const block = city.blockList.find((b) => b.wonder === 'moai');
+      if (!block) {
+        expect(heads).toEqual([]);
+        continue;
+      }
+      expect(heads.length, `${map}#${seed}`).toBe(4);
+      for (const h of heads) {
+        expect(h.x > block.x && h.x < block.x + BLOCK && h.z > block.z && h.z < block.z + BLOCK).toBe(true);
+        expect(Math.abs(h.rot)).toBeLessThan(0.3);
+      }
+      expect(new Set(heads.map((h) => h.variant)).size).toBe(2);
+    }
+  });
+
+  it('stands a wonder too wide for a block across two, over the built-over street', () => {
+    for (const { map, seed, city } of cities) {
+      for (const p of city.props.filter((q) => KINDS[q.kind].wonder && Math.max(KINDS[q.kind].w, KINDS[q.kind].d) > BLOCK - 2 * SIDEWALK)) {
+        const b = bounds(outline(p)[0]);
+        const street = city.lots.find((l) => within(cut(b, l) ?? { x0: 0, z0: 0, x1: 0, z1: 0 }, l) && cut(b, l));
+        expect(street, `${map}#${seed}: ${where(p)}`).toBeTruthy();
+        expect(city.blockList.filter((k) => k.wonder === p.kind).length).toBe(2);
+      }
+    }
+  });
+
+  it('builds gas works of separate pieces instead of a chemical plant', () => {
+    let works = 0;
+    for (const { city } of cities) {
+      works += city.props.filter((p) => p.kind === 'flarestack').length;
+      const tanks = city.props.filter((p) => p.kind === 'gastank').length;
+      const flares = city.props.filter((p) => p.kind === 'flarestack').length;
+      expect(tanks).toBeGreaterThanOrEqual(flares * 2);
+      expect(city.props.filter((p) => p.kind === 'plantshed').length).toBe(flares);
+    }
+    expect(works).toBeGreaterThan(0);
+  });
+
   it('still fits the rest of the Region round the airport', () => {
     for (let seed = 1; seed <= 8; seed++) {
-      const city = createCity(seededRng(seed), 'region', ['pyramid', 'colosseum', 'moai', 'liberty']);
+      const city = createCity(seededRng(seed), 'region', ['pyramid', 'buddha', 'moai', 'liberty']);
       const kinds = new Set(city.blockList.map((b) => b.kind));
       for (const k of ['military', 'helipad', 'arena', 'parking', 'industrial', 'park'] as const) expect(kinds.has(k), `seed ${seed} ${k}`).toBe(true);
       const props = new Set(city.props.map((p) => p.kind));
-      for (const k of ['pyramid', 'colosseum', 'moai', 'liberty'] as const) expect(props.has(k), `seed ${seed} ${k}`).toBe(true);
+      for (const k of ['pyramid', 'buddha', 'moai', 'liberty'] as const) expect(props.has(k), `seed ${seed} ${k}`).toBe(true);
     }
   });
 });

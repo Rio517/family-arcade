@@ -3,10 +3,11 @@
  * scoreboard snapshot copied out of the live world, and how the 3D scene is
  * loaded. Kept apart from the components so each file holds only components.
  */
-import { KINDS, LEVELS } from '../domain/catalog';
+import { KINDS } from '../domain/catalog';
 import { MAPS, type MapId, type Side } from '../domain/city';
 import type { Difficulty } from '../domain/rivals';
-import { POWER_TIME, comboOf, levelOf, levelProgress, nextLabel, standings, type World } from '../domain/world';
+import { EAT_HOLE, POWER_TIME, comboOf, levelOf, levelProgress, nextLabel, standings, type World } from '../domain/world';
+import type { Settings } from '../storage/settings';
 import type { GulpScene } from '../three/scene';
 import { SKINS } from './skins';
 
@@ -17,19 +18,12 @@ export type SceneLoader = () => Promise<{ GulpScene: typeof GulpScene }>;
 // not front-load the 3D library.
 export const loadScene: SceneLoader = () => import('../three/scene');
 
-export interface Settings {
-  map: MapId;
-  /** Round length: the map's own, twice that, or 0 for endless. */
-  length: 'short' | 'long' | 'endless';
-  powerups: boolean;
-  fightBack: boolean;
-  /** Things grow back and eaten buildings are rebuilt, bigger as the round goes on. */
-  regrow: boolean;
-  /** How hard the computer holes play; settings saved before there was a choice play Easy. */
-  difficulty?: Difficulty;
-  skin: number;
-  muted: boolean;
-}
+export type { Settings };
+
+/** The maps from smallest to biggest, as the menu and the Scores dialog list them. */
+export const MAP_ORDER: MapId[] = ['town', 'city', 'mega', 'region'];
+
+export const DIFFICULTY_TITLE: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 
 /** Seconds a round lasts with these settings (0: until someone ends it). */
 export function durationOf(s: Settings): number {
@@ -74,6 +68,16 @@ export interface Hud {
   eatenBy: string | null;
   respawnIn: number;
   elapsed: number;
+  /** Arrows at the edge of the screen toward danger on its way: attacks coming for the child, and bigger holes close by. */
+  pointers: Pointer[];
+}
+
+export interface Pointer {
+  key: string;
+  /** Screen direction from the middle: 0 is up, clockwise, in radians. */
+  angle: number;
+  kind: 'tanker' | 'tank' | 'heli' | 'hole';
+  label: string;
 }
 
 export interface Banner {
@@ -83,6 +87,18 @@ export interface Banner {
   sub?: string;
 }
 
+
+/** How many wonders a round's map has: counted once, the HUD asks ten times a second. */
+const wonderCounts = new WeakMap<World, number>();
+function wondersIn(w: World): number {
+  let n = wonderCounts.get(w);
+  if (n === undefined) {
+    // Kinds, not props: the four Easter Island Heads are one wonder.
+    n = new Set(w.city.props.filter((p) => KINDS[p.kind].wonder).map((p) => p.kind)).size;
+    wonderCounts.set(w, n);
+  }
+  return n;
+}
 
 export function hudOf(w: World, me: number): Hud {
   const order = standings(w);
@@ -114,20 +130,45 @@ export function hudOf(w: World, me: number): Hud {
     doubleLeft: h.doubleTime / POWER_TIME.double,
     nearEdge: h.alive && nearOpenEdge(w, h.x, h.z),
     wonders: h.wonders,
-    wondersTotal: w.city.props.filter((p) => KINDS[p.kind].wonder).length,
+    wondersTotal: wondersIn(w),
     combo: comboOf(h.streak),
     streak: h.streak,
     alive: h.alive,
     eatenBy: h.eatenBy,
     respawnIn: Math.max(1, Math.ceil(h.respawnIn)),
     elapsed: w.elapsed,
+    pointers: h.alive ? pointersFor(w, h) : [],
   };
 }
 
-/** What a level newly lets you eat, for the level-up banner. */
-export function unlockedAt(level: number): string {
-  return level < LEVELS.length ? LEVELS[level].label : 'Anything!';
+const ATTACK_LABEL: Record<Pointer['kind'], string> = { tanker: 'Fuel truck', tank: 'Tank', heli: 'Helicopter', hole: '' };
+
+/**
+ * Where danger is coming from, as arrows at the screen's edge: a fuel truck,
+ * tank or helicopter on its way to the child (the bomber shows its own red
+ * circles), and on Medium and Hard any hole big enough to swallow the child
+ * that is close. Screen up is the city's north (-z), screen right its east.
+ */
+function pointersFor(w: World, h: World['holes'][number]): Pointer[] {
+  const out: Pointer[] = [];
+  const angleTo = (x: number, z: number) => Math.atan2(x - h.x, -(z - h.z));
+  for (const a of w.attacks) {
+    if (a.kind === 'bomber' || a.target !== h.id) continue;
+    // Only while it is still on its way: once it is close, it can be seen.
+    if (Math.hypot(a.x - h.x, a.z - h.z) < h.r + 18) continue;
+    out.push({ key: `a${a.id}`, angle: angleTo(a.x, a.z), kind: a.kind, label: ATTACK_LABEL[a.kind] });
+  }
+  if (w.options.difficulty !== 'easy' && h.safe <= 0) {
+    for (const o of w.holes) {
+      if (o === h || !o.alive || o.r < h.r * EAT_HOLE) continue;
+      const d = Math.hypot(o.x - h.x, o.z - h.z);
+      if (d > 25 + o.r * 2.5 || d < o.r) continue;
+      out.push({ key: `h${o.id}`, angle: angleTo(o.x, o.z), kind: 'hole', label: `${o.name} is bigger!` });
+    }
+  }
+  return out;
 }
+
 
 /**
  * Near the edge of play on a side with no sea. Where the sea is the edge the
@@ -144,3 +185,4 @@ function nearOpenEdge(w: World, x: number, z: number): boolean {
   if (z < -edge) near.push('n');
   return near.some((side) => !w.city.shores.includes(side));
 }
+

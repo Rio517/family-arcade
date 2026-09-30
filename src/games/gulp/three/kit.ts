@@ -34,6 +34,14 @@ export function mix(a: number, b: number, t: number): number {
 export const darker = (c: number, t = 0.25): number => mix(c, 0x000000, t);
 export const lighter = (c: number, t = 0.25): number => mix(c, 0xffffff, t);
 
+/** A quarter turn, used everywhere a part stands a part on its side or faces along the other axis. */
+export const HALF_PI = Math.PI / 2;
+
+/** The construction-site palette: barrier panels, cranes and their pads, shared by every site kind. */
+export const SITE_YELLOW = 0xffc21a;
+export const SITE_ORANGE = 0xff7a1a;
+export const CONCRETE_GREY = 0xc9cdd3;
+
 /** Shared palette, so every kind agrees on what glass, tyres and trim look like. */
 export const PAL = {
   ink: 0x2d3142,
@@ -502,6 +510,17 @@ interface Bounds {
 const apart = (a: Bounds, b: Bounds) => a.x0 > b.x1 - 0.01 || b.x0 > a.x1 - 0.01 || a.y0 > b.y1 - 0.01 || b.y0 > a.y1 - 0.01;
 
 /**
+ * Test hook: how many facet pairs `flushClashes` has compared with `overlaps`
+ * since the last reset. This is the work the flush pass actually pays for (an
+ * earlier version compared every pair in a plane instead of grouping first,
+ * which doubled build time) — a stable stand-in for timing it directly.
+ */
+export let flushCompareCount = 0;
+export function resetFlushCompareCount(): void {
+  flushCompareCount = 0;
+}
+
+/**
  * Pairs of differently coloured faces that face the same way, lie in the
  * same plane (or all but) and overlap: the depth buffer cannot tell which is
  * in front, so they flicker. Each pair is (earlier facet, later facet).
@@ -543,6 +562,7 @@ export function flushClashes(parts: readonly THREE.BufferGeometry[]): Array<[Fac
         for (const p of g.facets) {
           for (const q of h.facets) {
             if (p.rgb === q.rgb || Math.abs(q.d - p.d) >= FLUSH_GAP || apart(p, q)) continue;
+            flushCompareCount++;
             if (overlaps(p.flat, q.flat)) clashes.push([p, q]);
           }
         }
@@ -736,4 +756,62 @@ export function doorAt(k: Kit, frame: number, door: number, u: number, y: number
 export function parapet(k: Kit, color: number, W: number, D: number, y: number, h: number, t: number): void {
   for (const sz of [-1, 1]) k.box(color, W, h, t, 0, y, sz * (D / 2 - t / 2), undefined, ON_GROUND);
   for (const sx of [-1, 1]) k.box(color, t, h, D - 2 * t, sx * (W / 2 - t / 2), y, 0, undefined, ON_GROUND);
+}
+
+// ---------------------------------------------------------------------------
+// Shared across kinds in different files
+
+/**
+ * Orange and white barrier panels round a W x D lot, leaving a gate gap at
+ * the front. Every construction site (a small site, the big site, and the
+ * tower going up) rings its lot with this same fence.
+ */
+export function barrier(k: Kit, W: number, D: number, panel: number, h: number, gate: number): void {
+  let i = 0;
+  for (const wall of walls(W, D)) {
+    k.within(wall.m, () => {
+      const n = Math.round(wall.len / panel);
+      const pw = wall.len / n;
+      for (let j = 0; j < n; j++) {
+        const u = -wall.len / 2 + (j + 0.5) * pw;
+        if (wall.side === 'front' && Math.abs(u) < gate / 2) continue;
+        k.box(i++ % 2 ? PAL.white : SITE_ORANGE, pw - 0.08, h, 0.16, u, 0, -0.1, undefined, ON_GROUND);
+      }
+    });
+  }
+}
+
+/**
+ * The car body every wheeled car in town shares: wheels, chassis, the main
+ * shell, a glass cabin, head and tail lights, and the bumpers, facing +z.
+ * `roof` colours the cabin's roof plate and its three pillars: body colour
+ * for an ordinary car, white for the police car's black-and-white livery.
+ */
+export function carBody(k: Kit, body: number, roof: number): void {
+  // Tyres stand a little proud of the body: a tyre face flush with a body side flickers.
+  for (const x of [-0.88, 0.88]) for (const z of [-1.3, 1.3]) k.wheel(0.38, 0.3, [x, 0.38, z], 10);
+  k.box(PAL.chassis, 1.7, 0.32, 3.5, 0, 0.18, 0);
+  k.cbox(body, 1.9, 0.62, 4.1, 0.14, 0, 0.3, 0);
+  // Cabin: a glass hull, a roof and pillars so it reads as windows.
+  k.hull(PAL.carGlass, [
+    [-0.84, 0.9, -1.2],
+    [0.84, 0.9, -1.2],
+    [-0.84, 0.9, 0.95],
+    [0.84, 0.9, 0.95],
+    [-0.72, 1.48, -0.88],
+    [0.72, 1.48, -0.88],
+    [-0.72, 1.48, 0.45],
+    [0.72, 1.48, 0.45],
+  ]);
+  k.cbox(roof, 1.52, 0.12, 1.44, 0.05, 0, 1.46, -0.22);
+  for (const sx of [-1, 1]) {
+    k.beam(roof, [sx * 0.8, 0.9, 0.92], [sx * 0.71, 1.49, 0.44], 0.1);
+    k.beam(roof, [sx * 0.8, 0.9, -1.18], [sx * 0.71, 1.49, -0.86], 0.12);
+    k.beam(roof, [sx * 0.83, 0.9, -0.14], [sx * 0.72, 1.49, -0.2], 0.1);
+    k.box(PAL.head, 0.36, 0.16, 0.06, sx * 0.58, 0.62, 2.05);
+    k.box(PAL.tail, 0.34, 0.14, 0.06, sx * 0.62, 0.66, -2.05);
+    k.box(body, 0.14, 0.1, 0.12, sx * 0.94, 0.98, 0.78);
+  }
+  k.box(darker(body, 0.35), 0.62, 0.14, 0.05, 0, 0.47, 2.05);
+  for (const sz of [-1, 1]) k.box(PAL.metal, 1.92, 0.16, 0.14, 0, 0.3, sz * 2.03);
 }

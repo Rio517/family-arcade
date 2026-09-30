@@ -366,7 +366,7 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  width: 220px;
+  width: 250px;
 }
 .gulp-board li,
 .gulp-results-list li {
@@ -514,6 +514,37 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-combo.c4 b { color: #6fe0ff; }
 .gulp-combo.c5 b { color: #ff7a5c; }
 
+/* Danger on its way: an arrow at the screen's edge pointing at it, with a
+   label. Orange for an attack coming, red for a hole big enough to eat you. */
+.gulp-pointer {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+.gulp-pointer-arrow {
+  width: 0;
+  height: 0;
+  border-left: 16px solid transparent;
+  border-right: 16px solid transparent;
+  border-bottom: 26px solid #ff8a1f;
+  filter: drop-shadow(0 3px 0 rgba(29, 31, 51, 0.35));
+}
+.gulp-pointer.danger .gulp-pointer-arrow { border-bottom-color: #e8322b; }
+.gulp-pointer-label {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(29, 31, 51, 0.82);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.gulp-pointer.danger .gulp-pointer-label { background: #e8322b; }
+
 /* Near the edge of the world: a red warning under the clock. */
 .gulp-edge {
   position: absolute;
@@ -608,7 +639,8 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 
 .gulp-countdown {
   position: absolute;
-  top: 38%;
+  /* Above the hole and its name tag. */
+  top: 28%;
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: clamp(96px, 18vw, 180px);
@@ -623,7 +655,8 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-eaten,
 .gulp-banner {
   position: absolute;
-  top: 32%;
+  /* Above the middle, so the hole that did the eating stays in view. */
+  top: 22%;
   left: 50%;
   transform: translate(-50%, -50%);
   display: flex;
@@ -751,10 +784,191 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-results-list li { background: #eef2f8; color: var(--g-ink); text-align: left; }
 .gulp-results-list li .gulp-rank { background: #d6dcea; }
 .gulp-results-list li.me { background: #fff3c4; box-shadow: inset 0 0 0 2px var(--g-yellow); }
+.gulp-results-list li.me .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-results-list small { font-size: 14px; color: var(--g-muted); font-weight: 800; }
 .gulp-stats { margin: 4px 0; font-size: 16px; font-weight: 800; color: var(--g-muted); }
-.gulp-newbest { font-style: normal; color: #1a9c3c; }
+.gulp-newbest {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  margin: 8px 0 2px;
+}
+.gulp-newbest b {
+  font-size: 26px;
+  font-weight: 900;
+  color: #1a9c3c;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.gulp-newbest span { color: var(--g-muted); font-weight: 800; }
 .gulp-modal-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* ----- scores ----- */
+/* The trophy beside Options: as tall as PLAY, so the card does not grow. */
+.gulp-scores-btn {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 20px;
+  background: #fff4cc;
+  color: #8a5a00;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.1;
+  cursor: pointer;
+  box-shadow: 0 5px 0 #f3d27a;
+}
+.gulp-scores-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #f3d27a; }
+
+/* One family board: gold, silver and bronze on the top three, and the round
+   just played picked out in yellow. */
+.gulp-family-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.gulp-family-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 5px;
+  border-radius: 999px;
+  background: #eef2f8;
+  color: var(--g-ink);
+  font-size: 15px;
+  font-weight: 800;
+  text-align: left;
+}
+.gulp-family-list .gulp-rank { background: #d6dcea; color: var(--g-ink); }
+.gulp-family-list li.p1 .gulp-rank { background: var(--g-yellow); color: #5a3d00; }
+.gulp-family-list li.p2 .gulp-rank { background: #c9d3e3; color: #34405e; }
+.gulp-family-list li.p3 .gulp-rank { background: #f1b884; color: #6b3a0c; }
+.gulp-family-list li.me { background: #fff3c4; box-shadow: inset 0 0 0 2px var(--g-yellow); }
+.gulp-family-list small { font-size: 14px; color: var(--g-muted); font-weight: 800; }
+.gulp-family-list b { font-variant-numeric: tabular-nums; }
+
+/* The results card: this round's holes, and the family board beside or
+   below them. Only the lists scroll, so the buttons always show. */
+.gulp-modal.results { overflow: hidden; }
+.gulp-results-body { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
+.gulp-results-round,
+.gulp-results-family { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.gulp-results-round .gulp-stats { display: block; }
+.gulp-results-family { padding: 10px; border-radius: 20px; background: #fffaf0; box-shadow: inset 0 0 0 2px #ffe7a3; }
+.gulp-family-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #8a5a00;
+  font-size: 16px;
+  font-weight: 900;
+}
+.gulp-family-head small { margin-left: auto; font-size: 14px; font-weight: 800; color: var(--g-muted); }
+.gulp-family-place { margin: 0 0 2px; font-size: 16px; font-weight: 900; color: var(--g-muted); text-align: left; }
+.gulp-family-place.made { color: #1a9c3c; }
+
+@media (min-width: 760px) {
+  .gulp-modal.results { width: min(820px, 100%); }
+  .gulp-results-body { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; align-items: start; }
+  .gulp-results-round .gulp-stats { margin-bottom: 0; }
+}
+
+/* The Scores dialog, held near the top so its tabs stay put when the two
+   panels differ in height. */
+.gulp-modal-backdrop.gulp-scores-backdrop { place-items: start center; padding-top: max(48px, 8dvh); }
+.gulp-modal.scores { width: min(500px, 100%); text-align: left; gap: 12px; }
+.gulp-scores-title { display: flex; align-items: center; gap: 10px; }
+.gulp-trophy {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--g-yellow);
+  color: #5a3d00;
+  box-shadow: 0 3px 0 var(--g-yellow-deep);
+}
+.gulp-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 18px;
+  background: #eef2f8;
+}
+.gulp-tabs button {
+  min-height: 44px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--g-muted);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.gulp-tabs button.on { background: #fff; color: var(--g-blue-ink); box-shadow: 0 3px 0 rgba(20, 40, 90, 0.12); }
+.gulp-scores-panel { display: flex; flex-direction: column; gap: 8px; min-height: 250px; }
+.gulp-chips { display: flex; gap: 6px; }
+.gulp-chips button {
+  flex: 1 1 auto;
+  min-height: 40px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 12px;
+  background: #eef2f8;
+  color: var(--g-ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(20, 40, 90, 0.12);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gulp-chips button.on { background: var(--g-blue); color: #fff; box-shadow: 0 3px 0 var(--g-blue-ink); }
+.gulp-scores-panel .gulp-family-list { margin-top: 4px; }
+.gulp-scores-empty {
+  margin: 8px 0 0;
+  padding: 18px 16px;
+  border-radius: 18px;
+  background: #fffaf0;
+  box-shadow: inset 0 0 0 2px #ffe7a3;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: #8a5a00;
+  text-align: center;
+}
+.gulp-my-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.gulp-my-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: #eef2f8;
+}
+.gulp-my-what { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.gulp-my-what b { font-size: 15px; font-weight: 900; }
+.gulp-my-what small { font-size: 14px; font-weight: 700; color: var(--g-muted); }
+.gulp-my-best {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  background: var(--g-yellow);
+  color: #5a3d00;
+  font-size: 14px;
+  font-weight: 900;
+}
+.gulp-my-score { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
 
 /* An iPad on its side: the logo beside the card, so PLAY is never below the
    fold or under the arcade's own bottom bar. */
@@ -783,6 +997,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   .gulp-seg button { min-height: 42px; }
   .gulp-toggles { gap: 6px; }
   .gulp-options-btn { padding: 0 12px; font-size: 16px; }
+  .gulp-scores-btn { padding: 0 10px; border-radius: 18px; }
   .gulp-toggle { min-height: 0; padding: 6px 10px; }
   .gulp-play { min-height: 56px; font-size: 28px; }
   .gulp-foot { display: none; }
@@ -811,6 +1026,18 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   .gulp-hint { white-space: normal; text-align: center; }
   .gulp-banner { padding: 12px 22px; }
   .gulp-banner strong { font-size: 24px; }
+
+  /* The results card and Scores dialog, slimmer to fit the family board. */
+  .gulp-modal.results,
+  .gulp-modal.scores { padding: 16px; gap: 8px; }
+  .gulp-modal.results h2 { font-size: 24px; margin-bottom: 0; }
+  .gulp-results-list,
+  .gulp-family-list { gap: 4px; }
+  .gulp-results-list li,
+  .gulp-family-list li { padding: 3px 10px 3px 3px; font-size: 15px; }
+  .gulp-results-family { padding: 8px; }
+  .gulp-results-round .gulp-stats { margin: 2px 0; font-size: 15px; }
+  .gulp-my-list li { padding: 5px 12px; }
 }
 
 /* Keyboard focus shows on every control. */
@@ -821,6 +1048,11 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .gulp-pointer { animation: gulp-pulse 0.8s ease-in-out infinite alternate; }
+  @keyframes gulp-pulse {
+    from { opacity: 0.65; }
+    to { opacity: 1; }
+  }
   .gulp-loading-hole { animation: gulp-gulp 0.9s ease-in-out infinite alternate; }
   @keyframes gulp-gulp {
     from { transform: scale(0.85, 0.8); }

@@ -15,11 +15,17 @@ import {
   type Builder,
   type Face,
   type V3,
+  CONCRETE_GREY,
   FLUSH,
+  HALF_PI,
   Kit,
   ON_GROUND,
   PAL,
+  SITE_ORANGE,
+  SITE_YELLOW,
   archDoor,
+  barrier,
+  carBody,
   cells,
   darker,
   lighter,
@@ -33,8 +39,10 @@ import { LANDMARKS, type LandmarkKind } from './landmarks';
 import { MILITARY, type MilitaryKind } from './military';
 import { PARK, type ParkKind } from './park';
 import { WONDERS_BUILDERS, type WonderKind } from './wonders';
+import { WORKS } from './works';
 
-const HALF_PI = Math.PI / 2;
+/** The gas works and airport train kinds, whose builders live in works.ts. */
+type WorksKind = keyof typeof WORKS;
 
 // ---------------------------------------------------------------------------
 // Tier 0: small street things
@@ -236,26 +244,6 @@ function haybale(k: Kit): void {
 
 // ---------------------------------------------------------------------------
 // Construction sites: what stands on an eaten lot until the new building is up.
-
-const SITE_YELLOW = 0xffc21a;
-const SITE_ORANGE = 0xff7a1a;
-const CONCRETE_GREY = 0xc9cdd3;
-
-/** Orange and white barrier panels round a W x D lot, leaving a gate gap at the front. */
-function barrier(k: Kit, W: number, D: number, panel: number, h: number, gate: number): void {
-  let i = 0;
-  for (const wall of walls(W, D)) {
-    k.within(wall.m, () => {
-      const n = Math.round(wall.len / panel);
-      const pw = wall.len / n;
-      for (let j = 0; j < n; j++) {
-        const u = -wall.len / 2 + (j + 0.5) * pw;
-        if (wall.side === 'front' && Math.abs(u) < gate / 2) continue;
-        k.box(i++ % 2 ? PAL.white : SITE_ORANGE, pw - 0.08, h, 0.16, u, 0, -0.1, undefined, ON_GROUND);
-      }
-    });
-  }
-}
 
 /** A traffic cone with a white band, simpler than the street cone. */
 function siteCone(k: Kit, x: number, z: number, s = 1): void {
@@ -548,32 +536,8 @@ const CARS = [0xe63946, 0x3a86ff, 0x9ccc3c, 0xf4f5f7, 0x8e5cd9] as const;
 
 function car(k: Kit, v: number, taxi = false): void {
   const body = taxi ? 0xffc21a : CARS[v];
-  // Tyres stand a little proud of the body: a tyre face flush with a body side flickers.
-  for (const x of [-0.88, 0.88]) for (const z of [-1.3, 1.3]) k.wheel(0.38, 0.3, [x, 0.38, z], 10);
-  k.box(PAL.chassis, 1.7, 0.32, 3.5, 0, 0.18, 0);
-  k.cbox(body, 1.9, 0.62, 4.1, 0.14, 0, 0.3, 0);
-  // Cabin: a glass hull, a body-coloured roof and pillars so it reads as windows.
-  k.hull(PAL.carGlass, [
-    [-0.84, 0.9, -1.2],
-    [0.84, 0.9, -1.2],
-    [-0.84, 0.9, 0.95],
-    [0.84, 0.9, 0.95],
-    [-0.72, 1.48, -0.88],
-    [0.72, 1.48, -0.88],
-    [-0.72, 1.48, 0.45],
-    [0.72, 1.48, 0.45],
-  ]);
-  k.cbox(body, 1.52, 0.12, 1.44, 0.05, 0, 1.46, -0.22);
-  for (const sx of [-1, 1]) {
-    k.beam(body, [sx * 0.8, 0.9, 0.92], [sx * 0.71, 1.49, 0.44], 0.1);
-    k.beam(body, [sx * 0.8, 0.9, -1.18], [sx * 0.71, 1.49, -0.86], 0.12);
-    k.beam(body, [sx * 0.83, 0.9, -0.14], [sx * 0.72, 1.49, -0.2], 0.1);
-    k.box(PAL.head, 0.36, 0.16, 0.06, sx * 0.58, 0.62, 2.05);
-    k.box(PAL.tail, 0.34, 0.14, 0.06, sx * 0.62, 0.66, -2.05);
-    k.box(body, 0.14, 0.1, 0.12, sx * 0.94, 0.98, 0.78);
-  }
-  k.box(darker(body, 0.35), 0.62, 0.14, 0.05, 0, 0.47, 2.05);
-  for (const sz of [-1, 1]) k.box(PAL.metal, 1.92, 0.16, 0.14, 0, 0.3, sz * 2.03);
+  // The police car (park.ts) shares this same body, in its own livery.
+  carBody(k, body, body);
   if (taxi) {
     k.box(PAL.ink, 0.76, 0.04, 0.34, 0, 1.58, -0.22);
     k.cbox(PAL.white, 0.7, 0.22, 0.3, 0.04, 0, 1.62, -0.22);
@@ -1023,31 +987,11 @@ function house(k: Kit, v: number, s: number): void {
     }
     k.hull(c.roof, pts);
   } else {
-    // Gable facing the street, the way a child draws a house: a wall-coloured
-    // triangle under two thick slabs with rounded edges.
-    k.hull(c.wall, [
-      [-halfW, eave, cz - halfD],
-      [halfW, eave, cz - halfD],
-      [-halfW, eave, cz + halfD],
-      [halfW, eave, cz + halfD],
-      [0, ridge, cz - halfD],
-      [0, ridge, cz + halfD],
-    ]);
-    const len = D + 2 * over;
-    const dy = lift / 2;
-    for (const sx of [-1, 1]) {
-      const x0 = sx * (halfW + over);
-      const y0 = eave - (over * roofH) / halfW + dy;
-      k.beam(c.roof, [x0, y0, cz], [0, ridge + dy, cz], t, len);
-      k.rod(c.roof, t * 0.56, len, 8, [x0, y0, cz], { rx: HALF_PI });
-    }
-    k.rod(lighter(c.roof, 0.15), roll, len + 0.1, 10, [0, ridge + dy, cz], { rx: HALF_PI });
-    // A round window in each gable.
-    for (const sz of [-1, 1]) {
-      const z = cz + sz * (halfD + 0.02);
-      k.rod(PAL.white, 0.52, 0.12, 10, [0, eave + 0.85, z], { rx: HALF_PI });
-      k.rod(GLASS, 0.38, 0.18, 10, [0, eave + 0.85, z], { rx: HALF_PI });
-    }
+    // Gable facing the street, the way a child draws a house: the same
+    // shape cottage's roof uses, with this house's own window size and
+    // height (its gable is taller, so the generic window formula would
+    // shrink and lower it).
+    gableRoof(k, c.wall, c.roof, W, D, cz, H, roofH, t, roll, over, 0.52, 0.85, 0.38);
   }
   // A chubby chimney on the slope the camera sees.
   k.rbox(0xf08c6c, 0.8, H - 0.3 - eave, 0.8, 0.22, 0, 1.9, eave, cz - 1.3);
@@ -1058,8 +1002,26 @@ function house(k: Kit, v: number, s: number): void {
  * Gable roof over a W x D block, the house's way: a wall-coloured triangle
  * under two thick slabs, a fat roll on the ridge, and a round window in each
  * gable. `eave` is where the slabs start; the top of the roll is at `top`.
+ * The window's radius and its height above the eave default to a formula
+ * that fits cottage's low roof; house's taller gable passes its own numbers
+ * so its window keeps its original size and place.
  */
-function gableRoof(k: Kit, wall: number, roof: number, W: number, D: number, cz: number, top: number, roofH: number, t: number, roll: number, over: number): number {
+function gableRoof(
+  k: Kit,
+  wall: number,
+  roof: number,
+  W: number,
+  D: number,
+  cz: number,
+  top: number,
+  roofH: number,
+  t: number,
+  roll: number,
+  over: number,
+  windowR = Math.min(0.52, roofH * 0.3),
+  windowY = roofH * 0.4,
+  windowGlassR = windowR * 0.72,
+): number {
   const halfW = W / 2;
   const halfD = D / 2;
   const lift = (t * Math.hypot(halfW, roofH)) / halfW;
@@ -1082,11 +1044,10 @@ function gableRoof(k: Kit, wall: number, roof: number, W: number, D: number, cz:
     k.rod(roof, t * 0.56, len, 8, [x0, y0, cz], { rx: HALF_PI });
   }
   k.rod(lighter(roof, 0.15), roll, len + 0.1, 10, [0, ridge + dy, cz], { rx: HALF_PI });
-  const r = Math.min(0.52, roofH * 0.3);
   for (const sz of [-1, 1]) {
     const z = cz + sz * (halfD + 0.02);
-    k.rod(PAL.white, r, 0.12, 10, [0, eave + roofH * 0.4, z], { rx: HALF_PI });
-    k.rod(GLASS, r * 0.72, 0.18, 10, [0, eave + roofH * 0.4, z], { rx: HALF_PI });
+    k.rod(PAL.white, windowR, 0.12, 10, [0, eave + windowY, z], { rx: HALF_PI });
+    k.rod(GLASS, windowGlassR, 0.18, 10, [0, eave + windowY, z], { rx: HALF_PI });
   }
   return eave;
 }
@@ -1490,7 +1451,7 @@ function tower(k: Kit, v: number, s: number): void {
 
 // ---------------------------------------------------------------------------
 
-const STREET: Record<Exclude<PropKind, LandmarkKind | WonderKind | MilitaryKind | ParkKind>, Builder> = {
+const STREET: Record<Exclude<PropKind, LandmarkKind | WonderKind | MilitaryKind | ParkKind | WorksKind>, Builder> = {
   cone,
   hydrant,
   bin,
@@ -1526,7 +1487,7 @@ const STREET: Record<Exclude<PropKind, LandmarkKind | WonderKind | MilitaryKind 
   tower,
 };
 
-const BUILDERS: Record<PropKind, Builder> = { ...STREET, ...LANDMARKS, ...WONDERS_BUILDERS, ...MILITARY, ...PARK };
+const BUILDERS: Record<PropKind, Builder> = { ...STREET, ...LANDMARKS, ...WONDERS_BUILDERS, ...MILITARY, ...PARK, ...WORKS };
 
 /**
  * One merged geometry (position, normal, colour) for a kind. Origin is the

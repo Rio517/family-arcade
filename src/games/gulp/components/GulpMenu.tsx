@@ -2,18 +2,19 @@
  * The title screen, over the live city with computer holes roaming it. The
  * card asks two things, which map and how long, then PLAY. Everything else
  * (the hole's colour, how hard the rivals play and the three switches) sits
- * behind Options, with the difficulty named on the Options button.
+ * behind Options, with the difficulty named on the Options button. The
+ * trophy beside Options opens the family's scores.
  */
 import { useState } from 'react';
 import { PlayingAs } from '@shared/profile/PlayingAs';
-import { CloseIcon } from '@shared/ui/icons';
+import { CloseIcon, TrophyIcon } from '@shared/ui/icons';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { MAPS, type MapId } from '../domain/city';
 import type { Difficulty } from '../domain/rivals';
+import { ScoresDialog } from './ScoresDialog';
 import { SKINS } from './skins';
-import type { Settings } from './round';
-
-const MAP_ORDER: MapId[] = ['town', 'city', 'mega', 'region'];
+import { DIFFICULTY_TITLE, MAP_ORDER, type Settings } from './round';
+import type { ScoreRound } from '../storage/scores';
 
 const MAP_BLURB: Record<MapId, string> = {
   town: 'Houses, shops and parks',
@@ -39,13 +40,20 @@ export function GulpMenu({
   onChange,
   onPlay,
   best,
+  rounds,
+  userId,
 }: {
   settings: Settings;
   onChange: (s: Settings) => void;
   onPlay: () => void;
   best: number;
+  /** Every round kept on this device, for the Scores dialog. */
+  rounds: ScoreRound[];
+  /** Whose rounds "My rounds" lists. */
+  userId: string;
 }) {
   const [options, setOptions] = useState(false);
+  const [scores, setScores] = useState(false);
   useDismissOnEscape(options, () => setOptions(false));
   const set = (patch: Partial<Settings>) => onChange({ ...settings, ...patch });
   const minutes = MAPS[settings.map].minutes;
@@ -114,6 +122,10 @@ export function GulpMenu({
         </div>
 
         <div className="gulp-play-row">
+          <button type="button" className="gulp-scores-btn" onClick={() => setScores(true)} data-testid="gulp-scores-open">
+            <TrophyIcon size={24} />
+            <span>Scores</span>
+          </button>
           <button type="button" className="gulp-options-btn" onClick={() => setOptions(true)} data-testid="gulp-options">
             <span className="gulp-skin mini" style={{ '--hole': skin.css } as React.CSSProperties} aria-hidden="true">
               <span className="gulp-skin-eyes" />
@@ -130,11 +142,21 @@ export function GulpMenu({
         {best > 0 && (
           <p className="gulp-foot">
             Best on {MAPS[settings.map].label}
-            {settings.difficulty && settings.difficulty !== 'easy' ? ` (${settings.difficulty === 'hard' ? 'Hard' : 'Medium'})` : ''}:{' '}
+            {difficulty !== 'easy' ? ` (${DIFFICULTY_TITLE[difficulty]})` : ''}:{' '}
             <b data-testid="gulp-best">{best.toLocaleString()}</b>
           </p>
         )}
       </div>
+
+      {scores && (
+        <ScoresDialog
+          rounds={rounds}
+          userId={userId}
+          map={settings.map}
+          difficulty={difficulty}
+          onClose={() => setScores(false)}
+        />
+      )}
 
       {options && (
         /* Backdrop click is a mouse convenience; Escape and Done are the

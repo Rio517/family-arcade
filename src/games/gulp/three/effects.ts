@@ -59,11 +59,15 @@ export class Effects {
   private popups: Popup[] = [];
   private popupTex = new Map<number, THREE.Texture>();
   private orbs = new Map<number, THREE.Group>();
+  /** Reused by syncPowerups every frame instead of a fresh Set, since it is only ever read there. */
+  private livePowerupIds = new Set<number>();
   private orbGeo = new THREE.IcosahedronGeometry(1, 1);
   private ringGeo = new THREE.RingGeometry(0.82, 1, 48);
   private discGeo = new THREE.CircleGeometry(1, 48);
   private powerIcons: Record<PowerKind, THREE.Texture> = { speed: iconTexture('bolt'), double: iconTexture('x2') };
-  private attackViews = new Map<number, { group: THREE.Group; rings: Map<number, THREE.Mesh>; bombs: Map<number, THREE.Mesh> }>();
+  private attackViews = new Map<number, { group: THREE.Group; rings: Map<number, THREE.Mesh>; bombs: Map<number, THREE.Mesh>; liveShellIds: Set<number> }>();
+  /** Reused by syncAttacks every frame instead of a fresh Set, since it is only ever read there. */
+  private liveAttackIds = new Set<number>();
   private tankerGeo: THREE.BufferGeometry;
   private bomberGeo: THREE.BufferGeometry;
   private tankGeo: THREE.BufferGeometry;
@@ -312,7 +316,8 @@ export class Effects {
 
   /** Power-up orbs float and spin, sized so the child's hole can see them. */
   syncPowerups(list: PowerUp[], scale: number): void {
-    const live = new Set<number>();
+    const live = this.livePowerupIds;
+    live.clear();
     for (const p of list) {
       live.add(p.id);
       let orb = this.orbs.get(p.id);
@@ -367,14 +372,15 @@ export class Effects {
    * the child's hole: the plane flies below the camera, which rises with it.
    */
   syncAttacks(list: Attack[], r: number): void {
-    const live = new Set<number>();
+    const live = this.liveAttackIds;
+    live.clear();
     // Over the rooftops but under the camera, and big enough to read against a giant hole.
     const alt = 14 + r * 1.3;
     for (const a of list) {
       live.add(a.id);
       let view = this.attackViews.get(a.id);
       if (!view) {
-        view = { group: this.makeAttack(a), rings: new Map(), bombs: new Map() };
+        view = { group: this.makeAttack(a), rings: new Map(), bombs: new Map(), liveShellIds: new Set() };
         this.attackViews.set(a.id, view);
         this.group.add(view.group);
       }
@@ -403,7 +409,10 @@ export class Effects {
         if (rotor && !this.reducedMotion) rotor.rotation.y = this.time * 18;
       }
       const shells = a.kind === 'bomber' ? a.bombs : a.shells;
-      const now = new Set(shells.map((b) => b.id));
+      // Reused per attack view every frame instead of a fresh Set.
+      const now = view.liveShellIds;
+      now.clear();
+      for (const b of shells) now.add(b.id);
       for (const b of shells) {
         let ring = view.rings.get(b.id);
         if (!ring) {

@@ -30,7 +30,6 @@ export type LandmarkKind = Extract<
   | 'warehouse'
   | 'watertower'
   | 'barn'
-  | 'chemplant'
   | 'stadium'
   | 'powerplant'
   | 'mall'
@@ -47,9 +46,6 @@ type Pair = readonly [number, number];
 
 const HAZARD_YELLOW = 0xffc61a;
 const HAZARD_BLACK = 0x25272e;
-const TOXIC = 0x3cc444;
-const TOXIC_TOP = 0x86e46a;
-const TOXIC_GLOW = 0xb2ff66;
 const CONCRETE = 0xd4d0c8;
 const ASPHALT = 0x6f7580;
 const STEAM = 0xf3f6f9;
@@ -77,14 +73,6 @@ function latheOval(
     o.phi?.[1] ?? Math.PI * 2,
   );
   k.add(g, color, placement(o.x ?? 0, 0, o.z ?? 0, undefined, [o.sx ?? 1, 1, 1]));
-}
-
-/** Ring of alternating colours hugging a cylinder: hazard stripes, painted bands. */
-function stripeBand(k: Kit, colors: Pair, r: number, h: number, n: number, x: number, y: number, z: number): void {
-  const step = (Math.PI * 2) / n;
-  for (let i = 0; i < n; i++) {
-    k.cyl(colors[i % 2], r, r, h, 1, x, y, z, { open: true, theta: [i * step, step] });
-  }
 }
 
 /** Chimney or mast in alternating colour bands, tapering from rBot to rTop, with a dark mouth. */
@@ -560,130 +548,6 @@ const barn: Builder = (k, v) => {
   k.beam(c.silo, [sx - 1.3, 7.9, sz], [cx + hw - 0.4, 6.0, sz], 0.4);
 };
 
-const chemplant: Builder = (k) => {
-  k.box(CONCRETE, 22, 0.25, 18, 0, 0, 0, undefined, ON_GROUND);
-  hazardKerb(k, 22, 18, 0.25, 0.35, 0.5, 2.0);
-  const base = 0.25;
-
-  // Two tall green tanks with hazard bands and a ladder.
-  for (const [x, z, r, h] of [
-    [-7.8, -4.6, 2.5, 9.6],
-    [-2.3, -4.6, 2.5, 8.0],
-  ] as const) {
-    k.cyl(TOXIC, r, r, h, 12, x, base, z, { open: true });
-    k.sphere(TOXIC_TOP, r, [x, base + h, z], 12, 3, { hemi: true, scale: [1, 0.42, 1] });
-    stripeBand(k, [HAZARD_YELLOW, HAZARD_BLACK], r * 1.03, 1.0, 14, x, base + h * 0.62, z);
-    stripeBand(k, [HAZARD_YELLOW, HAZARD_BLACK], r * 1.03, 0.6, 14, x, base, z);
-    for (const s of [-1, 1]) k.box(PAL.metal, 0.1, h, 0.1, x + s * 0.28, base, z + r + 0.08);
-  }
-
-  // Spherical tank on legs.
-  const spx = 5.0;
-  const spz = -4.3;
-  const spr = 3.1;
-  const spy = base + 1.7 + spr;
-  for (let i = 0; i < 6; i++) {
-    const a = (i * Math.PI) / 3 + 0.3;
-    k.beam(PAL.metal, [spx + 2.6 * Math.sin(a), base, spz + 2.6 * Math.cos(a)], [spx + 2.8 * Math.sin(a), spy, spz + 2.8 * Math.cos(a)], 0.3);
-  }
-  k.sphere(TOXIC, spr, [spx, spy, spz], 12, 7);
-  stripeBand(k, [HAZARD_YELLOW, HAZARD_BLACK], spr * 1.01, 0.7, 14, spx, spy - 0.35, spz);
-
-  // Pipe rack joining everything.
-  for (const x of [-9, -4.5, 0, 4.5, 8]) {
-    for (const z of [-0.2, 0.9]) k.beam(PAL.metal, [x, base, z], [x, 3.6, z], 0.26);
-    k.box(PAL.metal, 0.3, 0.25, 1.4, x, 3.6, 0.35);
-  }
-  k.rod(HAZARD_YELLOW, 0.24, 17.5, 8, [-0.5, 3.1, 0.0], { rz: Math.PI / 2 });
-  k.rod(0x9aa5b1, 0.3, 17.5, 8, [-0.5, 3.1, 0.7], { rz: Math.PI / 2 });
-  k.rod(TOXIC, 0.22, 17.5, 8, [-0.5, 4.1, 0.35], { rz: Math.PI / 2 });
-  for (const x of [-7.8, -2.3]) k.rod(HAZARD_YELLOW, 0.24, 2.0, 6, [x, 3.1, -1.1], { rx: Math.PI / 2 });
-
-  // Two bullet tanks lying down.
-  for (const x of [-0.2, 3.2]) {
-    const y = base + 1.55;
-    const z = 3.6;
-    for (const dz of [-1.3, 1.3]) k.box(CONCRETE, 1.9, 0.9, 0.4, x, base, z + dz, undefined, ON_GROUND);
-    k.rod(TOXIC, 1.05, 3.6, 12, [x, y, z], { rx: Math.PI / 2 });
-    for (const s of [-1, 1]) {
-      k.sphere(TOXIC_TOP, 1.05, [x, y, z + s * 1.8], 12, 2, {
-        hemi: true,
-        scale: [1, 0.55, 1],
-        rot: { rx: (s * Math.PI) / 2 },
-      });
-    }
-    stripeBand(k, [HAZARD_YELLOW, HAZARD_BLACK], 0.6, 0.12, 10, x, y + 1.0, z);
-  }
-
-  // Flare stack with a flame.
-  k.box(CONCRETE, 1.8, 0.7, 1.8, 8.6, base, 6.2, undefined, ON_GROUND);
-  stripedStack(k, [RED, PAL.white], 0.5, 0.34, 14.2, 7, 8.6, 6.2, base, 8);
-  k.cyl(0xff7b24, 0, 0.8, 1.5, 7, 8.6, base + 14.2, 6.2);
-  k.cyl(0xffd23f, 0, 0.45, 1.0, 7, 8.6, base + 14.25, 6.2, { ry: 0.4 });
-
-  // Control room with a striped roof edge.
-  const bx = -6.6;
-  const bz = 5.0;
-  k.box(0xeef1f4, 6.2, 3.3, 4.4, bx, base, bz, undefined, ON_GROUND);
-  k.box(PAL.roofDeck, 5.8, 0.04, 4.0, bx, base + 3.3, bz, undefined, ON_GROUND);
-  for (let i = 0; i < 8; i++) {
-    k.box(i % 2 ? HAZARD_BLACK : HAZARD_YELLOW, 6.3 / 8, 0.45, 0.2, bx - 3.15 + (i + 0.5) * (6.3 / 8), base + 2.95, bz + 2.25, undefined, FLUSH);
-  }
-  k.within(translate(bx, base, bz), () => {
-    for (const wall of walls(6.2, 4.4)) {
-      if (wall.side === 'back') continue;
-      k.within(wall.m, () => {
-        if (wall.side === 'front') {
-          doorAt(k, PAL.metal, 0x5d6470, -1.8, 0, 0.9, 2.0);
-          ribbon(k, PAL.glassDeep, PAL.metal, 3.0, 1.2, 1.1, 3);
-        } else ribbon(k, PAL.glassDeep, PAL.metal, 2.6, 1.2, 1.1, 2);
-      });
-    }
-  });
-
-  // Toxic pond with a striped rim, and drums beside it.
-  k.cyl(TOXIC_GLOW, 1.8, 1.8, 0.14, 12, 1.8, base, 6.3);
-  stripeBand(k, [HAZARD_YELLOW, HAZARD_BLACK], 1.85, 0.4, 12, 1.8, base, 6.3);
-  for (const [dx, dz] of [
-    [-0.6, -0.4],
-    [0.7, 0.5],
-    [0.1, 0.8],
-  ] as const) {
-    k.gem(0xe0ffc0, 0.22, [1.8 + dx, base + 0.2, 6.3 + dz]);
-  }
-  for (const [x, z] of [
-    [4.4, 6.9],
-    [5.3, 6.9],
-    [4.85, 7.75],
-  ] as const) {
-    k.cyl(TOXIC, 0.4, 0.4, 1.1, 8, x, base, z);
-    k.cyl(HAZARD_YELLOW, 0.41, 0.41, 0.12, 8, x, base + 1.1, z);
-  }
-
-  // Warning signs on posts at the front.
-  for (const x of [-2.5, 5.9]) {
-    const z = 8.2;
-    k.box(PAL.metal, 0.14, 1.7, 0.14, x, base, z);
-    k.hull(HAZARD_BLACK, [
-      [x - 0.95, 1.55, z + 0.08],
-      [x + 0.95, 1.55, z + 0.08],
-      [x, 3.25, z + 0.08],
-      [x - 0.95, 1.55, z + 0.16],
-      [x + 0.95, 1.55, z + 0.16],
-      [x, 3.25, z + 0.16],
-    ]);
-    k.hull(HAZARD_YELLOW, [
-      [x - 0.72, 1.7, z + 0.16],
-      [x + 0.72, 1.7, z + 0.16],
-      [x, 2.98, z + 0.16],
-      [x - 0.72, 1.7, z + 0.24],
-      [x + 0.72, 1.7, z + 0.24],
-      [x, 2.98, z + 0.24],
-    ]);
-    k.box(HAZARD_BLACK, 0.14, 0.55, 0.06, x, 2.12, z + 0.26);
-    k.box(HAZARD_BLACK, 0.14, 0.14, 0.06, x, 1.85, z + 0.26);
-  }
-};
 
 // ---------------------------------------------------------------------------
 // Tier 8: stadiums, power and airliners
@@ -1442,7 +1306,13 @@ const terminal: Builder = (k) => {
 // ---------------------------------------------------------------------------
 // Tier 10: mountains
 
-/** Small seeded generator, so every mountain of a variant is the same mountain. */
+/**
+ * Small seeded generator, so every mountain of a variant is the same
+ * mountain. Kept local rather than `@shared/rng`'s `seededRng`: that is a
+ * different algorithm (mulberry32 vs. this plain LCG), so swapping it in
+ * would draw a different sequence from the same seed and reshape every bump
+ * and pine on the mountain. Not worth doing only to share one line.
+ */
 function lcg(seed: number): () => number {
   let st = seed >>> 0;
   return () => {
@@ -1539,7 +1409,6 @@ export const LANDMARKS: Record<LandmarkKind, Builder> = {
   warehouse,
   watertower,
   barn,
-  chemplant,
   stadium,
   powerplant,
   mall,

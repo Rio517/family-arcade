@@ -18,7 +18,8 @@ export type WonderKind = Extract<
   | 'irontower'
   | 'pyramid'
   | 'pearlpalace'
-  | 'colosseum'
+  | 'buddha'
+  | 'reichstag'
   | 'opera'
   | 'onion'
   | 'clocktower'
@@ -481,228 +482,388 @@ const pyramid: Builder = (k) => {
 // ---------------------------------------------------------------------------
 // The Taj Mahal
 
+/** The Taj Mahal's square grew; scaling the whole palace keeps its proportions. */
+const TAJ_SCALE = 1.115;
+
 const pearlpalace: Builder = (k) => {
-  const marble = 0xfbf7ef;
-  const dome = 0xffffff;
-  const inlay = 0xc9bff0;
-  const sandstone = 0xf2a488;
-  const pz = -3.5;
-  // Pink sandstone terrace, the white plinth on it, then the palace.
-  k.rbox(sandstone, 22, 0.8, 19, 0.6, 0.2, 0, 0, pz);
-  k.rbox(marble, 21, 1.4, 18, 0.5, 0.2, 0, 0.8, pz);
-  const by = 2.2;
-  k.rbox(marble, 11.4, 8.8, 11.4, 2.4, 0, 0, by, pz, { seg: 1 });
-  k.within(translate(0, 0, pz), () => {
-    for (const wall of walls(11.4, 11.4)) {
+  k.within(placement(0, 0, 0, undefined, [TAJ_SCALE, TAJ_SCALE, TAJ_SCALE]), () => {
+    const marble = 0xfbf7ef;
+    const dome = 0xffffff;
+    const inlay = 0xc9bff0;
+    const sandstone = 0xf2a488;
+    const pz = -3.5;
+    // Pink sandstone terrace, the white plinth on it, then the palace.
+    k.rbox(sandstone, 22, 0.8, 19, 0.6, 0.2, 0, 0, pz);
+    k.rbox(marble, 21, 1.4, 18, 0.5, 0.2, 0, 0.8, pz);
+    const by = 2.2;
+    k.rbox(marble, 11.4, 8.8, 11.4, 2.4, 0, 0, by, pz, { seg: 1 });
+    k.within(translate(0, 0, pz), () => {
+      for (const wall of walls(11.4, 11.4)) {
+        k.within(wall.m, () => {
+          arch(k, GOLD, 5.0, 7.6, 0.08, 0, by + 0.3, 0, true);
+          arch(k, inlay, 4.2, 7.0, 0.14, 0, by + 0.3, 0, true);
+          arch(k, 0x6a5fae, 2.0, 3.4, 0.2, 0, by + 0.3, 0, true);
+          for (const u of [-2.6, 2.6]) {
+            for (const y of [by + 0.6, by + 4.3]) arch(k, inlay, 1.1, 2.7, 0.14, u + Math.sign(u) * 0.2, y, 0, true);
+          }
+        });
+      }
+    });
+    k.rbox(0xf6e9c8, 11.8, 0.6, 11.8, 2.5, 0.2, 0, by + 8.8, pz, { seg: 1 });
+    const ry = by + 9.4;
+    // Four little domed kiosks round the drum.
+    for (const cx of [-3.9, 3.9]) {
+      for (const cz of [-3.9, 3.9]) {
+        k.cyl(marble, 1.2, 1.25, 1.5, 8, cx, ry, pz + cz);
+        k.lathe(
+          dome,
+          [
+            [1.2, ry + 1.5],
+            [1.45, ry + 2.0],
+            [1.3, ry + 2.7],
+            [0.7, ry + 3.4],
+            [0, ry + 3.8],
+          ],
+          10,
+          cx,
+          pz + cz,
+        );
+        k.gem(GOLD, 0.25, [cx, ry + 4.0, pz + cz]);
+      }
+    }
+    // The big onion dome on its drum.
+    k.cyl(marble, 3.6, 3.7, 2.2, 16, 0, ry, pz);
+    k.cyl(GOLD, 3.75, 3.75, 0.3, 16, 0, ry + 1.9, pz);
+    const dy = ry + 2.2;
+    k.lathe(
+      dome,
+      [
+        [3.6, dy],
+        [4.5, dy + 1.2],
+        [5.0, dy + 2.8],
+        [4.9, dy + 4.4],
+        [4.3, dy + 6.0],
+        [3.2, dy + 7.4],
+        [1.8, dy + 8.6],
+        [0.7, dy + 9.6],
+        [0, dy + 10.2],
+      ],
+      16,
+      0,
+      pz,
+    );
+    finial(k, 0, dy + 9.9, pz, 3.4);
+    // Slim minarets at the plinth corners.
+    for (const mx of [-9.4, 9.4]) {
+      for (const mz of [-7.6, 7.6]) {
+        const x = mx;
+        const z = pz + mz;
+        k.cyl(marble, 0.72, 0.95, 17.4, 8, x, 2.2, z);
+        for (const y of [7.6, 13.0, 18.3]) k.cyl(0xf6e9c8, 1.25, 1.1, 0.45, 8, x, y, z);
+        k.cyl(marble, 0.8, 0.8, 1.0, 8, x, 19.6, z);
+        k.lathe(
+          dome,
+          [
+            [0.85, 20.6],
+            [1.0, 21.0],
+            [0.6, 21.8],
+            [0, 22.3],
+          ],
+          8,
+          x,
+          z,
+        );
+        k.gem(GOLD, 0.22, [x, 22.5, z]);
+      }
+    }
+    // Reflecting pool down the middle of a lawn, lined with cypresses.
+    k.box(GRASS, 10, 0.2, 7.3, 0, 0, 9.2, undefined, ON_GROUND);
+    k.box(marble, 3.2, 0.32, 7.3, 0, 0, 9.2, undefined, ON_GROUND);
+    k.box(PAL.water, 2.2, 0.36, 6.9, 0, 0, 9.3, undefined, ON_GROUND);
+    for (const x of [-3.2, 3.2]) for (const z of [7.2, 9.6, 12.0]) cypress(k, x, 0.2, z, 2.6);
+  });
+};
+
+// ---------------------------------------------------------------------------
+// The Big Buddha
+
+const BRONZE = 0x4f9b85;
+const BRONZE_LIGHT = 0x6fbf9f;
+const BRONZE_DARK = 0x39776a;
+const STONE_WHITE = 0xf3efe6;
+const STONE_RIM = 0xd9d3c4;
+const LOTUS = 0xf29bb5;
+
+/** A dark closed-eye or smile curve on a face: half a thin ring, turned so its ends point up. */
+function faceArc(k: Kit, r: number, tube: number, x: number, y: number, z: number): void {
+  k.add(new THREE.TorusGeometry(r, tube, 3, 6, Math.PI), PAL.ink, placement(x, y, z, { rz: Math.PI }));
+}
+
+/**
+ * A lotus petal lying round the throne at angle `a`: (radial, height,
+ * sideways) points turned into place, bottom at y.
+ */
+function petal(k: Kit, color: number, a: number, r0: number, r1: number, y: number, rise: number, w: number): void {
+  const at = (r: number, h: number, t: number): V3 => [
+    r * Math.sin(a) + t * Math.cos(a),
+    y + h,
+    r * Math.cos(a) - t * Math.sin(a),
+  ];
+  k.hull(color, [
+    at(r0, 0, -w),
+    at(r0, 0, w),
+    at((r0 + r1) / 2 + 0.3, rise * 0.55, -w * 0.9),
+    at((r0 + r1) / 2 + 0.3, rise * 0.55, w * 0.9),
+    at(r1, rise, 0),
+    at(r0 - 0.4, rise * 0.7, 0),
+  ]);
+}
+
+/**
+ * The Big Buddha, after Hong Kong's Tian Tan Buddha: a calm bronze-green
+ * figure sitting cross-legged on a pink lotus throne, one hand raised, with a
+ * round head, a topknot, long ears and a serene face turned to the camera. It
+ * sits on three round white stone tiers with a wide staircase at the front,
+ * incense urns and small attendant figures on the tiers, and a tree at each
+ * corner.
+ */
+const buddha: Builder = (k) => {
+  // Three round white tiers, each with a low balustrade that opens for the stairs.
+  const stairW = 4.4;
+  const tiers: ReadonlyArray<readonly [number, number]> = [
+    [11.5, 0],
+    [9.5, 1.2],
+    [7.5, 2.4],
+  ];
+  for (const [r, y] of tiers) {
+    k.cyl(STONE_WHITE, r, r, 1.2, 24, 0, y, 0);
+    const gap = Math.asin((stairW / 2 + 0.2) / r);
+    latheAt(
+      k,
+      STONE_RIM,
+      [
+        [r + 0.05, y + 1.2],
+        [r + 0.05, y + 1.6],
+        [r - 0.35, y + 1.6],
+        [r - 0.35, y + 1.2],
+      ],
+      20,
+      { phi: [gap, TAU - 2 * gap] },
+    );
+  }
+  // The wide staircase up the front, between two sloping side walls.
+  for (let i = 0; i < 6; i++) k.box(STONE_WHITE, stairW, 3.6 - i * 0.6, 0.8, 0, 0, 7.4 + i * 0.8);
+  for (const sx of [-1, 1]) {
+    const x0 = sx * (stairW / 2 + 0.05);
+    const x1 = sx * (stairW / 2 + 0.45);
+    k.hull(STONE_RIM, [
+      [x0, 0, 11.8],
+      [x1, 0, 11.8],
+      [x0, 0.9, 11.8],
+      [x1, 0.9, 11.8],
+      [x0, 0, 7.0],
+      [x1, 0, 7.0],
+      [x0, 4.4, 7.0],
+      [x1, 4.4, 7.0],
+    ]);
+  }
+  // Incense urns on the lowest tier, each with a puff of smoke.
+  for (const deg of [40, 90, 140, 220, 270, 320]) {
+    const a = (deg * Math.PI) / 180;
+    const x = 10.5 * Math.sin(a);
+    const z = 10.5 * Math.cos(a);
+    latheAt(
+      k,
+      BRONZE_DARK,
+      [
+        [0.35, 1.2],
+        [0.75, 1.7],
+        [0.8, 2.2],
+        [0.6, 2.4],
+        [0, 2.4],
+      ],
+      8,
+      { x, z },
+    );
+    k.ico(0xf4f4f4, 0.35, 0, [x, 3.0, z]);
+  }
+  // Small attendant figures kneeling on the middle tier, holding up gold offerings.
+  for (const deg of [55, 125, 235, 305]) {
+    const a = (deg * Math.PI) / 180;
+    const x = 8.5 * Math.sin(a);
+    const z = 8.5 * Math.cos(a);
+    k.cyl(BRONZE_LIGHT, 0.35, 0.6, 1.3, 8, x, 2.4, z);
+    k.sphere(BRONZE_LIGHT, 0.38, [x, 4.0, z], 8, 5);
+    k.gem(GOLD, 0.28, [x - 0.6 * Math.sin(a), 3.6, z - 0.6 * Math.cos(a)]);
+  }
+  // A round tree at each corner.
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const x = sx * 10.3;
+      const z = sz * 10.3;
+      k.cyl(0x8a5a3b, 0.25, 0.35, 1.6, 6, x, 0, z);
+      k.ico(sz > 0 ? PAL.leafLight : PAL.leaf, 1.75, 1, [x, 2.9, z], [1, 0.9, 1], sx);
+    }
+  }
+  // The lotus throne: two rings of pink petals round a bronze drum, and a gold cushion.
+  k.cyl(BRONZE_DARK, 5.2, 5.4, 0.9, 16, 0, 3.6, 0);
+  for (let i = 0; i < 12; i++) {
+    const a = (i * TAU) / 12;
+    petal(k, LOTUS, a, 4.8, 7.0, 3.7, 2.0, 0.95);
+    petal(k, lighter(LOTUS, 0.35), a + TAU / 24, 3.8, 5.4, 4.3, 1.6, 0.75);
+  }
+  k.cyl(0xe8c35a, 4.3, 4.4, 0.7, 16, 0, 4.5, 0);
+  // The figure, drawn at unit size and scaled up onto the cushion.
+  const S = 1.69;
+  k.within(placement(0, 5.2, -0.4, undefined, [S, S, S]), () => {
+    // Crossed legs as one broad lap, with the soles turned up.
+    k.sphere(BRONZE, 1, [0, 1.2, 0.8], 14, 6, { scale: [4.0, 1.5, 2.6] });
+    for (const sx of [-1, 1]) k.sphere(BRONZE_LIGHT, 0.8, [sx * 1.6, 2.5, 2.6], 8, 4, { scale: [1.3, 0.5, 0.8] });
+    // A robed body, a little flattened front to back.
+    const body = new THREE.LatheGeometry(
+      [
+        [3.0, 1.2],
+        [3.3, 3.2],
+        [3.1, 6.2],
+        [2.8, 7.8],
+        [2.0, 8.9],
+        [0.9, 9.4],
+        [0, 9.5],
+      ].map(([r, y]) => new THREE.Vector2(r, y)),
+      12,
+    );
+    k.add(body, BRONZE, placement(0, 0, 0.2, undefined, [1, 1, 0.72]));
+    // The left hand rests in the lap; the right is raised, palm out.
+    spike(k, BRONZE, [-3.0, 7.4, 0.2], [-3.6, 4.2, 1.0], 0.8, 0.7, 8);
+    spike(k, BRONZE, [-3.6, 4.2, 1.0], [-1.8, 3.0, 2.6], 0.7, 0.6, 8);
+    k.sphere(BRONZE_LIGHT, 0.7, [-1.5, 3.0, 2.8], 8, 4, { scale: [1.2, 0.5, 1] });
+    spike(k, BRONZE, [3.0, 7.4, 0.2], [3.8, 4.6, 1.2], 0.8, 0.7, 8);
+    spike(k, BRONZE, [3.8, 4.6, 1.2], [3.4, 7.2, 2.8], 0.7, 0.6, 8);
+    k.cbox(BRONZE_LIGHT, 1.2, 1.5, 0.45, 0.12, 3.4, 7.1, 2.9);
+    // Neck, head, hair, topknot and long ears.
+    k.cyl(BRONZE, 0.95, 0.95, 1.0, 10, 0, 9.2, 0.2);
+    // The head tips up a little, so the face turns toward the high camera.
+    k.within(placement(0, 12.0, 0.3, { rx: -0.3 }), () => {
+      k.sphere(BRONZE_LIGHT, 2.1, [0, 0, 0], 14, 8);
+      k.sphere(BRONZE_DARK, 2.18, [0, 0.45, -0.25], 14, 4, { hemi: true, rot: { rx: -0.4 } });
+      k.sphere(BRONZE_DARK, 1.0, [0, 2.35, -0.3], 8, 5);
+      for (const sx of [-1, 1]) k.sphere(BRONZE_LIGHT, 1, [sx * 2.1, -0.6, -0.1], 8, 5, { scale: [0.35, 1.35, 0.55] });
+      // A serene face: closed eyes, a small smile, and a gold dot between the brows.
+      for (const sx of [-1, 1]) faceArc(k, 0.38, 0.08, sx * 0.8, -0.1, 1.97);
+      faceArc(k, 0.45, 0.07, 0, -1.05, 1.82);
+      k.gem(GOLD, 0.2, [0, 0.45, 2.06]);
+    });
+  });
+};
+
+// ---------------------------------------------------------------------------
+// The Reichstag
+
+const SANDSTONE = 0xe9d8b4;
+const SANDSTONE_LIGHT = 0xf5ead0;
+const SANDSTONE_DARK = 0xcdb88e;
+const WINDOW_DARK = 0x3d5a78;
+const DOME_GLASS = 0xa9dff5;
+const STEEL = 0x8f98a5;
+
+/**
+ * The Reichstag: a long pale sandstone block with a square tower at each
+ * corner flying a black, red and gold flag, a columned portico with a
+ * pediment and wide steps at the front (+z), a lawn with paths before it, and
+ * on the roof the glass dome with its steel ribs and the spiral ramp showing
+ * through.
+ */
+const reichstag: Builder = (k) => {
+  const W = 25;
+  const D = 13;
+  const cz = -3.2;
+  const front = cz + D / 2;
+  // Lawn and paths in front.
+  k.box(GRASS, 29, 0.12, 3.4, 0, 0, 10.3, undefined, ON_GROUND);
+  k.box(PAL.stone, 3.0, 0.16, 3.4, 0, 0, 10.3, undefined, ON_GROUND);
+  k.box(PAL.stone, 29, 0.16, 1.0, 0, 0, 10.6, undefined, ON_GROUND);
+  // Plinth, main block, cornice and roof.
+  k.rbox(SANDSTONE_DARK, W + 1, 1.4, D + 1, 0.4, 0.1, 0, 0, cz, { seg: 1 });
+  k.rbox(SANDSTONE, W, 10.6, D, 0.4, 0, 0, 1.4, cz, { seg: 1 });
+  k.rbox(SANDSTONE_LIGHT, W + 0.6, 0.6, D + 0.6, 0.5, 0.15, 0, 12.0, cz, { seg: 1 });
+  k.box(0x9aa1ab, W - 1, 0.05, D - 1, 0, 12.6, cz, undefined, ON_GROUND);
+  const T = 4.6;
+  const tx = W / 2 - 1.6;
+  const tz = D / 2 - 1.6;
+  // Two rows of tall windows, clear of the towers and the portico.
+  k.within(translate(0, 0, cz), () => {
+    for (const wall of walls(W, D)) {
       k.within(wall.m, () => {
-        arch(k, GOLD, 5.0, 7.6, 0.08, 0, by + 0.3, 0, true);
-        arch(k, inlay, 4.2, 7.0, 0.14, 0, by + 0.3, 0, true);
-        arch(k, 0x6a5fae, 2.0, 3.4, 0.2, 0, by + 0.3, 0, true);
-        for (const u of [-2.6, 2.6]) {
-          for (const y of [by + 0.6, by + 4.3]) arch(k, inlay, 1.1, 2.7, 0.14, u + Math.sign(u) * 0.2, y, 0, true);
+        const reach = wall.len / 2 - T + 0.6;
+        for (let u = -reach + 1.1; u <= reach - 1.1 + 0.01; u += 2.2) {
+          if (wall.side === 'front' && Math.abs(u) < 7.4) continue;
+          for (const y of [3.0, 7.4]) k.plate(WINDOW_DARK, 1.1, 2.6, 0.2, 0.12, u, y, 0, 1);
         }
       });
     }
   });
-  k.rbox(0xf6e9c8, 11.8, 0.6, 11.8, 2.5, 0.2, 0, by + 8.8, pz, { seg: 1 });
-  const ry = by + 9.4;
-  // Four little domed kiosks round the drum.
-  for (const cx of [-3.9, 3.9]) {
-    for (const cz of [-3.9, 3.9]) {
-      k.cyl(marble, 1.2, 1.25, 1.5, 8, cx, ry, pz + cz);
-      k.lathe(
-        dome,
-        [
-          [1.2, ry + 1.5],
-          [1.45, ry + 2.0],
-          [1.3, ry + 2.7],
-          [0.7, ry + 3.4],
-          [0, ry + 3.8],
-        ],
-        10,
-        cx,
-        pz + cz,
-      );
-      k.gem(GOLD, 0.25, [cx, ry + 4.0, pz + cz]);
-    }
-  }
-  // The big onion dome on its drum.
-  k.cyl(marble, 3.6, 3.7, 2.2, 16, 0, ry, pz);
-  k.cyl(GOLD, 3.75, 3.75, 0.3, 16, 0, ry + 1.9, pz);
-  const dy = ry + 2.2;
-  k.lathe(
-    dome,
-    [
-      [3.6, dy],
-      [4.5, dy + 1.2],
-      [5.0, dy + 2.8],
-      [4.9, dy + 4.4],
-      [4.3, dy + 6.0],
-      [3.2, dy + 7.4],
-      [1.8, dy + 8.6],
-      [0.7, dy + 9.6],
-      [0, dy + 10.2],
-    ],
-    16,
-    0,
-    pz,
-  );
-  finial(k, 0, dy + 9.9, pz, 3.4);
-  // Slim minarets at the plinth corners.
-  for (const mx of [-9.4, 9.4]) {
-    for (const mz of [-7.6, 7.6]) {
-      const x = mx;
-      const z = pz + mz;
-      k.cyl(marble, 0.72, 0.95, 17.4, 8, x, 2.2, z);
-      for (const y of [7.6, 13.0, 18.3]) k.cyl(0xf6e9c8, 1.25, 1.1, 0.45, 8, x, y, z);
-      k.cyl(marble, 0.8, 0.8, 1.0, 8, x, 19.6, z);
-      k.lathe(
-        dome,
-        [
-          [0.85, 20.6],
-          [1.0, 21.0],
-          [0.6, 21.8],
-          [0, 22.3],
-        ],
-        8,
-        x,
-        z,
-      );
-      k.gem(GOLD, 0.22, [x, 22.5, z]);
-    }
-  }
-  // Reflecting pool down the middle of a lawn, lined with cypresses.
-  k.box(GRASS, 10, 0.2, 7.3, 0, 0, 9.2, undefined, ON_GROUND);
-  k.box(marble, 3.2, 0.32, 7.3, 0, 0, 9.2, undefined, ON_GROUND);
-  k.box(PAL.water, 2.2, 0.36, 6.9, 0, 0, 9.3, undefined, ON_GROUND);
-  for (const x of [-3.2, 3.2]) for (const z of [7.2, 9.6, 12.0]) cypress(k, x, 0.2, z, 2.6);
-};
-
-// ---------------------------------------------------------------------------
-// The Colosseum
-
-const colosseum: Builder = (k) => {
-  const travertine = 0xf2d7a6;
-  const band = 0xfbe8c4;
-  const archColor = 0x9a5236;
-  const B = 11.4;
-  const sx = 13.4 / B;
-  const deg = Math.PI / 180;
-  // Outer wall as oval shells; the top two storeys have fallen on the front
-  // right, stepping down so the camera can see into the bowl.
-  const shell = (y0: number, y1: number, phi?: Pair) => {
-    latheAt(
-      k,
-      travertine,
-      [
-        [B, y0],
-        [B, y1],
-        [B - 1.5, y1],
-        [B - 1.5, y0],
-      ],
-      36,
-      { sx, phi },
-    );
-    if (!phi) return;
-    // Cap the broken ends so the hollow wall reads solid.
-    for (const a of [phi[0], phi[0] + phi[1]]) {
-      const pts: V3[] = [];
-      for (const r of [B, B - 1.5]) {
-        for (const y of [y0, y1]) {
-          for (const da of [-0.01, 0.01]) pts.push([sx * r * Math.sin(a + da), y, r * Math.cos(a + da)]);
+  // Corner towers with windows on their outer faces and flags on top.
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const x = sx * tx;
+      const z = cz + sz * tz;
+      k.rbox(SANDSTONE, T, 14.6, T, 0.3, 0, x, 1.4, z, { seg: 1 });
+      k.rbox(SANDSTONE_LIGHT, T + 0.5, 0.6, T + 0.5, 0.4, 0.15, x, 16.0, z, { seg: 1 });
+      k.within(translate(x, 0, z), () => {
+        for (const wall of walls(T, T)) {
+          const outward =
+            (wall.side === 'front' && sz > 0) ||
+            (wall.side === 'back' && sz < 0) ||
+            (wall.side === 'right' && sx > 0) ||
+            (wall.side === 'left' && sx < 0);
+          if (!outward) continue;
+          k.within(wall.m, () => {
+            for (const y of [3.0, 7.4, 12.2]) k.plate(WINDOW_DARK, 1.2, y > 12 ? 1.8 : 2.6, 0.2, 0.12, 0, y, 0, 1);
+          });
         }
-      }
-      k.hull(travertine, pts);
+      });
+      k.box(PAL.ink, 0.1, 2.8, 0.1, x, 16.6, z, undefined, ['ny']);
+      [0x1a1a1a, 0xdd0000, 0xffce00].forEach((col, i) => k.box(col, 1.6, 0.32, 0.06, x + 0.85, 18.9 - i * 0.32, z));
     }
-  };
-  const gap3: Pair = [80 * deg, 310 * deg];
-  const gap4: Pair = [100 * deg, 270 * deg];
-  shell(0, 7.2);
-  shell(7.2, 10.6, gap3);
-  shell(10.6, 14, gap4);
-  // Cornices between storeys.
-  const ledge = (y: number, phi?: Pair) =>
-    latheAt(
-      k,
-      band,
-      [
-        [B + 0.3, y],
-        [B + 0.3, y + 0.45],
-        [B - 1.7, y + 0.45],
-        [B - 1.7, y],
-      ],
-      36,
-      { sx, phi },
-    );
-  ledge(3.4);
-  ledge(6.9);
-  ledge(10.3, gap3);
-  ledge(13.6, gap4);
-  // Rows of arches round each storey (the top storey has small windows).
-  const inside = (a: number, phi?: Pair) => {
-    if (!phi) return true;
-    const t = (((a - phi[0]) % TAU) + TAU) % TAU;
-    return t > 0.08 && t < phi[1] - 0.08;
-  };
-  const n = 26;
-  const storeys: ReadonlyArray<readonly [number, number, number, Pair | undefined]> = [
-    [0.4, 2.7, 1.7, undefined],
-    [3.95, 2.6, 1.6, undefined],
-    [7.5, 2.5, 1.5, gap3],
-    [11.3, 1.3, 0.8, gap4],
-  ];
-  for (let i = 0; i < n; i++) {
-    const a = ((i + 0.5) * TAU) / n;
-    const nx = Math.sin(a) / sx;
-    const nz = Math.cos(a);
-    const x = sx * B * Math.sin(a);
-    const z = B * Math.cos(a);
-    k.within(placement(x, 0, z, { ry: Math.atan2(nx, nz) }), () => {
-      for (const [y, h, w, phi] of storeys) {
-        if (!inside(a, phi)) continue;
-        arch(k, archColor, w, h, 0.12, 0, y, -0.06);
-      }
-    });
   }
-  // Seating bowl: bright stepped rings down to a sandy arena.
-  const rows: ReadonlyArray<readonly [number, number]> = [
-    [9.95, 7.0],
-    [9.25, 6.0],
-    [8.55, 5.0],
-    [7.85, 4.0],
-    [7.15, 3.0],
-    [6.45, 2.0],
-  ];
-  rows.forEach(([r, y], i) => {
-    const next = rows[i + 1];
-    const rIn = next ? next[0] : 6.0;
-    const yDown = next ? next[1] : 0.3;
-    latheAt(
-      k,
-      i % 2 ? 0xf7e2bd : 0xe9c48f,
-      [
-        [r, y],
-        [rIn, y],
-        [rIn, yDown],
-      ],
-      32,
-      { sx },
-    );
-  });
-  latheAt(
-    k,
-    0xf7d98e,
-    [
-      [6.05, 0.3],
-      [6.05, 0.5],
-      [0, 0.5],
-    ],
-    32,
-    { sx },
-  );
-  // Trap-door grid in the arena floor.
-  for (const z of [-2.2, 0, 2.2]) k.box(0xc79a5a, 11.6 - Math.abs(z) * 1.6, 0.06, 0.4, 0, 0.5, z);
-  for (const x of [-3, 3]) k.box(0xc79a5a, 0.4, 0.06, 7.2, x, 0.5, 0);
+  // The portico: a podium, wide steps, six columns, an entablature with its inscription band, and a pediment.
+  const pz = front + 1.6;
+  k.box(SANDSTONE_DARK, 13.4, 2.6, 3.2, 0, 0, pz);
+  for (let i = 1; i <= 4; i++) k.box(SANDSTONE_LIGHT, 12.0, 2.6 - (i - 1) * 0.65, 0.5, 0, 0, pz + 1.6 + (i - 0.5) * 0.5);
+  for (let i = 0; i < 6; i++) k.cyl(SANDSTONE_LIGHT, 0.42, 0.48, 7.4, 8, -5.5 + i * 2.2, 2.6, pz + 0.9);
+  k.box(SANDSTONE_LIGHT, 13.4, 1.2, 3.4, 0, 10.0, pz);
+  k.box(0x5d4a30, 8.0, 0.4, 0.05, 0, 10.4, pz + 1.7, undefined, FLUSH);
+  k.hull(SANDSTONE, [
+    [-6.7, 11.2, pz - 1.7],
+    [6.7, 11.2, pz - 1.7],
+    [-6.7, 11.2, pz + 1.7],
+    [6.7, 11.2, pz + 1.7],
+    [0, 14.0, pz - 1.7],
+    [0, 14.0, pz + 1.7],
+  ]);
+  // The glass dome: a steel drum, a glassy dome, steel ribs and rings, and the spiral ramp.
+  const dy = 13.8;
+  const R = 6.0;
+  const sy = 1.45;
+  k.cyl(STEEL, R + 0.4, R + 0.4, 1.2, 16, 0, 12.6, cz);
+  k.sphere(DOME_GLASS, R, [0, dy, cz], 16, 6, { hemi: true, scale: [1, sy, 1] });
+  for (let i = 0; i < 6; i++) {
+    k.add(new THREE.TorusGeometry(R + 0.06, 0.1, 3, 10, Math.PI), STEEL, placement(0, dy, cz, { ry: (i * Math.PI) / 6 }, [1, sy, 1]));
+  }
+  for (const deg of [25, 50, 70]) {
+    const p = (deg * Math.PI) / 180;
+    k.ring(STEEL, (R + 0.06) * Math.cos(p), 0.1, [0, dy + R * sy * Math.sin(p), cz], { rx: Math.PI / 2 }, 3, 16);
+  }
+  const turns = 2.2;
+  const steps = 20;
+  const helix = (t: number): V3 => {
+    const p = (5 + 70 * t) * (Math.PI / 180);
+    const a = turns * TAU * t;
+    const rr = (R + 0.1) * Math.cos(p);
+    return [rr * Math.sin(a), dy + R * sy * Math.sin(p), cz + rr * Math.cos(a)];
+  };
+  for (let i = 0; i < steps; i++) spike(k, 0x5d6470, helix(i / steps), helix((i + 1) / steps), 0.1, 0.1, 4);
+  k.ring(STEEL, 1.3, 0.12, [0, dy + R * sy - 0.1, cz], { rx: Math.PI / 2 }, 3, 10);
 };
 
 // ---------------------------------------------------------------------------
@@ -1046,22 +1207,16 @@ function moaiHead(k: Kit, x: number, z: number, y0: number, s: number, topknot: 
   });
 }
 
-const moai: Builder = (k) => {
-  k.box(GRASS, 20, 0.2, 10, 0, 0, 0, undefined, ON_GROUND);
-  // Low stone platform with its big blocks outlined.
-  k.rbox(0x8d877d, 19.4, 1.2, 5.4, 0.5, 0.2, 0, 0.2, -0.6);
-  for (const x of [-7.3, -2.4, 2.4, 7.3]) k.box(0x7a746b, 0.18, 0.9, 0.1, x, 0.35, 2.12);
-  moaiHead(k, -6.3, -0.8, 1.4, 0.94, false);
-  moaiHead(k, 0, -0.8, 1.4, 1.0, true);
-  moaiHead(k, 6.3, -0.8, 1.4, 0.94, false);
-  // A few round rocks in the grass out front.
-  const rocks: ReadonlyArray<readonly [number, number, number]> = [
-    [-8.6, 3.6, 0.7],
-    [-3.2, 4.2, 0.5],
-    [4.4, 3.8, 0.6],
-    [8.8, 4.1, 0.45],
-  ];
-  rocks.forEach(([x, z, r], i) => k.ico(lighter(0x8d877d, 0.1 * i), r, 0, [x, 0.2 + r * 0.5, z], [1.2, 0.8, 1], i));
+/**
+ * One Easter Island head on a low stone base, a little bigger than the heads
+ * that once stood in a row; a block holds four of them. Variant 1 wears the
+ * red topknot hat (pukao).
+ */
+const moai: Builder = (k, v) => {
+  k.box(GRASS, 4.5, 0.12, 4.5, 0, 0, 0, undefined, ON_GROUND);
+  k.rbox(0x8d877d, 4.2, 0.7, 3.8, 0.4, 0.15, 0, 0.12, -0.1);
+  k.box(0x7a746b, 0.14, 0.5, 0.08, 0, 0.25, 1.83);
+  moaiHead(k, 0, -0.35, 0.82, 1.15, v === 1);
 };
 
 export const WONDERS_BUILDERS: Record<WonderKind, Builder> = {
@@ -1070,7 +1225,8 @@ export const WONDERS_BUILDERS: Record<WonderKind, Builder> = {
   irontower,
   pyramid,
   pearlpalace,
-  colosseum,
+  buddha,
+  reichstag,
   opera,
   onion,
   clocktower,

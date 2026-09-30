@@ -35,6 +35,12 @@ const BUDGET: Partial<Record<PropKind, number>> = {
   hoop: 270,
   crane: 550,
   ship: 800,
+  // An office gains floors with its height scale; this covers the tallest, at 2x.
+  office: 2100,
+  gastank: 1000,
+  flarestack: 600,
+  plantshed: 600,
+  train: 1200,
   policecar: 900,
   swings: 600,
   slide: 700,
@@ -57,13 +63,15 @@ const BUDGET: Partial<Record<PropKind, number>> = {
   irontower: 8000,
   pyramid: 6000,
   pearlpalace: 6000,
-  colosseum: 6000,
+  buddha: 6000,
+  reichstag: 6000,
   opera: 6000,
   onion: 6000,
   clocktower: 6000,
   leaning: 6000,
   stonecircle: 6000,
-  moai: 6000,
+  // One head on its base; a block holds four.
+  moai: 500,
 };
 
 /** Triangle budgets by tier, so a city of instanced props stays fast on an iPad. */
@@ -92,6 +100,22 @@ const OFF_BASE: Partial<Record<PropKind, string>> = {
   bomber: 'flies over',
 };
 
+/** A grounded thing's footprint should come close to filling the catalogue rectangle it is given. */
+const FOOTPRINT_FILL = 0.8;
+
+/**
+ * Kinds whose own shape never squares off to fill its footprint, so the fill
+ * check below would only ever be flagging their shape, not a mistake.
+ */
+const THIN_FOOTPRINT: Partial<Record<PropKind, string>> = {
+  radar: 'a dish on a narrow lattice mast, tilted toward +z: the mast sets x, far short of the square dish pad',
+  lamp: 'a slim post with a crossbar and banner; only those give it any width at all',
+  tree: 'four canopy blobs turned by variant; variant 2 happens to pinch the spread along x',
+  hydrant: 'a round lathe body, already a circle inside the square footprint it is given',
+  helicopter: "the footprint is sized for the main rotor's sweep; the parked body is much narrower",
+  dog: 'a low, narrow four-legged body, well under its swallow-size footprint',
+};
+
 describe('buildKindGeometry', () => {
   for (const kind of kinds) {
     const info = KINDS[kind];
@@ -113,9 +137,20 @@ describe('buildKindGeometry', () => {
           expect(tris).toBeLessThanOrEqual(budget(kind, info.tier));
 
           const box = new THREE.Box3().setFromBufferAttribute(pos as THREE.BufferAttribute);
-          // Origin is the footprint centre, so each half-extent must fit half the footprint.
+          // Origin is the footprint centre and the model is built with +z
+          // forward already, so each half-extent (no extra rotation needed)
+          // must fit half the footprint...
           expect(Math.max(-box.min.x, box.max.x)).toBeLessThanOrEqual((info.w / 2) * 1.1);
           expect(Math.max(-box.min.z, box.max.z)).toBeLessThanOrEqual((info.d / 2) * 1.1);
+          // ...and come reasonably close to filling it too, catching a kind
+          // whose model shrank well away from the footprint its catalogue
+          // entry promises (a typo, or a resize that only touched one of
+          // them, the way the office's 15x12 walls drifted from its 16x13
+          // catalogue row).
+          if (!THIN_FOOTPRINT[kind]) {
+            expect(Math.max(-box.min.x, box.max.x)).toBeGreaterThanOrEqual((info.w / 2) * FOOTPRINT_FILL);
+            expect(Math.max(-box.min.z, box.max.z)).toBeGreaterThanOrEqual((info.d / 2) * FOOTPRINT_FILL);
+          }
           expect(box.min.y).toBeGreaterThanOrEqual(-0.02);
           expect(box.min.y).toBeLessThanOrEqual(0.02);
           const h = info.h * s;

@@ -25,7 +25,8 @@
     "caribbean:naval-check": "node scripts/caribbean-naval-check.mjs",
     "caribbean:port-check": "node scripts/caribbean-port-check.mjs",
     "glb": "node scripts/optimize-glb.mjs",
-    "risk:drag": "node scripts/risk-drag-check.mjs"
+    "risk:drag": "node scripts/risk-drag-check.mjs",
+    "perf:gulp": "node scripts/perf-gulp.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
