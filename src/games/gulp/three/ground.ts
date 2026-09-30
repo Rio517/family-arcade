@@ -125,7 +125,7 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
     meadow: tex((g, s) => drawGrass(g, s, '#98d56d', '#86c35c', 2), 512),
     forest: tex((g, s) => drawGrass(g, s, '#5fa84a', '#4d943b', 3), 512),
     rock: tex((g, s) => drawGrass(g, s, '#8fae6a', '#8a8f86', 4), 512),
-    paving: tex((g, s) => drawTiles(g, s, '#ddd6c8', 'rgba(120,110,95,0.25)', 4)),
+    paving: tex((g, s) => drawTiles(g, s, '#efcf9c', 'rgba(160,115,60,0.3)', 4)),
     plaza: tex((g, s) => drawTiles(g, s, '#ece0c8', 'rgba(150,120,90,0.25)', 6)),
     concrete: tex((g, s) => drawTiles(g, s, '#c9c8c3', 'rgba(90,90,90,0.22)', 2)),
     field: tex(drawField),
@@ -133,6 +133,7 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   const bySurface = new Map<Surface, THREE.BufferGeometry[]>();
   const paths: THREE.BufferGeometry[] = [];
   const kerbs: THREE.BufferGeometry[] = [];
+  const shadows: THREE.BufferGeometry[] = [];
   for (const b of city.blockList) {
     const surface = FLOOR[b.kind];
     const inset = surface === 'paving' || surface === 'plaza' ? SIDEWALK : SIDEWALK - 0.4;
@@ -151,9 +152,14 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
       paths.push(quad(b.x + SIDEWALK, b.z + c - 2.5, b.x + b.size - SIDEWALK, b.z + c + 2.5, -0.07, 4));
       paths.push(disc(b.x + c, b.z + c, 10, -0.065, 4));
     }
-    // A kerb line round the block.
-    // Wide enough not to shimmer as a hairline from a height.
-    const k = 0.6;
+    // A bright kerb round the block, wide enough not to shimmer as a
+    // hairline from a height, with a shadow on the road side below.
+    const k = 0.5;
+    const o = 0.35;
+    shadows.push(quad(b.x - o, b.z - o, b.x + b.size + o, b.z, -0.045, 4));
+    shadows.push(quad(b.x - o, b.z + b.size, b.x + b.size + o, b.z + b.size + o, -0.045, 4));
+    shadows.push(quad(b.x - o, b.z, b.x, b.z + b.size, -0.045, 4));
+    shadows.push(quad(b.x + b.size, b.z, b.x + b.size + o, b.z + b.size, -0.045, 4));
     kerbs.push(quad(b.x, b.z, b.x + b.size, b.z + k, -0.06, 4));
     kerbs.push(quad(b.x, b.z + b.size - k, b.x + b.size, b.z + b.size, -0.06, 4));
     kerbs.push(quad(b.x, b.z, b.x + k, b.z + b.size, -0.06, 4));
@@ -165,7 +171,7 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   }
   const pathMesh = layer(paths, flat(surfaces.plaza, 0xf3e6cc, 2), 2);
   if (pathMesh) group.add(pathMesh);
-  const kerbMesh = layer(kerbs, flat(null, 0xb3ab9c, 2), 2);
+  const kerbMesh = layer(kerbs, flat(null, 0xf3f1ea, 2), 2);
   if (kerbMesh) group.add(kerbMesh);
 
   // Roads, then their markings.
@@ -177,6 +183,8 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
   }
   const roadMesh = layer(roads, flat(asphalt, 0xffffff, 3), 3);
   if (roadMesh) group.add(roadMesh);
+  const shadowMesh = layer(shadows, flat(null, 0x3a3f4a, 4), 4);
+  if (shadowMesh) group.add(shadowMesh);
 
   // No centre lines: plain roads read calmer, and thin lines shimmer at a
   // distance. Zebra crossings stay.
@@ -202,7 +210,8 @@ export function buildGround(city: City, renderer: THREE.WebGLRenderer): Ground {
     new THREE.BoxGeometry(half * 2 + 3, 3, half * 2 + 3),
     new THREE.MeshStandardMaterial({ color: 0xd9d2c3, roughness: 0.9 }),
   );
-  edge.position.y = -1.52;
+  // Its top sits below every ground layer (they run from -0.1 up to 0).
+  edge.position.y = -1.75;
   edge.receiveShadow = true;
   group.add(edge);
 
@@ -249,15 +258,26 @@ function speckle(g: CanvasRenderingContext2D, s: number, n: number, color: strin
   for (let i = 0; i < n; i++) g.fillRect(r() * s, r() * s, size, size);
 }
 
+/** The pavement: cool light-grey square slabs with clear joints. */
 function drawSlabs(g: CanvasRenderingContext2D, s: number): void {
-  g.fillStyle = '#e6dfd2';
+  // Cool blue-grey, so it stays grey under the warm sun and reads apart
+  // from the sandy paving inside the blocks.
+  g.fillStyle = '#c3cdda';
   g.fillRect(0, 0, s, s);
+  // Each slab a shade apart from its neighbours, like real paving.
+  const shades = ['rgba(255,255,255,0.10)', 'rgba(0,0,0,0.035)', 'rgba(255,255,255,0.04)', 'rgba(0,0,0,0.06)'];
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      g.fillStyle = shades[(i * 2 + j * 3) % shades.length];
+      g.fillRect((i * s) / 3, (j * s) / 3, s / 3, s / 3);
+    }
+  }
   speckle(g, s, 500, 'rgba(0,0,0,0.035)', 2, 1);
-  g.strokeStyle = 'rgba(150,140,125,0.45)';
-  g.lineWidth = 2;
-  // Four units of pavement: 2 x 2 slabs.
-  for (let i = 0; i <= 2; i++) {
-    const p = (i * s) / 2;
+  g.strokeStyle = 'rgba(80,92,112,0.75)';
+  g.lineWidth = 4;
+  // Four units of pavement: 3 x 3 slabs.
+  for (let i = 0; i <= 3; i++) {
+    const p = (i * s) / 3;
     g.beginPath();
     g.moveTo(p, 0);
     g.lineTo(p, s);

@@ -34,6 +34,9 @@ const TALL_TIER = 5;
 const SUN_DIR = new THREE.Vector3(0.35, 1, 0.25).normalize();
 const SHADOW_MAP = 2048;
 
+/** How see-through a building standing in front of the child's hole goes. */
+const GHOST = 0.2;
+
 /** Things are batched per square of this many units (two blocks), so the
  * squares off screen are skipped while the hole is small. */
 const CHUNK = 108;
@@ -98,8 +101,10 @@ export class GulpScene {
   private lastYum = -10;
   private lightBasis = new THREE.Matrix4();
   /** Things wobbling on the rim of the child's hole: too big to fall in yet. */
-  private wobbling = new Set<number>();
+  private wobbling = new Map<number, number>();
   /** People: one batch per outfit, and where each person sits in it. */
+  private facing = new Map<number, number>();
+  private frameDt = 0;
   private peopleSlots: Array<{ person: Person; mesh: THREE.InstancedMesh; index: number }> = [];
   private wobbleDummy = new THREE.Object3D();
   private tiltAxis = new THREE.Vector3();
@@ -254,9 +259,17 @@ export class GulpScene {
       if (!p.alive) {
         mesh.setMatrixAt(index, this.hidden);
       } else {
-        const bob = this.reducedMotion ? 0 : Math.abs(Math.sin(this.time * (p.panic > 0 ? 16 : 8) + p.id)) * 0.12;
+        // A soft step bob, a little quicker when running.
+        const bob = this.reducedMotion ? 0 : Math.abs(Math.sin(this.time * (p.panic > 0 ? 10 : 6) + p.id)) * 0.07;
+        // Turn smoothly toward the way they walk (corners and turn-rounds).
+        let face = this.facing.get(p.id) ?? p.heading;
+        let turn = p.heading - face;
+        while (turn > Math.PI) turn -= Math.PI * 2;
+        while (turn < -Math.PI) turn += Math.PI * 2;
+        face += turn * (this.reducedMotion ? 1 : Math.min(1, this.frameDt * 10));
+        this.facing.set(p.id, face);
         d.position.set(p.x, bob, p.z);
-        d.rotation.set(0, p.heading, 0);
+        d.rotation.set(0, face, 0);
         d.scale.set(1, 1, 1);
         d.updateMatrix();
         mesh.setMatrixAt(index, d.matrix);
@@ -445,6 +458,7 @@ export class GulpScene {
   sync(world: World, events: WorldEvent[], dt: number): void {
     if (this.disposed) return;
     this.time += dt;
+    this.frameDt = dt;
     const me = world.holes[this.follow];
 
     for (const e of events) {
@@ -495,7 +509,7 @@ export class GulpScene {
     this.stepBuilt(dt);
     this.syncPeople();
     this.stepBubble(world, dt);
-    if (me) this.wobble(world, me);
+    if (me) this.wobble(world, me, dt);
     const scale = me ? Math.max(1, me.r / 2.5) : 1;
     this.effects.syncPowerups(world.powerups, scale);
     this.effects.syncAttacks(world.attacks, me ? me.r : 2);
@@ -503,7 +517,7 @@ export class GulpScene {
 
     if (me) {
       this.moveCamera(me, dt);
-      this.fadeInTheWay(world, me);
+      this.fadeInTheWay(world, me, dt);
       // Small things cast no shadow once the camera is high above them.
       const small = me.r > 14;
       for (const b of this.batches) b.mesh.castShadow = !(small && b.tier <= 2);
@@ -539,40 +553,52 @@ export class GulpScene {
    * Anything too big to swallow that sits over the rim of the child's hole
    * rocks and leans in, as if it is about to go: a hint of what is next.
    */
-  private wobble(world: World, me: Hole): void {
-    const now = new Set<number>();
+  private wobble(world: World, me: Hole, dt: number): void {
+    // Each thing's wobble eases in while it sits on the rim and out after,
+    // so nothing snaps upright or starts shaking in a single frame.
+    const near = new Set<number>();
     if (me.alive && !this.reducedMotion) {
       for (const p of propsNear(world, me.x, me.z, me.r + 12)) {
         if (canEat(me, p) || this.ghosts.has(p.id)) continue;
-        const dx = me.x - p.x;
-        const dz = me.z - p.z;
-        const d = Math.hypot(dx, dz);
         const reach = Math.max(KINDS[p.kind].w, KINDS[p.kind].d) / 2;
-        if (d > me.r + reach * 0.6) continue;
-        now.add(p.id);
-        // Lean toward the hole's middle, and rock a little around that lean.
-        const lean = 0.05 + 0.04 * Math.sin(this.time * 13 + p.id * 1.7);
-        this.tiltAxis.set(dz, 0, -dx).normalize();
-        if (d < 0.01) this.tiltAxis.set(1, 0, 0);
-        this.tiltQ.setFromAxisAngle(this.tiltAxis, lean);
-        const w = this.wobbleDummy;
-        w.position.set(p.x, 0, p.z);
-        w.rotation.set(0, p.rot, 0);
-        w.quaternion.premultiply(this.tiltQ);
-        w.updateMatrix();
-        this.place(p, w.matrix, w.quaternion);
+        if (Math.hypot(me.x - p.x, me.z - p.z) > me.r + reach * 0.6) continue;
+        near.add(p.id);
+        if (!this.wobbling.has(p.id)) this.wobbling.set(p.id, 0);
       }
     }
-    // Anything that stopped wobbling (and still stands) goes back upright.
-    for (const id of this.wobbling) {
-      if (now.has(id)) continue;
+    for (const [id, amount] of this.wobbling) {
       const p = world.props.get(id);
-      if (p && !this.ghosts.has(id)) this.setShown(p, true);
-      const b = this.built.get(id);
-      if (b) b.mesh.quaternion.setFromEuler(new THREE.Euler(0, p ? p.rot : 0, 0));
+      const next = Math.max(0, Math.min(1, amount + (near.has(id) ? dt * 3 : -dt * 3)));
+      if (!p || next === 0) {
+        this.wobbling.delete(id);
+        if (p && !this.ghosts.has(id)) this.setShown(p, true);
+        const b = this.built.get(id);
+        if (b) b.mesh.quaternion.setFromEuler(new THREE.Euler(0, p ? p.rot : 0, 0));
+        continue;
+      }
+      this.wobbling.set(id, next);
+      if (this.ghosts.has(id)) continue;
+      // A gentle lean toward the hole and a slow rock around it. The angle is
+      // capped by height, so a tower's top sways a little, not by metres.
+      const h = KINDS[p.kind].h * p.hScale;
+      const cap = Math.min(0.08, 0.6 / Math.max(1, h));
+      const lean = next * cap * (0.6 + 0.4 * Math.sin(this.time * 7 + id * 1.7));
+      const dx = me.x - p.x;
+      const dz = me.z - p.z;
+      this.tiltAxis.set(dz, 0, -dx);
+      if (this.tiltAxis.lengthSq() < 0.0001) this.tiltAxis.set(1, 0, 0);
+      this.tiltAxis.normalize();
+      this.tiltQ.setFromAxisAngle(this.tiltAxis, lean);
+      const w = this.wobbleDummy;
+      w.position.set(p.x, 0, p.z);
+      w.rotation.set(0, p.rot, 0);
+      w.scale.set(1, 1, 1);
+      w.quaternion.premultiply(this.tiltQ);
+      w.updateMatrix();
+      this.place(p, w.matrix, w.quaternion);
     }
-    this.wobbling = now;
   }
+
 
   /** Set where a thing is drawn: its batch slot, or its own mesh if it was built during the round. */
   private place(p: Prop, matrix: THREE.Matrix4, q: THREE.Quaternion): void {
@@ -760,14 +786,14 @@ export class GulpScene {
    * Tall things between the camera and the child's hole are swapped for
    * see-through copies while they are in the way.
    */
-  private fadeInTheWay(world: World, me: Hole): void {
+  private fadeInTheWay(world: World, me: Hole, dt: number): void {
     const want = new Set<number>();
     if (me.alive) {
-      // Sight lines from the camera to the hole's eyes and its near rim: a
-      // building fades only if one of them passes through it.
+      // Sight lines from the camera to the hole's eyes and the middle of its
+      // mouth. Only buildings standing in front of the hole (on the camera's
+      // side) may fade: one behind it never hides the mouth, and letting it
+      // fade made it flick on and off as the hole moved along it.
       const eye = this.camera.position;
-      // The eyes and the middle of the mouth: fading for the whole rim turns
-      // a street of skyscrapers into a haze. The glowing ring shows the rest.
       const targets = [new THREE.Vector3(me.x, 0.5 + me.r * 0.4, me.z - me.r), new THREE.Vector3(me.x, 0.3, me.z)];
       const rays = targets.map((t) => ({ ray: new THREE.Ray(eye.clone(), t.clone().sub(eye).normalize()), far: eye.distanceTo(t) }));
       const box = new THREE.Box3();
@@ -776,6 +802,7 @@ export class GulpScene {
         if (!world.props.has(p.id)) continue;
         const info = KINDS[p.kind];
         const half = Math.max(info.w, info.d) / 2;
+        if (p.z + half < me.z + me.r * 0.3) continue;
         const h = info.h * p.hScale;
         box.min.set(p.x - half, 0, p.z - half);
         box.max.set(p.x + half, h, p.z + half);
@@ -783,11 +810,17 @@ export class GulpScene {
       }
     }
     for (const id of want) this.ghostSeen.set(id, this.time);
+    // Fade in and out over a quarter of a second rather than snapping.
+    const step = this.reducedMotion ? 1 : Math.min(1, dt * 4);
     for (const [id, ghost] of this.ghosts) {
-      if (want.has(id) || this.time - (this.ghostSeen.get(id) ?? 0) < 0.5) continue;
+      const mat = ghost.material as THREE.MeshStandardMaterial;
+      const keep = want.has(id) || this.time - (this.ghostSeen.get(id) ?? 0) < 0.6;
+      const target = keep ? GHOST : 1;
+      mat.opacity += (target - mat.opacity) * step;
+      if (keep || mat.opacity < 0.97) continue;
       this.ghostSeen.delete(id);
       this.scene.remove(ghost);
-      (ghost.material as THREE.Material).dispose();
+      mat.dispose();
       this.ghosts.delete(id);
       const p = world.props.get(id);
       if (p) this.setShown(p, true);
@@ -798,16 +831,18 @@ export class GulpScene {
       if (!p) continue;
       const mat = this.material.clone();
       mat.transparent = true;
-      mat.opacity = 0.2;
+      mat.opacity = 1;
       mat.depthWrite = false;
       const ghost = new THREE.Mesh(this.geometry(p), mat);
       ghost.position.set(p.x, 0, p.z);
       ghost.rotation.y = p.rot;
+      ghost.renderOrder = 2;
       this.scene.add(ghost);
       this.ghosts.set(id, ghost);
       this.setShown(p, false);
     }
   }
+
 
   render(): void {
     if (this.disposed) return;
