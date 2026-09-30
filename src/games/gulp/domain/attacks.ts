@@ -66,17 +66,16 @@ const TANK_SIZE = footSize('tank');
 const TANK_RANGE = 200;
 const MIN_ATTACK_LEVEL = 4;
 /**
- * How often the city goes after the child rather than a computer hole, when
- * both are big enough: now and then on Easy, half the time on Hard (where a
- * child in the lead is always the one it goes after).
+ * On Easy, how often the city lets a child who is the biggest mouth off and
+ * goes after the next biggest instead.
  */
-const CHILD_SHARE: Record<Difficulty, number> = { easy: 0.2, medium: 0.35, hard: 0.5 };
+const EASY_SPARE = 0.5;
 /** Hits a wave of tanks or helicopters lands before it heads home. */
 const WAVE_HITS: Record<Difficulty, number> = { easy: 1, medium: 2, hard: 3 };
 
-export function fightBack(w: World, dt: number, events: WorldEvent[], player: Hole | null): void {
+export function fightBack(w: World, dt: number, events: WorldEvent[]): void {
   w.nextAttack -= dt;
-  if (w.nextAttack <= 0) launch(w, events, player);
+  if (w.nextAttack <= 0) launch(w, events);
 
   for (const a of w.attacks) {
     a.life -= dt;
@@ -88,20 +87,15 @@ export function fightBack(w: World, dt: number, events: WorldEvent[], player: Ho
 }
 
 /**
- * Pick who the city goes after: big holes only. The child is one of them,
- * picked now and then (see CHILD_SHARE); otherwise the biggest computer hole.
+ * Pick who the city goes after: the biggest mouth, whoever it is. On Easy a
+ * child in the lead is spared half the time, for the next biggest.
  */
-function pickTarget(w: World, big: Hole[], player: Hole | null): Hole {
-  const rivals = big.filter((h) => h !== player);
-  if (!player || !big.includes(player) || !rivals.length) return rivals.length ? biggestOf(rivals) : big[0];
-  const { difficulty } = w.options;
-  if (difficulty === 'hard' && player === biggestOf(big)) return player;
-  return w.rng() < CHILD_SHARE[difficulty] ? player : biggestOf(rivals);
+function pickTarget(w: World, big: Hole[]): Hole {
+  const [first, second] = [...big].sort((a, b) => b.r - a.r);
+  return first.isPlayer && second && w.options.difficulty === 'easy' && w.rng() < EASY_SPARE ? second : first;
 }
 
-const biggestOf = (hs: Hole[]): Hole => hs.reduce((a, b) => (b.r > a.r ? b : a));
-
-function launch(w: World, events: WorldEvent[], player: Hole | null): void {
+function launch(w: World, events: WorldEvent[]): void {
   const big = w.holes.filter((h) => h.alive && h.safe <= 0 && levelOf(h.r) >= MIN_ATTACK_LEVEL);
   if (!big.length) {
     w.nextAttack = 5;
@@ -109,7 +103,7 @@ function launch(w: World, events: WorldEvent[], player: Hole | null): void {
   }
   // Now and then, not all the time: each attack should feel like an event.
   w.nextAttack = 20 + w.rng() * 12;
-  const target = pickTarget(w, big, player);
+  const target = pickTarget(w, big);
   // A map with a military base sends its army half the time.
   const base = w.city.base;
   if (base && w.rng() < 0.5) {

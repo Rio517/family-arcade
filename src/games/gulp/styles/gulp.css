@@ -468,18 +468,22 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   color: #fff;
 }
 .gulp-lv {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 6px 12px 0;
+  border-radius: 999px;
   background: #fff;
   color: var(--g-ink);
-  line-height: 0.9;
   box-shadow: inset 0 0 0 3px var(--g-blue);
+  white-space: nowrap;
 }
-.gulp-lv small { font-size: 10px; font-weight: 900; }
-.gulp-lv b { font-size: 17px; font-weight: 900; }
+.gulp-lv small { font-size: 14px; font-weight: 800; }
+.gulp-lv-short { display: none; }
+/* Room for two digits, so the pill keeps its width from level 9 to 10. */
+.gulp-lv b { min-width: 1.3em; font-size: 21px; font-weight: 900; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; }
 .gulp-meter { width: 120px; height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); overflow: hidden; }
 .gulp-meter-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7fd0ff, #fff); }
 .gulp-next { font-size: 14px; font-weight: 800; white-space: nowrap; }
@@ -1049,7 +1053,10 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   .gulp-board .gulp-dot { display: none; }
   .gulp-clock { font-size: 20px; padding: 6px 12px; }
   .gulp-level { padding: 3px 8px 3px 3px; gap: 5px; }
-  .gulp-lv { width: 30px; height: 30px; }
+  .gulp-lv { height: 30px; padding: 4px 10px 0; gap: 3px; }
+  .gulp-lv-long { display: none; }
+  .gulp-lv-short { display: inline; }
+  .gulp-lv b { font-size: 18px; }
   .gulp-meter { width: 56px; }
   .gulp-next { display: none; }
   .gulp-right { flex-direction: column-reverse; align-items: flex-end; gap: 6px; }

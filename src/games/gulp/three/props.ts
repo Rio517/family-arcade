@@ -41,7 +41,7 @@ import { PARK, type ParkKind } from './park';
 import { WONDERS_BUILDERS, type WonderKind } from './wonders';
 import { WORKS } from './works';
 
-/** The gas works and airport train kinds, whose builders live in works.ts. */
+/** The chemical works and airport train kinds, whose builders live in works.ts. */
 type WorksKind = keyof typeof WORKS;
 
 // ---------------------------------------------------------------------------

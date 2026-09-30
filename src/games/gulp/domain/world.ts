@@ -244,7 +244,7 @@ export function stepWorld(w: World, dt: number, input: Input | null): WorldEvent
     rebuild(w, events);
   }
   if (w.options.powerups) spawnPowerups(w, dt, player);
-  if (w.options.fightBack) fightBack(w, dt, events, player);
+  if (w.options.fightBack) fightBack(w, dt, events);
   return events;
 }
 

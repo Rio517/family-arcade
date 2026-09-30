@@ -1,6 +1,6 @@
 /**
- * The gas works and the airport shuttle: a gas tank, a flare stack, the works'
- * control shed, and a three-car airport train. Same kit and rules as
+ * The chemical works and the airport shuttle: a chemical tank, a flare stack,
+ * the works' control shed, and a three-car airport train. Same kit and rules as
  * props.ts: toy shapes, bold colours, and tops that read from the high camera.
  */
 import * as THREE from 'three';
@@ -15,6 +15,8 @@ const HAZARD_BLACK = 0x25272e;
 const VALVE_RED = 0xe63946;
 const FLAME = 0xff8a1f;
 const FLAME_CORE = 0xffd23f;
+/** Toxic green: the chemical works' bands, trim and warning marks. */
+const TOXIC = 0x7ddc1f;
 
 const UP = new THREE.Vector3(0, 1, 0);
 const ONE = new THREE.Vector3(1, 1, 1);
@@ -39,7 +41,7 @@ function hazardRing(k: Kit, r: number, h: number, y: number, n = 12): void {
 }
 
 /**
- * The hazard kit every gas tank carries: a pipe dropping to the ground and
+ * The hazard kit every chemical tank carries: a pipe dropping to the ground and
  * running out to the lot's edge with a red valve wheel, and a yellow warning
  * diamond on a post by the path. `x0` is where the pipe leaves the tank.
  */
@@ -55,18 +57,18 @@ function tankFittings(k: Kit, x0: number, y0: number): void {
     k.box(HAZARD_BLACK, 0.95, 0.95, 0.04, 0, -0.475, 0);
     k.box(HAZARD_YELLOW, 0.8, 0.8, 0.04, 0, -0.4, 0.03);
   });
-  k.gem(VALVE_RED, 0.16, [-2.6, 1.7, 3.84]);
+  k.gem(TOXIC, 0.16, [-2.6, 1.7, 3.84]);
 }
 
 /**
- * A gas tank. Variant 0 is a big white sphere on legs with a stair winding up
- * to a railed top; variant 1 is a squat cylinder with a domed roof and a stair
- * spiralling round its wall. Both carry hazard-striped railings, a warning
- * placard, and a pipe out to a red valve.
+ * A chemical tank. Variant 0 is a big white sphere on legs with a stair
+ * winding up to a railed top; variant 1 is a squat cylinder with a domed roof
+ * and a stair spiralling round its wall. Both carry a toxic-green band,
+ * hazard-striped railings, a warning placard, and a pipe out to a red valve.
  */
 const gastank: Builder = (k, v) => {
   k.rbox(CONCRETE, 7.8, 0.2, 7.8, 0.8, 0.06, 0, 0, 0, { seg: 1 });
-  const blue = 0x3a86ff;
+  const band = TOXIC;
   if (v === 0) {
     const R = 3.2;
     const cy = 5.0;
@@ -76,7 +78,7 @@ const gastank: Builder = (k, v) => {
     }
     k.ring(STEEL, 3.05, 0.1, [0, 1.8, 0], { rx: Math.PI / 2 }, 3, 16);
     k.sphere(TANK_WHITE, R, [0, cy, 0], 14, 8);
-    k.ring(blue, R + 0.02, 0.18, [0, cy, 0], { rx: Math.PI / 2 }, 3, 20);
+    k.ring(band, R + 0.02, 0.18, [0, cy, 0], { rx: Math.PI / 2 }, 3, 20);
     // The stair: a straight flight up to the equator, then a spiral over the top.
     pipe(k, STAIR_ORANGE, [3.7, 0.2, 2.2], [3.35, cy, -0.6], 0.09);
     pipe(k, STAIR_ORANGE, [3.95, 1.1, 2.2], [3.6, cy + 0.9, -0.6], 0.06, 4);
@@ -95,7 +97,7 @@ const gastank: Builder = (k, v) => {
     const H = 6.0;
     k.cyl(CONCRETE, R + 0.3, R + 0.3, 0.4, 16, 0, 0.2, 0);
     k.cyl(TANK_WHITE, R, R, H, 16, 0, 0.6, 0, { open: true });
-    k.cyl(blue, R + 0.03, R + 0.03, 0.7, 16, 0, 3.6, 0, { open: true });
+    k.cyl(band, R + 0.03, R + 0.03, 0.7, 16, 0, 3.6, 0, { open: true });
     const top = 0.6 + H;
     k.sphere(TANK_WHITE, R, [0, top, 0], 16, 4, { hemi: true, scale: [1, 0.36, 1] });
     hazardRing(k, R + 0.05, 0.45, top, 16);
@@ -151,13 +153,13 @@ const flarestack: Builder = (k) => {
 };
 
 /**
- * The gas works' control shed: a low building with a band of windows, a flat
+ * The chemical works' control shed: a low building with a band of windows, a flat
  * roof with an AC unit and a radio mast, a door with a little canopy at the
  * front, and a pipe rack along its right side carrying three coloured pipes.
  */
 const plantshed: Builder = (k) => {
   const wall = 0xdfe6ee;
-  const trim = 0x3a86ff;
+  const trim = TOXIC;
   const W = 8.2;
   const D = 5.6;
   const cz = -0.3;

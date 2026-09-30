@@ -430,7 +430,7 @@ function ringKind(map: MapId, f: number, rng: Rng): BlockKind {
       if (f < 0.3) return r < 0.4 ? 'skyline' : 'downtown';
       if (f < 0.45) return r < 0.6 ? 'downtown' : 'town';
       if (f < 0.6) return r < 0.5 ? 'town' : 'suburb';
-      return r < 0.8 ? 'suburb' : 'park';
+      return r < 0.75 ? 'suburb' : 'town';
   }
 }
 
@@ -747,9 +747,9 @@ function interior(b: Block, t: Tools, ring: number, eastHalf = false): boolean {
       return fills(kind);
     }
     case 'industrial': {
-      // A factory (or the chemical plant) at the back, a yard of containers,
+      // A factory (or a chemical works) at the back, a yard of containers,
       // a tanker and a van at the front; now and then a water tower.
-      if (rng() < 0.4) gasworks(t, lot);
+      if (rng() < 0.4) chemWorks(t, lot);
       else add('factory', cx, z0 + s - KINDS.factory.d / 2 - 0.4, 0, variant());
       for (let i = 0; i < 4; i++) add('container', x0 + 1.6 + i * 3, z0 + 3.3, 0, variant());
       add('tanker', x0 + 15, z0 + 4.2, 0);
@@ -888,11 +888,11 @@ function scatter(t: Tools, x0: number, z0: number, s: number, n: number, each: (
 }
 
 /**
- * A gas works on the back of an industrial lot, where a factory would
- * stand: two or three gas holders, a flare stack, the control shed, and
- * containers when there is room for them.
+ * A chemical works on the back of an industrial lot, where a factory would
+ * stand: two or three chemical tanks, a flare stack, the control shed, and
+ * containers when there is room for them. All of it is hazardous to eat.
  */
-function gasworks({ add, rng, variant }: Tools, { x0, z0, s }: Lot): void {
+function chemWorks({ add, rng, variant }: Tools, { x0, z0, s }: Lot): void {
   const cx = x0 + s / 2;
   const back = z0 + s;
   add('gastank', cx - 6.5, back - 5, 0, variant());

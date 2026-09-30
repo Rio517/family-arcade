@@ -64,8 +64,8 @@ export type PropKind =
   | 'warehouse'
   | 'watertower'
   | 'barn'
-  // A gas works, in pieces that can each be swallowed: the tanks give a
-  // hole the chemical knock, the flare stack and control shed do not.
+  // A chemical works, in pieces that can each be swallowed, and each
+  // hazardous: whoever eats one gets the chemical knock (once while reeling).
   | 'gastank'
   | 'flarestack'
   | 'plantshed'
@@ -202,9 +202,9 @@ const TABLE: Record<PropKind, KindRow> = {
   warehouse: { name: 'a warehouse', tier: 7, w: 24.0, d: 14.0, h: 9.0, variants: 3 },
   watertower: { name: 'a water tower', tier: 7, w: 9.0, d: 9.0, h: 22.0, variants: 2 },
   barn: { name: 'a barn', tier: 7, w: 14.0, d: 10.0, h: 10.0, variants: 2, food: 'healthy' },
-  gastank: { name: 'a gas tank', tier: 6, w: 8.0, d: 8.0, h: 9.0, variants: 2, hazard: true },
-  flarestack: { name: 'a flare stack', tier: 5, w: 3.0, d: 3.0, h: 24.0, variants: 1 },
-  plantshed: { name: 'a control shed', tier: 5, w: 10.0, d: 7.0, h: 6.0, variants: 1 },
+  gastank: { name: 'a chemical tank', tier: 6, w: 8.0, d: 8.0, h: 9.0, variants: 2, hazard: true },
+  flarestack: { name: 'a chemical flare', tier: 5, w: 3.0, d: 3.0, h: 24.0, variants: 1, hazard: true },
+  plantshed: { name: 'the chemical works', tier: 5, w: 10.0, d: 7.0, h: 6.0, variants: 1, hazard: true },
   train: { name: 'an airport train', tier: 6, w: 2.6, d: 20.0, h: 3.4, variants: 1, vehicle: true },
   stadium: { name: 'a stadium', tier: 8, w: 36.0, d: 30.0, h: 14.0, variants: 2 },
   powerplant: { name: 'a power plant', tier: 8, w: 34.0, d: 26.0, h: 30.0, variants: 1 },
