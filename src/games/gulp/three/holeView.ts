@@ -48,6 +48,13 @@ const PIT_PROFILE: THREE.Vector2[] = [
   new THREE.Vector2(0, -PIT_DEPTH),
 ];
 
+/** Rings of teeth by mouth size: up to `upTo` radius, `count` teeth at `size` of a small mouth's. */
+const TEETH = [
+  { upTo: 9, count: 14, size: 1 },
+  { upTo: 20, count: 22, size: 0.66 },
+  { upTo: Infinity, count: 32, size: 0.46 },
+] as const;
+
 /** Each power-up's colour: the aura, the countdown ring and its number. */
 const POWER_COLOR = { speed: 0x39c6ff, double: 0xffc62e } as const;
 /** The countdown ring is built whole once and drawn in part: this many segments, about 0.01 radians each. */
@@ -69,6 +76,8 @@ interface HoleObj {
   /** The mouth's cut in the ground, its throat and any mess on it: one unit wide, scaled to the hole. */
   disc: THREE.Group;
   body: THREE.Group;
+  /** Rings of teeth for a small, middling and giant mouth: more, smaller teeth as it grows (see `TEETH`). */
+  teeth: THREE.Group[];
   rim: THREE.MeshStandardMaterial;
   pupils: THREE.Object3D[];
   lids: THREE.Object3D[];
@@ -224,18 +233,41 @@ export class HoleViews {
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.05;
     body.add(ring);
+    // A darker inner lip where the rim turns down into the throat, and a
+    // light shine along the top: the rim reads as a rounded, two-tone lip
+    // even when the mouth fills the screen.
+    const base = new THREE.Color(look.color);
+    const lip = new THREE.Mesh(
+      new THREE.TorusGeometry(0.92, 0.05, 8, 56),
+      keep(new THREE.MeshStandardMaterial({ color: base.clone().multiplyScalar(0.55), roughness: 0.6 })),
+    );
+    lip.rotation.x = Math.PI / 2;
+    lip.position.y = 0.01;
+    const shine = new THREE.Mesh(
+      new THREE.TorusGeometry(1.0, 0.028, 6, 56),
+      keep(new THREE.MeshStandardMaterial({ color: base.clone().lerp(new THREE.Color(0xffffff), 0.5), roughness: 0.3 })),
+    );
+    shine.rotation.x = Math.PI / 2;
+    shine.position.y = 0.125;
+    body.add(lip, shine);
 
-    // Teeth round the rim, leaning in: friendly, not scary.
+    // Teeth round the rim, leaning in: friendly, not scary. A bigger mouth
+    // gets more, smaller teeth, not a few giant spikes.
     const white = keep(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }));
-    const toothGeo = new THREE.ConeGeometry(0.09, 0.24, 5);
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2;
-      const tooth = new THREE.Mesh(toothGeo, white);
-      tooth.position.set(Math.cos(a) * 0.88, 0.1, Math.sin(a) * 0.88);
-      tooth.rotation.set(0, -a, 0);
-      tooth.rotateZ(0.9);
-      body.add(tooth);
-    }
+    const teeth = TEETH.map(({ count, size }) => {
+      const set = new THREE.Group();
+      const toothGeo = new THREE.ConeGeometry(0.09 * size, 0.24 * size, 5);
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2;
+        const tooth = new THREE.Mesh(toothGeo, white);
+        tooth.position.set(Math.cos(a) * (0.9 - 0.02 * size), 0.1 * size, Math.sin(a) * (0.9 - 0.02 * size));
+        tooth.rotation.set(0, -a, 0);
+        tooth.rotateZ(0.9);
+        set.add(tooth);
+      }
+      body.add(set);
+      return set;
+    });
 
     // Googly eyes on the far rim, where the camera always sees them.
     const eyeGeo = new THREE.SphereGeometry(0.32, 18, 14);
@@ -296,7 +328,7 @@ export class HoleViews {
     smearMesh.visible = false;
     disc.add(smearMesh);
     const smear = { mesh: smearMesh, kind: null, amount: 0, base: new THREE.Color(look.color), flameIn: 0 };
-    const obj: HoleObj = { group, disc, body, rim, pupils, lids, eyes, label, materials, smear, shown: 1, y: 0, flash: 0, blink: 2 + (group.id % 5) * 0.7 };
+    const obj: HoleObj = { group, disc, body, teeth, rim, pupils, lids, eyes, label, materials, smear, shown: 1, y: 0, flash: 0, blink: 2 + (group.id % 5) * 0.7 };
     if (mine) obj.power = buildPowerShow(group);
     return obj;
   }
@@ -315,6 +347,8 @@ export class HoleViews {
     const r = h.r * obj.shown;
     obj.disc.scale.setScalar(r);
     obj.body.scale.setScalar(r);
+    const set = TEETH.findIndex((t) => r < t.upTo);
+    obj.teeth.forEach((g, i) => (g.visible = i === set));
     // The eyes grow with the square root of the hole, so a giant's eyes stay
     // cute instead of filling the screen. They sit on the rim either way.
     const eye = Math.min(1, Math.sqrt(2.4 / Math.max(0.1, r)));
