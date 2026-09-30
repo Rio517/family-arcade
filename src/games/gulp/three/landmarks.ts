@@ -1,5 +1,5 @@
 /**
- * The big Gulp City kinds (tier 7 and up): factories, stadiums, skyscrapers
+ * The big Gulp Universe kinds (tier 7 and up): factories, stadiums, skyscrapers
  * and mountains. Same kit and rules as props.ts; kept apart because each one
  * is a small scene of its own.
  */

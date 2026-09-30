@@ -31,9 +31,9 @@ export function GulpMenu({
   const minutes = MAPS[settings.map].minutes;
   return (
     <div className="gulp-menu" data-testid="gulp-menu">
-      <div className="gulp-logo" aria-label="Gulp City">
+      <div className="gulp-logo" aria-label="Gulp Universe">
         <span className="gulp-logo-gulp">GULP</span>
-        <span className="gulp-logo-city">CITY</span>
+        <span className="gulp-logo-city">UNIVERSE</span>
         <span className="gulp-tag">Swallow the city, bite by bite!</span>
       </div>
 

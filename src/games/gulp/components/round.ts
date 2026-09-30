@@ -1,5 +1,5 @@
 /**
- * The plain parts of a Gulp City round's screens: the menu's settings, the
+ * The plain parts of a Gulp Universe round's screens: the menu's settings, the
  * scoreboard snapshot copied out of the live world, and how the 3D scene is
  * loaded. Kept apart from the components so each file holds only components.
  */

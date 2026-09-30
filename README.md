@@ -10,7 +10,7 @@ score logger, installable as an offline PWA:
   flying unicorn, a bunny on a cloud. A rainbow road leads the way. First to
   20 coins wins; rainbow rings give a burst of speed, and power-ups make you
   bigger, give you big wings, or lay a line of coins ahead.
-- **Gulp City** — be a hungry hole in a toy 3D city (1 player against the
+- **Gulp Universe** — be a hungry hole in a toy 3D city (1 player against the
   computer): swallow cones, then cars, buses, towers, stadiums and mountains,
   and grow without limit across four maps from a Town to a whole Region.
   Optional power-ups and a city that fights back with fuel trucks and planes.

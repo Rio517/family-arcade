@@ -1,5 +1,5 @@
 /**
- * The rules of a Gulp City round: holes move, swallow whatever fits, grow
+ * The rules of a Gulp Universe round: holes move, swallow whatever fits, grow
  * without limit, and swallow smaller holes. Two things can be switched on:
  * power-ups that turn up from time to time, and a city that fights back
  * (a chemical plant that shrinks whoever eats it, tanker trucks driven into

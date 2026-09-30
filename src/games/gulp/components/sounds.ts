@@ -1,5 +1,5 @@
 /**
- * Gulp City's sounds, made in code with Web Audio: a gulp that deepens with
+ * Gulp Universe's sounds, made in code with Web Audio: a gulp that deepens with
  * what was swallowed, a level-up chime, a power-up sparkle, a boom, a warning
  * horn and the countdown beeps. No sound files, so the PWA stays offline.
  *

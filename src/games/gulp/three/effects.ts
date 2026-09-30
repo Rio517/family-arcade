@@ -1,5 +1,5 @@
 /**
- * The moving extras in a Gulp City round: explosions and gas, "+points"
+ * The moving extras in a Gulp Universe round: explosions and gas, "+points"
  * popping up over the child's hole, power-up orbs, and the city fighting
  * back (a tanker with a warning sign, a plane, and red target rings where
  * its bombs will land).

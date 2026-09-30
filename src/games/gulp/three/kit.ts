@@ -1,5 +1,5 @@
 /**
- * The toolbox the Gulp City props are built with. Every part is turned into
+ * The toolbox the Gulp Universe props are built with. Every part is turned into
  * plain non-indexed triangles with one flat vertex colour, so a whole prop
  * merges into a single geometry that the scene draws with one shared
  * vertex-coloured, flat-shaded material.

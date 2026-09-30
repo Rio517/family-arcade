@@ -1,5 +1,5 @@
 /**
- * Everything in Gulp City that a hole can eat, from a traffic cone to a
+ * Everything in Gulp Universe that a hole can eat, from a traffic cone to a
  * tower block, and what it takes to eat it.
  *
  * A thing's `size` is the smallest hole radius, times FIT, that can swallow

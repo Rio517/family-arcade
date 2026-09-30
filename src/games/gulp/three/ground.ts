@@ -1,5 +1,5 @@
 /**
- * Gulp City's ground: pavements, roads with their markings, and what each
+ * Gulp Universe's ground: pavements, roads with their markings, and what each
  * block stands on (grass, paving, fields, concrete), on an island in the sea.
  *
  * Built from flat layers of quads, each with a small tiling texture mapped in

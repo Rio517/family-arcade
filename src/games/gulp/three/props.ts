@@ -1,5 +1,5 @@
 /**
- * The Gulp City model kit: every PropKind drawn as one merged, vertex-coloured
+ * The Gulp Universe model kit: every PropKind drawn as one merged, vertex-coloured
  * geometry, sized to the footprint and height in the catalogue so the rules
  * and the picture agree. Everything is procedural (the game is an offline
  * PWA), deterministic (variety comes from `variant` and `hScale`, never
