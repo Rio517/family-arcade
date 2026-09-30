@@ -14,8 +14,16 @@ import { blobTexture } from './canvasTextures';
 import { modelOf } from './models';
 import { SeeThrough } from './seeThrough';
 
-/** How long a swallowed thing takes to disappear, in seconds. */
-const FALL = 0.8;
+/**
+ * How long a swallowed thing takes to go, in seconds: a cone is gone in half
+ * a second, a skyscraper topples for over a second and a half.
+ */
+const fallTime = (size: number) => Math.min(1.6, Math.max(0.5, 0.45 + size * 0.07));
+/** Share of the fall spent tipping over the rim before it drops free. */
+const TIP = 0.4;
+/** How far it has tipped (radians) when it goes over, and when it is gone. */
+const TIPPED = 1.05;
+const TUMBLED = 1.45;
 /** Buildings from this tier up can hide the child's hole, and fade. */
 const TALL_TIER = 5;
 /** Things are batched per square of this many units (two blocks), so the
@@ -39,18 +47,23 @@ interface Slot {
 interface Faller {
   mesh: THREE.Mesh;
   hole: number;
+  /** 0..1 through the fall, and how long the whole fall takes. */
   t: number;
-  from: THREE.Vector3;
+  time: number;
+  /** Where it stood, from the hole's middle: the fall follows a moving hole. */
+  offX: number;
+  offZ: number;
+  /** Half its footprint along the line to the middle: it tips over its outer edge. */
+  half: number;
   rot: number;
   h: number;
   /** A see-through copy has its own material to free. */
   ownMaterial: boolean;
 }
 
-/** Something put up during the round; `t` runs 0..1 while it rises, and on to 1.4 while its scaffold comes down. */
+/** Something put up during the round; `t` runs 0..1 while it rises. */
 interface Built {
   mesh: THREE.Mesh;
-  scaffold: THREE.Group;
   t: number;
   /** Seconds to rise. */
   time: number;
@@ -62,8 +75,6 @@ export class PropView {
   private built = new Map<number, Built>();
   private fallers: Faller[] = [];
   private seeThrough: SeeThrough;
-  private scaffoldMat = new THREE.MeshStandardMaterial({ color: 0xffb81c, roughness: 0.6 });
-  private scaffoldGeo = new THREE.BoxGeometry(1, 1, 1);
   private blobTex = blobTexture();
   private blobMat = new THREE.MeshBasicMaterial({
     map: this.blobTex,
@@ -83,6 +94,13 @@ export class PropView {
   private tiltAxis = new THREE.Vector3();
   private tiltQ = new THREE.Quaternion();
   private upright = new THREE.Euler();
+  private fallAxis = new THREE.Vector3();
+  private fallQ = new THREE.Quaternion();
+  private fallYaw = new THREE.Quaternion();
+  private fallUp = new THREE.Vector3();
+  private yAxis = new THREE.Vector3(0, 1, 0);
+  /** The world the view was last stepped with, for where a swallowing hole stands. */
+  private lastWorld: World;
 
   constructor(
     private scene: THREE.Scene,
@@ -91,6 +109,7 @@ export class PropView {
     world: World,
     private reducedMotion: boolean,
   ) {
+    this.lastWorld = world;
     this.seeThrough = new SeeThrough(scene, material, reducedMotion, (p, shown) => this.setShown(p, shown));
     this.buildBatches(world);
   }
@@ -100,10 +119,7 @@ export class PropView {
     this.setShown(p, false);
     const ghost = this.seeThrough.take(p.id);
     const built = this.built.get(p.id);
-    if (built) {
-      this.built.delete(p.id);
-      this.scene.remove(built.scaffold);
-    }
+    if (built) this.built.delete(p.id);
     let mesh: THREE.Mesh;
     let ownMaterial = false;
     if (ghost) {
@@ -122,12 +138,20 @@ export class PropView {
       this.scene.add(mesh);
     }
     const info = KINDS[p.kind];
-    this.fallers.push({ mesh, hole, t: 0, from: mesh.position.clone(), rot: p.rot, h: info.h * p.hScale, ownMaterial });
+    const h = this.holeAt(hole);
+    const offX = mesh.position.x - (h?.x ?? mesh.position.x);
+    const offZ = mesh.position.z - (h?.z ?? mesh.position.z);
+    // Half its footprint along the line from the hole's middle to it.
+    const along = Math.atan2(offX, offZ) - p.rot;
+    const half = Math.abs(Math.sin(along)) * (info.w / 2) + Math.abs(Math.cos(along)) * (info.d / 2);
+    this.fallers.push({ mesh, hole, t: 0, time: fallTime(p.size), offX, offZ, half, rot: p.rot, h: info.h * p.hScale, ownMaterial });
   }
 
   /**
    * Something new goes up. A construction site pops up out of the ground; a
-   * finished building rises out of its site's scaffold over a few seconds.
+   * tower's frame climbs out more slowly with its own scaffolding and crane;
+   * a finished building rises out of the ground over a few seconds, with a
+   * little overshoot, while dust puffs out round its base (see the scene).
    */
   raise(p: Prop): void {
     const mesh = new THREE.Mesh(modelOf(p), this.material);
@@ -137,47 +161,18 @@ export class PropView {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     this.scene.add(mesh);
-    if (isSite(p.kind)) {
-      // Sites pop up quickly with no scaffold of their own; a tower's frame
-      // climbs out more slowly, bringing its own scaffolding and crane.
-      const time = p.kind === 'tallsite' ? 2.5 : 0.6;
-      this.built.set(p.id, { mesh, scaffold: new THREE.Group(), t: this.reducedMotion ? 1.4 : 0, time });
-      return;
-    }
-    const info = KINDS[p.kind];
-    const w = info.w + 0.6;
-    const d = info.d + 0.6;
-    const h = info.h * p.hScale + 1;
-    const scaffold = new THREE.Group();
-    scaffold.position.set(p.x, 0, p.z);
-    scaffold.rotation.y = p.rot;
-    const bar = (sx: number, sy: number, sz: number, x: number, y: number, z: number) => {
-      const m = new THREE.Mesh(this.scaffoldGeo, this.scaffoldMat);
-      m.scale.set(sx, sy, sz);
-      m.position.set(x, y, z);
-      scaffold.add(m);
-    };
-    const t = 0.35;
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) bar(t, h, t, (sx * w) / 2, h / 2, (sz * d) / 2);
-    for (let y = h / 3; y <= h; y += h / 3) {
-      bar(w, t, t, 0, y, d / 2);
-      bar(w, t, t, 0, y, -d / 2);
-      bar(t, t, d, w / 2, y, 0);
-      bar(t, t, d, -w / 2, y, 0);
-    }
-    this.scene.add(scaffold);
-    this.built.set(p.id, { mesh, scaffold, t: this.reducedMotion ? 1 : 0, time: BUILD_TIME });
-    this.seeThrough.track(p);
+    const time = p.kind === 'tallsite' ? 2.5 : isSite(p.kind) ? 0.6 : BUILD_TIME;
+    this.built.set(p.id, { mesh, t: this.reducedMotion ? 1 : 0, time });
+    if (!isSite(p.kind)) this.seeThrough.track(p);
   }
 
-  /** Something that was always there joins the city: no rising out of the ground, and no scaffold. */
+  /** Something that was always there joins the city (a police car that has parked): no rising out of the ground. */
   appear(p: Prop): void {
     this.raise(p);
     const b = this.built.get(p.id);
     if (b) {
-      b.t = 1.4;
+      b.t = 1;
       b.mesh.scale.y = 1;
-      this.scene.remove(b.scaffold);
     }
   }
 
@@ -186,7 +181,7 @@ export class PropView {
     const b = this.built.get(p.id);
     if (!b) return;
     this.built.delete(p.id);
-    this.scene.remove(b.mesh, b.scaffold);
+    this.scene.remove(b.mesh);
     this.seeThrough.untrack(p);
   }
 
@@ -197,6 +192,7 @@ export class PropView {
 
   /** Things falling into holes, and buildings rising. */
   step(world: World, dt: number): void {
+    this.lastWorld = world;
     this.stepFallers(world, dt);
     this.stepBuilt(dt);
   }
@@ -276,8 +272,6 @@ export class PropView {
   }
 
   dispose(): void {
-    this.scaffoldGeo.dispose();
-    this.scaffoldMat.dispose();
     this.blobTex.dispose();
     this.blobMat.dispose();
     for (const g of this.blobGeos.values()) g.dispose();
@@ -366,22 +360,40 @@ export class PropView {
     if (b && b.t >= 1) b.mesh.quaternion.copy(q);
   }
 
+  /**
+   * A swallowed thing tips over the edge of its footprint furthest from the
+   * hole's middle, leaning in faster and faster like anything overbalancing,
+   * then drops out of sight, still turning over. It keeps its heading: no
+   * spinning. The ground outside the mouth hides whatever is below it, so it
+   * seems to fall into the hole, not through the street.
+   */
   private stepFallers(world: World, dt: number): void {
+    const up = this.fallUp;
     for (let i = this.fallers.length - 1; i >= 0; i--) {
       const f = this.fallers[i];
-      f.t += dt / FALL;
+      f.t += dt / f.time;
       const h = world.holes[f.hole];
+      const cx = h ? h.x : f.mesh.position.x - f.offX;
+      const cz = h ? h.z : f.mesh.position.z - f.offZ;
       const k = Math.min(1, f.t);
-      // Slide toward the middle of the hole, tip over its edge, and sink.
-      const tx = h ? h.x : f.from.x;
-      const tz = h ? h.z : f.from.z;
-      const slide = Math.min(1, k * 1.6);
-      f.mesh.position.x = f.from.x + (tx - f.from.x) * slide;
-      f.mesh.position.z = f.from.z + (tz - f.from.z) * slide;
-      f.mesh.position.y = -k * k * (f.h * 1.4 + 2);
-      const along = Math.atan2(tx - f.from.x, tz - f.from.z);
-      const tilt = Math.min(1.3, k * 2.2);
-      f.mesh.rotation.set(Math.cos(along) * tilt, f.rot + k * 1.2, -Math.sin(along) * tilt, 'YXZ');
+      // Toward the middle along the ground, and the axis it tips about.
+      const d = Math.hypot(f.offX, f.offZ) || 1;
+      const inX = -f.offX / d;
+      const inZ = -f.offZ / d;
+      this.fallAxis.set(inZ, 0, -inX);
+      // Tipping (accelerating), then over and dropping (under gravity).
+      const tip = Math.min(1, k / TIP);
+      const drop = Math.max(0, (k - TIP) / (1 - TIP));
+      const angle = TIPPED * tip * tip + (TUMBLED - TIPPED) * drop;
+      this.fallQ.setFromAxisAngle(this.fallAxis, angle);
+      // Pivot on the outer edge of its footprint: the base swings in and down.
+      const px = f.offX - inX * f.half;
+      const pz = f.offZ - inZ * f.half;
+      up.set(inX * f.half, 0, inZ * f.half).applyQuaternion(this.fallQ);
+      const sink = drop * drop * (f.h * 1.4 + 3);
+      f.mesh.position.set(cx + px + up.x + inX * drop * f.half, up.y - sink, cz + pz + up.z + inZ * drop * f.half);
+      this.fallYaw.setFromAxisAngle(this.yAxis, f.rot);
+      f.mesh.quaternion.copy(this.fallQ).multiply(this.fallYaw);
       if (f.t >= 1) {
         this.scene.remove(f.mesh);
         if (f.ownMaterial) (f.mesh.material as THREE.Material).dispose();
@@ -392,16 +404,16 @@ export class PropView {
 
   private stepBuilt(dt: number): void {
     for (const b of this.built.values()) {
-      if (b.t >= 1.4) continue;
-      b.t += dt / b.time;
-      const k = Math.min(1, b.t);
+      if (b.t >= 1) continue;
+      b.t = Math.min(1, b.t + dt / b.time);
       // Up with a little overshoot, then settled.
+      const k = b.t;
       const ease = 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2);
-      b.mesh.scale.y = Math.max(0.02, Math.min(1.04, ease));
-      if (b.t >= 1 || this.reducedMotion) b.mesh.scale.y = 1;
-      // The scaffold comes down once the building is up.
-      b.scaffold.scale.y = b.t < 1 ? 1 : Math.max(0.001, 1 - (b.t - 1) / 0.4);
-      if (b.t >= 1.4) this.scene.remove(b.scaffold);
+      b.mesh.scale.y = b.t >= 1 || this.reducedMotion ? 1 : Math.max(0.02, Math.min(1.04, ease));
     }
+  }
+
+  private holeAt(id: number): Hole | undefined {
+    return this.lastWorld.holes[id];
   }
 }

@@ -213,6 +213,27 @@ export class Effects {
 
   private markGeo = new THREE.PlaneGeometry(2, 2);
 
+  /**
+   * Dust puffing out round the base of a building as it rises: soft, pale,
+   * low, drifting outwards and up, gone in a couple of seconds.
+   */
+  dust(x: number, z: number, size: number): void {
+    const n = this.reducedMotion ? 4 : 14;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + this.rand() * 0.4;
+      const out = size * (0.25 + this.rand() * 0.2);
+      this.puff(
+        new THREE.Vector3(x + Math.cos(a) * size * 0.5, 0.6, z + Math.sin(a) * size * 0.5),
+        0xd8cdb8,
+        new THREE.Vector3(Math.cos(a) * out, 0.8 + this.rand() * 1.2, Math.sin(a) * out),
+        size * 0.22,
+        1.6 + this.rand() * 0.8,
+        size * 0.25,
+        { cold: 0xeee6d8, opacity: 0.55 },
+      );
+    }
+  }
+
   /** A lick of flame off a burning rim: it rises, cooling from yellow to red, and goes. */
   flame(x: number, z: number, size: number): void {
     this.puff(new THREE.Vector3(x, 0.6, z), 0xffd060, new THREE.Vector3(0, size * 1.6, 0), size * 0.6, 0.55, size * 0.4, {

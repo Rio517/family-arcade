@@ -19,7 +19,7 @@
  */
 import * as THREE from 'three';
 import { disposeDeep } from '@shared/three/disposeDeep';
-import { KINDS } from '../domain/catalog';
+import { isSite, KINDS } from '../domain/catalog';
 import type { World, WorldEvent } from '../domain/world';
 import { CameraRig } from './cameraRig';
 import type { Smear } from './canvasTextures';
@@ -142,6 +142,8 @@ export class GulpScene {
       } else if (e.type === 'rebuild') {
         if (e.replaces) this.props.clear(e.replaces);
         this.props.raise(e.prop);
+        // A finished building rises out of its site in a puff of dust.
+        if (!isSite(e.prop.kind)) this.effects.dust(e.prop.x, e.prop.z, Math.max(KINDS[e.prop.kind].w, KINDS[e.prop.kind].d));
       } else if (e.type === 'food' && e.hole === this.follow) {
         if (e.food === 'healthy') this.holes.say(`Healthy! +${e.bonus}`, true, e.hole);
         else if (this.time - this.lastYum > 2.5) {
