@@ -33,6 +33,8 @@ const REGROW_BATCH = 3;
  * and each opening makes the news.
  */
 const LADDER: PropKind[] = ['house', 'shop', 'apartment', 'tower', 'skyscraper'];
+/** Buildings that go up through a tall building site first. */
+const TALL: PropKind[] = ['tower', 'skyscraper'];
 const BIG: PropKind[] = ['factory', 'warehouse', 'chemplant', 'mall', 'stadium', 'powerplant'];
 /** Seconds from a building being eaten to its construction site appearing. */
 const SITE_AFTER = 6;
@@ -149,8 +151,12 @@ const COUNTDOWN = 3;
 /** How much of its size a swallowed hole keeps: the child keeps more. */
 const KEEP_PLAYER = 0.85;
 const KEEP_RIVAL = 0.7;
-/** How much of its size a hole keeps when the city hurts it, and how long it reels. */
-const HURT_PLAYER = 0.85;
+/**
+ * How much of its size a hole keeps when the city hurts it, and how long it
+ * reels. The child's knock depends on the level: a hit on Hard is a real
+ * setback, a hit on Easy a small one.
+ */
+const HURT_PLAYER: Record<'easy' | 'medium' | 'hard', number> = { easy: 0.85, medium: 0.75, hard: 0.6 };
 const HURT_RIVAL = 0.8;
 const STUN = 1.2;
 /** How long a hole burns after a fuel truck crashes into it (it looks dramatic; the hurt is the same). */
@@ -268,6 +274,8 @@ export type WorldEvent =
   | { type: 'eat'; prop: Prop; hole: number }
   | { type: 'regrow'; prop: Prop }
   | { type: 'rebuild'; prop: Prop; replaces: Prop | null }
+  /** Something new stands in the city as it is, with no building-up (a police car that has parked). */
+  | { type: 'park'; prop: Prop }
   | { type: 'news'; text: string; x: number; z: number }
   | { type: 'food'; hole: number; food: 'treat' | 'healthy'; bonus: number }
   | { type: 'combo'; hole: number; mult: number }
@@ -389,7 +397,7 @@ export function createWorld(rng: Rng, player: Racer | null, rivals: Racer[], opt
     rng,
     grid,
     nextPower: 8,
-    nextAttack: 20,
+    nextAttack: 22,
     nextId: 1,
     eaten: [],
     regrowIn: REGROW_EVERY,
@@ -598,7 +606,7 @@ function eatProps(w: World, h: Hole, events: WorldEvent[]): void {
     if (Math.hypot(p.x - h.x, p.z - h.z) > h.r - p.size * 0.35) continue;
     w.props.delete(p.id);
     const info = KINDS[p.kind];
-    if (p.kind === 'site' || p.kind === 'bigsite') {
+    if (p.kind === 'site' || p.kind === 'bigsite' || p.kind === 'tallsite') {
       // The site was eaten: the lot waits a while and starts again.
       const lot = w.lots.find((l) => l.site === p.id);
       if (lot) {
@@ -642,7 +650,7 @@ function gobble(w: World, h: Hole, p: Prop, events: WorldEvent[]): void {
   if (bonus) h.stun = 0;
   events.push({ type: 'eat', prop: p, hole: h.id });
   if (info.food) events.push({ type: 'food', hole: h.id, food: info.food, bonus });
-  if (w.options.fightBack && info.hazard) hurt(h, 'chem', events);
+  if (w.options.fightBack && info.hazard) hurt(w, h, 'chem', events);
 }
 
 function eatHoles(w: World, events: WorldEvent[]): void {
@@ -716,10 +724,24 @@ function rebuild(w: World, events: WorldEvent[]): void {
       continue;
     }
     const site = w.props.get(lot.site);
-    w.lots.splice(i, 1);
-    if (!site) continue;
-    w.props.delete(site.id);
+    if (!site) {
+      w.lots.splice(i, 1);
+      continue;
+    }
     const kind = lot.rung < 0 ? bigKind(w, lot) : ladderKind(w, lot);
+    // A tall building goes up in stages: the building site, then a frame
+    // with a crane on it, then the tower itself.
+    if (TALL.includes(kind.kind) && site.kind !== 'tallsite') {
+      w.props.delete(site.id);
+      const frame = makeProp(w.nextPropId++, 'tallsite', lot.x, lot.z, lot.rot, variant);
+      place(w, frame);
+      lot.site = frame.id;
+      lot.due = w.elapsed + SITE_TIME + w.rng() * 8;
+      events.push({ type: 'rebuild', prop: frame, replaces: site });
+      continue;
+    }
+    w.lots.splice(i, 1);
+    w.props.delete(site.id);
     const extra = lot.rung < 0 ? 0 : Math.max(0, lot.rung + 1 - LADDER.indexOf(kind.kind));
     const p = makeProp(w.nextPropId++, kind.kind, lot.x, lot.z, lot.rot, variant, kind.hScale ?? Math.min(2, 1 + 0.2 * extra));
     place(w, p);
@@ -999,7 +1021,9 @@ function police(w: World, dt: number, me: Hole, events: WorldEvent[]): void {
         // Parked: now it's a car in the city like any other, and two officers get out.
         r.state = 'leave';
         r.t = Infinity;
-        place(w, makeProp(w.nextPropId++, 'policecar', r.tx, r.tz, r.heading));
+        const parked = makeProp(w.nextPropId++, 'policecar', r.tx, r.tz, r.heading);
+        place(w, parked);
+        events.push({ type: 'park', prop: parked });
         for (const side of [-1, 1]) {
           w.responders.push({
             id: w.nextId++,
@@ -1061,7 +1085,8 @@ function callPolice(w: World, me: Hole, events: WorldEvent[]): void {
   const edge = w.city.half - 6;
   for (const side of [-1, 1]) {
     const stopAlong = (alongZ ? me.z : me.x) + side * (me.r + 9);
-    const startAlong = stopAlong + side * 70;
+    // From well out of sight up the street.
+    const startAlong = stopAlong + side * (110 + me.r * 2);
     const lane = side * 2.4;
     const clampE = (v: number) => Math.max(-edge, Math.min(edge, v));
     const sx = alongZ ? nearX + lane : clampE(startAlong);
@@ -1101,14 +1126,21 @@ function respawn(w: World, h: Hole): void {
 // -------------------------------------------------------------------------
 
 /** A spot on the island, `near` to `far` from a point. */
+/**
+ * A spot on land between `near` and `far` from (x, z). It tries a few
+ * directions for one that fits on land as it is, so a spot meant to be off
+ * screen is not pulled back into view by the edge of the land.
+ */
 function spotNear(w: World, x: number, z: number, near: number, far: number): { x: number; z: number } {
-  const a = w.rng() * Math.PI * 2;
-  const d = near + w.rng() * (far - near);
   const edge = w.city.land - 4;
-  return {
-    x: Math.max(-edge, Math.min(edge, x + Math.cos(a) * d)),
-    z: Math.max(-edge, Math.min(edge, z + Math.sin(a) * d)),
-  };
+  let spot = { x, z };
+  for (let tries = 0; tries < 6; tries++) {
+    const a = w.rng() * Math.PI * 2;
+    const d = near + w.rng() * (far - near);
+    spot = { x: x + Math.cos(a) * d, z: z + Math.sin(a) * d };
+    if (Math.abs(spot.x) <= edge && Math.abs(spot.z) <= edge) return spot;
+  }
+  return { x: Math.max(-edge, Math.min(edge, spot.x)), z: Math.max(-edge, Math.min(edge, spot.z)) };
 }
 
 function spawnPowerups(w: World, dt: number, player: Hole | null): void {
@@ -1149,8 +1181,8 @@ const TANK_SIZE = footSize('tank');
 const TANK_RANGE = 200;
 const MIN_ATTACK_LEVEL = 4;
 
-function hurt(h: Hole, cause: HurtCause, events: WorldEvent[]): void {
-  h.mass *= h.isPlayer ? HURT_PLAYER : HURT_RIVAL;
+function hurt(w: World, h: Hole, cause: HurtCause, events: WorldEvent[]): void {
+  h.mass *= h.isPlayer ? HURT_PLAYER[w.options.difficulty ?? 'easy'] : HURT_RIVAL;
   h.r = radiusFor(h.mass);
   h.stun = STUN;
   if (cause === 'tanker') h.burn = BURN;
@@ -1178,7 +1210,8 @@ function launch(w: World, events: WorldEvent[], player: Hole | null): void {
     w.nextAttack = 5;
     return;
   }
-  w.nextAttack = 16 + w.rng() * 10;
+  // Now and then, not all the time: each attack should feel like an event.
+  w.nextAttack = 20 + w.rng() * 12;
   const biggest = big.reduce((a, b) => (b.r > a.r ? b : a));
   const target = player && big.includes(player) && (player === biggest || w.rng() < 0.5) ? player : biggest;
   // A map with a military base sends its army half the time.
@@ -1213,7 +1246,7 @@ function launch(w: World, events: WorldEvent[], player: Hole | null): void {
     const dx = Math.cos(a);
     const dz = Math.sin(a);
     const reach = 140 + target.r * 4;
-    const speed = 45 + target.r * 0.8;
+    const speed = 62 + target.r;
     const radius = Math.max(5, target.r * 0.8);
     // Bombs along the plane's line, over where the hole is now. Each lands a
     // little after the plane passes, so its target ring shows for a while.
@@ -1221,15 +1254,16 @@ function launch(w: World, events: WorldEvent[], player: Hole | null): void {
       const bx = target.x + dx * k * radius * 1.4;
       const bz = target.z + dz * k * radius * 1.4;
       const pass = (reach + k * radius * 1.4) / speed;
-      return { id: w.nextId++, x: bx, z: bz, radius, fuse: pass + 1.2 };
+      return { id: w.nextId++, x: bx, z: bz, radius, fuse: pass + 1 };
     });
     w.attacks.push({ id, kind: 'bomber', target: target.id, x: target.x - dx * reach, z: target.z - dz * reach, dx, dz, speed, life: (reach * 2) / speed + 2, bombs });
   } else {
-    const spot = spotNear(w, target.x, target.z, 45 + target.r * 2.5, 55 + target.r * 3);
+    // Out of sight, then it drives in: nothing appears out of nowhere on screen.
+    const spot = spotNear(w, target.x, target.z, 90 + target.r * 4, 105 + target.r * 4.5);
     const heading = Math.atan2(target.x - spot.x, target.z - spot.z);
     // A little slower than the hole it chases, and slow to turn: a child who
     // sees it coming can always get out of the way.
-    w.attacks.push({ id, kind: 'tanker', ...spot, heading, speed: speedOf(target.r) * 0.8, target: target.id, life: 14 });
+    w.attacks.push({ id, kind: 'tanker', ...spot, heading, speed: speedOf(target.r) * 0.8, target: target.id, life: 26 });
   }
   events.push({ type: 'incoming', target: target.id, kind: bomber ? 'bomber' : 'tanker' });
 }
@@ -1244,14 +1278,16 @@ function driveTanker(w: World, a: Extract<Attack, { kind: 'tanker' }>, dt: numbe
     while (turn < -Math.PI) turn += Math.PI * 2;
     a.heading += Math.max(-1, Math.min(1, turn)) * 0.8 * dt;
   }
-  a.x += Math.sin(a.heading) * a.speed * dt;
-  a.z += Math.cos(a.heading) * a.speed * dt;
+  // Quick while it is far off, so it arrives; slower close up, so it can be dodged.
+  const far = target?.alive && Math.hypot(target.x - a.x, target.z - a.z) > 45 + target.r * 2 ? 1.6 : 1;
+  a.x += Math.sin(a.heading) * a.speed * far * dt;
+  a.z += Math.cos(a.heading) * a.speed * far * dt;
   // It crashes into any hole it reaches, big or small, and goes up in flames.
   for (const h of w.holes) {
     if (!h.alive || h.safe > 0) continue;
     if (Math.hypot(h.x - a.x, h.z - a.z) > h.r + TANKER_SIZE * 0.4) continue;
     a.life = 0;
-    hurt(h, 'tanker', events);
+    hurt(w, h, 'tanker', events);
     return;
   }
   if (Math.abs(a.x) > w.city.land + 20 || Math.abs(a.z) > w.city.land + 20) a.life = 0;
@@ -1300,7 +1336,7 @@ function moveUnit(w: World, a: Extract<Attack, { kind: 'tank' | 'heli' }>, dt: n
     if (b.fuse > 0) continue;
     events.push({ type: 'boom', x: b.x, z: b.z, size: b.radius });
     for (const h of w.holes) {
-      if (h.alive && h.safe <= 0 && Math.hypot(h.x - b.x, h.z - b.z) < b.radius + h.r * 0.25) hurt(h, 'bomb', events);
+      if (h.alive && h.safe <= 0 && Math.hypot(h.x - b.x, h.z - b.z) < b.radius + h.r * 0.25) hurt(w, h, 'bomb', events);
     }
   }
   a.shells = a.shells.filter((b) => b.fuse > 0);
@@ -1326,7 +1362,7 @@ function flyBomber(w: World, a: Extract<Attack, { kind: 'bomber' }>, dt: number,
     if (b.fuse > 0) continue;
     events.push({ type: 'boom', x: b.x, z: b.z, size: b.radius });
     for (const h of w.holes) {
-      if (h.alive && h.safe <= 0 && Math.hypot(h.x - b.x, h.z - b.z) < b.radius + h.r * 0.25) hurt(h, 'bomb', events);
+      if (h.alive && h.safe <= 0 && Math.hypot(h.x - b.x, h.z - b.z) < b.radius + h.r * 0.25) hurt(w, h, 'bomb', events);
     }
   }
   a.bombs = a.bombs.filter((b) => b.fuse > 0);

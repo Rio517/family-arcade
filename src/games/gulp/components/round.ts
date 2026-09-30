@@ -4,7 +4,7 @@
  * loaded. Kept apart from the components so each file holds only components.
  */
 import { KINDS, LEVELS } from '../domain/catalog';
-import { MAPS, type MapId } from '../domain/city';
+import { MAPS, type MapId, type Side } from '../domain/city';
 import type { Difficulty } from '../domain/rivals';
 import { POWER_TIME, comboOf, levelOf, levelProgress, nextLabel, standings, type World } from '../domain/world';
 import type { GulpScene } from '../three/scene';
@@ -89,7 +89,7 @@ export function hudOf(w: World, me: number): Hud {
   const rows = order.map((h, i) => ({
     id: h.id,
     rank: i + 1,
-    name: h.isPlayer ? 'You' : h.name,
+    name: h.name,
     css: SKINS[h.skin % SKINS.length].css,
     score: h.score,
     me: h.id === me,
@@ -112,8 +112,7 @@ export function hudOf(w: World, me: number): Hud {
     double: Math.ceil(h.doubleTime),
     speedLeft: h.speedTime / POWER_TIME.speed,
     doubleLeft: h.doubleTime / POWER_TIME.double,
-    nearEdge: h.alive && Math.max(Math.abs(h.x), Math.abs(h.z)) > w.city.land - 24 &&
-      !w.city.extraLand.some((l) => h.x >= l.x0 && h.x <= l.x1 && h.z >= l.z0 && h.z <= l.z1),
+    nearEdge: h.alive && nearOpenEdge(w, h.x, h.z),
     wonders: h.wonders,
     wondersTotal: w.city.props.filter((p) => KINDS[p.kind].wonder).length,
     combo: comboOf(h.streak),
@@ -128,4 +127,20 @@ export function hudOf(w: World, me: number): Hud {
 /** What a level newly lets you eat, for the level-up banner. */
 export function unlockedAt(level: number): string {
   return level < LEVELS.length ? LEVELS[level].label : 'Anything!';
+}
+
+/**
+ * Near the edge of play on a side with no sea. Where the sea is the edge the
+ * child can see it, so no warning is needed; where the green carries on
+ * past the edge, the warning says where play stops.
+ */
+function nearOpenEdge(w: World, x: number, z: number): boolean {
+  const edge = w.city.land - 24;
+  if (w.city.extraLand.some((l) => x >= l.x0 && x <= l.x1 && z >= l.z0 && z <= l.z1)) return false;
+  const near: Side[] = [];
+  if (x > edge) near.push('e');
+  if (x < -edge) near.push('w');
+  if (z > edge) near.push('s');
+  if (z < -edge) near.push('n');
+  return near.some((side) => !w.city.shores.includes(side));
 }

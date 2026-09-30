@@ -6,6 +6,26 @@ local until the release step at the end of this list.
 Status: **done** (built and checked), **check** (built, still to verify in the
 browser), **doing** (in progress), **todo**, **decide** (needs the owner).
 
+## Second release
+
+| Feedback | Status | Notes |
+| --- | --- | --- |
+| The mouth should be a real 3D hole, like Gulp City's; fire and poop should follow its shape | done | The mouth cuts the ground away and a funnel of throat goes down into the dark; things fall into it; messes are painted on the walls. |
+| Skyscrapers pop up: building site, then a taller building site, then the skyscraper | done | New `tallsite` (frame and tower crane) between the site and every tower or skyscraper. |
+| Bombs should come faster, but attacks come too often | done | The bomber flies in faster and its bombs land sooner; attacks come every 20–32 s. |
+| On Hard with fight-back, a hit should make you smaller | done | A hit keeps 85% of your size on Easy, 75% on Medium, 60% on Hard. |
+| Better explosions | done | Flash, cooling fireball, shock ring, sparks, debris, lingering smoke, scorch mark. |
+| A house shakes when you are at its edge, but not when you are right under it | done | See-through buildings over the hole now shake too. |
+| "Yuck!" when you swallow a garbage truck | done | |
+| Cars (a fuel truck, police) come out of nowhere on screen; a police car appeared from nowhere | done | Attacks and police start well out of sight and drive in. Parked police cars were never drawn at all: fixed. |
+| The menu camera should move at a moderate pace, no quick pans | done | Steady glide to the nearest unseen showpiece, a rest there, no sideways drift. |
+| Use the player's name like Rainbow Racer, part of the site's player management | done | The site's "Playing as · Switch player" line heads the menu; the name labels your hole and leaderboard row; bests and results are kept per player. |
+| Playgrounds together, with a basketball court or picnic tables nearby | done | One soft surface per playground; beside it a court with two hoops, picnic tables, or open lawn. |
+| Map edge is all water: continue the green, water on one or two sides, a port on big maps | done | Sea to the north (and one more side on bigger maps); green to the horizon elsewhere; a port with cranes, ships, containers and warehouses on Megalopolis and Region. |
+| Farms only at the edges, none in Town | done | Farms are countryside only. |
+| Maps a little bigger | done | Town 8 blocks a side, City 10; wider countryside. |
+| No edge warning where water already shows the edge | done | The warning shows only near a side with no sea. |
+
 ## Open now
 
 | Feedback | Status | Notes |
@@ -23,12 +43,14 @@ browser), **doing** (in progress), **todo**, **decide** (needs the owner).
 | Grass texture still has hard slices | done | A texture bug cut patches off at the tile edge; the countryside is now one continuous surface. |
 | Stadium not flat on the ground, with a light gap | check | Paved apron and plinth added. Verify in the game. |
 | Dev-only asset gallery comparing each asset with the smallest mouth that eats it | done | `/preview-gulp.html` (`?kind=` and `?tier=` filters, test-mouth slider). |
-| Cottages and villas (little and big houses) | doing | Approved and connected; placing them in towns, suburbs and the countryside. |
-| Airport over a 4×4 block area | doing | Runway, taxiway, terminal, jets, control tower. |
-| Compare with Gulp City | doing | Reference shots are in the session scratchpad (`gulp-ref/`). |
-| Benchmark the points available in Gulp City | doing | Play it and record the score over time against ours. |
+| Cottages and villas (little and big houses) | done | Cottages across Town and the suburbs, villa blocks at the edge of town, both in the countryside; rebuilt when eaten. |
+| Airport over a 4×4 block area | done | Region: runway with numbers, taxiways, terminal and tower, two jets, hangars, radar. |
+| Compare with Gulp City | done | Ours levels up sooner and has the minimap and a richer points spread; theirs has a far more dramatic rival leaderboard, and our level 4 drags (about 140 s). Both are open tuning items below. |
+| Benchmark the points available in Gulp City | done | Their rivals reach 35–60k in 2 minutes; ours stay under 3k in 4. |
 | Finish the fun audit | todo | Includes the gaps in the park textures. |
-| Performance audit, then publish to GitHub Pages | todo | The very last step, after everything above. |
+| Performance audit, then publish to GitHub Pages | done | Lighthouse (mobile) blocking time on the menu 5.2 s → 0.9 s; published. |
+| Level 4 lasts too long | todo | About 140 s at level 4 in a City round (from the benchmark). |
+| Rival leaderboard feels flat next to Gulp City's | todo | Their rivals' totals climb far higher; consider a late-round surge for show. |
 
 ## Performance cuts (owner's picks)
 

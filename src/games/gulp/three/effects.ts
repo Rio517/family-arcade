@@ -15,6 +15,34 @@ interface Puff {
   total: number;
   vel: THREE.Vector3;
   grow: number;
+  /** Pulls it down (sparks); 0 for fire and smoke, which rise. */
+  gravity: number;
+  /** Opacity when fresh; it fades to nothing over its life. */
+  peak: number;
+  /** Fire cools from `hot` to `cold` over its life. */
+  hot?: THREE.Color;
+  cold?: THREE.Color;
+}
+
+/** A chunk of debris thrown out by an explosion: it arcs, lands, and shrinks away. */
+interface Chunk {
+  mesh: THREE.Mesh;
+  vel: THREE.Vector3;
+  spin: THREE.Vector3;
+  life: number;
+}
+
+/** Something flat on the ground: the shock ring racing out, the scorch mark left behind. */
+interface Mark {
+  mesh: THREE.Mesh;
+  life: number;
+  total: number;
+  /** Scale at the start and at the end. */
+  from: number;
+  to: number;
+  /** Opacity at full strength, and the share of its life it holds that before fading. */
+  peak: number;
+  hold: number;
 }
 
 interface Popup {
@@ -48,6 +76,13 @@ export class Effects {
   private bombMat = new THREE.MeshStandardMaterial({ color: 0x33363d, roughness: 0.5 });
   private time = 0;
   private protos = new THREE.Group();
+  private chunks: Chunk[] = [];
+  private marks: Mark[] = [];
+  private chunkGeo = new THREE.BoxGeometry(1, 1, 1);
+  private chunkMats = [0x3d3a38, 0x6b4a33, 0x8d8f96].map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, flatShading: true }));
+  private emberMat = new THREE.MeshStandardMaterial({ color: 0x2a1a12, emissive: 0xff5a14, emissiveIntensity: 0.55, flatShading: true });
+  /** Small repeatable randomness for the look of explosions (never gameplay). */
+  private seed = 1;
 
   constructor(private reducedMotion: boolean) {
     this.tankerGeo = buildKindGeometry('tanker', 0);
@@ -57,28 +92,129 @@ export class Effects {
     this.rotorGeo = buildRotorGeometry();
   }
 
-  /** A fiery burst: a quick flash, then orange fire and grey smoke rolling out. */
-  boom(x: number, z: number, size: number): void {
-    const n = this.reducedMotion ? 4 : 12;
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2;
-      const fire = i % 3 !== 2;
-      this.puff(
-        new THREE.Vector3(x + Math.cos(a) * size * 0.2, 1 + size * 0.15, z + Math.sin(a) * size * 0.2),
-        fire ? (i % 2 ? 0xffa42e : 0xff5a24) : 0x7c7c84,
-        new THREE.Vector3(Math.cos(a) * size * 0.9, size * (0.6 + (i % 4) * 0.25), Math.sin(a) * size * 0.9),
-        size * 0.55,
-        fire ? 0.8 : 1.4,
-        size * 0.9,
-      );
-    }
-    this.puff(new THREE.Vector3(x, 2, z), 0xffe9a0, new THREE.Vector3(0, 0, 0), size * 1.1, 0.25, size);
+  private rand(): number {
+    this.seed = (this.seed * 16807) % 2147483647;
+    return this.seed / 2147483647;
   }
 
-  /** A lick of flame off a burning rim: it rises, flickers orange to yellow, and goes. */
+  /**
+   * An explosion, in layers: a white-hot flash; a fireball that rises and
+   * cools from yellow to red; a shock ring racing out over the ground;
+   * sparks and chunks of debris thrown up and falling back; dark smoke that
+   * lingers and climbs; and a scorch mark that fades after a few seconds.
+   */
+  boom(x: number, z: number, size: number): void {
+    const r = () => this.rand();
+    // The flash, and a scorch mark: both even with reduced motion.
+    this.puff(new THREE.Vector3(x, 1.5, z), 0xffe2a0, new THREE.Vector3(), size * 1.5, 0.16, size * 2, { additive: true, opacity: 0.7 });
+    this.mark(x, z, size * 1.5, size * 1.5, 6, 0.75, 0.6, this.scorchMat);
+    if (this.reducedMotion) {
+      for (let i = 0; i < 4; i++) this.puff(new THREE.Vector3(x, 1 + size * 0.3, z), 0xff8a2e, new THREE.Vector3(), size * 0.9, 0.8, size * 0.5);
+      return;
+    }
+    // The shock ring.
+    this.mark(x, z, size * 0.3, size * 3.4, 0.5, 0.9, 0, this.waveMat);
+    // The fireball: hot at the heart, cooling as it climbs.
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 + r();
+      const out = size * (0.3 + r() * 0.6);
+      this.puff(
+        new THREE.Vector3(x + Math.cos(a) * size * 0.25, 0.8 + size * 0.2 * r(), z + Math.sin(a) * size * 0.25),
+        0xffe27a,
+        new THREE.Vector3(Math.cos(a) * out, size * (1 + r() * 1.2), Math.sin(a) * out),
+        size * (0.55 + r() * 0.35),
+        0.7 + r() * 0.4,
+        size * 0.9,
+        { additive: true, cold: 0xff3b1f },
+      );
+    }
+    // Smoke: dark, slow, and lasting.
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + r();
+      const out = size * (0.2 + r() * 0.4);
+      this.puff(
+        new THREE.Vector3(x + Math.cos(a) * size * 0.4, 1 + size * 0.4, z + Math.sin(a) * size * 0.4),
+        0x1e1e24,
+        new THREE.Vector3(Math.cos(a) * out, size * (0.5 + r() * 0.5), Math.sin(a) * out),
+        size * 0.45,
+        1.8 + r() * 1,
+        size * 0.35,
+        { cold: 0x3a3a42, opacity: 0.6 },
+      );
+    }
+    // Sparks: quick and bright, falling back.
+    for (let i = 0; i < 14; i++) {
+      const a = r() * Math.PI * 2;
+      const out = size * (1.8 + r() * 2);
+      this.puff(
+        new THREE.Vector3(x, 1 + size * 0.2, z),
+        0xffd36b,
+        new THREE.Vector3(Math.cos(a) * out, size * (2 + r() * 2.5), Math.sin(a) * out),
+        size * 0.14,
+        0.5 + r() * 0.4,
+        -size * 0.1,
+        { additive: true, gravity: size * 7 },
+      );
+    }
+    // Debris: chunks of the street, some still glowing.
+    for (let i = 0; i < 9; i++) {
+      const a = r() * Math.PI * 2;
+      const out = size * (1.2 + r() * 1.6);
+      const mesh = new THREE.Mesh(this.chunkGeo, i % 4 === 0 ? this.emberMat : this.chunkMats[i % this.chunkMats.length]);
+      mesh.scale.setScalar(size * (0.035 + r() * 0.045));
+      mesh.position.set(x, 1 + size * 0.2, z);
+      mesh.castShadow = true;
+      this.group.add(mesh);
+      this.chunks.push({
+        mesh,
+        vel: new THREE.Vector3(Math.cos(a) * out, size * (2.2 + r() * 2), Math.sin(a) * out),
+        spin: new THREE.Vector3(r() * 12 - 6, r() * 12 - 6, r() * 12 - 6),
+        life: 1.8 + r() * 0.6,
+      });
+    }
+  }
+
+  private waveMat = new THREE.MeshBasicMaterial({
+    map: ringTexture(),
+    color: 0xfff0c0,
+    transparent: true,
+    premultipliedAlpha: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    polygonOffset: true,
+    polygonOffsetFactor: -6,
+    polygonOffsetUnits: -24,
+  });
+
+  private scorchMat = new THREE.MeshBasicMaterial({
+    map: softTexture(),
+    color: 0x16110e,
+    transparent: true,
+    premultipliedAlpha: true,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -5,
+    polygonOffsetUnits: -20,
+  });
+
+  private mark(x: number, z: number, from: number, to: number, life: number, peak: number, hold: number, material: THREE.MeshBasicMaterial): void {
+    const mesh = new THREE.Mesh(this.markGeo, material.clone());
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, 0.08, z);
+    mesh.scale.setScalar(from);
+    mesh.renderOrder = 4;
+    this.group.add(mesh);
+    this.marks.push({ mesh, life, total: life, from, to, peak, hold });
+  }
+
+  private markGeo = new THREE.PlaneGeometry(2, 2);
+
+  /** A lick of flame off a burning rim: it rises, cooling from yellow to red, and goes. */
   flame(x: number, z: number, size: number): void {
-    const hot = (this.time * 13) % 1 < 0.5;
-    this.puff(new THREE.Vector3(x, 0.6, z), hot ? 0xffb02e : 0xff5a24, new THREE.Vector3(0, size * 1.6, 0), size * 0.6, 0.55, size * 0.4);
+    this.puff(new THREE.Vector3(x, 0.6, z), 0xffd060, new THREE.Vector3(0, size * 1.6, 0), size * 0.6, 0.55, size * 0.4, {
+      additive: true,
+      cold: 0xff3b1f,
+    });
   }
 
   /** Green gas billowing out of a hole that ate the chemical plant. */
@@ -97,15 +233,40 @@ export class Effects {
     }
   }
 
-  private puff(at: THREE.Vector3, color: number, vel: THREE.Vector3, size: number, life: number, grow: number): void {
+  private puff(
+    at: THREE.Vector3,
+    color: number,
+    vel: THREE.Vector3,
+    size: number,
+    life: number,
+    grow: number,
+    o: { additive?: boolean; cold?: number; gravity?: number; opacity?: number } = {},
+  ): void {
     const sprite = new THREE.Sprite(
-      new THREE.SpriteMaterial({ map: this.puffTex, color, transparent: true, depthWrite: false, premultipliedAlpha: true }),
+      new THREE.SpriteMaterial({
+        map: this.puffTex,
+        color,
+        transparent: true,
+        depthWrite: false,
+        premultipliedAlpha: true,
+        blending: o.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      }),
     );
     sprite.position.copy(at);
     sprite.scale.setScalar(size);
     sprite.renderOrder = 6;
     this.group.add(sprite);
-    this.puffs.push({ sprite, life, total: life, vel, grow });
+    this.puffs.push({
+      sprite,
+      life,
+      total: life,
+      vel,
+      grow,
+      gravity: o.gravity ?? 0,
+      peak: o.opacity ?? 0.85,
+      hot: o.cold !== undefined ? new THREE.Color(color) : undefined,
+      cold: o.cold !== undefined ? new THREE.Color(o.cold) : undefined,
+    });
   }
 
   /** "+8" rising over where the child just ate. */
@@ -144,6 +305,8 @@ export class Effects {
     g.add(ring, new THREE.Mesh(this.bombGeo, this.shellMat), new THREE.Mesh(this.bombGeo, this.bombMat));
     g.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: this.puffTex, transparent: true, depthWrite: false, premultipliedAlpha: true })));
     g.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: this.warnTex, depthTest: false, transparent: true, sizeAttenuation: false })));
+    g.add(new THREE.Mesh(this.chunkGeo, this.chunkMats[0]), new THREE.Mesh(this.chunkGeo, this.emberMat));
+    g.add(new THREE.Mesh(this.markGeo, this.waveMat), new THREE.Mesh(this.markGeo, this.scorchMat));
     return g;
   }
 
@@ -342,16 +505,57 @@ export class Effects {
     for (let i = this.puffs.length - 1; i >= 0; i--) {
       const p = this.puffs[i];
       p.life -= dt;
+      const mat = p.sprite.material as THREE.SpriteMaterial;
       if (!this.reducedMotion) {
         p.sprite.position.addScaledVector(p.vel, dt);
-        p.vel.multiplyScalar(1 - dt * 2);
+        if (p.gravity) p.vel.y -= p.gravity * dt;
+        else p.vel.multiplyScalar(1 - dt * 2);
         p.sprite.scale.addScalar(p.grow * dt);
+        if (p.sprite.scale.x < 0.02) p.life = 0;
       }
-      (p.sprite.material as THREE.SpriteMaterial).opacity = 0.85 * Math.max(0, p.life / p.total);
+      if (p.hot && p.cold) mat.color.copy(p.hot).lerp(p.cold, Math.min(1, 1 - p.life / p.total));
+      mat.opacity = p.peak * Math.max(0, p.life / p.total);
       if (p.life <= 0) {
         this.group.remove(p.sprite);
         (p.sprite.material as THREE.Material).dispose();
         this.puffs.splice(i, 1);
+      }
+    }
+    for (let i = this.chunks.length - 1; i >= 0; i--) {
+      const c = this.chunks[i];
+      c.life -= dt;
+      const m = c.mesh;
+      if (m.position.y > 0.05 || c.vel.y > 0) {
+        m.position.addScaledVector(c.vel, dt);
+        c.vel.y -= 30 * dt;
+        m.rotation.x += c.spin.x * dt;
+        m.rotation.y += c.spin.y * dt;
+        m.rotation.z += c.spin.z * dt;
+        if (m.position.y < 0.05) {
+          // Landed: a little skid, then still.
+          m.position.y = 0.05;
+          c.vel.set(c.vel.x * 0.2, 0, c.vel.z * 0.2);
+          c.spin.set(0, 0, 0);
+        }
+      }
+      if (c.life < 0.4) m.scale.multiplyScalar(Math.max(0, 1 - dt / Math.max(0.05, c.life)));
+      if (c.life <= 0) {
+        this.group.remove(m);
+        this.chunks.splice(i, 1);
+      }
+    }
+    for (let i = this.marks.length - 1; i >= 0; i--) {
+      const k = this.marks[i];
+      k.life -= dt;
+      const t = 1 - k.life / k.total;
+      const ease = 1 - Math.pow(1 - Math.min(1, t), 3);
+      k.mesh.scale.setScalar(k.from + (k.to - k.from) * ease);
+      const fade = t < k.hold ? 1 : Math.max(0, 1 - (t - k.hold) / (1 - k.hold));
+      (k.mesh.material as THREE.MeshBasicMaterial).opacity = k.peak * fade;
+      if (k.life <= 0) {
+        this.group.remove(k.mesh);
+        (k.mesh.material as THREE.Material).dispose();
+        this.marks.splice(i, 1);
       }
     }
     for (let i = this.popups.length - 1; i >= 0; i--) {
@@ -370,6 +574,12 @@ export class Effects {
   dispose(): void {
     this.protos.traverse((o) => ((o as THREE.Mesh).material as THREE.Material | undefined)?.dispose());
     for (const p of this.puffs) (p.sprite.material as THREE.Material).dispose();
+    for (const k of this.marks) (k.mesh.material as THREE.Material).dispose();
+    this.chunkGeo.dispose();
+    this.markGeo.dispose();
+    for (const m of [...this.chunkMats, this.emberMat, this.waveMat, this.scorchMat]) m.dispose();
+    this.waveMat.map?.dispose();
+    this.scorchMat.map?.dispose();
     for (const p of this.popups) (p.sprite.material as THREE.Material).dispose();
     for (const t of this.popupTex.values()) t.dispose();
     for (const t of Object.values(this.powerIcons)) t.dispose();
@@ -405,6 +615,24 @@ function softTexture(): THREE.Texture {
   const t = new THREE.CanvasTexture(c);
   // Uploaded as the canvas holds it: WebKit's near-transparent gradient
   // pixels can speckle when un-premultiplied (see the racer's sun).
+  t.premultiplyAlpha = true;
+  return t;
+}
+
+/** A soft bright band near the edge of a circle: the explosion's shock ring. */
+function ringTexture(): THREE.Texture {
+  const s = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.62, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.84, 'rgba(255,255,255,1)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, s, s);
+  const t = new THREE.CanvasTexture(c);
   t.premultiplyAlpha = true;
   return t;
 }

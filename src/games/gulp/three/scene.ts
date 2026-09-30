@@ -78,9 +78,42 @@ const SMEAR_FADE = 5;
  */
 const MODELS = new Map<string, THREE.BufferGeometry>();
 
-/** The menu's tour: seconds at each showpiece, and the share of that spent gliding there. */
-const TOUR_DWELL = 9;
-const TOUR_GLIDE = 0.4;
+/**
+ * Holes are real holes. Each frame the ground is drawn first; then each
+ * mouth's mask marks its circle in the stencil and pushes the depth there to
+ * the far plane, which cuts the ground away; then the throat is drawn only
+ * inside those circles, with ordinary depth, so anything standing in front
+ * of a hole still hides it, and things falling in show inside it. Props and
+ * everything else come after. The ground's own layers are moved before all
+ * this (see the constructor).
+ */
+const PIT_ORDER = -50;
+const GROUND_SHIFT = -100;
+/** Drawn only inside a mouth's circle. */
+const INSIDE_HOLE = {
+  stencilWrite: true,
+  stencilRef: 1,
+  stencilFunc: THREE.EqualStencilFunc,
+  stencilFail: THREE.KeepStencilOp,
+  stencilZFail: THREE.KeepStencilOp,
+  stencilZPass: THREE.KeepStencilOp,
+} as const;
+/** The throat's shape, from the rim (radius 1) down to its dark floor, as (radius, height) pairs. */
+const PIT_DEPTH = 2.6;
+const PIT_PROFILE: THREE.Vector2[] = [
+  ...Array.from({ length: 17 }, (_, i) => {
+    const t = i / 16;
+    return new THREE.Vector2(0.42 + 0.58 * Math.pow(1 - t, 2.4), -PIT_DEPTH * Math.pow(t, 1.15));
+  }),
+  new THREE.Vector2(0, -PIT_DEPTH),
+];
+
+/** The menu's tour: its gliding speed (units a second) and the seconds it rests at each showpiece. */
+const TOUR_SPEED = 16;
+const TOUR_REST = 4;
+
+/** Things that sit lower than the ground: a ship floats in the sea, below the quay. */
+const SINK: Partial<Record<Prop['kind'], number>> = { ship: -2 };
 
 /** Small street furniture: no shadows, to save the shadow pass drawing hundreds of them. */
 const CLUTTER: ReadonlySet<string> = new Set(['lamp', 'bin', 'hydrant', 'planter', 'cone', 'bike', 'mailbox']);
@@ -100,7 +133,8 @@ interface Faller {
 
 interface HoleObj {
   group: THREE.Group;
-  disc: THREE.Mesh;
+  /** The mouth's cut in the ground, its throat and any mess on it: one unit wide, scaled to the hole. */
+  disc: THREE.Group;
   body: THREE.Group;
   rim: THREE.MeshStandardMaterial;
   pupils: THREE.Object3D[];
@@ -199,7 +233,24 @@ export class GulpScene {
   private shake = 0;
   private warmQueue: Array<[Prop['kind'], number, number]> = [];
   private smearTex = new Map<Smear, THREE.Texture>();
+  private maskGeo = new THREE.CircleGeometry(1, 56).rotateX(-Math.PI / 2);
+  private maskMat = new THREE.ShaderMaterial({
+    // Push the depth to the far plane: whatever was drawn here (the ground) no longer hides the throat.
+    vertexShader: 'void main() { vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); p.z = p.w * 0.99999; gl_Position = p; }',
+    fragmentShader: 'void main() { gl_FragColor = vec4(0.0); }',
+    colorWrite: false,
+    depthFunc: THREE.AlwaysDepth,
+    stencilWrite: true,
+    stencilRef: 1,
+    stencilFunc: THREE.AlwaysStencilFunc,
+    stencilZPass: THREE.ReplaceStencilOp,
+  });
+  private pitMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: false, ...INSIDE_HOLE });
+  /** The throat's shape with no colours, for the mess painted on it. */
+  private pitShape = new THREE.LatheGeometry(PIT_PROFILE, 48);
   private stops: Array<{ x: number; z: number; r: number }> | null = null;
+  /** Where the menu's camera is on its tour, where it is heading, and what it has shown. */
+  private tour_ = { at: null as { x: number; z: number; r: number } | null, to: 0, rest: 0, moving: 0, seen: new Set<number>() };
   private resizeObs: ResizeObserver | null = null;
   private time = 0;
   private pending = 0;
@@ -219,7 +270,8 @@ export class GulpScene {
     /** The menu's backdrop: a slow, steady glide over the city, following nobody. */
     private tour = false,
   ) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    // A stencil buffer, to cut the holes out of the ground.
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true });
     // A little under the iPad's full density: the city is busy, and the
     // difference is hard to see at arm's length.
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
@@ -245,6 +297,10 @@ export class GulpScene {
     this.scene.add(this.sun, this.sun.target);
 
     this.ground = buildGround(world.city, this.renderer);
+    // The ground's layers go before the holes, in their own order (see PIT_ORDER).
+    this.ground.group.traverse((o) => {
+      o.renderOrder += GROUND_SHIFT;
+    });
     this.scene.add(this.ground.group);
     this.buildProps(world);
     this.buildPeople(world);
@@ -333,7 +389,7 @@ export class GulpScene {
       const mesh = new THREE.InstancedMesh(this.geometry(list[0]), this.material, list.length);
       const blob = vehicle ? new THREE.InstancedMesh(this.blobGeometry(kind), this.blobMat, list.length) : undefined;
       list.forEach((p, i) => {
-        dummy.position.set(p.x, 0, p.z);
+        dummy.position.set(p.x, SINK[p.kind] ?? 0, p.z);
         dummy.rotation.set(0, p.rot, 0);
         dummy.updateMatrix();
         const matrix = dummy.matrix.clone();
@@ -523,15 +579,14 @@ export class GulpScene {
       materials.push(m);
       return m;
     };
-    const throat = keep(new THREE.MeshBasicMaterial({ map: throatTexture(look.color), fog: false }));
-    // Always over the ground's layers, whatever the camera angle.
-    throat.polygonOffset = true;
-    throat.polygonOffsetFactor = -8;
-    throat.polygonOffsetUnits = -32;
-    const disc = new THREE.Mesh(new THREE.CircleGeometry(1, 56), throat);
-    disc.rotation.x = -Math.PI / 2;
-    disc.position.y = 0.12;
-    disc.renderOrder = 5;
+    // A real hole: the mouth cuts the ground away (see `holeMask`) and a
+    // funnel of throat goes down into the dark below it. Things fall into it.
+    const disc = new THREE.Group();
+    const mask = new THREE.Mesh(this.maskGeo, this.maskMat);
+    mask.renderOrder = PIT_ORDER;
+    const pit = new THREE.Mesh(pitGeometry(look.color), this.pitMat);
+    pit.renderOrder = PIT_ORDER + 1;
+    disc.add(mask, pit);
     group.add(disc);
 
     const body = new THREE.Group();
@@ -594,16 +649,21 @@ export class GulpScene {
     const label = labelSprite(look.label, look.color, mine);
     group.add(label);
     this.scene.add(group);
-    // The mess layer, over the throat and under the teeth.
+    // The mess, painted on the throat's walls so it follows the mouth down.
     // Not in `materials`: the safe-blink sets their opacity every frame, and the mess fades on its own.
-    const smearMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, fog: false });
-    smearMat.polygonOffset = true;
-    smearMat.polygonOffsetFactor = -9;
-    smearMat.polygonOffsetUnits = -36;
-    // A child of the throat disc, so it lies flat and grows with it.
-    const smearMesh = new THREE.Mesh(new THREE.CircleGeometry(1, 56), smearMat);
-    smearMesh.position.z = 0.001;
-    smearMesh.renderOrder = 6;
+    const smearMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      fog: false,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -4,
+      ...INSIDE_HOLE,
+    });
+    const smearMesh = new THREE.Mesh(this.pitShape, smearMat);
+    smearMesh.renderOrder = PIT_ORDER + 2;
     smearMesh.visible = false;
     disc.add(smearMesh);
     const smear = { mesh: smearMesh, kind: null, amount: 0, base: new THREE.Color(look.color), flameIn: 0 };
@@ -747,7 +807,7 @@ export class GulpScene {
     if (!visible) return;
     obj.group.position.set(h.x, 0, h.z);
     const r = h.r * obj.shown;
-    obj.disc.scale.set(r, r, 1);
+    obj.disc.scale.setScalar(r);
     obj.body.scale.setScalar(r);
     // The eyes grow with the square root of the hole, so a giant's eyes stay
     // cute instead of filling the screen. They sit on the rim either way.
@@ -818,6 +878,10 @@ export class GulpScene {
         const mess = MESSY[e.prop.kind];
         const eater = world.holes[e.hole];
         if (mess && eater) this.smearHole(e.hole, mess, Math.pow(e.prop.size / (eater.r * FIT), 0.7));
+        if (e.prop.kind === 'garbagetruck' && e.hole === this.follow && this.time - this.lastYum > 1.5) {
+          this.lastYum = this.time;
+          this.say('Yuck!', false, e.hole);
+        }
         if (e.hole === this.follow) {
           const h = world.holes[e.hole];
           this.pending += e.prop.points * (h && h.doubleTime > 0 ? 2 : 1);
@@ -831,6 +895,14 @@ export class GulpScene {
         else if (this.time - this.lastYum > 2.5) {
           this.lastYum = this.time;
           this.say('Yum!', false, e.hole);
+        }
+      } else if (e.type === 'park') {
+        this.raise(e.prop);
+        const b = this.built.get(e.prop.id);
+        // Already there: no rising out of the ground.
+        if (b) {
+          b.t = 1.4;
+          b.mesh.scale.y = 1;
         }
       } else if (e.type === 'regrow') {
         this.setShown(e.prop, true);
@@ -875,7 +947,7 @@ export class GulpScene {
     this.effects.step(dt);
 
     if (this.tour) {
-      this.moveCamera(this.tourSpot(world), dt);
+      this.moveCamera(this.tourSpot(world, dt), dt);
     } else if (me) {
       this.moveCamera(me, dt);
       this.fadeInTheWay(world, me, dt);
@@ -920,7 +992,9 @@ export class GulpScene {
     const near = new Set<number>();
     if (me.alive && !this.reducedMotion) {
       for (const p of propsNear(world, me.x, me.z, me.r + 12)) {
-        if (canEat(me, p) || this.ghosts.has(p.id)) continue;
+        // A building the hole is right under is see-through (so the hole
+        // shows), and it shakes all the same.
+        if (canEat(me, p)) continue;
         const reach = Math.max(KINDS[p.kind].w, KINDS[p.kind].d) / 2;
         if (Math.hypot(me.x - p.x, me.z - p.z) > me.r + reach * 0.6) continue;
         // How close the mouth is to fitting it: a third of the size and it
@@ -941,10 +1015,10 @@ export class GulpScene {
         if (p && !this.ghosts.has(id)) this.setShown(p, true);
         const b = this.built.get(id);
         if (b) b.mesh.quaternion.setFromEuler(new THREE.Euler(0, p ? p.rot : 0, 0));
+        this.ghosts.get(id)?.quaternion.setFromEuler(new THREE.Euler(0, p ? p.rot : 0, 0));
         continue;
       }
       this.wobbling.set(id, next);
-      if (this.ghosts.has(id)) continue;
       // A gentle lean toward the hole and a slow rock around it. The angle is
       // capped by height, so a tower's top sways a little, not by metres.
       const h = KINDS[p.kind].h * p.hScale;
@@ -963,7 +1037,9 @@ export class GulpScene {
       w.scale.set(1, 1, 1);
       w.quaternion.premultiply(this.tiltQ);
       w.updateMatrix();
-      this.place(p, w.matrix, w.quaternion);
+      const ghost = this.ghosts.get(id);
+      if (ghost) ghost.quaternion.copy(w.quaternion);
+      else this.place(p, w.matrix, w.quaternion);
     }
   }
 
@@ -1005,6 +1081,11 @@ export class GulpScene {
     if (p.kind === 'site' || p.kind === 'bigsite') {
       // Sites pop up quickly, with no scaffold of their own.
       this.built.set(p.id, { mesh, scaffold: new THREE.Group(), t: this.reducedMotion ? 1.4 : 0, time: 0.6 });
+      return;
+    }
+    if (p.kind === 'tallsite') {
+      // The frame climbs out of its site: it brings its own scaffolding and crane.
+      this.built.set(p.id, { mesh, scaffold: new THREE.Group(), t: this.reducedMotion ? 1.4 : 0, time: 2.5 });
       return;
     }
     const info = KINDS[p.kind];
@@ -1089,28 +1170,54 @@ export class GulpScene {
    * A point gliding on a wide, slow circle round the city, dressed as a
    * mid-size hole so the camera frames the streets from a pleasant height.
    */
-  private tourSpot(world: World): Hole {
+  private tourSpot(world: World, dt = 0): Hole {
     const stops = this.tourStops(world);
-    if (!stops.length) {
-      const a = this.time * 0.035;
-      const R = world.city.half * 0.45;
-      return { ...world.holes[0], x: Math.cos(a) * R, z: Math.sin(a) * R, r: 12, alive: true, vx: -Math.sin(a), vz: Math.cos(a) };
+    const t = this.tour_;
+    if (!stops.length) return { ...world.holes[0], x: 0, z: 0, r: 12, alive: true, vx: 0, vz: 1 };
+    if (!t.at) {
+      const first = stops[0];
+      t.at = { x: first.x, z: first.z, r: first.r };
+      t.to = 0;
+      t.seen.add(0);
     }
-    // Glide to the next highlight, then drift slowly round it for a while.
-    const leg = this.time / TOUR_DWELL;
-    const i = Math.floor(leg) % stops.length;
-    // The first stop is where the tour starts, not somewhere to glide to.
-    const from = leg < 1 ? stops[0] : stops[(i + stops.length - 1) % stops.length];
-    const to = stops[i];
-    const t = Math.min(1, (leg - Math.floor(leg)) / TOUR_GLIDE);
-    const k = t * t * (3 - 2 * t);
-    const drift = this.time * 0.15;
-    const r = from.r + (to.r - from.r) * k;
+    const to = stops[t.to];
+    const dx = to.x - t.at.x;
+    const dz = to.z - t.at.z;
+    const d = Math.hypot(dx, dz);
+    if (d > 0.5) {
+      // A steady glide, easing in as it sets off and out as it arrives.
+      const speed = Math.min(TOUR_SPEED, 2 + d * 0.5, 2 + t.moving * 6);
+      t.moving += dt;
+      const step = Math.min(d, speed * dt);
+      t.at.x += (dx / d) * step;
+      t.at.z += (dz / d) * step;
+      t.at.r += (to.r - t.at.r) * Math.min(1, dt * 0.6);
+    } else {
+      t.moving = 0;
+      t.rest += dt;
+      if (t.rest > TOUR_REST) {
+        // On to the nearest showpiece not yet seen; round again once all are.
+        t.rest = 0;
+        if (t.seen.size >= stops.length) t.seen = new Set([t.to]);
+        let best = -1;
+        let bestD = Infinity;
+        stops.forEach((p, i) => {
+          if (t.seen.has(i)) return;
+          const e = Math.hypot(p.x - to.x, p.z - to.z);
+          if (e < bestD) {
+            bestD = e;
+            best = i;
+          }
+        });
+        if (best >= 0) {
+          t.to = best;
+          t.seen.add(best);
+        }
+      }
+    }
     // Aim a little in front of the showpiece, so it stands in the top of the
     // screen, clear of the menu card in the middle.
-    const x = from.x + (to.x - from.x) * k + Math.cos(drift) * 4;
-    const z = from.z + (to.z - from.z) * k + Math.sin(drift) * 4 + r * 1.1;
-    return { ...world.holes[0], x, z, r, alive: true, vx: to.x - from.x, vz: to.z - from.z };
+    return { ...world.holes[0], x: t.at.x, z: t.at.z + t.at.r * 1.1, r: t.at.r, alive: true, vx: dx, vz: dz };
   }
 
   /**
@@ -1336,6 +1443,10 @@ export class GulpScene {
     this.ground.dispose();
     for (const t of this.bubbleTex.values()) t.dispose();
     for (const t of this.smearTex.values()) t.dispose();
+    this.maskGeo.dispose();
+    this.maskMat.dispose();
+    this.pitMat.dispose();
+    this.pitShape.dispose();
     this.scaffoldGeo.dispose();
     this.batonGeo.dispose();
     this.blobTex.dispose();
@@ -1361,83 +1472,84 @@ export class GulpScene {
  * sprinkles. Blobs sit at fixed spots, so the same mess always looks the same.
  */
 function smearTexture(kind: Smear): THREE.Texture {
-  const s = 512;
-  // Sizes below are for a 256 canvas; the texture is drawn at twice that so a giant's mouth stays crisp.
-  const k = s / 256;
+  // Laid on the throat's walls: across is once round the mouth, and the rim
+  // is the bottom edge, so the mess is thickest at the rim and thins out
+  // going down. Sizes are for a 256-high canvas, drawn at twice that.
+  const W = 1024;
+  const H = 512;
+  const k = H / 256;
   const c = document.createElement('canvas');
-  c.width = c.height = s;
+  c.width = W;
+  c.height = H;
   const g = c.getContext('2d')!;
   const rng = seededRng(kind === 'burn' ? 11 : kind === 'poop' ? 23 : 37);
-  const blob = (x: number, y: number, r: number, color: string) => {
-    g.fillStyle = color;
-    g.beginPath();
-    g.arc(x, y, r, 0, Math.PI * 2);
-    g.fill();
+  // Drawn twice across the seam, so nothing is cut off where the walls meet.
+  const twice = (x: number, draw: (x: number) => void) => {
+    draw(x);
+    draw(x < W / 2 ? x + W : x - W);
   };
-  const around = (n: number, draw: (x: number, y: number, i: number) => void) => {
-    for (let i = 0; i < n; i++) {
-      const a = rng() * Math.PI * 2;
-      const d = (0.5 + rng() * 0.42) * (s / 2);
-      draw(s / 2 + Math.cos(a) * d, s / 2 + Math.sin(a) * d, i);
-    }
+  const blob = (x: number, y: number, r: number, color: string) =>
+    twice(x, (bx) => {
+      g.fillStyle = color;
+      g.beginPath();
+      g.arc(bx, y, r, 0, Math.PI * 2);
+      g.fill();
+    });
+  const onWall = (n: number, draw: (x: number, y: number, i: number) => void) => {
+    for (let i = 0; i < n; i++) draw(rng() * W, H - Math.pow(rng(), 1.5) * H * 0.75, i);
   };
   if (kind === 'burn') {
-    const grad = g.createRadialGradient(s / 2, s / 2, s * 0.15, s / 2, s / 2, s / 2);
-    grad.addColorStop(0, 'rgba(20,14,12,0)');
-    grad.addColorStop(0.6, 'rgba(30,20,16,0.85)');
-    grad.addColorStop(1, 'rgba(40,26,20,0.95)');
+    const grad = g.createLinearGradient(0, H, 0, 0);
+    grad.addColorStop(0, 'rgba(40,26,20,0.95)');
+    grad.addColorStop(0.45, 'rgba(30,20,16,0.8)');
+    grad.addColorStop(1, 'rgba(20,14,12,0)');
     g.fillStyle = grad;
-    g.fillRect(0, 0, s, s);
-    around(40, (x, y, i) => blob(x, y, (2 + rng() * 4) * k, i % 3 ? '#ff7a1a' : '#ffd23f'));
+    g.fillRect(0, 0, W, H);
+    onWall(90, (x, y, i) => blob(x, y, (2 + rng() * 4) * k, i % 3 ? '#ff7a1a' : '#ffd23f'));
   } else if (kind === 'poop') {
-    around(22, (x, y) => blob(x, y, (12 + rng() * 16) * k, rng() < 0.5 ? '#6b3f1a' : '#86532a'));
-    around(10, (x, y) => blob(x, y, (5 + rng() * 5) * k, '#a06a38'));
+    onWall(40, (x, y) => blob(x, y, (12 + rng() * 16) * k, rng() < 0.5 ? '#6b3f1a' : '#86532a'));
+    onWall(20, (x, y) => blob(x, y, (5 + rng() * 5) * k, '#a06a38'));
   } else {
     const scoops = ['#ffb3d1', '#fff1c9', '#9be3c4', '#8a5a3c', '#ffd0e4'];
-    around(20, (x, y, i) => blob(x, y, (14 + rng() * 14) * k, scoops[i % scoops.length]));
+    onWall(38, (x, y, i) => blob(x, y, (14 + rng() * 14) * k, scoops[i % scoops.length]));
     const sprinkles = ['#ff4d6d', '#3a86ff', '#ffd23f', '#2ec27e', '#ffffff'];
-    around(60, (x, y, i) => {
-      g.fillStyle = sprinkles[i % sprinkles.length];
-      g.save();
-      g.translate(x, y);
-      g.rotate(rng() * Math.PI);
-      g.fillRect(-4 * k, -1.2 * k, 8 * k, 2.4 * k);
-      g.restore();
-    });
+    onWall(130, (x, y, i) =>
+      twice(x, (sx) => {
+        g.fillStyle = sprinkles[i % sprinkles.length];
+        g.save();
+        g.translate(sx, y);
+        g.rotate(rng() * Math.PI);
+        g.fillRect(-4 * k, -1.2 * k, 8 * k, 2.4 * k);
+        g.restore();
+      }),
+    );
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
-/** The inside of a hole: its colour at the rim, dark rings, black at the bottom. */
-function throatTexture(color: number): THREE.Texture {
-  const s = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = s;
-  const g = c.getContext('2d')!;
-  const col = new THREE.Color(color);
-  const tone = (f: number) =>
-    `rgb(${Math.round(col.r * 255 * f)},${Math.round(col.g * 255 * f)},${Math.round(col.b * 255 * f)})`;
-  const grad = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  grad.addColorStop(0, '#000000');
-  grad.addColorStop(0.45, '#07030a');
-  grad.addColorStop(0.72, tone(0.32));
-  grad.addColorStop(0.9, tone(0.62));
-  grad.addColorStop(1, tone(0.8));
-  g.fillStyle = grad;
-  g.fillRect(0, 0, s, s);
-  // Rings going down the throat.
-  g.strokeStyle = 'rgba(0,0,0,0.28)';
-  for (const f of [0.62, 0.74, 0.85]) {
-    g.lineWidth = 4 * f;
-    g.beginPath();
-    g.arc(s / 2, s / 2, (s / 2) * f, 0, Math.PI * 2);
-    g.stroke();
+/**
+ * A mouth's throat, coloured like the hole at the rim and darkening down to
+ * black, with soft rings going down it.
+ */
+function pitGeometry(color: number): THREE.BufferGeometry {
+  const geo = new THREE.LatheGeometry(PIT_PROFILE, 48);
+  const pos = geo.getAttribute('position');
+  const rgb = new Float32Array(pos.count * 3);
+  const base = new THREE.Color(color);
+  const c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const depth = -pos.getY(i) / PIT_DEPTH;
+    const shade = 0.8 * Math.pow(1 - Math.min(1, depth * 1.35), 1.6);
+    const ring = (depth * 7) % 1 < 0.18 ? 0.72 : 1;
+    c.copy(base).multiplyScalar(shade * ring);
+    rgb[i * 3] = c.r;
+    rgb[i * 3 + 1] = c.g;
+    rgb[i * 3 + 2] = c.b;
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  geo.setAttribute('color', new THREE.BufferAttribute(rgb, 3));
+  return geo;
 }
 
 /** A name tag that always faces the camera and keeps its size on screen. */

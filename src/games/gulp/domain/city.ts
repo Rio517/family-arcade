@@ -21,10 +21,10 @@ type Rng = () => number;
 export type MapId = 'town' | 'city' | 'mega' | 'region';
 
 export const MAPS: Record<MapId, { blocks: number; label: string; rivals: number; minutes: number; country: number }> = {
-  town: { blocks: 7, label: 'Town', rivals: 4, minutes: 3, country: 0 },
-  city: { blocks: 9, label: 'City', rivals: 5, minutes: 4, country: 50 },
-  mega: { blocks: 12, label: 'Megalopolis', rivals: 6, minutes: 5, country: 75 },
-  region: { blocks: 13, label: 'Region', rivals: 8, minutes: 6, country: 130 },
+  town: { blocks: 8, label: 'Town', rivals: 4, minutes: 3, country: 0 },
+  city: { blocks: 10, label: 'City', rivals: 5, minutes: 4, country: 60 },
+  mega: { blocks: 12, label: 'Megalopolis', rivals: 6, minutes: 5, country: 90 },
+  region: { blocks: 13, label: 'Region', rivals: 8, minutes: 6, country: 145 },
 };
 
 export type BlockKind =
@@ -36,7 +36,6 @@ export type BlockKind =
   | 'plaza'
   | 'landmark'
   | 'industrial'
-  | 'farm'
   | 'forest'
   | 'windfarm'
   | 'airport'
@@ -50,7 +49,7 @@ export type BlockKind =
   | 'parking';
 
 /** Blocks out of town: green verges instead of pavements full of street things. */
-const RURAL: ReadonlySet<BlockKind> = new Set(['farm', 'forest', 'windfarm', 'mountain', 'military', 'helipad']);
+const RURAL: ReadonlySet<BlockKind> = new Set(['forest', 'windfarm', 'mountain', 'military', 'helipad']);
 
 export interface Block {
   kind: BlockKind;
@@ -92,6 +91,23 @@ export interface City {
   base: { x: number; z: number } | null;
   /** The airport's ground (Region only): see `Airfield`. */
   airfield: Airfield | null;
+  /**
+   * The sides of the land that meet the sea. Every other side carries on as
+   * countryside past the edge of play, as scenery. The north is always sea:
+   * the Statue of Liberty's islet stands off it.
+   */
+  shores: Side[];
+  /** The port on a bigger map's shore: its quay, and the side it faces. */
+  port: { quay: Rect; side: Side } | null;
+  /** Soft play surfaces under playgrounds, and ball courts, for the ground to draw. */
+  play: PlayArea[];
+}
+
+export type Side = 'n' | 's' | 'e' | 'w';
+
+/** A playground's soft surface, or a small basketball court (long side along z). */
+export interface PlayArea extends Rect {
+  kind: 'soft' | 'court';
 }
 
 /**
@@ -116,7 +132,7 @@ export interface Airfield {
 interface AirportSite {
   bx: number;
   bz: number;
-  side: 'n' | 's' | 'e' | 'w';
+  side: Side;
 }
 
 /**
@@ -161,8 +177,10 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
   const add: Add = (kind, x, z, rot = 0, variant = 0, hScale = 1) => {
     props.push(makeProp(nextId++, kind, x, z, rot, variant, hScale));
   };
+  const play: PlayArea[] = [];
   const tools: Tools = {
     map,
+    play,
     rng,
     add,
     pick: (list) => list[Math.floor(rng() * list.length)],
@@ -196,6 +214,11 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
   roadside(roads, half, tools, lots);
   const land = half + MAPS[map].country;
   const mid = roads[Math.floor(blocks / 2)];
+  // The sea: always to the north; the bigger maps have a second shore, and
+  // Megalopolis and Region a port on it.
+  const shores: Side[] = ['n'];
+  if (map !== 'town' && (map !== 'city' || rng() < 0.5)) shores.push(pick3(rng));
+  const port = map === 'mega' || map === 'region' ? harbour(shores[1], land, mid, tools) : null;
   const countryRoads: Rect[] = [];
   const fields: Rect[] = [];
   if (land > half) {
@@ -205,7 +228,7 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
       { x0: -land, z0: mid - ROAD / 2, x1: -half, z1: mid + ROAD / 2 },
       { x0: half, z0: mid - ROAD / 2, x1: land, z1: mid + ROAD / 2 },
     );
-    countryside(map, half, land, countryRoads, fields, tools);
+    countryside(map, half, land, countryRoads, fields, tools, port ? [port.yard] : []);
   }
   // The Statue of Liberty's islet off the north shore, a bridge across to it.
   const ix = mid;
@@ -228,7 +251,24 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
   }
   const baseBlock = blockList.find((b) => b.kind === 'military');
   const base = baseBlock ? { x: baseBlock.x + baseBlock.size / 2, z: baseBlock.z + baseBlock.size / 2 } : null;
-  return { map, blocks, half, land, lots, countryRoads, fields, roads, blockList, props, extraLand: liberty ? [bridge, islet] : [], base, airfield: field };
+  return {
+    map,
+    blocks,
+    half,
+    land,
+    lots,
+    countryRoads,
+    fields,
+    roads,
+    blockList,
+    props,
+     extraLand: liberty ? [bridge, islet] : [],
+    base,
+    airfield: field,
+    shores,
+    port: port ? { quay: port.quay, side: port.side } : null,
+    play,
+  };
 }
 
 // -------------------------------------------------------------------------
@@ -297,7 +337,6 @@ function layout(map: MapId, rng: Rng): { grid: BlockKind[][]; airport: AirportSi
   switch (map) {
     case 'town':
       place('industrial', 2, (f) => f > 0.8);
-      place('farm', 2, (f) => f > 0.8);
       place('park', 2, (f) => f > 0.2);
       place('playpark', 1, (f) => f > 0.2);
       place('dogpark', 1, (f) => f > 0.2);
@@ -416,6 +455,8 @@ type Add = (kind: PropKind, x: number, z: number, rot?: number, variant?: number
 
 interface Tools {
   map: MapId;
+  /** Where interiors record their playground surfaces and courts. */
+  play: PlayArea[];
   rng: Rng;
   add: Add;
   pick: <T>(list: readonly T[]) => T;
@@ -442,7 +483,7 @@ function sidewalk(b: Block, { add: put, rng, pick, variant }: Tools): void {
 
 /** Country verges: hay, rocks, the odd tree. */
 function verge(b: Block, { add, rng, pick, variant }: Tools): void {
-  const kinds: PropKind[] = b.kind === 'farm' ? ['haybale', 'haybale', 'bush', 'rock'] : ['rock', 'bush', 'pine', 'tree'];
+  const kinds: PropKind[] = ['rock', 'bush', 'pine', 'tree'];
   alongEdges(b, 4, (x, z, rot) => {
     if (rng() < 0.55) add(pick(kinds), x, z, rot, variant());
   });
@@ -638,30 +679,59 @@ function interior(b: Block, t: Tools, ring: number): boolean {
           add((i + j) % 4 === 3 ? 'fruitstand' : 'cafe', x0 + 3.5 + i * 6.5, z0 + 2.5 + (j * (deep - 5)) / 2, 0, variant());
         }
       }
-      add('slide', x0 + s - 4.5, z0 + 3.5, 0, variant());
-      add('seesaw', x0 + s - 1.2, z0 + 4, 0, variant());
-      add('sandbox', x0 + s - 3, z0 + deep - 2.5, 0);
+      // The play corner: slide, seesaw and sandpit together on one soft
+      // surface, and now and then a pair of picnic tables beside it.
+      t.play.push({ kind: 'soft', x0: x0 + 18.5, z0: z0 + 1.5, x1: x0 + s - 0.5, z1: z0 + 8.5 });
+      add('slide', x0 + 20.6, z0 + 5, 0, variant());
+      add('seesaw', x0 + 23.3, z0 + 5, 0, variant());
+      add('sandbox', x0 + 25.9, z0 + 5, 0);
+      if (rng() < 0.5) for (const u of [20.8, 25.4]) add('picnic', x0 + u, z0 + 12.5, 0, variant());
       return false;
     }
     case 'playpark': {
-      // A kids' park: a playground in the middle, parents on the benches
-      // round it, trees in the corners and an ice-cream cart.
-      const kit: PropKind[] = ['swings', 'slide', 'climber', 'carousel', 'sandbox', 'seesaw'];
-      kit.forEach((kind, i) => {
-        add(kind, x0 + 5.5 + (i % 3) * 8.5, z0 + 7 + Math.floor(i / 3) * 9, 0, variant());
-      });
-      for (let i = 0; i < 4; i++) {
-        const bx = x0 + 3 + i * 7.3;
-        add('bench', bx, z0 + s - 1.2, Math.PI, variant());
-        if (rng() < 0.6) add('sitter', bx, z0 + s - 1.2, Math.PI, variant());
+      // A kids' park: the playground together on one soft surface, parents
+      // on benches at its edge, and beside it a little basketball court,
+      // picnic tables, or open lawn. An ice-cream cart and shady trees.
+      t.play.push({ kind: 'soft', x0: x0 + 1.5, z0: z0 + 1.5, x1: x0 + 14.8, z1: z0 + 15.5 });
+      const kit: Array<[PropKind, number, number]> = [
+        ['swings', 4.5, 3.8],
+        ['slide', 9, 4.5],
+        ['seesaw', 12.8, 4.5],
+        ['climber', 4.5, 11.5],
+        ['carousel', 9, 11.5],
+        ['sandbox', 12.8, 12],
+      ];
+      for (const [kind, u, v] of kit) add(kind, x0 + u, z0 + v, 0, variant());
+      for (const u of [4.5, 11]) {
+        add('bench', x0 + u, z0 + 17.3, Math.PI, variant());
+        if (rng() < 0.6) add('sitter', x0 + u, z0 + 17.3, Math.PI, variant());
       }
-      for (const [dx, dz] of [
-        [1.8, 1.8],
-        [s - 1.8, 1.8],
-      ]) {
-        add('tree', x0 + dx, z0 + dz, turn(), variant());
-      }
-      add('cart', x0 + s - 2, z0 + s - 6, Math.PI / 2, variant());
+      add('cart', x0 + 7.5, z0 + 23.5, Math.PI / 2, variant());
+      for (const u of [2, 13]) add('tree', x0 + u, z0 + s - 2, turn(), variant());
+      const beside = pick(['court', 'court', 'picnic', 'lawn'] as const);
+      if (beside === 'court') {
+        // Long side along z; a hoop at each end, its backboard facing in.
+        const court = { kind: 'court' as const, x0: x0 + 16.4, z0: z0 + 1.5, x1: x0 + s - 0.8, z1: z0 + s - 1.5 };
+        t.play.push(court);
+        const mid = (court.x0 + court.x1) / 2;
+        add('hoop', mid, court.z0 + 1.1, 0);
+        add('hoop', mid, court.z1 - 1.1, Math.PI);
+      } else if (beside === 'picnic') {
+        for (const [u, v] of [
+          [19.5, 5],
+          [25, 5],
+          [19.5, 12],
+          [25, 12],
+        ]) {
+          add('picnic', x0 + u, z0 + v, 0, variant());
+        }
+        for (const [u, v] of [
+          [19, 22],
+          [25, 25],
+        ]) {
+          add(pick(['tree', 'tree', 'pine'] as const), x0 + u, z0 + v, turn(), variant());
+        }
+      } else add('tree', x0 + 25, z0 + 25, turn(), variant());
       return false;
     }
     case 'dogpark': {
@@ -700,13 +770,6 @@ function interior(b: Block, t: Tools, ring: number): boolean {
         add('van', x0 + 19, z0 + 3, 0, variant());
         for (let i = 0; i < 3; i++) add('cone', x0 + s - 5 + i * 1.8, z0 + 2, 0);
       }
-      return false;
-    }
-    case 'farm': {
-      add('barn', x0 + 7.5, z0 + 5.5, 0, variant());
-      add('fruitstand', x0 + 17.5, z0 + 2, 0, variant());
-      add('tractor', x0 + s - 3, z0 + 5, 0, variant());
-      for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) add('haybale', x0 + 3 + i * 5.5, z0 + 15 + j * 5, 0);
       return false;
     }
     case 'forest': {
@@ -942,6 +1005,60 @@ function airport(site: AirportSite, half: number, t: Tools, lots: Rect[]): Airfi
 }
 
 // -------------------------------------------------------------------------
+// The sea and the port
+// -------------------------------------------------------------------------
+
+/** A second shore: east, west or south (the north is always sea). */
+function pick3(rng: Rng): Side {
+  return (['e', 'w', 's'] as const)[Math.floor(rng() * 3)];
+}
+
+/**
+ * The port on a shore, in the countryside ring beside the country road that
+ * reaches that shore. Worked out along the shore (`u`) and inland from it
+ * (`v`): a concrete quay with cranes at its edge, their booms out over the
+ * water, ships moored alongside, rows of containers and warehouses behind.
+ * Returns the quay (for the ground) and the ground it takes (for the
+ * countryside to keep off).
+ */
+function harbour(side: Side, land: number, mid: number, t: Tools): { quay: Rect; yard: Rect; side: Side } {
+  const { add, rng, variant } = t;
+  const L = 150;
+  const D = 56;
+  // Beside the country road, to one side or the other.
+  const u0 = rng() < 0.5 ? mid + 14 : mid - 14 - L;
+  const at = (u: number, v: number): [number, number] =>
+    side === 'e' ? [land - v, u] : side === 'w' ? [-land + v, u] : side === 's' ? [u, land - v] : [u, -land + v];
+  const rect = (a0: number, b0: number, a1: number, b1: number): Rect => {
+    const [ax, az] = at(a0, b0);
+    const [bx, bz] = at(a1, b1);
+    return { x0: Math.min(ax, bx), z0: Math.min(az, bz), x1: Math.max(ax, bx), z1: Math.max(az, bz) };
+  };
+  const facing = (du: number, dv: number) => {
+    const [ax, az] = at(0, 0);
+    const [bx, bz] = at(du, dv);
+    return Math.atan2(bx - ax, bz - az);
+  };
+  const toSea = facing(0, -1);
+  const alongShore = facing(1, 0);
+  // Cranes on the quay's edge, facing the sea; a ship or two moored alongside.
+  for (const u of [30, 72, 114]) add('crane', ...at(u0 + u, 6.5), toSea, variant());
+  const ships = t.map === 'region' ? [44, 106] : [70];
+  for (const u of ships) add('ship', ...at(u0 + u, -8), alongShore, variant());
+  // Containers in rows behind, a gap between each run of six.
+  for (let run = 0; run < 5; run++) {
+    for (let i = 0; i < 6; i++) {
+      for (const v of [18.5, 26]) {
+        if (rng() < 0.85) add('container', ...at(u0 + 8 + run * 28 + i * 3, v), toSea, variant());
+      }
+    }
+  }
+  // Warehouses at the back, doors to the quay.
+  for (const u of [38, 110]) add('warehouse', ...at(u0 + u, 45), toSea, variant());
+  return { quay: rect(u0, 0, u0 + L, D), yard: rect(u0 - 4, 0, u0 + L + 4, D + 4), side };
+}
+
+// -------------------------------------------------------------------------
 // The countryside round the bigger maps
 // -------------------------------------------------------------------------
 
@@ -951,7 +1068,7 @@ function airport(site: AirportSite, half: number, t: Tools, lots: Rect[]): Airfi
  * meadows, and on the Region mountains along the far edge. Things keep off
  * the country roads, and fields are recorded so the ground can plough them.
  */
-function countryside(map: MapId, half: number, land: number, roads: readonly Rect[], fields: Rect[], t: Tools): void {
+function countryside(map: MapId, half: number, land: number, roads: readonly Rect[], fields: Rect[], t: Tools, keepOff: readonly Rect[]): void {
   const { rng, pick, variant, turn } = t;
   const margin = land - half;
   const CELL = 26;
@@ -986,6 +1103,8 @@ function countryside(map: MapId, half: number, land: number, roads: readonly Rec
     const key = `${Math.floor(x / SQ)}:${Math.floor(z / SQ)}`;
     small.set(key, [...(small.get(key) ?? []), { x, z, r }]);
   };
+
+  for (const r of keepOff) block((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2, r.x1 - r.x0, r.z1 - r.z0);
 
   // One power plant out on the Region's countryside, on its own ground.
   if (map === 'region') {

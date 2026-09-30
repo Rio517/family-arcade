@@ -106,7 +106,8 @@ describe('GulpPage', () => {
     expect(screen.getByTestId('gulp-countdown')).toHaveTextContent('3');
     // Town: the child and four computer holes.
     expect(screen.getByTestId('gulp-board').querySelectorAll('li')).toHaveLength(5);
-    expect(screen.getByTestId('gulp-board')).toHaveTextContent('You');
+    // The child's row carries their name from the arcade's player screen.
+    expect(screen.getByTestId('gulp-board').querySelector('li.me')).toHaveTextContent('Rio');
     expect(screen.getByTestId('gulp-clock')).toHaveTextContent('3:00');
   });
 
