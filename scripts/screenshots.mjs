@@ -528,6 +528,44 @@ const SHOTS = [
     selector: '.mirror-stage',
     prep: waitForMask,
   },
+  {
+    // Gulp City's menu over the live city, computer holes roaming it. The
+    // city is seeded fresh each load, so the picture behind the card churns.
+    name: 'gulp',
+    path: '/#/gulp',
+    viewport: TABLET,
+    fits: true,
+    expect: '[data-testid="gulp-play"]',
+    prep: async (page) => {
+      await page.waitForSelector('.gulp-canvas canvas', { timeout: 20000 });
+      await page.waitForTimeout(2500);
+    },
+  },
+  {
+    // A round under way: the hole, the leaderboard, the clock and the level meter.
+    name: 'gulp-round',
+    path: '/#/gulp',
+    viewport: TABLET,
+    fits: true,
+    expect: '[data-testid="gulp-hud"]',
+    prep: async (page) => {
+      await page.getByTestId('gulp-play').click();
+      await page.waitForSelector('.gulp-canvas canvas', { timeout: 20000 });
+      await page.waitForTimeout(6000);
+    },
+  },
+  {
+    // The phone menu must leave PLAY clear of the arcade's own bottom bar.
+    name: 'gulp-phone',
+    path: '/#/gulp',
+    viewport: PHONE,
+    fits: true,
+    expect: '[data-testid="gulp-play"]',
+    prep: async (page) => {
+      await page.waitForSelector('.gulp-canvas canvas', { timeout: 20000 });
+      await page.waitForTimeout(2000);
+    },
+  },
 ];
 
 /**

@@ -29,6 +29,7 @@ const PREVIEWS = {
   mirror: { from: 'mirror-effects.png', to: 'src/games/mirror/assets/preview.webp' },
   caribbean: { from: 'caribbean-naval/battle-tablet-landscape.png', to: 'src/games/caribbean/assets/preview.webp' },
   yahtzee: { from: 'yahtzee-tabs.png', to: 'src/app/assets/yahtzee-preview.webp' },
+  'gulp': { from: 'gulp.png', to: 'src/games/gulp/assets/preview.webp' },
 };
 
 const only = process.argv.slice(2);
