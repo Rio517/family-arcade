@@ -154,6 +154,8 @@ function pointersFor(w: World, h: World['holes'][number]): Pointer[] {
   const angleTo = (x: number, z: number) => Math.atan2(x - h.x, -(z - h.z));
   for (const a of w.attacks) {
     if (a.kind === 'bomber' || a.target !== h.id) continue;
+    // A tank or helicopter on its way home is no danger any more.
+    if ((a.kind === 'tank' || a.kind === 'heli') && a.home) continue;
     // Only while it is still on its way: once it is close, it can be seen.
     if (Math.hypot(a.x - h.x, a.z - h.z) < h.r + 18) continue;
     out.push({ key: `a${a.id}`, angle: angleTo(a.x, a.z), kind: a.kind, label: ATTACK_LABEL[a.kind] });

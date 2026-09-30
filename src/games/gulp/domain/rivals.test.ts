@@ -49,7 +49,8 @@ describe('difficulty', () => {
       steerRival(brain, rival, w, 1 / 60, me);
       return brain.pace;
     };
-    expect(pace('easy')).toBe(0.35);
+    // The runaway slow-down, on top of Easy's ambling speed.
+    expect(pace('easy')).toBeCloseTo(0.35 * 0.75);
     expect(pace('medium')).toBeGreaterThan(0.7);
     expect(pace('medium')).toBeLessThan(1);
     expect(pace('hard')).toBe(1);

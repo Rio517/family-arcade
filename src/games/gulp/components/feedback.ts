@@ -27,6 +27,14 @@ const INCOMING: Record<'tanker' | 'tank' | 'heli' | 'bomber', Omit<Banner, 'id'>
   bomber: { kind: 'warn', text: 'Bombers overhead!', sub: 'Get out of the red circles' },
 };
 
+/** When the city goes after a computer hole, the child hears about it too. */
+const AFTER: Record<'tanker' | 'tank' | 'heli' | 'bomber', string> = {
+  tanker: 'A fuel truck is after',
+  tank: 'Tanks are after',
+  heli: 'A helicopter is after',
+  bomber: 'Bombers are after',
+};
+
 const HURT: Record<'chem' | 'tanker' | 'bomb', Omit<Banner, 'id'>> = {
   chem: { kind: 'hurt', text: 'Yuck! Chemicals!', sub: 'Ouch, a bit smaller' },
   tanker: { kind: 'hurt', text: 'Hot hot hot!', sub: 'The fuel truck burned you' },
@@ -66,7 +74,8 @@ export function feedbackFor(e: WorldEvent, w: World, said: Said): Feedback | nul
     case 'gulp':
       return e.eater === ME ? { cue: 'gulp', size: 1, banner: { kind: 'good', text: `You swallowed ${w.holes[e.eaten].name}!` } } : null;
     case 'incoming':
-      return e.target === ME ? { cue: 'warn', banner: INCOMING[e.kind] } : null;
+      if (e.target === ME) return { cue: 'warn', banner: INCOMING[e.kind] };
+      return { banner: { kind: 'news', text: `${AFTER[e.kind]} ${w.holes[e.target].name}!` } };
     case 'hurt':
       return e.hole === ME ? { cue: 'hurt', banner: HURT[e.cause] } : null;
     case 'boom': {

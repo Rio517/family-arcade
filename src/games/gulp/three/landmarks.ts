@@ -1129,7 +1129,8 @@ const skyscraper: Builder = (k, v, s) => {
 /**
  * A TV tower on a broad round visitor building with a plaza ring and trees,
  * so its foot fills the lot and it never looks like a needle you could
- * swallow early. Fins and a thick lower shaft carry it up to the pod.
+ * swallow early. A drum and a flared plinth lift the shaft, and fins carry
+ * it up to the pod.
  */
 const tvtower: Builder = (k) => {
   const conc = 0xe8e3da;
@@ -1156,11 +1157,30 @@ const tvtower: Builder = (k) => {
     [8.3, pb + 0.1],
     [8.3, pb],
   ], 20);
-  k.lathe(PAL.glass, [
-    [7.2, pb],
-    [7.2, pb + 0.25],
-    [5.2, pb + 0.25],
-    [5.2, pb],
+  // The pedestal: a windowed drum on the roof, then a flared plinth the shaft
+  // grows out of, so the needle stands on something as broad as it is tall.
+  const drum = pb + 15;
+  const plinth = drum + 12;
+  k.lathe(conc, [
+    [8.2, pb],
+    [8.2, drum],
+  ], 20);
+  for (const y of [pb + 2.5, pb + 7, pb + 11.5]) {
+    k.lathe(PAL.glassDeep, [
+      [8.24, y],
+      [8.24, y + 2.2],
+    ], 20);
+  }
+  k.lathe(RED, [
+    [8.2, drum - 0.7],
+    [8.8, drum - 0.7],
+    [8.8, drum],
+    [7.4, drum],
+  ], 20);
+  k.lathe(conc, [
+    [7.4, drum],
+    [6.0, drum + 5],
+    [5.0, plinth],
   ], 20);
   // Round-topped glass doors on four sides, under little red canopies.
   for (let i = 0; i < 4; i++) {
@@ -1185,13 +1205,13 @@ const tvtower: Builder = (k) => {
     const pz = -dx * 0.6;
     const pts: V3[] = [];
     for (const s of [-1, 1]) {
-      pts.push([dx * 3.4 + s * px, pb, dz * 3.4 + s * pz]);
-      pts.push([dx * 7.4 + s * px, pb, dz * 7.4 + s * pz]);
-      pts.push([dx * 2.6 + s * px, 34, dz * 2.6 + s * pz]);
+      pts.push([dx * 4.6 + s * px, drum, dz * 4.6 + s * pz]);
+      pts.push([dx * 8.0 + s * px, drum, dz * 8.0 + s * pz]);
+      pts.push([dx * 2.8 + s * px, 58, dz * 2.8 + s * pz]);
     }
     k.hull(conc, pts);
   }
-  k.cyl(conc, 1.8, 4.0, 92 - pb, 14, 0, pb, 0);
+  k.cyl(conc, 1.8, 5.0, 92 - plinth, 14, 0, plinth, 0);
   // Main pod: white underside, glass ring, balcony and a red cap.
   k.lathe(PAL.white, [
     [1.9, 92],

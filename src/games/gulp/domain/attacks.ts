@@ -6,6 +6,7 @@
 import { FIT, footSize, makeProp } from './catalog';
 import { levelOf, speedOf } from './growth';
 import { gobble, hurt, type Hole } from './holes';
+import type { Difficulty } from './rivals';
 import { spotNear, wrapAngle } from './space';
 import type { World, WorldEvent } from './world';
 
@@ -24,6 +25,11 @@ export interface Bomb {
 /** A tank or a helicopter from the military base: it closes in, then fires. */
 interface Unit {
   id: number;
+  /** The units sent out together share a wave, and go home together. */
+  wave: number;
+  /** Hits the wave has landed; enough of them and it goes home. */
+  hits: number;
+  home: boolean;
   target: number;
   x: number;
   z: number;
@@ -59,6 +65,14 @@ const TANK_SIZE = footSize('tank');
 /** The base only sends tanks after holes this close; helicopters go anywhere. */
 const TANK_RANGE = 200;
 const MIN_ATTACK_LEVEL = 4;
+/**
+ * How often the city goes after the child rather than a computer hole, when
+ * both are big enough: now and then on Easy, half the time on Hard (where a
+ * child in the lead is always the one it goes after).
+ */
+const CHILD_SHARE: Record<Difficulty, number> = { easy: 0.2, medium: 0.35, hard: 0.5 };
+/** Hits a wave of tanks or helicopters lands before it heads home. */
+const WAVE_HITS: Record<Difficulty, number> = { easy: 1, medium: 2, hard: 3 };
 
 export function fightBack(w: World, dt: number, events: WorldEvent[], player: Hole | null): void {
   w.nextAttack -= dt;
@@ -73,7 +87,20 @@ export function fightBack(w: World, dt: number, events: WorldEvent[], player: Ho
   w.attacks = w.attacks.filter((a) => a.life > 0);
 }
 
-/** Pick who the city goes after: big holes only, the child about half the time. */
+/**
+ * Pick who the city goes after: big holes only. The child is one of them,
+ * picked now and then (see CHILD_SHARE); otherwise the biggest computer hole.
+ */
+function pickTarget(w: World, big: Hole[], player: Hole | null): Hole {
+  const rivals = big.filter((h) => h !== player);
+  if (!player || !big.includes(player) || !rivals.length) return rivals.length ? biggestOf(rivals) : big[0];
+  const { difficulty } = w.options;
+  if (difficulty === 'hard' && player === biggestOf(big)) return player;
+  return w.rng() < CHILD_SHARE[difficulty] ? player : biggestOf(rivals);
+}
+
+const biggestOf = (hs: Hole[]): Hole => hs.reduce((a, b) => (b.r > a.r ? b : a));
+
 function launch(w: World, events: WorldEvent[], player: Hole | null): void {
   const big = w.holes.filter((h) => h.alive && h.safe <= 0 && levelOf(h.r) >= MIN_ATTACK_LEVEL);
   if (!big.length) {
@@ -82,18 +109,21 @@ function launch(w: World, events: WorldEvent[], player: Hole | null): void {
   }
   // Now and then, not all the time: each attack should feel like an event.
   w.nextAttack = 20 + w.rng() * 12;
-  const biggest = big.reduce((a, b) => (b.r > a.r ? b : a));
-  const target = player && big.includes(player) && (player === biggest || w.rng() < 0.5) ? player : biggest;
+  const target = pickTarget(w, big, player);
   // A map with a military base sends its army half the time.
   const base = w.city.base;
   if (base && w.rng() < 0.5) {
     const near = Math.hypot(target.x - base.x, target.z - base.z) < TANK_RANGE;
     const kind = near && w.rng() < 0.6 ? 'tank' : 'heli';
     const count = kind === 'tank' ? 2 : 1;
+    const wave = w.nextId;
     for (let i = 0; i < count; i++) {
       const heading = Math.atan2(target.x - base.x, target.z - base.z);
       const unit: Unit = {
         id: w.nextId++,
+        wave,
+        hits: 0,
+        home: false,
         target: target.id,
         x: base.x + (i - (count - 1) / 2) * 6 * Math.cos(heading),
         z: base.z - (i - (count - 1) / 2) * 6 * Math.sin(heading),
@@ -165,11 +195,22 @@ function driveTanker(w: World, a: Extract<Attack, { kind: 'tanker' }>, dt: numbe
  * circles), and fire every few seconds at the spot where the hole is now.
  * Each shell shows its red target circle while it flies, so a moving hole
  * gets away. A hole big enough simply swallows a tank that comes too close.
+ * Once its wave has landed its hits (see WAVE_HITS), or its time is up, it
+ * goes back to the base and stops there.
  */
 function moveUnit(w: World, a: Extract<Attack, { kind: 'tank' | 'heli' }>, dt: number, events: WorldEvent[]): void {
   const target = w.holes[a.target];
   const tank = a.kind === 'tank';
-  if (target?.alive) {
+  const base = w.city.base ?? { x: a.x, z: a.z };
+  if (a.life <= 0 && !a.home) goHome(a, base);
+  if (a.home) {
+    const d = Math.hypot(base.x - a.x, base.z - a.z);
+    const turn = wrapAngle(Math.atan2(base.x - a.x, base.z - a.z) - a.heading);
+    a.heading += Math.max(-1, Math.min(1, turn)) * (tank ? 1.2 : 2) * dt;
+    a.x += Math.sin(a.heading) * a.speed * dt;
+    a.z += Math.cos(a.heading) * a.speed * dt;
+    if (d < 6 && !a.shells.length) a.life = 0;
+  } else if (target?.alive) {
     const d = Math.hypot(target.x - a.x, target.z - a.z);
     const stand = target.r + (tank ? 22 : 26);
     const want = Math.atan2(target.x - a.x, target.z - a.z);
@@ -182,7 +223,9 @@ function moveUnit(w: World, a: Extract<Attack, { kind: 'tank' | 'heli' }>, dt: n
       a.z += Math.cos(a.heading) * a.speed * dt;
     }
     a.reload -= dt;
-    if (a.reload <= 0 && d < stand + 30) {
+    // The tanks of a wave take turns: one shell in the air at a time.
+    const mateFiring = w.attacks.some((o) => o !== a && (o.kind === 'tank' || o.kind === 'heli') && o.wave === a.wave && o.shells.length > 0);
+    if (a.reload <= 0 && d < stand + 30 && !mateFiring) {
       a.reload = tank ? 2.8 : 2.2;
       const flight = tank ? 1.5 : 1.1;
       a.shells.push({
@@ -196,7 +239,15 @@ function moveUnit(w: World, a: Extract<Attack, { kind: 'tank' | 'heli' }>, dt: n
       });
     }
   }
-  a.shells = fall(w, a.shells, dt, events);
+  const { falling, hits } = fall(w, a.shells, dt, events);
+  a.shells = falling;
+  if (hits) {
+    for (const o of w.attacks) {
+      if ((o.kind !== 'tank' && o.kind !== 'heli') || o.wave !== a.wave) continue;
+      o.hits += hits;
+      if (o.hits >= WAVE_HITS[w.options.difficulty] && !o.home) goHome(o, base);
+    }
+  }
   // A big hole swallows a tank that rolls into it.
   if (tank) {
     for (const h of w.holes) {
@@ -206,28 +257,36 @@ function moveUnit(w: World, a: Extract<Attack, { kind: 'tank' | 'heli' }>, dt: n
       return;
     }
   }
-  // Out of time: it stops firing and leaves once its last shell lands.
-  if (a.life <= 0 && a.shells.length) a.life = 0.01;
+}
+
+/** Turn for the base, with time enough to drive there. */
+function goHome(a: Unit, base: { x: number; z: number }): void {
+  a.home = true;
+  a.life = Math.hypot(base.x - a.x, base.z - a.z) / a.speed + 4;
 }
 
 function flyBomber(w: World, a: Extract<Attack, { kind: 'bomber' }>, dt: number, events: WorldEvent[]): void {
   a.x += a.dx * a.speed * dt;
   a.z += a.dz * a.speed * dt;
-  a.bombs = fall(w, a.bombs, dt, events);
+  a.bombs = fall(w, a.bombs, dt, events).falling;
 }
 
 /**
  * Count down the bombs or shells in the air. Each one that lands goes off
- * and hurts every hole it hits; the rest are returned, still falling.
+ * and hurts every hole it hits; the rest are returned, still falling, with
+ * how many holes were hit.
  */
-function fall(w: World, bombs: Bomb[], dt: number, events: WorldEvent[]): Bomb[] {
+function fall(w: World, bombs: Bomb[], dt: number, events: WorldEvent[]): { falling: Bomb[]; hits: number } {
+  let hits = 0;
   for (const b of bombs) {
     b.fuse -= dt;
     if (b.fuse > 0) continue;
     events.push({ type: 'boom', x: b.x, z: b.z, size: b.radius });
     for (const h of w.holes) {
-      if (h.alive && h.safe <= 0 && Math.hypot(h.x - b.x, h.z - b.z) < b.radius + h.r * 0.25) hurt(w, h, 'bomb', events);
+      if (!h.alive || h.safe > 0 || Math.hypot(h.x - b.x, h.z - b.z) >= b.radius + h.r * 0.25) continue;
+      hurt(w, h, 'bomb', events);
+      hits += 1;
     }
   }
-  return bombs.filter((b) => b.fuse > 0);
+  return { falling: bombs.filter((b) => b.fuse > 0), hits };
 }

@@ -69,8 +69,13 @@ const STUN = 1.2;
 const BURN = 3;
 /** How much of an item's worth healthy food adds on top, as a health bonus. */
 const HEALTH_BONUS = 0.5;
-/** How much faster the child grows on Easy. */
+/**
+ * On Easy the child grows a third faster, and the computer holes get less
+ * from each thing they eat, in size and in points: a young player wandering
+ * between meals still climbs the levels and stays in the race.
+ */
 const EASY_GROWTH = 1.35;
+const EASY_RIVAL = 0.7;
 
 export function newHole(id: number, name: string, skin: number, isPlayer: boolean, x: number, z: number): Hole {
   return {
@@ -136,11 +141,11 @@ export function gobble(w: World, h: Hole, p: Prop, events: WorldEvent[]): void {
   if (mult > was) events.push({ type: 'combo', hole: h.id, mult });
   // A wonder scores its big bonus but grows the hole like any big thing of
   // its tier: a statue is a treat, not a jump to the top of the map.
-  // On Easy the child grows a third faster: a young player wandering
-  // between meals still climbs the levels.
-  const kind = h.isPlayer && w.options.difficulty === 'easy' ? EASY_GROWTH : 1;
-  h.mass += ((info.wonder ? worthOf(p.size) * 2 : p.points) + bonus) * kind;
-  const gained = (p.points + bonus) * mult * (h.doubleTime > 0 ? 2 : 1);
+  const easy = w.options.difficulty === 'easy';
+  const growth = easy ? (h.isPlayer ? EASY_GROWTH : EASY_RIVAL) : 1;
+  h.mass += ((info.wonder ? worthOf(p.size) * 2 : p.points) + bonus) * growth;
+  const share = easy && !h.isPlayer ? EASY_RIVAL : 1;
+  const gained = Math.round((p.points + bonus) * mult * (h.doubleTime > 0 ? 2 : 1) * share);
   h.score += gained;
   if (h.isPlayer && info.tier <= 5) w.police.eaten += 1;
   if (info.wonder) {
