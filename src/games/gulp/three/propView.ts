@@ -149,6 +149,8 @@ interface Rising {
 export class PropView {
   private slots = new Map<number, Slot>();
   private batches: Array<{ mesh: THREE.InstancedMesh; kind: Prop['kind']; casts: boolean }> = [];
+  /** The soft dark patches under vehicles, a batch beside each vehicle batch. */
+  private blobs: THREE.InstancedMesh[] = [];
   /** Batches for things put up during the round, by area and model. */
   private pools = new Map<string, Pool[]>();
   private rising = new Map<number, Rising>();
@@ -272,9 +274,14 @@ export class PropView {
     this.seeThrough.untrack(p);
   }
 
-  /** Show or hide the tiny things (see `isTiny`): they go when the camera is high above them. */
+  /**
+   * Show or hide the tiny things (see `isTiny`) and the patches under
+   * vehicles: they go when the camera is high above them. From there a
+   * car's patch hardly shows, but each batch of patches is still a draw.
+   */
   showTiny(shown: boolean): void {
     for (const b of this.batches) if (isTiny(b.kind)) b.mesh.visible = shown;
+    for (const b of this.blobs) b.visible = shown;
   }
 
   /** Show a thing again where it stands (it grew back). */
@@ -404,6 +411,7 @@ export class PropView {
         blob.renderOrder = 1;
         blob.computeBoundingSphere();
         this.scene.add(blob);
+        this.blobs.push(blob);
       }
       // Small street clutter casts no shadow either: hundreds of them, for little look.
       const casts = !vehicle && !CLUTTER.has(kind);
