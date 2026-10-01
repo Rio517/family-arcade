@@ -52,18 +52,20 @@ export class ModelWarmup {
     }
   }
 
-  /** Build models from the queue for up to `budgetMs`. */
-  step(budgetMs: number): void {
-    if (!this.queue.length) return;
+  /** Build models from the queue for up to `budgetMs`; returns the ones built, for the scene to upload. */
+  step(budgetMs: number): THREE.BufferGeometry[] {
+    const built: THREE.BufferGeometry[] = [];
+    if (!this.queue.length) return built;
     const until = performance.now() + budgetMs;
     while (this.queue.length && performance.now() < until) {
       const [kind, variant, h] = this.queue.pop()!;
       // A kind without a model yet is never placed either; skip it rather than stop the frame.
       try {
-        modelFor(kind, variant, h);
+        built.push(modelFor(kind, variant, h));
       } catch {
         continue;
       }
     }
+    return built;
   }
 }

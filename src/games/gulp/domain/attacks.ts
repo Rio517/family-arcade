@@ -72,10 +72,10 @@ const MIN_ATTACK_LEVEL = 4;
  * goes after the next biggest instead.
  */
 const EASY_SPARE = 0.5;
-/** Hits a wave of tanks or helicopters lands before it heads home: one knock is enough, at any level. */
-const WAVE_HITS = 1;
+/** Hits a wave of tanks or helicopters lands before it heads home. */
+const WAVE_HITS: Record<Difficulty, number> = { easy: 2, medium: 3, hard: 3 };
 /** Shots each tank or helicopter fires before it gives up and heads home, hit or miss. */
-const SHOTS: Record<Difficulty, number> = { easy: 2, medium: 3, hard: 3 };
+const SHOTS: Record<Difficulty, number> = { easy: 4, medium: 5, hard: 5 };
 /**
  * How big a bomb's or a shell's blast is: the same for every hole, however
  * big (a giant is hit by a bomb that lands near its middle, a small hole by
@@ -254,7 +254,7 @@ function moveUnit(w: World, a: Extract<Attack, { kind: 'tank' | 'heli' }>, dt: n
     for (const o of w.attacks) {
       if ((o.kind !== 'tank' && o.kind !== 'heli') || o.wave !== a.wave) continue;
       o.hits += hits;
-      if (o.hits >= WAVE_HITS && !o.home) goHome(o, base);
+      if (o.hits >= WAVE_HITS[w.options.difficulty] && !o.home) goHome(o, base);
     }
   }
   // A big hole swallows a tank that rolls into it.

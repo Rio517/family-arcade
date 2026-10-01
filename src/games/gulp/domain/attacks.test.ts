@@ -104,7 +104,7 @@ describe('the city fights back', () => {
     expect(picks('hard', 1200)).toBe(0);
   });
 
-  it('a wave of tanks goes home after one hit at every level, and a helicopter that keeps missing gives up after a few shots', () => {
+  it('a wave of tanks goes home after 2 hits on Easy and 3 on Medium and Hard, and a helicopter that keeps missing gives up after a few shots', () => {
     const hits = (difficulty: Difficulty) => {
       const w = round(6, 0, { fightBack: true, difficulty });
       only(w, []);
@@ -119,8 +119,8 @@ describe('the city fights back', () => {
       for (let i = 0; i < 60 * 20; i++) for (const e of stepWorld(w, 1 / 60, still)) if (e.type === 'hurt') n += 1;
       return { n, home: w.attacks.every((a) => a.kind === 'tank' && a.home) };
     };
-    for (const d of ['easy', 'medium', 'hard'] as const) {
-      expect(hits(d).n, d).toBe(1);
+    for (const [d, n] of [['easy', 2], ['medium', 3], ['hard', 3]] as const) {
+      expect(hits(d).n, d).toBe(n);
       expect(hits(d).home, d).toBe(true);
     }
 

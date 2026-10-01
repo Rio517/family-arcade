@@ -1264,9 +1264,6 @@ const terminal: Builder = (k) => {
   }
   k.box(ASPHALT, 36, 0.08, 3.4, 0, 0, -13.2, undefined, ON_GROUND);
   for (let i = 0; i < 9; i++) k.box(PAL.white, 1.6, 0.04, 0.2, -16 + i * 4, 0.08, -13.2, undefined, ON_GROUND);
-  toyCar(k, 0xffc21a, -9, 0.08, -12.4, Math.PI / 2);
-  toyCar(k, 0x3a86ff, 1, 0.08, -14.0, -Math.PI / 2);
-  toyCar(k, 0xe63946, 7, 0.08, -12.4, Math.PI / 2);
   // Glass hall under a white arched roof.
   const x0 = -17;
   const x1 = 11;
