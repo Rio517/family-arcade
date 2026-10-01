@@ -31,10 +31,16 @@ same paused moment drawn twice, at the detail a Retina Mac draws in a
 and 2× and 4× zoom: close-ups of eight spots, the whole level-15 frame (the
 closest they would be seen), the whole level-17 frame, and the model gallery.
 
-The pictures were taken from the dev server with the far models swapped into
-a running round by a throwaway script; the asset gallery takes `?far` to show
-them (`/preview-gulp.html?tier=5&far`).
+The pictures were taken from the dev server with the simpler models swapped
+into a running round by a throwaway script.
 
 ## Outcome
 
-Pending.
+**Decision: the simpler models everywhere, not only from high up.** Gas
+tanks, trees and cars keep their full detail, as do people, pets and street
+clutter (the two smallest tiers), whose small parts are the whole of them.
+The rule lives in `kitFor` in `three/kit.ts`. At the start of a round the
+camera is close, so the simpler windows show as hexagons there; that was
+accepted for the saving. In the same level-17 test as above, frames over
+33 ms went from 7 (car shadow patches already hidden) to 0, and the typical
+frame from 12.8 ms to 10.3 ms.
