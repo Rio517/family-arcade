@@ -566,6 +566,19 @@ const SHOTS = [
     },
   },
   {
+    // A round on a big monitor: the mini map grows with the screen.
+    name: 'gulp-round-monitor',
+    path: '/#/gulp',
+    viewport: MONITOR,
+    fits: true,
+    expect: '[data-testid="gulp-minimap"]',
+    prep: async (page) => {
+      await page.getByTestId('gulp-play').click();
+      await page.waitForSelector('.gulp-canvas canvas', { timeout: 20000 });
+      await page.waitForTimeout(6000);
+    },
+  },
+  {
     // The phone menu must leave PLAY clear of the arcade's own bottom bar.
     name: 'gulp-phone',
     path: '/#/gulp',

@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import type { Attack, PowerKind, PowerUp } from '../domain/world';
 import { buildHeliBodyGeometry, buildRotorGeometry } from './military';
 import { buildKindGeometry } from './props';
+import { ProjectileKit } from './projectiles';
 
 interface Puff {
   sprite: THREE.Sprite;
@@ -102,14 +103,12 @@ export class Effects {
   private tankGeo: THREE.BufferGeometry;
   private heliGeo: THREE.BufferGeometry;
   private rotorGeo: THREE.BufferGeometry;
-  private shellMat = new THREE.MeshStandardMaterial({ color: 0x4a5a2a, roughness: 0.5, emissive: 0xff7a1a, emissiveIntensity: 0.35 });
+  private projectiles = new ProjectileKit();
   private kitMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 });
   private warnTex = iconTexture('warn');
   /** A gold star over each wonder still standing (one shared material; see `syncWonders`). */
   private starMat = new THREE.SpriteMaterial({ map: iconTexture('star'), transparent: true, depthWrite: false, sizeAttenuation: false });
   private wonderStars = new Map<string, THREE.Sprite>();
-  private bombGeo = new THREE.CapsuleGeometry(0.5, 1.4, 4, 8);
-  private bombMat = new THREE.MeshStandardMaterial({ color: 0x33363d, roughness: 0.5 });
   private time = 0;
   private protos = new THREE.Group();
   private chunks: Chunk[] = [];
@@ -375,7 +374,7 @@ export class Effects {
     g.add(this.makeOrb('speed'));
     for (const kind of ['tanker', 'bomber', 'tank', 'heli'] as const) g.add(this.makeAttack({ kind } as Attack));
     const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: 0xff2d20, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
-    g.add(ring, new THREE.Mesh(this.bombGeo, this.shellMat), new THREE.Mesh(this.bombGeo, this.bombMat));
+    g.add(ring, ...this.projectiles.warmMeshes());
     g.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: this.puffTex, transparent: true, depthWrite: false, premultipliedAlpha: true })));
     g.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: this.warnTex, depthTest: false, transparent: true, sizeAttenuation: false })));
     g.add(new THREE.Mesh(this.chunkGeo, this.chunkMats[0]), new THREE.Mesh(this.chunkGeo, this.emberMat));
@@ -551,8 +550,7 @@ export class Effects {
         if (shell || b.fuse < 1.2) {
           let bomb = view.bombs.get(b.id);
           if (!bomb) {
-            bomb = new THREE.Mesh(this.bombGeo, shell ? this.shellMat : this.bombMat);
-            bomb.castShadow = true;
+            bomb = this.projectiles.make(a.kind === 'bomber' ? 'bomber' : a.kind === 'heli' ? 'heli' : 'tank');
             view.bombs.set(b.id, bomb);
             view.group.add(bomb);
           }
@@ -563,10 +561,13 @@ export class Effects {
             const y = b.from.y * (1 - k) + Math.sin(k * Math.PI) * (4 + r * 0.3);
             bomb.position.set(x, y, z);
             bomb.scale.setScalar(Math.max(0.7, r / 14));
-            bomb.rotation.set(Math.PI / 2, Math.atan2(b.x - b.from.x, b.z - b.from.z), 0, 'YXZ');
+            // Along the arc's tangent: pitch as well as yaw.
+            this.projectiles.pointAlong(bomb, b.x - b.from.x, -b.from.y + Math.PI * (4 + r * 0.3) * Math.cos(k * Math.PI), b.z - b.from.z);
+            this.projectiles.flicker(bomb, this.time, b.id, this.reducedMotion);
           } else {
             bomb.scale.setScalar(Math.max(1, r / 8));
             bomb.position.set(b.x, alt * (b.fuse / 1.2), b.z);
+            this.projectiles.pointDown(bomb);
           }
         }
       }
@@ -714,14 +715,12 @@ export class Effects {
     this.orbGeo.dispose();
     this.ringGeo.dispose();
     this.discGeo.dispose();
-    this.bombGeo.dispose();
-    this.bombMat.dispose();
+    this.projectiles.dispose();
     this.tankerGeo.dispose();
     this.bomberGeo.dispose();
     this.tankGeo.dispose();
     this.heliGeo.dispose();
     this.rotorGeo.dispose();
-    this.shellMat.dispose();
     this.kitMat.dispose();
   }
 }

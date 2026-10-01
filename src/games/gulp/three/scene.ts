@@ -20,7 +20,7 @@
 import * as THREE from 'three';
 import { disposeDeep } from '@shared/three/disposeDeep';
 import { isSite, KINDS } from '../domain/catalog';
-import type { World, WorldEvent } from '../domain/world';
+import { levelOf, type World, type WorldEvent } from '../domain/world';
 import { CameraRig } from './cameraRig';
 import type { Smear } from './canvasTextures';
 import { Effects, type WonderSpot } from './effects';
@@ -39,6 +39,8 @@ const SHADOW_MAP = 2048;
  */
 const TINY_FAR = 125;
 const TINY_BACK = 110;
+/** From this level, blasts no longer shake the camera. */
+const CALM_LEVEL = 7;
 
 export class GulpScene {
   private renderer: THREE.WebGLRenderer;
@@ -49,6 +51,12 @@ export class GulpScene {
   private effects: Effects;
   /** The one flat-shaded, vertex-coloured material every model shares. */
   private material = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8, metalness: 0 });
+  /**
+   * The same look for things drawn one at a time (falling in, the police, the
+   * warm-up): a copy apart from the batches', so the renderer does not swap
+   * between the batched and the single shader on every other thing it draws.
+   */
+  private looseMaterial = this.material.clone();
   /**
    * Models the warm-up just built, drawn once far out of sight (tiny, deep
    * under the ground) so their geometry reaches the graphics card in a quiet
@@ -126,8 +134,8 @@ export class GulpScene {
       byKind.set(p.kind, spot);
     }
     this.wonders = [...byKind.values()];
-    this.props = new PropView(this.scene, this.material, world, reducedMotion);
-    this.walkers = new Walkers(this.scene, this.material, world, reducedMotion);
+    this.props = new PropView(this.scene, this.material, this.looseMaterial, world, reducedMotion);
+    this.walkers = new Walkers(this.scene, this.material, this.looseMaterial, world, reducedMotion);
     this.effects = new Effects(reducedMotion);
     this.scene.add(this.effects.group);
     this.holes = new HoleViews(this.scene, this.effects, reducedMotion, looks, follow);
@@ -154,7 +162,7 @@ export class GulpScene {
     if (this.disposed) return;
     this.primer.clear();
     for (const geo of this.warmup?.step(2) ?? []) {
-      const m = new THREE.Mesh(geo, this.material);
+      const m = new THREE.Mesh(geo, this.looseMaterial);
       m.frustumCulled = false;
       m.castShadow = true;
       this.primer.add(m);
@@ -198,7 +206,9 @@ export class GulpScene {
         this.holes.flash(e.hole);
       } else if (e.type === 'boom') {
         this.effects.boom(e.x, e.z, Math.max(3, e.size));
-        if (me && Math.hypot(e.x - me.x, e.z - me.z) < 30 + me.r * 3) this.rig.shake(0.5);
+        // A blast close by shakes the camera, until the hole is big enough
+        // that bombs are a nuisance, not an earthquake.
+        if (me && levelOf(me.r) < CALM_LEVEL && Math.hypot(e.x - me.x, e.z - me.z) < 30 + me.r * 3) this.rig.shake(0.5);
       } else if (e.type === 'hurt' && e.cause === 'tanker') {
         const h = world.holes[e.hole];
         this.smearHole(e.hole, 'burn', 1);
@@ -279,6 +289,7 @@ export class GulpScene {
     this.walkers.dispose();
     disposeDeep(this.scene);
     this.material.dispose();
+    this.looseMaterial.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

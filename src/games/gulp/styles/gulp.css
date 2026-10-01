@@ -770,6 +770,10 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 }
 .gulp-minimap {
   display: block;
+  /* Grows with the screen's short side: about 104px on a phone, 150px on an
+     iPad, 194px on a laptop and 259px on a big monitor. */
+  width: clamp(104px, 18vmin, 300px);
+  height: clamp(104px, 18vmin, 300px);
   border-radius: 16px;
   border: 3px solid #fff;
   box-shadow: 0 5px 0 rgba(20, 40, 90, 0.18), var(--g-shadow);
@@ -1076,7 +1080,6 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   .gulp-right { flex-direction: column-reverse; align-items: flex-end; gap: 6px; }
   .gulp-wonders,
   .gulp-kills { height: 34px; font-size: 16px; padding: 0 12px 0 8px; }
-  .gulp-minimap { width: 104px !important; height: 104px !important; }
   .gulp-minimap-slot { bottom: max(64px, env(safe-area-inset-bottom)); }
   .gulp-pause-label { display: none; }
   .gulp-round.gulp-pause-btn { padding: 0; width: 44px; justify-content: center; }
