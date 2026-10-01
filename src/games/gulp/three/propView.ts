@@ -44,7 +44,7 @@ const CHUNK = 216;
 const SINK: Partial<Record<Prop['kind'], number>> = { ship: -2 };
 /** Small street furniture: no shadows, to save the shadow pass drawing hundreds of them. */
 const CLUTTER: ReadonlySet<string> = new Set(['lamp', 'bin', 'hydrant', 'planter', 'cone', 'bike', 'mailbox']);
-/** Where a batch puts a thing it is not showing. */
+/** Where a ship's containers batch puts a box it is not showing. */
 const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
 /** Slots in each batch of things put up during a round. */
 const POOL_SIZE = 32;
@@ -70,18 +70,32 @@ function ownCopy(model: THREE.BufferGeometry): THREE.BufferGeometry {
   return g;
 }
 
-/** A batch for things put up during a round, and its slots let go. */
-interface Pool {
+/**
+ * One model drawn many times. The things shown fill its first `mesh.count`
+ * slots, so something eaten or hidden costs nothing to draw: it leaves the
+ * drawn slots, and the last one drawn moves into its place.
+ */
+interface Batch {
   mesh: THREE.InstancedMesh;
-  free: number[];
+  kind: Prop['kind'];
+  casts: boolean;
+  /** Which thing each drawn slot holds. */
+  ids: number[];
+  /** Vehicles' soft shadow patches, slot for slot with the vehicles. */
+  blob?: THREE.InstancedMesh;
+}
+
+/** A batch for things put up during a round, and how many it holds, shown or not. */
+interface Pool {
+  batch: Batch;
+  members: number;
 }
 
 interface Slot {
-  mesh: THREE.InstancedMesh;
+  batch: Batch;
+  /** Where it is drawn in its batch, or -1 while it is not shown. */
   index: number;
   matrix: THREE.Matrix4;
-  /** A vehicle's soft shadow patch, drawn with the same matrix. */
-  blob?: THREE.InstancedMesh;
   /** The batch it was given when it was put up during the round. */
   pool?: Pool;
 }
@@ -148,9 +162,10 @@ interface Rising {
 
 export class PropView {
   private slots = new Map<number, Slot>();
-  private batches: Array<{ mesh: THREE.InstancedMesh; kind: Prop['kind']; casts: boolean }> = [];
-  /** The soft dark patches under vehicles, a batch beside each vehicle batch. */
-  private blobs: THREE.InstancedMesh[] = [];
+  private batches: Batch[] = [];
+  /** Whether the tiny things and the patches under vehicles are shown (see `showTiny`). */
+  private tinyShown = true;
+  private moved = new THREE.Matrix4();
   /** Batches for things put up during the round, by area and model. */
   private pools = new Map<string, Pool[]>();
   private rising = new Map<number, Rising>();
@@ -253,6 +268,7 @@ export class PropView {
    * little overshoot, while dust puffs out round its base (see the scene).
    */
   raise(p: Prop): void {
+    this.release(p);
     this.slots.set(p.id, this.slotFor(p));
     const time = p.kind === 'tallsite' ? 2.5 : isSite(p.kind) ? 0.6 : BUILD_TIME;
     if (!this.reducedMotion) this.rising.set(p.id, { t: 0, time });
@@ -262,6 +278,7 @@ export class PropView {
 
   /** Something that was always there joins the city (a police car that has parked): no rising out of the ground. */
   appear(p: Prop): void {
+    this.release(p);
     this.slots.set(p.id, this.slotFor(p));
     this.setShown(p, true);
     this.seeThrough.track(p);
@@ -280,8 +297,8 @@ export class PropView {
    * car's patch hardly shows, but each batch of patches is still a draw.
    */
   showTiny(shown: boolean): void {
-    for (const b of this.batches) if (isTiny(b.kind)) b.mesh.visible = shown;
-    for (const b of this.blobs) b.visible = shown;
+    this.tinyShown = shown;
+    for (const b of this.batches) this.refresh(b);
   }
 
   /** Show a thing again where it stands (it grew back). */
@@ -398,29 +415,37 @@ export class PropView {
       // A batch never moves, only its things do: no need to work out where it is every frame.
       mesh.matrixAutoUpdate = false;
       if (blob) blob.matrixAutoUpdate = false;
-      list.forEach((p, i) => {
+      // Small street clutter casts no shadow either: hundreds of them, for little look.
+      const casts = !vehicle && !CLUTTER.has(kind);
+      const batch: Batch = { mesh, kind, casts, ids: [], blob };
+      // Those standing first, in the drawn slots; any not standing yet after them.
+      const standing = list.filter((p) => world.props.has(p.id));
+      const order = [...standing, ...list.filter((p) => !world.props.has(p.id))];
+      order.forEach((p, i) => {
         dummy.position.set(p.x, (SINK[p.kind] ?? 0) + groundAt(world.city, p.x, p.z), p.z);
         dummy.rotation.set(0, p.rot, 0);
         dummy.updateMatrix();
         const matrix = dummy.matrix.clone();
-        const m = world.props.has(p.id) ? matrix : HIDDEN;
-        mesh.setMatrixAt(i, m);
-        blob?.setMatrixAt(i, m);
-        this.slots.set(p.id, { mesh, index: i, matrix, blob });
+        mesh.setMatrixAt(i, matrix);
+        blob?.setMatrixAt(i, matrix);
+        const drawn = i < standing.length;
+        if (drawn) batch.ids.push(p.id);
+        this.slots.set(p.id, { batch, index: drawn ? i : -1, matrix });
       });
+      // Bound the batch by all its things, so one shown again later is not culled.
+      for (const m of blob ? [mesh, blob] : [mesh]) {
+        m.computeBoundingSphere();
+        m.count = standing.length;
+      }
       if (blob) {
         blob.renderOrder = 1;
-        blob.computeBoundingSphere();
         this.scene.add(blob);
-        this.blobs.push(blob);
       }
-      // Small street clutter casts no shadow either: hundreds of them, for little look.
-      const casts = !vehicle && !CLUTTER.has(kind);
       mesh.castShadow = casts;
       mesh.receiveShadow = true;
-      mesh.computeBoundingSphere();
       this.scene.add(mesh);
-      this.batches.push({ mesh, kind, casts });
+      this.batches.push(batch);
+      this.refresh(batch);
     }
   }
 
@@ -451,7 +476,7 @@ export class PropView {
       list = [];
       this.pools.set(key, list);
     }
-    let pool = list.find((q) => q.free.length > 0 || q.mesh.count < POOL_SIZE);
+    let pool = list.find((q) => q.members < POOL_SIZE);
     if (!pool) {
       const mesh = new THREE.InstancedMesh(ownCopy(geo), this.material, POOL_SIZE);
       mesh.count = 0;
@@ -463,25 +488,30 @@ export class PropView {
       // Everything in it stands in one square: bound it by the square, not by its slots.
       mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3((cx + 0.5) * CHUNK, 0, (cz + 0.5) * CHUNK), CHUNK * Math.SQRT1_2 + POOL_REACH);
       this.scene.add(mesh);
-      pool = { mesh, free: [] };
+      const batch: Batch = { mesh, kind: p.kind, casts, ids: [] };
+      pool = { batch, members: 0 };
       list.push(pool);
-      this.batches.push({ mesh, kind: p.kind, casts });
+      this.batches.push(batch);
+      this.refresh(batch);
     }
-    const index = pool.free.pop() ?? pool.mesh.count++;
+    pool.members++;
     const d = this.dummy;
     d.position.set(p.x, (SINK[p.kind] ?? 0) + this.groundOf(p), p.z);
     d.rotation.set(0, p.rot, 0);
     d.scale.set(1, 1, 1);
     d.updateMatrix();
-    return { mesh: pool.mesh, index, matrix: d.matrix.clone(), pool };
+    return { batch: pool.batch, index: -1, matrix: d.matrix.clone(), pool };
   }
 
   /** Let go of the slot of something put up during the round (it was eaten or replaced). */
   private release(p: Prop): void {
     this.rising.delete(p.id);
     const slot = this.slots.get(p.id);
-    if (!slot?.pool) return;
-    slot.pool.free.push(slot.index);
+    if (!slot) return;
+    this.undraw(slot);
+    // One from the city's start keeps its slot, to show again if it grows back.
+    if (!slot.pool) return;
+    slot.pool.members--;
     this.slots.delete(p.id);
   }
 
@@ -499,13 +529,62 @@ export class PropView {
   private setShown(p: Prop, shown: boolean): void {
     const slot = this.slots.get(p.id);
     if (!slot) return;
-    const rise = this.rising.get(p.id);
-    slot.mesh.setMatrixAt(slot.index, !shown ? HIDDEN : rise ? this.risenMatrix(slot, rise.t) : slot.matrix);
-    slot.mesh.instanceMatrix.needsUpdate = true;
-    if (slot.blob) {
-      slot.blob.setMatrixAt(slot.index, shown ? slot.matrix : HIDDEN);
-      slot.blob.instanceMatrix.needsUpdate = true;
+    if (!shown) {
+      this.undraw(slot);
+      return;
     }
+    this.draw(slot, p.id);
+    const rise = this.rising.get(p.id);
+    slot.batch.mesh.setMatrixAt(slot.index, rise ? this.risenMatrix(slot, rise.t) : slot.matrix);
+    slot.batch.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  /** Put a thing among its batch's drawn slots, at the end. */
+  private draw(slot: Slot, id: number): void {
+    if (slot.index >= 0) return;
+    const b = slot.batch;
+    slot.index = b.mesh.count++;
+    b.ids.push(id);
+    if (b.blob) {
+      b.blob.count = b.mesh.count;
+      b.blob.setMatrixAt(slot.index, slot.matrix);
+      b.blob.instanceMatrix.needsUpdate = true;
+    }
+    this.refresh(b);
+  }
+
+  /** Take a thing out of its batch's drawn slots: the last one drawn moves into its place. */
+  private undraw(slot: Slot): void {
+    const i = slot.index;
+    if (i < 0) return;
+    const b = slot.batch;
+    const last = b.mesh.count - 1;
+    if (i !== last) {
+      for (const m of b.blob ? [b.mesh, b.blob] : [b.mesh]) {
+        m.getMatrixAt(last, this.moved);
+        m.setMatrixAt(i, this.moved);
+      }
+      const id = b.ids[last];
+      b.ids[i] = id;
+      const other = this.slots.get(id);
+      if (other) other.index = i;
+    }
+    b.ids.pop();
+    b.mesh.count = last;
+    b.mesh.instanceMatrix.needsUpdate = true;
+    if (b.blob) {
+      b.blob.count = last;
+      b.blob.instanceMatrix.needsUpdate = true;
+    }
+    slot.index = -1;
+    this.refresh(b);
+  }
+
+  /** A batch is drawn while it shows anything; its tiny things and patches only from near. */
+  private refresh(b: Batch): void {
+    const any = b.mesh.count > 0;
+    b.mesh.visible = any && (this.tinyShown || !isTiny(b.kind));
+    if (b.blob) b.blob.visible = any && this.tinyShown;
   }
 
   /** Set where a thing is drawn: its batch slot, or its own mesh if it was built during the round. */
@@ -517,9 +596,9 @@ export class PropView {
   private place(p: Prop, matrix: THREE.Matrix4): void {
     const slot = this.slots.get(p.id);
     // A thing still rising does not rock yet.
-    if (!slot || this.rising.has(p.id)) return;
-    slot.mesh.setMatrixAt(slot.index, matrix);
-    slot.mesh.instanceMatrix.needsUpdate = true;
+    if (!slot || slot.index < 0 || this.rising.has(p.id)) return;
+    slot.batch.mesh.setMatrixAt(slot.index, matrix);
+    slot.batch.mesh.instanceMatrix.needsUpdate = true;
   }
 
   /**
@@ -681,9 +760,9 @@ export class PropView {
       rise.t = Math.min(1, rise.t + dt / rise.time);
       const slot = this.slots.get(id);
       // One the camera sees through is drawn as its see-through copy for now.
-      if (slot && !this.seeThrough.get(id)) {
-        slot.mesh.setMatrixAt(slot.index, rise.t >= 1 ? slot.matrix : this.risenMatrix(slot, rise.t));
-        slot.mesh.instanceMatrix.needsUpdate = true;
+      if (slot && slot.index >= 0) {
+        slot.batch.mesh.setMatrixAt(slot.index, rise.t >= 1 ? slot.matrix : this.risenMatrix(slot, rise.t));
+        slot.batch.mesh.instanceMatrix.needsUpdate = true;
       }
       if (rise.t >= 1) this.rising.delete(id);
     }
