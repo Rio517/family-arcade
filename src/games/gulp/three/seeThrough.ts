@@ -19,6 +19,17 @@ const LINGER = 0.6;
 /** Tall things are filed by square of this many units, so each frame only
  * those near the sight lines are checked. */
 const CELL = 32;
+/**
+ * When a see-through copy is drawn: after what lies on the ground or floats
+ * in the world (scorch marks, dust, danger zones, power-up glows, wonder
+ * stars, up to 9), so those still show through it, and before the names,
+ * marks and eyes drawn over everything (10 and up). Its near side goes into
+ * the depth buffer first (`DEPTH_FIRST`), then is faded.
+ */
+const DEPTH_FIRST = 9.5;
+const FADED = 9.6;
+/** A falling copy keeps its old turn in the drawing order. */
+const FALLING = 2;
 
 const cellOf = (v: number): number => Math.floor(v / CELL);
 const cellKey = (cx: number, cz: number): number => cx * 65536 + cz;
@@ -36,6 +47,14 @@ export class SeeThrough {
   private far = [0, 0];
   private box = new THREE.Box3();
   private hit = new THREE.Vector3();
+  /**
+   * Draws a copy's nearest faces into the depth buffer only, so the faded
+   * copy shows just those, one layer thick. Drawn whole, its far walls and
+   * the backs of its windows pile up on the near ones, and the windows stay
+   * nearly solid while the walls go faint. The same material as the city's
+   * (so the same shader, and the same depths), drawing no colour.
+   */
+  private depthOnly: THREE.MeshStandardMaterial;
 
   constructor(
     private scene: THREE.Scene,
@@ -44,7 +63,12 @@ export class SeeThrough {
     private reducedMotion: boolean,
     /** Hides a thing where it is drawn while its copy stands in, and shows it again after. */
     private show: (p: Prop, shown: boolean) => void,
-  ) {}
+  ) {
+    this.depthOnly = material.clone();
+    // In the see-through queue, so it goes after the city and the ground.
+    this.depthOnly.transparent = true;
+    this.depthOnly.colorWrite = false;
+  }
 
   /** A tall thing that might stand in the way. */
   track(p: Prop): void {
@@ -71,7 +95,14 @@ export class SeeThrough {
   take(id: number): THREE.Mesh | undefined {
     const ghost = this.ghosts.get(id);
     this.ghosts.delete(id);
+    // Its depth-only twin stays behind: the falling copy may change shape (a ship drops its containers).
+    ghost?.clear();
+    if (ghost) ghost.renderOrder = FALLING;
     return ghost;
+  }
+
+  dispose(): void {
+    this.depthOnly.dispose();
   }
 
   /** Fade whatever stands between the camera at `eye` and the child's hole. `time` is the scene's clock. */
@@ -104,10 +135,15 @@ export class SeeThrough {
       mat.transparent = true;
       mat.opacity = 1;
       mat.depthWrite = false;
-      const ghost = new THREE.Mesh(modelOf(p), mat);
+      const model = modelOf(p);
+      const ghost = new THREE.Mesh(model, mat);
       ghost.position.set(p.x, groundAt(world.city, p.x, p.z), p.z);
       ghost.rotation.y = p.rot;
-      ghost.renderOrder = 2;
+      ghost.renderOrder = FADED;
+      // Its twin rides along (a rocking building rocks both).
+      const near = new THREE.Mesh(model, this.depthOnly);
+      near.renderOrder = DEPTH_FIRST;
+      ghost.add(near);
       // The see-through copy still casts the building's shadow: without it
       // the shadow vanished while faded and popped back late.
       ghost.castShadow = true;
