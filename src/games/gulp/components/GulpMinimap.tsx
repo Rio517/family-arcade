@@ -1,7 +1,8 @@
 /**
  * A small map in the corner: the island, each block tinted by how many
  * points are still standing on it (pale for little, warm gold and orange
- * for a lot), gold stars on the wonders, and a dot for every hole (the
+ * for a lot), the mountains out of town, the power-ups waiting to be
+ * picked up, gold stars on the wonders, and a dot for every hole (the
  * child's big and ringed in white). The sea on the shore sides, the airport
  * and the quay are drawn once and reused. Redrawn twice a second: it is a guide,
  * not a mirror.
@@ -9,11 +10,15 @@
 import { useEffect, useRef } from 'react';
 import { KINDS } from '../domain/catalog';
 import type { Rect } from '../domain/city';
-import type { World } from '../domain/world';
+import type { PowerKind, World } from '../domain/world';
 import { SKINS } from './skins';
 
 /** The map's size on an iPad; the stylesheet grows and shrinks it with the screen. */
 const SIZE = 150;
+/** Out of town, only things of this tier and up are marked (mountains): barns and wind turbines would crowd the map. */
+const OUT_OF_TOWN_TIER = 9;
+/** Each power-up's colour, as its glow in the city shows it. */
+const POWER_CSS: Record<PowerKind, string> = { speed: '#39c6ff', double: '#ffc62e' };
 
 /** Pale grey (little left to eat) through yellow and orange to red (a feast): nothing like the green land round it. */
 function heat(t: number): string {
@@ -140,22 +145,64 @@ export function GulpMinimap({ world }: { world: World }) {
 
       if (over.lg) g.drawImage(over.c, 0, 0, size, size);
 
-      // The countryside's big prizes (wind turbines, barns, mountains): a
-      // white-ringed orange dot each, a hint of the feast out of town.
+      // Only the countryside's biggest prizes, a hint of the feast out of
+      // town: a mountain as a little snow-capped peak, anything else as a
+      // white-ringed orange dot. Barns and wind turbines are left off.
       g.lineWidth = s;
       g.strokeStyle = '#ffffff';
-      g.fillStyle = '#ff8a1f';
       for (const p of world.props.values()) {
-        if (KINDS[p.kind].tier < 7 || KINDS[p.kind].wonder) continue;
+        if (KINDS[p.kind].tier < OUT_OF_TOWN_TIER || KINDS[p.kind].wonder) continue;
         if (Math.max(Math.abs(p.x), Math.abs(p.z)) < city.half) continue;
+        const x = px(p.x);
+        const z = px(p.z);
+        if (p.kind === 'mountain') {
+          const half = Math.max(4.5 * s, (KINDS.mountain.w / 2) * k);
+          const peak = z - half * 0.9;
+          g.beginPath();
+          g.moveTo(x - half, z + half * 0.6);
+          g.lineTo(x, peak);
+          g.lineTo(x + half, z + half * 0.6);
+          g.closePath();
+          g.fillStyle = '#6f6359';
+          g.fill();
+          // The snow cap: the top third of the peak.
+          g.beginPath();
+          g.moveTo(x - half * 0.36, peak + half * 0.54);
+          g.lineTo(x, peak);
+          g.lineTo(x + half * 0.36, peak + half * 0.54);
+          g.closePath();
+          g.fillStyle = '#ffffff';
+          g.fill();
+        } else {
+          g.beginPath();
+          g.arc(x, z, 2 * s, 0, Math.PI * 2);
+          g.fillStyle = '#ff8a1f';
+          g.fill();
+          g.stroke();
+        }
+      }
+
+      // Power-ups waiting to be picked up: a diamond in the power-up's own
+      // colour (blue for speed, gold for double points), ringed in white.
+      g.lineWidth = 1.2 * s;
+      for (const u of world.powerups) {
+        const x = px(u.x);
+        const z = px(u.z);
+        const d = 3.6 * s;
         g.beginPath();
-        g.arc(px(p.x), px(p.z), 2 * s, 0, Math.PI * 2);
+        g.moveTo(x, z - d);
+        g.lineTo(x + d, z);
+        g.lineTo(x, z + d);
+        g.lineTo(x - d, z);
+        g.closePath();
+        g.fillStyle = POWER_CSS[u.kind];
         g.fill();
+        g.strokeStyle = '#ffffff';
         g.stroke();
       }
 
       // Wonders still standing.
-      g.font = `bold ${Math.max(10, Math.round(size / 12))}px system-ui, sans-serif`;
+      g.font = `bold ${Math.max(9, Math.round(size / 15))}px system-ui, sans-serif`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       for (const p of world.props.values()) {

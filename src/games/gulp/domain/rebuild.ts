@@ -8,7 +8,8 @@ import type { World, WorldEvent } from './world';
 
 /**
  * The city puts small things back (up to buses) where they stood, a few at a
- * time and never under anyone's nose, so a long round never runs dry.
+ * time and never under anyone's nose, so a long round never runs dry
+ * (every REGROW_EVERY seconds at full pace, see PACE_START).
  */
 const REGROW_TIER = 4;
 export const REGROW_EVERY = 0.4;
@@ -48,7 +49,7 @@ const SAME_AGAIN: ReadonlySet<PropKind> = new Set(['terminal', 'hangar', 'radar'
 const COUNTRY_SAME: ReadonlySet<PropKind> = new Set(['cottage', 'villa', 'barn', 'watertower']);
 /** Big vehicles that are put back where they stood, like small things: the airport's jets and its train. */
 const PUT_BACK: ReadonlySet<PropKind> = new Set(['jet', 'train']);
-/** Seconds from a building being eaten to its construction site appearing. */
+/** Seconds from a building being eaten to its construction site appearing, at full pace (see PACE_START). */
 const SITE_AFTER = 6;
 /**
  * Seconds from an airport or army-base building being eaten to it going back
@@ -56,16 +57,32 @@ const SITE_AFTER = 6;
  */
 const LANDMARK_AFTER = 15;
 const LANDMARK_SPREAD = 5;
-/** Seconds a construction site stands before the building is finished. */
+/** Seconds a construction site stands before the building is finished, at full pace. */
 const SITE_TIME = 16;
 /** Every this many seconds of a round, one more rung of the ladder opens. */
 const AGE_STEP = 40;
 /**
- * Seconds between two things going up: a block eaten at once comes back one
- * building at a time, never all on the same frame (a stall on a tablet), yet
- * fast enough to keep up with a giant eating whole blocks.
+ * Seconds between two things going up, at full pace: a block eaten at once
+ * comes back one building at a time, never all on the same frame (a stall on
+ * a tablet), yet fast enough to keep up with a giant eating whole blocks.
  */
 const RAISE_GAP = 0.03;
+/**
+ * Rebuilding starts slow and speeds up as the round goes on: at the start
+ * every wait above (the small things' return, a building site's wait and
+ * build) is drawn out by 1 / PACE_START and things go up at most every
+ * RAISE_GAP_START seconds; both ease to full pace over the first PACE_RAMP
+ * seconds, when the holes are big enough to eat whole blocks.
+ */
+const PACE_START = 0.5;
+const RAISE_GAP_START = 0.25;
+const PACE_RAMP = 300;
+/** How far into the speed-up the round is, from 0 at the start to 1 at full pace. */
+const ramp = (w: World) => Math.min(1, w.elapsed / PACE_RAMP);
+/** How fast the city rebuilds now, as a share of full pace. */
+const paceOf = (w: World) => PACE_START + (1 - PACE_START) * ramp(w);
+/** Seconds between two things going up, now (see RAISE_GAP). */
+const raiseGap = (w: World) => RAISE_GAP_START + (RAISE_GAP - RAISE_GAP_START) * ramp(w);
 /** Seconds a new building takes to rise in the scene. */
 export const BUILD_TIME = 3;
 /** Seconds between two news stories, at least. */
@@ -110,7 +127,7 @@ export function markEaten(w: World, p: Prop): void {
     const lot = w.lots.find((l) => l.site === p.id);
     if (lot) {
       lot.site = null;
-      lot.due = w.elapsed + SITE_AFTER * 2;
+      lot.due = w.elapsed + (SITE_AFTER * 2) / paceOf(w);
     }
   } else if (info.tier <= REGROW_TIER || PUT_BACK.has(p.kind)) {
     w.eaten.push(p);
@@ -118,7 +135,7 @@ export function markEaten(w: World, p: Prop): void {
     if (w.eaten.length > EATEN_MAX) w.eaten.splice(Math.max(0, w.eaten.findIndex((q) => !PUT_BACK.has(q.kind))), 1);
   }
   const room = Math.max(info.w, info.d) + 4;
-  const due = w.elapsed + SITE_AFTER + w.rng() * 6;
+  const due = w.elapsed + (SITE_AFTER + w.rng() * 6) / paceOf(w);
   const country = Math.max(Math.abs(p.x), Math.abs(p.z)) > w.city.half;
   if (SAME_AGAIN.has(p.kind) || (country && COUNTRY_SAME.has(p.kind))) {
     const when = SAME_AGAIN.has(p.kind) ? w.elapsed + LANDMARK_AFTER + w.rng() * LANDMARK_SPREAD : due;
@@ -134,7 +151,7 @@ export function markEaten(w: World, p: Prop): void {
 export function regrow(w: World, dt: number, events: WorldEvent[]): void {
   w.regrowIn -= dt;
   if (w.regrowIn > 0 || !w.eaten.length) return;
-  w.regrowIn = REGROW_EVERY;
+  w.regrowIn = REGROW_EVERY / paceOf(w);
   for (let n = 0; n < REGROW_BATCH && w.eaten.length; n++) {
     const i = Math.floor(w.rng() * w.eaten.length);
     const p = w.eaten[i];
@@ -164,9 +181,9 @@ export function rebuild(w: World, events: WorldEvent[]): void {
       const site = makeProp(w.nextPropId++, lot.rung < 0 && lot.room >= 20 ? 'bigsite' : 'site', lot.x, lot.z, lot.rot, variant);
       placeProp(w, site);
       lot.site = site.id;
-      lot.due = w.elapsed + SITE_TIME + w.rng() * 8;
+      lot.due = w.elapsed + (SITE_TIME + w.rng() * 8) / paceOf(w);
       events.push({ type: 'rebuild', prop: site, replaces: null });
-      w.nextRaise = w.elapsed + RAISE_GAP;
+      w.nextRaise = w.elapsed + raiseGap(w);
       return;
     }
     const site = lot.site === null ? null : w.props.get(lot.site);
@@ -184,9 +201,9 @@ export function rebuild(w: World, events: WorldEvent[]): void {
       const frame = makeProp(w.nextPropId++, 'tallsite', lot.x, lot.z, lot.rot, variant);
       placeProp(w, frame);
       lot.site = frame.id;
-      lot.due = w.elapsed + SITE_TIME + w.rng() * 8;
+      lot.due = w.elapsed + (SITE_TIME + w.rng() * 8) / paceOf(w);
       events.push({ type: 'rebuild', prop: frame, replaces: site });
-      w.nextRaise = w.elapsed + RAISE_GAP;
+      w.nextRaise = w.elapsed + raiseGap(w);
       return;
     }
     w.lots.splice(w.lots.indexOf(lot), 1);
@@ -198,7 +215,7 @@ export function rebuild(w: World, events: WorldEvent[]): void {
     const p = makeProp(w.nextPropId++, kind.kind, lot.x, lot.z, lot.rot, look, kind.hScale ?? Math.min(2, 1 + 0.2 * extra));
     placeProp(w, p);
     events.push({ type: 'rebuild', prop: p, replaces: site });
-    w.nextRaise = w.elapsed + RAISE_GAP;
+    w.nextRaise = w.elapsed + raiseGap(w);
     const headline = HEADLINE[p.kind] ?? (p.kind === 'tower' && p.hScale >= 1.4 ? 'The city has a new skyscraper!' : undefined);
     if (headline && w.elapsed - w.lastNews >= NEWS_GAP) {
       w.lastNews = w.elapsed;
