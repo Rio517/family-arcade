@@ -18,7 +18,7 @@ code. In the family arcade, free play keeps every map open.
   | Region | 6 min | 8 | Includes countryside |
 
 - **Round settings:** easy, medium and hard; short, long and endless rounds. Power-ups, the city fighting back, and rebuilding can each be turned on or off.
-- **Growing:** inside a round the mouth grows from eating traffic cones to eating mountains. Level 15 is the giant.
+- **Growing:** inside a round the mouth grows from eating traffic cones to eating mountains. Level 14 is the giant.
 - **Things to eat:** 90 kinds, plus 14 wonders dealt from a deck so each round shows new ones.
   - **Healthy food:** fruit stands and hay bales give a health bonus.
   - **The chemical plant:** shrinks whoever eats it.
@@ -48,7 +48,7 @@ has about ten levels.
 
 | Goal | Example |
 |---|---|
-| Reach a size | Reach level 10 |
+| Reach a size | Reach level 9 |
 | Clear the map | Eat 60% of the town |
 | Eat a target | Swallow the Eiffel Tower |
 | Win | Finish first |
@@ -65,14 +65,14 @@ has about ten levels.
 **Teaching order:** each early level introduces one idea, and later levels
 combine them. A draft of the Town district:
 
-1. **First bites:** reach level 3. No rivals.
+1. **First bites:** reach level 2. No rivals.
 2. **Clean plate:** eat half the town.
 3. **Company:** finish first against two easy rivals.
-4. **Power-ups:** reach level 6 with power-ups on.
+4. **Power-ups:** reach level 5 with power-ups on.
 5. **Combos:** score a big combo.
 6. **Wonder hunt:** swallow the town's wonder.
 7. **Eat your greens:** eat 10 healthy foods.
-8. **Hazard:** reach level 8 with the chemical plant in the way.
+8. **Hazard:** reach level 7 with the chemical plant in the way.
 9. **The army:** survive two minutes with the city fighting back.
 10. **Top hole:** finish first on medium with everything on.
 

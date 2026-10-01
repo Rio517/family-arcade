@@ -51,7 +51,7 @@ const POOL_SIZE = 32;
 /** How far above and around its square a batch's tallest thing can reach, for culling. */
 const POOL_REACH = 100;
 /**
- * The tiny things that go when the camera is far up (about level 15): people,
+ * The tiny things that go when the camera is far up (about level 14): people,
  * street lamps and the street clutter a giant takes without a fuss. Trees stay.
  */
 const isTiny = (kind: Prop['kind']): boolean => kind === 'lamp' || (KINDS[kind].tier <= 1 && !isSite(kind));

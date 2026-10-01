@@ -427,7 +427,7 @@ describe('placement', () => {
   });
 
   it('keeps the countryside worth wandering: food in view, and a real meal within two screens, everywhere', () => {
-    // A hole at level 7 (r ≈ 6) swallows things up to 6 × FIT across; a meal
+    // A hole at level 6 (r ≈ 6) swallows things up to 6 × FIT across; a meal
     // is a van, a little house or bigger. The view is roughly what the play
     // camera frames round such a hole.
     const r = 6 * FIT;

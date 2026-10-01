@@ -35,7 +35,7 @@ const LEAVE_TIME = 6;
 
 export function police(w: World, dt: number, me: Hole, events: WorldEvent[]): void {
   w.police.cool = Math.max(0, w.police.cool - dt);
-  const small = levelOf(me.r) <= 6;
+  const small = levelOf(me.r) <= 5;
   if (me.alive && small && w.police.cool === 0 && w.police.eaten >= POLICE_AFTER && !w.responders.length) {
     w.police.eaten = 0;
     w.police.cool = POLICE_COOL;

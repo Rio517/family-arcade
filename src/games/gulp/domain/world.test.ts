@@ -225,7 +225,7 @@ describe('a round against the computer is fair and fun', () => {
     const h = w2.holes[0];
     h.r = footSize('van') / 0.92 + 0.05;
     h.mass = massFor(h.r);
-    expect(levelOf(h.r)).toBeLessThanOrEqual(4);
+    expect(levelOf(h.r)).toBeLessThanOrEqual(3);
     only(w2, [makeProp(1, 'van', h.x, h.z, 0)]);
     expect(stepWorld(w2, 1 / 60, still)).toContainEqual(expect.objectContaining({ type: 'eat' }));
   });

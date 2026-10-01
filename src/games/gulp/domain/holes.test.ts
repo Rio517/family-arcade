@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { makeProp } from './catalog';
+import { FIT, footSize, makeProp } from './catalog';
 import { START_R, comboOf, levelOf, massFor, radiusFor } from './growth';
-import { CHILD_GROWTH, GIANT_LEVEL, RESPAWN } from './holes';
+import { CHILD_GROWTH, GIANT_LEVEL, RESPAWN, canEat } from './holes';
 import { faceOff, grow, only, round, still } from './testing';
 import { stepWorld, type WorldEvent } from './world';
 
 describe('eating', () => {
+  it('a fresh hole can eat a tree, so level 1 is cones, benches and trees', () => {
+    const w = round();
+    const me = w.holes[0];
+    expect(me.r).toBe(START_R);
+    expect(canEat(me, makeProp(1, 'tree', me.x, me.z, 0))).toBe(true);
+    expect(canEat(me, makeProp(2, 'car', me.x, me.z, 0))).toBe(false);
+  });
+
   it('swallows a small thing under the hole, scores it and grows', () => {
     const w = round();
     const me = w.holes[0];
@@ -35,6 +43,10 @@ describe('eating', () => {
   it('says so when a hole reaches a new level', () => {
     const w = round();
     const me = w.holes[0];
+    // Just short of fitting a car, the first step up from the start.
+    me.r = footSize('car') / FIT - 0.001;
+    me.mass = massFor(me.r);
+    expect(levelOf(me.r)).toBe(1);
     only(w, [makeProp(1, 'bench', me.x, me.z, 0)]);
     expect(stepWorld(w, 0.016, still)).toContainEqual({ type: 'level', hole: 0, level: 2 });
   });
@@ -158,7 +170,7 @@ describe('food and combos', () => {
     expect(eat?.type === 'eat' && eat.gained).toBe(mountain.points + 5000);
   });
 
-  it('a giant (level 15 and up) takes tiny things without a fuss: no points, no gulp; a tree still counts', () => {
+  it('a giant (level 14 and up) takes tiny things without a fuss: no points, no gulp; a tree still counts', () => {
     const w = round(1, 0);
     const me = grow(w, 0, 200000);
     expect(levelOf(me.r)).toBeGreaterThanOrEqual(GIANT_LEVEL);
