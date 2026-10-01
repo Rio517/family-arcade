@@ -22,6 +22,7 @@ import {
   barrier,
   carBody,
   darker,
+  kitFor,
   lighter,
   placement,
   translate,
@@ -808,9 +809,9 @@ function cargoShip(k: Kit, v: number, cargo: boolean): void {
 
 const ship: Builder = (k, v) => cargoShip(k, v, true);
 
-/** A cargo ship with a bare deck, in the same frame as the kind (its containers come from `shipCargo`). */
+/** A cargo ship with a bare deck, in the same frame and detail as the kind (its containers come from `shipCargo`). */
 export function buildShipHullGeometry(v: number): THREE.BufferGeometry {
-  const k = new Kit();
+  const k = kitFor('ship');
   cargoShip(k, shipVariant(v), false);
   const g = k.build();
   // Snap to the water the way buildKindGeometry does, so both frames agree.

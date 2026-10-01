@@ -18,7 +18,7 @@ import {
   CONCRETE_GREY,
   FLUSH,
   HALF_PI,
-  Kit,
+  type Kit,
   ON_GROUND,
   PAL,
   SITE_ORANGE,
@@ -28,6 +28,7 @@ import {
   carBody,
   cells,
   darker,
+  kitFor,
   lighter,
   mix,
   paneAt,
@@ -1493,6 +1494,7 @@ const BUILDERS: Record<PropKind, Builder> = { ...STREET, ...LANDMARKS, ...WONDER
  * One merged geometry (position, normal, colour) for a kind. Origin is the
  * footprint centre with the base on y = 0; vehicles face +z. Kinds marked
  * `scales` in the catalogue grow taller with `hScale` by gaining floors.
+ * Most kinds are built with a simple kit (see `kitFor`).
  */
 export function buildKindGeometry(kind: PropKind, variant: number, hScale = 1): THREE.BufferGeometry {
   const info = KINDS[kind];
@@ -1500,7 +1502,7 @@ export function buildKindGeometry(kind: PropKind, variant: number, hScale = 1): 
   const whole = Number.isFinite(variant) ? Math.floor(variant) : 0;
   const v = ((whole % n) + n) % n;
   const s = info.scales && Number.isFinite(hScale) ? Math.max(0.5, hScale) : 1;
-  const k = new Kit();
+  const k = kitFor(kind);
   BUILDERS[kind](k, v, s);
   const g = k.build();
   // Faceted wheels and blobs never land exactly on zero; snap the lowest point
