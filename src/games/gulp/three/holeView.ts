@@ -381,8 +381,11 @@ export class HoleViews {
     // Above the eyes on the far rim, not over them.
     obj.label.position.set(0, 1.4 + r * 0.9, -r * 1.1);
     // The child's own tag goes once their hole is big: it is plain which one
-    // is theirs, and the tag would sit up under the scoreboard.
-    if (h.isPlayer) obj.label.visible = r < 9;
+    // is theirs, and the tag would sit up under the scoreboard. It also steps
+    // aside while the hole speaks, so the bubble does not sit half over it.
+    const speaking = this.bubble !== null && this.bubble.hole === h.id && this.bubble.life > 0;
+    if (h.isPlayer) obj.label.visible = r < 9 && !speaking;
+    else obj.label.visible = !speaking;
     this.syncPowerShow(obj, h, r);
 
     // Blinking while it is safe after coming back.

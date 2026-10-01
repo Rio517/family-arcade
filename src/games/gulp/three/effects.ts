@@ -80,6 +80,9 @@ const POPUP_LOOK: Record<PopupTier, { fill: string; scale: number; life: number 
   huge: { fill: '#ff5cc8', scale: 1.35, life: 2.4 },
 };
 
+/** A points pop's height on screen (an ordinary one; bigger tiers scale it up). */
+const POPUP_HEIGHT = 0.046;
+
 const POWER_COLOR: Record<PowerKind, number> = { speed: 0x39c6ff, double: 0xffc62e };
 
 export class Effects {
@@ -355,9 +358,10 @@ export class Effects {
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }));
     // The texture is as wide as its number: keep the letters' height, widen the sprite to match.
     const aspect = tex.image.width / tex.image.height;
-    sprite.scale.set(0.036 * aspect * look.scale, 0.036 * look.scale, 1);
+    sprite.scale.set(POPUP_HEIGHT * aspect * look.scale, POPUP_HEIGHT * look.scale, 1);
     sprite.position.copy(at);
-    sprite.renderOrder = 11;
+    // Over the hole's see-through ring and the power-up countdown (20 to 22), under its eyes.
+    sprite.renderOrder = 23;
     this.group.add(sprite);
     this.popups.push({ sprite, life: look.life, total: look.life, rise: 4 * look.scale, y0: at.y });
   }
@@ -762,24 +766,32 @@ function ringTexture(): THREE.Texture {
   return t;
 }
 
-/** "+8" in chunky letters of the given colour with a dark edge. */
-/** Words or a number on a transparent strip 64 high, as wide as the text needs (never cut off). */
+/**
+ * "+8" in chunky letters of the given colour, on a transparent strip 64 high
+ * and as wide as the text needs (never cut off). A thick dark edge and a soft
+ * shadow under it keep it readable over a pale pavement or a busy building.
+ */
 function textTexture(text: string, fill: string): THREE.Texture {
   const c = document.createElement('canvas');
   const font = '900 44px ui-rounded, system-ui, -apple-system, sans-serif';
   const probe = c.getContext('2d')!;
   probe.font = font;
-  c.width = Math.max(128, Math.ceil(probe.measureText(text).width) + 24);
+  c.width = Math.max(128, Math.ceil(probe.measureText(text).width) + 32);
   c.height = 64;
   const g = c.getContext('2d')!;
   g.font = font;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.lineWidth = 8;
-  g.strokeStyle = 'rgba(40,30,10,0.85)';
-  g.strokeText(text, c.width / 2, 34);
+  g.lineJoin = 'round';
+  g.lineWidth = 11;
+  g.strokeStyle = '#2b1d08';
+  g.shadowColor = 'rgba(0,0,0,0.45)';
+  g.shadowOffsetY = 3;
+  g.shadowBlur = 4;
+  g.strokeText(text, c.width / 2, 32);
+  g.shadowColor = 'transparent';
   g.fillStyle = fill;
-  g.fillText(text, c.width / 2, 34);
+  g.fillText(text, c.width / 2, 32);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
