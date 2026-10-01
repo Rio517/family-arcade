@@ -182,7 +182,10 @@ export function createCity(rng: Rng, map: MapId = 'city', wonders?: readonly Pro
       const mid = (blocks - 1) / 2;
       const ring = Math.max(Math.abs(bx - mid), Math.abs(bz - mid)) / Math.max(1, mid);
       const big = interior(block, tools, ring, wonderEast.has(`${bx}:${bz}`));
-      if (!big) (RURAL.has(block.kind) ? verge : sidewalk)(block, tools);
+      if (big) continue;
+      if (RURAL.has(block.kind)) verge(block, tools);
+      // A mailbox on one block in six, spread evenly over the map.
+      else sidewalk(block, tools, (bx + 2 * bz) % 6 === 0);
     }
   }
   // Big lots: the street between an arena and its car park is built over,
@@ -449,19 +452,49 @@ function ringKind(map: MapId, f: number, rng: Rng): BlockKind {
 // What stands where
 // -------------------------------------------------------------------------
 
-/** Lamps and trees at a steady beat round the block, street things between them. */
-function sidewalk(b: Block, { add: put, rng, pick, variant }: Tools): void {
-  const street: PropKind[] = ['hydrant', 'bin', 'mailbox', 'planter', 'bench', 'bike', 'cone', 'bin', 'planter'];
+/**
+ * What stands on the pavement between the lamps and trees, as a share of the
+ * spots: bins and planters often, a hydrant or a bike now and then, a bench
+ * less often, a traffic cone hardly ever. Mailboxes go by the block (see
+ * `sidewalk`).
+ */
+const STREET: ReadonlyArray<readonly [PropKind, number]> = [
+  ['bin', 0.16],
+  ['planter', 0.16],
+  ['hydrant', 0.08],
+  ['bike', 0.08],
+  ['bench', 0.035],
+  ['cone', 0.004],
+];
+/**
+ * Lamps at a steady beat round the block, street things between them, and
+ * on a block that has one (`post`) a mailbox. No trees: a pavement is too
+ * narrow for one to stand out of the way, so the trees are in the parks,
+ * plazas, courtyards and gardens.
+ */
+function sidewalk(b: Block, { add: put, rng, variant }: Tools, post: boolean): void {
+  let spot = 0;
+  const postAt = post ? Math.floor(rng() * 24) : -1;
   alongEdges(b, 2.6, (x, z, rot, beat, t) => {
     // A park's paths come out in the middle of each side: nothing stands
     // there (the spot is still drawn for, so the rest of the city is as it was).
     const add: Add = b.kind === 'park' && Math.abs(t - b.size / 2) < PARK_PATH / 2 + 1 ? () => {} : put;
-    if (beat % 5 === 0) add(beat % 10 === 0 ? 'lamp' : 'tree', x, z, rot, variant());
-    else if (rng() < 0.7) {
-      const kind = pick(street);
-      const turn = rot + (rng() < 0.5 ? 0 : Math.PI);
+    if (beat % 5 === 0) {
+      if (beat % 10 === 0) add('lamp', x, z, rot, variant());
+      return;
+    }
+    const turn = rot + (rng() < 0.5 ? 0 : Math.PI);
+    if (spot++ === postAt) {
+      add('mailbox', x, z, turn, variant());
+      return;
+    }
+    let roll = rng();
+    for (const [kind, share] of STREET) {
+      roll -= share;
+      if (roll >= 0) continue;
       add(kind, x, z, turn, variant());
       if (kind === 'bench' && rng() < 0.45) add('sitter', x, z, turn, variant());
+      return;
     }
   });
 }
@@ -475,7 +508,7 @@ function verge(b: Block, { add, rng, pick, variant }: Tools): void {
 }
 
 function alongEdges(b: Block, step: number, each: (x: number, z: number, rot: number, beat: number, t: number) => void): void {
-  // A little in from the middle of the pavement, so a tree's crown clears the road.
+  // A little in from the middle of the pavement, so a country tree's crown clears the road.
   const inset = SIDEWALK / 2 + 0.2;
   const edges = [
     { x0: b.x, z0: b.z + inset, dx: 1, dz: 0, rot: 0 },
@@ -955,7 +988,8 @@ function roadside(roads: number[], half: number, { add, rng, pick, variant }: To
           const rot = alongX ? (side > 0 ? Math.PI / 2 : -Math.PI / 2) : side > 0 ? 0 : Math.PI;
           if (alongX) add(kind, at, line + side * kerb, rot, variant());
           else add(kind, line + side * kerb, at, rot, variant());
-        } else if (r < 0.56) {
+        } else if (r < 0.51) {
+          // Now and then, rarely, a traffic cone left in the road.
           if (alongX) add('cone', t, line + (rng() - 0.5) * 3, 0);
           else add('cone', line + (rng() - 0.5) * 3, t, 0);
         }
