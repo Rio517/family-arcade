@@ -1,0 +1,1173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gulp HUD Depth</title>
+<style>
+/* =====================================================================
+   Page chrome
+   ===================================================================== */
+:root {
+  --round: ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', -apple-system, system-ui, sans-serif;
+  --canvas-font: ui-rounded, system-ui, -apple-system, sans-serif;
+  --page: #11142a;
+  --panel: #1b1f3d;
+  --panel-2: #262b52;
+  --line: #3a406e;
+  --text: #eef1ff;
+  --muted: #b4bbe0;
+  --hi: #ffc62e;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--round);
+  font-size: 16px;
+  line-height: 1.45;
+}
+.wrap { max-width: 1480px; margin: 0 auto; padding: 20px 16px 48px; }
+h1 { margin: 0 0 6px; font-size: 28px; line-height: 1.15; font-weight: 900; }
+h2 { margin: 0 0 10px; font-size: 22px; font-weight: 900; }
+.lede { margin: 0; max-width: 72ch; color: var(--muted); font-size: 16px; }
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin: 16px -16px 18px;
+  padding: 10px 16px;
+  background: #11142a;
+  border-bottom: 1px solid var(--line);
+}
+.group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.group-label { font-size: 14px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+.seg button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font: 800 15px/1 var(--round);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.seg button:hover { background: var(--panel-2); }
+.seg button[aria-pressed='true'] { background: var(--hi); color: #3d2a00; }
+.seg button:focus-visible,
+.page-link:focus-visible,
+.parts button:focus-visible { outline: 3px solid #7fd0ff; outline-offset: 2px; }
+.keys-line { margin-top: 6px; font-size: 15px; }
+.keys-line kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; background: var(--panel); font: 800 14px/1.5 var(--round); text-align: center; color: var(--text); }
+
+/* Frames */
+.frames { display: grid; gap: 22px 18px; justify-content: center; }
+figure.shot { margin: 0; min-width: 0; }
+figure.shot figcaption {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 800;
+}
+.tag-opt {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--hi);
+  color: #3d2a00;
+  font-size: 15px;
+  font-weight: 900;
+}
+.tag-opt.cur { background: #d7dcf5; color: #1f2440; }
+.cap-size { color: var(--muted); font-size: 14px; font-weight: 700; }
+.fit { position: relative; overflow: hidden; border-radius: 12px; box-shadow: 0 0 0 1px var(--line), 0 12px 30px rgba(0, 0, 0, 0.35); }
+.stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; background: #8fd8f5; }
+.stage > .bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage.ipad { width: 1180px; height: 820px; --mm: 147.6px; --kt: 0.58; --kp: 0.711; --kb: 0.464; }
+.stage.laptop { width: 1920px; height: 1080px; --mm: 194.4px; --kt: 0.764; --kp: 0.937; --kb: 0.611; }
+.stage.phone { width: 430px; height: 932px; --mm: 104px; --kt: 0.659; --kp: 0.808; --kb: 0.527; }
+
+/* Option notes */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; margin: 30px 0 8px; }
+.note { padding: 16px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+.note h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 18px; font-weight: 900; }
+.note p { margin: 0 0 8px; font-size: 15px; color: var(--muted); }
+.note p b { color: var(--text); }
+.note.on { border-color: var(--hi); box-shadow: 0 0 0 2px var(--hi) inset; }
+.page-link { color: #9fd8ff; font-weight: 800; }
+
+/* Up close */
+.closeup { margin-top: 34px; }
+.closeup > p { margin: 0 0 14px; color: var(--muted); font-size: 15px; max-width: 80ch; }
+.parts-row { margin: 0 0 22px; }
+.parts-row > h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 18px; font-weight: 900; }
+.parts { position: relative; display: flex; flex-wrap: wrap; gap: 12px; }
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 14px 16px 16px;
+  border-radius: 16px;
+  background-color: #6aa84f;
+  background-image: url('frame-ipad.webp');
+  background-size: 1180px 820px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.tile-name {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(17, 20, 42, 0.86);
+  color: #fff;
+  font: 800 14px/1.4 var(--round);
+}
+.tile .row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 18px; }
+.tile .pair { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.tile .pair > small { padding: 1px 8px; border-radius: 999px; background: rgba(17, 20, 42, 0.82); color: #fff; font: 700 14px/1.4 var(--round); }
+
+/* =====================================================================
+   The HUD as the game draws it today (from src/games/gulp/styles/gulp.css),
+   with position: fixed made absolute inside the frame and the phone
+   media query applied by the .phone class.
+   ===================================================================== */
+.gulp-root {
+  --g-ink: #1f2440;
+  --g-muted: #5b6480;
+  --g-blue: #2f7cf6;
+  --g-blue-ink: #1a4fb0;
+  --g-yellow: #ffc62e;
+  --g-yellow-deep: #e79a00;
+  --g-green: #35c95a;
+  --g-card: rgba(255, 255, 255, 0.94);
+  --g-shadow: 0 10px 28px rgba(20, 30, 70, 0.25);
+  color: var(--g-ink);
+  font-family: var(--round);
+  font-size: 16px;
+  line-height: normal;
+}
+.stage .gulp-root { position: absolute; inset: 0; }
+.gulp-hud { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+.gulp-board {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 250px;
+}
+.gulp-board li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 5px;
+  border-radius: 999px;
+  background: rgba(29, 31, 51, 0.72);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+}
+.gulp-board li.me { background: #fff; color: var(--g-ink); box-shadow: 0 0 0 2px var(--g-yellow); }
+.gulp-rank {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 14px;
+  font-weight: 900;
+}
+li:first-child > .gulp-rank { background: var(--g-yellow); color: #5a3d00; }
+li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
+.gulp-dot { flex-shrink: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--hole); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
+.gulp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.gulp-center {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.gulp-clock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--g-card);
+  box-shadow: 0 4px 0 rgba(20, 40, 90, 0.15), var(--g-shadow);
+  font-size: 26px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.gulp-level {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 5px;
+  border-radius: 999px;
+  background: rgba(29, 31, 51, 0.72);
+  color: #fff;
+}
+.gulp-lv {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 6px 12px 0;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--g-ink);
+  box-shadow: inset 0 0 0 3px var(--g-blue);
+  white-space: nowrap;
+}
+.gulp-lv small { font-size: 14px; font-weight: 800; }
+.gulp-lv-short { display: none; }
+.gulp-lv b { min-width: 1.3em; font-size: 21px; font-weight: 900; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; }
+.gulp-meter { display: block; width: 120px; height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); overflow: hidden; }
+.gulp-meter-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7fd0ff, #fff); }
+.gulp-next { min-width: 150px; font-size: 14px; font-weight: 800; white-space: nowrap; }
+
+.gulp-right {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gulp-stats,
+.gulp-buttons { display: flex; align-items: center; gap: 8px; }
+.gulp-stats { margin: 4px 0; font-size: 16px; font-weight: 800; color: var(--g-muted); }
+.gulp-kills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 14px 0 10px;
+  border-radius: 999px;
+  background: rgba(29, 31, 51, 0.72);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+}
+.gulp-wonders {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 40px;
+  padding: 0 14px 0 10px;
+  border-radius: 999px;
+  background: rgba(29, 31, 51, 0.72);
+  color: var(--g-yellow);
+  font-size: 18px;
+  font-weight: 900;
+}
+.gulp-kills-icon { width: 22px; height: 14px; border-radius: 50%; background: #000; box-shadow: 0 0 0 3px #ff5f6d; }
+
+.gulp-round {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  border: none;
+  display: grid;
+  place-items: center;
+  background: var(--g-card);
+  color: var(--g-blue-ink);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 5px 0 rgba(20, 40, 90, 0.18), var(--g-shadow);
+}
+.gulp-round.gulp-pause-btn {
+  width: auto;
+  gap: 6px;
+  padding: 0 16px 0 12px;
+  display: flex;
+  align-items: center;
+  background: var(--g-yellow);
+  color: #5a3d00;
+  box-shadow: 0 5px 0 var(--g-yellow-deep), var(--g-shadow);
+}
+.gulp-pause-label { font-size: 17px; font-weight: 900; }
+.gulp-round:active,
+.gulp-round.is-pressed { transform: translateY(2px); box-shadow: 0 3px 0 rgba(20, 40, 90, 0.18), var(--g-shadow); }
+.gulp-root button:focus-visible,
+.gulp-root .is-focus { outline: 3px solid var(--g-blue); outline-offset: 3px; }
+
+.gulp-messages {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.gulp-messages > * { max-width: min(620px, 100%); }
+.gulp-hint {
+  padding: 10px 22px;
+  border-radius: 999px;
+  background: rgba(29, 31, 51, 0.78);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.gulp-minimap-slot { position: absolute; right: 12px; bottom: 12px; z-index: 11; pointer-events: none; }
+.gulp-minimap {
+  position: relative;
+  display: block;
+  width: var(--mm, 147.6px);
+  height: var(--mm, 147.6px);
+  border-radius: 16px;
+  border: 3px solid #fff;
+  overflow: hidden;
+  box-shadow: 0 5px 0 rgba(20, 40, 90, 0.18), var(--g-shadow);
+}
+.gulp-minimap img { display: block; width: 100%; height: 100%; }
+
+.gulp-explore {
+  position: absolute;
+  left: 16px;
+  bottom: 76px;
+  z-index: 11;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  background: rgba(29, 31, 51, 0.72);
+  color: #fff;
+  font: 800 15px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.party-root { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40; }
+.party-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 8px;
+  border: 1px solid #475569;
+  background: color-mix(in srgb, #1e293b 92%, transparent);
+  color: #f1f5f9;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+
+/* The phone's media query (max-width: 600px), as a class. */
+.phone .gulp-board { width: 156px; gap: 4px; }
+.phone .gulp-board .gulp-name { min-width: 3.2em; }
+.phone .gulp-center { left: 0; right: 0; transform: none; }
+.phone .gulp-board li { font-size: 14px; padding: 3px 8px 3px 3px; gap: 5px; }
+.phone .gulp-board li:nth-child(n + 4):not(.me) { display: none; }
+.phone .gulp-board .gulp-rank { width: 20px; height: 20px; font-size: 14px; }
+.phone .gulp-board .gulp-dot { display: none; }
+.phone .gulp-clock { font-size: 20px; padding: 6px 12px; }
+.phone .gulp-level { padding: 3px 8px 3px 3px; gap: 5px; }
+.phone .gulp-lv { height: 30px; padding: 4px 10px 0; gap: 3px; }
+.phone .gulp-lv-long { display: none; }
+.phone .gulp-lv-short { display: inline; }
+.phone .gulp-lv b { font-size: 18px; }
+.phone .gulp-meter { width: 56px; }
+.phone .gulp-next { display: none; }
+.phone .gulp-right { flex-direction: column-reverse; align-items: flex-end; gap: 6px; }
+.phone .gulp-wonders,
+.phone .gulp-kills { height: 34px; font-size: 16px; padding: 0 12px 0 8px; }
+.phone .gulp-minimap-slot { bottom: 64px; }
+.phone .gulp-pause-label { display: none; }
+.phone .gulp-round.gulp-pause-btn { padding: 0; width: 44px; justify-content: center; }
+.phone .gulp-round { width: 44px; height: 44px; border-radius: 14px; }
+.phone .gulp-messages { bottom: 186px; }
+.phone .gulp-hint { white-space: normal; text-align: center; }
+
+/* In-city labels, as the canvas draws them today (canvasTextures.ts,
+   effects.ts). --k is screen pixels per canvas pixel at this screen size. */
+.world { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.stage .world > * { position: absolute; transform: translate(-50%, -50%); }
+.w-tag {
+  --k: var(--kt, 0.58);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(44px * var(--k));
+  padding: 0 calc(17px * var(--k));
+  border-radius: calc(22px * var(--k));
+  background: rgba(20, 24, 36, 0.7);
+  color: #fff;
+  font: 700 calc(30px * var(--k)) / 1 var(--canvas-font);
+  white-space: nowrap;
+}
+.w-tag.mine { background: #fff; color: var(--hole); }
+.w-bubble {
+  --k: var(--kb, 0.464);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: calc(240px * var(--k));
+  height: calc(86px * var(--k));
+  margin-bottom: calc(28px * var(--k));
+  padding: 0 calc(34px * var(--k));
+  border: calc(6px * var(--k)) solid rgba(29, 31, 51, 0.85);
+  border-radius: calc(40px * var(--k));
+  background: #fff;
+  color: #e0457b;
+  font: 900 calc(44px * var(--k)) / 1 var(--canvas-font);
+  white-space: nowrap;
+}
+.w-bubble.healthy { color: #1a9c3c; }
+.w-bubble::before,
+.w-bubble::after {
+  content: '';
+  position: absolute;
+  left: calc(14px * var(--k));
+  top: calc(100% - 1px);
+  width: calc(62px * var(--k));
+  height: calc(32px * var(--k));
+  background: rgba(29, 31, 51, 0.85);
+  clip-path: polygon(40% 0, 92% 0, 6% 100%);
+}
+.w-bubble::after {
+  top: calc(100% - 6px * var(--k) - 1px);
+  background: #fff;
+  clip-path: polygon(46% 0, 82% 0, 14% 84%);
+}
+.w-pop {
+  --k: var(--kp, 0.711);
+  --t: 1;
+  position: relative;
+  display: inline-block;
+  color: #fff3d1;
+  font: 900 calc(44px * var(--k) * var(--t)) / 1 var(--canvas-font);
+  -webkit-text-stroke: calc(11px * var(--k) * var(--t)) #2b1d08;
+  paint-order: stroke fill;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 calc(3px * var(--k)) calc(2px * var(--k)) rgba(0, 0, 0, 0.45));
+  white-space: nowrap;
+}
+.w-pop.big { --t: 1.15; color: #ffc41f; }
+.w-pop.huge { --t: 1.35; color: #ff5cc8; }
+.parts .world-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 22px; }
+.parts .w-tag, .parts .w-bubble, .parts .w-pop { --kt: 0.58; --kp: 0.711; --kb: 0.464; position: relative; }
+
+/* Up close: the same pieces, laid out in a row instead of round the screen. */
+.parts .gulp-board,
+.parts .gulp-center,
+.parts .gulp-right,
+.parts .gulp-messages,
+.parts .gulp-minimap-slot,
+.parts .gulp-explore,
+.parts .party-root { position: static; transform: none; }
+.parts .gulp-messages { display: flex; }
+.parts .gulp-right { flex-wrap: wrap; }
+.parts .gulp-board { width: 250px; }
+.parts .gulp-explore { position: relative; left: auto; bottom: auto; }
+
+/* =====================================================================
+   A — Toy plastic: moulded pieces lit from above, a glossy highlight,
+   a darker lip underneath, a soft shadow on the city.
+   Each piece sets --t (top), --f (face), --l (lip), --c (text).
+   ===================================================================== */
+.opt-a {
+  --navy-t: #5a70e0; --navy: #3346b4; --navy-l: #1d287a;
+  --yel-t: #ffe68a; --yel: #ffc62e; --yel-l: #cf8600;
+  --wht-t: #ffffff; --wht: #edf1fb; --wht-l: #b7c3e0;
+  --blu-t: #6aaaff; --blu: #2f7cf6; --blu-l: #17469f;
+  --drop: 0 9px 16px rgba(16, 26, 70, 0.34);
+  --ring: #1a4fb0;
+}
+.opt-a :is(.gulp-board li:not(.gulp-gap), .gulp-clock, .gulp-level, .gulp-wonders, .gulp-kills, .gulp-round, .gulp-hint, .gulp-explore, .party-pill, .gulp-minimap) {
+  isolation: isolate;
+  border: 0;
+  background: linear-gradient(180deg, var(--t, var(--navy-t)) 0%, var(--f, var(--navy)) 60%);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), inset 0 -2px 0 rgba(0, 0, 0, 0.14), 0 var(--lip, 4px) 0 var(--l, var(--navy-l)), var(--drop), var(--focus, 0 0 0 0 transparent);
+  color: var(--c, #fff);
+  font-family: var(--round);
+  backdrop-filter: none;
+}
+.opt-a :is(.gulp-board li, .gulp-clock, .gulp-level, .gulp-wonders, .gulp-kills, .gulp-round, .gulp-hint, .party-pill) { position: relative; }
+/* The gloss: a soft oval of light across the top half, under the words. */
+.opt-a :is(.gulp-board li:not(.gulp-gap), .gulp-clock, .gulp-level, .gulp-wonders, .gulp-kills, .gulp-round, .gulp-hint, .gulp-explore, .party-pill, .w-tag)::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 9%;
+  right: 9%;
+  top: 2px;
+  height: 46%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.04));
+  pointer-events: none;
+}
+.opt-a .gulp-board { gap: 9px; }
+.opt-a .gulp-board li:not(.gulp-gap) { padding: 6px 12px 6px 6px; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3); }
+.opt-a .gulp-board li.me { --t: var(--yel-t); --f: var(--yel); --l: var(--yel-l); --c: #3d2a00; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45); }
+.opt-a .gulp-rank {
+  background: radial-gradient(circle at 50% 28%, #fff 0%, #e8edfb 50%, #bfcae8 100%);
+  color: #1f2440;
+  text-shadow: none;
+  box-shadow: inset 0 -2px 0 rgba(20, 30, 70, 0.22), 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.opt-a li:first-child > .gulp-rank { background: radial-gradient(circle at 50% 28%, #fff8d0 0%, #ffd84a 48%, #eaa200 100%); color: #3d2a00; }
+.opt-a li.me > .gulp-rank { background: radial-gradient(circle at 50% 28%, #5b66a8 0%, #1f2440 70%); color: #fff; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.6); }
+.opt-a .gulp-dot { background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.95) 0 14%, rgba(255, 255, 255, 0) 32%), var(--hole); box-shadow: 0 0 0 2px #fff, inset 0 -2px 2px rgba(0, 0, 0, 0.3); }
+.opt-a .gulp-center { gap: 10px; }
+.opt-a .gulp-clock { --t: var(--wht-t); --f: var(--wht); --l: var(--wht-l); --c: var(--g-ink); padding: 8px 20px; }
+.opt-a .gulp-clock svg { color: var(--g-blue-ink); }
+.opt-a .gulp-level { --t: var(--blu-t); --f: var(--blu); --l: var(--blu-l); text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3); }
+.opt-a .gulp-lv {
+  background: linear-gradient(180deg, #fff 0%, #e9eefb 100%);
+  text-shadow: none;
+  box-shadow: inset 0 -2px 0 rgba(20, 40, 90, 0.16), 0 2px 0 var(--blu-l), 0 3px 4px rgba(0, 0, 0, 0.25);
+}
+.opt-a .gulp-meter { height: 12px; background: #163f8f; box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.35); }
+.opt-a .gulp-meter-fill { background: linear-gradient(180deg, #fff6b0 0%, #ffd23f 50%, #f2a200 100%); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7); }
+.opt-a .gulp-wonders { --c: #ffd84a; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+.opt-a .gulp-wonders svg { fill: #ffd84a; color: #b87800; stroke-width: 1.4; }
+.opt-a .gulp-kills { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+.opt-a .gulp-kills-icon { background: radial-gradient(ellipse at 50% 70%, #000 50%, #2a0a12 100%); box-shadow: 0 0 0 3px #ff5f6d, 0 -1px 0 3px #ffb0b8; }
+.opt-a .gulp-round { --t: var(--wht-t); --f: var(--wht); --l: var(--wht-l); --lip: 5px; --c: var(--g-blue-ink); transition: transform 0.06s ease, box-shadow 0.06s ease; }
+.opt-a .gulp-round.gulp-pause-btn { --t: var(--yel-t); --f: var(--yel); --l: var(--yel-l); --c: #3d2a00; overflow: hidden; }
+.opt-a .gulp-round:active,
+.opt-a .gulp-round.is-pressed { --lip: 1px; --drop: 0 3px 6px rgba(16, 26, 70, 0.3); transform: translateY(4px); }
+.opt-a .gulp-hint { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3); }
+.opt-a .gulp-explore { font-size: 16px; }
+.opt-a .party-pill { font-size: 15px; }
+.opt-a .gulp-minimap { --t: var(--wht-t); --f: var(--wht); --l: var(--wht-l); --lip: 5px; padding: 6px; border-radius: 22px; overflow: visible; }
+.opt-a .gulp-minimap img { border-radius: 15px; }
+.opt-a .gulp-minimap::after { content: ''; position: absolute; inset: 6px; border-radius: 15px; box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(0, 0, 0, 0.15); pointer-events: none; }
+.opt-a :is(button:focus-visible, .is-focus) { outline: 3px solid #fff; outline-offset: 3px; --focus: 0 0 0 9px var(--ring); }
+/* On a phone the top of the screen is already full: thinner lips, today's footprint. */
+.phone.opt-a .gulp-board { gap: 5px; }
+.phone.opt-a .gulp-board li:not(.gulp-gap) { --lip: 3px; padding: 3px 8px 3px 3px; }
+.phone.opt-a .gulp-center { gap: 7px; }
+.phone.opt-a .gulp-clock { --lip: 3px; padding: 6px 12px; }
+.phone.opt-a .gulp-level { --lip: 3px; }
+.phone.opt-a :is(.gulp-wonders, .gulp-kills) { --lip: 3px; }
+/* In the city: a plastic tag, a glossy bubble, 3D block numbers. */
+.opt-a .w-tag {
+  isolation: isolate;
+  background: linear-gradient(180deg, var(--t, var(--navy-t)) 0%, var(--f, var(--navy)) 60%);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), inset 0 -2px 0 rgba(0, 0, 0, 0.14), 0 calc(5px * var(--k)) 0 var(--l, var(--navy-l)), 0 calc(8px * var(--k)) calc(10px * var(--k)) rgba(0, 0, 0, 0.3);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+.opt-a .w-tag.mine { --t: #fff; --f: #edf1fb; --l: color-mix(in srgb, var(--hole) 75%, #000); color: var(--hole); text-shadow: none; }
+.opt-a .w-bubble {
+  border: 0;
+  background: linear-gradient(180deg, #fff 0%, #eef2fb 70%);
+  filter: drop-shadow(0 calc(6px * var(--k)) 0 #b7c3e0) drop-shadow(0 calc(10px * var(--k)) calc(8px * var(--k)) rgba(0, 0, 0, 0.3));
+}
+.opt-a .w-bubble::before { display: none; }
+.opt-a .w-bubble::after { top: calc(100% - 1px); background: #eef2fb; clip-path: polygon(40% 0, 92% 0, 6% 100%); }
+.opt-a .w-pop {
+  --side: #cf9436;
+  -webkit-text-stroke-width: calc(8px * var(--k) * var(--t));
+  filter: drop-shadow(0 calc(2px * var(--k)) 0 var(--side)) drop-shadow(0 calc(2px * var(--k)) 0 var(--side)) drop-shadow(0 calc(2px * var(--k)) 0 var(--side)) drop-shadow(0 calc(2px * var(--k)) 0 #2b1d08) drop-shadow(0 calc(8px * var(--k)) calc(5px * var(--k)) rgba(0, 0, 0, 0.35));
+}
+.opt-a .w-pop.big { --side: #c47a00; }
+.opt-a .w-pop.huge { --side: #b3308c; }
+/* Block numbers: a moulded side under each digit and a shine on top. */
+.opt-a .w-pop::after {
+  content: attr(data-t);
+  position: absolute;
+  left: 0;
+  top: 0;
+  -webkit-text-stroke: 0;
+  color: transparent;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.35) 38%, rgba(255, 255, 255, 0) 52%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* =====================================================================
+   B — Sticker: die-cut pieces with a thick white edge, a soft shadow
+   that lifts them off the city, a faint paper grain and vinyl sheen.
+   Each piece sets --f (fill), --c (text), --tilt, --key (a keyline).
+   ===================================================================== */
+.opt-b {
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.16 0 0 0 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  --sheen: linear-gradient(118deg, rgba(255, 255, 255, 0) 32%, rgba(255, 255, 255, 0.2) 44%, rgba(255, 255, 255, 0) 56%);
+  --lift: 0 1px 0 rgba(0, 0, 0, 0.08), 0 6px 12px rgba(10, 16, 48, 0.38);
+  --navy: #252f66;
+  --ring: #1f2440;
+}
+.opt-b :is(.gulp-board li:not(.gulp-gap), .gulp-clock, .gulp-level, .gulp-wonders, .gulp-kills, .gulp-round, .gulp-hint, .gulp-explore, .party-pill, .gulp-minimap) {
+  border: var(--bw, 3px) solid #fff;
+  background: var(--grain), var(--sheen), var(--f, var(--navy));
+  box-shadow: var(--key, 0 0 0 0 transparent), var(--lift), var(--focus, 0 0 0 0 transparent);
+  color: var(--c, #fff);
+  font-family: var(--round);
+  transform: rotate(var(--tilt, 0deg)) translateY(var(--dy, 0px)) scale(var(--sc, 1));
+  backdrop-filter: none;
+}
+.opt-b .gulp-board { gap: 6px; }
+.opt-b .gulp-board li:not(.gulp-gap) { padding: 4px 11px 4px 4px; }
+.opt-b .gulp-board li.me { --f: #ffc62e; --c: #2a1d00; --tilt: -1.4deg; margin: 2px 0 2px 4px; }
+.opt-b .gulp-rank { background: #fff; color: #1f2440; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+.opt-b li:first-child > .gulp-rank { background: #ffc62e; color: #2a1d00; box-shadow: 0 0 0 2px #fff, 0 1px 2px rgba(0, 0, 0, 0.3); }
+.opt-b li.me > .gulp-rank { background: #1f2440; color: #fff; box-shadow: 0 0 0 2px #fff; }
+.opt-b .gulp-dot { width: 15px; height: 15px; box-shadow: 0 0 0 2.5px #fff, 0 1px 2px rgba(0, 0, 0, 0.35); }
+.opt-b .gulp-center { gap: 8px; }
+.opt-b .gulp-clock { --f: #1f63e0; --tilt: -2deg; --bw: 4px; }
+.opt-b .gulp-lv {
+  border: 3px solid #fff;
+  background: #ffc62e;
+  color: #2a1d00;
+  height: 36px;
+  padding-top: 5px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+  transform: rotate(-4deg);
+  margin: -4px 0 -4px -6px;
+}
+.opt-b .gulp-meter { height: 12px; padding: 2px; background: #141a3f; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85); }
+.opt-b .gulp-meter-fill { background: linear-gradient(180deg, #ffa3d3 0%, #ff5fa8 100%); }
+.opt-b .gulp-wonders { --f: #ffc62e; --c: #2a1d00; }
+.opt-b .gulp-wonders svg { fill: #fff; stroke-width: 1.8; }
+.opt-b .gulp-kills { --f: #fff; --c: #1f2440; --key: inset 0 0 0 1.5px #d5dcec; }
+.opt-b .gulp-round { --f: #fff; --c: var(--g-blue-ink); --key: inset 0 0 0 1.5px #d5dcec; transition: transform 0.08s ease, box-shadow 0.08s ease; }
+.opt-b .gulp-round.gulp-pause-btn { --f: #ffc62e; --c: #2a1d00; --tilt: 2.5deg; --key: 0 0 0 0 transparent; }
+.opt-b .gulp-round:active,
+.opt-b .gulp-round.is-pressed { --lift: 0 1px 2px rgba(10, 16, 48, 0.35); --dy: 2px; --sc: 0.95; }
+.opt-b .gulp-explore { font-size: 16px; }
+.opt-b .party-pill { font-size: 15px; }
+.opt-b .gulp-minimap { --f: #fff; --bw: 6px; --tilt: 2deg; border-radius: 12px; }
+.opt-b .gulp-minimap img { border-radius: 4px; }
+.opt-b :is(button:focus-visible, .is-focus) { outline: 3px solid #fff; outline-offset: 3px; --focus: 0 0 0 9px var(--ring); }
+.phone.opt-b .gulp-board { gap: 4px; }
+.phone.opt-b .gulp-board li:not(.gulp-gap) { --bw: 2px; padding: 2px 8px 2px 2px; }
+.phone.opt-b .gulp-board li.me { margin: 1px 0 1px 3px; }
+.phone.opt-b .gulp-center { gap: 6px; }
+.phone.opt-b .gulp-clock { --bw: 3px; }
+.phone.opt-b .gulp-level { --bw: 2px; }
+.phone.opt-b .gulp-lv { height: 30px; padding-top: 3px; border-width: 2px; margin: 0; transform: rotate(-3deg); }
+.phone.opt-b :is(.gulp-wonders, .gulp-kills, .gulp-round) { --bw: 2px; }
+/* In the city: the same white die-cut edge on every label. */
+.opt-b .w-tag {
+  height: calc(52px * var(--k));
+  border: calc(5px * var(--k)) solid #fff;
+  background: var(--grain), var(--navy);
+  box-shadow: 0 calc(5px * var(--k)) calc(8px * var(--k)) rgba(0, 0, 0, 0.38);
+}
+.opt-b .w-tag.mine { background: var(--grain), color-mix(in srgb, var(--hole) 82%, #000); color: #fff; }
+.opt-b .w-bubble {
+  transform: rotate(-3deg);
+  filter: drop-shadow(calc(7px * var(--k)) 0 0 #fff) drop-shadow(calc(-7px * var(--k)) 0 0 #fff) drop-shadow(0 calc(7px * var(--k)) 0 #fff) drop-shadow(0 calc(-7px * var(--k)) 0 #fff) drop-shadow(0 calc(7px * var(--k)) calc(8px * var(--k)) rgba(0, 0, 0, 0.38));
+}
+.opt-b .w-pop {
+  -webkit-text-stroke-width: calc(8px * var(--k) * var(--t));
+  -webkit-text-stroke-color: #1f2440;
+  filter: drop-shadow(calc(4px * var(--k)) 0 0 #fff) drop-shadow(calc(-4px * var(--k)) 0 0 #fff) drop-shadow(0 calc(4px * var(--k)) 0 #fff) drop-shadow(0 calc(-4px * var(--k)) 0 #fff) drop-shadow(0 calc(6px * var(--k)) calc(6px * var(--k)) rgba(0, 0, 0, 0.4));
+}
+
+/* =====================================================================
+   C — Arcade: dark bevelled cabinet panels with an orange trim, amber
+   numbers that glow, a 70s sunset ring round the clock, push-buttons,
+   an LED level meter and a CRT screen for the map.
+   Each panel can set --sh (shadows), --bw (trim width), --c (text).
+   ===================================================================== */
+.opt-c {
+  --panel: linear-gradient(180deg, #36264d 0%, #1e1531 52%, #140d22 100%);
+  --trim: #ff8a1f;
+  --trim-l: #8f3a00;
+  --amber: #ffd056;
+  --glow: 0 0 8px rgba(255, 160, 30, 0.75);
+  --cream: #fff1d6;
+  --ring: #ff8a1f;
+  --panel-sh: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -2px 0 rgba(0, 0, 0, 0.5), 0 3px 0 var(--trim-l), 0 8px 16px rgba(0, 0, 0, 0.42);
+}
+.opt-c :is(.gulp-board li:not(.gulp-gap), .gulp-clock, .gulp-level, .gulp-wonders, .gulp-kills, .gulp-hint, .gulp-explore, .party-pill) {
+  border: var(--bw, 2px) solid var(--trim);
+  background: var(--panel);
+  box-shadow: var(--sh, var(--panel-sh)), var(--focus, 0 0 0 0 transparent);
+  color: var(--c, var(--cream));
+  font-family: var(--round);
+  backdrop-filter: none;
+}
+.opt-c .gulp-board { gap: 7px; }
+.opt-c .gulp-board li:not(.gulp-gap) { padding: 4px 12px 4px 4px; }
+.opt-c .gulp-board b { color: var(--amber); text-shadow: var(--glow); font-variant-numeric: tabular-nums; }
+.opt-c .gulp-board li.me {
+  background: linear-gradient(180deg, #ffd765 0%, #ffa21f 58%, #f27a00 100%);
+  border-color: var(--cream);
+  --c: #2a1300;
+  --sh: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -2px 0 rgba(120, 50, 0, 0.35), 0 3px 0 #9a4300, 0 8px 16px rgba(0, 0, 0, 0.42);
+}
+.opt-c .gulp-board li.me b { color: #2a1300; text-shadow: none; }
+.opt-c .gulp-rank { background: #0c0714; color: var(--amber); text-shadow: var(--glow); box-shadow: inset 0 0 0 2px #4a3560; }
+.opt-c li:first-child > .gulp-rank { background: radial-gradient(circle at 50% 30%, #ffe9a0, #ffc23d 55%, #e58a00); color: #2a1300; text-shadow: none; box-shadow: 0 0 8px rgba(255, 190, 60, 0.7); }
+.opt-c li.me > .gulp-rank { background: #2a1300; color: var(--amber); box-shadow: none; }
+.opt-c .gulp-dot { box-shadow: 0 0 0 2px #0c0714, 0 0 8px var(--hole); }
+.opt-c .gulp-center { gap: 14px; }
+.opt-c .gulp-clock {
+  --bw: 0px;
+  --c: var(--amber);
+  --sh: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -2px 0 rgba(0, 0, 0, 0.5), 0 0 0 2px #ffd23f, 0 0 0 4px #ff9f1c, 0 0 0 6px #ff6b2b, 0 0 0 8px #e8322b, 0 4px 0 8px #7a1a12, 0 12px 20px 6px rgba(0, 0, 0, 0.38);
+  margin-top: 8px;
+  padding: 8px 20px;
+  text-shadow: var(--glow);
+}
+.opt-c .gulp-clock svg { color: var(--cream); filter: drop-shadow(0 0 4px rgba(255, 160, 30, 0.6)); }
+.opt-c .gulp-lv {
+  background: linear-gradient(180deg, #ffb347 0%, #ff8a1f 60%, #e86f00 100%);
+  color: #2a1300;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -2px 0 rgba(120, 50, 0, 0.4);
+}
+.opt-c .gulp-meter {
+  height: 14px;
+  padding: 2px;
+  border-radius: 4px;
+  background: repeating-linear-gradient(90deg, #3a2a12 0 8px, transparent 8px 11px) content-box, #0b0712;
+  box-shadow: inset 0 0 0 1px #4a3560;
+}
+.opt-c .gulp-meter-fill { border-radius: 1px; background: repeating-linear-gradient(90deg, var(--amber) 0 8px, transparent 8px 11px); filter: drop-shadow(0 0 3px rgba(255, 170, 40, 0.9)); }
+.opt-c .gulp-next b { color: var(--amber); text-shadow: var(--glow); }
+.opt-c .gulp-wonders { --c: var(--amber); text-shadow: var(--glow); }
+.opt-c .gulp-wonders svg { fill: var(--amber); filter: drop-shadow(0 0 4px rgba(255, 170, 40, 0.8)); }
+.opt-c .gulp-kills { --c: var(--amber); text-shadow: var(--glow); }
+.opt-c .gulp-kills-icon { box-shadow: 0 0 0 3px #ff5f6d, 0 0 10px 3px rgba(255, 95, 109, 0.7); }
+/* Push-buttons: a domed cap in a dark bezel with the orange trim. */
+.opt-c .gulp-buttons { gap: 16px; margin: 0 6px; }
+.opt-c .gulp-round {
+  --cap: radial-gradient(ellipse at 50% 28%, #fffaf0 0%, #ffe9be 42%, #e2b56a 100%);
+  --sh: inset 0 3px 1px rgba(255, 255, 255, 0.75), inset 0 -4px 0 rgba(90, 50, 0, 0.25), 0 0 0 4px #140d22, 0 0 0 6px var(--trim), 0 5px 0 4px #140d22, 0 5px 0 6px var(--trim-l), 0 12px 18px 4px rgba(0, 0, 0, 0.38);
+  border: 0;
+  border-radius: 50%;
+  background: var(--cap);
+  box-shadow: var(--sh), var(--focus, 0 0 0 0 transparent);
+  color: #2a1300;
+  font-family: var(--round);
+  transition: transform 0.06s ease, box-shadow 0.06s ease;
+}
+.opt-c .gulp-round.gulp-pause-btn { --cap: radial-gradient(ellipse at 50% 22%, #fff7b8 0%, #ffd23f 40%, #ef9c00 100%); border-radius: 999px; }
+.opt-c .gulp-round:active,
+.opt-c .gulp-round.is-pressed {
+  transform: translateY(3px);
+  --sh: inset 0 2px 2px rgba(90, 50, 0, 0.3), inset 0 -1px 0 rgba(255, 255, 255, 0.4), 0 0 0 4px #140d22, 0 0 0 6px var(--trim), 0 2px 0 4px #140d22, 0 2px 0 6px var(--trim-l), 0 6px 10px 4px rgba(0, 0, 0, 0.3);
+}
+.opt-c .gulp-explore { font-size: 16px; }
+.opt-c .party-pill { font-size: 15px; }
+/* The map as a little CRT: dark bezel, curved glass, scanlines, a glare. */
+.opt-c .gulp-minimap {
+  padding: 7px;
+  border: 2px solid var(--trim);
+  border-radius: 22px;
+  background: linear-gradient(180deg, #3d2c54, #140d22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 0 var(--trim-l), 0 10px 18px rgba(0, 0, 0, 0.42);
+  overflow: visible;
+}
+.opt-c .gulp-minimap img { border-radius: 16px / 20px; }
+.opt-c .gulp-minimap::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: 16px / 20px;
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 38%),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.opt-c :is(button:focus-visible, .is-focus) { outline: 3px solid #fff; outline-offset: 3px; --focus: 0 0 16px 7px rgba(255, 138, 31, 0.9); }
+.opt-c .gulp-round:is(:focus-visible, .is-focus) { outline-offset: 9px; }
+.phone.opt-c .gulp-board { gap: 4px; }
+.phone.opt-c .gulp-board li:not(.gulp-gap) { padding: 2px 8px 2px 2px; }
+.phone.opt-c .gulp-center { gap: 8px; }
+.phone.opt-c .gulp-clock {
+  margin-top: 3px;
+  padding: 5px 10px;
+  --sh: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -2px 0 rgba(0, 0, 0, 0.5), 0 0 0 1px #ffd23f, 0 0 0 2px #ff9f1c, 0 0 0 3px #ff6b2b, 0 0 0 4px #e8322b, 0 3px 0 4px #7a1a12, 0 8px 14px 3px rgba(0, 0, 0, 0.38);
+}
+.phone.opt-c .gulp-buttons { gap: 12px; margin: 0 4px; }
+.phone.opt-c .gulp-round {
+  --sh: inset 0 3px 1px rgba(255, 255, 255, 0.75), inset 0 -4px 0 rgba(90, 50, 0, 0.25), 0 0 0 3px #140d22, 0 0 0 4.5px var(--trim), 0 4px 0 3px #140d22, 0 4px 0 4.5px var(--trim-l), 0 10px 14px 3px rgba(0, 0, 0, 0.38);
+}
+/* In the city: neon-sign name tags, a comic bubble, sunset numbers. */
+.opt-c .w-tag {
+  height: calc(48px * var(--k));
+  border: calc(4px * var(--k)) solid var(--hole);
+  background: rgba(20, 13, 34, 0.88);
+  color: #fff;
+  text-shadow: 0 0 calc(10px * var(--k)) var(--hole), 0 0 2px var(--hole);
+  box-shadow: 0 0 calc(12px * var(--k)) var(--hole), inset 0 0 calc(10px * var(--k)) color-mix(in srgb, var(--hole) 55%, transparent);
+}
+.opt-c .w-tag.mine { border-width: calc(5px * var(--k)); }
+.opt-c .w-bubble {
+  border-color: #140d22;
+  background: var(--cream);
+  filter: drop-shadow(calc(6px * var(--k)) calc(6px * var(--k)) 0 var(--trim));
+}
+.opt-c .w-bubble::before { background: #140d22; }
+.opt-c .w-bubble::after { background: var(--cream); }
+.opt-c .w-pop {
+  --top: #fff6c2; --mid: #ffc23d; --bot: #ff7a1a;
+  color: #140d22;
+  -webkit-text-stroke: calc(10px * var(--k) * var(--t)) #140d22;
+  filter: drop-shadow(0 calc(4px * var(--k)) 0 #140d22) drop-shadow(0 calc(8px * var(--k)) calc(6px * var(--k)) rgba(0, 0, 0, 0.35));
+}
+.opt-c .w-pop.big { --top: #fff2a8; --mid: #ffb21f; --bot: #ff5a1f; }
+.opt-c .w-pop.huge { --top: #ffd6f3; --mid: #ff5cc8; --bot: #a64dff; }
+.opt-c .w-pop::after {
+  content: attr(data-t);
+  position: absolute;
+  left: 0;
+  top: 0;
+  -webkit-text-stroke: 0;
+  color: transparent;
+  background: linear-gradient(180deg, var(--top) 0%, var(--top) 30%, var(--mid) 31%, var(--mid) 62%, var(--bot) 63%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Motion: A's Pause gets a slow shine. Off under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .opt-a .gulp-round.gulp-pause-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.65) 50%, transparent 62%) no-repeat;
+    background-size: 260% 100%;
+    animation: shine 4.5s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes shine {
+    0%, 62% { background-position: 140% 0; }
+    100% { background-position: -40% 0; }
+  }
+}
+
+/* Narrow page: the bar stays usable. */
+@media (max-width: 1399px) {
+  .group-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  h1 { font-size: 24px; }
+  .parts .gulp-next { min-width: 0; }
+  .parts .gulp-meter { width: 80px; }
+  .bar { gap: 8px; }
+  .seg button { padding: 0 11px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Gulp Universe: controls with depth</h1>
+    <p class="lede">In a round, the controls are flat: single-colour pills, dark glass or plain white, with no light on them and one hard shadow at most. Three ways to make them look like pieces of the toy city. Positions, sizes, words and the colours that mean something stay as they are.</p>
+    <p class="lede keys-line">Keys: <kbd>1</kbd>–<kbd>4</kbd> pick a look, <kbd>←</kbd> <kbd>→</kbd> step through them, <kbd>S</kbd> shows all four side by side.</p>
+  </header>
+
+  <nav class="bar" aria-label="What to show">
+    <div class="group">
+      <span class="group-label" id="lbl-look">Look</span>
+      <div class="seg" role="group" aria-labelledby="lbl-look" id="seg-look"></div>
+    </div>
+    <div class="group">
+      <span class="group-label" id="lbl-screen">Screen</span>
+      <div class="seg" role="group" aria-labelledby="lbl-screen" id="seg-screen"></div>
+    </div>
+    <div class="group">
+      <span class="group-label" id="lbl-view">Show</span>
+      <div class="seg" role="group" aria-labelledby="lbl-view" id="seg-view"></div>
+    </div>
+  </nav>
+
+  <main>
+    <section class="frames" id="frames" aria-live="polite"></section>
+
+    <section class="notes" id="notes" aria-label="The options"></section>
+
+    <section class="closeup" aria-labelledby="closeup-title">
+      <h2 id="closeup-title">Up close</h2>
+      <p>Each piece at its iPad size over the city. The buttons here are real: tab to them for the keyboard focus ring, press and hold for the pressed state. The in-city labels are HTML copies of what the game paints on a canvas.</p>
+      <div id="closeup"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+  const OPTS = [
+    { id: 'cur', key: 'Current', name: 'Current', line: 'What a round shows today.' },
+    { id: 'a', key: 'A', name: 'Toy plastic', line: 'Moulded pieces lit from above: a glossy highlight, a darker lip underneath and a soft shadow on the city. Buttons press down onto their lip.' },
+    { id: 'b', key: 'B', name: 'Sticker', line: 'Die-cut stickers: a thick white edge, a soft shadow that lifts them off the city, a faint paper grain. The player’s row, the clock and Pause sit at a slight tilt.' },
+    { id: 'c', key: 'C', name: 'Arcade', line: 'Cabinet panels: dark bevels with an orange trim, glowing amber numbers, a 70s sunset ring round the clock, push-buttons, an LED level meter, the map on a little CRT.' },
+  ];
+  const COST = {
+    cur: 'Nothing to build.',
+    a: '<b>Builds in:</b> gulp.css (a light layer and a lip on each piece; a shine on Pause, off under reduced motion), canvasTextures.ts (tags and bubble), effects.ts (block numbers).',
+    b: '<b>Builds in:</b> gulp.css (white edge, shadow, grain, three tilts), canvasTextures.ts and effects.ts (a white edge round each label), holeView.ts (labels grow a little).',
+    c: '<b>Builds in:</b> gulp.css (panels, push-buttons, LED meter, CRT map: the most CSS of the three), canvasTextures.ts (neon tags need a WebKit check), effects.ts (striped numbers).',
+  };
+  const DEVS = {
+    ipad: { label: 'iPad', size: '1180 × 820', w: 1180, h: 820, tag: [590, 334], hole: [590, 461], touch: false },
+    laptop: { label: 'Laptop', size: '1920 × 1080', w: 1920, h: 1080, tag: [960, 440], hole: [960, 607], touch: false },
+    phone: { label: 'Phone', size: '430 × 932', w: 430, h: 932, tag: [215, 404], hole: [215, 509], touch: true },
+  };
+  const VIEWS = { one: 'One at a time', grid: 'Side by side' };
+
+  // A City round a few seconds in: the same numbers in every frame.
+  const ROWS = [
+    { rank: 1, name: 'Big Gulp', hole: '#ff5fa8', score: 64 },
+    { rank: 2, name: 'Klara', hole: '#3d7bff', score: 52, me: true },
+    { rank: 3, name: 'Sir Slurps', hole: '#3fcf5a', score: 41 },
+    { rank: 4, name: 'Nom Nom', hole: '#9b5cff', score: 30 },
+    { rank: 5, name: 'Hungry Hattie', hole: '#ff8a2a', score: 22 },
+  ];
+
+  const svg = (size, body, extra = '') =>
+    `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" ${extra}>${body}</svg>`;
+  const ICON = {
+    clock: (s) => svg(s, '<circle cx="12" cy="12" r="8.6"/><path d="M12 7v5.3l3.3 2"/>'),
+    star: (s) => svg(s, '<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.5Z"/>'),
+    speaker: (s) => svg(s, '<path d="M4 9.4h3.2L11.4 5.6v12.8L7.2 14.6H4V9.4Z"/><path d="M15 9.6a3.6 3.6 0 0 1 0 4.8"/><path d="M17.6 7.2a7 7 0 0 1 0 9.6"/>'),
+    pause: (s) => svg(s, '<path d="M8.5 5.5v13"/><path d="M15.5 5.5v13"/>', 'style="stroke-width:3"'),
+    party: (s) => svg(s, '<path d="M3 21.2 8.4 8.6l7 7L3 21.2Z"/><path d="M11.6 5.4c1.1-.6 2.4-.4 3 .7"/><path d="M16.4 2.8c.2 1 .9 1.6 1.9 1.8"/><path d="M19.6 8.6c1-.3 1.9 0 2.4.9"/><path d="M15.4 10.4l1.6-1.6"/>'),
+  };
+
+  const row = (r) =>
+    `<li class="${r.me ? 'me' : ''}" style="--hole:${r.hole}"><span class="gulp-rank">${r.rank}</span><span class="gulp-dot"></span><span class="gulp-name">${r.name}</span><b>${r.score}</b></li>`;
+  const board = (rows) => `<ol class="gulp-board" aria-label="Leaderboard">${rows.map(row).join('')}</ol>`;
+  const center = () => `
+    <div class="gulp-center">
+      <div class="gulp-clock">${ICON.clock(20)}<span>3:52</span></div>
+      <div class="gulp-level">
+        <span class="gulp-lv"><small><span class="gulp-lv-long">Level</span><span class="gulp-lv-short">Lv</span></small><b>2</b></span>
+        <span class="gulp-meter"><span class="gulp-meter-fill" style="width:62%"></span></span>
+        <span class="gulp-next">Next: <b>Cars</b></span>
+      </div>
+    </div>`;
+  const stats = () => `
+    <div class="gulp-stats">
+      <span class="gulp-wonders" title="Wonders swallowed">${ICON.star(18)}0/1</span>
+      <span class="gulp-kills" title="Holes swallowed"><span class="gulp-kills-icon"></span>1</span>
+    </div>`;
+  const buttons = (live, extra = '') => {
+    const t = live ? '' : ' tabindex="-1"';
+    return `
+    <div class="gulp-buttons">
+      <button type="button" class="gulp-round${extra}" aria-label="Sound off"${t}>${ICON.speaker(22)}</button>
+      <button type="button" class="gulp-round gulp-pause-btn${extra}" aria-label="Pause"${t}>${ICON.pause(22)}<span class="gulp-pause-label">Pause</span></button>
+    </div>`;
+  };
+  const hint = (touch) => `<div class="gulp-hint">${touch ? 'Drag anywhere to move' : 'Point with the mouse, or use the arrow keys'}</div>`;
+  const minimap = (dev) => `<div class="gulp-minimap-slot"><div class="gulp-minimap"><img src="minimap-${dev}.webp" alt=""></div></div>`;
+  const explore = (live) => `<button type="button" class="gulp-explore"${live ? '' : ' tabindex="-1"'}>Explore</button>`;
+  const party = (live) => `<div class="party-root"><button type="button" class="party-pill"${live ? '' : ' tabindex="-1"'}>${ICON.party(16)} Play together</button></div>`;
+
+  function frame(devId, optId) {
+    const d = DEVS[devId];
+    const [tx, ty] = d.tag;
+    const [hx, hy] = d.hole;
+    const H = d.h;
+    return `
+      <div class="stage ${devId} opt-${optId}" role="img" aria-label="${OPTS.find((o) => o.id === optId).name} on ${d.label}">
+        <img class="bg" src="frame-${devId}.webp" alt="">
+        <div class="gulp-root">
+          <div class="world" aria-hidden="true">
+            <span class="w-tag mine" style="left:${tx}px;top:${ty}px;--hole:#3d7bff">Klara</span>
+            <span class="w-pop" data-t="+8" style="left:${Math.round(hx + 0.11 * H)}px;top:${Math.round(hy - 0.06 * H)}px">+8</span>
+            <span class="w-pop" data-t="+5" style="left:${Math.round(hx - 0.13 * H)}px;top:${Math.round(hy - 0.1 * H)}px">+5</span>
+          </div>
+          <div class="gulp-hud" aria-hidden="true">
+            ${board(ROWS)}
+            ${center()}
+            <div class="gulp-right">${stats()}${buttons(false)}</div>
+            <div class="gulp-messages">${hint(d.touch)}</div>
+          </div>
+          ${minimap(devId)}
+          ${explore(false)}
+          ${party(false)}
+        </div>
+      </div>`;
+  }
+
+  function parts(optId) {
+    const bg = (x, y) => `style="background-position:${-x}px ${-y}px"`;
+    return `
+      <div class="gulp-root parts opt-${optId}">
+        <div class="tile" ${bg(40, 330)}>
+          <span class="tile-name">Leaderboard</span>
+          ${board(ROWS.slice(0, 3))}
+        </div>
+        <div class="tile" ${bg(380, 560)}>
+          <span class="tile-name">Clock and level</span>
+          ${center()}
+        </div>
+        <div class="tile" ${bg(560, 230)}>
+          <span class="tile-name">Counters and buttons</span>
+          <div class="gulp-right">${stats()}${buttons(true)}</div>
+          <div class="row">
+            <div class="pair">${buttons(false, ' is-pressed').replace('gulp-buttons', 'gulp-buttons')}<small>pressed</small></div>
+            <div class="pair">${buttons(false, ' is-focus')}<small>keyboard focus</small></div>
+          </div>
+        </div>
+        <div class="tile" ${bg(100, 600)}>
+          <span class="tile-name">Hint, Explore, Play together</span>
+          <div class="gulp-messages">${hint(false)}</div>
+          <div class="row">${explore(true)}${party(true)}</div>
+        </div>
+        <div class="tile" ${bg(20, 560)}>
+          <span class="tile-name">Map</span>
+          ${minimap('ipad')}
+        </div>
+        <div class="tile" ${bg(700, 540)}>
+          <span class="tile-name">In the city</span>
+          <div class="world-row">
+            <span class="w-tag mine" style="--hole:#3d7bff">Klara</span>
+            <span class="w-tag" style="--hole:#ff5fa8">Big Gulp</span>
+            <span class="w-bubble">Yum!</span>
+            <span class="w-bubble healthy">+250 healthy!</span>
+          </div>
+          <div class="world-row">
+            <span class="w-pop" data-t="+8">+8</span>
+            <span class="w-pop big" data-t="+180">+180</span>
+            <span class="w-pop huge" data-t="+2,400">+2,400</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // State lives in the address, so a link reopens the same view.
+  const state = { opt: 'cur', dev: 'ipad', view: 'one' };
+  const readHash = () => {
+    try {
+      const q = new URLSearchParams(location.hash.slice(1));
+      if (OPTS.some((o) => o.id === q.get('look'))) state.opt = q.get('look');
+      if (DEVS[q.get('screen')]) state.dev = q.get('screen');
+      if (VIEWS[q.get('show')]) state.view = q.get('show');
+    } catch (e) { /* the defaults stand */ }
+  };
+  readHash();
+  window.addEventListener('hashchange', () => { readHash(); render(); });
+
+  const $ = (id) => document.getElementById(id);
+  const segButtons = (el, entries, key) => {
+    el.innerHTML = entries.map(([id, label]) => `<button type="button" data-${key}="${id}">${label}</button>`).join('');
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      state[key] = b.dataset[key];
+      render();
+    });
+  };
+  segButtons($('seg-look'), OPTS.map((o) => [o.id, o.id === 'cur' ? 'Current' : `${o.key} · ${o.name}`]), 'opt');
+  segButtons($('seg-screen'), Object.entries(DEVS).map(([id, d]) => [id, d.label]), 'dev');
+  segButtons($('seg-view'), Object.entries(VIEWS), 'view');
+
+  $('notes').innerHTML = OPTS.map((o) => `
+    <article class="note" data-note="${o.id}">
+      <h3><span class="tag-opt ${o.id === 'cur' ? 'cur' : ''}">${o.key === 'Current' ? 'Now' : o.key}</span>${o.name}</h3>
+      <p>${o.line}</p>
+      <p>${COST[o.id]}</p>
+      ${o.id === 'cur' ? '<p><a class="page-link" href="today-ipad.webp">Photo of the same moment in the game</a>, to check this copy against.</p>' : ''}
+    </article>`).join('');
+
+  const caption = (o, d) => `
+    <figcaption><span class="tag-opt ${o.id === 'cur' ? 'cur' : ''}">${o.id === 'cur' ? 'Now' : o.key}</span>${o.name}<span class="cap-size">${d.label} ${d.size}<span class="pct"></span></span></figcaption>`;
+
+  function render() {
+    for (const b of document.querySelectorAll('.seg button')) {
+      const key = Object.keys(b.dataset)[0];
+      b.setAttribute('aria-pressed', String(state[key] === b.dataset[key]));
+    }
+    try { history.replaceState(null, '', `#look=${state.opt}&screen=${state.dev}&show=${state.view}`); } catch (e) { /* file:// */ }
+    const d = DEVS[state.dev];
+    const shown = state.view === 'grid' ? OPTS : OPTS.filter((o) => o.id === state.opt);
+    $('frames').innerHTML = shown
+      .map((o) => `<figure class="shot" data-w="${d.w}" data-h="${d.h}">${caption(o, d)}<div class="fit">${frame(state.dev, o.id)}</div></figure>`)
+      .join('');
+    for (const n of document.querySelectorAll('.note')) n.classList.toggle('on', state.view === 'one' && n.dataset.note === state.opt);
+    const rows = state.view === 'grid' ? OPTS : OPTS.filter((o) => o.id === state.opt);
+    $('closeup').innerHTML = rows
+      .map((o) => `<div class="parts-row"><h3><span class="tag-opt ${o.id === 'cur' ? 'cur' : ''}">${o.id === 'cur' ? 'Now' : o.key}</span>${o.name}</h3>${parts(o.id)}</div>`)
+      .join('');
+    layout();
+  }
+
+  function layout() {
+    const box = $('frames');
+    const avail = box.parentElement.clientWidth;
+    const d = DEVS[state.dev];
+    const figs = [...box.querySelectorAll('figure.shot')];
+    let cols = 1;
+    if (state.view === 'grid') {
+      if (state.dev === 'phone') cols = avail >= 980 ? 4 : avail >= 420 ? 2 : 1;
+      else cols = avail >= 900 ? 2 : 1;
+    }
+    const gap = 18;
+    const cellW = (avail - gap * (cols - 1)) / cols;
+    const barH = document.querySelector('.bar').offsetHeight;
+    const maxH = state.view === 'one' ? Math.max(320, window.innerHeight - barH - 64) : Infinity;
+    const s = Math.min(1, cellW / d.w, maxH / d.h);
+    box.style.gridTemplateColumns = `repeat(${cols}, ${Math.floor(d.w * s)}px)`;
+    for (const f of figs) {
+      const fit = f.querySelector('.fit');
+      fit.style.width = `${Math.floor(d.w * s)}px`;
+      fit.style.height = `${Math.floor(d.h * s)}px`;
+      f.querySelector('.stage').style.transform = `scale(${s})`;
+      f.querySelector('.pct').textContent = s < 0.995 ? `, shown at ${Math.round(s * 100)}%` : ', full size';
+    }
+  }
+
+  window.addEventListener('resize', layout);
+  window.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const i = OPTS.findIndex((o) => o.id === state.opt);
+    if (e.key >= '1' && e.key <= '4') state.opt = OPTS[Number(e.key) - 1].id;
+    else if (e.key === 'ArrowRight') state.opt = OPTS[(i + 1) % OPTS.length].id;
+    else if (e.key === 'ArrowLeft') state.opt = OPTS[(i + OPTS.length - 1) % OPTS.length].id;
+    else if (e.key === 's' || e.key === 'S') state.view = state.view === 'grid' ? 'one' : 'grid';
+    else return;
+    // Arrows while a page button has focus would otherwise scroll as well.
+    e.preventDefault();
+    if (state.view === 'grid' && /^[1-4]$|Arrow/.test(e.key)) state.view = 'one';
+    render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
