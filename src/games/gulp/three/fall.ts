@@ -1,45 +1,34 @@
 /**
  * How a swallowed thing moves as it falls into a hole, worked out apart from
  * the meshes so it can be checked without a renderer. A hole's mouth cuts the
- * ground away only inside its circle, and its throat narrows going down (see
- * holeView.ts), so whatever is under the street outside the circle, or
- * outside the throat's wall, is hidden. A thing much wider than the mouth
- * would lose its corners that way as it tipped in. So a falling thing tips
- * over the rim, never past it, then slides toward the middle and shrinks as
- * it drops, just enough that every part of it under the street stays inside
- * the throat at the depth it has reached, and dwindles away at the bottom.
- * A small thing already fits and falls as before. A swallowed ship's
- * containers spill off and fall by the same rule (`spillPose`).
+ * ground away only inside its circle, and its throat widens a little just
+ * under the rim and goes straight down from there (see holeView.ts), so
+ * whatever is under the street outside the circle, or past the throat's
+ * wall, is hidden. A falling thing tips over the rim, never past it, then
+ * slips straight down the throat at its own size, sliding over to where none
+ * of it is cut off, and drops through the throat's dark floor out of sight. A swallowed ship's containers spill off and fall
+ * by the same rule (`spillPose`).
  *
  * Positions here are measured from the hole's middle, at the level of the
  * street the thing stood on, so the fall follows a moving hole.
  */
 import * as THREE from 'three';
 
-/** How deep the throat goes below the rim, in mouth radii: holeView.ts draws its funnel this deep. */
+/** How deep the throat goes below the rim, in mouth radii: holeView.ts draws it this deep. */
 export const THROAT_DEPTH = 2.6;
-/** The throat narrows to this share of the mouth at its floor. */
-const THROAT_FLOOR = 0.42;
-
 /**
- * The throat's radius at `depth` below the rim, both in mouth radii: the
- * shape holeView.ts turns its funnel from (its PIT_PROFILE), 1 at the rim
- * and narrowing quickly, then slowly, to its floor.
+ * Just under the rim the throat widens to this share of the mouth, over
+ * `THROAT_LIP` mouth radii, and goes straight down from there: room for
+ * anything a mouth can swallow, at any turn, without it touching the wall.
  */
+const THROAT_WIDE = 1.2;
+const THROAT_LIP = 0.12;
+
+/** The throat's radius at `depth` below the rim, both in mouth radii: the shape holeView.ts turns its throat from. */
 export function throatRadius(depth: number): number {
   if (depth <= 0) return 1;
-  if (depth >= THROAT_DEPTH) return THROAT_FLOOR;
-  const t = Math.pow(depth / THROAT_DEPTH, 1 / 1.15);
-  return THROAT_FLOOR + (1 - THROAT_FLOOR) * Math.pow(1 - t, 2.4);
-}
-
-/** The throat's radius looked up rather than worked out: it is asked for thousands of times a frame. */
-const LUT_STEPS = 128;
-const THROAT_LUT = Float32Array.from({ length: LUT_STEPS + 2 }, (_, i) => throatRadius((i / LUT_STEPS) * THROAT_DEPTH));
-function throatAt(depth: number): number {
-  const f = (Math.min(Math.max(depth, 0), THROAT_DEPTH) / THROAT_DEPTH) * LUT_STEPS;
-  const i = Math.floor(f);
-  return THROAT_LUT[i] + (THROAT_LUT[i + 1] - THROAT_LUT[i]) * (f - i);
+  const t = Math.min(1, depth / THROAT_LIP);
+  return 1 + (THROAT_WIDE - 1) * t * (2 - t);
 }
 
 /** The share of the throat a falling thing may fill: the wall bulges in a little between the points checked. */
@@ -48,25 +37,22 @@ const MARGIN = 0.95;
  * Just under the street, a thing may still reach past the rim a little, as
  * if scraping over it: up to this many mouth radii more at the street, none
  * by `SCRAPE_DEPTH` down. Without it, a corner that dips a hair under the
- * street outside the mouth would make the whole thing jump smaller at once.
+ * street outside the mouth would make the whole thing jump in at once.
  */
 const SCRAPE = 0.5;
 const SCRAPE_DEPTH = 0.08;
-/** The point a thing hangs from stays this far inside the room it has, leaving space round it for the rest of it. */
-const HOLD = 0.85;
 
 /** How far from the hole's middle a falling thing may reach at `depth` under the street, in world units, for a mouth of radius `r`. */
 function room(depth: number, r: number): number {
   const d = depth / r;
-  return r * (MARGIN * throatAt(d) + SCRAPE * Math.max(0, 1 - d / SCRAPE_DEPTH));
+  return r * (MARGIN * throatRadius(d) + SCRAPE * Math.max(0, 1 - d / SCRAPE_DEPTH));
 }
 
-/** Pull a point under the street in toward the hole's middle until it is inside the throat, with room to spare. */
-function holdInside(p: THREE.Vector3, r: number): void {
+/** Pull a point under the street in toward the hole's middle until everything within `pad` of it is inside the throat. */
+function holdInside(p: THREE.Vector3, r: number, pad: number): void {
   const depth = -p.y;
   if (depth <= 0) return;
-  // Below the floor nothing shows; keep to the floor's room so it never jumps back out.
-  const lim = HOLD * room(Math.min(depth, THROAT_DEPTH * r * 0.999), r);
+  const lim = Math.max(0, room(depth, r) - pad);
   const d = Math.hypot(p.x, p.z);
   if (d > lim) {
     p.x *= lim / d;
@@ -81,21 +67,21 @@ const EDGES = [0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3, 4, 6, 5, 7, 0, 4, 1, 5, 2, 6,
 /** Points checked along each edge where it is under the street. */
 const SAMPLES = 5;
 
-/** Each corner's offset from the point the thing shrinks about, as drawn at full size: eight (x, y, z). */
+/** Each corner's offset from the line the thing tips over, as it is turned now: eight (x, y, z). */
 const offsets = new Float64Array(24);
 
-/** Whether a thing drawn at `s` of its size, shrinking about `anchor`, is wholly inside the throat where it is under the street. */
-function fits(anchor: THREE.Vector3, s: number, r: number): boolean {
+/** Whether a thing whose tipping line is at `anchor` is wholly inside the throat where it is under the street. */
+function fits(anchor: THREE.Vector3, r: number): boolean {
   const floor = THROAT_DEPTH * r;
   for (let e = 0; e < EDGES.length; e += 2) {
     const a = EDGES[e] * 3;
     const b = EDGES[e + 1] * 3;
-    const ax = anchor.x + s * offsets[a];
-    const az = anchor.z + s * offsets[a + 2];
-    const da = -(anchor.y + s * offsets[a + 1]);
-    const bx = anchor.x + s * offsets[b];
-    const bz = anchor.z + s * offsets[b + 2];
-    const db = -(anchor.y + s * offsets[b + 1]);
+    const ax = anchor.x + offsets[a];
+    const az = anchor.z + offsets[a + 2];
+    const da = -(anchor.y + offsets[a + 1]);
+    const bx = anchor.x + offsets[b];
+    const bz = anchor.z + offsets[b + 2];
+    const db = -(anchor.y + offsets[b + 1]);
     // Above the street, or below the throat's floor: nothing there is cut off.
     if ((da <= 0 && db <= 0) || (da >= floor && db >= floor)) continue;
     // Only the stretch of the edge between the street and the floor counts.
@@ -109,8 +95,7 @@ function fits(anchor: THREE.Vector3, s: number, r: number): boolean {
     }
     for (let i = 0; i < SAMPLES; i++) {
       const u = u0 + ((u1 - u0) * i) / (SAMPLES - 1);
-      // The stretch just above the floor counts too: the throat is narrowest there.
-      const depth = Math.min(da + (db - da) * u, floor * 0.999);
+      const depth = da + (db - da) * u;
       if (depth <= 0) continue;
       const x = ax + (bx - ax) * u;
       const z = az + (bz - az) * u;
@@ -121,47 +106,17 @@ function fits(anchor: THREE.Vector3, s: number, r: number): boolean {
   return true;
 }
 
-/** The largest size, no more than `most`, at which the corners in `offsets` fit inside the throat, shrinking about `anchor`. */
-function fitScale(anchor: THREE.Vector3, most: number, r: number): number {
-  if (fits(anchor, most, r)) return most;
-  // Step down to a size that fits, then narrow in on the largest one.
-  let hi = most;
-  let lo = most * 0.8;
-  while (lo > 0.02 && !fits(anchor, lo, r)) {
-    hi = lo;
-    lo *= 0.8;
-  }
-  if (lo <= 0.02) return lo;
-  for (let i = 0; i < 6; i++) {
-    const mid = (lo + hi) / 2;
-    if (fits(anchor, mid, r)) lo = mid;
-    else hi = mid;
-  }
-  return lo;
-}
-
-/** Share of the fall spent tipping over the rim before it drops free. */
+/** Share of the fall spent tipping over the rim before it drops free, for a thing that topples right over. */
 const TIP = 0.4;
 /** How far it has tipped (radians) when it goes over, and when it is gone. */
 const TIPPED = 1.05;
 const TUMBLED = 1.45;
 /**
  * The furthest out a thing tips over, as a share of the mouth: just inside
- * the rim, where the throat's wall curves in under the street, so the edge
- * it tips over clears the wall as it goes.
+ * the rim, so the part of it outside lifts up off the street instead of
+ * sinking through it.
  */
 const RIM_PIVOT = 0.9;
-/**
- * Moments of the fall looked at when it starts (every `STEP`), to see how
- * small it must be by each: it eases down to each size over the `EASE_IN`
- * before the moment just ahead of it, instead of shrinking all at once when a
- * corner first dips under the street.
- */
-const STEP = 0.05;
-const LOOK_AHEAD = Array.from({ length: 15 }, (_, i) => (i + 1) * STEP);
-const EASE_IN = 0.25;
-/** The last share of the fall, in which it dwindles away into the dark, so it is not just gone. */
-const DWINDLE = 0.3;
 
 /**
  * How far over a thing tips, as a share of the full tumble: a thing no taller
@@ -173,13 +128,32 @@ const DWINDLE = 0.3;
 const tiltShare = (height: number, r: number) => Math.min(1, Math.asin(Math.min(1, (r * 0.9) / height)) / TUMBLED);
 /**
  * A thing much longer than the mouth is wide tips in only so far too: its
- * inner end dips no deeper than this share of the mouth, where the throat is
- * still wide, and then it sinks, rather than plunging its far end to the
- * narrow bottom while the rest is still on the street.
+ * inner end dips no deeper than this share of the mouth, and then it sinks,
+ * rather than plunging its far end down while the rest is still on the street.
  */
 const PLUNGE = 0.6;
 
-/** A swallowed thing's fall: set once by `startFall`, its size (`s`) kept up by `fallPose`. */
+/**
+ * How far over a thing may tip and still fit down the throat, as a share of
+ * the full tumble. Tipped by `a`, it spans `2 half cos a + height sin a`
+ * along the line to the middle, and that must fit across the throat beside
+ * its width (`across`, half of it). A thing that only just fits the mouth
+ * hardly tips at all: it slips straight down.
+ */
+function roomToTip(half: number, across: number, height: number, r: number): number {
+  const wall = MARGIN * THROAT_WIDE * r;
+  if (across >= wall) return 0;
+  const span = 2 * Math.sqrt(wall * wall - across * across);
+  let share = 0;
+  for (let i = 1; i <= 40; i++) {
+    const a = (i / 40) * TUMBLED;
+    if (2 * half * Math.cos(a) + height * Math.sin(a) > span) break;
+    share = i / 40;
+  }
+  return share;
+}
+
+/** A swallowed thing's fall: set once by `startFall`, followed by `fallPose`. */
 export interface Fall {
   /** Where the middle of its footprint stood, from the hole's middle. */
   offX: number;
@@ -191,23 +165,29 @@ export interface Fall {
   rot: number;
   /** How far out from the middle of its footprint it tips over: its own outer edge, or the line just inside the rim if that is nearer. */
   pd: number;
-  /** Half its footprint along the line to the middle: as it drops it slides in this far, so any part that stood past the rim comes in over the mouth. */
+  /** Half its footprint along the line to the middle: as it drops it slides in this far (no further than the hole's middle), so any part that stood past the rim comes in over the mouth. */
   half: number;
-  /** How far over it tips, as a share of the full tumble (see `tiltShare` and `PLUNGE`). */
+  /** How far over it tips, as a share of the full tumble (see `tiltShare`, `PLUNGE` and `roomToTip`). */
   tilt: number;
-  /** How far it sinks by the end. */
+  /** The share of the fall spent tipping: less for a thing that only leans. */
+  tipEnd: number;
+  /** How far it sinks by the end, at the least. */
   sink: number;
-  /** How small it must be by each of the `LOOK_AHEAD` moments. */
-  needs: number[];
-  /** How big it is drawn now: it shrinks to fit the throat, and never grows back. */
-  s: number;
+  /** Its highest point above the line it tips over, once tipped as far as it goes: it sinks until that is under the throat's floor. */
+  top: number;
+  /**
+   * How far through its sinking it is (0..1), and how far through the drop
+   * it was when last drawn: it sinks with the drop, but not while it still
+   * rests on the rim, and catches up after.
+   */
+  sunk: number;
+  dropped: number;
 }
 
-/** Where a falling thing is drawn: its model's origin from the hole's middle, its turn, and its size (the same every way). */
+/** Where a falling thing is drawn: its model's origin from the hole's middle, and its turn. */
 export interface FallPose {
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;
-  scale: number;
 }
 
 const anchor = new THREE.Vector3();
@@ -218,30 +198,75 @@ const yaw = new THREE.Quaternion();
 const turn = new THREE.Quaternion();
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
+/** Toward the hole's middle along the ground, from where a thing stood (a thing right over the middle tips away from the camera). */
+function inward(f: Fall): { x: number; z: number } {
+  const dist = Math.hypot(f.offX, f.offZ);
+  return dist > 1e-6 ? { x: -f.offX / dist, z: -f.offZ / dist } : { x: 0, z: -1 };
+}
+
+/** Turn a thing over by `angle` toward the middle: sets `turn`, `pivot` (the line it tips over, in its own frame) and `offsets`. */
+function tipOver(f: Fall, angle: number): void {
+  const into = inward(f);
+  axis.set(into.z, 0, -into.x);
+  yaw.setFromAxisAngle(Y_AXIS, f.rot);
+  turn.setFromAxisAngle(axis, angle).multiply(yaw);
+  pivot.set(-into.x * f.pd, 0, -into.z * f.pd).applyQuaternion(yaw.invert());
+  for (let c = 0; c < 24; c += 3) {
+    corner.set(CORNERS[c] * f.hw - pivot.x, CORNERS[c + 1] * f.height, CORNERS[c + 2] * f.hd - pivot.z).applyQuaternion(turn);
+    offsets[c] = corner.x;
+    offsets[c + 1] = corner.y;
+    offsets[c + 2] = corner.z;
+  }
+}
+
 /**
  * Start the fall of a thing whose footprint (`w` × `d`, turned `rot`) stood
  * at (`offX`, `offZ`) from the middle of a mouth of radius `r`, `height` tall.
  */
 export function startFall(offX: number, offZ: number, w: number, d: number, height: number, rot: number, r: number): Fall {
   const dist = Math.hypot(offX, offZ);
-  // Half its footprint along the line from the hole's middle to it.
+  // Half its footprint along the line from the hole's middle to it, and across it.
   const along = Math.atan2(offX, offZ) - rot;
   const half = Math.abs(Math.sin(along)) * (w / 2) + Math.abs(Math.cos(along)) * (d / 2);
+  const across = Math.abs(Math.cos(along)) * (w / 2) + Math.abs(Math.sin(along)) * (d / 2);
   // It tips over its own outer edge, unless that stands past the rim: then
   // over a line just inside the rim (never inward of its own middle).
   const pd = Math.max(0, Math.min(dist + half, RIM_PIVOT * r) - dist);
-  const tilt = Math.min(tiltShare(height, r), Math.asin(Math.min(1, (PLUNGE * r) / Math.max(1e-6, pd + half))) / TUMBLED);
-  const f: Fall = { offX, offZ, hw: w / 2, hd: d / 2, height, rot, pd, half, tilt, sink: height * 1.4 + 3, needs: [], s: 1 };
-  // Look ahead: how small must it be by each moment?
-  const pose: FallPose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: 1 };
-  const needs = LOOK_AHEAD.map((k) => {
-    f.s = 1;
-    fallPose(f, k, r, pose);
-    return f.s;
-  });
-  f.needs = needs;
-  f.s = 1;
+  const tilt = Math.min(
+    tiltShare(height, r),
+    Math.asin(Math.min(1, (PLUNGE * r) / Math.max(1e-6, pd + half))) / TUMBLED,
+    roomToTip(half, across, height, r),
+  );
+  const tipEnd = TIP * Math.min(1, Math.sqrt(tilt / 0.25));
+  const f: Fall = { offX, offZ, hw: w / 2, hd: d / 2, height, rot, pd, half, tilt, tipEnd, sink: height * 1.4 + 3, top: 0, sunk: 0, dropped: 0 };
+  tipOver(f, TUMBLED * tilt);
+  for (let c = 1; c < 24; c += 3) f.top = Math.max(f.top, offsets[c]);
   return f;
+}
+
+/** Whether a thing fits with its tipping line `reach` out from the hole's middle (along `x`, `z`) at height `y`. */
+function fitsAt(x: number, z: number, reach: number, y: number, r: number): boolean {
+  anchor.set(x * reach, y, z * reach);
+  return fits(anchor, r);
+}
+
+/**
+ * How far out from the hole's middle a thing's tipping line should be (at
+ * height `y`, along `x`, `z`): `want` if all of it is inside the throat
+ * there, or else as near `want` as it can be on the way to `best`, where it
+ * fits if it fits anywhere; `best` if even there it does not.
+ */
+function fitReach(x: number, z: number, y: number, want: number, best: number, r: number): number {
+  if (fitsAt(x, z, want, y, r)) return want;
+  if (!fitsAt(x, z, best, y, r)) return best;
+  let ok = best;
+  let not = want;
+  for (let i = 0; i < 8; i++) {
+    const mid = (ok + not) / 2;
+    if (fitsAt(x, z, mid, y, r)) ok = mid;
+    else not = mid;
+  }
+  return ok;
 }
 
 /**
@@ -249,50 +274,64 @@ export function startFall(offX: number, offZ: number, w: number, d: number, heig
  * a mouth that is now `r` across. It tips over the edge of its footprint
  * furthest from the hole's middle, or nearer in when that edge stands past
  * the rim (the part outside lifts up), leaning in faster and faster like
- * anything overbalancing; then it drops, still turning over, sliding down
- * the throat toward the middle. It keeps its heading: no spinning. All the
- * while it is drawn just small enough to fit the throat, and it dwindles
- * away at the end.
+ * anything overbalancing; then it drops, still turning over, slipping down
+ * the throat and sliding over to where none of it is cut off by the wall.
+ * It keeps its heading and its size, and by the end it is all below the
+ * throat's floor.
  */
 export function fallPose(f: Fall, k: number, r: number, out: FallPose): void {
-  const dist = Math.hypot(f.offX, f.offZ);
-  // Toward the middle along the ground (a thing right over the middle tips away from the camera).
-  const inX = dist > 1e-6 ? -f.offX / dist : 0;
-  const inZ = dist > 1e-6 ? -f.offZ / dist : -1;
+  const into = inward(f);
   // Tipping (accelerating), then over and dropping (under gravity).
-  const tip = Math.min(1, k / TIP);
-  const drop = Math.max(0, (k - TIP) / (1 - TIP));
-  const angle = (TIPPED * tip * tip + (TUMBLED - TIPPED) * drop) * f.tilt;
-  axis.set(inZ, 0, -inX);
-  yaw.setFromAxisAngle(Y_AXIS, f.rot);
-  turn.setFromAxisAngle(axis, angle).multiply(yaw);
-  // The line it tips over: sliding in and sinking as it drops, and kept inside the throat.
-  const reach = Math.max(0, dist + f.pd - drop * f.half);
-  anchor.set(-inX * reach, -drop * drop * f.sink, -inZ * reach);
-  holdInside(anchor, r);
-  // That line on the thing itself, in its own frame: across its base.
-  pivot.set(-inX * f.pd, 0, -inZ * f.pd).applyQuaternion(yaw.invert());
+  const tip = f.tipEnd > 0 ? Math.min(1, k / f.tipEnd) : 1;
+  const drop = Math.max(0, (k - f.tipEnd) / (1 - f.tipEnd));
+  tipOver(f, (TIPPED * tip * tip + (TUMBLED - TIPPED) * drop) * f.tilt);
+  // Its middle slides in as it drops, never past the hole's middle.
+  const planned = Math.max(0, Math.hypot(f.offX, f.offZ) - drop * f.half) + f.pd;
+  // How far it reaches out and in from its tipping line as it leans now, and to the side.
+  let lo = Infinity;
+  let hi = -Infinity;
+  let side = 0;
   for (let c = 0; c < 24; c += 3) {
-    corner.set(CORNERS[c] * f.hw - pivot.x, CORNERS[c + 1] * f.height, CORNERS[c + 2] * f.hd - pivot.z).applyQuaternion(turn);
-    offsets[c] = corner.x;
-    offsets[c + 1] = corner.y;
-    offsets[c + 2] = corner.z;
+    const away = -(into.x * offsets[c] + into.z * offsets[c + 2]);
+    lo = Math.min(lo, away);
+    hi = Math.max(hi, away);
+    side = Math.max(side, Math.abs(into.z * offsets[c] - into.x * offsets[c + 2]));
   }
-  // Easing down to the sizes it will need, in time, and no bigger than the
-  // throat has room for now.
-  let most = f.s;
-  for (let i = 0; i < f.needs.length; i++) {
-    const by = Math.max(LOOK_AHEAD[i] - STEP, STEP);
-    const from = Math.max(0, by - EASE_IN);
-    const t = Math.min(1, Math.max(0, (k - from) / (by - from)));
-    most = Math.min(most, 1 - (1 - f.needs[i]) * t * t * (3 - 2 * t));
+  // The nearest place to that where all of it is inside the throat's wall,
+  // or right over the middle if it is too big for that. It eases over to
+  // there as it drops, so it is there before it is deep: a tall thing
+  // leaning in has its foot kicked back out, as anything toppling does.
+  const wall = MARGIN * THROAT_WIDE * r;
+  const span = side < wall ? Math.sqrt(wall * wall - side * side) : 0;
+  const centred = -(lo + hi) / 2;
+  const target = hi - lo <= 2 * span ? Math.min(Math.max(planned, -span - lo), span - hi) : centred;
+  const ease = 1 - (1 - drop) * (1 - drop);
+  const want = planned + (target - planned) * ease;
+  // Down under gravity, deep enough by the end that the top of it is under
+  // the floor; but a thing still resting on the street past the rim sinks
+  // only as far as it fits, while it slides off.
+  const deep = Math.max(0, THROAT_DEPTH * r * 1.02 + f.top - f.sink);
+  const depthAt = (u: number) => -(u * u * f.sink + u * u * u * u * deep);
+  const free = drop >= 1 ? 1 : f.sunk + ((1 - f.sunk) * Math.max(0, drop - f.dropped)) / (1 - f.dropped);
+  f.dropped = drop;
+  let sunk = free;
+  if (drop < 1 && !fitsAt(-into.x, -into.z, want, depthAt(free), r)) {
+    sunk = f.sunk;
+    if (fitsAt(-into.x, -into.z, want, depthAt(sunk), r)) {
+      let not = free;
+      for (let i = 0; i < 8; i++) {
+        const mid = (sunk + not) / 2;
+        if (fitsAt(-into.x, -into.z, want, depthAt(mid), r)) sunk = mid;
+        else not = mid;
+      }
+    }
   }
-  f.s = fitScale(anchor, most, r);
-  const end = Math.max(0, (k - (1 - DWINDLE)) / DWINDLE);
-  const s = f.s * (1 - end * end * (3 - 2 * end));
-  out.scale = s;
+  f.sunk = sunk;
+  const y = depthAt(sunk);
+  const reach = fitReach(-into.x, -into.z, y, want, centred, r);
+  anchor.set(-into.x * reach, y, -into.z * reach);
   out.quaternion.copy(turn);
-  out.position.copy(pivot).applyQuaternion(turn).multiplyScalar(-s).add(anchor);
+  out.position.copy(pivot).applyQuaternion(turn).negate().add(anchor);
 }
 
 /** A container spilling off a swallowed ship, once it has slid off the deck: see `startSpill`. */
@@ -317,13 +356,11 @@ export interface Spill {
   hw: number;
   hh: number;
   hd: number;
-  /** How big it is drawn now (see `Fall.s`). */
-  s: number;
 }
 
 /** A spill not started yet, for a box `size` big: made when the ship goes in, filled in by `startSpill`. */
 export function emptySpill(size: { w: number; h: number; d: number }): Spill {
-  const still = { x0: 0, y0: 0, z0: 0, tx: 0, tz: 0, vy: 0, g: 0, rollX: 1, rollZ: 0, roll: 0, spin: 0, s: 1 };
+  const still = { x0: 0, y0: 0, z0: 0, tx: 0, tz: 0, vy: 0, g: 0, rollX: 1, rollZ: 0, roll: 0, spin: 0 };
   return { ...still, q0: new THREE.Quaternion(), hw: size.w / 2, hh: size.h / 2, hd: size.d / 2 };
 }
 
@@ -339,7 +376,7 @@ export function noise(seed: number, i: number): number {
 
 /**
  * Start a container's spill from where it stands now (`x`, `y`, `z` from
- * the hole's middle, turned `q`, at `s` of its size), sliding off the deck
+ * the hole's middle, turned `q`), sliding off the deck
  * to the side `sideX`, `sideZ` (a unit step, across the ship) and into a
  * mouth of radius `r`. `seed` makes each one fly a little differently.
  */
@@ -349,7 +386,6 @@ export function startSpill(
   y: number,
   z: number,
   q: THREE.Quaternion,
-  s: number,
   sideX: number,
   sideZ: number,
   r: number,
@@ -367,9 +403,9 @@ export function startSpill(
     tx *= most / far;
     tz *= most / far;
   }
-  // A hop off the deck as high as `hop`, then down deep into the throat.
+  // A hop off the deck as high as `hop`, then down through the throat's floor.
   const hop = (0.07 + 0.1 * noise(seed, 3)) * r;
-  const depth = (1.1 + 0.5 * noise(seed, 4)) * r;
+  const depth = (THROAT_DEPTH * 1.02 + 0.3 * noise(seed, 4)) * r + Math.hypot(b.hw, b.hh, b.hd);
   b.vy = 2 * hop + 2 * Math.sqrt(hop * hop + hop * (Math.max(0, y) + depth));
   b.g = y + b.vy + depth;
   // It rolls over the way it travels.
@@ -384,33 +420,23 @@ export function startSpill(
   b.q0.copy(q);
   b.tx = tx;
   b.tz = tz;
-  b.s = s;
 }
 
 /**
  * Where a spilling container is drawn `u` (0..1) of the way through its
  * spill into a mouth now `r` across: it hops off the deck, slides out to the
  * side and in toward the middle, tumbling, then drops down the throat, kept
- * just small enough to fit it, and dwindles away at the end.
+ * clear of its wall, and through its floor out of sight.
  */
 export function spillPose(b: Spill, u: number, r: number, out: FallPose): void {
   // Across quickly, down under gravity: it is over the mouth before it is under the street.
   const across = 1 - Math.pow(1 - u, 3);
   anchor.set(b.x0 + (b.tx - b.x0) * across, b.y0 + b.vy * u - b.g * u * u, b.z0 + (b.tz - b.z0) * across);
-  holdInside(anchor, r);
+  holdInside(anchor, r, Math.hypot(b.hw, b.hh, b.hd));
   axis.set(b.rollX, 0, b.rollZ);
   turn.setFromAxisAngle(axis, b.roll * Math.pow(u, 1.3));
   yaw.setFromAxisAngle(Y_AXIS, b.spin * u);
   turn.multiply(yaw).multiply(b.q0);
-  for (let c = 0; c < 24; c += 3) {
-    corner.set(CORNERS[c] * b.hw, (CORNERS[c + 1] * 2 - 1) * b.hh, CORNERS[c + 2] * b.hd).applyQuaternion(turn);
-    offsets[c] = corner.x;
-    offsets[c + 1] = corner.y;
-    offsets[c + 2] = corner.z;
-  }
-  b.s = fitScale(anchor, b.s, r);
-  const end = Math.max(0, (u - (1 - DWINDLE)) / DWINDLE);
-  out.scale = b.s * (1 - end * end * (3 - 2 * end));
   out.quaternion.copy(turn);
   out.position.copy(anchor);
 }

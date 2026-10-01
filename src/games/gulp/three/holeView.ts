@@ -229,7 +229,7 @@ export class HoleViews {
       return m;
     };
     // A real hole: the mouth cuts the ground away (see `PIT_ORDER`) and a
-    // funnel of throat goes down into the dark below it. Things fall into it.
+    // throat goes down into the dark below it. Things fall into it.
     const disc = new THREE.Group();
     const mask = new THREE.Mesh(this.maskGeo, this.maskMat);
     mask.renderOrder = PIT_ORDER;

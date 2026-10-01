@@ -99,8 +99,6 @@ interface Faller {
   /** Where the hole's middle was last seen. */
   cx: number;
   cz: number;
-  /** A building still going up falls as tall as it got. */
-  rise: number;
   /** A see-through copy has its own material to free. */
   ownMaterial: boolean;
   /** The level it stood at (a block stands a kerb above the road; a ship floats below the quay). */
@@ -178,9 +176,9 @@ export class PropView {
   private tiltQ = new THREE.Quaternion();
   private upright = new THREE.Euler();
   /** Where a falling thing or container is drawn this frame (see fall.ts). */
-  private pose: FallPose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: 1 };
+  private pose: FallPose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
   private boxAt = new THREE.Vector3();
-  private boxScale = new THREE.Vector3();
+  private boxScale = new THREE.Vector3(1, 1, 1);
   private boxMatrix = new THREE.Matrix4();
   /** Swallowed ships' containers, spilling. */
   private cargo: Cargo[] = [];
@@ -241,7 +239,7 @@ export class PropView {
     const cx = h?.x ?? p.x;
     const cz = h?.z ?? p.z;
     const fall = startFall(p.x - cx, p.z - cz, info.w, info.d, info.h * p.hScale * riseY, p.rot, r);
-    const faller: Faller = { mesh, hole, t: 0, time: fallTime(p.size), fall, r, cx, cz, rise: riseY, ownMaterial, y0 };
+    const faller: Faller = { mesh, hole, t: 0, time: fallTime(p.size), fall, r, cx, cz, ownMaterial, y0 };
     this.fallers.push(faller);
     if (spills) this.spillCargo(p, faller);
   }
@@ -519,8 +517,8 @@ export class PropView {
    * A swallowed thing tips into its hole and drops out of sight, following
    * the hole if it moves (see `fallPose` in fall.ts for the way it goes).
    * The ground outside the mouth hides whatever is below it, so it seems to
-   * fall into the hole, not through the street; it is kept small enough
-   * that none of it is cut off by the rim or the throat's wall.
+   * fall into the hole, not through the street; it slides in along the
+   * throat's wall when it must, so none of it is cut off.
    */
   private stepFallers(world: World, dt: number): void {
     const pose = this.pose;
@@ -536,7 +534,6 @@ export class PropView {
       fallPose(f.fall, Math.min(1, f.t), f.r, pose);
       f.mesh.position.set(f.cx + pose.position.x, f.y0 + pose.position.y, f.cz + pose.position.z);
       f.mesh.quaternion.copy(pose.quaternion);
-      f.mesh.scale.set(pose.scale, pose.scale * f.rise, pose.scale);
       if (f.t >= 1) {
         this.scene.remove(f.mesh);
         if (f.ownMaterial) (f.mesh.material as THREE.Material).dispose();
@@ -607,8 +604,8 @@ export class PropView {
   }
 
   /**
-   * Each container rides on its ship's deck (tipping and shrinking with
-   * it) until its turn comes, then slides off the side, hops, tumbles and
+   * Each container rides on its ship's deck (tipping with it) until its
+   * turn comes, then slides off the side, hops, tumbles and
    * drops into the mouth on its own, kept inside the throat like the ship
    * (see `spillPose`).
    */
@@ -635,7 +632,7 @@ export class PropView {
         }
         this.boxAt.copy(b.local).applyMatrix4(ship.mesh.matrix);
         if (ship.t < b.leaveAt) {
-          // Riding on the deck, tipping and shrinking with the ship.
+          // Riding on the deck, tipping with the ship.
           this.boxMatrix.compose(this.boxAt, ship.mesh.quaternion, ship.mesh.scale);
           b.mesh.setMatrixAt(b.index, this.boxMatrix);
           continue;
@@ -648,7 +645,6 @@ export class PropView {
           this.boxAt.y - c.y0,
           this.boxAt.z - c.cz,
           ship.mesh.quaternion,
-          ship.mesh.scale.x,
           Math.cos(rot) * b.side,
           -Math.sin(rot) * b.side,
           c.r,
@@ -664,7 +660,7 @@ export class PropView {
         continue;
       }
       this.boxAt.set(c.cx + pose.position.x, c.y0 + pose.position.y, c.cz + pose.position.z);
-      this.boxMatrix.compose(this.boxAt, pose.quaternion, this.boxScale.setScalar(pose.scale));
+      this.boxMatrix.compose(this.boxAt, pose.quaternion, this.boxScale);
       b.mesh.setMatrixAt(b.index, this.boxMatrix);
     }
     for (const m of c.meshes) m.instanceMatrix.needsUpdate = true;
