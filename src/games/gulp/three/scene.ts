@@ -240,9 +240,10 @@ export class GulpScene {
     this.effects.step(dt);
 
     this.rig.update(world, me, this.time, dt);
-    // From high above (a giant's camera, about level 15) people, street lamps
-    // and street clutter are specks: they go, and come back when the camera
-    // comes down again (a little lower, so they do not flicker on the line).
+    // From high above (a giant's camera, about level 15) people, street lamps,
+    // street clutter and the patches under cars are specks: they go, and come
+    // back when the camera comes down again (a little lower, so they do not
+    // flicker on the line).
     const dist = this.rig.distance();
     const far = this.tinyHidden ? dist > TINY_BACK : dist > TINY_FAR;
     if (far !== this.tinyHidden) {
