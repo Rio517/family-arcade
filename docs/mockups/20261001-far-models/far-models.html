@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Simpler buildings from high up</title>
+<style>
+  :root {
+    --bg: #06090f; --surface: #111a2e; --border: #2d3a55; --text: #f1f5f9; --muted: #a7b4c6;
+    --today: #ffd76a; --simpler: #34e0c8; --line: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+    font-size: 16px; line-height: 1.5; padding: 32px 24px 64px;
+  }
+  main { max-width: 1400px; margin: 0 auto; display: grid; gap: 44px; }
+  h1 { font-size: 30px; margin: 0 0 8px; }
+  h2 { font-size: 22px; margin: 0 0 6px; }
+  h3 { font-size: 17px; margin: 0; }
+  p { margin: 0; }
+  .lede { color: var(--muted); max-width: 78ch; }
+  .key { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 14px; font-weight: 700; }
+  .key span::before { content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; }
+  .key .t::before { background: var(--today); }
+  .key .s::before { background: var(--simpler); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+  .stat b { display: block; font-size: 24px; }
+  .stat span { color: var(--muted); font-size: 14px; }
+  section { display: grid; gap: 16px; }
+  section > p { color: var(--muted); max-width: 85ch; }
+  .spots { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 26px; }
+
+  /* A before/after: the simpler picture over today's, cut at the line. Both sit on one stage that zooms and pans. */
+  figure { margin: 0; display: grid; gap: 8px; }
+  .cmp {
+    position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: #000;
+    touch-action: pan-y; cursor: ew-resize; user-select: none; -webkit-user-select: none;
+  }
+  .cmp.zoomed { cursor: grab; touch-action: none; }
+  .cmp.zoomed.dragging { cursor: grabbing; }
+  .stage { position: relative; transform-origin: 0 0; will-change: transform; }
+  .stage img { display: block; width: 100%; height: auto; -webkit-user-drag: none; }
+  .stage .top { position: absolute; inset: 0; }
+  .divider { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--line); box-shadow: 0 0 0 1px rgba(0,0,0,.45); pointer-events: none; }
+  .tag { position: absolute; top: 10px; padding: 3px 10px; border-radius: 999px; font-size: 14px; font-weight: 800; color: #0b1220; pointer-events: none; }
+  .tag.t { left: 10px; background: var(--today); }
+  .tag.s { right: 10px; background: var(--simpler); }
+  .hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); padding: 3px 12px; border-radius: 999px; background: rgba(6,9,15,.8); font-size: 14px; color: var(--text); pointer-events: none; opacity: 0; transition: opacity .2s; }
+  .cmp.zoomed .hint { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .hint { transition: none; } }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; font-size: 14px; color: var(--muted); }
+  .controls input[type=range] { flex: 1 1 220px; accent-color: var(--simpler); min-height: 32px; }
+  .controls .group { display: inline-flex; gap: 6px; }
+  .controls button {
+    font: inherit; font-weight: 700; color: var(--text); background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 14px; cursor: pointer; min-height: 36px;
+  }
+  .controls button:hover { border-color: var(--muted); }
+  .controls button[aria-pressed=true] { background: var(--simpler); color: #0b1220; border-color: var(--simpler); }
+  :focus-visible { outline: 3px solid var(--simpler); outline-offset: 2px; }
+  figcaption { font-size: 14px; color: var(--muted); }
+  figcaption a { color: var(--text); }
+
+  .lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 8px; }
+  .card ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+  table { border-collapse: collapse; width: 100%; max-width: 640px; font-size: 15px; }
+  th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .decision { border-left: 4px solid var(--today); padding: 4px 0 4px 14px; }
+  @media (max-width: 640px) {
+    body { padding: 20px 16px 48px; }
+    .spots { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Simpler buildings from high up</h1>
+    <p class="lede">
+      Late in a round, the drawing work sets the frame rate, not the game's own code. From about level 15
+      the camera is high enough that the city could be drawn with plainer copies of its buildings: the same
+      shapes and colours, with fewer facets. Each pair below is the same paused moment drawn twice, at the
+      detail a Retina Mac draws in a 2320×1363 window. Drag the line, or use <b>Today</b> and <b>Simpler</b>
+      to see one at a time. <b>2×</b> and <b>4×</b> zoom in; drag the picture to look around.
+    </p>
+    <div class="key"><span class="t">Today</span><span class="s">Simpler</span></div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><b>About a third</b><span>fewer triangles per frame at levels 15 to 17</span></div>
+    <div class="stat"><b>1.84M → 1.30M</b><span>triangles drawn at level 17 (the main pass)</span></div>
+    <div class="stat"><b>Same cut again</b><span>for the shadow pass, which draws the same models</span></div>
+    <div class="stat"><b>Level 15 and up</b><span>where the swap would happen, back when the camera comes down</span></div>
+  </div>
+
+  <section>
+    <h2>Close-ups</h2>
+    <p>
+      Spots from the two frames below at full detail, shown large. This is where the differences are: round
+      windows and roof skylights get fewer sides (hexagons and octagons), roof rims lose their soft rounded lip,
+      and trees are blockier. In the game these spots are a few hundred pixels across.
+    </p>
+    <div class="spots">
+      <figure data-cmp>
+        <div class="cmp"><div class="stage"><img src="level15-houses-near.webp" alt="Level 15, houses and shops, today" width="1000" height="700" /><img class="top" src="level15-houses-far.webp" alt="Level 15, houses and shops, simpler" width="1000" height="700" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+        <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+        <figcaption>Level 15: houses and shops.</figcaption>
+      </figure>
+      <figure data-cmp>
+        <div class="cmp"><div class="stage"><img src="level15-helipad-near.webp" alt="Level 15, helipad tower, today" width="800" height="650" /><img class="top" src="level15-helipad-far.webp" alt="Level 15, helipad tower, simpler" width="800" height="650" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+        <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+        <figcaption>Level 15: a helipad tower and its neighbours.</figcaption>
+      </figure>
+      <figure data-cmp>
+        <div class="cmp"><div class="stage"><img src="level15-towers-near.webp" alt="Level 15, towers beside the camera, today" width="1000" height="900" /><img class="top" src="level15-towers-far.webp" alt="Level 15, towers beside the camera, simpler" width="1000" height="900" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+        <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+        <figcaption>Level 15: big towers right beside the camera, the closest anything is seen.</figcaption>
+      </figure>
+      <figure data-cmp>
+        <div class="cmp"><div class="stage"><img src="level15-park-near.webp" alt="Level 15, park trees, today" width="1000" height="700" /><img class="top" src="level15-park-far.webp" alt="Level 15, park trees, simpler" width="1000" height="700" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+        <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+        <figcaption>Level 15: the park's trees.</figcaption>
+      </figure>
+      <figure data-cmp>
+        <div class="cmp"><div class="stage"><img src="level17-houses-near.webp" alt="Level 17, a row of houses, today" width="1300" height="500" /><img class="top" src="level17-houses-far.webp" alt="Level 17, a row of houses, simpler" width="1300" height="500" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+        <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+        <figcaption>Level 17: a street of houses.</figcaption>
+      </figure>
+      <figure data-cmp>
+        <div class="cmp"><div class="stage"><img src="level17-helipad-near.webp" alt="Level 17, helipad tower and shops, today" width="800" height="900" /><img class="top" src="level17-helipad-far.webp" alt="Level 17, helipad tower and shops, simpler" width="800" height="900" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+        <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+        <figcaption>Level 17: a helipad tower and shops.</figcaption>
+      </figure>
+      <figure data-cmp>
+        <div class="cmp"><div class="stage"><img src="level17-dome-near.webp" alt="Level 17, domed tower top, today" width="900" height="650" /><img class="top" src="level17-dome-far.webp" alt="Level 17, domed tower top, simpler" width="900" height="650" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+        <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+        <figcaption>Level 17: the top of a domed tower.</figcaption>
+      </figure>
+      <figure data-cmp>
+        <div class="cmp"><div class="stage"><img src="level17-cluster-near.webp" alt="Level 17, small shops, today" width="550" height="450" /><img class="top" src="level17-cluster-far.webp" alt="Level 17, small shops, simpler" width="550" height="450" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+        <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+        <figcaption>Level 17: a small block of shops further off.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>Level 15: the whole frame</h2>
+    <p>The swap would start here, where people and street clutter already disappear. Zoom in anywhere.</p>
+    <figure data-cmp>
+      <div class="cmp"><div class="stage"><img src="level15-near.webp" alt="Level 15, today's buildings" width="3480" height="2045" /><img class="top" src="level15-far.webp" alt="Level 15, simpler buildings" width="3480" height="2045" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+      <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+      <figcaption><a href="level15-near.webp">Today, full size</a> · <a href="level15-far.webp">Simpler, full size</a></figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Level 17: the whole frame, where the jitter was recorded</h2>
+    <figure data-cmp>
+      <div class="cmp"><div class="stage"><img src="level17-near.webp" alt="Level 17, today's buildings" width="3480" height="2045" /><img class="top" src="level17-far.webp" alt="Level 17, simpler buildings" width="3480" height="2045" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+      <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+      <figcaption><a href="level17-near.webp">Today, full size</a> · <a href="level17-far.webp">Simpler, full size</a></figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Up close in the model gallery</h2>
+    <p>Much closer than the game camera ever is from level 15. Houses, cottages and shops first, then apartments and towers.</p>
+    <div class="spots">
+      <figure data-cmp>
+        <div class="cmp"><div class="stage"><img src="gallery-t5-near.webp" alt="Houses and shops up close, today" width="2560" height="1660" /><img class="top" src="gallery-t5-far.webp" alt="Houses and shops up close, simpler" width="2560" height="1660" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+        <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+        <figcaption>Houses, cottages, villas and shops.</figcaption>
+      </figure>
+      <figure data-cmp>
+        <div class="cmp"><div class="stage"><img src="gallery-t6-near.webp" alt="Apartments and towers up close, today" width="2560" height="1660" /><img class="top" src="gallery-t6-far.webp" alt="Apartments and towers up close, simpler" width="2560" height="1660" /></div><span class="divider"></span><span class="tag t">Today</span><span class="tag s">Simpler</span><span class="hint">Drag to look around</span></div>
+        <div class="controls"><input aria-label="Compare" type="range" min="0" max="100" value="50" /><span class="group"><button type="button" data-show="today">Today</button><button type="button" data-show="simpler">Simpler</button></span><span class="group"><button type="button" data-zoom="1" aria-pressed="true">1×</button><button type="button" data-zoom="2" aria-pressed="false">2×</button><button type="button" data-zoom="4" aria-pressed="false">4×</button></span></div>
+        <figcaption>Apartments, towers and other tier-6 things.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>What changes and what stays</h2>
+    <div class="lists">
+      <div class="card">
+        <h3>Changes</h3>
+        <ul>
+          <li>Rounded corners take two steps instead of three or more.</li>
+          <li>Top edges of walls and roofs are square instead of softly rounded.</li>
+          <li>Small round windows and skylights get fewer sides: hexagons and octagons.</li>
+          <li>Round things like helipads and domes have fewer sides, never fewer than ten.</li>
+          <li>Trees and bushes are blockier.</li>
+          <li>Parts under 0.4 units every way are left out: door knobs, the flower by a house's door.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Stays</h3>
+        <ul>
+          <li>Every building's outline, size and colours.</li>
+          <li>Windows, doors, roofs, chimneys, signs and helipads.</li>
+          <li>Everything below level 15: the simpler models are used only from high up.</li>
+          <li>Shadows: they come from the same models, so they get cheaper too.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Triangles per model</h2>
+    <table>
+      <thead><tr><th>Model</th><th class="n">Today</th><th class="n">Simpler</th><th class="n">Fewer</th></tr></thead>
+      <tbody>
+        <tr><td>House</td><td class="n">1,686</td><td class="n">1,150</td><td class="n">32%</td></tr>
+        <tr><td>Shop</td><td class="n">1,458</td><td class="n">1,022</td><td class="n">30%</td></tr>
+        <tr><td>Cottage</td><td class="n">1,268</td><td class="n">888</td><td class="n">30%</td></tr>
+        <tr><td>Villa</td><td class="n">1,640</td><td class="n">1,340</td><td class="n">18%</td></tr>
+        <tr><td>Apartment</td><td class="n">1,896</td><td class="n">1,432</td><td class="n">24%</td></tr>
+        <tr><td>Tower</td><td class="n">1,759</td><td class="n">1,109</td><td class="n">37%</td></tr>
+        <tr><td>Office</td><td class="n">1,332</td><td class="n">1,172</td><td class="n">12%</td></tr>
+        <tr><td>Skyscraper</td><td class="n">2,851</td><td class="n">2,183</td><td class="n">23%</td></tr>
+        <tr><td>Tree</td><td class="n">360</td><td class="n">120</td><td class="n">67%</td></tr>
+        <tr><td>Car</td><td class="n">548</td><td class="n">476</td><td class="n">13%</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <p class="decision"><strong>Decision:</strong> pending.</p>
+</main>
+<script>
+  for (const fig of document.querySelectorAll('[data-cmp]')) {
+    const box = fig.querySelector('.cmp');
+    const stage = fig.querySelector('.stage');
+    const top = fig.querySelector('.top');
+    const divider = fig.querySelector('.divider');
+    const range = fig.querySelector('input[type=range]');
+    const zoomButtons = [...fig.querySelectorAll('button[data-zoom]')];
+    // Where the line is (0..100 across the frame), how far in, and how far the stage is moved (pixels).
+    const s = { cut: 50, z: 1, px: 0, py: 0 };
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const draw = () => {
+      const w = box.clientWidth;
+      const h = box.clientHeight;
+      s.px = clamp(s.px, w - w * s.z, 0);
+      s.py = clamp(s.py, h - h * s.z, 0);
+      stage.style.transform = `translate(${s.px}px, ${s.py}px) scale(${s.z})`;
+      // The line is in the frame; the simpler picture is cut at the same place in the stage's own terms.
+      const x = (s.cut / 100) * w;
+      const inStage = clamp(((x - s.px) / s.z / w) * 100, 0, 100);
+      top.style.clipPath = `inset(0 0 0 ${inStage}%)`;
+      divider.style.left = `${s.cut}%`;
+      range.value = String(Math.round(s.cut));
+      box.classList.toggle('zoomed', s.z > 1);
+      for (const b of zoomButtons) b.setAttribute('aria-pressed', String(Number(b.dataset.zoom) === s.z));
+    };
+    const zoomTo = (z, cx = box.clientWidth / 2, cy = box.clientHeight / 2) => {
+      // Keep the point under (cx, cy) where it is.
+      const sx = (cx - s.px) / s.z;
+      const sy = (cy - s.py) / s.z;
+      s.z = z;
+      s.px = cx - sx * z;
+      s.py = cy - sy * z;
+      draw();
+    };
+    range.addEventListener('input', () => {
+      s.cut = Number(range.value);
+      draw();
+    });
+    for (const b of fig.querySelectorAll('button[data-show]')) {
+      b.addEventListener('click', () => {
+        s.cut = b.dataset.show === 'today' ? 100 : 0;
+        draw();
+      });
+    }
+    for (const b of zoomButtons) b.addEventListener('click', () => zoomTo(Number(b.dataset.zoom)));
+    // Not zoomed: drag moves the line. Zoomed: drag moves the picture.
+    let last = null;
+    box.addEventListener('pointerdown', (e) => {
+      box.setPointerCapture(e.pointerId);
+      last = { x: e.clientX, y: e.clientY };
+      box.classList.add('dragging');
+      if (s.z === 1) {
+        const r = box.getBoundingClientRect();
+        s.cut = clamp(((e.clientX - r.left) / r.width) * 100, 0, 100);
+        draw();
+      }
+    });
+    box.addEventListener('pointermove', (e) => {
+      if (!last || !box.hasPointerCapture(e.pointerId)) return;
+      if (s.z === 1) {
+        const r = box.getBoundingClientRect();
+        s.cut = clamp(((e.clientX - r.left) / r.width) * 100, 0, 100);
+      } else {
+        s.px += e.clientX - last.x;
+        s.py += e.clientY - last.y;
+      }
+      last = { x: e.clientX, y: e.clientY };
+      draw();
+    });
+    const end = () => {
+      last = null;
+      box.classList.remove('dragging');
+    };
+    box.addEventListener('pointerup', end);
+    box.addEventListener('pointercancel', end);
+    // Double-click (or double-tap) zooms in on that spot, and back out at 4×.
+    box.addEventListener('dblclick', (e) => {
+      const r = box.getBoundingClientRect();
+      zoomTo(s.z >= 4 ? 1 : s.z * 2, e.clientX - r.left, e.clientY - r.top);
+    });
+    window.addEventListener('resize', draw);
+    for (const img of fig.querySelectorAll('img')) img.addEventListener('load', draw);
+    draw();
+  }
+</script>
+</body>
+</html>
