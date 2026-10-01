@@ -180,7 +180,11 @@ export class GulpScene {
         }
         if (e.hole === this.follow) {
           this.pending += e.gained;
-          this.pendingAt.set(e.prop.x, 2 + KINDS[e.prop.kind].h, e.prop.z);
+          // Over the thing, but no higher than about the mouth's width: a
+          // tall tower's points would start far up the screen, away from
+          // the mouth, often up under the scoreboard.
+          const top = Math.min(KINDS[e.prop.kind].h * e.prop.hScale, 2 + world.holes[e.hole].r * 1.5);
+          this.pendingAt.set(e.prop.x, 2 + top, e.prop.z);
         }
       } else if (e.type === 'rebuild') {
         if (e.replaces) this.props.clear(e.replaces);

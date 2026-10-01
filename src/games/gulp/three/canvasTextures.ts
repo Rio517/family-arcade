@@ -128,15 +128,21 @@ export function bubbleTexture(text: string, healthy: boolean): THREE.Texture {
   g.fillStyle = '#ffffff';
   g.strokeStyle = 'rgba(29,31,51,0.85)';
   g.lineWidth = 6;
+  g.lineJoin = 'round';
+  // The bubble and its tail are one outline, so no seam shows where they meet.
+  const [left, top, right, bottom, r] = [8, 8, w - 8, 94, 40];
   g.beginPath();
-  g.roundRect(8, 8, w - 16, 86, 40);
-  g.moveTo(52, 90);
+  g.moveTo(left + r, top);
+  g.arcTo(right, top, right, bottom, r);
+  g.arcTo(right, bottom, left, bottom, r);
+  g.lineTo(84, bottom);
   g.lineTo(36, 122);
-  g.lineTo(84, 92);
+  g.lineTo(54, bottom);
+  g.arcTo(left, bottom, left, top, r);
+  g.arcTo(left, top, right, top, r);
+  g.closePath();
   g.fill();
   g.stroke();
-  // Cover the seam between the bubble and its tail.
-  g.fillRect(44, 84, 44, 10);
   g.font = font;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
