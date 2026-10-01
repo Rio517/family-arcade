@@ -54,6 +54,44 @@ describe('the round', () => {
   });
 });
 
+describe('where the child starts', () => {
+  const maps = ['town', 'city', 'mega', 'region'] as const;
+
+  it('starts in a park on easy and medium, with things to eat all round', () => {
+    for (const map of maps) {
+      for (const difficulty of ['easy', 'medium'] as const) {
+        for (const seed of [1, 2, 3]) {
+          const w = round(seed, 5, { map, difficulty });
+          const me = w.holes[0];
+          const park = w.city.blockList.find((b) => b.kind === 'park' && me.x > b.x && me.x < b.x + b.size && me.z > b.z && me.z < b.z + b.size);
+          expect(park, `${map} ${difficulty} seed ${seed}`).toBeDefined();
+          // Trees, bushes, benches and people within a few steps.
+          const near = w.city.props.filter((p) => Math.hypot(p.x - me.x, p.z - me.z) < 12 && ['tree', 'pine', 'bush', 'bench', 'sitter', 'planter'].includes(p.kind));
+          expect(near.length, `${map} ${difficulty} seed ${seed}`).toBeGreaterThanOrEqual(8);
+          // Nothing it cannot eat stands on the spot.
+          expect(w.city.props.some((p) => Math.hypot(p.x - me.x, p.z - me.z) < me.r && p.size > me.r)).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('starts anywhere on hard, on a crossing no rival starts on', () => {
+    const starts = new Set<string>();
+    for (const map of maps) {
+      for (const seed of [1, 2, 3, 4]) {
+        const w = round(seed, 5, { map, difficulty: 'hard' });
+        const [me, ...others] = w.holes;
+        expect(w.city.roads).toContain(me.x);
+        expect(w.city.roads).toContain(me.z);
+        for (const o of others) expect(o.x === me.x && o.z === me.z).toBe(false);
+        starts.add(`${map}:${me.x}:${me.z}`);
+      }
+    }
+    // Not the same crossing every time.
+    expect(starts.size).toBeGreaterThan(8);
+  });
+});
+
 describe('a round against the computer is fair and fun', () => {
   it('a steady player climbs the levels in a two-minute city round, nearly always places, and wins some', () => {
     const results = [1, 2, 3, 4, 5, 6].map((s) => play(s, 0.7));

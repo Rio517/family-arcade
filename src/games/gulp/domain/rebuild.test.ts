@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeProp, type Prop } from './catalog';
-import { grow, only, round, still } from './testing';
+import { grow, only, round, still, toMiddle } from './testing';
 import { stepWorld, type World, type WorldEvent } from './world';
 
 describe('the city rebuilds', () => {
@@ -109,7 +109,7 @@ describe('the city rebuilds', () => {
 
   it('a big lot becomes something grand, and it makes the news', () => {
     const w = round(1, 0, { regrow: true, duration: 0 });
-    const me = grow(w, 0, 40000);
+    const me = toMiddle(w, grow(w, 0, 40000));
     w.elapsed = 100;
     const events = eatAndWait(w, [makeProp(1, 'stadium', me.x, me.z, 0)], 60);
     const kinds = built(events);
@@ -120,7 +120,7 @@ describe('the city rebuilds', () => {
 
   it('the airport comes back as it was, straight up 15 to 20 seconds on: no building site on the tarmac, its jet put back', () => {
     const w = round(1, 0, { regrow: true, duration: 0 });
-    const me = grow(w, 0, 90000);
+    const me = toMiddle(w, grow(w, 0, 90000));
     w.elapsed = 300;
     const eatenAt = w.elapsed;
     const events = eatAndWait(w, [makeProp(1, 'terminal', me.x, me.z, 0), makeProp(2, 'jet', me.x + 2, me.z, 0, 1)], 30);
@@ -130,14 +130,14 @@ describe('the city rebuilds', () => {
     expect(events).toContainEqual(expect.objectContaining({ type: 'regrow', prop: expect.objectContaining({ kind: 'jet', variant: 1 }) }));
     // Not before fifteen seconds: re-run the first 14 and nothing has gone up yet.
     const again = round(1, 0, { regrow: true, duration: 0 });
-    const me2 = grow(again, 0, 90000);
+    const me2 = toMiddle(again, grow(again, 0, 90000));
     again.elapsed = eatenAt;
     expect(built(eatAndWait(again, [makeProp(1, 'terminal', me2.x, me2.z, 0)], 14))).toEqual([]);
   });
 
   it('with many lots waiting, the airport goes up first', () => {
     const w = round(1, 0, { regrow: true, duration: 0 });
-    const me = grow(w, 0, 90000);
+    const me = toMiddle(w, grow(w, 0, 90000));
     w.elapsed = 300;
     const houses = Array.from({ length: 6 }, (_, i) => makeProp(1 + i, 'house', me.x - 20 + i * 8, me.z, 0));
     only(w, [...houses, makeProp(10, 'terminal', me.x, me.z + 10, 0)]);

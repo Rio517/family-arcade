@@ -16,7 +16,7 @@
  */
 import { fightBack, type Attack } from './attacks';
 import type { Prop, PropKind } from './catalog';
-import { createCity, type City, type MapId } from './city';
+import { PARK_PLAZA, createCity, type City, type MapId } from './city';
 import { berthOf } from './city/ports';
 import { EAT_HOLE, speedOf } from './growth';
 import { LIVES, eatHoles, eatProps, newHole, type Hole, type HurtCause } from './holes';
@@ -146,15 +146,19 @@ export function createWorld(rng: Rng, player: Racer | null, rivals: Racer[], opt
     ...(player ? [{ ...player, isPlayer: true }] : []),
     ...rivals.map((r) => ({ ...r, isPlayer: false })),
   ];
-  // Start everyone on a crossing: the child in the middle, rivals spread out.
+  // Rivals start on crossings spread out from the middle; the child starts
+  // where `childStart` says.
   const crossings = city.roads
     .flatMap((x) => city.roads.map((z) => ({ x, z })))
     .filter((c) => !builtOver(city, c.x, c.z))
     .sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
+  const rivalSpot = (i: number) => 1 + ((i * 5) % (crossings.length - 1));
   const holes: Hole[] = [];
   const brains: Array<Brain | null> = [];
   everyone.forEach((who, i) => {
-    const spot = crossings[i === 0 ? 0 : 1 + ((i * 5) % (crossings.length - 1))];
+    const spot = who.isPlayer
+      ? childStart(city, options.difficulty, rng, crossings, new Set(everyone.map((_, j) => rivalSpot(j)).slice(1)))
+      : crossings[i === 0 ? 0 : rivalSpot(i)];
     const hole = newHole(i, who.name, who.skin, who.isPlayer, spot.x, spot.z);
     hole.lives = LIVES[options.difficulty];
     holes.push(hole);
@@ -191,6 +195,26 @@ export function createWorld(rng: Rng, player: Racer | null, rivals: Racer[], opt
   };
   indexProps(world);
   return world;
+}
+
+/**
+ * Where the child's hole starts. On easy and medium: in the park nearest the
+ * middle of the map, on the path just south of its plaza, between two little
+ * woods, with benches, people, bushes and then trees all round to eat at
+ * once: a quick start. On hard: any crossing, by chance, but not one a rival
+ * starts on (`taken`, as indexes into `crossings`). With no park, the
+ * crossing nearest the middle.
+ */
+function childStart(city: City, difficulty: Difficulty, rng: Rng, crossings: Array<{ x: number; z: number }>, taken: Set<number>): { x: number; z: number } {
+  if (difficulty === 'hard') {
+    const free = crossings.map((_, i) => i).filter((i) => !taken.has(i));
+    return crossings[free[Math.floor(rng() * free.length)] ?? 0];
+  }
+  const middle = (b: { x: number; z: number; size: number }) => ({ x: b.x + b.size / 2, z: b.z + b.size / 2 });
+  const parks = city.blockList.filter((b) => b.kind === 'park').map(middle);
+  if (!parks.length) return crossings[0];
+  const park = parks.reduce((best, p) => (Math.hypot(p.x, p.z) < Math.hypot(best.x, best.z) ? p : best));
+  return { x: park.x, z: park.z + PARK_PLAZA + 2 };
 }
 
 /** One step of the round. Returns what happened, for the scene and the HUD. */
