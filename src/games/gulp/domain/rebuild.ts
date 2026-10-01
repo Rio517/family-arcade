@@ -50,15 +50,22 @@ const COUNTRY_SAME: ReadonlySet<PropKind> = new Set(['cottage', 'villa', 'barn',
 const PUT_BACK: ReadonlySet<PropKind> = new Set(['jet', 'train']);
 /** Seconds from a building being eaten to its construction site appearing. */
 const SITE_AFTER = 6;
+/**
+ * Seconds from an airport or army-base building being eaten to it going back
+ * up (straight up, with no building site): at least the wait, up to the spread more.
+ */
+const LANDMARK_AFTER = 15;
+const LANDMARK_SPREAD = 5;
 /** Seconds a construction site stands before the building is finished. */
 const SITE_TIME = 16;
 /** Every this many seconds of a round, one more rung of the ladder opens. */
 const AGE_STEP = 40;
 /**
  * Seconds between two things going up: a block eaten at once comes back one
- * building at a time, never all on the same frame (a stall on a tablet).
+ * building at a time, never all on the same frame (a stall on a tablet), yet
+ * fast enough to keep up with a giant eating whole blocks.
  */
-const RAISE_GAP = 0.25;
+const RAISE_GAP = 0.03;
 /** Seconds a new building takes to rise in the scene. */
 export const BUILD_TIME = 3;
 /** Seconds between two news stories, at least. */
@@ -107,13 +114,15 @@ export function markEaten(w: World, p: Prop): void {
     }
   } else if (info.tier <= REGROW_TIER || PUT_BACK.has(p.kind)) {
     w.eaten.push(p);
-    if (w.eaten.length > EATEN_MAX) w.eaten.shift();
+    // Too many waiting: the oldest small thing is let go, never a jet or the train.
+    if (w.eaten.length > EATEN_MAX) w.eaten.splice(Math.max(0, w.eaten.findIndex((q) => !PUT_BACK.has(q.kind))), 1);
   }
   const room = Math.max(info.w, info.d) + 4;
   const due = w.elapsed + SITE_AFTER + w.rng() * 6;
   const country = Math.max(Math.abs(p.x), Math.abs(p.z)) > w.city.half;
   if (SAME_AGAIN.has(p.kind) || (country && COUNTRY_SAME.has(p.kind))) {
-    w.lots.push({ x: p.x, z: p.z, rot: p.rot, room, rung: -1, due, site: null, same: { kind: p.kind, variant: p.variant, hScale: p.hScale } });
+    const when = SAME_AGAIN.has(p.kind) ? w.elapsed + LANDMARK_AFTER + w.rng() * LANDMARK_SPREAD : due;
+    w.lots.push({ x: p.x, z: p.z, rot: p.rot, room, rung: -1, due: when, site: null, same: { kind: p.kind, variant: p.variant, hScale: p.hScale } });
     return;
   }
   if (country) return;
@@ -139,16 +148,19 @@ export function regrow(w: World, dt: number, events: WorldEvent[]): void {
 
 /**
  * Work on the waiting lots, only while no hole is close by: put up a
- * construction site, and later finish it as a new building.
+ * construction site, and later finish it as a new building. One thing goes
+ * up at a time (see `nextLot` for which).
  */
 export function rebuild(w: World, events: WorldEvent[]): void {
   if (w.elapsed < w.nextRaise) return;
-  for (let i = w.lots.length - 1; i >= 0; i--) {
-    const lot = w.lots[i];
-    if (lot.due > w.elapsed) continue;
-    if (w.holes.some((h) => h.alive && Math.hypot(h.x - lot.x, h.z - lot.z) < h.r + lot.room / 2 + 14)) continue;
+  for (;;) {
+    const lot = nextLot(w);
+    if (!lot) return;
     const variant = Math.floor(w.rng() * 8);
-    if (lot.site === null) {
+    // The airport's and the army base's buildings go straight back up: a
+    // building site out on the open tarmac only ever got eaten.
+    const direct = lot.same !== undefined && SAME_AGAIN.has(lot.same.kind);
+    if (lot.site === null && !direct) {
       const site = makeProp(w.nextPropId++, lot.rung < 0 && lot.room >= 20 ? 'bigsite' : 'site', lot.x, lot.z, lot.rot, variant);
       placeProp(w, site);
       lot.site = site.id;
@@ -157,15 +169,16 @@ export function rebuild(w: World, events: WorldEvent[]): void {
       w.nextRaise = w.elapsed + RAISE_GAP;
       return;
     }
-    const site = w.props.get(lot.site);
-    if (!site) {
-      w.lots.splice(i, 1);
+    const site = lot.site === null ? null : w.props.get(lot.site);
+    if (site === undefined) {
+      // Its site went some other way: the lot is done with; look again.
+      w.lots.splice(w.lots.indexOf(lot), 1);
       continue;
     }
     const kind = lot.same ?? lot.plan ?? (lot.rung < 0 ? bigKind(w, lot) : ladderKind(w, lot));
     // A tall building goes up in stages: the building site, then a frame
     // with a crane on it, then the tower itself.
-    if (TALL.includes(kind.kind) && site.kind !== 'tallsite') {
+    if (site && TALL.includes(kind.kind) && site.kind !== 'tallsite') {
       lot.plan = kind;
       w.props.delete(site.id);
       const frame = makeProp(w.nextPropId++, 'tallsite', lot.x, lot.z, lot.rot, variant);
@@ -176,8 +189,8 @@ export function rebuild(w: World, events: WorldEvent[]): void {
       w.nextRaise = w.elapsed + RAISE_GAP;
       return;
     }
-    w.lots.splice(i, 1);
-    w.props.delete(site.id);
+    w.lots.splice(w.lots.indexOf(lot), 1);
+    if (site) w.props.delete(site.id);
     // An office stands where a tower would: count it as that rung.
     const onRung = LADDER.indexOf(kind.kind === 'office' ? 'tower' : kind.kind);
     const extra = lot.rung < 0 ? 0 : Math.max(0, lot.rung + 1 - onRung);
@@ -193,6 +206,35 @@ export function rebuild(w: World, events: WorldEvent[]): void {
     }
     return;
   }
+}
+
+/**
+ * Which waiting lot to work on next, of those due with no hole close by. The
+ * airport's and the army base's buildings come first: they are landmarks, and
+ * the airport looks empty without them. Then, turn and turn about, the lot nearest
+ * the child (so the city grows back where the child can see it, ready to eat
+ * again) and the lot that has waited longest (so no corner of the map is
+ * left bare for good). Lots are kept in the order they were eaten.
+ */
+function nextLot(w: World): Lot | null {
+  const me = w.holes.find((h) => h.isPlayer && h.alive);
+  let oldest: Lot | null = null;
+  let nearest: Lot | null = null;
+  let nearestD = Infinity;
+  for (const lot of w.lots) {
+    if (lot.due > w.elapsed) continue;
+    if (w.holes.some((h) => h.alive && Math.hypot(h.x - lot.x, h.z - lot.z) < h.r + lot.room / 2 + 14)) continue;
+    if (lot.same && SAME_AGAIN.has(lot.same.kind)) return lot;
+    oldest ??= lot;
+    if (me) {
+      const d = Math.hypot(me.x - lot.x, me.z - lot.z);
+      if (d < nearestD) {
+        nearestD = d;
+        nearest = lot;
+      }
+    }
+  }
+  return (w.rng() < 0.5 ? nearest : oldest) ?? oldest;
 }
 
 /** One rung above what stood here, no higher than the city's age allows, and it must fit. */

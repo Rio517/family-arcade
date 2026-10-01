@@ -482,6 +482,9 @@ export class Effects {
     live.clear();
     // Over the rooftops but under the camera, and big enough to read against a giant hole.
     const alt = 14 + r * 1.3;
+    // Fuel trucks and tanks grow with the hole, more slowly, so a giant can
+    // still spot them from its height and they still fit the streets.
+    const big = Math.max(1, Math.sqrt(r / 5));
     for (const a of list) {
       live.add(a.id);
       let view = this.attackViews.get(a.id);
@@ -494,8 +497,9 @@ export class Effects {
       if (a.kind === 'tanker') {
         body.position.set(a.x, this.ground(a.x, a.z), a.z);
         body.rotation.y = a.heading;
+        body.scale.setScalar(big);
         const warn = view.group.children[1];
-        warn.position.set(a.x, 6 + (this.reducedMotion ? 0 : Math.sin(this.time * 8) * 0.6), a.z);
+        warn.position.set(a.x, (6 + (this.reducedMotion ? 0 : Math.sin(this.time * 8) * 0.6)) * big, a.z);
         continue;
       }
       if (a.kind === 'bomber') {
@@ -505,6 +509,7 @@ export class Effects {
       } else if (a.kind === 'tank') {
         body.position.set(a.x, this.ground(a.x, a.z), a.z);
         body.rotation.y = a.heading;
+        body.scale.setScalar(big);
       } else {
         // A helicopter hovers low enough to see, bobbing, its rotor spinning.
         const hover = 9 + r * 0.8 + (this.reducedMotion ? 0 : Math.sin(this.time * 2 + a.id) * 0.5);

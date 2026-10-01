@@ -67,6 +67,9 @@ const TANK_SIZE = footSize('tank');
 /** The base only sends tanks after holes this close; helicopters go anywhere. */
 const TANK_RANGE = 200;
 const MIN_ATTACK_LEVEL = 4;
+/** Seconds between one attack setting off and the next: at least the gap, up to the spread more. */
+const ATTACK_GAP = 26;
+const ATTACK_SPREAD = 14;
 /**
  * On Easy, how often the city lets a child who is the biggest mouth off and
  * goes after the next biggest instead.
@@ -113,7 +116,7 @@ function launch(w: World, events: WorldEvent[]): void {
     return;
   }
   // Now and then, not all the time: each attack should feel like an event.
-  w.nextAttack = 20 + w.rng() * 12;
+  w.nextAttack = ATTACK_GAP + w.rng() * ATTACK_SPREAD;
   const target = pickTarget(w, big);
   // A map with a military base sends its army half the time.
   const base = w.city.base;

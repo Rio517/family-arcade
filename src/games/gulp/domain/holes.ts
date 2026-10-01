@@ -78,6 +78,8 @@ const STUN = 1.2;
 const BURN = 3;
 /** How much of an item's worth healthy food adds on top, as a health bonus. */
 const HEALTH_BONUS = 0.5;
+/** The most a combo adds to one bite, so one huge bite never jumps the scoreboard. */
+const COMBO_EXTRA_MAX = 5000;
 /**
  * How fast the child grows, and what share of each thing's size and points
  * a computer hole gets, by level. On Easy the child grows a third faster and
@@ -167,9 +169,12 @@ export function gobble(w: World, h: Hole, p: Prop, events: WorldEvent[]): void {
   const growth = h.isPlayer ? CHILD_GROWTH[level] : RIVAL_SHARE[level];
   h.mass += ((info.wonder ? worthOf(p.size) * 2 : p.points) + bonus) * growth;
   const share = h.isPlayer ? 1 : RIVAL_SHARE[level];
-  // A wonder's bonus is a flat treat: combos and double points do not multiply it.
-  const boost = info.wonder ? 1 : mult * (h.doubleTime > 0 ? 2 : 1);
-  const gained = Math.round((p.points + bonus) * boost * share);
+  // A combo adds to each bite in the streak, up to COMBO_EXTRA_MAX: a stream of
+  // cars and houses multiplies, a mountain in a streak is a big bite, not a jackpot.
+  // A wonder's bonus is a flat treat: combos and double points do not touch it.
+  const base = p.points + bonus;
+  const combo = info.wonder ? base : base + Math.min(base * (mult - 1), COMBO_EXTRA_MAX);
+  const gained = Math.round(combo * (!info.wonder && h.doubleTime > 0 ? 2 : 1) * share);
   h.score += gained;
   if (h.isPlayer && info.tier <= 5) w.police.eaten += 1;
   if (info.wonder) {

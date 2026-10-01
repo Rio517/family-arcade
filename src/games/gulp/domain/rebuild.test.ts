@@ -89,13 +89,36 @@ describe('the city rebuilds', () => {
     expect(events).toContainEqual(expect.objectContaining({ type: 'news' }));
   });
 
-  it('the airport comes back as it was: its terminal through a building site, its jet put back', () => {
+  it('the airport comes back as it was, straight up 15 to 20 seconds on: no building site on the tarmac, its jet put back', () => {
     const w = round(1, 0, { regrow: true, duration: 0 });
     const me = grow(w, 0, 90000);
     w.elapsed = 300;
-    const events = eatAndWait(w, [makeProp(1, 'terminal', me.x, me.z, 0), makeProp(2, 'jet', me.x + 2, me.z, 0, 1)], 60);
-    expect(built(events)).toEqual(['bigsite', 'terminal']);
+    const eatenAt = w.elapsed;
+    const events = eatAndWait(w, [makeProp(1, 'terminal', me.x, me.z, 0), makeProp(2, 'jet', me.x + 2, me.z, 0, 1)], 30);
+    expect(built(events)).toEqual(['terminal']);
+    const lot = w.lots.length;
+    expect(lot).toBe(0);
     expect(events).toContainEqual(expect.objectContaining({ type: 'regrow', prop: expect.objectContaining({ kind: 'jet', variant: 1 }) }));
+    // Not before fifteen seconds: re-run the first 14 and nothing has gone up yet.
+    const again = round(1, 0, { regrow: true, duration: 0 });
+    const me2 = grow(again, 0, 90000);
+    again.elapsed = eatenAt;
+    expect(built(eatAndWait(again, [makeProp(1, 'terminal', me2.x, me2.z, 0)], 14))).toEqual([]);
+  });
+
+  it('with many lots waiting, the airport goes up first', () => {
+    const w = round(1, 0, { regrow: true, duration: 0 });
+    const me = grow(w, 0, 90000);
+    w.elapsed = 300;
+    const houses = Array.from({ length: 6 }, (_, i) => makeProp(1 + i, 'house', me.x - 20 + i * 8, me.z, 0));
+    only(w, [...houses, makeProp(10, 'terminal', me.x, me.z + 10, 0)]);
+    stepWorld(w, 1 / 60, still);
+    expect(w.lots).toHaveLength(7);
+    // Every lot is due at once, and the hole is far away.
+    for (const lot of w.lots) lot.due = w.elapsed;
+    me.x += 2000;
+    const first = stepWorld(w, 1 / 60, still).find((e) => e.type === 'rebuild');
+    expect(first?.type === 'rebuild' && first.prop.kind).toBe('terminal');
   });
 
   it('out in the country a home comes back as the same home, never a city building', () => {
@@ -114,7 +137,7 @@ describe('the city rebuilds', () => {
     expect(events.filter((e) => e.type === 'rebuild' || e.type === 'regrow')).toEqual([]);
   });
 
-  it('a block eaten at once comes back one building at a time, a quarter-second apart at least', () => {
+  it('a block eaten at once comes back one building at a time, never two in the same frame', () => {
     const w = round(1, 0, { regrow: true, duration: 0 });
     const me = grow(w, 0, 3000);
     w.elapsed = 100;
@@ -126,6 +149,6 @@ describe('the city rebuilds', () => {
       for (const e of stepWorld(w, 1 / 60, i < 60 * 6 ? { x: 1, z: 0 } : still)) if (e.type === 'rebuild') times.push(w.elapsed);
     }
     expect(times.length).toBeGreaterThanOrEqual(16);
-    for (let i = 1; i < times.length; i++) expect(times[i] - times[i - 1]).toBeGreaterThanOrEqual(0.24);
+    for (let i = 1; i < times.length; i++) expect(times[i] - times[i - 1]).toBeGreaterThanOrEqual(0.029);
   });
 });

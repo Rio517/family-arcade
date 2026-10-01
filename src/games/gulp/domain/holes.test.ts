@@ -146,6 +146,18 @@ describe('food and combos', () => {
     expect(me.streak).toBe(0);
   });
 
+  it('a combo adds at most 5,000 to one bite: a mountain in a full streak is not a jackpot', () => {
+    const w = round();
+    const me = grow(w, 0, 400000);
+    const mountain = makeProp(1, 'mountain', me.x, me.z, 0);
+    only(w, [mountain]);
+    me.streak = 100;
+    me.comboTime = 1;
+    const events = stepWorld(w, 1 / 60, still);
+    const eat = events.find((e) => e.type === 'eat');
+    expect(eat?.type === 'eat' && eat.gained).toBe(mountain.points + 5000);
+  });
+
   it('a giant (level 15 and up) takes tiny things without a fuss: no points, no gulp; a tree still counts', () => {
     const w = round(1, 0);
     const me = grow(w, 0, 200000);

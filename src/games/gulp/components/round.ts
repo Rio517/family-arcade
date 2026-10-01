@@ -118,7 +118,9 @@ export function hudOf(w: World, me: number): Hud {
     lives: Number.isFinite(h.lives) ? h.lives : null,
     out: h.lives <= 0,
   }));
-  const top = rows.slice(0, 5);
+  // Holes out of lives leave the list, so the five shown are still in the
+  // round; their ranks stay as the results card will count them.
+  const top = rows.filter((r) => !r.out || r.me).slice(0, 5);
   const mine = top.some((r) => r.me) ? null : (rows.find((r) => r.me) ?? null);
   const h = w.holes[me];
   const secs = w.options.duration > 0 ? Math.max(0, Math.ceil(w.options.duration - w.elapsed)) : Math.floor(w.elapsed);

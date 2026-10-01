@@ -111,14 +111,25 @@ export function labelTexture(name: string, color: number, mine: boolean): THREE.
   return srgb(c);
 }
 
-/** A white speech bubble with a little tail; green words for healthy food. */
+/** How tall a speech bubble's picture is; its width follows the words (see `bubbleTexture`). */
+export const BUBBLE_HEIGHT = 128;
+
+/**
+ * A white speech bubble with a little tail; green words for healthy food.
+ * The bubble is as wide as its words need (a health bonus can run to five
+ * digits), never narrower than a "Yum!".
+ */
 export function bubbleTexture(text: string, healthy: boolean): THREE.Texture {
-  const { c, g } = canvas(256, 128);
+  const font = `900 44px ${FONT}`;
+  const probe = canvas(1, 1).g;
+  probe.font = font;
+  const w = Math.max(256, Math.ceil(probe.measureText(text).width) + 80);
+  const { c, g } = canvas(w, BUBBLE_HEIGHT);
   g.fillStyle = '#ffffff';
   g.strokeStyle = 'rgba(29,31,51,0.85)';
   g.lineWidth = 6;
   g.beginPath();
-  g.roundRect(8, 8, 240, 86, 40);
+  g.roundRect(8, 8, w - 16, 86, 40);
   g.moveTo(52, 90);
   g.lineTo(36, 122);
   g.lineTo(84, 92);
@@ -126,11 +137,11 @@ export function bubbleTexture(text: string, healthy: boolean): THREE.Texture {
   g.stroke();
   // Cover the seam between the bubble and its tail.
   g.fillRect(44, 84, 44, 10);
-  g.font = `900 44px ${FONT}`;
+  g.font = font;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillStyle = healthy ? '#1a9c3c' : '#e0457b';
-  g.fillText(text, 128, 52);
+  g.fillText(text, w / 2, 52);
   return srgb(c);
 }
 
