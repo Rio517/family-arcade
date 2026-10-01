@@ -36,9 +36,12 @@ const TUMBLED = 1.45;
 const tiltShare = (height: number, r: number) => Math.min(1, Math.asin(Math.min(1, (r * 0.9) / height)) / TUMBLED);
 /** Buildings from this tier up can hide the child's hole, and fade. */
 const TALL_TIER = 5;
-/** Things are batched per square of this many units (two blocks), so the
- * squares off screen are skipped while the hole is small. */
-const CHUNK = 108;
+/**
+ * Things are batched per square of this many units (four blocks), so the
+ * squares off screen are skipped while the hole is small. Two blocks made
+ * batches of one or two things each, and a giant's view drew too many.
+ */
+const CHUNK = 216;
 /** Things that sit lower than the ground: a ship floats in the sea, below the quay. */
 const SINK: Partial<Record<Prop['kind'], number>> = { ship: -2 };
 /** Small street furniture: no shadows, to save the shadow pass drawing hundreds of them. */
@@ -54,6 +57,20 @@ const POOL_REACH = 100;
  * street lamps and the street clutter a giant takes without a fuss. Trees stay.
  */
 const isTiny = (kind: Prop['kind']): boolean => kind === 'lamp' || (KINDS[kind].tier <= 1 && !isSite(kind));
+
+/**
+ * A batch's own handle on a model many batches share: the same vertex data
+ * (uploaded to the graphics card once), in a geometry of its own, so the
+ * renderer keeps each batch's attribute setup instead of redoing it for every
+ * batch that draws the same model.
+ */
+function ownCopy(model: THREE.BufferGeometry): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  for (const [name, attribute] of Object.entries(model.attributes)) g.setAttribute(name, attribute);
+  g.setIndex(model.index);
+  for (const group of model.groups) g.addGroup(group.start, group.count, group.materialIndex);
+  return g;
+}
 
 /** A batch for things put up during a round, and its slots let go. */
 interface Pool {
@@ -137,8 +154,10 @@ export class PropView {
 
   constructor(
     private scene: THREE.Scene,
-    /** The one flat-shaded, vertex-coloured material every model shares. */
+    /** The one flat-shaded, vertex-coloured material every model shares, for the batches. */
     private material: THREE.MeshStandardMaterial,
+    /** The same look for things drawn one by one: falling into a hole (see the scene). */
+    private looseMaterial: THREE.MeshStandardMaterial,
     world: World,
     private reducedMotion: boolean,
   ) {
@@ -165,7 +184,7 @@ export class PropView {
       mesh = ghost;
       ownMaterial = true;
     } else {
-      mesh = new THREE.Mesh(modelOf(p), this.material);
+      mesh = new THREE.Mesh(modelOf(p), this.looseMaterial);
       mesh.position.set(p.x, this.groundOf(p), p.z);
       mesh.rotation.y = p.rot;
       // A building still going up falls as tall as it got.
@@ -322,11 +341,14 @@ export class PropView {
     for (const list of groups.values()) {
       const kind = list[0].kind;
       const vehicle = KINDS[kind].vehicle === true;
-      const mesh = new THREE.InstancedMesh(modelOf(list[0]), this.material, list.length);
+      const mesh = new THREE.InstancedMesh(ownCopy(modelOf(list[0])), this.material, list.length);
       // Vehicles cast no sun shadow: small, low shadows came out with a gap
       // under the wheels. They sit on a soft dark patch instead, which is
       // steadier and cheaper to draw.
-      const blob = vehicle ? new THREE.InstancedMesh(this.blobGeometry(kind), this.blobMat, list.length) : undefined;
+      const blob = vehicle ? new THREE.InstancedMesh(ownCopy(this.blobGeometry(kind)), this.blobMat, list.length) : undefined;
+      // A batch never moves, only its things do: no need to work out where it is every frame.
+      mesh.matrixAutoUpdate = false;
+      if (blob) blob.matrixAutoUpdate = false;
       list.forEach((p, i) => {
         dummy.position.set(p.x, (SINK[p.kind] ?? 0) + groundAt(world.city, p.x, p.z), p.z);
         dummy.rotation.set(0, p.rot, 0);
@@ -381,8 +403,9 @@ export class PropView {
     }
     let pool = list.find((q) => q.free.length > 0 || q.mesh.count < POOL_SIZE);
     if (!pool) {
-      const mesh = new THREE.InstancedMesh(geo, this.material, POOL_SIZE);
+      const mesh = new THREE.InstancedMesh(ownCopy(geo), this.material, POOL_SIZE);
       mesh.count = 0;
+      mesh.matrixAutoUpdate = false;
       // A building site is low: no shadow to draw.
       const casts = !isSite(p.kind);
       mesh.castShadow = casts;

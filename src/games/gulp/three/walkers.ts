@@ -35,8 +35,10 @@ export class Walkers {
 
   constructor(
     private scene: THREE.Scene,
-    /** The one flat-shaded, vertex-coloured material every model shares. */
-    private material: THREE.MeshStandardMaterial,
+    /** The one flat-shaded, vertex-coloured material every model shares, for the batches. */
+    material: THREE.MeshStandardMaterial,
+    /** The same look for the police, drawn one by one (see the scene). */
+    private looseMaterial: THREE.MeshStandardMaterial,
     world: World,
     private reducedMotion: boolean,
   ) {
@@ -52,6 +54,8 @@ export class Walkers {
       mesh.castShadow = true;
       // They move every frame, so their bounds are the whole island.
       mesh.frustumCulled = false;
+      // The batch itself never moves: only its people do.
+      mesh.matrixAutoUpdate = false;
       list.forEach((person, index) => this.people.push({ person, mesh, index }));
       scene.add(mesh);
       this.crowds.push(mesh);
@@ -136,7 +140,7 @@ export class Walkers {
       let view = this.responders.get(r.id);
       if (!view) {
         const group = new THREE.Group();
-        const body = new THREE.Mesh(modelFor(r.kind === 'car' ? 'policecar' : 'police', 0, 1), this.material);
+        const body = new THREE.Mesh(modelFor(r.kind === 'car' ? 'policecar' : 'police', 0, 1), this.looseMaterial);
         body.castShadow = true;
         group.add(body);
         let baton: THREE.Object3D | undefined;
