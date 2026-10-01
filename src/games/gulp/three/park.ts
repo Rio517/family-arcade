@@ -706,17 +706,69 @@ const SHIPS = [
   { hull: 0x2e8b57, stripe: PAL.white },
 ] as const;
 
-const BOXES = [0xe63946, 0x3a86ff, 0xffc21a, 0x2ec4b6, 0xff8a1f, 0x8e5cd9, 0xf4f5f7, 0x3fa34d] as const;
+/** The colours a ship's containers come in. */
+export const BOXES = [0xe63946, 0x3a86ff, 0xffc21a, 0x2ec4b6, 0xff8a1f, 0x8e5cd9, 0xf4f5f7, 0x3fa34d] as const;
+
+/** One shipping container on a ship's deck: 2.4 wide, 2.4 high and 6.1 long. */
+export const CONTAINER = { w: 2.4, h: 2.4, d: 6.1 } as const;
+/** The ship's deck height, where the bottom row of containers stands. */
+const DECK = 4.6;
+/** Container stacks: four bays (stern to bow) of four rows, stacks of one to three. */
+const STACKS = [
+  [2, 3, 3, 2],
+  [3, 2, 3, 3],
+  [2, 3, 2, 3],
+  [1, 2, 2, 1],
+] as const;
+/** The thin gap between containers in a stack, and under the bottom one. */
+const STACK_GAP = 0.06;
+
+/** A container on a ship's deck: its middle in the ship's own frame, and its colour. */
+export interface ShipBox {
+  x: number;
+  y: number;
+  z: number;
+  color: number;
+}
+
+/** A ship's variant as its model is built: whole, and wrapped round the ones there are (see buildKindGeometry). */
+const shipVariant = (v: number): number => {
+  const whole = Number.isFinite(v) ? Math.floor(v) : 0;
+  return ((whole % SHIPS.length) + SHIPS.length) % SHIPS.length;
+};
+
+/**
+ * The containers on a cargo ship of variant `variant`, as `ship` stacks
+ * them, so a swallowed ship can spill them one by one (see propView.ts).
+ */
+export function shipCargo(variant: number): ShipBox[] {
+  const v = shipVariant(variant);
+  const boxes: ShipBox[] = [];
+  const h = CONTAINER.h;
+  STACKS.forEach((bay, b) => {
+    const z = -10.8 + b * 6.4;
+    bay.forEach((n, r) => {
+      const x = -3.75 + r * 2.5;
+      for (let i = 0; i < n; i++) {
+        const color = BOXES[(b * 5 + r * 3 + i * 2 + v) % BOXES.length];
+        boxes.push({ x, y: DECK + STACK_GAP + i * (h + STACK_GAP) + h / 2, z, color });
+      }
+    });
+  });
+  return boxes;
+}
 
 /**
  * A cargo ship, bow to +z, sitting in the water from y = 0: a strong-coloured
  * hull over a red waterline band, a white bridge and a funnel at the stern,
  * and stacks of containers in many colours along the deck, which is what
- * reads from the high camera.
+ * reads from the high camera. Without `cargo`, the deck is bare: the ship a
+ * hole has swallowed falls in without its containers, which spill off on
+ * their own.
  */
-function ship(k: Kit, v: number): void {
+function cargoShip(k: Kit, v: number, cargo: boolean): void {
   const c = SHIPS[v];
-  const deck = 4.6;
+  const deck = DECK;
   const band = 1.6;
   // The hull outline at a height: square stern, straight sides, pointed bow.
   const outline = (y: number, inset: number, bowZ: number): V3[] => {
@@ -736,25 +788,9 @@ function ship(k: Kit, v: number): void {
   k.hull(0x9aa1ab, [...outline(deck - 0.1, 0.45, 21.2), ...outline(deck + 0.06, 0.45, 21.2)]);
   // A white line just under the deck edge, along both sides.
   for (const sx of [-1, 1]) k.box(c.stripe, 0.06, 0.25, 32.5, sx * 5.8, deck - 0.6, -4.95, undefined, [sx > 0 ? 'nx' : 'px']);
-  // Container stacks: four bays of four rows, stacks of one to three.
-  const heights = [
-    [2, 3, 3, 2],
-    [3, 2, 3, 3],
-    [2, 3, 2, 3],
-    [1, 2, 2, 1],
-  ];
-  const h = 2.4;
-  const gap = 0.06;
-  heights.forEach((bay, b) => {
-    const z = -10.8 + b * 6.4;
-    bay.forEach((n, r) => {
-      const x = -3.75 + r * 2.5;
-      for (let i = 0; i < n; i++) {
-        const col = BOXES[(b * 5 + r * 3 + i * 2 + v) % BOXES.length];
-        k.box(col, 2.4, h, 6.1, x, deck + 0.06 + i * (h + gap), z, undefined, ON_GROUND);
-      }
-    });
-  });
+  if (cargo) {
+    for (const b of shipCargo(v)) k.box(b.color, CONTAINER.w, CONTAINER.h, CONTAINER.d, b.x, b.y - CONTAINER.h / 2, b.z, undefined, ON_GROUND);
+  }
   // Superstructure at the stern: accommodation, bridge with wings, funnel.
   const sz = -17.6;
   k.cbox(PAL.white, 8.4, 6.2, 5.0, 0.2, 0, deck, sz);
@@ -768,6 +804,26 @@ function ship(k: Kit, v: number): void {
   // A mast on the bow.
   k.box(0xe8e3da, 0.25, 3.2, 0.25, 0, deck, 18.2, undefined, ON_GROUND);
   k.box(0xe8e3da, 1.8, 0.2, 0.2, 0, deck + 2.6, 18.2);
+}
+
+const ship: Builder = (k, v) => cargoShip(k, v, true);
+
+/** A cargo ship with a bare deck, in the same frame as the kind (its containers come from `shipCargo`). */
+export function buildShipHullGeometry(v: number): THREE.BufferGeometry {
+  const k = new Kit();
+  cargoShip(k, shipVariant(v), false);
+  const g = k.build();
+  // Snap to the water the way buildKindGeometry does, so both frames agree.
+  const minY = g.boundingBox?.min.y ?? 0;
+  if (minY !== 0) g.translate(0, -minY, 0);
+  return g;
+}
+
+/** One container spilled off a ship, its middle on the origin, closed on every side as it tumbles. */
+export function buildContainerGeometry(color: number): THREE.BufferGeometry {
+  const k = new Kit();
+  k.box(color, CONTAINER.w, CONTAINER.h, CONTAINER.d, 0, -CONTAINER.h / 2, 0);
+  return k.build();
 }
 
 // ---------------------------------------------------------------------------

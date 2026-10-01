@@ -6,9 +6,21 @@
  */
 import type * as THREE from 'three';
 import { KINDS, type PropKind, type Prop } from '../domain/catalog';
+import { BOXES, buildContainerGeometry, buildShipHullGeometry } from './park';
 import { buildKindGeometry } from './props';
 
 const MODELS = new Map<string, THREE.BufferGeometry>();
+
+/** A model from the cache, built by `build` on first use. */
+function cached(key: string, build: () => THREE.BufferGeometry): THREE.BufferGeometry {
+  let geo = MODELS.get(key);
+  if (!geo) {
+    geo = build();
+    geo.computeBoundingSphere();
+    MODELS.set(key, geo);
+  }
+  return geo;
+}
 
 /**
  * A kind's model, built on first use. Exported on its own (no renderer is
@@ -16,14 +28,7 @@ const MODELS = new Map<string, THREE.BufferGeometry>();
  * reuses the first's models.
  */
 export function modelFor(kind: PropKind, variant: number, h: number): THREE.BufferGeometry {
-  const key = `${kind}:${variant}:${h}`;
-  let geo = MODELS.get(key);
-  if (!geo) {
-    geo = buildKindGeometry(kind, variant, h);
-    geo.computeBoundingSphere();
-    MODELS.set(key, geo);
-  }
-  return geo;
+  return cached(`${kind}:${variant}:${h}`, () => buildKindGeometry(kind, variant, h));
 }
 
 /** A thing's model: buildings come in a few heights (quarters), everything else in its colours. */
@@ -31,15 +36,28 @@ export function modelOf(p: Prop): THREE.BufferGeometry {
   return modelFor(p.kind, p.variant, KINDS[p.kind].scales ? Math.round(p.hScale * 4) / 4 : 1);
 }
 
+/** A swallowed cargo ship falling in without its containers, which spill off on their own. */
+export function hullModel(variant: number): THREE.BufferGeometry {
+  return cached(`ship:${variant}:hull`, () => buildShipHullGeometry(variant));
+}
+
+/** One spilled container in a colour: every container of that colour shares it. */
+export function containerModel(color: number): THREE.BufferGeometry {
+  return cached(`box:${color}`, () => buildContainerGeometry(color));
+}
+
 /**
  * Every model a round might still need (a rebuilt lot, a police car, a
- * taller tower), built a few at a time in spare frame time. Building one the
- * moment it first appears stalls that frame.
+ * taller tower, a swallowed ship's bare hull and its containers), built a
+ * few at a time in spare frame time. Building one the moment it first
+ * appears stalls that frame.
  */
 export class ModelWarmup {
-  private queue: Array<[PropKind, number, number]> = [];
+  private queue: Array<() => THREE.BufferGeometry> = [];
 
   constructor() {
+    for (const color of BOXES) this.queue.push(() => containerModel(color));
+    for (let v = 0; v < KINDS.ship.variants; v++) this.queue.push(() => hullModel(v));
     // Heights a rebuilt building can come in (see the domain's rebuild).
     // Biggest first, so the slow ones are built during the countdown. Wonders
     // are never rebuilt.
@@ -48,7 +66,7 @@ export class ModelWarmup {
     kinds.sort((a, b) => KINDS[a].tier - KINDS[b].tier);
     for (const kind of kinds) {
       const info = KINDS[kind];
-      for (let v = 0; v < info.variants; v++) for (const h of info.scales ? heights : [1]) this.queue.push([kind, v, h]);
+      for (let v = 0; v < info.variants; v++) for (const h of info.scales ? heights : [1]) this.queue.push(() => modelFor(kind, v, h));
     }
   }
 
@@ -58,10 +76,10 @@ export class ModelWarmup {
     if (!this.queue.length) return built;
     const until = performance.now() + budgetMs;
     while (this.queue.length && performance.now() < until) {
-      const [kind, variant, h] = this.queue.pop()!;
+      const build = this.queue.pop()!;
       // A kind without a model yet is never placed either; skip it rather than stop the frame.
       try {
-        built.push(modelFor(kind, variant, h));
+        built.push(build());
       } catch {
         continue;
       }

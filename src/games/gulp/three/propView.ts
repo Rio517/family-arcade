@@ -4,16 +4,19 @@
  * quick and the areas off screen are skipped. Things put up during a round
  * go into batches of their own, made as they are needed, and rise there; a
  * slot let go by an eaten one is used again. A swallowed thing tips into its hole
- * (`swallow`, `stepFallers`); one too big to swallow rocks on the rim of the
- * child's hole (`wobble`); one in the way of the camera goes see-through
- * (see seeThrough.ts).
+ * (`swallow`, `stepFallers`, and fall.ts for the way it moves), and a
+ * swallowed ship's containers spill off on their own (`stepCargo`); one too
+ * big to swallow rocks on the rim of the child's hole (`wobble`); one in the
+ * way of the camera goes see-through (see seeThrough.ts).
  */
 import * as THREE from 'three';
 import { FIT, KINDS, isSite, type Prop } from '../domain/catalog';
 import { BUILD_TIME, canEat, propsNear, type Hole, type World } from '../domain/world';
 import { blobTexture } from './canvasTextures';
+import { emptySpill, fallPose, noise, spillPose, startFall, startSpill, type Fall, type FallPose, type Spill } from './fall';
 import { groundAt } from './ground';
-import { modelOf } from './models';
+import { containerModel, hullModel, modelOf } from './models';
+import { CONTAINER, shipCargo } from './park';
 import { SeeThrough } from './seeThrough';
 
 /**
@@ -21,19 +24,14 @@ import { SeeThrough } from './seeThrough';
  * a second, a skyscraper topples for over a second and a half.
  */
 const fallTime = (size: number) => Math.min(1.6, Math.max(0.5, 0.45 + size * 0.07));
-/** Share of the fall spent tipping over the rim before it drops free. */
-const TIP = 0.4;
-/** How far it has tipped (radians) when it goes over, and when it is gone. */
-const TIPPED = 1.05;
-const TUMBLED = 1.45;
 /**
- * How far over a thing tips, as a share of the full tumble: a thing no taller
- * than the mouth is wide topples right over, a tower much taller than that
- * only leans in (its top reaches no further than about the mouth's far rim)
- * and drops straight down, so it never lies across the street or sinks
- * through the ground outside the mouth.
+ * A swallowed ship's containers slide off its deck one after another over
+ * this share of the ship's fall (each after `CARGO_FIRST` of it), and each
+ * spills into the mouth over about a second.
  */
-const tiltShare = (height: number, r: number) => Math.min(1, Math.asin(Math.min(1, (r * 0.9) / height)) / TUMBLED);
+const CARGO_FIRST = 0.04;
+const CARGO_SPREAD = 0.3;
+const SPILL_TIME = 1.0;
 /** Buildings from this tier up can hide the child's hole, and fade. */
 const TALL_TIER = 5;
 /**
@@ -94,19 +92,54 @@ interface Faller {
   /** 0..1 through the fall, and how long the whole fall takes. */
   t: number;
   time: number;
-  /** Where it stood, from the hole's middle: the fall follows a moving hole. */
-  offX: number;
-  offZ: number;
-  /** Half its footprint along the line to the middle: it tips over its outer edge. */
-  half: number;
-  rot: number;
-  h: number;
+  /** How it falls (see fall.ts): where it stood from the hole's middle, so the fall follows a moving hole. */
+  fall: Fall;
+  /** The mouth's size when it went in, for when the hole itself is gone. */
+  r: number;
+  /** Where the hole's middle was last seen. */
+  cx: number;
+  cz: number;
+  /** A building still going up falls as tall as it got. */
+  rise: number;
   /** A see-through copy has its own material to free. */
   ownMaterial: boolean;
-  /** The ground it stood on (a block stands a kerb above the road). */
+  /** The level it stood at (a block stands a kerb above the road; a ship floats below the quay). */
   y0: number;
-  /** How far over it tips, as a share of the full tumble (see `tiltShare`). */
-  tilt: number;
+}
+
+/** A container on a swallowed ship: riding on the deck, then spilling off on its own. */
+interface CargoBox {
+  mesh: THREE.InstancedMesh;
+  index: number;
+  /** Its middle on the ship, in the ship's own frame. */
+  local: THREE.Vector3;
+  /** Which side of the deck it stands on: it slides off that way. */
+  side: number;
+  /** When it slides off, as a share of the ship's fall. */
+  leaveAt: number;
+  /** Its spill once it has left the deck (see fall.ts), whether it has, how far into it (0..1), and how long it takes. */
+  spill: Spill;
+  off: boolean;
+  u: number;
+  time: number;
+}
+
+/** A swallowed ship's containers, one batch per colour. */
+interface Cargo {
+  /** The ship they ride on until each spills off; null once the ship is gone. */
+  ship: Faller | null;
+  meshes: THREE.InstancedMesh[];
+  boxes: CargoBox[];
+  /** Those still falling. */
+  left: number;
+  /** For a stagger and a tumble of their own, the same every time. */
+  seed: number;
+  /** The hole they fall into, where its middle was last seen and how big it was, and the level the ship floated at. */
+  hole: number;
+  cx: number;
+  cz: number;
+  r: number;
+  y0: number;
 }
 
 /** Something put up during the round, rising: `t` runs 0..1 over `time` seconds. */
@@ -144,11 +177,13 @@ export class PropView {
   private tiltAxis = new THREE.Vector3();
   private tiltQ = new THREE.Quaternion();
   private upright = new THREE.Euler();
-  private fallAxis = new THREE.Vector3();
-  private fallQ = new THREE.Quaternion();
-  private fallYaw = new THREE.Quaternion();
-  private fallUp = new THREE.Vector3();
-  private yAxis = new THREE.Vector3(0, 1, 0);
+  /** Where a falling thing or container is drawn this frame (see fall.ts). */
+  private pose: FallPose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: 1 };
+  private boxAt = new THREE.Vector3();
+  private boxScale = new THREE.Vector3();
+  private boxMatrix = new THREE.Matrix4();
+  /** Swallowed ships' containers, spilling. */
+  private cargo: Cargo[] = [];
   /** The world the view was last stepped with, for where a swallowing hole stands. */
   private lastWorld: World;
 
@@ -172,36 +207,43 @@ export class PropView {
     this.release(p);
   }
 
-  /** A thing leaves the city: hide it where it stood, and start a copy falling. */
+  /**
+   * A thing leaves the city: hide it where it stood, and start a copy
+   * falling. A ship falls with a bare deck while its containers spill off
+   * one by one (with reduced motion they stay on and fall with it).
+   */
   swallow(p: Prop, hole: number): void {
     this.setShown(p, false);
     const ghost = this.seeThrough.take(p.id);
     const rise = this.rising.get(p.id);
     this.release(p);
+    const spills = p.kind === 'ship' && !this.reducedMotion;
+    const model = spills ? hullModel(p.variant) : modelOf(p);
     let mesh: THREE.Mesh;
     let ownMaterial = false;
     if (ghost) {
       mesh = ghost;
+      mesh.geometry = model;
       ownMaterial = true;
     } else {
-      mesh = new THREE.Mesh(modelOf(p), this.looseMaterial);
-      mesh.position.set(p.x, this.groundOf(p), p.z);
-      mesh.rotation.y = p.rot;
-      // A building still going up falls as tall as it got.
-      if (rise) mesh.scale.y = this.risen(rise.t);
+      mesh = new THREE.Mesh(model, this.looseMaterial);
       mesh.castShadow = true;
       this.scene.add(mesh);
     }
+    const y0 = (SINK[p.kind] ?? 0) + this.groundOf(p);
+    mesh.position.set(p.x, y0, p.z);
+    mesh.rotation.set(0, p.rot, 0);
+    const riseY = rise ? this.risen(rise.t) : 1;
+    mesh.scale.set(1, riseY, 1);
     const info = KINDS[p.kind];
     const h = this.holeAt(hole);
-    const offX = mesh.position.x - (h?.x ?? mesh.position.x);
-    const offZ = mesh.position.z - (h?.z ?? mesh.position.z);
-    // Half its footprint along the line from the hole's middle to it.
-    const along = Math.atan2(offX, offZ) - p.rot;
-    const half = Math.abs(Math.sin(along)) * (info.w / 2) + Math.abs(Math.cos(along)) * (info.d / 2);
-    const height = info.h * p.hScale;
-    const tilt = tiltShare(height, h?.r ?? height);
-    this.fallers.push({ mesh, hole, t: 0, time: fallTime(p.size), offX, offZ, half, rot: p.rot, h: height, ownMaterial, y0: mesh.position.y, tilt });
+    const r = h?.r ?? Math.max(info.w, info.d);
+    const cx = h?.x ?? p.x;
+    const cz = h?.z ?? p.z;
+    const fall = startFall(p.x - cx, p.z - cz, info.w, info.d, info.h * p.hScale * riseY, p.rot, r);
+    const faller: Faller = { mesh, hole, t: 0, time: fallTime(p.size), fall, r, cx, cz, rise: riseY, ownMaterial, y0 };
+    this.fallers.push(faller);
+    if (spills) this.spillCargo(p, faller);
   }
 
   /**
@@ -246,6 +288,7 @@ export class PropView {
   step(world: World, dt: number): void {
     this.lastWorld = world;
     this.stepFallers(world, dt);
+    this.stepCargo(world, dt);
     this.stepRising(dt);
   }
 
@@ -473,45 +516,158 @@ export class PropView {
   }
 
   /**
-   * A swallowed thing tips over the edge of its footprint furthest from the
-   * hole's middle, leaning in faster and faster like anything overbalancing,
-   * then drops out of sight, still turning over. It keeps its heading: no
-   * spinning. The ground outside the mouth hides whatever is below it, so it
-   * seems to fall into the hole, not through the street.
+   * A swallowed thing tips into its hole and drops out of sight, following
+   * the hole if it moves (see `fallPose` in fall.ts for the way it goes).
+   * The ground outside the mouth hides whatever is below it, so it seems to
+   * fall into the hole, not through the street; it is kept small enough
+   * that none of it is cut off by the rim or the throat's wall.
    */
   private stepFallers(world: World, dt: number): void {
-    const up = this.fallUp;
+    const pose = this.pose;
     for (let i = this.fallers.length - 1; i >= 0; i--) {
       const f = this.fallers[i];
       f.t += dt / f.time;
       const h = world.holes[f.hole];
-      const cx = h ? h.x : f.mesh.position.x - f.offX;
-      const cz = h ? h.z : f.mesh.position.z - f.offZ;
-      const k = Math.min(1, f.t);
-      // Toward the middle along the ground, and the axis it tips about.
-      const d = Math.hypot(f.offX, f.offZ) || 1;
-      const inX = -f.offX / d;
-      const inZ = -f.offZ / d;
-      this.fallAxis.set(inZ, 0, -inX);
-      // Tipping (accelerating), then over and dropping (under gravity).
-      const tip = Math.min(1, k / TIP);
-      const drop = Math.max(0, (k - TIP) / (1 - TIP));
-      const angle = (TIPPED * tip * tip + (TUMBLED - TIPPED) * drop) * f.tilt;
-      this.fallQ.setFromAxisAngle(this.fallAxis, angle);
-      // Pivot on the outer edge of its footprint: the base swings in and down.
-      const px = f.offX - inX * f.half;
-      const pz = f.offZ - inZ * f.half;
-      up.set(inX * f.half, 0, inZ * f.half).applyQuaternion(this.fallQ);
-      const sink = drop * drop * (f.h * 1.4 + 3);
-      f.mesh.position.set(cx + px + up.x + inX * drop * f.half, f.y0 + up.y - sink, cz + pz + up.z + inZ * drop * f.half);
-      this.fallYaw.setFromAxisAngle(this.yAxis, f.rot);
-      f.mesh.quaternion.copy(this.fallQ).multiply(this.fallYaw);
+      if (h) {
+        f.cx = h.x;
+        f.cz = h.z;
+        f.r = h.r;
+      }
+      fallPose(f.fall, Math.min(1, f.t), f.r, pose);
+      f.mesh.position.set(f.cx + pose.position.x, f.y0 + pose.position.y, f.cz + pose.position.z);
+      f.mesh.quaternion.copy(pose.quaternion);
+      f.mesh.scale.set(pose.scale, pose.scale * f.rise, pose.scale);
       if (f.t >= 1) {
         this.scene.remove(f.mesh);
         if (f.ownMaterial) (f.mesh.material as THREE.Material).dispose();
         this.fallers.splice(i, 1);
+        for (const c of this.cargo) if (c.ship === f) c.ship = null;
       }
     }
+  }
+
+  /**
+   * Load a swallowed ship's containers onto its falling hull: one batch per
+   * colour (a handful of draws for the lot, in the batches' own shader),
+   * each container riding on the deck until its turn to slide off. The
+   * stacks go in no set order, each from the top down.
+   */
+  private spillCargo(p: Prop, ship: Faller): void {
+    const boxes = shipCargo(p.variant);
+    const byColour = new Map<number, number>();
+    for (const b of boxes) byColour.set(b.color, (byColour.get(b.color) ?? 0) + 1);
+    const meshes = new Map<number, THREE.InstancedMesh>();
+    for (const [color, count] of byColour) {
+      const mesh = new THREE.InstancedMesh(containerModel(color), this.material, count);
+      mesh.count = 0;
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      // They move every frame and stay over the mouth: no bounds to keep up, and no shadows to draw.
+      mesh.frustumCulled = false;
+      mesh.matrixAutoUpdate = false;
+      mesh.receiveShadow = true;
+      meshes.set(color, mesh);
+      this.scene.add(mesh);
+    }
+    const seed = p.id * 7919;
+    const { hole, cx, cz, r, y0 } = ship;
+    const cargo: Cargo = { ship, meshes: [...meshes.values()], boxes: [], left: boxes.length, seed, hole, cx, cz, r, y0 };
+    const stacks = [...new Set(boxes.map((b) => `${b.x}:${b.z}`))];
+    for (const b of boxes) {
+      const mesh = meshes.get(b.color)!;
+      const stack = stacks.indexOf(`${b.x}:${b.z}`);
+      const above = boxes.filter((o) => o.x === b.x && o.z === b.z && o.y > b.y).length;
+      cargo.boxes.push({
+        mesh,
+        index: mesh.count++,
+        local: new THREE.Vector3(b.x, b.y, b.z),
+        side: b.x < 0 ? -1 : 1,
+        leaveAt: CARGO_FIRST + CARGO_SPREAD * (0.8 * noise(seed, stack) + 0.1 * above),
+        spill: emptySpill(CONTAINER),
+        off: false,
+        u: 0,
+        time: SPILL_TIME * (0.85 + 0.3 * noise(seed, 100 + cargo.boxes.length)),
+      });
+    }
+    this.cargo.push(cargo);
+    this.moveCargo(cargo, this.lastWorld, 0);
+  }
+
+  /** Swallowed ships' containers, riding and spilling; each ship's batches are freed once all of its containers are gone. */
+  private stepCargo(world: World, dt: number): void {
+    for (let i = this.cargo.length - 1; i >= 0; i--) {
+      const c = this.cargo[i];
+      this.moveCargo(c, world, dt);
+      if (c.left > 0) continue;
+      for (const m of c.meshes) {
+        this.scene.remove(m);
+        m.dispose();
+      }
+      this.cargo.splice(i, 1);
+    }
+  }
+
+  /**
+   * Each container rides on its ship's deck (tipping and shrinking with
+   * it) until its turn comes, then slides off the side, hops, tumbles and
+   * drops into the mouth on its own, kept inside the throat like the ship
+   * (see `spillPose`).
+   */
+  private moveCargo(c: Cargo, world: World, dt: number): void {
+    const pose = this.pose;
+    const h = world.holes[c.hole];
+    if (h) {
+      c.cx = h.x;
+      c.cz = h.z;
+      c.r = h.r;
+    }
+    const ship = c.ship;
+    if (ship) ship.mesh.updateMatrix();
+    for (let n = 0; n < c.boxes.length; n++) {
+      const b = c.boxes[n];
+      if (b.u >= 1) continue;
+      if (!b.off) {
+        if (!ship) {
+          // The ship went before this one came off (it never should): it goes with it.
+          b.u = 1;
+          b.mesh.setMatrixAt(b.index, HIDDEN);
+          c.left--;
+          continue;
+        }
+        this.boxAt.copy(b.local).applyMatrix4(ship.mesh.matrix);
+        if (ship.t < b.leaveAt) {
+          // Riding on the deck, tipping and shrinking with the ship.
+          this.boxMatrix.compose(this.boxAt, ship.mesh.quaternion, ship.mesh.scale);
+          b.mesh.setMatrixAt(b.index, this.boxMatrix);
+          continue;
+        }
+        // Its turn: off the side of the deck, from where it is now.
+        const rot = ship.fall.rot;
+        startSpill(
+          b.spill,
+          this.boxAt.x - c.cx,
+          this.boxAt.y - c.y0,
+          this.boxAt.z - c.cz,
+          ship.mesh.quaternion,
+          ship.mesh.scale.x,
+          Math.cos(rot) * b.side,
+          -Math.sin(rot) * b.side,
+          c.r,
+          c.seed + 31 * n,
+        );
+        b.off = true;
+      }
+      b.u = Math.min(1, b.u + dt / b.time);
+      spillPose(b.spill, b.u, c.r, pose);
+      if (b.u >= 1) {
+        b.mesh.setMatrixAt(b.index, HIDDEN);
+        c.left--;
+        continue;
+      }
+      this.boxAt.set(c.cx + pose.position.x, c.y0 + pose.position.y, c.cz + pose.position.z);
+      this.boxMatrix.compose(this.boxAt, pose.quaternion, this.boxScale.setScalar(pose.scale));
+      b.mesh.setMatrixAt(b.index, this.boxMatrix);
+    }
+    for (const m of c.meshes) m.instanceMatrix.needsUpdate = true;
   }
 
   /** Things put up during the round rise out of the ground in their batch slots. */

@@ -18,17 +18,46 @@ describe('the city rebuilds', () => {
     const w = round(1, 0, { regrow: true, duration: 0 });
     const me = grow(w, 0, 400);
     w.elapsed = 45;
-    const events = eatAndWait(w, [makeProp(1, 'house', me.x, me.z, 0)], 45);
-    // Forty-five seconds in, the city is old enough for shops: one rung up.
+    const events = eatAndWait(w, [makeProp(1, 'house', me.x, me.z, 0)], 75);
+    // Past the first minute, the city is old enough for shops: one rung up.
     expect(built(events)).toEqual(['site', 'shop']);
     const done = events.find((e) => e.type === 'rebuild' && e.prop.kind === 'shop');
     expect(done?.type === 'rebuild' && done.replaces?.kind).toBe('site');
   });
 
-  it('a young city rebuilds small: early on a tower comes back as a house', () => {
+  it('an unfinished building is worth far less than a finished one', () => {
+    const worth = (kind: Parameters<typeof makeProp>[1]) => makeProp(1, kind, 0, 0, 0).points;
+    expect(worth('site')).toBeLessThan(worth('house') / 5);
+    expect(worth('tallsite')).toBeLessThan(worth('tower') / 5);
+    expect(worth('bigsite')).toBeLessThan(worth('factory') / 3);
+  });
+
+  it('a young city rebuilds small: a tower eaten at the start comes back as a shop', () => {
     const w = round(1, 0, { regrow: true, duration: 0 });
     const me = grow(w, 0, 3000);
-    expect(built(eatAndWait(w, [makeProp(1, 'tower', me.x, me.z, 0)], 45))).toEqual(['site', 'house']);
+    // It goes up within the first minute and a half, when the city is only old enough for shops.
+    expect(built(eatAndWait(w, [makeProp(1, 'tower', me.x, me.z, 0)], 80))).toEqual(['site', 'shop']);
+  });
+
+  it('rebuilds slowly at the start of a round and at full pace five minutes in', () => {
+    /** Seconds from a house being eaten at `start` to its building site going up. */
+    const siteAfter = (start: number) => {
+      const w = round(1, 0, { regrow: true, duration: 0 });
+      const me = grow(w, 0, 400);
+      w.elapsed = start;
+      only(w, [makeProp(1, 'house', me.x, me.z, 0)]);
+      for (let i = 0; i < 60 * 40; i++) {
+        if (stepWorld(w, 1 / 60, i < 60 * 6 ? { x: 1, z: 0 } : still).some((e) => e.type === 'rebuild')) return w.elapsed - start;
+      }
+      return Infinity;
+    };
+    const early = siteAfter(0);
+    const late = siteAfter(300);
+    // Six to twelve seconds at full pace, twice that at the start.
+    expect(early).toBeGreaterThanOrEqual(12);
+    expect(early).toBeLessThanOrEqual(24.1);
+    expect(late).toBeGreaterThanOrEqual(6);
+    expect(late).toBeLessThanOrEqual(12.1);
   });
 
   it('an old city rebuilds taller than the old building, where it cannot go wider', () => {
@@ -65,7 +94,7 @@ describe('the city rebuilds', () => {
   it('a construction site that is eaten starts again later', () => {
     const w = round(1, 0, { regrow: true, duration: 0 });
     const me = grow(w, 0, 400);
-    const events = eatAndWait(w, [makeProp(1, 'house', me.x, me.z, 0)], 14);
+    const events = eatAndWait(w, [makeProp(1, 'house', me.x, me.z, 0)], 26);
     const site = events.find((e) => e.type === 'rebuild');
     if (site?.type !== 'rebuild') throw new Error('no construction site');
     expect(site.prop.kind).toBe('site');
@@ -82,7 +111,7 @@ describe('the city rebuilds', () => {
     const w = round(1, 0, { regrow: true, duration: 0 });
     const me = grow(w, 0, 40000);
     w.elapsed = 100;
-    const events = eatAndWait(w, [makeProp(1, 'stadium', me.x, me.z, 0)], 45);
+    const events = eatAndWait(w, [makeProp(1, 'stadium', me.x, me.z, 0)], 60);
     const kinds = built(events);
     expect(kinds[0]).toBe('bigsite');
     expect(['stadium', 'mall', 'powerplant']).toContain(kinds[1]);

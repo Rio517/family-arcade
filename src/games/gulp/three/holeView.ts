@@ -9,6 +9,7 @@ import { FIT, type Prop } from '../domain/catalog';
 import { POWER_TIME, type Hole } from '../domain/world';
 import { BUBBLE_HEIGHT, auraTexture, bubbleTexture, countTexture, labelTexture, smearTexture, type Smear } from './canvasTextures';
 import type { Effects } from './effects';
+import { THROAT_DEPTH, throatRadius } from './fall';
 
 export interface HoleLook {
   /** The hole's colour: rim, throat and name tag. */
@@ -38,14 +39,16 @@ const INSIDE_HOLE = {
   stencilZFail: THREE.KeepStencilOp,
   stencilZPass: THREE.KeepStencilOp,
 } as const;
-/** The throat's shape, from the rim (radius 1) down to its dark floor, as (radius, height) pairs. */
-const PIT_DEPTH = 2.6;
+/**
+ * The throat's shape, from the rim (radius 1) down to its dark floor, as
+ * (radius, height) pairs: the shape falling things are kept inside (fall.ts).
+ */
 const PIT_PROFILE: THREE.Vector2[] = [
   ...Array.from({ length: 17 }, (_, i) => {
-    const t = i / 16;
-    return new THREE.Vector2(0.42 + 0.58 * Math.pow(1 - t, 2.4), -PIT_DEPTH * Math.pow(t, 1.15));
+    const depth = THROAT_DEPTH * Math.pow(i / 16, 1.15);
+    return new THREE.Vector2(throatRadius(depth), -depth);
   }),
-  new THREE.Vector2(0, -PIT_DEPTH),
+  new THREE.Vector2(0, -THROAT_DEPTH),
 ];
 
 /**
@@ -556,7 +559,7 @@ function pitGeometry(color: number): THREE.BufferGeometry {
   const base = new THREE.Color(color);
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
-    const depth = -pos.getY(i) / PIT_DEPTH;
+    const depth = -pos.getY(i) / THROAT_DEPTH;
     const shade = 0.8 * Math.pow(1 - Math.min(1, depth * 1.35), 1.6);
     const ring = (depth * 7) % 1 < 0.18 ? 0.72 : 1;
     c.copy(base).multiplyScalar(shade * ring);

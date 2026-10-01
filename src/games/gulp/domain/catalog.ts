@@ -350,6 +350,12 @@ export interface Prop {
   hScale: number;
 }
 
+/**
+ * A building site is worth this share of what its size would score: an
+ * unfinished building is a snack, and waiting for it to go up pays.
+ */
+const SITE_WORTH = 0.15;
+
 /** A new thing of a kind: sized by its footprint, scored by its tier. */
 export function makeProp(
   id: number,
@@ -370,7 +376,7 @@ export function makeProp(
     z,
     rot,
     size,
-    points: info.wonder ? info.wonder.bonus : worthOf(size),
+    points: info.wonder ? info.wonder.bonus : info.site ? Math.max(1, Math.round(worthOf(size) * SITE_WORTH)) : worthOf(size),
     hScale: info.scales ? hScale : 1,
   };
 }
