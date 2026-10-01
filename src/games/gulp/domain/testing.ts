@@ -21,6 +21,20 @@ export const round = (seed = 1, n = 0, opts: Partial<Options> = {}) =>
     ...opts,
   });
 
+/**
+ * Put `h` still on the crossing nearest the middle of the map, clear of the
+ * edges, for a rule that does not care where the round started (the child
+ * starts in a park on easy and medium, anywhere on hard).
+ */
+export function toMiddle(w: World, h: World['holes'][number]) {
+  const road = w.city.roads.reduce((a, b) => (Math.abs(b) < Math.abs(a) ? b : a));
+  h.x = road;
+  h.z = road;
+  h.vx = 0;
+  h.vz = 0;
+  return h;
+}
+
 /** Clear the city and put exactly these things in it. */
 export function only(w: World, props: Prop[]): void {
   w.props = new Map(props.map((p) => [p.id, p]));
