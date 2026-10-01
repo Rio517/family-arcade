@@ -66,7 +66,7 @@ const TANKER_SIZE = footSize('tanker');
 const TANK_SIZE = footSize('tank');
 /** The base only sends tanks after holes this close; helicopters go anywhere. */
 const TANK_RANGE = 200;
-const MIN_ATTACK_LEVEL = 4;
+const MIN_ATTACK_LEVEL = 3;
 /** Seconds between one attack setting off and the next: at least the gap, up to the spread more. */
 const ATTACK_GAP = 26;
 const ATTACK_SPREAD = 14;
@@ -148,7 +148,7 @@ function launch(w: World, events: WorldEvent[]): void {
     events.push({ type: 'incoming', target: target.id, kind });
     return;
   }
-  const bomber = levelOf(target.r) >= 6 ? w.rng() < 0.75 : w.rng() < 0.2;
+  const bomber = levelOf(target.r) >= 5 ? w.rng() < 0.75 : w.rng() < 0.2;
   const id = w.nextId++;
   if (bomber) {
     const a = w.rng() * Math.PI * 2;

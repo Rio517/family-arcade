@@ -127,7 +127,7 @@ export function newHole(id: number, name: string, skin: number, isPlayer: boolea
  * no sound, so a giant's screen is not a snowstorm of crumbs. Trees and
  * anything bigger still count.
  */
-export const GIANT_LEVEL = 15;
+export const GIANT_LEVEL = 14;
 const CRUMB_TIER = 1;
 export const isCrumb = (h: Hole, kind: PropKind): boolean => KINDS[kind].tier <= CRUMB_TIER && !isSite(kind) && levelOf(h.r) >= GIANT_LEVEL;
 

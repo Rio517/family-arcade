@@ -147,6 +147,8 @@ export interface KindInfo {
   vehicle?: true;
   /** A building site, of any size. */
   site?: true;
+  /** Its crown squeezes in: it swallows as this share of its footprint size. */
+  soft?: number;
 }
 
 /**
@@ -171,7 +173,7 @@ const TABLE: Record<PropKind, KindRow> = {
   bike: { name: 'a bike', tier: 1, w: 0.5, d: 1.8, h: 1.1, variants: 3, vehicle: true },
   haybale: { name: 'a hay bale', tier: 1, w: 1.6, d: 1.6, h: 1.4, variants: 1, food: 'healthy' },
   site: { name: 'a building site', tier: 1, w: 8.0, d: 8.0, h: 5.0, variants: 2, site: true },
-  tree: { name: 'a tree', tier: 2, w: 2.8, d: 2.8, h: 5.0, variants: 3 },
+  tree: { name: 'a tree', tier: 2, w: 2.8, d: 2.8, h: 5.0, variants: 3, soft: 0.85 },
   pine: { name: 'a pine tree', tier: 2, w: 2.4, d: 2.4, h: 5.5, variants: 2 },
   lamp: { name: 'a street lamp', tier: 2, w: 0.6, d: 1.6, h: 5.0, variants: 1 },
   cafe: { name: 'a café table', tier: 2, w: 2.4, d: 2.4, h: 2.6, variants: 3, food: 'treat' },
@@ -273,7 +275,7 @@ export function footSize(kind: PropKind, hScale = 1): number {
   const info = KINDS[kind];
   // A taller building is a little harder to swallow (and worth more) than a low one.
   const tall = info.scales ? 1 + (hScale - 1) * 0.2 : 1;
-  return Math.hypot(info.w, info.d) * 0.5 * 0.85 * tall;
+  return Math.hypot(info.w, info.d) * 0.5 * 0.85 * tall * (info.soft ?? 1);
 }
 
 /**
@@ -285,7 +287,6 @@ export const LEVELS: Array<{ size: number; label: string }> = (
   [
     ['cone', 'Cones'],
     ['bench', 'Benches'],
-    ['tree', 'Trees'],
     ['car', 'Cars'],
     ['van', 'Vans'],
     ['cottage', 'Little houses'],

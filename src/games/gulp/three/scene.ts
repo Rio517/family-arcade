@@ -35,12 +35,12 @@ export type { HoleLook } from './holeView';
 const SHADOW_MAP = 2048;
 /**
  * How far the camera is from the hole when people and street clutter go
- * (about level 15 at the usual zoom), and when they come back.
+ * (about level 14 at the usual zoom), and when they come back.
  */
 const TINY_FAR = 125;
 const TINY_BACK = 110;
 /** From this level, blasts no longer shake the camera. */
-const CALM_LEVEL = 7;
+const CALM_LEVEL = 6;
 
 export class GulpScene {
   private renderer: THREE.WebGLRenderer;
@@ -240,7 +240,7 @@ export class GulpScene {
     this.effects.step(dt);
 
     this.rig.update(world, me, this.time, dt);
-    // From high above (a giant's camera, about level 15) people, street lamps,
+    // From high above (a giant's camera, about level 14) people, street lamps,
     // street clutter and the patches under cars are specks: they go, and come
     // back when the camera comes down again (a little lower, so they do not
     // flicker on the line).
