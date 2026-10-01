@@ -24,3 +24,7 @@ for work already agreed.
   chairs are filled by tapping tickets from the roster, and a party opens the
   table for online games so two devices never trade a code. Four phases, each
   a PR.
+- [gulp-levels-and-unlocks.md](./gulp-levels-and-unlocks.md) — campaign levels
+  with goals and stars, then coins, a Wonder Book and mouth looks, then new
+  worlds. Shared by the family arcade and the Chompville release; five steps,
+  each a PR.
