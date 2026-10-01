@@ -7,7 +7,7 @@
  */
 import * as THREE from 'three';
 import type { PropKind } from '../domain/catalog';
-import { type Builder, type V3, FLUSH, HALF_PI, type Kit, ON_GROUND, PAL, archDoor, darker, kitFor, lighter, paneAt, placement } from './kit';
+import { type Builder, type V3, FLUSH, HALF_PI, Kit, ON_GROUND, PAL, archDoor, darker, lighter, paneAt, placement } from './kit';
 
 export type MilitaryKind = Extract<
   PropKind,
@@ -73,11 +73,10 @@ function rotor(k: Kit): void {
 
 /**
  * The helicopter's main rotor on its own, centred on the hub with the blades
- * in the XZ plane, so the scene can spin it on a flying helicopter. Drawn in
- * the parked helicopter's detail.
+ * in the XZ plane, so the scene can spin it on a flying helicopter.
  */
 export function buildRotorGeometry(): THREE.BufferGeometry {
-  const k = kitFor('helicopter');
+  const k = new Kit();
   rotor(k);
   return k.build();
 }
@@ -187,12 +186,11 @@ function heli(k: Kit, withRotor: boolean): void {
 const helicopter: Builder = (k) => heli(k, true);
 
 /**
- * The helicopter without its main rotor, in the same frame and detail as the
- * kind: the mast stays, and a rotor from buildRotorGeometry() sits on it at
- * (0, 3.4, 1.0).
+ * The helicopter without its main rotor, in the same frame as the kind: the
+ * mast stays, and a rotor from buildRotorGeometry() sits on it at (0, 3.4, 1.0).
  */
 export function buildHeliBodyGeometry(): THREE.BufferGeometry {
-  const k = kitFor('helicopter');
+  const k = new Kit();
   heli(k, false);
   const g = k.build();
   // Snap to the ground the way buildKindGeometry does, so both frames agree.

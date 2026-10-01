@@ -12,7 +12,7 @@ what was set aside.
 |-------|-----------|---------|
 | [20260830-game-previews](./20260830-game-previews/) | A way to sell a game before anyone signs in | **B, poster strip** — shipped |
 | [20260831-party-ui](./20260831-party-ui/) | Visual design is fine; the UX needs work | 6 of 10 shipped in [#145](https://github.com/Rio517/family-arcade/pull/145) |
-| [20261001-far-models](./20261001-far-models/) | Smooth late-game play; simpler buildings from high up, shown before they go in | **Simpler models everywhere**, except gas tanks, trees and cars |
+| [20261001-far-models](./20261001-far-models/) | Smooth late-game play; simpler buildings from high up, shown before they go in | Detailed models stay; the simpler ones looked less friendly in play |
 
 ## What goes in a pitch folder
 
