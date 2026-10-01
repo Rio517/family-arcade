@@ -3,18 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { FIT, KINDS, footSize, type PropKind } from '../domain/catalog';
 import { emptySpill, fallPose, spillPose, startFall, startSpill, throatRadius, THROAT_DEPTH, type FallPose } from './fall';
 
-/** The throat holeView.ts turns: (radius, height) pairs from the rim down, in mouth radii. */
-const PIT_PROFILE = Array.from({ length: 17 }, (_, i) => {
-  const t = i / 16;
-  return { radius: 0.42 + 0.58 * Math.pow(1 - t, 2.4), depth: THROAT_DEPTH * Math.pow(t, 1.15) };
-});
-
 /** Below this depth (in mouth radii) a corner may no longer reach past the throat's wall at all. */
 const CLEAR_BELOW = 0.08;
 
-const pose = (): FallPose => ({ position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: 1 });
+const pose = (): FallPose => ({ position: new THREE.Vector3(), quaternion: new THREE.Quaternion() });
 
-/** Points all over a box's edges (`hw`, `hh`, `hd` half sizes, y from `y0` to `y1`), in its own frame. */
+/** Points all over a box's edges (`hw`, `hd` half sizes, y from `y0` to `y1`), in its own frame. */
 function edgePoints(hw: number, y0: number, y1: number, hd: number): THREE.Vector3[] {
   const out: THREE.Vector3[] = [];
   const n = 24;
@@ -31,23 +25,29 @@ function edgePoints(hw: number, y0: number, y1: number, hd: number): THREE.Vecto
   return out;
 }
 
+/** The points of a box drawn at `p`, where they are. */
+function placed(points: THREE.Vector3[], p: FallPose): THREE.Vector3[] {
+  const m = new THREE.Matrix4().compose(p.position, p.quaternion, new THREE.Vector3(1, 1, 1));
+  return points.map((q) => q.clone().applyMatrix4(m));
+}
+
 /**
  * How far past the throat's wall (in mouth radii) any part of a box drawn at
  * `p` reaches, where it is deeper than `CLEAR_BELOW` under the street and
  * above the throat's floor: 0 when it is all inside.
  */
 function worstReach(points: THREE.Vector3[], p: FallPose, r: number): number {
-  const m = new THREE.Matrix4().compose(p.position, p.quaternion, new THREE.Vector3(p.scale, p.scale, p.scale));
-  const v = new THREE.Vector3();
   let worst = 0;
-  for (const q of points) {
-    v.copy(q).applyMatrix4(m);
+  for (const v of placed(points, p)) {
     const depth = -v.y / r;
     if (depth <= CLEAR_BELOW || depth >= THROAT_DEPTH) continue;
     worst = Math.max(worst, Math.hypot(v.x, v.z) / r - throatRadius(depth));
   }
   return worst;
 }
+
+/** The highest point of a box drawn at `p`. */
+const topOf = (points: THREE.Vector3[], p: FallPose) => Math.max(...placed(points, p).map((v) => v.y));
 
 /**
  * Where a thing of `size` can stand, from the middle of a mouth of radius
@@ -63,51 +63,67 @@ function spots(size: number, r: number): Array<[number, number]> {
   return out;
 }
 
-/** Run a whole fall at 60 frames a second; the worst reach past the wall and the biggest one-frame shrink. */
-function runFall(kind: PropKind, r: number, x: number, z: number, rot: number) {
+/** Run a whole fall at 60 frames a second: the worst reach past the wall, the biggest step sideways in one frame, and the last pose. */
+function runFall(kind: PropKind, hScale: number, r: number, x: number, z: number, rot: number) {
   const info = KINDS[kind];
-  const f = startFall(x, z, info.w, info.d, info.h, rot, r);
-  const points = edgePoints(info.w / 2, 0, info.h, info.d / 2);
+  const height = info.h * hScale;
+  const f = startFall(x, z, info.w, info.d, height, rot, r);
+  const points = edgePoints(info.w / 2, 0, height, info.d / 2);
   const p = pose();
   let worst = 0;
-  let jump = 0;
-  let last = 1;
+  let step = 0;
+  let last: THREE.Vector3 | null = null;
   const frames = 96;
   for (let i = 0; i <= frames; i++) {
-    const k = i / frames;
-    fallPose(f, k, r, p);
+    fallPose(f, i / frames, r, p);
     worst = Math.max(worst, worstReach(points, p, r));
-    // The dwindle at the end is meant: count only the fit's own shrinking.
-    if (k < 0.7) jump = Math.max(jump, last - p.scale);
-    last = p.scale;
+    if (last) step = Math.max(step, Math.hypot(p.position.x - last.x, p.position.z - last.z) / r);
+    last = p.position.clone();
   }
-  return { worst, jump, f };
+  return { worst, step, f, p, points };
 }
 
+/** Big things, and the shortest each comes (a short tower has the widest footprint for its mouth). */
+const BIG: Array<[PropKind, number]> = [
+  ['ship', 1],
+  ['stadium', 1],
+  ['mall', 1],
+  ['factory', 1],
+  ['warehouse', 1],
+  ['office', 0.9],
+  ['house', 0.85],
+  ['tower', 0.8],
+  ['skyscraper', 0.8],
+  ['apartment', 0.8],
+  ['mountain', 1],
+];
+
 describe('throatRadius', () => {
-  it('follows the funnel holeView.ts draws, from the rim to the floor', () => {
-    for (const { radius, depth } of PIT_PROFILE) expect(throatRadius(depth)).toBeCloseTo(radius, 9);
+  it('is the mouth at the rim and never narrows going down', () => {
     expect(throatRadius(0)).toBe(1);
     expect(throatRadius(-1)).toBe(1);
-    expect(throatRadius(THROAT_DEPTH * 2)).toBeCloseTo(0.42, 9);
+    for (let d = 0; d < THROAT_DEPTH; d += 0.01) expect(throatRadius(d + 0.01)).toBeGreaterThanOrEqual(throatRadius(d));
   });
 
-  it('only narrows going down', () => {
-    for (let d = 0; d < THROAT_DEPTH; d += 0.01) expect(throatRadius(d + 0.01)).toBeLessThanOrEqual(throatRadius(d));
+  it('is wider than anything a mouth can swallow, from just under the rim down', () => {
+    for (const [kind, hScale] of BIG) {
+      const info = KINDS[kind];
+      // Middle to corner, for the smallest mouth that takes it.
+      const corner = Math.hypot(info.w, info.d) / 2 / (footSize(kind, hScale) / FIT);
+      expect(corner, kind).toBeLessThan(0.95 * throatRadius(0.3));
+    }
   });
 });
 
 describe('fallPose', () => {
-  const big: PropKind[] = ['ship', 'stadium', 'mall', 'factory', 'warehouse', 'office', 'house', 'tower', 'skyscraper', 'mountain'];
-
   it('keeps every part of a big thing inside the throat, from anywhere it can be swallowed', () => {
-    for (const kind of big) {
-      const size = footSize(kind);
+    for (const [kind, hScale] of BIG) {
+      const size = footSize(kind, hScale);
       // The smallest mouth that takes it, and one a good deal bigger.
       for (const r of [size / FIT, (size / FIT) * 1.6]) {
         for (const [x, z] of spots(size, r)) {
           for (const rot of [0, 0.7]) {
-            const { worst } = runFall(kind, r, x, z, rot);
+            const { worst } = runFall(kind, hScale, r, x, z, rot);
             expect(worst, `${kind} in r=${r.toFixed(1)} from (${x.toFixed(1)}, ${z.toFixed(1)}) turned ${rot}`).toBeLessThan(0.01);
           }
         }
@@ -115,51 +131,67 @@ describe('fallPose', () => {
     }
   });
 
-  it('shrinks a big thing smoothly, never all at once', () => {
-    for (const kind of big) {
-      const size = footSize(kind);
+  it('slides a big thing in smoothly, never with a jump', () => {
+    for (const [kind, hScale] of BIG) {
+      const size = footSize(kind, hScale);
       const r = size / FIT;
       for (const [x, z] of spots(size, r)) {
-        const { jump } = runFall(kind, r, x, z, 0.4);
-        expect(jump, `${kind} from (${x.toFixed(1)}, ${z.toFixed(1)})`).toBeLessThan(0.06);
+        const { step } = runFall(kind, hScale, r, x, z, 0.4);
+        expect(step, `${kind} from (${x.toFixed(1)}, ${z.toFixed(1)})`).toBeLessThan(0.05);
       }
     }
   });
 
+  it('drops everything, big or small, all the way under the throat floor by the end', () => {
+    for (const [kind, hScale] of [...BIG, ['car', 1] as [PropKind, number], ['person', 1] as [PropKind, number]]) {
+      const size = footSize(kind, hScale);
+      for (const r of [size / FIT, (size / FIT) * 3]) {
+        const [x, z] = spots(size, r)[3];
+        const { p, points } = runFall(kind, hScale, r, x, z, 0.4);
+        expect(topOf(points, p), `${kind} in r=${r.toFixed(1)}`).toBeLessThan(-THROAT_DEPTH * r);
+      }
+    }
+  });
+
+  it('lets a thing that only just fits slip straight down, hardly tipping', () => {
+    const info = KINDS.house;
+    const r = footSize('house', 0.85) / FIT;
+    const f = startFall(0, r * 0.4, info.w, info.d, info.h * 0.85, 0, r);
+    const p = pose();
+    for (let k = 0; k <= 1; k += 0.05) {
+      fallPose(f, k, r, p);
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion);
+      expect(Math.acos(up.y)).toBeLessThan(0.2);
+    }
+  });
+
+  it('topples a small thing right over as it goes in', () => {
+    const r = 20;
+    const info = KINDS.car;
+    const f = startFall(0, 10, info.w, info.d, info.h, 0, r);
+    const p = pose();
+    fallPose(f, 0.4, r, p);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion);
+    expect(Math.acos(up.y)).toBeCloseTo(1.05, 2);
+    // Over toward the middle (at -z).
+    expect(up.z).toBeLessThan(0);
+  });
+
   it('tips a thing standing past the rim over the rim, lifting the part outside', () => {
     // A ship lying along the line to the middle, its far end well past the rim.
-    const r = footSize('ship') / FIT;
+    const r = (footSize('ship') / FIT) * 1.6;
     const f = startFall(0, r * 0.6, 12, 44, 14, 0, r);
     expect(r * 0.6 + f.pd).toBeLessThan(r);
     const p = pose();
     fallPose(f, 0.2, r, p);
     // Its outer end (the bow, at +z) is up off the water, not under the street.
-    const bow = new THREE.Vector3(0, 0, 22).multiplyScalar(p.scale).applyQuaternion(p.quaternion).add(p.position);
+    const bow = new THREE.Vector3(0, 0, 22).applyQuaternion(p.quaternion).add(p.position);
     expect(bow.y).toBeGreaterThan(0);
-  });
-
-  it('lets a small thing fall as it always has: full size until it dwindles away at the end', () => {
-    const r = 20;
-    const info = KINDS.car;
-    for (const [x, z] of [
-      [0, 10],
-      [12, -9],
-      [-5, 3],
-    ]) {
-      const f = startFall(x, z, info.w, info.d, info.h, 0.5, r);
-      const p = pose();
-      for (let k = 0; k <= 0.7; k += 0.05) {
-        fallPose(f, k, r, p);
-        expect(p.scale).toBe(1);
-      }
-      fallPose(f, 1, r, p);
-      expect(p.scale).toBeCloseTo(0, 5);
-    }
   });
 });
 
 describe('spillPose', () => {
-  it('lands containers inside the throat, even ones that came off past the rim', () => {
+  it('lands containers inside the throat, even ones that came off past the rim, and drops them under its floor', () => {
     const r = footSize('ship') / FIT;
     const size = { w: 2.4, h: 2.4, d: 6.1 };
     const points = edgePoints(size.w / 2, -size.h / 2, size.h / 2, size.d / 2);
@@ -170,14 +202,13 @@ describe('spillPose', () => {
       const from = r * (0.2 + 0.03 * i);
       const b = emptySpill(size);
       const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), a);
-      startSpill(b, Math.sin(a) * from, 4 + (i % 3) * 2.5, Math.cos(a) * from, q, 1, Math.cos(a), -Math.sin(a), r, i);
+      startSpill(b, Math.sin(a) * from, 4 + (i % 3) * 2.5, Math.cos(a) * from, q, Math.cos(a), -Math.sin(a), r, i);
       for (let u = 0; u <= 1; u += 1 / 60) {
         spillPose(b, u, r, p);
         worst = Math.max(worst, worstReach(points, p, r));
       }
-      // Gone by the end.
       spillPose(b, 1, r, p);
-      expect(p.scale).toBeCloseTo(0, 5);
+      expect(topOf(points, p)).toBeLessThan(-THROAT_DEPTH * r);
     }
     expect(worst).toBeLessThan(0.01);
   });
