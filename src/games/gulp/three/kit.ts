@@ -7,7 +7,6 @@
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { KINDS, type PropKind } from '../domain/catalog';
 
 export type V3 = readonly [number, number, number];
 /** A box face, named by its outward normal. Hidden faces are dropped to save triangles. */
@@ -162,30 +161,6 @@ function plateGeometry(w: number, h: number, r: number, depth: number, seg: numb
 
 /** Faces hidden when a part sits flat against a wall (local +z faces out). */
 export const FLUSH: readonly Face[] = ['nz'];
-const partSize = new THREE.Vector3();
-
-/**
- * Kinds whose look is in their curves and small parts keep every facet: the
- * gas works' round tanks, trees, and cars. So do the smallest kinds (people,
- * pets and street clutter, below `SIMPLE_FROM_TIER`), whose small parts are
- * the whole of them. Every other kind is built with a simple kit (see `Kit`),
- * which draws a third fewer triangles or so for the city's buildings: a
- * city's worth of them is most of what a frame draws.
- */
-const DETAILED: ReadonlySet<PropKind> = new Set<PropKind>(['gastank', 'tree', 'pine', 'car', 'taxi', 'policecar']);
-const SIMPLE_FROM_TIER = 2;
-
-/**
- * The kit `kind` is drawn with: simple, or with every facet (see
- * `DETAILED`). A simple kit leaves out parts smaller every way than a few
- * hundredths of the thing's own size, at most 0.4 units: a house's door knob
- * or flower.
- */
-export function kitFor(kind: PropKind): Kit {
-  const info = KINDS[kind];
-  if (DETAILED.has(kind) || info.tier < SIMPLE_FROM_TIER) return new Kit();
-  return new Kit(true, Math.min(0.4, 0.06 * Math.hypot(info.w, info.d)));
-}
 /** Faces hidden when a part sits on the ground or on another part. */
 export const ON_GROUND: readonly Face[] = ['ny'];
 
@@ -200,22 +175,6 @@ export const ON_GROUND: readonly Face[] = ['ny'];
 export class Kit {
   private readonly parts: THREE.BufferGeometry[] = [];
   private frame = new THREE.Matrix4();
-
-  /**
-   * A `simple` kit draws the same model with fewer facets: rounded corners
-   * take fewer steps and lose their soft top edge, curves have fewer sides,
-   * and parts smaller than `tiny` every way are left out. The outline and
-   * every colour stay.
-   */
-  constructor(
-    readonly simple = false,
-    private readonly tiny = 0,
-  ) {}
-
-  /** How many sides a round part gets: fewer in a simple kit, but never fewer than ten (or than asked), so a helipad still reads round. */
-  private sides(seg: number): number {
-    return this.simple ? Math.max(Math.min(seg, 10), Math.ceil(seg * 0.6)) : seg;
-  }
 
   within(m: THREE.Matrix4, draw: () => void): void {
     const saved = this.frame;
@@ -233,14 +192,6 @@ export class Kit {
     }
     if (!g.getAttribute('normal')) g.computeVertexNormals();
     g.applyMatrix4(m ? this.frame.clone().multiply(m) : this.frame);
-    if (this.simple) {
-      g.computeBoundingBox();
-      g.boundingBox!.getSize(partSize);
-      if (Math.max(partSize.x, partSize.y, partSize.z) < this.tiny) {
-        g.dispose();
-        return;
-      }
-    }
     const c = new THREE.Color(color);
     const count = g.getAttribute('position').count;
     const rgb = new Float32Array(count * 3);
@@ -314,10 +265,9 @@ export class Kit {
     z: number,
     o: { seg?: number; ry?: number; under?: boolean } = {},
   ): void {
-    // A simple kit keeps the round outline in fewer steps, with a square top edge.
-    const seg = this.simple ? Math.min(o.seg ?? 2, 2) : (o.seg ?? 2);
+    const seg = o.seg ?? 2;
     const rr = Math.max(0.03, Math.min(r, w / 2 - 0.01, d / 2 - 0.01));
-    const bb = this.simple ? 0 : Math.max(0, Math.min(b, rr - 0.02, o.under ? h / 2 - 0.01 : h - 0.01));
+    const bb = Math.max(0, Math.min(b, rr - 0.02, o.under ? h / 2 - 0.01 : h - 0.01));
     // Each ring is (height, inset); two steps per rounded edge approximate a quarter circle.
     const q = bb * (1 - Math.SQRT1_2);
     const rings: Array<[number, number]> = [];
@@ -337,7 +287,7 @@ export class Kit {
    * windows, doors and signs. Bottom edge at y, standing out from z by `depth`.
    */
   plate(color: number, w: number, h: number, r: number, depth: number, u: number, y: number, z = 0, seg = 1): void {
-    this.add(plateGeometry(w, h, r, depth, this.simple ? 1 : seg), color, translate(u, y, z));
+    this.add(plateGeometry(w, h, r, depth, seg), color, translate(u, y, z));
   }
 
   /** Cylinder or cone standing with its base centred on (x, y, z). */
@@ -356,7 +306,7 @@ export class Kit {
       rTop,
       rBot,
       h,
-      this.sides(seg),
+      seg,
       1,
       o.open ?? false,
       o.theta?.[0] ?? 0,
@@ -368,7 +318,7 @@ export class Kit {
 
   /** Centred cylinder turned by `rot`: wheels ({ rz: PI/2 }), pipes, nozzles. */
   rod(color: number, r: number, len: number, seg: number, c: V3, rot: Rot = {}, rEnd = r): void {
-    this.add(new THREE.CylinderGeometry(rEnd, r, len, this.sides(seg)), color, placement(c[0], c[1], c[2], rot));
+    this.add(new THREE.CylinderGeometry(rEnd, r, len, seg), color, placement(c[0], c[1], c[2], rot));
   }
 
   /** A wheel with a hub, axle along x. */
@@ -380,7 +330,7 @@ export class Kit {
 
   /** Low-poly blob: canopies, bushes, flowers, scoops. */
   ico(color: number, r: number, detail: number, c: V3, scale?: V3, ry = 0): void {
-    this.add(new THREE.IcosahedronGeometry(r, this.simple ? 0 : detail), color, placement(c[0], c[1], c[2], { ry }, scale));
+    this.add(new THREE.IcosahedronGeometry(r, detail), color, placement(c[0], c[1], c[2], { ry }, scale));
   }
 
   /** Eight-triangle gem: tiny flowers, lamp bulbs, warning lights. */
@@ -396,12 +346,12 @@ export class Kit {
     rings = 6,
     o: { hemi?: boolean; scale?: V3; rot?: Rot } = {},
   ): void {
-    const g = new THREE.SphereGeometry(r, this.sides(seg), this.simple ? Math.max(3, Math.ceil(rings / 2)) : rings, 0, Math.PI * 2, 0, o.hemi ? Math.PI / 2 : Math.PI);
+    const g = new THREE.SphereGeometry(r, seg, rings, 0, Math.PI * 2, 0, o.hemi ? Math.PI / 2 : Math.PI);
     this.add(g, color, placement(c[0], c[1], c[2], o.rot, o.scale));
   }
 
   ring(color: number, r: number, tube: number, c: V3, rot: Rot = {}, radial = 3, tubular = 10): void {
-    this.add(new THREE.TorusGeometry(r, tube, radial, this.sides(tubular)), color, placement(c[0], c[1], c[2], rot));
+    this.add(new THREE.TorusGeometry(r, tube, radial, tubular), color, placement(c[0], c[1], c[2], rot));
   }
 
   /** Convex solid around the given points: roofs, cabins, wedges, rocks. */
@@ -427,7 +377,7 @@ export class Kit {
    */
   lathe(color: number, profile: ReadonlyArray<readonly [number, number]>, seg: number, x = 0, z = 0): void {
     const pts = profile.map(([r, y]) => new THREE.Vector2(r, y));
-    this.add(new THREE.LatheGeometry(pts, this.sides(seg)), color, placement(x, 0, z));
+    this.add(new THREE.LatheGeometry(pts, seg), color, placement(x, 0, z));
   }
 
   /** Striped umbrella: n wedges alternating two colours, with a short skirt. */

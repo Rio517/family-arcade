@@ -10,7 +10,7 @@ the picture and again for the shadows.
 **The proposal:** from about level 15, where people and street clutter
 already disappear, draw the city with plainer copies of its buildings, and
 switch back when the camera comes down. The plainer copies come from the same
-builders in a "far" mode of the model kit (`three/kit.ts`):
+builders with a lighter hand:
 
 - rounded corners take two steps, and top edges lose their soft bevel
 - small rounded windows get crisper corners
@@ -36,11 +36,7 @@ into a running round by a throwaway script.
 
 ## Outcome
 
-**Decision: the simpler models everywhere, not only from high up.** Gas
-tanks, trees and cars keep their full detail, as do people, pets and street
-clutter (the two smallest tiers), whose small parts are the whole of them.
-The rule lives in `kitFor` in `three/kit.ts`. At the start of a round the
-camera is close, so the simpler windows show as hexagons there; that was
-accepted for the saving. In the same level-17 test as above, frames over
-33 ms went from 7 (car shadow patches already hidden) to 0, and the typical
-frame from 12.8 ms to 10.3 ms.
+**Decision: the detailed models stay, everywhere.** Played up close, where
+every round starts, the simpler buildings looked less friendly. Their code is
+in the git history, in the commit "Gulp: simpler building models
+everywhere", for a version used only from high up.
