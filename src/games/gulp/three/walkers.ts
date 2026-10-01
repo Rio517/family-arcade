@@ -29,6 +29,9 @@ export class Walkers {
   private batonMat = new THREE.MeshStandardMaterial({ color: 0x1d1f33, roughness: 0.5 });
   private dummy = new THREE.Object3D();
   private touched = new Set<THREE.InstancedMesh>();
+  /** The walkers' batches, and whether they are drawn (not from high above, see `showPeople`). */
+  private crowds: THREE.InstancedMesh[] = [];
+  private peopleShown = true;
 
   constructor(
     private scene: THREE.Scene,
@@ -51,6 +54,7 @@ export class Walkers {
       mesh.frustumCulled = false;
       list.forEach((person, index) => this.people.push({ person, mesh, index }));
       scene.add(mesh);
+      this.crowds.push(mesh);
     }
     // A pool of "!" marks for people running away.
     for (let i = 0; i < ALARMS; i++) {
@@ -65,8 +69,20 @@ export class Walkers {
 
   /** Everyone where the world says. `time` is the scene's clock. */
   sync(world: World, time: number, dt: number): void {
-    this.syncPeople(world, time, dt);
+    if (this.peopleShown) this.syncPeople(world, time, dt);
     this.syncResponders(world, time);
+  }
+
+  /**
+   * Draw the people walking about, or not: from high above (a giant's
+   * camera) they are specks, and their "!" marks are clutter. Hidden, they
+   * are not moved either.
+   */
+  showPeople(shown: boolean): void {
+    if (shown === this.peopleShown) return;
+    this.peopleShown = shown;
+    for (const m of this.crowds) m.visible = shown;
+    if (!shown) for (const a of this.alarms) a.visible = false;
   }
 
   dispose(): void {

@@ -2,7 +2,8 @@
  * The city's things as drawn. They stand in batches (one InstancedMesh per
  * model per area of the map), so a Region map with thousands of things stays
  * quick and the areas off screen are skipped. Things put up during a round
- * are drawn one by one as they rise. A swallowed thing tips into its hole
+ * go into batches of their own, made as they are needed, and rise there; a
+ * slot let go by an eaten one is used again. A swallowed thing tips into its hole
  * (`swallow`, `stepFallers`); one too big to swallow rocks on the rim of the
  * child's hole (`wobble`); one in the way of the camera goes see-through
  * (see seeThrough.ts).
@@ -44,6 +45,21 @@ const SINK: Partial<Record<Prop['kind'], number>> = { ship: -2 };
 const CLUTTER: ReadonlySet<string> = new Set(['lamp', 'bin', 'hydrant', 'planter', 'cone', 'bike', 'mailbox']);
 /** Where a batch puts a thing it is not showing. */
 const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
+/** Slots in each batch of things put up during a round. */
+const POOL_SIZE = 32;
+/** How far above and around its square a batch's tallest thing can reach, for culling. */
+const POOL_REACH = 100;
+/**
+ * The tiny things that go when the camera is far up (about level 15): people,
+ * street lamps and the street clutter a giant takes without a fuss. Trees stay.
+ */
+const isTiny = (kind: Prop['kind']): boolean => kind === 'lamp' || (KINDS[kind].tier <= 1 && !isSite(kind));
+
+/** A batch for things put up during a round, and its slots let go. */
+interface Pool {
+  mesh: THREE.InstancedMesh;
+  free: number[];
+}
 
 interface Slot {
   mesh: THREE.InstancedMesh;
@@ -51,6 +67,8 @@ interface Slot {
   matrix: THREE.Matrix4;
   /** A vehicle's soft shadow patch, drawn with the same matrix. */
   blob?: THREE.InstancedMesh;
+  /** The batch it was given when it was put up during the round. */
+  pool?: Pool;
 }
 
 interface Faller {
@@ -74,18 +92,20 @@ interface Faller {
   tilt: number;
 }
 
-/** Something put up during the round; `t` runs 0..1 while it rises. */
-interface Built {
-  mesh: THREE.Mesh;
+/** Something put up during the round, rising: `t` runs 0..1 over `time` seconds. */
+interface Rising {
   t: number;
-  /** Seconds to rise. */
   time: number;
 }
 
 export class PropView {
   private slots = new Map<number, Slot>();
-  private batches: Array<{ mesh: THREE.InstancedMesh; tier: number; casts: boolean }> = [];
-  private built = new Map<number, Built>();
+  private batches: Array<{ mesh: THREE.InstancedMesh; kind: Prop['kind']; casts: boolean }> = [];
+  /** Batches for things put up during the round, by area and model. */
+  private pools = new Map<string, Pool[]>();
+  private rising = new Map<number, Rising>();
+  private riseMatrix = new THREE.Matrix4();
+  private riseScale = new THREE.Matrix4();
   private fallers: Faller[] = [];
   private seeThrough: SeeThrough;
   private blobTex = blobTexture();
@@ -130,28 +150,26 @@ export class PropView {
   /** A tiny thing a giant took without a fuss: hide it where it stood, no fall. */
   vanish(p: Prop): void {
     this.setShown(p, false);
+    this.release(p);
   }
 
   /** A thing leaves the city: hide it where it stood, and start a copy falling. */
   swallow(p: Prop, hole: number): void {
     this.setShown(p, false);
     const ghost = this.seeThrough.take(p.id);
-    const built = this.built.get(p.id);
-    if (built) this.built.delete(p.id);
+    const rise = this.rising.get(p.id);
+    this.release(p);
     let mesh: THREE.Mesh;
     let ownMaterial = false;
     if (ghost) {
-      if (built) this.scene.remove(built.mesh);
       mesh = ghost;
       ownMaterial = true;
-    } else if (built) {
-      // A building still going up falls as it stands.
-      mesh = built.mesh;
-      mesh.visible = true;
     } else {
       mesh = new THREE.Mesh(modelOf(p), this.material);
       mesh.position.set(p.x, this.groundOf(p), p.z);
       mesh.rotation.y = p.rot;
+      // A building still going up falls as tall as it got.
+      if (rise) mesh.scale.y = this.risen(rise.t);
       mesh.castShadow = true;
       this.scene.add(mesh);
     }
@@ -174,36 +192,30 @@ export class PropView {
    * little overshoot, while dust puffs out round its base (see the scene).
    */
   raise(p: Prop): void {
-    const mesh = new THREE.Mesh(modelOf(p), this.material);
-    mesh.position.set(p.x, this.groundOf(p), p.z);
-    mesh.rotation.y = p.rot;
-    mesh.scale.y = 0.02;
-    // A building site is low: no shadow to draw.
-    mesh.castShadow = !isSite(p.kind);
-    mesh.receiveShadow = true;
-    this.scene.add(mesh);
+    this.slots.set(p.id, this.slotFor(p));
     const time = p.kind === 'tallsite' ? 2.5 : isSite(p.kind) ? 0.6 : BUILD_TIME;
-    this.built.set(p.id, { mesh, t: this.reducedMotion ? 1 : 0, time });
+    if (!this.reducedMotion) this.rising.set(p.id, { t: 0, time });
+    this.setShown(p, true);
     if (!isSite(p.kind)) this.seeThrough.track(p);
   }
 
   /** Something that was always there joins the city (a police car that has parked): no rising out of the ground. */
   appear(p: Prop): void {
-    this.raise(p);
-    const b = this.built.get(p.id);
-    if (b) {
-      b.t = 1;
-      b.mesh.scale.y = 1;
-    }
+    this.slots.set(p.id, this.slotFor(p));
+    this.setShown(p, true);
+    this.seeThrough.track(p);
   }
 
   /** Take away something built during the round (a site whose building is done). */
   clear(p: Prop): void {
-    const b = this.built.get(p.id);
-    if (!b) return;
-    this.built.delete(p.id);
-    this.scene.remove(b.mesh);
+    this.setShown(p, false);
+    this.release(p);
     this.seeThrough.untrack(p);
+  }
+
+  /** Show or hide the tiny things (see `isTiny`): they go when the camera is high above them. */
+  showTiny(shown: boolean): void {
+    for (const b of this.batches) if (isTiny(b.kind)) b.mesh.visible = shown;
   }
 
   /** Show a thing again where it stands (it grew back). */
@@ -215,7 +227,7 @@ export class PropView {
   step(world: World, dt: number): void {
     this.lastWorld = world;
     this.stepFallers(world, dt);
-    this.stepBuilt(dt);
+    this.stepRising(dt);
   }
 
   /**
@@ -252,7 +264,6 @@ export class PropView {
         const ghost = this.seeThrough.get(id);
         if (p && !ghost) this.setShown(p, true);
         this.upright.set(0, p ? p.rot : 0, 0);
-        this.built.get(id)?.mesh.quaternion.setFromEuler(this.upright);
         ghost?.quaternion.setFromEuler(this.upright);
         continue;
       }
@@ -277,7 +288,7 @@ export class PropView {
       w.updateMatrix();
       const ghost = this.seeThrough.get(id);
       if (ghost) ghost.quaternion.copy(w.quaternion);
-      else this.place(p, w.matrix, w.quaternion);
+      else this.place(p, w.matrix);
     }
   }
 
@@ -289,7 +300,7 @@ export class PropView {
   /** Small things cast no shadow once the camera is high above them (a hole of radius `r`). */
   castShadows(r: number): void {
     const small = r > 14;
-    for (const b of this.batches) b.mesh.castShadow = b.casts && !(small && b.tier <= 2);
+    for (const b of this.batches) b.mesh.castShadow = b.casts && !(small && KINDS[b.kind].tier <= 2);
   }
 
   dispose(): void {
@@ -337,7 +348,7 @@ export class PropView {
       mesh.receiveShadow = true;
       mesh.computeBoundingSphere();
       this.scene.add(mesh);
-      this.batches.push({ mesh, tier: KINDS[kind].tier, casts });
+      this.batches.push({ mesh, kind, casts });
     }
   }
 
@@ -354,14 +365,69 @@ export class PropView {
     return geo;
   }
 
+  /**
+   * A slot for something put up during the round, in a batch for its model
+   * and square of the map: a free one in a batch already made, or a new batch.
+   */
+  private slotFor(p: Prop): Slot {
+    const geo = modelOf(p);
+    const cx = Math.floor(p.x / CHUNK);
+    const cz = Math.floor(p.z / CHUNK);
+    const key = `${cx}:${cz}:${geo.uuid}`;
+    let list = this.pools.get(key);
+    if (!list) {
+      list = [];
+      this.pools.set(key, list);
+    }
+    let pool = list.find((q) => q.free.length > 0 || q.mesh.count < POOL_SIZE);
+    if (!pool) {
+      const mesh = new THREE.InstancedMesh(geo, this.material, POOL_SIZE);
+      mesh.count = 0;
+      // A building site is low: no shadow to draw.
+      const casts = !isSite(p.kind);
+      mesh.castShadow = casts;
+      mesh.receiveShadow = true;
+      // Everything in it stands in one square: bound it by the square, not by its slots.
+      mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3((cx + 0.5) * CHUNK, 0, (cz + 0.5) * CHUNK), CHUNK * Math.SQRT1_2 + POOL_REACH);
+      this.scene.add(mesh);
+      pool = { mesh, free: [] };
+      list.push(pool);
+      this.batches.push({ mesh, kind: p.kind, casts });
+    }
+    const index = pool.free.pop() ?? pool.mesh.count++;
+    const d = this.dummy;
+    d.position.set(p.x, (SINK[p.kind] ?? 0) + this.groundOf(p), p.z);
+    d.rotation.set(0, p.rot, 0);
+    d.scale.set(1, 1, 1);
+    d.updateMatrix();
+    return { mesh: pool.mesh, index, matrix: d.matrix.clone(), pool };
+  }
+
+  /** Let go of the slot of something put up during the round (it was eaten or replaced). */
+  private release(p: Prop): void {
+    this.rising.delete(p.id);
+    const slot = this.slots.get(p.id);
+    if (!slot?.pool) return;
+    slot.pool.free.push(slot.index);
+    this.slots.delete(p.id);
+  }
+
+  /** How tall a thing rising out of the ground stands, 0..1 through its rise: up with a little overshoot, then settled. */
+  private risen(t: number): number {
+    if (t >= 1 || this.reducedMotion) return 1;
+    return Math.max(0.02, Math.min(1.04, 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2)));
+  }
+
+  /** A slot's matrix squashed to how far it has risen. */
+  private risenMatrix(slot: Slot, t: number): THREE.Matrix4 {
+    return this.riseMatrix.copy(slot.matrix).multiply(this.riseScale.makeScale(1, this.risen(t), 1));
+  }
+
   private setShown(p: Prop, shown: boolean): void {
     const slot = this.slots.get(p.id);
-    if (!slot) {
-      const b = this.built.get(p.id);
-      if (b) b.mesh.visible = shown;
-      return;
-    }
-    slot.mesh.setMatrixAt(slot.index, shown ? slot.matrix : HIDDEN);
+    if (!slot) return;
+    const rise = this.rising.get(p.id);
+    slot.mesh.setMatrixAt(slot.index, !shown ? HIDDEN : rise ? this.risenMatrix(slot, rise.t) : slot.matrix);
     slot.mesh.instanceMatrix.needsUpdate = true;
     if (slot.blob) {
       slot.blob.setMatrixAt(slot.index, shown ? slot.matrix : HIDDEN);
@@ -375,15 +441,12 @@ export class PropView {
     return groundAt(this.lastWorld.city, p.x, p.z);
   }
 
-  private place(p: Prop, matrix: THREE.Matrix4, q: THREE.Quaternion): void {
+  private place(p: Prop, matrix: THREE.Matrix4): void {
     const slot = this.slots.get(p.id);
-    if (slot) {
-      slot.mesh.setMatrixAt(slot.index, matrix);
-      slot.mesh.instanceMatrix.needsUpdate = true;
-      return;
-    }
-    const b = this.built.get(p.id);
-    if (b && b.t >= 1) b.mesh.quaternion.copy(q);
+    // A thing still rising does not rock yet.
+    if (!slot || this.rising.has(p.id)) return;
+    slot.mesh.setMatrixAt(slot.index, matrix);
+    slot.mesh.instanceMatrix.needsUpdate = true;
   }
 
   /**
@@ -428,14 +491,17 @@ export class PropView {
     }
   }
 
-  private stepBuilt(dt: number): void {
-    for (const b of this.built.values()) {
-      if (b.t >= 1) continue;
-      b.t = Math.min(1, b.t + dt / b.time);
-      // Up with a little overshoot, then settled.
-      const k = b.t;
-      const ease = 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2);
-      b.mesh.scale.y = b.t >= 1 || this.reducedMotion ? 1 : Math.max(0.02, Math.min(1.04, ease));
+  /** Things put up during the round rise out of the ground in their batch slots. */
+  private stepRising(dt: number): void {
+    for (const [id, rise] of this.rising) {
+      rise.t = Math.min(1, rise.t + dt / rise.time);
+      const slot = this.slots.get(id);
+      // One the camera sees through is drawn as its see-through copy for now.
+      if (slot && !this.seeThrough.get(id)) {
+        slot.mesh.setMatrixAt(slot.index, rise.t >= 1 ? slot.matrix : this.risenMatrix(slot, rise.t));
+        slot.mesh.instanceMatrix.needsUpdate = true;
+      }
+      if (rise.t >= 1) this.rising.delete(id);
     }
   }
 

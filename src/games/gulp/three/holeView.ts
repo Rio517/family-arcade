@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { FIT, type Prop } from '../domain/catalog';
 import { POWER_TIME, type Hole } from '../domain/world';
-import { auraTexture, bubbleTexture, countTexture, labelTexture, smearTexture, type Smear } from './canvasTextures';
+import { BUBBLE_HEIGHT, auraTexture, bubbleTexture, countTexture, labelTexture, smearTexture, type Smear } from './canvasTextures';
 import type { Effects } from './effects';
 
 export interface HoleLook {
@@ -192,6 +192,9 @@ export class HoleViews {
     const mat = this.bubble.sprite.material as THREE.SpriteMaterial;
     mat.map = tex;
     mat.needsUpdate = true;
+    // As wide on screen as its picture: a long bonus gets a longer bubble, not squeezed words.
+    const width = (tex.image as HTMLCanvasElement).width;
+    this.bubble.sprite.scale.set((0.06 * width) / BUBBLE_HEIGHT, 0.06, 1);
     this.bubble.life = 1.3;
     this.bubble.hole = hole;
   }

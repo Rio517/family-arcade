@@ -109,6 +109,11 @@ export class CameraRig {
     this.free.z -= dy * per * 1.3;
   }
 
+  /** How far the camera is from the spot it looks at. */
+  distance(): number {
+    return this.camPos.distanceTo(this.camLook);
+  }
+
   /** Shake the camera for `seconds` (a blast nearby). */
   shake(seconds: number): void {
     this.shakeLeft = seconds;

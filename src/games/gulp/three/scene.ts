@@ -33,6 +33,12 @@ import { Walkers } from './walkers';
 export type { HoleLook } from './holeView';
 
 const SHADOW_MAP = 2048;
+/**
+ * How far the camera is from the hole when people and street clutter go
+ * (about level 15 at the usual zoom), and when they come back.
+ */
+const TINY_FAR = 125;
+const TINY_BACK = 110;
 
 export class GulpScene {
   private renderer: THREE.WebGLRenderer;
@@ -65,6 +71,8 @@ export class GulpScene {
   private pending = 0;
   private pendingAt = new THREE.Vector3();
   private pendingFor = 0;
+  /** People and street clutter hidden, the camera being high above them. */
+  private tinyHidden = false;
   private disposed = false;
 
   constructor(
@@ -222,6 +230,16 @@ export class GulpScene {
     this.effects.step(dt);
 
     this.rig.update(world, me, this.time, dt);
+    // From high above (a giant's camera, about level 15) people, street lamps
+    // and street clutter are specks: they go, and come back when the camera
+    // comes down again (a little lower, so they do not flicker on the line).
+    const dist = this.rig.distance();
+    const far = this.tinyHidden ? dist > TINY_BACK : dist > TINY_FAR;
+    if (far !== this.tinyHidden) {
+      this.tinyHidden = far;
+      this.props.showTiny(!far);
+      this.walkers.showPeople(!far);
+    }
     // After the camera has moved: what stands in its way depends on where it is now.
     if (playing) {
       this.props.fadeInTheWay(world, playing, this.camera.position, this.time, dt);
