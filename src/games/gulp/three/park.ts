@@ -512,6 +512,13 @@ function tallsite(k: Kit, v: number): void {
   const y0 = 0.2;
   k.box(CONCRETE_GREY, 2.6, 21.2, 2.6, bx, y0, bz, undefined, ON_GROUND);
   k.box(darker(CONCRETE_GREY, 0.2), 1.2, 2.2, 0.08, bx, y0 + 18.6, bz + 1.34, undefined, FLUSH);
+  // The columns run up through the slabs in one piece each: the slabs hide where they cross.
+  for (const px of [-1, 0, 1]) {
+    for (const pz of [-1, 0, 1]) {
+      if (px === 0 && pz === 0) continue;
+      k.box(lighter(CONCRETE_GREY, 0.1), 0.34, floors * fh, 0.34, bx + px * (S / 2 - 0.3), y0, bz + pz * (S / 2 - 0.3), undefined, ['py', 'ny']);
+    }
+  }
   for (let f = 0; f <= floors; f++) {
     const y = y0 + f * fh;
     const top = f === floors;
@@ -519,12 +526,6 @@ function tallsite(k: Kit, v: number): void {
     if (top) k.box(CONCRETE_GREY, S, 0.3, S / 2, bx, y, bz - S / 4);
     else if (f > 0) k.box(CONCRETE_GREY, S, 0.3, S, bx, y, bz);
     if (top) continue;
-    for (const px of [-1, 0, 1]) {
-      for (const pz of [-1, 0, 1]) {
-        if (px === 0 && pz === 0) continue;
-        k.box(lighter(CONCRETE_GREY, 0.1), 0.34, fh - (f === 0 ? 0 : 0.3), 0.34, bx + px * (S / 2 - 0.3), y + (f === 0 ? 0 : 0.3), bz + pz * (S / 2 - 0.3), undefined, ['py', 'ny']);
-      }
-    }
     // The lowest two floors are already glazed.
     if (f < 2) k.box(SITE_GLASS, S - 0.9, fh - 0.3, S - 0.9, bx, y + (f === 0 ? 0 : 0.3), bz, undefined, ['py', 'ny']);
   }
