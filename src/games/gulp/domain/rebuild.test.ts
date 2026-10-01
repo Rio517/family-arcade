@@ -113,4 +113,19 @@ describe('the city rebuilds', () => {
     const events = eatAndWait(w, [makeProp(1, 'house', me.x, me.z, 0), makeProp(2, 'cone', me.x + 1, me.z, 0)], 40);
     expect(events.filter((e) => e.type === 'rebuild' || e.type === 'regrow')).toEqual([]);
   });
+
+  it('a block eaten at once comes back one building at a time, a quarter-second apart at least', () => {
+    const w = round(1, 0, { regrow: true, duration: 0 });
+    const me = grow(w, 0, 3000);
+    w.elapsed = 100;
+    const houses = Array.from({ length: 8 }, (_, i) => makeProp(1 + i, 'house', me.x + (i % 4) * 9 - 13, me.z + Math.floor(i / 4) * 9 - 4, 0));
+    only(w, houses);
+    stepWorld(w, 1 / 60, still);
+    const times: number[] = [];
+    for (let i = 0; i < 60 * 60; i++) {
+      for (const e of stepWorld(w, 1 / 60, i < 60 * 6 ? { x: 1, z: 0 } : still)) if (e.type === 'rebuild') times.push(w.elapsed);
+    }
+    expect(times.length).toBeGreaterThanOrEqual(16);
+    for (let i = 1; i < times.length; i++) expect(times[i] - times[i - 1]).toBeGreaterThanOrEqual(0.24);
+  });
 });

@@ -43,6 +43,12 @@ export class GulpScene {
   private effects: Effects;
   /** The one flat-shaded, vertex-coloured material every model shares. */
   private material = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8, metalness: 0 });
+  /**
+   * Models the warm-up just built, drawn once far out of sight (tiny, deep
+   * under the ground) so their geometry reaches the graphics card in a quiet
+   * frame, not on the frame a building first rises (a stall on an iPad).
+   */
+  private primer = new THREE.Group();
   private props: PropView;
   private walkers: Walkers;
   private holes: HoleViews;
@@ -123,6 +129,9 @@ export class GulpScene {
     this.rig = new CameraRig(this.camera, this.sun, fog, menuTour, reducedMotion);
     this.rig.start(world, world.holes[follow]);
     this.warmup = menuTour ? null : new ModelWarmup();
+    this.primer.position.set(0, -500, 0);
+    this.primer.scale.setScalar(0.001);
+    this.scene.add(this.primer);
     // Compile every shader an effect or a mess will use now, not on the frame it first shows.
     this.renderer.compile(this.effects.prototypes(), this.camera, this.scene);
 
@@ -135,7 +144,13 @@ export class GulpScene {
   /** Mirror the world, play what just happened, and move the camera. */
   sync(world: World, events: WorldEvent[], dt: number): void {
     if (this.disposed) return;
-    this.warmup?.step(2);
+    this.primer.clear();
+    for (const geo of this.warmup?.step(2) ?? []) {
+      const m = new THREE.Mesh(geo, this.material);
+      m.frustumCulled = false;
+      m.castShadow = true;
+      this.primer.add(m);
+    }
     this.time += dt;
     const me = world.holes[this.follow];
 

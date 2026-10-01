@@ -54,6 +54,11 @@ const SITE_AFTER = 6;
 const SITE_TIME = 16;
 /** Every this many seconds of a round, one more rung of the ladder opens. */
 const AGE_STEP = 40;
+/**
+ * Seconds between two things going up: a block eaten at once comes back one
+ * building at a time, never all on the same frame (a stall on a tablet).
+ */
+const RAISE_GAP = 0.25;
 /** Seconds a new building takes to rise in the scene. */
 export const BUILD_TIME = 3;
 /** Seconds between two news stories, at least. */
@@ -137,6 +142,7 @@ export function regrow(w: World, dt: number, events: WorldEvent[]): void {
  * construction site, and later finish it as a new building.
  */
 export function rebuild(w: World, events: WorldEvent[]): void {
+  if (w.elapsed < w.nextRaise) return;
   for (let i = w.lots.length - 1; i >= 0; i--) {
     const lot = w.lots[i];
     if (lot.due > w.elapsed) continue;
@@ -148,7 +154,8 @@ export function rebuild(w: World, events: WorldEvent[]): void {
       lot.site = site.id;
       lot.due = w.elapsed + SITE_TIME + w.rng() * 8;
       events.push({ type: 'rebuild', prop: site, replaces: null });
-      continue;
+      w.nextRaise = w.elapsed + RAISE_GAP;
+      return;
     }
     const site = w.props.get(lot.site);
     if (!site) {
@@ -166,7 +173,8 @@ export function rebuild(w: World, events: WorldEvent[]): void {
       lot.site = frame.id;
       lot.due = w.elapsed + SITE_TIME + w.rng() * 8;
       events.push({ type: 'rebuild', prop: frame, replaces: site });
-      continue;
+      w.nextRaise = w.elapsed + RAISE_GAP;
+      return;
     }
     w.lots.splice(i, 1);
     w.props.delete(site.id);
@@ -177,11 +185,13 @@ export function rebuild(w: World, events: WorldEvent[]): void {
     const p = makeProp(w.nextPropId++, kind.kind, lot.x, lot.z, lot.rot, look, kind.hScale ?? Math.min(2, 1 + 0.2 * extra));
     placeProp(w, p);
     events.push({ type: 'rebuild', prop: p, replaces: site });
+    w.nextRaise = w.elapsed + RAISE_GAP;
     const headline = HEADLINE[p.kind] ?? (p.kind === 'tower' && p.hScale >= 1.4 ? 'The city has a new skyscraper!' : undefined);
     if (headline && w.elapsed - w.lastNews >= NEWS_GAP) {
       w.lastNews = w.elapsed;
       events.push({ type: 'news', text: headline, x: p.x, z: p.z });
     }
+    return;
   }
 }
 

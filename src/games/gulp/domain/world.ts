@@ -122,6 +122,8 @@ export interface World {
   nextPropId: number;
   people: Person[];
   lastNews: number;
+  /** When the next thing may go up (see rebuild's RAISE_GAP). */
+  nextRaise: number;
   responders: Responder[];
   police: { eaten: number; cool: number };
 }
@@ -185,6 +187,7 @@ export function createWorld(rng: Rng, player: Racer | null, rivals: Racer[], opt
     responders: [],
     police: { eaten: 0, cool: POLICE_COOL / 2 },
     lastNews: -NEWS_GAP,
+    nextRaise: 0,
   };
   indexProps(world);
   return world;
