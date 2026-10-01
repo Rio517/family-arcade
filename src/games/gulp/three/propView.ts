@@ -374,6 +374,7 @@ export class PropView {
     this.blobTex.dispose();
     this.blobMat.dispose();
     for (const g of this.blobGeos.values()) g.dispose();
+    this.seeThrough.dispose();
   }
 
   private buildBatches(world: World): void {
