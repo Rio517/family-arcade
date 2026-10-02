@@ -42,15 +42,17 @@ const HURT: Record<'chem' | 'tanker' | 'bomb', Omit<Banner, 'id'>> = {
   bomb: { kind: 'hurt', text: 'Boom! You shrank', sub: 'Ouch, a bit smaller' },
 };
 
-/** The child's hole is always hole 0. */
-const ME = 0;
-
-export function feedbackFor(e: WorldEvent, w: World, said: Said): Feedback | null {
+/**
+ * What `e` means for the child on this device, whose hole is `me`: hole 0
+ * for a solo round and for the host of a shared one, the seat it was given
+ * for a guest.
+ */
+export function feedbackFor(e: WorldEvent, w: World, said: Said, me = 0): Feedback | null {
   switch (e.type) {
     case 'eat':
-      return e.hole === ME ? { cue: 'gulp', size: Math.min(1, KINDS[e.prop.kind].tier / 8) } : null;
+      return e.hole === me ? { cue: 'gulp', size: Math.min(1, KINDS[e.prop.kind].tier / 8) } : null;
     case 'level':
-      if (e.hole !== ME) return null;
+      if (e.hole !== me) return null;
       return {
         cue: 'level',
         banner: {
@@ -67,28 +69,28 @@ export function feedbackFor(e: WorldEvent, w: World, said: Said): Feedback | nul
       said.police = true;
       return { cue: 'warn', banner: { kind: 'good', text: 'Nee-naw! Police!' } };
     case 'wonder':
-      return e.hole === ME ? { cue: 'win', banner: { kind: 'news', text: `You gulped ${e.name}! +${e.points.toLocaleString()}` } } : null;
+      return e.hole === me ? { cue: 'win', banner: { kind: 'news', text: `You gulped ${e.name}! +${e.points.toLocaleString()}` } } : null;
     case 'combo':
-      if (e.hole !== ME) return null;
+      if (e.hole !== me) return null;
       // The first step up in a round says what the multiplier is; after that the sound is enough.
       if (said.combo) return { cue: 'power' };
       said.combo = true;
       return { cue: 'power', banner: { kind: 'good', text: `Gulp fast! Points x${e.mult}`, sub: 'Keep gulping for bigger points' } };
     case 'power':
-      return e.hole === ME ? { cue: 'power', banner: { kind: 'good', text: e.kind === 'speed' ? 'Speed boost!' : 'Double points!' } } : null;
+      return e.hole === me ? { cue: 'power', banner: { kind: 'good', text: e.kind === 'speed' ? 'Speed boost!' : 'Double points!' } } : null;
     case 'gulp':
-      return e.eater === ME ? { cue: 'gulp', size: 1, banner: { kind: 'good', text: `You swallowed ${w.holes[e.eaten].name}!`, points: e.points } } : null;
+      return e.eater === me ? { cue: 'gulp', size: 1, banner: { kind: 'good', text: `You swallowed ${w.holes[e.eaten].name}!`, points: e.points } } : null;
     case 'out':
       // The child's own last life ends the round (the results say so); a computer hole's is news.
-      return e.hole === ME ? null : { banner: { kind: 'news', text: `${w.holes[e.hole].name} is out of lives!` } };
+      return e.hole === me ? null : { banner: { kind: 'news', text: `${w.holes[e.hole].name} is out of lives!` } };
     case 'incoming':
-      if (e.target === ME) return { cue: 'warn', banner: INCOMING[e.kind] };
+      if (e.target === me) return { cue: 'warn', banner: INCOMING[e.kind] };
       return { banner: { kind: 'news', text: `${AFTER[e.kind]} ${w.holes[e.target].name}!` } };
     case 'hurt':
-      return e.hole === ME ? { cue: 'hurt', banner: HURT[e.cause] } : null;
+      return e.hole === me ? { cue: 'hurt', banner: HURT[e.cause] } : null;
     case 'boom': {
-      const me = w.holes[ME];
-      return Math.hypot(e.x - me.x, e.z - me.z) < 60 + me.r * 3 ? { cue: 'boom' } : null;
+      const mine = w.holes[me];
+      return Math.hypot(e.x - mine.x, e.z - mine.z) < 60 + mine.r * 3 ? { cue: 'boom' } : null;
     }
     default:
       return null;
