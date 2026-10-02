@@ -982,7 +982,62 @@ const SHOTS = [
       await page.waitForTimeout(2000);
     },
   },
+  // ── Gulp with friends: a shared round's states (harness page, real stage) ──
+  {
+    // The host's screen: Rio's device dropped out, so Rio's hole waits beside
+    // Klara's, faint and with its name tag, and the note says whom we wait for.
+    name: 'gulp-together-waiting',
+    path: '/preview-gulp-together.html?s=round-waiting',
+    viewport: TABLET,
+    engines: ['chromium', 'webkit'],
+    fits: true,
+    expect: '[data-testid="gulp-notice"]',
+    prep: waitForGulpRound,
+  },
+  {
+    // Two devices dropped, on a phone: the longest note that fits on one line.
+    name: 'gulp-together-waiting-phone',
+    path: '/preview-gulp-together.html?s=round-waiting-two',
+    viewport: PHONE,
+    fits: true,
+    expect: '[data-testid="gulp-notice"]',
+    prep: waitForGulpRound,
+  },
+  {
+    // A guest's screen when the host's device goes quiet: everything holds still.
+    name: 'gulp-together-host-waiting',
+    path: '/preview-gulp-together.html?s=round-host-waiting',
+    viewport: PHONE,
+    fits: true,
+    expect: '[data-testid="gulp-notice"]',
+    prep: waitForGulpRound,
+  },
+  {
+    // The host's results after a shared round, with a guest asking for another.
+    name: 'gulp-together-results',
+    path: '/preview-gulp-together.html?s=results-shared',
+    viewport: TABLET,
+    fits: true,
+    expect: '[data-testid="gulp-results"]',
+    prep: waitForGulpRound,
+  },
+  {
+    // A guest's results when the host never came back: the round ended early.
+    name: 'gulp-together-ended-early',
+    path: '/preview-gulp-together.html?s=results-ended-early',
+    viewport: PHONE,
+    fits: true,
+    expect: '[data-testid="gulp-ended-early"]',
+    prep: waitForGulpRound,
+  },
 ];
+
+/** A Gulp round on the harness page: the city built and a few frames drawn. */
+async function waitForGulpRound(page) {
+  await page.waitForSelector('.gulp-canvas canvas', { timeout: 20000 });
+  await page.waitForSelector('[data-testid="gulp-loading"]', { state: 'detached', timeout: 60000 });
+  await page.waitForTimeout(2500);
+}
 
 /**
  * The mirror's tracker is lazy: ~23 MB of WASM and models on first use, then
