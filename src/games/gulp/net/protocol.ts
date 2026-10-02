@@ -130,7 +130,7 @@ function isSettings(v: unknown): v is RoundSettings {
   if (!isRecord(v)) return false;
   return (
     typeof v.map === 'string' &&
-    Object.hasOwn(MAPS, v.map) &&
+    Object.prototype.hasOwnProperty.call(MAPS, v.map) &&
     DIFFICULTIES.includes(v.difficulty) &&
     inRange(v.duration, 0, 60 * 60) &&
     isBool(v.powerups) &&
@@ -160,7 +160,7 @@ export function isGulpMsg(value: unknown): value is GulpMsg {
         isSettings(m.settings) &&
         Array.isArray(m.wonders) &&
         m.wonders.length <= 64 &&
-        m.wonders.every((k) => typeof k === 'string' && Object.hasOwn(KINDS, k)) &&
+        m.wonders.every((k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(KINDS, k)) &&
         isSeats(m.seats, MAX_HOLES) &&
         inRange(m.you, 1, MAX_CHILDREN - 1) &&
         m.you < m.seats.length
