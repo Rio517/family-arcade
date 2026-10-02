@@ -211,7 +211,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
       if (doneRef.current) return;
       doneRef.current = true;
       const order = standings(w);
-      const me = w.holes[0];
+      const me = w.holes[round.follow];
       const rank = order.indexOf(me) + 1;
       const map = w.options.map;
       const difficulty = w.options.difficulty;
@@ -250,7 +250,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
         finishedAt: now,
       });
     },
-    [scores, player, myName, userId],
+    [scores, player, myName, userId, round.follow],
   );
 
   const onFrame = useCallback(
@@ -259,7 +259,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
       if (!round.playing) return;
       const sounds = soundsRef.current;
       for (const e of events) {
-        const f = feedbackFor(e, w, said.current);
+        const f = feedbackFor(e, w, said.current, round.follow);
         if (f?.cue) sounds?.play(f.cue, f.size);
         if (f?.banner) say(f.banner);
       }
@@ -275,7 +275,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
       beatRef.current += dt;
       if (beatRef.current > 0.1) {
         beatRef.current = 0;
-        setHud(hudOf(w, 0));
+        setHud(hudOf(w, round.follow));
       }
       if (w.status === 'over') finish(w);
     },

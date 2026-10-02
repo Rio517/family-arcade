@@ -49,6 +49,7 @@ export function GulpStage({
   playing,
   pausedRef,
   onFrame,
+  step,
   load = loadScene,
 }: {
   /** One world per mount: the page gives each round a fresh key. */
@@ -59,12 +60,19 @@ export function GulpStage({
   playing: boolean;
   pausedRef: React.MutableRefObject<boolean>;
   onFrame: (events: WorldEvent[], dt: number) => void;
+  /**
+   * How the round moves on each frame, with this device's steering. Left out,
+   * the rules step the world here (a solo round). In a shared round the table
+   * steps it: the host's real round, or a guest's copy of it.
+   */
+  step?: (dt: number, input: Input | null) => WorldEvent[];
   load?: SceneLoader;
 }) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const keysRef = useRef(new Set<string>());
   const pointerRef = useRef<Pointer>({ kind: null, dx: 0, dy: 0, ox: 0, oy: 0, scale: 1 });
   const onFrameRef = useRef(onFrame);
+  const stepRef = useRef(step);
   const [stick, setStick] = useState<{ x: number; y: number; kx: number; ky: number } | null>(null);
   const [failed, setFailed] = useState(false);
   /** Until the city's first frame is drawn, a loading card covers the stage. */
@@ -80,7 +88,8 @@ export function GulpStage({
 
   useEffect(() => {
     onFrameRef.current = onFrame;
-  }, [onFrame]);
+    stepRef.current = step;
+  }, [onFrame, step]);
 
   const sceneRef = useRef<GulpScene | null>(null);
 
@@ -181,7 +190,10 @@ export function GulpStage({
         // The arrows slide the free camera; the round waits.
         const { x, z } = readInput(keysRef.current, { kind: null, dx: 0, dy: 0, ox: 0, oy: 0, scale: 1 });
         if (x || z) scene.pan(-x * 900 * dt, -z * 900 * dt);
-      } else if (!pausedRef.current) events = stepWorld(world, dt, playing ? readInput(keysRef.current, pointerRef.current) : null);
+      } else if (!pausedRef.current) {
+        const input = playing ? readInput(keysRef.current, pointerRef.current) : null;
+        events = stepRef.current ? stepRef.current(dt, input) : stepWorld(world, dt, input);
+      }
       const t1 = meter ? performance.now() : 0;
       scene.sync(world, events, pausedRef.current ? 0 : dt);
       scene.render();
