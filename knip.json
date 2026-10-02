@@ -10,7 +10,8 @@
     "src/app/preview-lobbies.tsx",
     "src/app/preview-party-states.tsx",
     "src/games/mirror/preview.tsx",
-    "src/games/gulp/preview-assets.tsx"
+    "src/games/gulp/preview-assets.tsx",
+    "src/games/gulp/together-preview.tsx"
   ],
   "project": ["src/**/*.{ts,tsx}"],
   "ignoreExportsUsedInFile": { "interface": true, "type": true },
