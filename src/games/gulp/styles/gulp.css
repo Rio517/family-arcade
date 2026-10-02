@@ -147,6 +147,22 @@
   pointer-events: none;
 }
 
+/* ----- the frame-time readout, for measuring a device (?fps in the address) ----- */
+.gulp-fps {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  top: 50%;
+  z-index: 30;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(20, 16, 40, 0.82);
+  color: #fff;
+  font: 700 14px/1.3 ui-monospace, 'SF Mono', Menlo, monospace;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.gulp-fps:empty { display: none; }
+
 /* ----- round buttons in the corners ----- */
 .gulp-corner {
   position: fixed;
