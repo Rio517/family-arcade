@@ -887,9 +887,12 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   box-shadow: 0 2px 0 var(--g-ink), 0 5px 10px rgba(42, 31, 74, 0.2);
   font-size: 17px;
   text-shadow: 0 1.5px 0 rgba(42, 31, 74, 0.5);
+  /* Three long names wrap to two even lines, never one word alone. */
+  text-align: center;
+  text-wrap: balance;
 }
 .gulp-pause-note,
-.gulp-again-note { margin: 0; font-size: 16px; font-weight: 800; color: var(--g-muted); text-align: center; }
+.gulp-again-note { margin: 0; font-size: 16px; font-weight: 800; color: var(--g-muted); text-align: center; text-wrap: balance; }
 .gulp-again-note { color: var(--g-purple); }
 
 /* The first hint, with a joystick: a red ball on a stick. */

@@ -5,7 +5,7 @@
  * of the live world a few times a second.
  */
 import { BoltIcon, ClockIcon, HeartIcon, JoystickIcon, PauseIcon, SpeakerIcon, SpeakerOffIcon, WarningIcon } from '@shared/ui/icons';
-import type { Banner, Hud, HudRow } from './round';
+import { namesList, type Banner, type Hud, type HudRow } from './round';
 
 const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n.toLocaleString());
 
@@ -31,7 +31,7 @@ export function GulpHud({
   notice?: string | null;
 }) {
   // A friend's device has dropped out and their hole waits for them.
-  const shown = notice ?? (hud.waiting.length ? `Waiting for ${hud.waiting.join(' and ')}…` : null);
+  const shown = notice ?? (hud.waiting.length ? `Waiting for ${namesList(hud.waiting)}…` : null);
   const row = (r: HudRow) => (
     <li key={r.id} className={`${r.me ? 'me' : ''}${r.out ? ' out' : ''}`}>
       <span className={r.rank <= 3 ? `gulp-rank coin-${r.rank}` : 'gulp-rank'}>{r.rank}</span>

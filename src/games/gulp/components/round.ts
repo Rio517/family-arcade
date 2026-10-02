@@ -24,6 +24,12 @@ export const MAP_ORDER: MapId[] = ['town', 'city', 'mega', 'region'];
 
 export const DIFFICULTY_TITLE: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 
+/** Names as a sentence lists them: "Rio", "Rio and Mina", "Rio, Mina and Oskar". */
+export function namesList(names: readonly string[]): string {
+  if (names.length < 3) return names.join(' and ');
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
 /** Seconds a round lasts with these settings (0: until someone ends it). */
 export function durationOf(s: Settings): number {
   if (s.length === 'endless') return 0;
