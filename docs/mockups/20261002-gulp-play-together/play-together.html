@@ -3,34 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gulp: Play Together</title>
+<title>Gulp: Play With Friends</title>
 <style>
 @font-face { font-family: 'Gulp Rounded'; src: url('gulp-rounded.woff2') format('woff2'); font-weight: 900; font-display: block; }
 @font-face { font-family: 'Gulp Pixel'; src: url('gulp-pixel.woff2') format('woff2'); font-display: block; unicode-range: U+20, U+2B-2E, U+30-3A, U+6B, U+78, U+A0, U+202F; }
 
 /* ===== the page around the pictures ===== */
-:root { --page: #f4efe4; --pink: #2a1f4a; --mute: #5b6480; }
+:root { --page: #f4efe4; --mute: #5b6480; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--page); color: #2a1f4a; font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; --s: 0.56; }
 .wrap { max-width: 1320px; margin: 0 auto; padding: 24px 16px 80px; }
 h1 { margin: 0 0 6px; font: 900 30px/1.15 'Gulp Rounded', system-ui, sans-serif; }
-.lede { margin: 0 0 18px; max-width: 70ch; color: #3d3560; }
+.lede { margin: 0 0 14px; max-width: 74ch; color: #3d3560; }
 .bar { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 0; background: var(--page); border-bottom: 1px solid #d8cfbd; }
-.tabs, .scales { display: flex; gap: 6px; }
-.tab, .scale { appearance: none; font: 700 15px/1 system-ui, sans-serif; padding: 11px 16px; border: 1.5px solid #2a1f4a; border-radius: 999px; background: #fffaf0; color: #2a1f4a; cursor: pointer; }
-.tab[aria-pressed="true"], .scale[aria-pressed="true"] { background: #2a1f4a; color: #fffaf0; }
-.tab:focus-visible, .scale:focus-visible, .jump a:focus-visible { outline: 3px solid #7a3cf0; outline-offset: 2px; }
-.bar label { font-size: 14px; color: var(--mute); }
-.opt-head { margin: 22px 0 6px; font: 900 24px/1.2 'Gulp Rounded', system-ui, sans-serif; }
-.opt-text { margin: 0 0 6px; max-width: 78ch; }
-.opt-cost { margin: 0 0 14px; max-width: 78ch; font-size: 15px; color: #3d3560; }
-.jump { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; padding: 0; list-style: none; }
+.grp2 { display: flex; gap: 6px; align-items: center; }
+.grp2 > span { font-size: 14px; color: var(--mute); margin-right: 4px; }
+.scale { appearance: none; font: 700 15px/1 system-ui, sans-serif; padding: 11px 16px; border: 1.5px solid #2a1f4a; border-radius: 999px; background: #fffaf0; color: #2a1f4a; cursor: pointer; }
+.scale[aria-pressed="true"] { background: #2a1f4a; color: #fffaf0; }
+.scale:hover { border-color: #7a3cf0; }
+.scale:focus-visible, .jump a:focus-visible { outline: 3px solid #7a3cf0; outline-offset: 2px; }
+.jump { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
 .jump a { display: block; padding: 5px 11px; border-radius: 999px; background: #e9e1ce; color: #2a1f4a; text-decoration: none; font-size: 14px; }
-.state { margin-top: 30px; scroll-margin-top: 70px; }
+.step { margin: 34px 0 0; padding-top: 10px; border-top: 2px solid #d8cfbd; font: 900 24px/1.2 'Gulp Rounded', system-ui, sans-serif; }
+.step small { display: block; margin-top: 2px; font: 400 15px/1.45 system-ui, sans-serif; color: #3d3560; max-width: 80ch; }
+.state { margin-top: 22px; scroll-margin-top: 70px; }
 .state h3 { margin: 0 0 2px; font: 900 19px/1.3 'Gulp Rounded', system-ui, sans-serif; }
 .state p { margin: 0 0 10px; max-width: 80ch; color: #3d3560; font-size: 15px; }
 .pair { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; max-width: 100%; overflow-x: auto; padding-bottom: 6px; }
-.tab:hover, .scale:hover { border-color: #7a3cf0; }
 .fig { margin: 0; }
 .fig figcaption { margin: 5px 0 0; font-size: 13px; color: var(--mute); }
 .fw { overflow: hidden; border: 1.5px solid #2a1f4a; border-radius: 14px; box-shadow: 0 4px 0 #2a1f4a; background: #333; }
@@ -67,7 +66,6 @@ h1 { margin: 0 0 6px; font: 900 30px/1.15 'Gulp Rounded', system-ui, sans-serif;
 .s .lab { font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0; }
 .s p { margin: 0; }
 .s .hint { font-size: 14px; color: var(--muted); font-weight: 900; }
-.s .rule { height: 0; border-top: 1.5px dashed #c9bfdc; }
 
 /* logo */
 .logo { display: flex; flex-direction: column; align-items: center; line-height: 0.86; text-align: center; }
@@ -76,8 +74,8 @@ h1 { margin: 0 0 6px; font: 900 30px/1.15 'Gulp Rounded', system-ui, sans-serif;
 .logo .u { color: #e8f6ff; font-size: 82px; margin-top: 6px; transform: rotate(3deg); }
 .logo .t { margin-top: 14px; padding: 6px 16px; border-radius: 999px; background: rgba(29, 31, 51, 0.85); color: #fff; font-size: 17px; font-weight: 800; }
 .phone .logo { flex-direction: row; align-items: baseline; gap: 10px; }
-.phone .logo .g { font-size: 58px; -webkit-text-stroke: 5px #1d1f33; }
-.phone .logo .u { font-size: 36px; margin: 0; -webkit-text-stroke: 5px #1d1f33; }
+.phone .logo .g { font-size: 52px; -webkit-text-stroke: 5px #1d1f33; }
+.phone .logo .u { font-size: 32px; margin: 0; -webkit-text-stroke: 5px #1d1f33; }
 .phone .logo .t { display: none; }
 
 /* cards, buttons, segments */
@@ -89,27 +87,32 @@ h1 { margin: 0 0 6px; font: 900 30px/1.15 'Gulp Rounded', system-ui, sans-serif;
 .ab.y { background: linear-gradient(180deg, var(--yellow-t), var(--yellow) 55%, #f0a800); }
 .ab.p { color: #fff; background: linear-gradient(180deg, var(--purple-t), var(--purple) 60%); text-shadow: 0 1.5px 0 rgba(42, 31, 74, 0.5); }
 .ab.c { background: linear-gradient(180deg, var(--cyan-t), var(--cyan) 60%); }
+.ab.g { background: linear-gradient(180deg, #9af2bb, var(--green) 60%); }
 .ab.r { color: #fff; background: linear-gradient(180deg, var(--red-t), var(--red) 55%); text-shadow: 0 1.5px 0 rgba(42, 31, 74, 0.5); }
 .ab.big { font-size: 28px; min-height: 68px; padding: 0 34px; }
 .ab.sm { min-height: 46px; font-size: 16px; padding: 0 16px; }
 .ab.full { width: 100%; }
 .ab[disabled] { cursor: not-allowed; color: #5f5878; background: #e7e1d7; border-color: #8d869c; box-shadow: 0 3px 0 #a79fb8; text-shadow: none; }
 .ab svg { flex: none; }
+.ab.bigbtn { flex-direction: column; gap: 8px; min-height: 108px; padding: 10px 12px; border-radius: 26px; font-size: 24px; line-height: 1.1; text-align: center; white-space: normal; box-shadow: inset 0 3px 1px rgba(255, 255, 255, 0.55), 0 5px 0 var(--ink); }
+.phone .ab.bigbtn { font-size: 20px; min-height: 100px; padding: 8px; }
+.trio { display: flex; padding-left: 10px; }
+.trio .hole { margin-left: -10px; }
 .rb { appearance: none; width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; border: 1.5px solid var(--ink); color: #fff; cursor: pointer; background: radial-gradient(circle at 50% 30%, var(--cyan-t) 0%, var(--cyan) 55%, var(--cyan-d) 100%); box-shadow: inset 0 3px 1px rgba(255, 255, 255, 0.6), 0 0 0 3px var(--paper), 0 0 0 4.5px var(--ink), 0 4px 0 4.5px var(--ink); }
 .rb svg { filter: drop-shadow(0 1.5px 0 rgba(42, 31, 74, 0.5)); }
 .rb.back { position: absolute; top: 16px; left: 16px; z-index: 3; }
 .rb.snd { position: absolute; top: 16px; right: 16px; z-index: 3; }
-.s :is(.ab, .opt, .rb, .key, .skinbtn, .reel):focus-visible, .s .is-focus { outline: 4px solid var(--ring); outline-offset: 3px; }
+.s :is(.ab, .opt, .rb, .key, .skinbtn, .ans, .lnk):focus-visible, .s .is-focus { outline: 4px solid var(--ring); outline-offset: 3px; }
 .seg { display: grid; gap: 8px; grid-template-columns: repeat(var(--n, 3), 1fr); }
 .opt { appearance: none; min-height: 48px; padding: 6px 8px; font-size: 17px; color: var(--ink); border: 1.5px solid var(--ink); border-radius: 14px; background: #f1ecf8; box-shadow: 0 3px 0 rgba(42, 31, 74, 0.35); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; text-align: center; }
 .opt small { font-size: 14px; color: var(--muted); font-weight: 900; }
 .opt.left { align-items: flex-start; text-align: left; padding: 8px 10px; }
 .opt.on { background: linear-gradient(180deg, var(--cyan-t), var(--cyan) 60%); box-shadow: 0 3px 0 var(--ink); }
 .opt.on small { color: var(--ink); }
-.dark .opt:not(.on) { background: #f1ecf8; }
 .chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; min-height: 30px; border: 1.5px solid var(--ink); border-radius: 999px; background: var(--paper); font-size: 14px; box-shadow: 0 2px 0 var(--ink); color: var(--ink); white-space: nowrap; }
-.chip.good { background: #d9f7e3; }
 .chip.warn { background: var(--yellow-t); }
+.lnk { appearance: none; background: none; border: 0; padding: 8px 10px; font-size: 16px; color: #fff; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; }
+.lnk.dk { color: var(--cyan-d); }
 
 /* holes */
 .hole { --d: 44px; position: relative; display: inline-block; flex: none; width: var(--d); height: var(--d); border-radius: 50%; border: calc(var(--d) * 0.11) solid var(--hole, #3d7bff); background: radial-gradient(circle at 50% 55%, #000 0 42%, color-mix(in srgb, var(--hole, #3d7bff) 40%, #000) 70%, color-mix(in srgb, var(--hole, #3d7bff) 70%, #000) 100%); box-shadow: 0 0 0 1.5px var(--ink); }
@@ -118,11 +121,12 @@ h1 { margin: 0 0 6px; font: 900 30px/1.15 'Gulp Rounded', system-ui, sans-serif;
 .hole::after { right: calc(var(--d) * 0.14); }
 .hole.free { --hole: #a79fb8; border-style: dashed; background: rgba(255, 255, 255, 0.5); box-shadow: none; border-color: #8d869c; }
 .hole.free::before, .hole.free::after { display: none; }
+.hole.wait { border-style: dashed; background: color-mix(in srgb, var(--hole) 22%, #fff); box-shadow: none; }
+.hole.wait::before, .hole.wait::after { display: none; }
 .hole.off { --hole: #9a93a8; }
 .hole.off::before, .hole.off::after { background: linear-gradient(180deg, #e8e3f0 0 46%, var(--ink) 46% 60%, #e8e3f0 60%); }
-.hole.cpu { --hole: #8d869c; }
 
-/* the 4-letter code */
+/* the 4-letter tiles */
 .code { display: flex; gap: calc(var(--ts) * 0.12); }
 .ct { width: calc(var(--ts) * 0.8); height: var(--ts); display: grid; place-items: center; font-size: calc(var(--ts) * 0.62); line-height: 1; color: var(--ink); background: linear-gradient(180deg, var(--tc) 0 11%, var(--paper) 11%); border: 2px solid var(--ink); border-radius: calc(var(--ts) * 0.2); box-shadow: 0 4px 0 var(--ink); padding-top: calc(var(--ts) * 0.06); }
 .ct.empty { color: #b3abc6; background: linear-gradient(180deg, var(--tc) 0 11%, #f1ecf8 11%); }
@@ -131,29 +135,11 @@ h1 { margin: 0 0 6px; font: 900 30px/1.15 'Gulp Rounded', system-ui, sans-serif;
 @media (prefers-reduced-motion: no-preference) { .caret { animation: blink 1s steps(1) infinite; } }
 @keyframes blink { 50% { opacity: 0; } }
 
-/* seats (A) */
-.seats { display: grid; gap: 8px; }
-.seats.g2 { grid-template-columns: 1fr 1fr; }
-.seat { display: flex; align-items: center; gap: 10px; padding: 7px 12px 7px 8px; min-height: 58px; border: 1.5px solid var(--ink); border-radius: 18px; background: color-mix(in srgb, var(--hole) 16%, var(--paper)); box-shadow: 0 3px 0 var(--ink); }
-.seat .pn { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--coin); border: 1.5px solid var(--ink); color: #5a3d00; font-size: 14px; }
-.seat .tx { flex: 1; min-width: 0; }
-.seat .tx b { display: block; font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.seat .tx small { display: block; font-size: 14px; color: var(--muted); }
-.seat .hw { width: 44px; display: grid; place-items: center; padding-top: 8px; }
-.seat.free { background: transparent; border: 2px dashed #a79fb8; box-shadow: none; }
-.seat.free .tx b { color: var(--muted); }
-.seat.free .pn { background: #e7e1d7; color: #5f5878; }
-.seat.you { box-shadow: 0 3px 0 var(--ink); outline: 3px solid var(--ring); outline-offset: 2px; }
-.phone .seat { padding: 6px 8px 6px 6px; gap: 6px; min-height: 58px; }
-.phone .seat .pn { display: none; }
-.phone .seat .tx b { font-size: 17px; }
-.phone .seat .hw { width: 38px; }
-
 /* menu */
 .menu { align-items: center; justify-content: center; gap: 44px; padding: 40px 16px 40px; }
-.phone .menu { flex-direction: column; gap: 12px; padding: 64px 16px 150px; }
+.phone .menu { flex-direction: column; gap: 10px; padding: 60px 16px 70px; }
 .menu .card { width: 560px; display: flex; flex-direction: column; gap: 12px; }
-.phone .menu .card { width: 398px; }
+.phone .menu .card { width: 398px; gap: 10px; padding: 24px 14px 14px; }
 .pa { display: flex; align-items: center; gap: 12px; padding: 6px 16px 6px 8px; border: 1.5px solid var(--ink); border-radius: 999px; background: #fff; min-height: 48px; }
 .pa .av { width: 34px; height: 34px; border-radius: 50%; background: #ff5fa8; display: grid; place-items: center; font-size: 17px; }
 .pa b { flex: 1; font-size: 19px; }
@@ -161,61 +147,139 @@ h1 { margin: 0 0 6px; font: 900 30px/1.15 'Gulp Rounded', system-ui, sans-serif;
 .maps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .phone .maps { grid-template-columns: 1fr 1fr; }
 .prow { display: flex; gap: 10px; align-items: stretch; }
-.prow .grow { flex: 1; }
+.prow > .grow { flex: 1; }
 .sbtn { min-height: 62px; padding: 0 14px; flex-direction: column; gap: 2px; font-size: 15px; background: linear-gradient(180deg, #fff3c4, #ffe38a); }
 .obtn { min-height: 62px; padding: 0 16px; font-size: 17px; flex-direction: row; text-align: left; }
 .obtn small { display: block; font-size: 14px; color: var(--muted); }
-.togglestrip { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1.5px solid var(--ink); border-radius: 18px; background: linear-gradient(180deg, #efe6ff, #e2d4ff); box-shadow: 0 3px 0 var(--ink); }
-.togglestrip .th { display: flex; align-items: center; gap: 10px; }
-.togglestrip .th .ic { width: 38px; height: 38px; border-radius: 50%; background: var(--purple); color: #fff; display: grid; place-items: center; border: 1.5px solid var(--ink); flex: none; }
-.togglestrip .th b { display: block; font-size: 19px; }
-.togglestrip .th small { display: block; font-size: 14px; color: #4a3f78; }
-.togglestrip .tb { display: flex; gap: 10px; }
-.togglestrip .tb .ab { flex: 1; padding: 0 12px; font-size: 17px; }
+.phone .prow.two { gap: 10px; }
+.phone .sbtn, .phone .obtn { min-height: 54px; }
+.phone .menu .prow.small > * { flex: 1; }
 .pill { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 2; min-height: 44px; font-size: 16px; padding: 0 18px; }
-.sheet { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); width: 430px; z-index: 4; display: flex; flex-direction: column; gap: 10px; padding: 14px; }
-.phone .sheet { width: 370px; }
-.sheet::after { content: ''; position: absolute; bottom: -9px; left: 50%; width: 16px; height: 16px; background: var(--paper); border-right: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); transform: translateX(-50%) rotate(45deg); }
-.sheet h4 { margin: 0; font-size: 20px; }
-.sheet .tb { display: flex; gap: 10px; }
-.sheet .tb .ab { flex: 1; padding: 0 10px; font-size: 17px; }
-.menu.up { padding-bottom: 200px; }
-.phone .menu.up { padding: 56px 16px 190px; }
+.invite { display: flex; align-items: center; gap: 12px; padding: 10px 12px 12px 10px; border: 1.5px solid var(--ink); border-radius: 22px; background: linear-gradient(180deg, #e9fbee, #c4f1d0); box-shadow: 0 4px 0 var(--ink), 0 0 0 5px rgba(53, 208, 127, 0.45); }
+.invite .hw { width: 58px; display: grid; place-items: center; padding-top: 12px; flex: none; }
+.invite .tx { flex: 1; font-size: 22px; line-height: 1.15; }
+.invite .tx small { display: block; font-size: 14px; color: #36594a; margin-top: 2px; }
+.phone .invite { flex-wrap: wrap; }
+.phone .invite .tx { font-size: 19px; flex: 1 1 60%; }
+.phone .invite .ab { flex: 1 1 100%; }
+@media (prefers-reduced-motion: no-preference) { .invite { animation: lit 1.6s ease-in-out infinite; } .litpill { animation: lit 1.6s ease-in-out infinite; } }
+@keyframes lit { 50% { box-shadow: 0 4px 0 var(--ink), 0 0 0 10px rgba(53, 208, 127, 0.25); } }
+.litpill { position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%); z-index: 3; width: 620px; display: flex; align-items: center; gap: 14px; padding: 12px 14px 14px 16px; border: 1.5px solid var(--ink); border-radius: 999px; color: #fff; background: linear-gradient(180deg, var(--purple-t), var(--purple) 60%); box-shadow: 0 4px 0 var(--ink), 0 0 0 6px rgba(167, 123, 255, 0.5); }
+.litpill .hw { width: 52px; display: grid; place-items: center; padding-top: 10px; flex: none; }
+.litpill .tx { flex: 1; font-size: 22px; line-height: 1.15; text-shadow: 0 2px 0 rgba(42, 31, 74, 0.5); }
+.litpill .tx small { display: block; font-size: 14px; color: #ece3ff; text-shadow: none; }
+.phone .litpill { width: 398px; border-radius: 28px; flex-wrap: wrap; bottom: 24px; }
+.phone .litpill .tx { flex: 1 1 60%; font-size: 19px; }
+.phone .litpill .ab { flex: 1 1 100%; }
+.tkrow { position: absolute; left: 0; right: 0; top: 150px; display: flex; gap: 22px; justify-content: center; opacity: 0.22; }
+.tk { width: 250px; height: 330px; border: 1.5px solid #fff; border-radius: 22px; background: var(--paper); overflow: hidden; }
+.tk::before { content: ''; display: block; height: 10px; background: var(--rainbow); }
+.phone .tkrow { top: 120px; flex-direction: column; align-items: center; gap: 14px; }
+.phone .tk { width: 300px; height: 150px; }
+.arc-title { position: absolute; left: 0; right: 0; top: 34px; text-align: center; color: #fff; font-size: 30px; }
+.phone .arc-title { top: 28px; font-size: 24px; }
 
-/* lobby cards (A) */
-.lobby { align-items: center; justify-content: center; padding: 24px 24px; }
-.lobby .card { width: 980px; display: flex; flex-direction: column; gap: 14px; }
-.phone .lobby { padding: 74px 16px 16px; align-items: flex-start; }
-.phone .lobby .card { width: 398px; gap: 10px; padding: 14px; padding-top: 24px; }
-.lh { display: flex; align-items: center; gap: 12px; }
-.lh h2 { margin: 0; font-size: 26px; flex: 1; }
-.lh .sub { font-size: 14px; color: var(--muted); }
-.phone .lh h2 { font-size: 22px; white-space: nowrap; }
-.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
-.col { display: flex; flex-direction: column; gap: 10px; }
-.foot { display: flex; align-items: center; gap: 14px; justify-content: flex-end; }
-.foot .note { flex: 1; font-size: 15px; color: var(--muted); }
-.phone .foot { flex-direction: column; align-items: stretch; gap: 6px; }
-.phone .foot .note { text-align: center; order: 2; }
-.skins { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-.skinbtn { appearance: none; position: relative; min-height: 64px; padding: 14px 4px 6px; border: 1.5px solid var(--ink); border-radius: 16px; background: #f1ecf8; display: grid; place-items: center; cursor: pointer; color: var(--ink); box-shadow: 0 3px 0 rgba(42, 31, 74, 0.35); }
+/* player select */
+.sign { position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 10px 34px; border: 1.5px solid var(--ink); border-radius: 999px; color: #fff; font-size: 34px; letter-spacing: 0.04em; background: linear-gradient(180deg, var(--red-t), var(--red) 55%); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 3px 0 var(--ink), 0 8px 16px rgba(0, 0, 0, 0.35); text-shadow: 0 2px 0 rgba(42, 31, 74, 0.55); }
+.sign::before { content: ''; position: absolute; inset: 3px; border: 3px dotted #ffe066; border-radius: inherit; pointer-events: none; }
+.sign.purple { background: linear-gradient(180deg, var(--purple-t), var(--purple) 60%); }
+@media (prefers-reduced-motion: no-preference) { .sign::before, .clock::before, .banner .bn::before { animation: bulbs 1s steps(1) infinite; } }
+@keyframes bulbs { 50% { border-color: #fff; } }
+.phone .sign { font-size: 24px; padding: 9px 22px; }
+.psel { flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px 32px 24px; }
+.phone .psel { gap: 8px; padding: 14px 16px 14px; }
+.toprow { width: 100%; display: flex; align-items: center; justify-content: center; position: relative; min-height: 58px; }
+.toprow .rb { position: absolute; left: 0; top: 4px; }
+.phone .toprow { min-height: 52px; justify-content: flex-end; }
+.phone .toprow .sign { margin-right: 10px; }
+.coderow { display: flex; align-items: center; gap: 22px; color: #fff; }
+.coderow .tl { text-align: right; }
+.coderow .tl b { display: block; font-size: 22px; color: var(--yellow); }
+.phone .coderow { gap: 12px; }
+.phone .coderow .tl b { font-size: 17px; }
+.mini { display: inline-grid; place-items: center; width: 26px; height: 30px; margin: 0 2px; font-size: 18px; line-height: 1; color: var(--ink); background: linear-gradient(180deg, var(--tc, #ff9f1c) 0 12%, var(--paper) 12%); border: 1.5px solid var(--ink); border-radius: 7px; vertical-align: middle; }
+.howto { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 8px; padding: 10px 16px; border: 1.5px solid var(--ink); border-radius: 18px; background: var(--yellow-t); box-shadow: 0 3px 0 var(--ink); font-size: 17px; line-height: 1.3; color: var(--ink); text-align: center; }
+.howto svg { color: var(--purple); }
+.phone .howto { font-size: 15px; padding: 8px 10px; gap: 2px 6px; }
+.slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; width: 100%; }
+.phone .slots { grid-template-columns: 1fr; gap: 7px; }
+.slot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 12px 14px; min-height: 290px; border: 1.5px solid var(--ink); border-radius: 22px; background: var(--paper); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 5px 0 var(--ink), 0 12px 20px rgba(0, 0, 0, 0.3); overflow: hidden; color: var(--ink); }
+.slot::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px; background: var(--rainbow); border-bottom: 1.5px solid var(--ink); }
+.slot .pn { position: absolute; left: 10px; top: 16px; width: 44px; height: 44px; border-radius: 50%; background: var(--coin); border: 1.5px solid var(--ink); display: grid; place-items: center; font-size: 18px; color: #5a3d00; }
+.slot .hw { height: 130px; display: grid; place-items: center; padding-top: 14px; }
+.slot .nm { font-size: 26px; }
+.slot .st { font-size: 15px; padding: 3px 12px; border: 1.5px solid var(--ink); border-radius: 999px; background: #d9f7e3; }
+.slot .st.soon { background: var(--yellow-t); }
+.slot .ins { font-size: 21px; color: #c2410c; }
+.slot .sub { font-size: 14px; color: var(--muted); }
+.slot.free { background: repeating-linear-gradient(45deg, #fffaf0 0 12px, #f6efe0 12px 24px); }
+.slot.you { outline: 4px solid var(--ring); outline-offset: 3px; }
+@media (prefers-reduced-motion: no-preference) { .blink { animation: blinkx 1.1s steps(1) infinite; } .spin { animation: spin 1.6s linear infinite; } }
+@keyframes blinkx { 50% { opacity: 0.4; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.phone .slot { flex-direction: row; min-height: 66px; padding: 8px 12px 8px 10px; gap: 10px; border-radius: 18px; box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--ink); text-align: left; }
+.phone .slot::before { display: none; }
+.phone .slot .pn { position: static; flex: none; width: 36px; height: 36px; font-size: 15px; }
+.phone .slot .hw { height: auto; width: 50px; padding-top: 8px; }
+.phone .slot .mid { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.phone .slot .nm { font-size: 20px; }
+.phone .slot .ins { font-size: 17px; }
+.mid { display: contents; }
+.phone .mid { display: flex; }
+.bar2 { width: 100%; display: flex; gap: 14px; align-items: center; padding: 10px 14px; border: 1.5px solid var(--ink); border-radius: 22px; background: var(--paper); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--ink); }
+.bar2 .grp { display: flex; align-items: center; gap: 8px; }
+.bar2 .grp .seg { gap: 6px; }
+.bar2 .opt { min-height: 46px; padding: 4px 12px; font-size: 16px; white-space: nowrap; }
+.phone .bar2 { flex-direction: column; align-items: stretch; gap: 6px; padding: 8px 12px; }
+.phone .bar2 .opt { min-height: 42px; }
+.phone .bar2 .grp { display: grid; grid-template-columns: 62px 1fr; align-items: center; }
+.bar2 .grp.maps2 .seg { grid-template-columns: repeat(4, auto); }
+.phone .bar2 .grp.maps2 .seg { grid-template-columns: 1fr 1fr; }
+.startrow { display: flex; align-items: center; gap: 18px; justify-content: center; width: 100%; }
+.startrow .note { color: #efe7ff; font-size: 16px; }
+.phone .startrow { flex-direction: column; gap: 4px; }
+.phone .startrow .ab { width: 100%; }
+.phone .startrow .note { order: 2; font-size: 14px; }
+.keys { display: grid; gap: 10px; justify-content: center; }
+.key { appearance: none; width: 84px; height: 66px; font-size: 30px; border: 1.5px solid var(--ink); border-radius: 16px; color: var(--ink); background: linear-gradient(180deg, #fff, #efe8f7); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--ink); cursor: pointer; display: grid; place-items: center; }
+.key:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.key.del { background: linear-gradient(180deg, var(--red-t), var(--red) 55%); color: #fff; }
+.kr2 { display: flex; gap: 10px; justify-content: center; }
+.phone .keys { gap: 8px; }
+.phone .kr2 { gap: 6px; }
+.phone .key { width: 50px; height: 56px; font-size: 24px; border-radius: 12px; }
+.pickp { width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1.5px solid var(--ink); border-radius: 22px; background: var(--paper); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--ink); }
+.skins { display: grid; grid-template-columns: repeat(10, 1fr); gap: 8px; }
+.phone .skins { grid-template-columns: repeat(5, 1fr); }
+.skinbtn { appearance: none; position: relative; min-height: 74px; padding: 14px 4px 6px; border: 1.5px solid var(--ink); border-radius: 16px; background: #f1ecf8; display: grid; place-items: center; cursor: pointer; color: var(--ink); box-shadow: 0 3px 0 rgba(42, 31, 74, 0.35); }
+.phone .skinbtn { min-height: 66px; }
 .skinbtn.on { background: linear-gradient(180deg, var(--cyan-t), var(--cyan) 60%); box-shadow: 0 3px 0 var(--ink); }
 .skinbtn.taken { background: #e7e1d7; cursor: not-allowed; }
 .skinbtn.taken .hole { opacity: 0.45; }
 .skinbtn .by { position: absolute; right: 4px; bottom: 3px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 999px; display: grid; place-items: center; font-size: 14px; background: var(--paper); border: 1.5px solid var(--ink); }
-.skinbtn .nm { position: absolute; left: 6px; bottom: 3px; font-size: 14px; color: var(--ink); }
 .guestnote { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1.5px solid var(--ink); border-radius: 14px; background: #d9f7e3; font-size: 15px; }
-.kbd { position: absolute; left: 0; right: 0; bottom: 0; height: 300px; background: #cfd3dc; border-top: 1.5px solid #8d95a6; padding: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 1; }
-.phone .kbd { height: 290px; }
-.kbd .kr { display: flex; gap: 6px; justify-content: center; }
-.kbd .kr i { display: block; flex: none; width: 70px; height: 56px; border-radius: 8px; background: #fff; box-shadow: 0 2px 0 #8d95a6; }
-.phone .kbd .kr i { width: 34px; height: 46px; }
-.kbd .kcap { align-self: center; margin-top: 6px; padding: 5px 14px; border-radius: 999px; background: #2a1f4a; color: #fff; font-size: 14px; }
-.lobby.kb { align-items: flex-start; padding-top: 70px; }
-.phone .lobby.kb { padding-top: 74px; }
-.lobby.kb .card { width: 620px; }
-.phone .lobby.kb .card { width: 398px; }
-.entry { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.cabres { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; color: #fff; }
+.bigcount { font-size: 96px; color: var(--yellow); text-shadow: 0 6px 0 rgba(0, 0, 0, 0.45); line-height: 1; }
+.cabres p { font-size: 19px; color: #efe7ff; max-width: 480px; }
+.px { font-family: 'Gulp Pixel', 'Gulp Rounded', sans-serif; font-weight: 400; }
+
+/* the question screens */
+.qs { flex-direction: column; align-items: center; justify-content: center; gap: 26px; padding: 20px 40px 30px; }
+.phone .qs { gap: 16px; padding: 70px 16px 24px; }
+.qs h2 { margin: 0; color: #fff; font-size: 46px; text-align: center; line-height: 1.12; text-shadow: 0 4px 0 rgba(0, 0, 0, 0.4); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 14px; }
+.phone .qs h2 { font-size: 30px; }
+.answers { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; width: 100%; max-width: 940px; }
+.phone .answers { grid-template-columns: 1fr; gap: 16px; }
+.ans { appearance: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; min-height: 330px; padding: 22px 20px; border: 1.5px solid var(--ink); border-radius: 30px; color: var(--ink); font-size: 32px; line-height: 1.12; text-align: center; cursor: pointer; box-shadow: inset 0 3px 1px rgba(255, 255, 255, 0.7), 0 7px 0 var(--ink), 0 14px 22px rgba(0, 0, 0, 0.3); transition: transform 0.08s ease; }
+.ans:active { transform: translateY(4px); }
+.ans.gold { background: linear-gradient(180deg, #fff3c4, var(--yellow)); }
+.ans.sky { background: linear-gradient(180deg, #d9f4ff, var(--cyan)); }
+.ans .pic { height: 120px; display: grid; place-items: center; }
+.crown { width: 112px; height: 112px; border-radius: 50%; display: grid; place-items: center; background: var(--coin); border: 2px solid var(--ink); color: #5a3d00; box-shadow: 0 4px 0 var(--ink); }
+.phone .ans { min-height: 190px; gap: 10px; font-size: 24px; padding: 14px 16px; }
+.phone .ans .pic { height: 84px; }
+.phone .crown { width: 84px; height: 84px; }
+.phone .crown svg { width: 48px; height: 48px; }
 
 /* HUD pieces for round states */
 .board { position: absolute; top: 12px; left: 12px; z-index: 2; width: 220px; margin: 0; padding: 10px 5px 5px; list-style: none; border: 1.5px solid var(--ink); border-radius: 16px; background: var(--paper); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 2px 0 var(--ink), 0 5px 10px rgba(42, 31, 74, 0.2); overflow: hidden; display: flex; flex-direction: column; }
@@ -224,7 +288,6 @@ h1 { margin: 0 0 6px; font: 900 30px/1.15 'Gulp Rounded', system-ui, sans-serif;
 .board li span.n { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .board li b { font-family: 'Gulp Pixel', 'Gulp Rounded', sans-serif; font-size: 14px; font-weight: 400; letter-spacing: -0.5px; position: relative; top: 1.5px; }
 .board li.me { background: linear-gradient(180deg, var(--yellow-t), var(--yellow) 60%); box-shadow: inset 0 0 0 1.5px var(--ink); }
-.board li.away { opacity: 0.6; }
 .rk { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--ink); background: var(--cyan); font-size: 14px; line-height: 1; color: var(--ink); }
 .rk.r1 { background: var(--coin); color: #5a3d00; }
 .rk.r2 { background: var(--silver); }
@@ -233,6 +296,7 @@ h1 { margin: 0 0 6px; font: 900 30px/1.15 'Gulp Rounded', system-ui, sans-serif;
 .dot { width: 12px; height: 12px; flex: none; border-radius: 50%; background: var(--hole); box-shadow: 0 0 0 1.5px var(--ink); }
 .clock { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 10px 24px; border: 1.5px solid var(--ink); border-radius: 999px; color: #fff; background: linear-gradient(180deg, var(--red-t), var(--red) 55%); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 2px 0 var(--ink), 0 5px 10px rgba(42, 31, 74, 0.2); }
 .clock::before, .banner::before { content: ''; position: absolute; inset: 3px; border: 3px dotted #ffe066; border-radius: inherit; pointer-events: none; }
+.banner::before { display: none; }
 .clock span { font-family: 'Gulp Pixel', 'Gulp Rounded', sans-serif; font-weight: 400; font-size: 22px; text-shadow: 0 2px 0 rgba(42, 31, 74, 0.55); }
 .phone .clock { left: auto; right: 12px; top: 74px; transform: none; padding: 7px 14px; }
 .phone .clock span { font-size: 16px; }
@@ -243,130 +307,24 @@ h1 { margin: 0 0 6px; font: 900 30px/1.15 'Gulp Rounded', system-ui, sans-serif;
 .phone .pausebtn span { display: none; }
 .banner { position: absolute; z-index: 3; left: 50%; top: 84px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .phone .banner { top: 236px; }
-.banner .bn { position: relative; padding: 12px 28px; border: 1.5px solid var(--ink); border-radius: 999px; font-size: 26px; color: #fff; background: linear-gradient(180deg, var(--purple-t), var(--purple) 60%); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4), 0 3px 0 var(--ink), 0 6px 12px rgba(42, 31, 74, 0.25); display: flex; align-items: center; gap: 10px; text-shadow: 0 2px 0 rgba(42, 31, 74, 0.5); white-space: nowrap; }
-.banner .bn.red { background: linear-gradient(180deg, var(--red-t), var(--red) 55%); }
+.banner .bn { position: relative; padding: 12px 28px; border: 1.5px solid var(--ink); border-radius: 999px; font-size: 26px; color: #fff; background: linear-gradient(180deg, var(--red-t), var(--red) 55%); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4), 0 3px 0 var(--ink), 0 6px 12px rgba(42, 31, 74, 0.25); display: flex; align-items: center; gap: 10px; text-shadow: 0 2px 0 rgba(42, 31, 74, 0.5); white-space: nowrap; }
 .banner .sub { padding: 5px 16px; border: 1.5px solid var(--ink); border-radius: 999px; background: var(--paper); font-size: 15px; box-shadow: 0 2px 0 var(--ink); white-space: nowrap; }
 .phone .banner .bn { font-size: 22px; padding: 10px 20px; }
 .phone .banner .sub { white-space: normal; text-align: center; max-width: 340px; }
-@media (prefers-reduced-motion: no-preference) {
-  .clock::before, .banner .bn::before { animation: bulbs 1s steps(1) infinite; }
-  .spin { animation: spin 1.6s linear infinite; }
-  .blink { animation: blink 1.1s steps(1) infinite; }
-}
-@keyframes bulbs { 50% { border-color: #fff; } }
-@keyframes spin { to { transform: rotate(360deg); } }
 .center { align-items: center; justify-content: center; padding: 20px; }
-.waitcard { width: 520px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 22px 22px 18px; padding-top: 32px; }
+.waitcard { width: 520px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 32px 22px 18px; }
 .phone .waitcard { width: 398px; }
 .waitcard h2 { margin: 0; font-size: 34px; }
 .waitcard p { font-size: 17px; color: #3d3560; }
-.meter { width: 100%; height: 18px; padding: 2px; border: 1.5px solid var(--ink); border-radius: 9px; background: #efe8f7; }
-.meter i { display: block; height: 100%; border-radius: 5px; background: repeating-linear-gradient(90deg, transparent 0 8px, #efe8f7 8px 10px), var(--rainbow); }
-.px { font-family: 'Gulp Pixel', 'Gulp Rounded', sans-serif; font-weight: 400; }
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
 .tile { border: 1.5px solid var(--ink); border-radius: 14px; background: #fff; padding: 8px 6px; text-align: center; box-shadow: 0 3px 0 var(--ink); }
 .tile .px { display: block; font-size: 20px; margin-bottom: 4px; }
 .tile small { font-size: 14px; color: var(--muted); }
 .phone .tile .px { font-size: 18px; }
 
-/* results list (A) */
-.res { display: flex; flex-direction: column; gap: 6px; width: 100%; margin: 0; padding: 0; list-style: none; }
-.res li { display: flex; align-items: center; gap: 10px; padding: 5px 14px 5px 6px; border-radius: 999px; border: 1.5px solid #cfc6e0; background: #fff; font-size: 18px; min-height: 46px; }
-.res li .rk { width: 32px; height: 32px; font-size: 16px; }
-.res li .n { flex: 1; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.res li .n small { font-size: 14px; color: var(--muted); }
-.res li b { font-family: 'Gulp Pixel', 'Gulp Rounded', sans-serif; font-weight: 400; font-size: 17px; }
-.res li.me { background: linear-gradient(180deg, var(--yellow-t), var(--yellow) 60%); border-color: var(--ink); box-shadow: 0 2px 0 var(--ink); }
-.res li.cpu { background: #f1ecf8; }
-.res li .dot { width: 18px; height: 18px; }
-.rescard { width: 640px; display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 34px; }
-.phone .rescard { width: 398px; padding: 32px 14px 14px; gap: 10px; }
-.rescard h2 { margin: 0; font-size: 34px; }
-.phone .rescard h2 { font-size: 28px; }
-.rescard .acts { display: flex; gap: 12px; width: 100%; justify-content: center; align-items: center; }
-.rescard .acts .grow { flex: 1; }
-.phone .rescard .acts { flex-direction: column; }
-.phone .rescard .acts .ab { width: 100%; }
-.big-split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 100%; align-items: start; }
-
-/* ===== B: player select ===== */
-.sign { position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 10px 34px; border: 1.5px solid var(--ink); border-radius: 999px; color: #fff; font-size: 34px; letter-spacing: 0.04em; background: linear-gradient(180deg, var(--red-t), var(--red) 55%); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 3px 0 var(--ink), 0 8px 16px rgba(0, 0, 0, 0.35); text-shadow: 0 2px 0 rgba(42, 31, 74, 0.55); }
-.sign::before { content: ''; position: absolute; inset: 3px; border: 3px dotted #ffe066; border-radius: inherit; pointer-events: none; }
-.sign.purple { background: linear-gradient(180deg, var(--purple-t), var(--purple) 60%); }
-@media (prefers-reduced-motion: no-preference) { .sign::before { animation: bulbs 1s steps(1) infinite; } }
-.phone .sign { font-size: 24px; padding: 9px 22px; }
-.psel { flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px 32px 24px; }
-.bar2 .opt { white-space: nowrap; }
-.startc { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px 16px; }
-.phone .startc { padding: 10px 12px 12px; gap: 4px; }
-.phone .psel { gap: 10px; padding: 16px 16px 16px; }
-.toprow { width: 100%; display: flex; align-items: center; justify-content: center; position: relative; min-height: 58px; }
-.toprow .rb { position: absolute; left: 0; top: 4px; }
-.phone .toprow { min-height: 52px; justify-content: flex-end; }
-.phone .toprow .sign { margin-right: 10px; }
-.coderow { display: flex; align-items: center; gap: 22px; color: #fff; }
-.coderow .tl { text-align: right; }
-.coderow .tl b { display: block; font-size: 22px; color: var(--yellow); }
-.coderow .tl small { font-size: 15px; color: #e6dcfa; }
-.phone .coderow { gap: 12px; }
-.phone .coderow .tl b { font-size: 17px; }
-.phone .coderow .tl small { display: none; }
-.slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; width: 100%; }
-.phone .slots { grid-template-columns: 1fr; gap: 8px; }
-.slot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 12px 14px; min-height: 290px; border: 1.5px solid var(--ink); border-radius: 22px; background: var(--paper); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 5px 0 var(--ink), 0 12px 20px rgba(0, 0, 0, 0.3); overflow: hidden; color: var(--ink); }
-.slot::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px; background: var(--rainbow); border-bottom: 1.5px solid var(--ink); }
-.slot .pn { position: absolute; left: 10px; top: 16px; width: 44px; height: 44px; border-radius: 50%; background: var(--coin); border: 1.5px solid var(--ink); display: grid; place-items: center; font-size: 18px; color: #5a3d00; }
-.slot .hw { height: 130px; display: grid; place-items: center; padding-top: 14px; }
-.slot .nm { font-size: 26px; }
-.slot .st { font-size: 15px; padding: 3px 12px; border: 1.5px solid var(--ink); border-radius: 999px; background: #d9f7e3; }
-.slot .ins { font-size: 21px; color: #c2410c; }
-.slot .sub { font-size: 14px; color: var(--muted); }
-.slot.free { background: repeating-linear-gradient(45deg, #fffaf0 0 12px, #f6efe0 12px 24px); }
-.slot.you { outline: 4px solid var(--ring); outline-offset: 3px; }
-.phone .slot { flex-direction: row; min-height: 72px; padding: 10px 12px 10px 10px; gap: 10px; border-radius: 18px; box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--ink); text-align: left; }
-.phone .slot::before { display: none; }
-.phone .slot .pn { position: static; flex: none; width: 36px; height: 36px; font-size: 15px; }
-.phone .slot .hw { height: auto; width: 52px; padding-top: 8px; }
-.phone .slot .mid { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-.phone .slot .nm { font-size: 21px; }
-.phone .slot .ins { font-size: 17px; }
-.mid { display: contents; }
-.phone .mid { display: flex; }
-.bar2 { width: 100%; display: flex; gap: 14px; align-items: center; padding: 10px 14px; border: 1.5px solid var(--ink); border-radius: 22px; background: var(--paper); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--ink); }
-.bar2 .grp { display: flex; align-items: center; gap: 8px; }
-.bar2 .grp .lab { margin-right: 2px; }
-.bar2 .grp .seg { gap: 6px; }
-.bar2 .grp .opt { min-height: 46px; padding: 4px 12px; font-size: 16px; }
-.phone .bar2 { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px; }
-.phone .bar2 .grp { display: grid; grid-template-columns: 62px 1fr; align-items: center; }
-.bar2 .grp.maps2 .seg { grid-template-columns: repeat(4, auto); }
-.phone .bar2 .grp.maps2 .seg { grid-template-columns: 1fr 1fr; }
-.bar2 .hn { margin-left: auto; font-size: 15px; color: var(--muted); }
-.startrow { display: flex; align-items: center; gap: 18px; justify-content: center; width: 100%; }
-.startrow .note { color: #efe7ff; font-size: 16px; }
-.phone .startrow { flex-direction: column; gap: 6px; }
-.phone .startrow .ab { width: 100%; }
-.phone .startrow .note { order: 2; }
-.keys { display: grid; gap: 10px; justify-content: center; }
-.key { appearance: none; width: 84px; height: 66px; font-size: 30px; border: 1.5px solid var(--ink); border-radius: 16px; color: var(--ink); background: linear-gradient(180deg, #fff, #efe8f7); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--ink); cursor: pointer; display: grid; place-items: center; }
-.key:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
-.key.del { background: linear-gradient(180deg, var(--red-t), var(--red) 55%); color: #fff; }
-.kr2 { display: flex; gap: 10px; justify-content: center; }
-.phone .keys { gap: 8px; }
-.phone .kr2 { gap: 6px; }
-.phone .key { width: 50px; height: 56px; font-size: 24px; border-radius: 12px; }
-.pickp { width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1.5px solid var(--ink); border-radius: 22px; background: var(--paper); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--ink); }
-.pickp .skins { grid-template-columns: repeat(10, 1fr); }
-.phone .pickp .skins { grid-template-columns: repeat(5, 1fr); }
-.pickp .skinbtn { min-height: 74px; }
-.phone .pickp .skinbtn { min-height: 66px; }
-.cabres { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; color: #fff; }
-.bigcount { font-size: 96px; color: var(--yellow); text-shadow: 0 6px 0 rgba(0, 0, 0, 0.45); line-height: 1; }
-.cabres p { font-size: 19px; color: #efe7ff; max-width: 480px; }
-
-/* results (B) */
+/* results */
 .podium4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; width: 100%; }
-.phone .podium4 { grid-template-columns: 1fr; gap: 8px; }
+.phone .podium4 { grid-template-columns: 1fr; gap: 7px; }
 .rslot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 10px 12px; border: 1.5px solid var(--ink); border-radius: 22px; background: color-mix(in srgb, var(--hole) 18%, var(--paper)); box-shadow: 0 5px 0 var(--ink), 0 10px 18px rgba(0, 0, 0, 0.3); }
 .rslot .pn { position: absolute; left: 10px; top: 10px; width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid var(--ink); display: grid; place-items: center; font-size: 22px; background: var(--cyan); }
 .rslot .pn.r1 { background: var(--coin); color: #5a3d00; }
@@ -376,100 +334,48 @@ h1 { margin: 0 0 6px; font: 900 30px/1.15 'Gulp Rounded', system-ui, sans-serif;
 .rslot .nm { font-size: 25px; }
 .rslot .sc { font-size: 22px; }
 .rslot.me { outline: 4px solid var(--ring); outline-offset: 3px; }
-.phone .rslot { flex-direction: row; gap: 10px; padding: 8px 14px 8px 10px; min-height: 66px; border-radius: 18px; box-shadow: 0 4px 0 var(--ink); }
+.phone .rslot { flex-direction: row; gap: 10px; padding: 8px 14px 8px 10px; min-height: 62px; border-radius: 18px; box-shadow: 0 4px 0 var(--ink); }
 .phone .rslot .pn { position: static; flex: none; width: 38px; height: 38px; font-size: 18px; }
 .phone .rslot .hw { height: auto; width: 46px; padding-top: 8px; }
-.phone .rslot .mid2 { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
 .mid2 { display: contents; }
-.phone .mid2 { display: flex; }
+.phone .mid2 { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
 .phone .rslot .nm { font-size: 20px; }
 .phone .rslot .sc { font-size: 16px; }
 .cpubar { width: 100%; padding: 8px 14px; border: 1.5px solid var(--ink); border-radius: 18px; background: #f1ecf8; font-size: 15px; box-shadow: 0 3px 0 var(--ink); display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
 .cpubar b { font-family: 'Gulp Pixel', 'Gulp Rounded', sans-serif; font-weight: 400; font-size: 15px; }
 .yr { width: 100%; display: flex; gap: 10px; align-items: stretch; }
 .yr .tile { flex: 1; }
-.dark .yr .tile { background: var(--paper); }
-.dark .lab.on-dark { color: #d9cdf5; }
-
-/* ===== C: the map lobby ===== */
-.mapl { padding: 22px 24px; gap: 20px; align-items: center; justify-content: center; }
-.phone .mapl { flex-direction: column; gap: 10px; align-items: stretch; justify-content: flex-start; padding: 70px 16px 16px; }
-.boardcard { width: 650px; display: flex; flex-direction: column; gap: 10px; padding-top: 26px; }
-.phone .boardcard { width: 100%; padding: 24px 12px 12px; gap: 8px; }
-.mapbox { position: relative; border: 1.5px solid var(--ink); border-radius: 18px; overflow: hidden; background: #6bbf5a; box-shadow: 0 3px 0 var(--ink); }
-.mapbox svg { display: block; width: 100%; height: 100%; }
-.pin { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.pin .tag { padding: 3px 12px; border: 3px solid var(--ink); border-radius: 999px; background: var(--paper); color: color-mix(in srgb, var(--hole) 85%, #000); font-size: 16px; box-shadow: 0 3px 0 var(--ink); white-space: nowrap; }
-.pin .tag.free { color: #5f5878; border-style: dashed; border-width: 2px; background: rgba(255, 250, 240, 0.9); box-shadow: none; }
-.pin .tag.you { background: var(--yellow-t); }
-.pin.cpu { opacity: 0.9; }
-.pin .ring { position: absolute; left: 50%; top: 0; width: calc(var(--d) * 1.5); height: calc(var(--d) * 1.5); margin-left: calc(var(--d) * -0.75); margin-top: calc(var(--d) * -0.22); border: 4px solid #fff; border-radius: 50%; box-shadow: 0 0 0 3px var(--ring); }
-.phone .pin .tag { font-size: 14px; padding: 2px 9px; border-width: 2px; }
-.roster { display: flex; gap: 8px; flex-wrap: wrap; }
-.roster .chip { flex: 1; justify-content: center; min-height: 36px; }
-.phone .roster .chip { padding: 3px 8px; gap: 6px; }
-.sidecol { width: 410px; display: flex; flex-direction: column; gap: 16px; }
-.phone .sidecol { width: 100%; gap: 10px; }
-.codecard { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding-top: 26px; }
-.phone .codecard { flex-direction: row; align-items: center; gap: 12px; padding: 22px 12px 10px; }
-.phone .codecard .tx { flex: 1; }
-.phone .codecard .tx .hint { font-size: 14px; }
-.setcard { display: flex; flex-direction: column; gap: 8px; padding-top: 26px; }
-.phone .setcard { padding: 22px 12px 12px; gap: 6px; }
-.reels { display: flex; gap: 16px; align-items: center; }
-.reel { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.reel .ab { width: 80px; padding: 0; min-height: 50px; }
-.reel .win { position: relative; width: 112px; height: 168px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid var(--ink); border-radius: 22px; background: linear-gradient(180deg, #d8d0ea, #fff 30%, #fff 70%, #d8d0ea); box-shadow: inset 0 6px 8px rgba(42, 31, 74, 0.2), 0 4px 0 var(--ink); overflow: hidden; }
-.reel .win .m { font-size: 84px; line-height: 1; color: var(--ink); }
-.reel .win .o { font-size: 24px; line-height: 1; color: #8d869c; padding: 4px 0; }
-.reel .win::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 10px; background: var(--tc); border-bottom: 1.5px solid var(--ink); }
-.phone .reels { gap: 8px; }
-.phone .reel .ab { width: 74px; }
-.phone .reel .win { width: 82px; height: 146px; }
-.phone .reel .win .m { font-size: 66px; }
-.podium { display: flex; align-items: flex-end; gap: 10px; width: 100%; justify-content: center; min-height: 250px; }
-.step { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
-.step .blk { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px 8px; border: 1.5px solid var(--ink); border-bottom-width: 1.5px; border-radius: 14px 14px 0 0; background: color-mix(in srgb, var(--hole) 30%, var(--paper)); box-shadow: 0 3px 0 var(--ink); }
-.step .blk .rk { width: 38px; height: 38px; font-size: 18px; }
-.step .blk .nm { font-size: 20px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.step .blk .sc { font-family: 'Gulp Pixel', 'Gulp Rounded', sans-serif; font-weight: 400; font-size: 15px; }
-.step.me .blk { outline: 4px solid var(--ring); outline-offset: 2px; }
-.step .hw { padding-bottom: 6px; padding-top: 14px; }
-.phone .podium { gap: 6px; min-height: 0; }
-.phone .step .blk .nm { font-size: 17px; }
-.phone .step .blk .rk { width: 32px; height: 32px; }
-.phone .step .blk .sc { font-size: 14px; }
+.card.st .acts { display: flex; gap: 12px; width: 100%; justify-content: center; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Gulp Universe: play together</h1>
-  <p class="lede">Up to four children, each on their own iPad or phone, in one Gulp round. Three ways to build the lobby, each shown in the same nine places at iPad and phone size. Everything is in the arcade's Coin-op look. Tap the buttons to try focus and press states; in option B the letter keys type into the code.</p>
+  <h1>Gulp Universe: play with friends</h1>
+  <p class="lede">One easy path for up to four children, each on their own iPad or phone. Every screen asks one thing, with big buttons that have a picture as well as words. It keeps the full-screen player select the family liked. The two ways of asking “who’s starting?” are shown side by side. Tap the buttons to try focus and press states; on the letter screen the keys type into the tiles.</p>
   <div class="bar">
-    <div class="tabs" role="group" aria-label="Option"></div>
-    <div class="scales" role="group" aria-label="Picture size"></div>
-    <label>Keys 1 to 3 pick an option.</label>
+    <div class="grp2" role="group" aria-label="Picture size"><span>Size</span></div>
+    <div class="grp2" role="group" aria-label="Wording on the other iPads" id="wording"><span>Instructions follow</span></div>
   </div>
+  <ul class="jump" id="jump"></ul>
   <div id="out"></div>
 </div>
 
 <script>
 /* ---------- data ---------- */
-const KL = { n: 'Klara', c: '#ff5fa8' }, MI = { n: 'Mina', c: '#3fcf5a' }, OS = { n: 'Oskar', c: '#9b5cff' }, TH = { n: 'Theo', c: '#3d7bff' };
+const KL = { n: 'Klara', c: '#ff5fa8' }, MI = { n: 'Mina', c: '#3fcf5a' }, OS = { n: 'Oskar', c: '#9b5cff' };
 const SKINS = [['Blueberry', '#3d7bff'], ['Bubblegum', '#ff5fa8'], ['Lime', '#3fcf5a'], ['Grape', '#9b5cff'], ['Tangerine', '#ff8a2a'], ['Lemon', '#f2c200'], ['Cherry', '#ff3b4f'], ['Mint', '#22cdb6'], ['Cocoa', '#9a6a4a'], ['Sky', '#6cc6ff']];
-const CPU = [{ n: 'Big Gulp', c: '#ff3b4f' }, { n: 'Nom Nom', c: '#ff8a2a' }, { n: 'Sir Slurps', c: '#22cdb6' }, { n: 'Hungry Hattie', c: '#f2c200' }, { n: 'Chompers', c: '#9a6a4a' }];
+const CPU = [{ n: 'Big Gulp', c: '#ff3b4f' }, { n: 'Nom Nom', c: '#ff8a2a' }];
 const TILE_C = ['#ff4d5e', '#ff9f1c', '#35d07f', '#2ec4ff'];
+/* Codes are letters only, never I, L or O (nothing reads like a 1 or a 0). */
+const LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ'.split('');
 const STAND = [
   { ...MI, s: '8,420', r: 1 }, { ...KL, s: '7,905', r: 2 }, { ...CPU[0], s: '6,640', r: 3, cpu: 1 },
-  { ...OS, s: '5,310', r: 4 }, { ...TH, s: '4,880', r: 5 }, { ...CPU[1], s: '2,100', r: 6, cpu: 1 },
+  { ...OS, s: '5,310', r: 4 }, { n: 'Theo', c: '#3d7bff', s: '4,880', r: 5 }, { ...CPU[1], s: '2,100', r: 6, cpu: 1 },
 ];
-
 const sv = (d, s = 24) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const I = {
   back: s => sv('<path d="M15 5l-7 7 7 7"/>', s),
   chev: s => sv('<path d="M9 5l7 7-7 7"/>', s),
-  up: s => sv('<path d="M5 15l7-7 7 7"/>', s),
-  down: s => sv('<path d="M5 9l7 7 7-7"/>', s),
   sound: s => sv('<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7"/>', s),
   party: s => sv('<circle cx="9" cy="8" r="3"/><circle cx="17.5" cy="9" r="2.5"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M16 14.5c3 0 5 2 5 5.5"/>', s),
   plug: s => sv('<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 01-12 0zM12 17v4"/>', s),
@@ -479,299 +385,165 @@ const I = {
   check: s => sv('<path d="M5 12l5 5 9-10"/>', s),
   clock: s => sv('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/>', s),
   pause: s => sv('<path d="M8 5v14M16 5v14"/>', s),
-  sliders: s => sv('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>', s),
-  crown: s =>sv('<path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/>', s),
+  crown: s => sv('<path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/>', s),
 };
 const hole = (c, d, cls = '') => `<span class="hole ${cls}" style="--hole:${c};--d:${d}px"></span>`;
-const tiles = (str, ts, cur = -1) => `<div class="code" style="--ts:${ts}px" aria-label="Code ${str || 'not typed yet'}">${[0, 1, 2, 3].map(i => {
+const tiles = (str, ts, cur = -1) => `<div class="code" style="--ts:${ts}px" aria-label="${str ? 'Letters ' + str.split('').join(' ') : 'No letters typed yet'}">${[0, 1, 2, 3].map(i => {
   const ch = str[i]; const c = `ct${ch ? '' : ' empty'}${i === cur ? ' cur' : ''}`;
   return `<span class="${c}" style="--tc:${TILE_C[i]}">${ch || (i === cur ? '<i class="caret"></i>' : '')}</span>`;
 }).join('')}</div>`;
-const holesLine = (kids, map = 'City', n = 6) => `${map} has ${n} holes: ${kids} ${kids === 1 ? 'child' : 'children'} and ${n - kids} computer ${n - kids === 1 ? 'hole' : 'holes'}.`;
+const mini = str => str.split('').map((c, i) => `<span class="mini" style="--tc:${TILE_C[i]}">${c}</span>`).join('');
 const back = () => `<button class="rb back" type="button" aria-label="Back">${I.back(24)}</button>`;
 const snd = () => `<button class="rb snd" type="button" aria-label="Sound">${I.sound(24)}</button>`;
-const pill = () => `<button class="ab p pill" type="button">${I.party(22)}Play together</button>`;
+const pill = (lit) => `<button class="ab p pill" type="button">${I.party(22)}Play together</button>`;
 const logo = () => `<div class="logo" aria-label="Gulp Universe"><span class="g">GULP</span><span class="u">UNIVERSE</span><span class="t">Swallow the city, bite by bite!</span></div>`;
+const sign = (t, cls = '') => `<div class="sign ${cls}" role="heading" aria-level="2">${t}</div>`;
+const holesLine = (kids, n = 6) => `City has ${n} holes: ${kids} ${kids === 1 ? 'child' : 'children'} and ${n - kids} computer ${n - kids === 1 ? 'hole' : 'holes'}.`;
+const state = { s: 0.56, w: '1' };
 
-/* ---------- shared pieces ---------- */
-function menuCard(d, o) {
+/* ---------- menu ---------- */
+function menuCard(d, extra = '') {
   const m = d === 'phone';
   const maps = [['Town', 'Houses, shops and parks', 0], ['City', 'Towers, a stadium and factories', 1], ['Megalopolis', 'Skyscrapers and power plants', 0], ['Region', 'Farms, an airport and mountains', 0]];
-  const mapBtns = maps.map(([n, b, on]) => `<button class="opt left ${on ? 'on' : ''}" type="button" aria-pressed="${!!on}"><b>${n}</b><small>${b}</small></button>`).join('');
+  const mapBtns = maps.map(([n, b, on]) => `<button class="opt left ${on ? 'on' : ''}" type="button" aria-pressed="${!!on}"><b>${n}</b><small>${m && extra ? '' : b}</small></button>`).join('');
   const times = ['4 min', '8 min', 'No limit'].map((t, i) => `<button class="opt ${i === 0 ? 'on' : ''}" type="button" aria-pressed="${i === 0}">${t}</button>`).join('');
   const scores = `<button class="ab sbtn" type="button">${I.trophy(24)}<span>Scores</span></button>`;
   const options = `<button class="ab obtn" type="button">${hole('#3d7bff', 26)}<span>Options<small>Easy</small></span></button>`;
-  let mid = '', bottom = '';
-  if (o === 'A') {
-    mid = `<div class="togglestrip"><div class="th"><span class="ic">${I.party(22)}</span><div><b>Play together</b><small>${m ? 'Up to 4, each on their own device' : 'Up to 4 children, each on their own iPad or phone'}</small></div></div><div class="tb"><button class="ab p" type="button" data-testid="together-open">Open a lobby</button><button class="ab" type="button" data-testid="together-join">Join with a code</button></div></div>`;
-    bottom = `<div class="prow">${scores}${options}<button class="ab y big grow" type="button">PLAY</button></div>`;
-  } else if (o === 'B') {
-    bottom = `<div class="prow">${scores}${options}${m ? '' : '<button class="ab ' + 'y big grow" type="button">1 PLAYER</button>'}</div>` +
-      (m ? `<div class="prow"><button class="ab y big grow" type="button" style="font-size:22px;padding:0 10px">1 PLAYER</button><button class="ab p big grow" type="button" style="font-size:22px;padding:0 10px">2–4 PLAYERS</button></div><div style="text-align:center"><button class="ab sm" type="button">Have a code? Join</button></div>`
-        : `<div class="prow"><button class="ab p big grow" type="button">2–4 PLAYERS</button><button class="ab" type="button" style="min-height:68px">Have a code? Join</button></div>`);
-  } else {
-    bottom = `<div class="prow">${scores}${options}<button class="ab y big grow" type="button">PLAY</button></div>`;
-  }
-  return `<div class="card st"><div class="pa"><span class="av">K</span><b>Klara</b><i>Switch player ${I.chev(16)}</i></div><div class="lab">Map</div><div class="maps">${mapBtns}</div><div class="lab">Time</div><div class="seg" style="--n:3">${times}</div>${mid}${bottom}</div>`;
+  const solo = `<button class="ab y bigbtn grow" type="button" data-testid="gulp-play">${hole('#3d7bff', 38)}<span>PLAY</span></button>`;
+  const friends = `<button class="ab p bigbtn grow" type="button" data-testid="gulp-play-friends"><span class="trio">${hole('#ff5fa8', 38)}${hole('#3fcf5a', 38)}${hole('#9b5cff', 38)}</span><span>PLAY WITH FRIENDS</span></button>`;
+  return `<div class="card st"><div class="pa"><span class="av">K</span><b>Klara</b><i>Switch player ${I.chev(16)}</i></div><div class="lab">Map</div><div class="maps">${mapBtns}</div><div class="lab">Time</div><div class="seg" style="--n:3">${times}</div>${extra}<div class="prow small">${scores}${options}</div><div class="prow">${solo}${friends}</div></div>`;
 }
-function hud(d, { away = false, banner = '' } = {}) {
-  const rows = [[MI, '4,210', 1], [KL, '3,980', 2], [CPU[0], '3,120', 3], [OS, '2,640', 4, 'me'], [TH, '2,300', 5, away ? 'away' : ''], [CPU[1], '900', 6]];
-  const li = rows.map(([p, s, r, cl]) => `<li class="${cl || ''}"><span class="rk r${r <= 3 ? r : ''}">${r}</span><span class="dot" style="--hole:${p.c}"></span><span class="n">${p.n}</span><b>${s}</b></li>`).join('');
-  return `<ul class="board" aria-label="Scores">${li}</ul><div class="clock">${I.clock(22)}<span>3:12</span></div><div class="hb"><button class="rb" type="button" aria-label="Sound">${I.sound(22)}</button><button class="ab pausebtn" type="button">${I.pause(22)}<span>Pause</span></button></div>${banner}`;
+const invite = d => `<div class="invite" role="status"><span class="hw">${hole(MI.c, 44)}</span><span class="tx">Mina is starting a game!</span><button class="ab g big" type="button" style="min-height:60px;font-size:24px;padding:0 26px">Join Mina</button></div>`;
+const menuScene = (d, extra = '', lit = false) => `<div class="scrim"></div><div class="ctr menu">${logo()}${menuCard(d, extra)}</div>${back()}${snd()}${pill(lit)}`;
+
+/* ---------- player select ---------- */
+function slot(i, p, o = {}) {
+  const m = o.m;
+  if (!p) return `<div class="slot free"><span class="pn">${i + 1}P</span><span class="hw">${hole('#a79fb8', m ? 40 : 96, 'free')}</span><span class="mid"><span class="ins blink">INSERT COIN</span><span class="sub">Waiting for a friend</span></span></div>`;
+  const cls = o.wait ? 'wait' : '';
+  return `<div class="slot ${o.you ? 'you' : ''}" style="--hole:${p.c}"><span class="pn">${i + 1}P</span><span class="hw">${hole(p.c, m ? 40 : 96, cls)}</span><span class="mid"><span class="nm">${p.n}</span>${o.sub ? `<span class="sub">${o.sub}</span>` : ''}<span class="st ${o.wait ? 'soon' : ''}">${o.st || 'READY!'}</span></span></div>`;
 }
-function pauseCard(d, host, kind) {
+function settingsBar(host = true) {
+  const opt = (t, on) => `<button class="opt ${on ? 'on' : ''}" type="button" aria-pressed="${on}" ${host ? '' : 'disabled'}>${t}</button>`;
+  return `<div class="bar2" aria-label="The round"><div class="grp maps2"><span class="lab">Map</span><div class="seg">${['Town', 'City', 'Megalopolis', 'Region'].map((t, i) => opt(t, i === 1)).join('')}</div></div><div class="grp"><span class="lab">Time</span><div class="seg">${['4 min', '8 min', 'No limit'].map((t, i) => opt(t, i === 0)).join('')}</div></div><div class="grp"><span class="lab">Level</span><div class="seg">${['Easy', 'Medium', 'Hard'].map((t, i) => opt(t, i === 1)).join('')}</div></div></div>`;
+}
+const howto = () => `<div class="howto"><span>On the other iPads:</span><b>Play with friends</b>${I.chev(18)}<b>${state.w === '1' ? 'A friend' : 'Yes'}</b>${I.chev(18)}<span>type ${mini('KQZT')}</span></div>`;
+function hostSelect(d, { slots, code = true, start, link = '' }) {
   const m = d === 'phone';
-  const acts = `<button class="ab y big full" type="button">Keep going</button><button class="ab full" type="button">${I.leave(22)}Leave round</button>${host ? '<button class="ab r full" type="button">End round for everyone</button>' : ''}`;
-  const t = kind === 'B' ? `<div class="sign" style="font-size:${m ? 22 : 28}px">STILL PLAYING</div>` : '';
-  return `<div class="card st waitcard" role="dialog" aria-label="Pause">${t}<h2 style="${kind === 'B' ? 'display:none' : ''}">The city keeps going!</h2><p>${host ? 'This is an endless round, so you can end it for everyone.' : 'A shared round can’t be paused, because everyone is still playing.'}</p><div style="display:flex;flex-direction:column;gap:12px;width:100%">${acts}</div></div>`;
+  const codeRow = code ? `<div class="coderow"><div class="tl"><b>JOIN CODE</b></div>${tiles('KQZT', m ? 46 : 72)}</div>${howto()}` : '';
+  return `<div class="scrim"></div><div class="ctr psel"><div class="toprow"><button class="rb" type="button" aria-label="Back">${I.back(24)}</button>${sign('PLAYER SELECT')}</div>${codeRow}<div class="slots">${slots}</div>${settingsBar()}${start}${link}</div>`;
 }
-function pickSkins(chosen = 3, note = true, cols) {
+const startRow = (on, note) => `<div class="startrow"><span class="note">${note}</span><button class="ab y big" type="button" ${on ? '' : 'disabled'}>START</button></div>`;
+const S_HOST_EMPTY = d => hostSelect(d, { slots: [0, 1, 2, 3].map(i => slot(i, i === 0 ? KL : null, { m: d === 'phone', sub: 'Host', st: 'HOST' })).join(''), start: startRow(false, 'Waiting for a friend to join…') });
+const S_HOST_FILLED = d => hostSelect(d, { slots: [KL, MI, OS, null].map((p, i) => slot(i, p, { m: d === 'phone', sub: i === 0 ? 'Host' : '', st: i === 0 ? 'HOST' : 'READY!' })).join(''), start: startRow(true, holesLine(3)) });
+const joinTheirs = `<div style="text-align:center"><button class="lnk" type="button">Is a friend starting instead? Join their game ${I.chev(16)}</button></div>`;
+const linkedSlots = (d, ready) => [0, 1, 2, 3].map(i => i === 0 ? slot(0, KL, { m: d === 'phone', sub: 'Host', st: 'HOST' }) : i === 1 ? slot(1, MI, ready ? { m: d === 'phone' } : { m: d === 'phone', wait: true, sub: 'is coming…', st: 'COMING…' }) : slot(i, null, { m: d === 'phone' })).join('');
+const S_LINKED = ready => d => hostSelect(d, { code: false, slots: linkedSlots(d, ready), start: startRow(ready, ready ? holesLine(2) : 'Start wakes up when Mina taps Join.'), link: joinTheirs });
+
+/* ---------- questions ---------- */
+const crownPic = () => `<span class="pic"><span class="crown">${I.crown(64)}</span></span>`;
+const tilesPic = d => `<span class="pic">${tiles('KQZT', d === 'phone' ? 40 : 66)}</span>`;
+function question(d, q) {
+  const m = d === 'phone';
+  if (q === 1) return `<div class="scrim"></div><div class="ctr qs"><button class="rb back" type="button" aria-label="Back">${I.back(24)}</button><h2>Who’s starting the game?</h2><div class="answers"><button class="ans gold is-focus" type="button">${crownPic()}<span>Me! Friends join me</span></button><button class="ans sky" type="button">${tilesPic(d)}<span>A friend. I’ll type their code</span></button></div></div>`;
+  return `<div class="scrim"></div><div class="ctr qs"><button class="rb back" type="button" aria-label="Back">${I.back(24)}</button><h2><span>Do you have a code from a friend?</span><span class="code-mini">${tiles('KQZT', m ? 32 : 40)}</span></h2><div class="answers"><button class="ans sky is-focus" type="button">${tilesPic(d)}<span>Yes! I have a code</span></button><button class="ans gold" type="button">${crownPic()}<span>No, I’m starting</span></button></div></div>`;
+}
+
+/* ---------- code entry and the guest ---------- */
+function keys(d) {
+  const per = d === 'phone' ? 7 : 9;
+  const rows = []; for (let i = 0; i < LETTERS.length; i += per) rows.push(LETTERS.slice(i, i + per));
+  rows[rows.length - 1].push('DEL');
+  return `<div class="keys" role="group" aria-label="Letters">${rows.map(r => `<div class="kr2">${r.map(k => k === 'DEL' ? `<button class="key del" type="button" data-k="DEL" aria-label="Delete">${I.del(26)}</button>` : `<button class="key" type="button" data-k="${k}">${k}</button>`).join('')}</div>`).join('')}</div>`;
+}
+const S_CODE = d => `<div class="scrim"></div><div class="ctr psel" data-b3 data-code="KQ"><div class="toprow"><button class="rb" type="button" aria-label="Back">${I.back(24)}</button>${sign('INSERT CODE', 'purple')}</div><div class="b3tiles">${tiles('KQ', d === 'phone' ? 66 : 110, 2)}</div><p style="color:#efe7ff;font-size:${d === 'phone' ? 16 : 19}px;text-align:center">Ask your friend for the four letters on their screen.</p>${keys(d)}<button class="ab y big" type="button" data-go disabled style="${d === 'phone' ? 'width:100%' : 'min-width:300px'}">GO!</button></div>`;
+function pickSkins(chosen = 3) {
   const taken = { 1: 'K', 2: 'M' };
   return `<div class="skins" role="radiogroup" aria-label="Your hole">${SKINS.map(([n, c], i) => {
     const tk = taken[i];
     return `<button type="button" class="skinbtn ${i === chosen ? 'on' : ''} ${tk ? 'taken' : ''}" role="radio" aria-checked="${i === chosen}" aria-label="${n}${tk ? ', taken' : ''}" ${tk ? 'disabled' : ''}>${hole(c, 34)}${tk ? `<span class="by">${tk}</span>` : ''}${i === chosen ? `<span class="by">${I.check(14)}</span>` : ''}</button>`;
   }).join('')}</div>`;
 }
-const grabNote = () => `<div class="guestnote">${I.check(18)}<span>Bubblegum was taken, so you got Grape.</span></div>`;
-
-/* ---------- Option A: a panel inside today's menu card ---------- */
-function seatA(i, p, sub, you) {
-  if (!p) return `<div class="seat free"><span class="pn">${i + 1}P</span><div class="tx"><b>Free seat</b><small>Waiting for a friend</small></div><span class="hw">${hole('#a79fb8', 36, 'free')}</span></div>`;
-  return `<div class="seat ${you ? 'you' : ''}" style="--hole:${p.c}"><span class="pn">${i + 1}P</span><div class="tx"><b>${p.n}</b><small>${sub}</small></div><span class="hw">${hole(p.c, 36)}</span></div>`;
-}
-function settingsA(d, host) {
+const S_GUEST = d => {
   const m = d === 'phone';
-  const mp = [['Town', '5'], ['City', '6'], ['Megalopolis', '7'], ['Region', '9']];
-  const maps = `<div class="seg" style="--n:${m ? 2 : 4}">${mp.map(([n, h], i) => `<button class="opt ${i === 1 ? 'on' : ''}" type="button" aria-pressed="${i === 1}" ${host ? '' : 'disabled'}><b>${n}</b>${m ? '' : `<small>${h} holes</small>`}</button>`).join('')}</div>`;
-  const time = `<div class="seg">${['4 min', '8 min', 'No limit'].map((t, i) => `<button class="opt ${i === 0 ? 'on' : ''}" type="button" aria-pressed="${i === 0}" ${host ? '' : 'disabled'}>${t}</button>`).join('')}</div>`;
-  const diff = `<div class="seg">${['Easy', 'Medium', 'Hard'].map((t, i) => `<button class="opt ${i === 1 ? 'on' : ''}" type="button" aria-pressed="${i === 1}" ${host ? '' : 'disabled'}>${t}</button>`).join('')}</div>`;
-  return `<div class="lab">Map</div>${maps}<div class="lab">Time</div>${time}<div class="lab">Difficulty</div>${diff}`;
-}
-function A_lobby(d, filled) {
-  const m = d === 'phone';
-  const ps = filled ? [KL, MI, OS] : [KL];
-  const seats = `<div class="seats g2">${[0, 1, 2, 3].map(i => seatA(i, ps[i], i === 0 ? 'Host' : 'Joined')).join('')}</div>`;
-  const kids = ps.length;
-  const left = `<div class="lab">Your code</div>${tiles('KQZT', m ? 54 : 88)}<p class="hint">${m ? 'Friends: Play together, then Join with a code.' : 'Friends tap Play together, then Join with a code, and type this.'}</p><div class="lab">Players</div>${seats}`;
-  const right = `${settingsA(d, true)}<p class="hint">${holesLine(kids)}</p>`;
-  const foot = `<div class="foot"><span class="note">${filled ? 'Everyone here? Press start.' : 'Start wakes up when a friend joins.'}</span><button class="ab y big" type="button" ${filled ? '' : 'disabled'}>START</button></div>`;
-  const head = `<div class="lh"><button class="ab sm" type="button">${I.back(18)}Back</button><h2>Your lobby</h2>${m ? `<button class="ab sm" type="button" style="width:46px;padding:0" aria-label="More options">${I.sliders(22)}</button>` : '<button class="ab sm" type="button">More options</button>'}</div>`;
-  if (m) return `<div class="scrim"></div><div class="ctr lobby"><div class="card st">${head}${left}${right}${foot}</div></div>`;
-  return `<div class="scrim"></div><div class="ctr lobby"><div class="card st">${head}<div class="cols"><div class="col">${left}</div><div class="col">${right}</div></div>${foot}</div></div>`;
-}
-const A = {
-  '1': d => `<div class="scrim"></div><div class="ctr menu">${logo()}${menuCard(d, 'A')}</div>${back()}${snd()}${pill()}`,
-  '2a': d => A_lobby(d, false),
-  '2b': d => A_lobby(d, true),
-  '3': d => {
-    const m = d === 'phone';
-    const kb = `<div class="kbd" aria-hidden="true">${[10, 9, 7].map(n => `<div class="kr">${'<i></i>'.repeat(m ? n : n)}</div>`).join('')}<span class="kcap">Your device’s keyboard</span></div>`;
-    return `<div class="scrim"></div><div class="ctr lobby kb"><div class="card st"><div class="lh"><button class="ab sm" type="button">${I.back(18)}Back</button><h2>Join with a code</h2></div><div class="entry"><p class="hint" style="text-align:center">Ask the host for their 4-letter code.</p>${tiles('KQ', m ? 62 : 96, 2)}<button class="ab y big full" type="button" disabled>JOIN</button></div></div></div>${kb}`;
-  },
-  '4': d => {
-    const m = d === 'phone';
-    const ps = [KL, MI, OS];
-    const seats = `<div class="seats g2">${[0, 1, 2, 3].map(i => seatA(i, ps[i], i === 0 ? 'Host' : i === 2 ? 'You' : 'Joined', i === 2)).join('')}</div>`;
-    const chips = `<div style="display:flex;flex-wrap:wrap;gap:8px"><span class="chip">City</span><span class="chip">4 min</span><span class="chip">Medium</span><span class="chip">6 holes</span></div>`;
-    const head = `<div class="lh"><div style="flex:1"><h2 style="margin:0;font-size:26px">Klara’s lobby</h2><span class="sub">The host picks the map, time and level.</span></div></div>`;
-    const colour = `<div class="lab">Your hole</div>${pickSkins()}${grabNote()}`;
-    const foot = `<div class="foot"><span class="note">Waiting for Klara to press start…</span><button class="ab" type="button">${I.leave(20)}Leave lobby</button></div>`;
-    if (m) return `<div class="scrim"></div><div class="ctr lobby"><div class="card st">${head}${chips}${seats}${colour}${foot}</div></div>`;
-    return `<div class="scrim"></div><div class="ctr lobby"><div class="card st">${head}<div class="cols"><div class="col"><div class="lab">Players</div>${seats}<div class="lab">The round</div>${chips}<p class="hint">${holesLine(3)}</p></div><div class="col">${colour}</div></div>${foot}</div></div>`;
-  },
-  '5a': d => `<div class="scrim"></div><div class="ctr"></div>${hud(d, { away: false, banner: `<div class="banner"><div class="bn" role="status"><span class="spin">${I.plug(26)}</span>Reconnecting…</div><div class="sub">Your hole waits right here until you are back.</div></div>` })}`,
-  '5b': d => `<div class="scrim"></div>${hud(d)}<div class="ctr center"><div class="card st waitcard" role="status"><div style="display:flex;gap:10px;align-items:center;padding-top:14px">${hole('#ff5fa8', 64, 'off')}</div><h2>Waiting for Klara</h2><p>Klara’s screen went quiet, so the round is on hold.</p><div class="meter" aria-label="Time left to wait"><i style="width:70%"></i></div><p class="hint" style="font-size:15px">If Klara is not back in <span class="px" style="font-size:15px">0:42</span>, the round ends and you see the scores.</p><button class="ab full" type="button">${I.leave(22)}Leave round</button></div></div>`,
-  '5c': d => `<div class="scrim"></div>${hud(d)}<div class="ctr center">${pauseCard(d, d === 'ipad', 'A')}</div>`,
-  '6': d => {
-    const rows = STAND.map(p => `<li class="${p.n === 'Oskar' ? 'me' : ''} ${p.cpu ? 'cpu' : ''}"><span class="rk r${p.r <= 3 ? p.r : ''}">${p.r}</span><span class="dot" style="--hole:${p.c}"></span><span class="n">${p.n}${p.cpu ? '<small>computer</small>' : p.n === 'Oskar' ? '<small>you</small>' : ''}</span><b>${p.s}</b></li>`).join('');
-    const mine = `<div class="tiles"><div class="tile"><span class="px">23</span><small>Things swallowed</small></div><div class="tile"><span class="px">2</span><small>Wonders</small></div><div class="tile"><span class="px">3</span><small>Holes swallowed</small></div></div>`;
-    const host = d === 'ipad';
-    const acts = `<div class="acts">${host ? '<button class="ab y big grow" type="button">Play again</button>' : '<button class="ab y big grow" type="button">Play again</button>'}<button class="ab" type="button">${I.leave(22)}Leave</button></div><p class="hint">${host ? 'Everyone starts a new round with you.' : 'Klara decides when the next round starts.'}</p>`;
-    return `<div class="scrim"></div><div class="ctr center"><div class="card st rescard"><h2>Round over!</h2><ul class="res">${rows}</ul>${mine}${acts}</div></div>`;
-  },
+  const ps = [KL, MI, OS];
+  const slots = `<div class="slots">${[0, 1, 2, 3].map(i => slot(i, ps[i], { m, you: i === 2, sub: i === 0 ? 'Host' : i === 2 ? 'You' : '', st: i === 2 ? 'PICKING…' : i === 0 ? 'HOST' : 'READY!' })).join('')}</div>`;
+  const pick = `<div class="pickp"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="lab">Pick your colour</span><div class="guestnote">${I.check(18)}<span>Bubblegum was taken, so you got Grape.</span></div></div>${pickSkins()}</div>`;
+  const info = `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><span class="chip">Klara’s game</span><span class="chip">City</span><span class="chip">4 min</span><span class="chip">Medium</span><span class="chip">6 holes</span></div>`;
+  const foot = `<div class="startrow"><span class="note">Waiting for Klara to press START…</span><button class="ab" type="button">${I.leave(20)}Leave</button></div>`;
+  return `<div class="scrim"></div><div class="ctr psel"><div class="toprow"><button class="rb" type="button" aria-label="Back">${I.back(24)}</button>${sign('PLAYER SELECT')}</div>${info}${slots}${pick}${foot}</div>`;
 };
 
-/* ---------- Option B: a full-screen player select ---------- */
-const sign = (t, cls = '') => `<div class="sign ${cls}" role="heading" aria-level="2">${t}</div>`;
-function slotB(i, p, o = {}) {
-  const m = o.m;
-  if (!p) return `<div class="slot free"><span class="pn">${i + 1}P</span><span class="hw">${hole('#a79fb8', m ? 40 : 96, 'free')}</span><span class="mid"><span class="ins blink">INSERT COIN</span><span class="sub">Waiting for a friend</span></span></div>`;
-  return `<div class="slot ${o.you ? 'you' : ''}" style="--hole:${p.c}"><span class="pn">${i + 1}P</span><span class="hw">${hole(p.c, m ? 40 : 96)}</span><span class="mid"><span class="nm">${p.n}</span>${o.sub ? `<span class="sub">${o.sub}</span>` : ''}${o.st === false ? '' : `<span class="st">${o.st || 'READY!'}</span>`}</span></div>`;
+/* ---------- the round ---------- */
+function hud(d, banner = '') {
+  const rows = [[MI, '4,210', 1], [KL, '3,980', 2], [CPU[0], '3,120', 3], [OS, '2,640', 4, 'me'], [{ n: 'Theo', c: '#3d7bff' }, '2,300', 5], [CPU[1], '900', 6]];
+  const li = rows.map(([p, s, r, cl]) => `<li class="${cl || ''}"><span class="rk r${r <= 3 ? r : ''}">${r}</span><span class="dot" style="--hole:${p.c}"></span><span class="n">${p.n}</span><b>${s}</b></li>`).join('');
+  return `<ul class="board" aria-label="Scores">${li}</ul><div class="clock">${I.clock(22)}<span>3:12</span></div><div class="hb"><button class="rb" type="button" aria-label="Sound">${I.sound(22)}</button><button class="ab pausebtn" type="button">${I.pause(22)}<span>Pause</span></button></div>${banner}`;
 }
-function settingsB(d, host = true) {
-  const m = d === 'phone';
-  const mp = ['Town', 'City', 'Megalopolis', 'Region'];
-  const opt = (t, on) => `<button class="opt ${on ? 'on' : ''}" type="button" aria-pressed="${on}" ${host ? '' : 'disabled'}>${t}</button>`;
-  return `<div class="bar2" aria-label="The round"><div class="grp maps2"><span class="lab">Map</span><div class="seg">${mp.map((t, i) => opt(t, i === 1)).join('')}</div></div><div class="grp"><span class="lab">Time</span><div class="seg">${['4 min', '8 min', 'No limit'].map((t, i) => opt(t, i === 0)).join('')}</div></div><div class="grp"><span class="lab">Level</span><div class="seg">${['Easy', 'Medium', 'Hard'].map((t, i) => opt(t, i === 1)).join('')}</div></div></div>`;
-}
-function B_lobby(d, filled) {
-  const m = d === 'phone';
-  const ps = filled ? [KL, MI, OS] : [KL];
-  const slots = `<div class="slots">${[0, 1, 2, 3].map(i => slotB(i, ps[i], { m, sub: i === 0 ? 'Host' : '', st: i === 0 ? 'HOST' : 'READY!' })).join('')}</div>`;
-  const code = `<div class="coderow"><div class="tl"><b>JOIN CODE</b><small>Friends tap Play together,<br>then Join with a code</small></div>${tiles('KQZT', m ? 50 : 72)}</div>`;
-  const start = `<div class="startrow"><span class="note">${filled ? holesLine(3) : 'Waiting for a friend to join…'}</span><button class="ab y big" type="button" ${filled ? '' : 'disabled'}>START</button></div>`;
-  return `<div class="scrim"></div><div class="ctr psel"><div class="toprow"><button class="rb" type="button" aria-label="Back">${I.back(24)}</button>${sign('PLAYER SELECT')}</div>${code}${slots}${settingsB(d)}${start}</div>`;
-}
-/* Codes are letters only, never I, L or O (nothing reads like a 1 or a 0). */
-const LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ'.split('');
-function keysB(d) {
-  const per = d === 'phone' ? 7 : 9;
-  const rows = []; for (let i = 0; i < LETTERS.length; i += per) rows.push(LETTERS.slice(i, i + per));
-  rows[rows.length - 1].push('DEL');
-  return `<div class="keys" role="group" aria-label="Letters">${rows.map(r => `<div class="kr2">${r.map(k => k === 'DEL' ? `<button class="key del" type="button" data-k="DEL" aria-label="Delete">${I.del(26)}</button>` : `<button class="key" type="button" data-k="${k}">${k}</button>`).join('')}</div>`).join('')}</div>`;
-}
-const B = {
-  '1': d => `<div class="scrim"></div><div class="ctr menu">${logo()}${menuCard(d, 'B')}</div>${back()}${snd()}${pill()}`,
-  '2a': d => B_lobby(d, false),
-  '2b': d => B_lobby(d, true),
-  '3': d => `<div class="scrim"></div><div class="ctr psel" data-b3 data-code="KQ"><div class="toprow"><button class="rb" type="button" aria-label="Back">${I.back(24)}</button>${sign('INSERT CODE', 'purple')}</div><p style="color:#efe7ff;font-size:${d === 'phone' ? 16 : 19}px;text-align:center">Ask the host for their 4-letter code.</p><div class="b3tiles">${tiles('KQ', d === 'phone' ? 66 : 110, 2)}</div>${keysB(d)}<button class="ab y big" type="button" data-go disabled style="${d === 'phone' ? 'width:100%' : 'min-width:300px'}">GO!</button></div>`,
-  '4': d => {
-    const m = d === 'phone';
-    const ps = [KL, MI, OS];
-    const slots = `<div class="slots">${[0, 1, 2, 3].map(i => slotB(i, ps[i], { m, you: i === 2, sub: i === 0 ? 'Host' : i === 2 ? 'You' : '', st: i === 2 ? 'PICKING…' : i === 0 ? 'HOST' : 'READY!' })).join('')}</div>`;
-    const pick = `<div class="pickp"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="lab" style="color:var(--muted)">Pick your colour</span>${grabNote()}</div>${pickSkins()}</div>`;
-    const info = `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><span class="chip">Klara’s game</span><span class="chip">City</span><span class="chip">4 min</span><span class="chip">Medium</span><span class="chip">6 holes</span></div>`;
-    const foot = `<div class="startrow"><span class="note">Waiting for Klara to press START…</span><button class="ab" type="button">${I.leave(20)}Leave</button></div>`;
-    return `<div class="scrim"></div><div class="ctr psel"><div class="toprow"><button class="rb" type="button" aria-label="Back">${I.back(24)}</button>${sign('PLAYER SELECT')}</div>${info}${slots}${pick}${foot}</div>`;
-  },
-  '5a': d => `<div class="scrim"></div>${hud(d, { banner: `<div class="banner"><div class="bn red" role="status"><span class="spin">${I.plug(26)}</span>RECONNECTING…</div><div class="sub">Your hole waits right here.</div></div>` })}`,
-  '5b': d => `<div class="scrim"></div><div class="ctr psel" style="justify-content:center"><div class="cabres">${hole('#ff5fa8', 90, 'off')}${sign('WAITING FOR KLARA', 'purple')}<div class="bigcount px" aria-label="45 seconds">0:42</div><p>If Klara is not back, the round ends and you see the scores.</p><button class="ab" type="button">${I.leave(22)}Leave round</button></div></div>`,
-  '5c': d => `<div class="scrim"></div>${hud(d)}<div class="ctr center">${pauseCard(d, d === 'ipad', 'B')}</div>`,
-  '6': d => {
-    const m = d === 'phone';
-    const kids = STAND.filter(p => !p.cpu);
-    const slots = kids.map(p => `<div class="rslot ${p.n === 'Oskar' ? 'me' : ''}" style="--hole:${p.c}"><span class="pn r${p.r <= 3 ? p.r : ''}">${p.r}</span><span class="hw">${hole(p.c, m ? 36 : 84)}</span><span class="mid2"><span class="nm">${p.n}${p.n === 'Oskar' ? ' (you)' : ''}</span><span class="sc px">${p.s}</span></span></div>`).join('');
-    const cpu = `<div class="cpubar"><span>Computer holes</span>${STAND.filter(p => p.cpu).map(p => `<span>${p.r}. ${p.n} <b>${p.s}</b></span>`).join('')}</div>`;
-    const mine = `<div class="yr"><div class="tile"><span class="px">23</span><small>Things swallowed</small></div><div class="tile"><span class="px">2</span><small>Wonders</small></div><div class="tile"><span class="px">3</span><small>Holes swallowed</small></div></div>`;
-    const host = !m;
-    const acts = `<div class="startrow"><span class="note">${host ? 'Everyone starts a new round with you.' : 'Klara decides when the next round starts.'}</span><button class="ab y big" type="button">PLAY AGAIN</button><button class="ab" type="button">${I.leave(20)}Leave</button></div>`;
-    return `<div class="scrim"></div><div class="ctr psel"><div class="toprow">${sign('ROUND OVER')}</div><div class="podium4">${slots}</div>${cpu}${mine}${acts}</div>`;
-  },
+const S_RECON = d => `<div class="scrim"></div>${hud(d, `<div class="banner"><div class="bn" role="status"><span class="spin">${I.plug(26)}</span>RECONNECTING…</div><div class="sub">Your hole waits right here.</div></div>`)}`;
+const S_HOSTGONE = d => `<div class="scrim"></div><div class="ctr psel" style="justify-content:center"><div class="cabres">${hole('#ff5fa8', 90, 'off')}${sign('WAITING FOR KLARA', 'purple')}<div class="bigcount px" aria-label="42 seconds">0:42</div><p>If Klara is not back, the round ends and you see the scores.</p><button class="ab" type="button">${I.leave(22)}Leave round</button></div></div>`;
+const S_PAUSE = d => {
+  const m = d === 'phone', host = !m;
+  return `<div class="scrim"></div>${hud(d)}<div class="ctr center"><div class="card st waitcard" role="dialog" aria-label="Pause"><div class="sign" style="font-size:${m ? 22 : 28}px">STILL PLAYING</div><p>${host ? 'This is an endless round, so you can end it for everyone.' : 'A shared round can’t be paused, because everyone is still playing.'}</p><div style="display:flex;flex-direction:column;gap:12px;width:100%"><button class="ab y big full" type="button">Keep going</button><button class="ab full" type="button">${I.leave(22)}Leave round</button>${host ? '<button class="ab r full" type="button">End round for everyone</button>' : ''}</div></div></div>`;
 };
-
-/* ---------- Option C: the map is the lobby ---------- */
-function citySvg(rows) {
-  let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  const pal = ['#ff9f1c', '#ffb84d', '#ff8a2a', '#f2c200', '#e8501e', '#ffc66b'];
-  const g = 50, H = rows * g; let r = '';
-  for (let y = 0; y < rows; y++) for (let x = 0; x < 12; x++) r += `<rect x="${x * g + 5}" y="${y * g + 5}" width="${g - 10}" height="${g - 10}" rx="6" fill="${pal[Math.floor(rnd() * pal.length)]}"/>`;
-  const parks = parkCells(rows).map(([x, y]) => `<rect x="${x * g - g * 0.3}" y="${y * g - g * 0.3}" width="${g * 1.6}" height="${g * 1.6}" rx="14" fill="#6bd08a" stroke="#2a1f4a" stroke-width="3"/>`).join('');
-  return `<svg viewBox="0 0 600 ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="600" height="${H}" fill="#3a3550"/>${r}${parks}<rect x="262" y="${H / 2 - 38}" width="76" height="76" rx="10" fill="#5ec8ff" stroke="#2a1f4a" stroke-width="3"/></svg>`;
-}
-const parkCells = rows => [[2, 2], [9, 2], [2, rows - 3], [9, rows - 3]];
-const CPUPOS = [[50, 12], [50, 88], [9, 50], [91, 50], [36, 50]];
-function mapBox(d, players, you) {
-  const m = d === 'phone', rows = m ? 8 : 11;
-  const pins = parkCells(rows).map(([cx, cy], i) => {
-    const p = players[i]; const x = (cx * 50 + 25) / 6, y = (cy * 50 + 25) / (rows * 0.5); const dd = m ? 40 : 66;
-    if (!p) return `<div class="pin" style="left:${x}%;top:${y}%">${hole('#a79fb8', dd, 'free')}<span class="tag free">${i + 1}P free</span></div>`;
-    const youMark = you === i;
-    return `<div class="pin" style="left:${x}%;top:${y}%;--hole:${p.c};--d:${dd}px">${youMark ? '<span class="ring"></span>' : ''}${hole(p.c, dd)}<span class="tag ${youMark ? 'you' : ''}">${youMark ? p.n + ' (you)' : p.n}</span></div>`;
-  }).join('');
-  const cpuN = 6 - players.length; const dd = m ? 22 : 30;
-  const cpus = CPUPOS.slice(0, cpuN).map(([x, y]) => `<div class="pin cpu" style="left:${x}%;top:${y}%">${hole('#8d869c', dd, 'cpu')}</div>`).join('');
-  return `<div class="mapbox" style="aspect-ratio:600/${rows * 50}">${citySvg(rows)}${cpus}${pins}</div>`;
-}
-function rosterC(players, you) {
-  return `<div class="roster">${[0, 1, 2, 3].map(i => { const p = players[i]; return p ? `<span class="chip" style="${you === i ? 'background:var(--yellow-t)' : ''}"><span class="dot" style="--hole:${p.c}"></span>${i + 1}P ${p.n}</span>` : `<span class="chip" style="border-style:dashed;box-shadow:none;color:var(--muted)">${i + 1}P free</span>`; }).join('')}</div>`;
-}
-function settingsC(d, host) {
+const S_RESULTS = d => {
   const m = d === 'phone';
-  const opt = (t, on) => `<button class="opt ${on ? 'on' : ''}" type="button" aria-pressed="${on}" ${host ? '' : 'disabled'}>${t}</button>`;
-  return `<div class="lab">Map</div><div class="seg" style="--n:${m ? 4 : 2}">${['Town', 'City', 'Megalopolis', 'Region'].map((t, i) => opt(t, i === 1)).join('')}</div><div class="lab">Time</div><div class="seg">${['4 min', '8 min', 'No limit'].map((t, i) => opt(t, i === 0)).join('')}</div><div class="lab">Level</div><div class="seg">${['Easy', 'Medium', 'Hard'].map((t, i) => opt(t, i === 1)).join('')}</div>`;
-}
-function C_lobby(d, filled) {
-  const m = d === 'phone';
-  const ps = filled ? [KL, MI, OS] : [KL];
-  const code = `<div class="card st codecard">${m ? '' : '<div class="lab">Your code</div>'}<div class="tx">${m ? '<div class="lab">Your code</div>' : ''}${m ? '<p class="hint">Friends: Play together, then Join with a code.</p>' : ''}</div>${tiles('KQZT', m ? 52 : 84)}${m ? '' : '<p class="hint">Friends tap Play together, then Join with a code, and type this.</p>'}</div>`;
-  const hn = `<p class="hint">${holesLine(ps.length)}</p>`;
-  const start = `<div class="card startc"><button class="ab y big full" type="button" ${filled ? '' : 'disabled'}>START</button><p class="hint" style="text-align:center">${filled ? 'Everyone here? Press start.' : 'Start wakes up when a friend joins.'}</p></div>`;
-  const board = `<div class="card st boardcard"><div class="lh"><button class="ab sm" type="button">${I.back(18)}Back</button><h2 style="font-size:${m ? 22 : 26}px">Pick a start park</h2></div>${mapBox(d, ps, -1)}${m ? "" : rosterC(ps)}</div>`;
-  const set = `<div class="card st setcard">${settingsC(d, true)}${hn}</div>`;
-  if (m) return `<div class="scrim"></div><div class="ctr mapl">${board}${code}${set}${start}</div>`;
-  return `<div class="scrim"></div><div class="ctr mapl">${board}<div class="sidecol">${code}${set}${start}</div></div>`;
-}
-const C = {
-  '1': d => `<div class="scrim"></div><div class="ctr menu up">${logo()}${menuCard(d, 'C')}</div>${back()}${snd()}<div class="card sheet" role="dialog" aria-label="Play together"><h4>Play together</h4><div class="tb"><button class="ab p" type="button">Open a lobby</button><button class="ab" type="button">Join with a code</button></div><p class="hint">${d === 'phone' ? 'A linked friend’s pill lights up too.' : 'A friend already linked in the party sees their pill light up too.'}</p></div>${pill()}`,
-  '2a': d => C_lobby(d, false),
-  '2b': d => C_lobby(d, true),
-  '3': d => {
-    const m = d === 'phone';
-    const letters = ['K', 'Q', 'Z', 'T'];
-    const reels = letters.map((l, i) => { const ai = LETTERS.indexOf(l); return `<div class="reel" style="--tc:${TILE_C[i]}"><button class="ab c" type="button" aria-label="Letter ${i + 1} up">${I.up(26)}</button><div class="win ${i === 2 ? 'is-focus' : ''}" aria-label="Letter ${l}"><span class="o">${LETTERS[(ai + LETTERS.length - 1) % LETTERS.length]}</span><span class="m">${l}</span><span class="o">${LETTERS[(ai + 1) % LETTERS.length]}</span></div><button class="ab c" type="button" aria-label="Letter ${i + 1} down">${I.down(26)}</button></div>`; }).join('');
-    return `<div class="scrim"></div><div class="ctr center">${back()}<div class="card st" style="display:flex;flex-direction:column;align-items:center;gap:14px;width:${m ? 398 : 640}px;padding-bottom:18px"><h2 style="margin:0;font-size:${m ? 26 : 32}px">Join with a code</h2><p class="hint" style="text-align:center">Spin the letters, or just type them with a keyboard.</p><div class="reels">${reels}</div><button class="ab y big full" type="button">JOIN</button></div></div>`;
-  },
-  '4': d => {
-    const m = d === 'phone';
-    const ps = [KL, MI, OS];
-    const board = `<div class="card st boardcard"><div class="lh"><h2 style="font-size:${m ? 22 : 26}px">Klara’s lobby</h2></div>${mapBox(d, ps, 2)}${m ? "" : rosterC(ps, 2)}</div>`;
-    const info = `<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="chip">City</span><span class="chip">4 min</span><span class="chip">Medium</span><span class="chip">6 holes</span></div>`;
-    const side = `<div class="card st setcard"><div class="lab">The round</div>${info}<div class="lab" style="margin-top:6px">Your hole</div>${pickSkins()}${grabNote()}</div><div class="card st" style="display:flex;align-items:center;gap:12px;padding-top:26px"><span style="flex:1;font-size:16px">Waiting for Klara to press start…</span><button class="ab sm" type="button">${I.leave(18)}Leave</button></div>`;
-    if (m) return `<div class="scrim"></div><div class="ctr mapl">${board}${side}</div>`;
-    return `<div class="scrim"></div><div class="ctr mapl">${board}<div class="sidecol">${side}</div></div>`;
-  },
-  '5a': d => `<div class="scrim"></div>${hud(d, { banner: `<div class="banner"><div class="bn" role="status" style="background:var(--paper);color:var(--ink);text-shadow:none"><span class="spin" style="color:var(--purple)">${I.plug(26)}</span>Reconnecting…</div><div class="sub">Your hole waits right here until you are back.</div></div>` })}`,
-  '5b': d => `<div class="scrim"></div>${hud(d)}<div class="ctr center"><div class="card st waitcard" role="status"><div style="display:flex;align-items:center;gap:14px;padding-top:14px">${hole('#ff5fa8', 72, 'off')}<span class="chip warn">${I.crown(16)}Host</span></div><h2>Waiting for Klara</h2><p>Klara’s start park is empty for now. The round is on hold.</p><div class="meter"><i style="width:70%"></i></div><p class="hint" style="font-size:15px">Back in <span class="px" style="font-size:15px">0:42</span> or the round ends and you see the scores.</p><button class="ab full" type="button">${I.leave(22)}Leave round</button></div></div>`,
-  '5c': d => `<div class="scrim"></div>${hud(d)}<div class="ctr center">${pauseCard(d, d === 'ipad', 'C')}</div>`,
-  '6': d => {
-    const m = d === 'phone';
-    const kids = STAND.filter(p => !p.cpu);
-    const hts = m ? [168, 138, 112, 92] : [196, 160, 128, 100];
-    const steps = kids.map((p, i) => `<div class="step ${p.n === 'Oskar' ? 'me' : ''}" style="--hole:${p.c}"><span class="hw">${hole(p.c, m ? 48 : 72)}</span><div class="blk" style="height:${hts[i]}px"><span class="rk r${p.r <= 3 ? p.r : ''}">${p.r}</span><span class="nm">${p.n}</span><span class="sc">${p.s}</span></div></div>`).join('');
-    const cpu = `<div class="cpubar"><span>Computer holes</span>${STAND.filter(p => p.cpu).map(p => `<span>${p.r}. ${p.n} <b>${p.s}</b></span>`).join('')}</div>`;
-    const mine = `<div class="tiles"><div class="tile"><span class="px">23</span><small>Things swallowed</small></div><div class="tile"><span class="px">2</span><small>Wonders</small></div><div class="tile"><span class="px">3</span><small>Holes swallowed</small></div></div>`;
-    const host = !m;
-    const acts = `<div class="acts"><button class="ab y big grow" type="button">Play again</button><button class="ab" type="button">${I.leave(22)}Leave</button></div><p class="hint">${host ? 'Everyone starts a new round with you.' : 'Klara decides when the next round starts.'}</p>`;
-    return `<div class="scrim"></div><div class="ctr center"><div class="card st rescard" style="width:${m ? 398 : 760}px"><h2>Round over!</h2><div class="podium">${steps}</div>${cpu}${mine}${acts}</div></div>`;
-  },
+  const kids = STAND.filter(p => !p.cpu);
+  const slots = kids.map(p => `<div class="rslot ${p.n === 'Oskar' ? 'me' : ''}" style="--hole:${p.c}"><span class="pn r${p.r <= 3 ? p.r : ''}">${p.r}</span><span class="hw">${hole(p.c, m ? 36 : 84)}</span><span class="mid2"><span class="nm">${p.n}${p.n === 'Oskar' ? ' (you)' : ''}</span><span class="sc px">${p.s}</span></span></div>`).join('');
+  const cpu = `<div class="cpubar"><span>Computer holes</span>${STAND.filter(p => p.cpu).map(p => `<span>${p.r}. ${p.n} <b>${p.s}</b></span>`).join('')}</div>`;
+  const mine = `<div class="yr"><div class="tile"><span class="px">23</span><small>Things swallowed</small></div><div class="tile"><span class="px">2</span><small>Wonders</small></div><div class="tile"><span class="px">3</span><small>Holes swallowed</small></div></div>`;
+  const acts = `<div class="startrow"><span class="note">${m ? 'Klara decides when the next round starts.' : 'Everyone starts a new round with you.'}</span><button class="ab y big" type="button">PLAY AGAIN</button><button class="ab" type="button">${I.leave(20)}Leave</button></div>`;
+  return `<div class="scrim"></div><div class="ctr psel"><div class="toprow">${sign('ROUND OVER')}</div><div class="podium4">${slots}</div>${cpu}${mine}${acts}</div>`;
+};
+const S_ELSEWHERE = d => {
+  const lp = `<div class="litpill" role="status"><span class="hw">${hole(MI.c, 40)}</span><span class="tx">Mina is starting Gulp Universe!</span><button class="ab g" type="button" style="min-height:56px;font-size:22px">Join Mina</button></div>`;
+  return `<div class="scrim"></div><div class="arc-title">The arcade</div><div class="tkrow" aria-hidden="true"><span class="tk"></span><span class="tk"></span><span class="tk"></span></div>${lp}`;
 };
 
 /* ---------- the page ---------- */
-const OPTS = {
-  A: { name: 'A, Panel in the menu card', fn: A, text: 'Play together is a strip inside today’s menu card with two buttons, Open a lobby and Join with a code. Each lobby is the same card, swapped to a lobby panel: the code, four seat rows, the settings and Start. Everything looks like the menu the children already know.', cost: 'Build: the smallest. New card states in GulpMenu.tsx and about 120 lines of gulp.css. Solo play and the PLAY button do not change.' },
-  B: { name: 'B, Player select (1P to 4P)', fn: B, text: 'Choosing 2 to 4 players opens a full-screen arcade player select with four tall slots, 1P to 4P. Empty slots say INSERT COIN, joined slots say READY!, and the join code sits above them. Join with a code is a full-screen entry with big arcade letter keys. PLAY becomes 1 PLAYER and 2–4 PLAYERS on the menu.', cost: 'Build: the largest. A new full-screen layout, slot and key pieces, and a menu change that touches every solo player’s PLAY button. About 300 lines of gulp.css and a new component.' },
-  C: { name: 'C, The map is the lobby', fn: C, text: 'Each child’s hole drops onto its own start park on a small map of the city as they join, with their name on it, and the computer holes sit in the gaps. The colour choice changes the hole on the map straight away. The door is the Play together pill, which opens a small sheet. The code is typed by spinning four slot-machine letters, or with a keyboard. Results are a podium.', cost: 'Build: medium. A small SVG map per map size (the minimap data exists), a pin piece, and the reels. About 220 lines of gulp.css. The start-park spots must match the ones the game picks for each child.' },
-};
-const STATES = [
-  ['1', 'Where Play together starts', 'The Gulp menu, with the door into a shared round.'],
-  ['2a', 'Host lobby, nobody here yet', 'The code, four seats, the settings. Start is switched off until someone joins. The note says how many holes are computer holes.'],
-  ['2b', 'Host lobby, friends joining', 'Names and colours fill the seats. Start is on.'],
-  ['3', 'Join with a code', 'A big 4-letter entry for a guest. A and C show the device keyboard or spinning letters; B shows tap-keys (they type into the code here).'],
-  ['4', 'A guest waiting and picking a colour', 'Seen from the guest’s device. Bubblegum was already taken, so the guest was given the next free colour, Grape. Settings can be read but not changed.'],
-  ['5a', 'In a round: the guest’s link drops', 'Reconnecting… with the hole waiting where it is. The round carries on for everyone else.'],
-  ['5b', 'In a round: the host drops', 'The guest sees Waiting for Klara and how long until the round ends.'],
-  ['5c', 'In a round: Pause is not a pause', 'Keep going and Leave round. The host of an endless round also gets End round (iPad picture).'],
-  ['6', 'Shared results', 'Every child’s standing, with this device’s own tiles. iPad shows the host (Play again starts a new round); phone shows a guest.'],
+const STEPS = [
+  ['1. The menu', 'Two big buttons side by side. PLAY is solo, as today. PLAY WITH FRIENDS has three holes on it. Nothing about the menu asks anything else.', [
+    ['menu', 'PLAY and PLAY WITH FRIENDS', 'The Gulp menu when no friend is linked.', d => menuScene(d)],
+  ]],
+  ['2. Friends already linked in the party', 'Friends joined through the arcade’s Play together party need no letters. A friend starting a game shows up as one big green button.', [
+    ['invite', 'A linked friend has started a game', 'A big card above the buttons on every linked device’s Gulp menu. One tap on Join Mina puts the child in Mina’s player select (the guest screen in step 4).', d => menuScene(d, invite(d))],
+    ['elsewhere', '…and the child is somewhere else in the arcade', 'The Play together pill lights up the same way, with the same one-tap Join.', S_ELSEWHERE],
+    ['linked-wait', 'The child taps PLAY WITH FRIENDS while a friend is linked', 'No question: straight to their own player select. The linked friend’s slot says Mina is coming… until Mina taps Join. If the friend was starting a game instead, the link underneath takes the child there.', S_LINKED(false)],
+    ['linked-ready', 'The linked friend has tapped Join', 'The slot turns to READY! and START wakes up.', S_LINKED(true)],
+  ]],
+  ['3. Not linked: one question', 'PLAY WITH FRIENDS asks one question with two big answers. Two wordings are shown for the family to choose between. The answer that starts the game leads to the child’s own player select; the other leads to the letter keys.', [
+    ['q1', 'Wording Q1: “Who’s starting the game?”', 'A crown for starting, four letter tiles for typing a friend’s letters.', d => question(d, 1)],
+    ['q2', 'Wording Q2: “Do you have a code from a friend?”', 'The same two pictures, asked the other way round.', d => question(d, 2)],
+    ['host-empty', 'Starting: my player select, nobody here yet', 'The four letters are shown big. One line says what the other iPads do next (it follows the wording picked above). START stays off until a friend joins, and the note says how many computer holes are left.', S_HOST_EMPTY],
+    ['host-filled', 'Starting: friends have joined', 'Names and colours fill the slots. START is on.', S_HOST_FILLED],
+    ['code', 'Typing a friend’s letters', 'Only the 23 code letters are on the keys: no I, L or O. A keyboard works too. GO! wakes up at four letters.', S_CODE],
+  ]],
+  ['4. After joining', 'The same player select, with the guest’s own slot outlined and a colour picker. Mina’s colour was taken, so the guest is told which one they got. Settings are read-only.', [
+    ['guest', 'Joined: my slot and my colour', 'Bubblegum was already taken, so the guest got Grape.', S_GUEST],
+  ]],
+  ['5. The round and the results', 'The same cabinet screens as before.', [
+    ['recon', 'My link drops', 'RECONNECTING… and my hole waits where it is.', S_RECON],
+    ['hostgone', 'The host drops', 'WAITING FOR KLARA with the seconds left before the round ends.', S_HOSTGONE],
+    ['pause', 'Pause is not a pause', 'Keep going and Leave round. The host of an endless round also gets End round (iPad picture).', S_PAUSE],
+    ['results', 'Shared results', 'Every child’s standing among all the holes, and this device’s own tiles. iPad shows the host; phone shows a guest.', S_RESULTS],
+  ]],
 ];
-const state = { o: 'A', s: 0.56 };
-const q = new URLSearchParams(location.hash.slice(1));
-if (OPTS[q.get('o')]) state.o = q.get('o');
-if (q.get('s')) state.s = Number(q.get('s')) || state.s;
+const CLS = { menu: '', invite: '', elsewhere: 'dark', 'linked-wait': 'dark', 'linked-ready': 'dark', q1: 'dark', q2: 'dark', 'host-empty': 'dark', 'host-filled': 'dark', code: 'dark', guest: 'dark', recon: 'round', hostgone: 'dark', pause: 'dim', results: 'dark' };
 
-function frame(o, id, d) {
-  const html = OPTS[o].fn[id](d);
-  let cls = '';
-  if (id === '5a') cls = 'round';
-  else if (id === '5c') cls = 'dim';
-  else if (id === '5b') cls = o === 'B' ? 'dark' : 'dim';
-  else if (o === 'B' && id !== '1') cls = 'dark';
+function frame(id, fn, d) {
   const label = d === 'ipad' ? 'iPad 1180×820' : 'Phone 430×932';
-  return `<figure class="fig"><div class="fw ${d}"><div class="frame ${d}"><div class="s ${d} ${cls}" data-o="${o}" data-st="${id}" data-d="${d}">${html}</div></div></div><figcaption>${label}</figcaption></figure>`;
+  return `<figure class="fig"><div class="fw ${d}"><div class="frame ${d}"><div class="s ${d} ${CLS[id]}" data-st="${id}" data-d="${d}">${fn(d)}</div></div></div><figcaption>${label}</figcaption></figure>`;
 }
 function render() {
   document.body.style.setProperty('--s', state.s);
-  const t = document.querySelector('.tabs'); t.innerHTML = Object.keys(OPTS).map((k, i) => `<button class="tab" type="button" aria-pressed="${state.o === k}" data-o="${k}">${OPTS[k].name.split(',')[0]} <span style="font-weight:400">${OPTS[k].name.split(', ')[1]}</span></button>`).join('');
-  const sc = document.querySelector('.scales'); sc.innerHTML = [['Fit', 0.56], ['Large', 0.8], ['Full size', 1]].map(([n, v]) => `<button class="scale" type="button" aria-pressed="${state.s === v}" data-s="${v}">${n}</button>`).join('');
-  const o = OPTS[state.o];
-  document.getElementById('out').innerHTML = `<h2 class="opt-head">${o.name}</h2><p class="opt-text">${o.text}</p><p class="opt-cost">${o.cost}</p><ul class="jump">${STATES.map(([id, title]) => `<li><a href="#o=${state.o}&s=${state.s}" data-j="${id}">${id} ${title}</a></li>`).join('')}</ul>` +
-    STATES.map(([id, title, cap]) => `<section class="state" id="st-${id}"><h3>${id}. ${title}</h3><p>${cap}</p><div class="pair">${frame(state.o, id, 'ipad')}${frame(state.o, id, 'phone')}</div></section>`).join('');
+  document.querySelectorAll('.grp2').forEach(g => g.querySelectorAll('button').forEach(b => b.remove()));
+  const sz = document.querySelector('.grp2[aria-label="Picture size"]');
+  [['Fit', 0.56], ['Large', 0.8], ['Full size', 1]].forEach(([n, v]) => sz.insertAdjacentHTML('beforeend', `<button class="scale" type="button" aria-pressed="${state.s === v}" data-s="${v}">${n}</button>`));
+  const wd = document.getElementById('wording');
+  [['Q1', '1'], ['Q2', '2']].forEach(([n, v]) => wd.insertAdjacentHTML('beforeend', `<button class="scale" type="button" aria-pressed="${state.w === v}" data-w="${v}">${n}</button>`));
+  document.getElementById('jump').innerHTML = STEPS.flatMap(([, , sts]) => sts.map(([id, title]) => `<li><a href="#st-${id}" data-j="${id}">${title}</a></li>`)).join('');
+  document.getElementById('out').innerHTML = STEPS.map(([h, sub, sts]) => `<h2 class="step">${h}<small>${sub}</small></h2>` + sts.map(([id, title, cap, fn]) => `<section class="state" id="st-${id}"><h3>${title}</h3><p>${cap}</p><div class="pair">${frame(id, fn, 'ipad')}${frame(id, fn, 'phone')}</div></section>`).join('')).join('');
 }
-document.addEventListener('click', e => {
-  const tab = e.target.closest('.tab'); if (tab) { state.o = tab.dataset.o; render(); return; }
-  const sc = e.target.closest('.scale'); if (sc) { state.s = Number(sc.dataset.s); render(); return; }
-  const j = e.target.closest('[data-j]'); if (j) { e.preventDefault(); document.getElementById('st-' + j.dataset.j).scrollIntoView({ behavior: 'auto' }); return; }
-  const key = e.target.closest('.key'); if (key) typeInto(key.closest('[data-b3]'), key.dataset.k);
-});
 function typeInto(root, k) {
   let c = root.dataset.code;
   if (k === 'DEL') c = c.slice(0, -1); else if (LETTERS.includes(k) && c.length < 4) c += k;
@@ -779,10 +551,20 @@ function typeInto(root, k) {
   root.querySelector('.b3tiles').innerHTML = tiles(c, Number(ts), c.length < 4 ? c.length : -1);
   root.querySelector('[data-go]').disabled = c.length < 4;
 }
+document.addEventListener('click', e => {
+  const sc = e.target.closest('[data-s]'); if (sc && sc.classList.contains('scale')) { state.s = Number(sc.dataset.s); render(); return; }
+  const w = e.target.closest('[data-w]'); if (w) { state.w = w.dataset.w; render(); return; }
+  const j = e.target.closest('[data-j]'); if (j) { e.preventDefault(); document.getElementById('st-' + j.dataset.j).scrollIntoView({ behavior: 'auto' }); return; }
+  const key = e.target.closest('.key'); if (key) typeInto(key.closest('[data-b3]'), key.dataset.k);
+});
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.length === 1 ? e.key.toUpperCase() : e.key === 'Backspace' ? 'DEL' : '';
-  if (k && (k === 'DEL' || /[A-Z]/.test(k))) { document.querySelectorAll('[data-b3]').forEach(r => typeInto(r, k)); return; } if (['1', '2', '3'].includes(e.key) && !e.target.closest('input')) { state.o = 'ABC'[Number(e.key) - 1]; render(); } });
+  if (k && (k === 'DEL' || /[A-Z]/.test(k))) document.querySelectorAll('[data-b3]').forEach(r => typeInto(r, k));
+});
+const q = new URLSearchParams(location.hash.slice(1));
+if (q.get('s')) state.s = Number(q.get('s')) || state.s;
+if (q.get('w') === '2') state.w = '2';
 render();
 </script>
 </body>
