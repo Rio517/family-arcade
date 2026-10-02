@@ -1,105 +1,92 @@
-# Gulp Universe: joining a round together
+# Gulp Universe: playing with friends
 
 **Product direction:** up to four children play one Gulp Universe round, each
-on their own iPad or phone. The host opens the lobby, the others join it, and
-everyone ends on one results card. The way into the round has to be clear to a
-child who has never done it, on a phone and on an iPad.
+on their own iPad or phone. Getting into the round is one easy path. Every
+screen asks one thing, in a child's words, and each answer is a big button with
+a picture as well as words. The path ends in the full-screen arcade player
+select (four slots, 1P to 4P, INSERT COIN and READY!), in the Coin-op look
+chosen in [20261001-gulp-hud-depth](../20261001-gulp-hud-depth/).
 
-**What every option does:**
+**What stays the same:** the host picks the map, time and difficulty as the menu
+does today. Each child picks a colour, and a taken colour goes to the next free
+one. People take computer seats, so each map keeps its number of holes (Town 5,
+City 6, Megalopolis 7, Region 9). A shared round cannot be paused: Pause shows
+*Keep going* and *Leave round*, and the host of an endless round also gets *End
+round*. A code is four letters and never uses I, L or O, so nothing reads like
+a 1 or a 0; the keys show the 23 letters that are left.
 
-- **Two ways in.** Devices already linked by the arcade's *Play together*
-  party get a nudge on their pill when the host opens Gulp, and one tap opens
-  the same game. For three or four devices, Gulp has a *Join with a code* door:
-  the host's lobby shows its 4-letter code large and the others type it in.
-- **Code letters.** A code is four letters, never I, L or O, so nothing reads
-  like a 1 or a 0.
-- **The host decides the round.** The host picks the map, time and difficulty
-  as the menu does today. The lobby shows the code, seats 1 to 4 filling with
-  names and colours, the settings, and *Start*, which stays off until someone
-  has joined.
-- **Colours.** Each child picks a colour. A taken colour goes to the next free
-  one, and the guest is told so.
-- **Seats come from the computer holes.** Each map keeps its number of holes
-  (Town 5, City 6, Megalopolis 7, Region 9). Every child who joins takes a
-  computer hole's place, and the lobby says how many computer holes are left.
-- **Guests read, hosts change.** A guest sees the host's settings as they
-  change but cannot change them.
-- **A shared round cannot be paused.** *Pause* opens *Keep going* and *Leave
-  round*, and the host of an endless round also gets *End round*.
-- **Dropped links.** A guest whose link drops sees *Reconnecting…* and the hole
-  waits where it is. If the host drops, guests see *Waiting for {host}* with
-  the time left before the round ends and the scores appear.
-- **Results.** One card shows every child's standing among all the holes, the
-  computer holes included, and this device's own *Your round* tiles. The host's
-  *Play again* starts a new round for everyone; a guest's asks the host.
+**Copy rules:** the screens never say "lobby". The word "code" appears only
+beside the four letter tiles. Every screen has a clear way back, text is 14px or
+more, and every button shows a focus ring.
 
-**What stays:** the Coin-op look chosen in
-[20261001-gulp-hud-depth](../20261001-gulp-hud-depth/) (cream pieces with a
-thin ink edge, the rainbow stripe, pixel digits, arcade buttons), the bundled
-fonts, text of 14px or more, visible keyboard focus, and solo play as it is.
-The pictures show the menu in that look too; the menu is not restyled in the
-build yet.
+## The path
 
-## The options
+1. **Menu.** Two buttons side by side: *PLAY* (yellow, solo, as today) and
+   *PLAY WITH FRIENDS* (purple, three holes on it). Nothing else on the menu
+   asks about friends.
+2. **Friends already linked in the arcade's Play together party.** They need no
+   letters.
+   - *A linked friend has started a game.* Every linked device's Gulp menu shows
+     a big card above the buttons: "Mina is starting a game!" with *Join Mina*.
+     A child who is somewhere else in the arcade sees the Play together pill
+     light up the same way. One tap puts them in Mina's player select.
+   - *The child taps PLAY WITH FRIENDS while a friend is linked.* No question:
+     straight to their own player select. The linked friend's slot says "Mina
+     is coming…" until Mina taps Join, then READY!. A small link underneath
+     reads "Is a friend starting instead? Join their game".
+3. **Not linked: one question.** *PLAY WITH FRIENDS* asks one question with two
+   answers. The family picks the wording:
+   - **Q1, "Who's starting the game?"** with *Me! Friends join me* (a crown) and
+     *A friend. I'll type their code* (letter tiles).
+   - **Q2, "Do you have a code from a friend?"** with *Yes! I have a code*
+     (letter tiles) and *No, I'm starting* (a crown).
 
-- **A, Panel in the menu card.** *Play together* is a strip inside today's menu
-  card with two buttons, *Open a lobby* and *Join with a code*. Each lobby
-  replaces the card's contents: the code, four seat rows, the settings and
-  *Start*. Joining types the code with the device's own keyboard into four big
-  tiles. A guest's lobby has the colour picker and a note about the colour
-  swap. The results are today's results card with every hole listed.
-- **B, Player select (1P to 4P).** The menu's *PLAY* becomes *1 PLAYER* and
-  *2–4 PLAYERS*, with a small *Have a code? Join* button. The lobby is a
-  full-screen arcade player select under a red marquee sign: four tall slots,
-  1P to 4P, that say *INSERT COIN* until someone joins and *READY!* after. Joining
-  is a full-screen *INSERT CODE* with big letter keys the child taps (a
-  hardware keyboard works too). A host-drop is a *WAITING FOR {HOST}* screen
-  with pixel-digit seconds. The results are four slot cards with rank coins.
-- **C, The map is the lobby.** The door is the *Play together* pill, which opens
-  a small sheet with the same two buttons. The lobby is a small map of the
-  city with four start parks. Each child's hole drops onto its park, wearing
-  their name, as they join, and the computer holes sit in the gaps. Choosing a
-  colour changes the hole on the map straight away. Joining spins four
-  slot-machine letters (up and down buttons, or type). The host-drop card shows
-  the host's hole asleep, and the results are a podium.
+   Starting leads to the child's own player select. It shows the four letters
+   big, and one line for the other devices: "On the other iPads: Play with
+   friends, then A friend (Q1) or Yes (Q2), then type K Q Z T". START stays off
+   until someone joins, and a note says how many computer holes are left. The
+   other answer leads to *INSERT CODE*, with big tap-keys for the 23 letters (a
+   keyboard works too) and GO!.
+4. **After joining by letters.** The same player select, with the guest's own
+   slot outlined, a colour picker and a note about the colour swap. The host's
+   settings are shown but cannot be changed. A child who arrives through *Join
+   Mina* sees the same screen.
+5. **The round and the results,** as in the cabinet look: *RECONNECTING…* when a
+   link drops, *WAITING FOR {HOST}* with the seconds left when the host drops,
+   the pause card, and one results card with every child's standing among all
+   the holes plus this device's own tiles.
 
-## What each costs
+## What it costs
 
-All three draw with CSS and inline SVG in the Coin-op look. They share the same
-lobby behaviour, which comes from the play-together plan and does not depend on
-the picture: the lobby, pick and start messages, seat tokens, the code, the
-reconnect and host-drop handling, and the results with several children.
+All of it draws with CSS and inline SVG in the Coin-op look, with the game's
+two bundled fonts. The lobby behaviour comes from the play-together plan and
+does not depend on the picture: the seat messages, seat tokens, the four-letter
+code, reconnect and host-drop handling, and results with several children.
 
-| | Components | `gulp.css` | Other |
-|---|---|---|---|
-| A | `GulpMenu.tsx` grows a lobby view (host, join, guest) rendered inside the card; a seat row | About 120 lines; seat rows and tiles, the rest reuses the menu's own segments and colour buttons | The smallest change. *PLAY* and solo play do not change. On a phone the host lobby fills the screen, so extra switches stay behind *More options*. |
-| B | A new full-screen player-select component with slot and letter-key pieces; the menu's play row changes | About 300 lines | The largest change. Every solo player sees *1 PLAYER* instead of *PLAY*. It reads most like a cabinet. |
-| C | A lobby view with a map and pins; a letter-reel entry; a podium results card; a sheet on the pill | About 220 lines | A small map picture for each of the four maps, and the start-park spots for each child from the game's rules (the plan defines them for Easy and Medium). Spinning four letters takes more taps than typing, so the keyboard stays as an alternative. |
+| Piece | Work |
+|---|---|
+| Menu | The play row becomes two big buttons. One new card above them for a linked friend's invitation, and the same message on the Play together pill. About 60 lines of `gulp.css`, small changes in `GulpMenu.tsx`. |
+| Question screen | One new full-screen component with two big answer buttons. Q1 and Q2 differ only in text and button order, so choosing one costs nothing extra. |
+| Player select | The largest piece: a full-screen component with slot cards, the marquee sign, the settings bar and START. It serves the host, the linked friend and the guest. About 300 lines of `gulp.css`. |
+| Letter entry | A letter-key component (23 keys, delete) and four tiles; it also listens to the hardware keyboard and ignores I, L, O and digits. |
+| Round states | The *Reconnecting…* banner, the host-left screen and the pause card are small HUD pieces. |
+| Linked friends | The party must tell every linked device that a friend opened Gulp, so the menu card and the pill can light up. This is part of the party work in the plan, not extra for the picture. |
 
-The pieces the three options share: the *Reconnecting…* banner, the
-*Waiting for {host}* card and the pause card are one HUD piece each, restyled
-per option. Screenshot states for each lobby view follow the party-states
-gallery pattern.
+Solo players see one change: *PLAY* is a bigger button beside *PLAY WITH
+FRIENDS*. Screenshot states for each screen follow the party-states gallery
+pattern.
 
 ## The page
 
-[play-together.html](./play-together.html) opens from disk. Pick an option
-(buttons or keys 1 to 3) and a size (Fit, Large, Full size). Each option shows
-the same nine pictures at iPad 1180×820 and phone 430×932:
-
-1. Where *Play together* starts on the Gulp menu.
-2. The host's lobby, with nobody there yet (Start off) and with friends joining.
-3. *Join with a code*.
-4. A guest waiting in the lobby, picking a colour.
-5. In a round: a guest's link dropping, the host dropping, and the pause card.
-6. The shared results.
-
-In option B the letter keys type into the code. All buttons have visible
-keyboard focus. The names, scores and codes in the pictures are examples. The
-city behind the pictures is the pair of round captures from the HUD pitch
-(`frame-ipad.webp`, `frame-phone.webp`); the fonts are the game's two bundled
-fonts (`gulp-rounded.woff2`, `gulp-pixel.woff2`, licence in `OFL.txt`).
+[play-together.html](./play-together.html) opens from disk. It lists every
+screen in path order, each at iPad 1180×820 and phone 430×932. *Size* scales
+the pictures (Fit, Large, Full size). *Instructions follow* picks which question
+wording the "On the other iPads" line uses. On the letter screen the keys type
+into the tiles. The names, scores and letters in the pictures are examples. The
+city behind the screens is the pair of round captures from the HUD pitch
+(`frame-ipad.webp`, `frame-phone.webp`); the fonts are `gulp-rounded.woff2` and
+`gulp-pixel.woff2`, with the licence in `OFL.txt`.
 
 ## Outcome
 
-**Pending.** Not yet chosen.
+**Pending.** Not yet chosen; the open choice is the question wording, Q1 or Q2.
