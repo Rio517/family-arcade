@@ -875,6 +875,21 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-banner.prize strong { color: #fff; text-shadow: 0 2px 0 rgba(42, 31, 74, 0.6); }
 .gulp-prize { margin-top: 2px; padding: 3px 14px; border: 1.5px solid var(--g-ink); border-radius: 999px; background: var(--g-paper); color: var(--g-ink); font-size: 18px; }
 
+/* A shared round's link is down: a purple sign that stays while it is. */
+.gulp-notice {
+  padding: 8px 20px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--g-purple-t) 0%, var(--g-purple) 60%);
+  color: #fff;
+  box-shadow: 0 2px 0 var(--g-ink), 0 5px 10px rgba(42, 31, 74, 0.2);
+  font-size: 17px;
+  text-shadow: 0 1.5px 0 rgba(42, 31, 74, 0.5);
+}
+.gulp-pause-note,
+.gulp-again-note { margin: 0; font-size: 16px; font-weight: 800; color: var(--g-muted); text-align: center; }
+.gulp-again-note { color: var(--g-purple); }
+
 /* The first hint, with a joystick: a red ball on a stick. */
 .gulp-hint {
   display: flex;

@@ -6,7 +6,25 @@ import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
 import { getUsersSnapshot, setUsersState } from '@shared/profile/usersStore';
 import type { World } from '../domain/world';
 import type { GulpScene as GulpSceneType } from '../three/scene';
+import { fakeParty } from '@shared/party/testing';
+import type { PartyValue } from '@shared/party/PartyContext';
 import { GulpPage } from './GulpPage';
+
+// The page reads the arcade's Play together party; here nobody is linked.
+const mockParty = vi.hoisted(() => ({ value: null as PartyValue | null }));
+vi.mock('@shared/party/PartyContext', () => ({ useParty: () => mockParty.value }));
+
+// No broker in jsdom: a peer that registers and never hears from anyone.
+vi.mock('peerjs', () => ({
+  default: class {
+    on(): void {}
+    connect() {
+      return { on() {}, close() {}, removeAllListeners() {}, open: false };
+    }
+    reconnect(): void {}
+    destroy(): void {}
+  },
+}));
 
 /**
  * jsdom has no WebGL, so a real scene can't be built. The page takes the
@@ -69,6 +87,7 @@ function frameDriver() {
 }
 
 beforeEach(() => {
+  mockParty.value = fakeParty();
   localStorage.clear();
   fake3d.enabled = false;
   // Rio is signed in — in the app the router's ticket gate guarantees it.
@@ -315,5 +334,40 @@ describe('GulpPage', () => {
     expect(screen.getByTestId('gulp-scores-board-empty')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('gulp-scores-mine'));
     expect(screen.getByTestId('gulp-scores-mine-empty')).toBeInTheDocument();
+  });
+
+  describe('playing with friends', () => {
+    it("asks who's starting when no friend is linked, then shows my player select and its letters", () => {
+      renderPage();
+      fireEvent.click(screen.getByTestId('gulp-friends'));
+      expect(screen.queryByTestId('gulp-menu')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('gulp-who-me'));
+      expect(screen.getByTestId('gulp-select')).toBeInTheDocument();
+      expect(screen.getByTestId('gulp-select-code').textContent).toMatch(/^[A-HJKMNP-Z]{4}/);
+      // Nobody has joined yet, so there is no starting.
+      expect(screen.getByTestId('gulp-select-start')).toBeDisabled();
+    });
+
+    it("a friend's letters are typed on the big keys", () => {
+      renderPage();
+      fireEvent.click(screen.getByTestId('gulp-friends'));
+      fireEvent.click(screen.getByTestId('gulp-who-friend'));
+      for (const ch of 'KQZT') fireEvent.click(screen.getByTestId(`gulp-code-key-${ch}`));
+      expect(screen.getByTestId('gulp-code-go')).toBeEnabled();
+    });
+
+    it('with a friend linked, PLAY WITH FRIENDS opens the table through the party and the friend is on their way', () => {
+      mockParty.value = fakeParty({ inParty: true, role: 'host', theirName: 'Mina' });
+      renderPage();
+      fireEvent.click(screen.getByTestId('gulp-friends'));
+      expect(mockParty.value.openTable).toHaveBeenCalledWith('gulp', expect.stringMatching(/^[A-HJKMNP-Z]{4}$/));
+      expect(screen.getByTestId('gulp-select-seat-1')).toHaveTextContent('Mina');
+    });
+
+    it("a linked friend's game shows on the menu, ready to join with one tap", () => {
+      mockParty.value = fakeParty({ inParty: true, role: 'guest', theirName: 'Klara', table: { game: 'gulp', code: 'WXYZ', hostSide: 'KQZT' } });
+      renderPage();
+      expect(screen.getByTestId('gulp-join-card')).toHaveTextContent('Klara');
+    });
   });
 });

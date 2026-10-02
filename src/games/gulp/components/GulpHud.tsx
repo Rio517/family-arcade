@@ -17,6 +17,7 @@ export function GulpHud({
   onMute,
   onPause,
   touch,
+  notice = null,
 }: {
   /** The round is over: the results card is up, so the combo and danger arrows go. */
   over?: boolean;
@@ -26,6 +27,8 @@ export function GulpHud({
   onMute: () => void;
   onPause: () => void;
   touch: boolean;
+  /** A shared round's link is down: "Waiting for Klara…", over everything else at the bottom. */
+  notice?: string | null;
 }) {
   const row = (r: HudRow) => (
     <li key={r.id} className={`${r.me ? 'me' : ''}${r.out ? ' out' : ''}`}>
@@ -185,6 +188,11 @@ export function GulpHud({
 
       {/* Messages stack at the bottom, one above the other, so they never overlap. */}
       <div className="gulp-messages">
+        {notice && (
+          <div className="gulp-notice" role="status" data-testid="gulp-notice">
+            {notice}
+          </div>
+        )}
         {top && hud.alive && (
           <div key={top.id} className={`gulp-banner ${top.kind}${top.points !== undefined ? ' prize' : ''}`} aria-live="polite" data-testid="gulp-banner">
             {top.kind === 'warn' && <WarningIcon size={22} />}

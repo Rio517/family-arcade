@@ -30,7 +30,7 @@ import { buildRound } from './round';
 export type Role = 'host' | 'guest';
 
 /** How often the host ticks and a guest reports, in seconds (20 a second). */
-export const SEND_EVERY = 0.05;
+const SEND_EVERY = 0.05;
 
 /** What the host's link must do: `GameHost` in the game, a fake in tests. */
 export interface HostLink {
@@ -54,7 +54,11 @@ export interface TableEvents {
   /** Guest: a round began; `mirror.world` is the world to show, seat `mirror.you` is mine. */
   onRound?: (mirror: Mirror) => void;
   /** Host: a guest asked for another round from the results card. */
-  onAgain?: () => void;
+  onAgain?: (name: string) => void;
+  /** Guest: the host's seat list arrived; I am sitting at the table. */
+  onSeated?: () => void;
+  /** Guest: the table could not be reached before I was seated. */
+  onLost?: () => void;
 }
 
 /** A child at the table, as the lobby shows them. */
@@ -118,6 +122,8 @@ export class GulpTable {
   private posSeq = 0;
   /** Guest: a snapshot has been asked for and not yet come. */
   private asked = false;
+  /** Guest: the host has sent its seat list since I dialled. */
+  private seated = false;
   private lastStart: Omit<StartMsg, 'you'> | null = null;
 
   constructor(
@@ -151,6 +157,7 @@ export class GulpTable {
     this.leave();
     this.role = 'guest';
     this.code = code;
+    this.seated = false;
     this.guestLink = this.links.guest({
       onStatus: (s, detail) => this.setStatus(s, detail),
       onOpen: () => this.guestLink?.send({ t: 'hello', name: this.me.name, skin: this.me.skin, token: this.me.token, inRound: !!this.mirror && this.world?.status !== 'over' }),
@@ -297,7 +304,7 @@ export class GulpTable {
         if (this.world) this.hostLink?.send(guestId, snapshotOf(this.world, this.seq));
         break;
       case 'again':
-        this.events.onAgain?.();
+        this.events.onAgain?.(seat.name);
         break;
       default:
         // Guests never get to say what the round holds.
@@ -377,6 +384,10 @@ export class GulpTable {
         this.settings = m.settings;
         this.seats = m.children.map((c) => ({ ...c, connected: true }));
         this.mySeat = m.you;
+        if (!this.seated) {
+          this.seated = true;
+          this.events.onSeated?.();
+        }
         this.events.onChange();
         break;
       case 'start':
@@ -408,5 +419,6 @@ export class GulpTable {
     this.status = s;
     this.statusDetail = detail;
     this.events.onChange();
+    if (s === 'error' && this.role === 'guest' && !this.seated) this.events.onLost?.();
   }
 }

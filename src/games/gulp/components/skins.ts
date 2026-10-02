@@ -26,6 +26,11 @@ const RIVAL_NAMES = ['Big Gulp', 'Sir Slurps', 'Nom Nom', 'Hungry Hattie', 'Capt
 
 /** `count` computer holes, each in a colour other than the child's. */
 export function rivalsFor(playerSkin: number, count: number): Array<{ name: string; skin: number }> {
-  const colours = SKINS.map((_, i) => i).filter((i) => i !== playerSkin);
+  return rivalsBesides([playerSkin], count);
+}
+
+/** `count` computer holes, in colours none of the children have where there are enough to go round. */
+export function rivalsBesides(taken: readonly number[], count: number): Array<{ name: string; skin: number }> {
+  const colours = SKINS.map((_, i) => i).filter((i) => !taken.includes(i));
   return RIVAL_NAMES.slice(0, count).map((name, i) => ({ name, skin: colours[i % colours.length] }));
 }
