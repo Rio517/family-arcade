@@ -53,6 +53,8 @@ const BASE = `http://localhost:${PORT}`;
  * two monitor sizes a layout has to fill without scrolling.
  */
 const PHONE = { width: 430, height: 932 };
+/** The narrowest common phone, for layouts that crowd a phone's top row. */
+const SMALL_PHONE = { width: 375, height: 812 };
 const TABLET = { width: 1180, height: 820 };
 /** The smaller phones (393×852), where the racer's cast has least room. */
 const PHONE_SMALL = { width: 393, height: 852 };
@@ -1039,6 +1041,25 @@ const SHOTS = [
     expect: '[data-testid="gulp-ended-early"]',
     prep: waitForGulpRound,
   },
+  // ── Gulp's HUD on a phone, at its fullest: "9,999" scores, lives, both power-ups ──
+  {
+    // The largest phone: the tray top left, the clock, level and power-ups down the right.
+    name: 'gulp-hud-phone',
+    path: '/preview-gulp-hud.html',
+    viewport: PHONE,
+    fits: true,
+    expect: '[data-testid="gulp-board"]',
+    prep: hudFits,
+  },
+  {
+    // The narrowest common phone, where the top row is most crowded.
+    name: 'gulp-hud-phone-small',
+    path: '/preview-gulp-hud.html',
+    viewport: SMALL_PHONE,
+    fits: true,
+    expect: '[data-testid="gulp-board"]',
+    prep: hudFits,
+  },
 ];
 
 /** A Gulp round on the harness page: the city built and a few frames drawn. */
@@ -1046,6 +1067,41 @@ async function waitForGulpRound(page) {
   await page.waitForSelector('.gulp-canvas canvas', { timeout: 20000 });
   await page.waitForSelector('[data-testid="gulp-loading"]', { state: 'detached', timeout: 60000 });
   await page.waitForTimeout(2500);
+}
+
+/**
+ * The HUD harness round, failing the shot if a HUD piece covers another or a
+ * leaderboard score runs past the tray's edge.
+ */
+async function hudFits(page) {
+  await waitForGulpRound(page);
+  const trouble = await page.evaluate(() => {
+    const box = (sel) => {
+      const e = document.querySelector(sel);
+      return e && getComputedStyle(e).display !== 'none' ? e.getBoundingClientRect() : null;
+    };
+    const pieces = {
+      board: box('[data-testid="gulp-board"]'),
+      clock: box('[data-testid="gulp-clock"]'),
+      level: box('[data-testid="gulp-level"]'),
+      buttons: box('.gulp-buttons'),
+      powers: box('[data-testid="gulp-powers"]'),
+      minimap: box('.gulp-minimap-slot'),
+    };
+    const hit = (a, b) => a && b && a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+    const names = Object.keys(pieces);
+    const found = [];
+    names.forEach((a, i) => names.slice(i + 1).forEach((b) => hit(pieces[a], pieces[b]) && found.push(`${a} covers ${b}`)));
+    const board = document.querySelector('[data-testid="gulp-board"]');
+    const style = getComputedStyle(board);
+    const inner = board.getBoundingClientRect().right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight);
+    for (const li of board.querySelectorAll('li')) {
+      const score = li.querySelector('b');
+      if (score && getComputedStyle(li).display !== 'none' && score.getBoundingClientRect().right > inner + 0.5) found.push(`score cut off: ${li.innerText.replace(/\s+/g, ' ')}`);
+    }
+    return found;
+  });
+  if (trouble.length) throw new Error(`phone HUD: ${trouble.join('; ')}`);
 }
 
 /**

@@ -1,22 +1,19 @@
 /**
- * Harness: the round's HUD on a phone with the longest likely names and
- * scores, in today's layout and in the three options of the phone HUD pitch
- * (docs/mockups/20261003-gulp-phone-hud/). The round is a real one on the
- * real stage, held still, with its names, scores, lives and power-ups set.
+ * Harness: the round's HUD with the longest likely names and scores, both
+ * power-ups running and the player fourth, so the leaderboard is at its
+ * tallest and widest. The round is a real one on the real stage, held still.
+ * The phone HUD shots load it at several phone widths and fail when a
+ * piece covers another or a score is cut off (scripts/screenshots.mjs).
  *
- *   /preview-gulp-hud.html         today
- *   /preview-gulp-hud.html?o=a     option A (b, c likewise)
+ *   /preview-gulp-hud.html
  *
  * Dev-only: built solely when BUILD_HARNESS is set, so it never ships.
  */
 import { createRoot } from 'react-dom/client';
 import '@shared/styles/tokens.css';
 import './styles/gulp.css';
-import './styles/phone-hud-options.css';
 import type { World } from './domain/world';
 import { LiveRound } from './together-round-preview';
-
-const OPTIONS = ['a', 'b', 'c'];
 
 /** Klara follows hole 0 and is fourth, so the tray shows the top three, the gap and her row. */
 function dress(w: World) {
@@ -41,10 +38,8 @@ function dress(w: World) {
 }
 
 export function Preview() {
-  const o = new URLSearchParams(location.search).get('o');
-  const option = o && OPTIONS.includes(o) ? o : undefined;
   return (
-    <div className="app gulp-root" data-phone-hud={option} data-testid="gulp-hud-preview" style={{ maxWidth: 'none', padding: 0 }}>
+    <div className="app gulp-root" data-testid="gulp-hud-preview" style={{ maxWidth: 'none', padding: 0 }}>
       <LiveRound seats={2} follow={0} frozen dress={dress} />
     </div>
   );
