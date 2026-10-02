@@ -12,7 +12,7 @@ everything else: what is eaten, scores, computer holes, police, attacks,
 power-ups, rebuilding and the clock. It sends every guest the holes' state
 plus an ordered list of what happened, 20 times a second.
 
-Status: proposed 2026-10-02. No code is written yet.
+Status: decided 2026-10-02 (see Decisions). Building.
 
 ## Current state
 
@@ -460,19 +460,15 @@ on both screens.
    rules. Mitigation: with one child each rule behaves as now, and the
    existing balance tests stay unchanged.
 
-## Open decisions
+## Decisions
 
-1. **Can children swallow each other?** This changes `eatHoles`, the results
-   wording and how a round feels between siblings. **Recommended default:** yes
-   on Medium and Hard, never on Easy. That extends today's Easy rule, where
-   computer holes never swallow the child.
-2. **Three or four devices now, or after two-device play?** Phase 3 changes
-   the shared net and party layers and reverses the "two devices" scope. It
-   also needs three or four devices to test. **Recommended default:** ship
-   Phases 1 and 2, let the family play, then decide. The Phase 1 protocol is
-   per guest, so Phase 3 adds no Gulp rework.
-3. **Arcade only, or Chompville too?** The standalone release has no party,
-   and play between homes would need a paid TURN relay, which ADR 0003
-   excludes. **Recommended default:** the arcade only. Keep `src/games/gulp/net`
-   free of party imports except the lobby, so a code-entry door can be added
-   later.
+1. **Children can swallow each other on Medium and Hard, never on Easy.**
+   This extends today's Easy rule, where computer holes never swallow the
+   child.
+2. **Up to four devices.** Phase 3 is part of the build, not a later choice.
+   The shared host for several guests is built alongside Phase 1, so the
+   Gulp protocol and screens are made for four seats from the start, and two
+   devices are the first thing tested.
+3. **The arcade only.** `src/games/gulp/net` stays free of party imports
+   except the lobby, so a code-entry door can be added later for the
+   standalone release.
