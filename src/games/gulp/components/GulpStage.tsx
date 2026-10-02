@@ -16,6 +16,7 @@ import { stepWorld, type Input, type World, type WorldEvent } from '../domain/wo
 import { loadFonts } from '../styles/fonts';
 import type { GulpScene, HoleLook } from '../three/scene';
 import { loadScene, type SceneLoader } from './round';
+import { FrameMeter, frameMeterWanted } from './frameMeter';
 import { HOLD_60_GAP, PACING_SAMPLE, shouldHold60 } from './pacing';
 
 const KEYS: Record<string, [number, number]> = {
@@ -73,6 +74,9 @@ export function GulpStage({
   const exploreRef = useRef(false);
   /** Fingers (or the mouse button) down while exploring, for dragging and pinching. */
   const dragRef = useRef(new Map<number, { x: number; y: number }>());
+  /** The frame-time readout, when the address asks for it (see frameMeter.ts). */
+  const [measuring] = useState(frameMeterWanted);
+  const meterRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     onFrameRef.current = onFrame;
@@ -155,6 +159,7 @@ export function GulpStage({
     let lastBeat = 0;
     const gaps: number[] = [];
     let hold60 = false;
+    const meter = meterRef.current ? new FrameMeter(meterRef.current) : null;
 
     const loop = (ts: number) => {
       raf = requestAnimationFrame(loop);
@@ -168,15 +173,19 @@ export function GulpStage({
       if (hold60 && last && ts - last < HOLD_60_GAP) return;
       // Never backwards, never a huge jump (after a hidden tab): 0 to 50 ms.
       const dt = last ? Math.max(0, Math.min(0.05, (ts - last) / 1000)) : 0;
+      const gap = last ? ts - last : 0;
       last = ts;
+      const t0 = meter ? performance.now() : 0;
       let events: WorldEvent[] = [];
       if (exploreRef.current) {
         // The arrows slide the free camera; the round waits.
         const { x, z } = readInput(keysRef.current, { kind: null, dx: 0, dy: 0, ox: 0, oy: 0, scale: 1 });
         if (x || z) scene.pan(-x * 900 * dt, -z * 900 * dt);
       } else if (!pausedRef.current) events = stepWorld(world, dt, playing ? readInput(keysRef.current, pointerRef.current) : null);
+      const t1 = meter ? performance.now() : 0;
       scene.sync(world, events, pausedRef.current ? 0 : dt);
       scene.render();
+      if (meter && gap) meter.add(ts, gap, t1 - t0, performance.now() - t1);
       if (!drawn) {
         drawn = true;
         setBuilding(false);
@@ -301,6 +310,7 @@ export function GulpStage({
       onPointerCancel={onPointer}
       onPointerLeave={onPointer}
     >
+      {measuring && <div ref={meterRef} className="gulp-fps" aria-hidden="true" data-testid="gulp-fps" />}
       {failed && (
         <p className="gulp-fallback" data-testid="gulp3d-fallback">
           Sorry, this device can’t show the 3D city.
