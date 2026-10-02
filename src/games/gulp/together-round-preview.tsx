@@ -107,9 +107,25 @@ const still = () => [];
  * waiting hole and a playing one are seen together. `frozen` is a guest whose
  * host has gone quiet: nothing moves, as nothing arrives.
  */
-export function LiveRound({ seats, follow, away = [], frozen = false, notice = null }: { seats: number; follow: number; away?: number[]; frozen?: boolean; notice?: string | null }) {
+export function LiveRound({
+  seats,
+  follow,
+  away = [],
+  frozen = false,
+  notice = null,
+  dress,
+}: {
+  seats: number;
+  follow: number;
+  away?: number[];
+  frozen?: boolean;
+  notice?: string | null;
+  /** Changes the played round before it is shown: names and scores for a layout check. */
+  dress?: (w: World) => void;
+}) {
   const [world] = useState(() => {
     const w = playedRound(seats, 40);
+    dress?.(w);
     const me = w.holes[follow];
     const spots = innerWidth > innerHeight ? WIDE_SPOTS : TALL_SPOTS;
     away.forEach((id, i) => {

@@ -115,6 +115,7 @@ export default defineConfig({
             'preview-gulp-together': fileURLToPath(new URL('./preview-gulp-together.html', import.meta.url)),
             'preview-gulp-spill': fileURLToPath(new URL('./preview-gulp-spill.html', import.meta.url)),
             'preview-racer-cast': fileURLToPath(new URL('./preview-racer-cast.html', import.meta.url)),
+            'preview-gulp-hud': fileURLToPath(new URL('./preview-gulp-hud.html', import.meta.url)),
           },
         }
       : {},
