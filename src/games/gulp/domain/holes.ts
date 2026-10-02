@@ -206,8 +206,9 @@ export function eatHoles(w: World, events: WorldEvent[]): void {
       if (Math.hypot(a.x - b.x, a.z - b.z) > a.r - b.r * 0.4) continue;
       const before = levelOf(a.r);
       const prize = Math.round(10 + b.mass * 0.25);
+      const points = prize * (a.doubleTime > 0 ? 2 : 1);
       a.mass += prize;
-      a.score += prize * (a.doubleTime > 0 ? 2 : 1);
+      a.score += points;
       a.kills += 1;
       a.r = radiusFor(a.mass);
       b.alive = false;
@@ -220,7 +221,7 @@ export function eatHoles(w: World, events: WorldEvent[]): void {
       b.vx = b.vz = 0;
       b.speedTime = b.doubleTime = b.stun = b.burn = 0;
       b.streak = b.comboTime = 0;
-      events.push({ type: 'gulp', eater: a.id, eaten: b.id });
+      events.push({ type: 'gulp', eater: a.id, eaten: b.id, points });
       if (b.lives <= 0) events.push({ type: 'out', hole: b.id });
       const after = levelOf(a.r);
       if (after > before) events.push({ type: 'level', hole: a.id, level: after });

@@ -4,7 +4,7 @@
  * warnings and being swallowed. It renders a snapshot the page copies out
  * of the live world a few times a second.
  */
-import { BoltIcon, ClockIcon, HeartIcon, PauseIcon, SpeakerIcon, SpeakerOffIcon, StarIcon, WarningIcon } from '@shared/ui/icons';
+import { BoltIcon, ClockIcon, HeartIcon, JoystickIcon, PauseIcon, SpeakerIcon, SpeakerOffIcon, WarningIcon } from '@shared/ui/icons';
 import type { Banner, Hud, HudRow } from './round';
 
 const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n.toLocaleString());
@@ -29,7 +29,7 @@ export function GulpHud({
 }) {
   const row = (r: HudRow) => (
     <li key={r.id} className={`${r.me ? 'me' : ''}${r.out ? ' out' : ''}`}>
-      <span className="gulp-rank">{r.rank}</span>
+      <span className={r.rank <= 3 ? `gulp-rank coin-${r.rank}` : 'gulp-rank'}>{r.rank}</span>
       <span className="gulp-dot" style={{ background: r.css }} aria-hidden="true" />
       <span className="gulp-name">{r.name}</span>
       {r.out ? (
@@ -49,10 +49,11 @@ export function GulpHud({
   );
   const news = banners.filter((b) => b.kind === 'news').pop();
   // A warning always wins the banner spot: a police or level-up message
-  // arriving on top of "Look out!" must not hide it.
+  // arriving on top of "Look out!" must not hide it. Swallowing a hole beats
+  // the level-up it often brings: the level badge shows the new level anyway.
   const top = banners
     .filter((b) => b.kind !== 'news')
-    .reduce<Banner | undefined>((best, b) => (!best || BANNER_RANK[b.kind] >= BANNER_RANK[best.kind] ? b : best), undefined);
+    .reduce<Banner | undefined>((best, b) => (!best || rankOf(b) >= rankOf(best) ? b : best), undefined);
   return (
     <div className="gulp-hud" data-testid="gulp-hud">
       {(hud.speed > 0 || hud.double > 0) && (
@@ -119,18 +120,6 @@ export function GulpHud({
       </div>
 
       <div className="gulp-right">
-        <div className="gulp-stats">
-          {hud.wondersTotal > 0 && (
-            <span className="gulp-wonders" title="Wonders swallowed" data-testid="gulp-wonders">
-            <StarIcon size={18} />
-            {hud.wonders}/{hud.wondersTotal}
-          </span>
-          )}
-          <span className="gulp-kills" title="Holes swallowed" data-testid="gulp-kills">
-            <span className="gulp-kills-icon" aria-hidden="true" />
-            {hud.kills}
-          </span>
-        </div>
         <div className="gulp-buttons">
           <button type="button" className="gulp-round" onClick={onMute} aria-label={muted ? 'Sound on' : 'Sound off'} data-testid="gulp-mute">
             {muted ? <SpeakerOffIcon size={22} /> : <SpeakerIcon size={22} />}
@@ -197,10 +186,11 @@ export function GulpHud({
       {/* Messages stack at the bottom, one above the other, so they never overlap. */}
       <div className="gulp-messages">
         {top && hud.alive && (
-          <div key={top.id} className={`gulp-banner ${top.kind}`} aria-live="polite" data-testid="gulp-banner">
+          <div key={top.id} className={`gulp-banner ${top.kind}${top.points !== undefined ? ' prize' : ''}`} aria-live="polite" data-testid="gulp-banner">
             {top.kind === 'warn' && <WarningIcon size={22} />}
             <strong>{top.text}</strong>
             {top.sub && <span>{top.sub}</span>}
+            {top.points !== undefined && <span className="gulp-prize">+{top.points.toLocaleString()} points</span>}
           </div>
         )}
         {news && (
@@ -210,7 +200,12 @@ export function GulpHud({
           </div>
         )}
         {hud.elapsed < 5 && hud.countdown === 0 && (
-          <div className="gulp-hint">{touch ? 'Drag anywhere to move' : 'Point with the mouse, or use the arrow keys'}</div>
+          <div className="gulp-hint">
+            <span className="gulp-joy">
+              <JoystickIcon size={24} />
+            </span>
+            {touch ? 'Drag anywhere to move' : 'Point with the mouse, or use the arrow keys'}
+          </div>
         )}
       </div>
     </div>
@@ -218,3 +213,4 @@ export function GulpHud({
 }
 
 const BANNER_RANK: Record<Banner['kind'], number> = { warn: 3, hurt: 3, level: 2, good: 1, news: 0 };
+const rankOf = (b: Banner) => (b.points !== undefined ? 2.5 : BANNER_RANK[b.kind]);

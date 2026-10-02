@@ -3,7 +3,6 @@
  * scoreboard snapshot copied out of the live world, and how the 3D scene is
  * loaded. Kept apart from the components so each file holds only components.
  */
-import { KINDS } from '../domain/catalog';
 import { MAPS, type MapId, type Side } from '../domain/city';
 import type { Difficulty } from '../domain/rivals';
 import { EAT_HOLE, POWER_TIME, comboOf, levelOf, levelProgress, nextLabel, standings, type World } from '../domain/world';
@@ -54,7 +53,6 @@ export interface Hud {
   level: number;
   progress: number;
   next: string | null;
-  kills: number;
   speed: number;
   double: number;
   /** 0..1 of each power-up still to run, for the countdown bars. */
@@ -62,9 +60,6 @@ export interface Hud {
   doubleLeft: number;
   /** True when the child's hole is close to the edge of the world. */
   nearEdge: boolean;
-  /** Wonders swallowed, and how many the map has. */
-  wonders: number;
-  wondersTotal: number;
   /** The combo multiplier and the things eaten in the streak. */
   combo: number;
   streak: number;
@@ -91,19 +86,8 @@ export interface Banner {
   kind: 'level' | 'warn' | 'good' | 'hurt' | 'news';
   text: string;
   sub?: string;
-}
-
-
-/** How many wonders a round's map has: counted once, the HUD asks ten times a second. */
-const wonderCounts = new WeakMap<World, number>();
-function wondersIn(w: World): number {
-  let n = wonderCounts.get(w);
-  if (n === undefined) {
-    // Kinds, not props: the four Easter Island Heads are one wonder.
-    n = new Set(w.city.props.filter((p) => KINDS[p.kind].wonder).map((p) => p.kind)).size;
-    wonderCounts.set(w, n);
-  }
-  return n;
+  /** Points the moment scored, shown on the banner as "+25 points". */
+  points?: number;
 }
 
 export function hudOf(w: World, me: number): Hud {
@@ -133,14 +117,11 @@ export function hudOf(w: World, me: number): Hud {
     level: levelOf(h.r),
     progress: levelProgress(h.r),
     next: nextLabel(h.r),
-    kills: h.kills,
     speed: Math.ceil(h.speedTime),
     double: Math.ceil(h.doubleTime),
     speedLeft: h.speedTime / POWER_TIME.speed,
     doubleLeft: h.doubleTime / POWER_TIME.double,
     nearEdge: h.alive && nearOpenEdge(w, h.x, h.z),
-    wonders: h.wonders,
-    wondersTotal: wondersIn(w),
     combo: comboOf(h.streak),
     streak: h.streak,
     alive: h.alive,

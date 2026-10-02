@@ -74,14 +74,23 @@ describe('holes eating holes', () => {
   it('a much bigger hole swallows a smaller one on top of it, which comes back later', () => {
     const { w, me, rival } = faceOff();
     grow(w, 0, 200);
+    const score = me.score;
     const events = stepWorld(w, 0.016, still);
-    expect(events).toContainEqual({ type: 'gulp', eater: 0, eaten: 1 });
+    expect(events).toContainEqual({ type: 'gulp', eater: 0, eaten: 1, points: me.score - score });
     expect(rival.alive).toBe(false);
     expect(rival.eatenBy).toBe('You');
     expect(me.kills).toBe(1);
     for (let i = 0; i < (RESPAWN + 0.2) * 60; i++) stepWorld(w, 1 / 60, still);
     expect(rival.alive).toBe(true);
     expect(rival.safe).toBeGreaterThan(0);
+  });
+
+  it('a swallow scores 10 plus a quarter of the swallowed hole, twice that under double points', () => {
+    const { w, me, rival } = faceOff();
+    grow(w, 0, 200);
+    me.doubleTime = 5;
+    const prize = Math.round(10 + rival.mass * 0.25);
+    expect(stepWorld(w, 0.016, still)).toContainEqual({ type: 'gulp', eater: 0, eaten: 1, points: prize * 2 });
   });
 
   it('holes the same size pass over each other', () => {

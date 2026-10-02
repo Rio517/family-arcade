@@ -6,6 +6,7 @@
  */
 import * as THREE from 'three';
 import type { Attack, PowerKind, PowerUp } from '../domain/world';
+import { DIGITS } from '../styles/fonts';
 import { buildHeliBodyGeometry, buildRotorGeometry } from './military';
 import { buildKindGeometry } from './props';
 import { ProjectileKit } from './projectiles';
@@ -64,21 +65,25 @@ interface Popup {
 }
 
 /**
- * How a points pop looks by what it is worth: cream for an ordinary gulp,
- * gold for a big one (a car park's worth, a tower), pink for a huge one
- * (a skyscraper, a wonder). Bigger tiers are a little larger and linger longer.
+ * How a points pop looks by what it is worth: white for an ordinary gulp,
+ * gold for a big one (a car park's worth, a tower, a swallowed hole), sky
+ * blue for a huge one (a skyscraper, a wonder). Bigger tiers are a little
+ * larger and linger longer.
  */
 type PopupTier = 'normal' | 'big' | 'huge';
-/** Gold from about a tower (150), pink from about a skyscraper (1,600) or a wonder. */
+/** Gold from about a tower (150), sky blue from about a skyscraper (1,600) or a wonder. */
 const POPUP_BIG = 150;
 const POPUP_HUGE = 1500;
 const popupTier = (points: number): PopupTier => (points >= POPUP_HUGE ? 'huge' : points >= POPUP_BIG ? 'big' : 'normal');
 const POPUP_LOOK: Record<PopupTier, { fill: string; scale: number; life: number }> = {
-  normal: { fill: '#fff3d1', scale: 1, life: 0.6 },
+  normal: { fill: '#ffffff', scale: 1, life: 0.6 },
   // A big gulp's points stay up long enough to read and enjoy.
-  big: { fill: '#ffc41f', scale: 1.15, life: 1.4 },
-  huge: { fill: '#ff5cc8', scale: 1.35, life: 2.4 },
+  big: { fill: '#ffd23f', scale: 1.15, life: 1.4 },
+  huge: { fill: '#9be3ff', scale: 1.35, life: 2.4 },
 };
+
+/** The coin-op look's dark ink, as in gulp.css: the points' edge and drop. */
+const INK = '#2a1f4a';
 
 /** A points pop's height on screen (an ordinary one; bigger tiers scale it up). */
 const POPUP_HEIGHT = 0.046;
@@ -339,9 +344,8 @@ export class Effects {
     });
   }
 
-  /** "+8" rising over where the child just ate. */
-  popup(points: number, at: THREE.Vector3): void {
-    const tier = popupTier(points);
+  /** "+8" rising over where the child just ate; `tier` overrides the colour and size its amount would give. */
+  popup(points: number, at: THREE.Vector3, tier = popupTier(points)): void {
     const look = POPUP_LOOK[tier];
     const key = `${tier}:${points}`;
     let tex = this.popupTex.get(key);
@@ -767,13 +771,13 @@ function ringTexture(): THREE.Texture {
 }
 
 /**
- * "+8" in chunky letters of the given colour, on a transparent strip 64 high
- * and as wide as the text needs (never cut off). A thick dark edge and a soft
- * shadow under it keep it readable over a pale pavement or a busy building.
+ * "+8" in pixel arcade digits of the given colour, on a transparent strip 64
+ * high and as wide as the text needs (never cut off). A dark ink edge and a
+ * hard drop under it keep it readable over a pale pavement or a busy building.
  */
 function textTexture(text: string, fill: string): THREE.Texture {
   const c = document.createElement('canvas');
-  const font = '900 44px ui-rounded, system-ui, -apple-system, sans-serif';
+  const font = `34px ${DIGITS}`;
   const probe = c.getContext('2d')!;
   probe.font = font;
   c.width = Math.max(128, Math.ceil(probe.measureText(text).width) + 32);
@@ -783,15 +787,15 @@ function textTexture(text: string, fill: string): THREE.Texture {
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.lineJoin = 'round';
-  g.lineWidth = 11;
-  g.strokeStyle = '#2b1d08';
-  g.shadowColor = 'rgba(0,0,0,0.45)';
-  g.shadowOffsetY = 3;
-  g.shadowBlur = 4;
-  g.strokeText(text, c.width / 2, 32);
-  g.shadowColor = 'transparent';
+  g.lineWidth = 8;
+  g.strokeStyle = INK;
+  g.fillStyle = INK;
+  // The drop: the edged digits again, 4 lower, in ink.
+  g.strokeText(text, c.width / 2, 34);
+  g.fillText(text, c.width / 2, 34);
+  g.strokeText(text, c.width / 2, 30);
   g.fillStyle = fill;
-  g.fillText(text, c.width / 2, 32);
+  g.fillText(text, c.width / 2, 30);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;

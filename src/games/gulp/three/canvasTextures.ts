@@ -6,11 +6,15 @@
  */
 import * as THREE from 'three';
 import { seededRng } from '@shared/rng';
+import { WORDS as FONT } from '../styles/fonts';
 
 /** What a mouth can be left with: burnt by a fuel truck, a garbage truck, ice cream. */
 export type Smear = 'burn' | 'poop' | 'icecream';
 
-const FONT = 'ui-rounded, system-ui, -apple-system, sans-serif';
+/** The coin-op look: cream pieces with a thin dark ink edge, as in gulp.css. */
+const INK = '#2a1f4a';
+const PAPER = '#fffaf0';
+const PAPER_RGB = [255, 250, 240];
 
 function canvas(w: number, h: number): { c: HTMLCanvasElement; g: CanvasRenderingContext2D } {
   const c = document.createElement('canvas');
@@ -91,31 +95,61 @@ export function smearTexture(kind: Smear): THREE.Texture {
   return srgb(c);
 }
 
-/** A hole's name tag: white with the hole's colour for the child's own, dark glass for the others. */
+/** A hole's name tag: cream with a thin ink edge and a small hard drop; the child's own is written in its hole's colour. */
 export function labelTexture(name: string, color: number, mine: boolean): THREE.Texture {
   const { c, g } = canvas(256, 64);
-  g.font = `700 30px ${FONT}`;
+  g.font = `900 30px ${FONT}`;
   // A long name is cut short with an ellipsis, so it fits its tag.
   let text = name;
-  while (text.length > 1 && g.measureText(text).width > 214) text = text.slice(0, -1);
+  while (text.length > 1 && g.measureText(text).width > 212) text = text.slice(0, -1);
   if (text !== name) text = `${text.trimEnd()}…`;
-  const w = Math.min(248, g.measureText(text).width + 34);
-  g.fillStyle = mine ? '#ffffff' : 'rgba(20,24,36,0.7)';
+  const w = Math.min(246, g.measureText(text).width + 34);
+  const x = (256 - w) / 2;
+  g.fillStyle = INK;
   g.beginPath();
-  g.roundRect((256 - w) / 2, 10, w, 44, 22);
+  g.roundRect(x, 11, w, 44, 22);
   g.fill();
-  g.fillStyle = mine ? `#${new THREE.Color(color).getHexString()}` : '#ffffff';
+  g.fillStyle = PAPER;
+  g.strokeStyle = INK;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.roundRect(x, 8, w, 44, 22);
+  g.fill();
+  g.stroke();
+  g.fillStyle = mine ? readable(color) : INK;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillText(text, 128, 33);
+  g.fillText(text, 128, 31);
   return srgb(c);
 }
+
+/** A hole's colour, darkened just enough to read on a cream tag (Lemon and Sky are too light as they are). */
+function readable(color: number): string {
+  const rgb = [(color >> 16) & 255, (color >> 8) & 255, color & 255];
+  for (let keep = 0.85; ; keep -= 0.05) {
+    const dark = rgb.map((v) => Math.round(v * keep));
+    if (contrast(dark, PAPER_RGB) >= 4.5 || keep <= 0.3) return `rgb(${dark.join(',')})`;
+  }
+}
+
+function luminance(rgb: number[]): number {
+  const [r, g, b] = rgb.map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+const contrast = (a: number[], b: number[]) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
 
 /** How tall a speech bubble's picture is; its width follows the words (see `bubbleTexture`). */
 export const BUBBLE_HEIGHT = 128;
 
 /**
- * A white speech bubble with a little tail; green words for healthy food.
+ * A cream speech bubble with a thin ink edge and a little tail; green words for healthy food.
  * The bubble is as wide as its words need (a health bonus can run to five
  * digits), never narrower than a "Yum!".
  */
@@ -125,9 +159,9 @@ export function bubbleTexture(text: string, healthy: boolean): THREE.Texture {
   probe.font = font;
   const w = Math.max(256, Math.ceil(probe.measureText(text).width) + 80);
   const { c, g } = canvas(w, BUBBLE_HEIGHT);
-  g.fillStyle = '#ffffff';
-  g.strokeStyle = 'rgba(29,31,51,0.85)';
-  g.lineWidth = 6;
+  g.fillStyle = PAPER;
+  g.strokeStyle = INK;
+  g.lineWidth = 4;
   g.lineJoin = 'round';
   // The bubble and its tail are one outline, so no seam shows where they meet.
   const [left, top, right, bottom, r] = [8, 8, w - 8, 94, 40];
@@ -146,7 +180,7 @@ export function bubbleTexture(text: string, healthy: boolean): THREE.Texture {
   g.font = font;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillStyle = healthy ? '#1a9c3c' : '#e0457b';
+  g.fillStyle = healthy ? '#1f9a52' : '#e8501e';
   g.fillText(text, w / 2, 52);
   return srgb(c);
 }

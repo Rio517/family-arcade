@@ -46,11 +46,10 @@ for good news), the 14px text floor and a visible keyboard focus ring.
   leaderboard, and the top three ranks are gold, silver and bronze coins.
   The clock is a red marquee sign ringed with bulbs that flash, and the
   swallow banner is a purple one. The level meter is a rainbow of LED
-  segments, sound and Pause are round arcade buttons, the hint carries a
-  joystick, and points rise with a coin. Digits are pixel-style (Press
-  Start 2P, a 1 KB digits-only subset) and words are a chunky rounded
-  Japanese font (M PLUS Rounded 1c Black, a 7 KB Latin subset), both
-  bundled so the PWA stays offline. The bulbs stay lit, without flashing,
+  segments, sound and Pause are round arcade buttons, and the hint carries a
+  joystick. Digits are pixel-style (Press Start 2P, a 1 KB digits-only
+  subset) and words are a chunky rounded Japanese font (M PLUS Rounded 1c
+  Black, a 7 KB Latin subset), both bundled so the PWA stays offline. The bulbs stay lit, without flashing,
   under reduced motion.
 
 ## What each costs
@@ -106,4 +105,13 @@ is the development toolbar, which is not part of the game.
 
 ## Outcome
 
-Pending.
+**Chosen: D, Coin-op**, with the clock and level digits centred and no
+coins beside the points. It is built in the game together with the changes
+every option shares. Two details differ from the page:
+
+- The game bundles a fuller subset of the word font (Latin letters with
+  accents and common punctuation, 17 KB) so every name and message draws in
+  it. The digits font is renamed Gulp Pixel, as the licence asks of a
+  modified copy of Press Start 2P.
+- The swallow banner wins the banner spot over the level-up a swallow often
+  brings; the level badge shows the new level anyway.
