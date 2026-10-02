@@ -13,6 +13,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { stepWorld, type Input, type World, type WorldEvent } from '../domain/world';
+import { loadFonts } from '../styles/fonts';
 import type { GulpScene, HoleLook } from '../three/scene';
 import { loadScene, type SceneLoader } from './round';
 import { HOLD_60_GAP, PACING_SAMPLE, shouldHold60 } from './pacing';
@@ -188,7 +189,8 @@ export function GulpStage({
     // card paint first, so the screen says what is happening.
     const painted = () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
 
-    Promise.all([load(), painted()])
+    // The name tags are painted with Gulp's own font, so it loads first.
+    Promise.all([load(), painted(), loadFonts()])
       .then(([{ GulpScene: Scene }]) => {
         if (gone) return;
         const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;

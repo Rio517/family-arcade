@@ -56,7 +56,8 @@ export type WorldEvent =
   | { type: 'combo'; hole: number; mult: number }
   | { type: 'wonder'; hole: number; name: string; points: number }
   | { type: 'police'; x: number; z: number }
-  | { type: 'gulp'; eater: number; eaten: number }
+  /** A hole swallowed another; `points` is what it scored, doubled under double points. */
+  | { type: 'gulp'; eater: number; eaten: number; points: number }
   | { type: 'level'; hole: number; level: number }
   | { type: 'respawn'; hole: number }
   /** A hole swallowed with no lives left: out of the round. */

@@ -77,7 +77,7 @@ export function feedbackFor(e: WorldEvent, w: World, said: Said): Feedback | nul
     case 'power':
       return e.hole === ME ? { cue: 'power', banner: { kind: 'good', text: e.kind === 'speed' ? 'Speed boost!' : 'Double points!' } } : null;
     case 'gulp':
-      return e.eater === ME ? { cue: 'gulp', size: 1, banner: { kind: 'good', text: `You swallowed ${w.holes[e.eaten].name}!` } } : null;
+      return e.eater === ME ? { cue: 'gulp', size: 1, banner: { kind: 'good', text: `You swallowed ${w.holes[e.eaten].name}!`, points: e.points } } : null;
     case 'out':
       // The child's own last life ends the round (the results say so); a computer hole's is news.
       return e.hole === ME ? null : { banner: { kind: 'news', text: `${w.holes[e.hole].name} is out of lives!` } };

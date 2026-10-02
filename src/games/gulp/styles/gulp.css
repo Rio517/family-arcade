@@ -5,16 +5,46 @@
    `.gulp-root` is left un-positioned (no z-index) so the result card can sit
    above the app-wide party pill, as in the racer. */
 
+/* Two bundled fonts (SIL OFL, see assets/fonts/OFL.txt): chunky rounded
+   words and pixel arcade digits. The digits font holds only what a score,
+   a clock or a level needs. */
+@font-face {
+  font-family: 'Gulp Rounded';
+  src: url('../assets/fonts/gulp-rounded.woff2') format('woff2');
+  font-weight: 900;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Gulp Pixel';
+  src: url('../assets/fonts/gulp-pixel.woff2') format('woff2');
+  font-display: block;
+  unicode-range: U+20, U+2B-2E, U+30-3A, U+6B, U+78, U+A0, U+202F;
+}
+
 .gulp-root {
-  --g-ink: #1f2440;
+  --g-ink: #2a1f4a;
   --g-muted: #5b6480;
   --g-blue: #2f7cf6;
   --g-blue-ink: #1a4fb0;
   --g-yellow: #ffc62e;
+  --g-yellow-t: #ffe98a;
   --g-yellow-deep: #e79a00;
   --g-green: #35c95a;
   --g-card: rgba(255, 255, 255, 0.94);
   --g-shadow: 0 10px 28px rgba(20, 30, 70, 0.25);
+  /* The round's coin-op arcade (see the HUD below). */
+  --g-paper: #fffaf0;
+  --g-red: #ff4d5e;
+  --g-red-t: #ff8a8f;
+  --g-orange: #ff9f1c;
+  --g-cyan: #2ec4ff;
+  --g-cyan-t: #9be3ff;
+  --g-cyan-d: #1590cc;
+  --g-purple: #7a3cf0;
+  --g-purple-t: #a77bff;
+  --g-rainbow: linear-gradient(90deg, #ff4d5e 0%, #ff9f1c 20%, #ffd23f 40%, #35d07f 60%, #2ec4ff 80%, #9b5cff 100%);
+  --g-words: 'Gulp Rounded', ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', -apple-system, system-ui, sans-serif;
+  --g-digits: 'Gulp Pixel', var(--g-words);
   color: var(--g-ink);
   font-family: ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', -apple-system, system-ui, sans-serif;
   background: #8fd8f5;
@@ -384,36 +414,79 @@
 .gulp-play.small { min-height: 54px; font-size: 22px; padding: 0 24px; }
 .gulp-foot { margin: 0; font-size: 14px; font-weight: 700; color: var(--g-muted); text-align: center; }
 
-/* ----- the round's HUD ----- */
-.gulp-hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+/* ----- the round's HUD: a happy coin-op arcade -----
+   Cream pieces with a thin ink outline and a small hard drop, a rainbow
+   marquee stripe on the leaderboard, a red marquee clock ringed with bulbs,
+   gold, silver and bronze coins for the top three, a rainbow LED level
+   meter and round arcade buttons. Words are in the chunky rounded font,
+   the clock, scores and level in pixel digits. */
+.gulp-hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; font-family: var(--g-words); }
 .gulp-hud button { pointer-events: auto; }
 
+/* Every piece: cream, a thin ink edge and a small hard drop. A piece can set
+   --piece-bg (its fill), --piece-c (its text), --piece-sh (its light) and
+   --piece-drop; named so, the app's own --bg never leaks in. */
+.gulp-board,
+.gulp-clock,
+.gulp-level,
+.gulp-hud .gulp-round,
+.gulp-hint,
+.gulp-minimap-slot {
+  border: 1.5px solid var(--g-ink);
+  background: var(--piece-bg, var(--g-paper));
+  box-shadow: var(--piece-sh, inset 0 2px 0 rgba(255, 255, 255, 0.7)), 0 var(--piece-drop, 2px) 0 var(--g-ink), 0 5px 10px rgba(42, 31, 74, 0.2);
+  color: var(--piece-c, var(--g-ink));
+  font-family: var(--g-words);
+  font-weight: 900;
+}
+
+/* The leaderboard: one tray with slim rows, a rainbow marquee stripe along
+   its top, and coins for the top three. */
 .gulp-board {
   position: absolute;
   top: max(12px, env(safe-area-inset-top));
   left: max(12px, env(safe-area-inset-left));
   margin: 0;
-  padding: 0;
+  padding: 10px 5px 5px;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  width: 250px;
+  width: 220px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  overflow: hidden;
 }
-.gulp-board li,
+.gulp-board::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 5px;
+  background: var(--g-rainbow);
+  border-bottom: 1.5px solid var(--g-ink);
+}
+.gulp-board li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px 3px 3px;
+  border-radius: 999px;
+  font-size: 14px;
+}
+.gulp-board li.me { background: linear-gradient(180deg, var(--g-yellow-t) 0%, var(--g-yellow) 60%); box-shadow: inset 0 0 0 1.5px var(--g-ink); }
+.gulp-board li.gulp-gap { justify-content: center; padding: 0; line-height: 0.6; }
+/* Pixel digits sit a little high in their line: nudged down to the names' middle. */
+.gulp-board b { position: relative; top: 1.5px; font-family: var(--g-digits); font-size: 14px; font-weight: 400; letter-spacing: -0.5px; }
 .gulp-results-list li {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 5px 10px 5px 5px;
   border-radius: 999px;
-  background: rgba(29, 31, 51, 0.72);
-  color: #fff;
   font-size: 15px;
   font-weight: 800;
 }
-.gulp-board li.me { background: #fff; color: var(--g-ink); box-shadow: 0 0 0 2px var(--g-yellow); }
-.gulp-board li.gulp-gap { background: none; justify-content: center; padding: 0; line-height: 0.6; }
 .gulp-rank {
   display: grid;
   place-items: center;
@@ -427,12 +500,19 @@
 }
 li:first-child > .gulp-rank { background: var(--g-yellow); color: #5a3d00; }
 li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
+.gulp-board li > .gulp-rank { width: 20px; height: 20px; box-sizing: border-box; border: 1.5px solid var(--g-ink); background: var(--g-cyan); color: var(--g-ink); }
+.gulp-board li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
+/* The top three win coins, the child's own row too. */
+.gulp-board li > .gulp-rank.coin-1 { background: radial-gradient(circle at 40% 34%, #fff8c4 0 16%, #ffd23f 20% 58%, #f0a800 62% 100%); color: #5a3d00; }
+.gulp-board li > .gulp-rank.coin-2 { background: radial-gradient(circle at 40% 34%, #fff 0 16%, #dfe6f2 20% 58%, #aab6cc 62%); color: var(--g-ink); }
+.gulp-board li > .gulp-rank.coin-3 { background: radial-gradient(circle at 40% 34%, #ffe2c4 0 16%, #f2a86a 20% 58%, #c9733a 62%); color: #4a2408; }
 .gulp-dot { flex-shrink: 0; width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
+.gulp-board .gulp-dot { width: 12px; height: 12px; box-shadow: 0 0 0 1.5px var(--g-ink); }
 .gulp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Lives left (Medium and Hard): a heart and a number; a hole out of lives is greyed. */
-.gulp-lives { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; color: #ff5d73; font-size: 14px; font-weight: 900; }
+.gulp-lives { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; color: #e0344b; font-size: 14px; font-weight: 900; }
 .gulp-lives svg { fill: currentColor; }
-.gulp-lives.out { color: rgba(255, 255, 255, 0.75); text-transform: uppercase; letter-spacing: 0.05em; }
+.gulp-lives.out { color: var(--g-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .gulp-board li.out { opacity: 0.55; }
 .gulp-board li.out .gulp-name { text-decoration: line-through; }
 
@@ -444,49 +524,84 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
+/* The clock: a red marquee sign ringed with bulbs. */
 .gulp-clock {
+  --piece-bg: linear-gradient(180deg, var(--g-red-t) 0%, var(--g-red) 55%);
+  --piece-c: #fff;
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 18px;
+  padding: 10px 24px;
   border-radius: 999px;
-  background: var(--g-card);
-  box-shadow: 0 4px 0 rgba(20, 40, 90, 0.15), var(--g-shadow);
-  font-size: 26px;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
 }
+/* Pixel digits are one em tall: nudged down so the ink sits in the middle. */
+.gulp-clock span { position: relative; top: 0.2em; font-family: var(--g-digits); font-size: 22px; font-weight: 400; line-height: 1; text-shadow: 0 2px 0 rgba(42, 31, 74, 0.55); }
+.gulp-clock svg { stroke-width: 2.4; filter: drop-shadow(0 1.5px 0 rgba(42, 31, 74, 0.55)); }
+.gulp-clock::before,
+.gulp-clock::after,
+.gulp-banner.prize::before,
+.gulp-banner.prize::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 3px dotted #ffe066;
+  border-radius: inherit;
+  pointer-events: none;
+}
+/* The bulbs' second colour, which flashes on and off (see the motion rules). */
+.gulp-clock::after,
+.gulp-banner.prize::after { border-color: #fff; opacity: 0; }
+
+/* The level: a cyan badge and a rainbow LED meter. */
 .gulp-level {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 12px 5px 5px;
+  padding: 4px 12px 4px 4px;
   border-radius: 999px;
-  background: rgba(29, 31, 51, 0.72);
-  color: #fff;
 }
 .gulp-lv {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 5px;
   height: 34px;
   box-sizing: border-box;
-  padding: 6px 12px 0;
+  padding: 0 12px;
+  border: 1.5px solid var(--g-ink);
   border-radius: 999px;
-  background: #fff;
+  background: linear-gradient(180deg, var(--g-cyan-t) 0%, var(--g-cyan) 60%);
   color: var(--g-ink);
-  box-shadow: inset 0 0 0 3px var(--g-blue);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55);
   white-space: nowrap;
 }
-.gulp-lv small { font-size: 14px; font-weight: 800; }
+.gulp-lv small { font-size: 14px; font-weight: 900; }
 .gulp-lv-short { display: none; }
-/* Room for two digits, so the pill keeps its width from level 9 to 10. */
-.gulp-lv b { min-width: 1.3em; font-size: 21px; font-weight: 900; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; }
-.gulp-meter { width: 120px; height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); overflow: hidden; }
-.gulp-meter-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7fd0ff, #fff); }
-.gulp-next { min-width: 150px; font-size: 14px; font-weight: 800; white-space: nowrap; }
+/* Room for two digits, so the badge keeps its width from level 9 to 10. */
+.gulp-lv b { position: relative; top: 0.23em; min-width: 2em; font-family: var(--g-digits); font-size: 17px; font-weight: 400; line-height: 1; text-align: center; }
+.gulp-meter {
+  --meter: 120px;
+  display: block;
+  width: var(--meter);
+  height: 12px;
+  padding: 2px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 6px;
+  background: #efe8f7;
+  overflow: hidden;
+}
+.gulp-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  /* LED segments over a rainbow as wide as the whole meter. */
+  background: repeating-linear-gradient(90deg, transparent 0 8px, #efe8f7 8px 10px), var(--g-rainbow);
+  background-size: auto, var(--meter) 100%;
+}
+.gulp-next { min-width: 150px; font-size: 14px; white-space: nowrap; }
+.gulp-next b { color: var(--g-purple); }
 .gulp-powers { display: flex; gap: 8px; }
 .gulp-power {
   display: flex;
@@ -494,18 +609,20 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   gap: 4px;
   min-width: 128px;
   padding: 6px 12px 8px;
+  border: 1.5px solid var(--g-ink);
   border-radius: 16px;
   font-size: 15px;
   font-weight: 900;
   color: #fff;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
+  text-shadow: 0 1.5px 0 rgba(42, 31, 74, 0.5);
+  box-shadow: 0 2px 0 var(--g-ink), 0 0 18px 2px var(--pc);
 }
 .gulp-power-top { display: flex; align-items: center; gap: 5px; }
 .gulp-power-top b { margin-left: auto; font-variant-numeric: tabular-nums; }
-.gulp-power-bar { height: 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.35); overflow: hidden; }
+.gulp-power-bar { height: 7px; border: 1.5px solid var(--g-ink); border-radius: 999px; background: rgba(255, 255, 255, 0.35); overflow: hidden; }
 .gulp-power-bar span { display: block; height: 100%; border-radius: 999px; background: #fff; transition: width 0.1s linear; }
-.gulp-power.speed { background: #1fa8e8; }
-.gulp-power.double { background: var(--g-yellow-deep); }
+.gulp-power.speed { --pc: rgba(57, 198, 255, 0.8); background: #1fa8e8; }
+.gulp-power.double { --pc: rgba(255, 198, 46, 0.8); background: var(--g-yellow-deep); }
 
 /* A power-up glows round the edges of the screen, in its colour. */
 .gulp-powerglow {
@@ -516,10 +633,6 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 }
 .gulp-powerglow.speed { --pg: rgba(57, 198, 255, 0.7); }
 .gulp-powerglow.double { --pg: rgba(255, 198, 46, 0.7); }
-.gulp-power.speed,
-.gulp-power.double { box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18), 0 0 18px 2px var(--pc); }
-.gulp-power.speed { --pc: rgba(57, 198, 255, 0.8); }
-.gulp-power.double { --pc: rgba(255, 198, 46, 0.8); }
 
 /* The combo: "POINTS x5" as a big stroked multiplier on the right edge,
    hotter each step, with "10 gulps in a row" under it. */
@@ -538,17 +651,20 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-combo b,
 .gulp-combo em {
   font-style: normal;
-  -webkit-text-stroke: 5px #1d1f33;
+  -webkit-text-stroke: 5px var(--g-ink);
   paint-order: stroke fill;
-  filter: drop-shadow(0 4px 0 rgba(29, 31, 51, 0.45));
+  filter: drop-shadow(0 4px 0 var(--g-ink));
 }
 .gulp-combo b { font-size: 64px; color: var(--g-yellow); }
 .gulp-combo em { font-size: 22px; letter-spacing: 0.08em; -webkit-text-stroke-width: 4px; }
 .gulp-combo span {
   margin-top: 6px;
   padding: 3px 10px;
+  border: 1.5px solid var(--g-ink);
   border-radius: 999px;
-  background: rgba(29, 31, 51, 0.72);
+  background: var(--g-paper);
+  color: var(--g-ink);
+  box-shadow: 0 2px 0 var(--g-ink);
   font-size: 15px;
   line-height: 1.3;
 }
@@ -572,20 +688,21 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   height: 0;
   border-left: 16px solid transparent;
   border-right: 16px solid transparent;
-  border-bottom: 26px solid #ff8a1f;
-  filter: drop-shadow(0 3px 0 rgba(29, 31, 51, 0.35));
+  border-bottom: 26px solid var(--g-orange);
+  filter: drop-shadow(0 2px 0 var(--g-ink));
 }
-.gulp-pointer.danger .gulp-pointer-arrow { border-bottom-color: #e8322b; }
+.gulp-pointer.danger .gulp-pointer-arrow { border-bottom-color: var(--g-red); }
 .gulp-pointer-label {
   padding: 4px 10px;
+  border: 1.5px solid var(--g-ink);
   border-radius: 999px;
-  background: rgba(29, 31, 51, 0.82);
-  color: #fff;
+  background: var(--g-paper);
+  color: var(--g-ink);
+  box-shadow: 0 2px 0 var(--g-ink);
   font-size: 14px;
-  font-weight: 900;
   white-space: nowrap;
 }
-.gulp-pointer.danger .gulp-pointer-label { background: #e8322b; }
+.gulp-pointer.danger .gulp-pointer-label { background: var(--g-red); color: #fff; }
 
 /* Near the edge of the world: a red warning under the clock. */
 .gulp-edge {
@@ -597,13 +714,13 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
+  border: 1.5px solid var(--g-ink);
   border-radius: 999px;
-  background: #e8322b;
+  background: var(--g-red);
   color: #fff;
   font-size: 16px;
-  font-weight: 900;
   white-space: nowrap;
-  box-shadow: 0 4px 0 #a51f1a, var(--g-shadow);
+  box-shadow: 0 2px 0 var(--g-ink), 0 5px 10px rgba(42, 31, 74, 0.2);
 }
 
 /* Breaking news: a TV-style strip near the bottom. */
@@ -611,16 +728,17 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   display: flex;
   align-items: stretch;
   max-width: 100%;
+  border: 1.5px solid var(--g-ink);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 6px 0 rgba(20, 30, 70, 0.2), var(--g-shadow);
-  font-weight: 900;
+  box-shadow: 0 3px 0 var(--g-ink), 0 6px 12px rgba(42, 31, 74, 0.25);
 }
 .gulp-news-tag {
   display: flex;
   align-items: center;
   padding: 10px 16px;
-  background: #e8322b;
+  border-right: 1.5px solid var(--g-ink);
+  background: var(--g-red);
   color: #fff;
   font-size: 14px;
   letter-spacing: 0.08em;
@@ -631,53 +749,38 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   display: flex;
   align-items: center;
   padding: 10px 20px;
-  background: #fff;
+  background: var(--g-paper);
   color: var(--g-ink);
   font-size: 17px;
   line-height: 1.3;
 }
 
+/* Sound and Pause: round arcade buttons in a thin cream bezel. */
 .gulp-right {
   position: absolute;
   top: max(12px, env(safe-area-inset-top));
   right: max(12px, env(safe-area-inset-right));
   display: flex;
   align-items: center;
-  gap: 8px;
 }
-.gulp-stats,
-.gulp-buttons { display: flex; align-items: center; gap: 8px; }
-.gulp-kills {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 14px 0 10px;
-  border-radius: 999px;
-  background: rgba(29, 31, 51, 0.72);
-  color: #fff;
-  font-size: 18px;
-  font-weight: 900;
-}
-.gulp-wonders {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 40px;
-  padding: 0 14px 0 10px;
-  border-radius: 999px;
-  background: rgba(29, 31, 51, 0.72);
-  color: var(--g-yellow);
-  font-size: 18px;
-  font-weight: 900;
-}
-.gulp-kills-icon {
-  width: 22px;
-  height: 14px;
+.gulp-buttons { display: flex; align-items: center; gap: 12px; margin: 0 3px; }
+.gulp-hud .gulp-round {
+  --piece-bg: radial-gradient(circle at 50% 30%, var(--g-cyan-t) 0%, var(--g-cyan) 55%, var(--g-cyan-d) 100%);
+  --piece-c: #fff;
+  --piece-sh: inset 0 3px 1px rgba(255, 255, 255, 0.6), 0 0 0 3px var(--g-paper), 0 0 0 4.5px var(--g-ink);
+  --piece-drop: 4px;
   border-radius: 50%;
-  background: #000;
-  box-shadow: 0 0 0 3px #ff5f6d;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
+.gulp-hud .gulp-round svg { stroke-width: 2.4; filter: drop-shadow(0 1.5px 0 rgba(42, 31, 74, 0.5)); }
+.gulp-hud .gulp-round.gulp-pause-btn {
+  --piece-bg: radial-gradient(ellipse at 50% 25%, var(--g-yellow-t) 0%, var(--g-yellow) 55%, #f0a800 100%);
+  --piece-c: var(--g-ink);
+  border-radius: 999px;
+}
+.gulp-hud .gulp-round.gulp-pause-btn svg { filter: none; }
+.gulp-hud .gulp-round:active { --piece-drop: 1px; transform: translateY(3px) scale(0.96); }
+.gulp-hud button:focus-visible { outline: 3px solid var(--g-purple); outline-offset: 7px; }
 
 .gulp-countdown {
   position: absolute;
@@ -685,12 +788,13 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   top: 28%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: clamp(96px, 18vw, 180px);
-  font-weight: 900;
+  font-family: var(--g-digits);
+  font-size: clamp(80px, 15vw, 150px);
+  font-weight: 400;
   color: var(--g-yellow);
-  -webkit-text-stroke: 8px #1d1f33;
+  -webkit-text-stroke: 8px var(--g-ink);
   paint-order: stroke fill;
-  filter: drop-shadow(0 8px 0 rgba(29, 31, 51, 0.5));
+  filter: drop-shadow(0 8px 0 var(--g-ink));
 }
 .gulp-countdown.go { color: #7cff6b; }
 
@@ -706,27 +810,27 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   align-items: center;
   gap: 4px;
   padding: 14px 26px;
-  border-radius: 22px;
-  background: var(--g-card);
-  box-shadow: 0 6px 0 rgba(20, 40, 90, 0.15), var(--g-shadow);
+  border: 1.5px solid var(--g-ink);
+  border-radius: 20px;
+  background: var(--g-paper);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 3px 0 var(--g-ink), 0 6px 12px rgba(42, 31, 74, 0.25);
   text-align: center;
-  font-weight: 800;
   font-size: 16px;
   max-width: calc(100vw - 32px);
   box-sizing: border-box;
 }
 .gulp-eaten strong,
-.gulp-banner strong { font-size: 30px; font-weight: 900; line-height: 1.1; }
+.gulp-banner strong { font-size: 30px; line-height: 1.1; }
 .gulp-eaten { top: max(22%, 190px); }
 .gulp-eaten-lives { display: inline-flex; align-items: center; gap: 4px; color: #e0344b; }
 .gulp-eaten-lives svg { fill: currentColor; }
 .gulp-eaten-kicker {
   padding: 3px 12px;
+  border: 1.5px solid var(--g-ink);
   border-radius: 999px;
-  background: #ff4d5e;
+  background: var(--g-red);
   color: #fff;
   font-size: 14px;
-  font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -744,28 +848,41 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   pointer-events: none;
 }
 .gulp-messages > * { max-width: min(620px, 100%); }
-.gulp-banner { position: static; transform: none; padding: 14px 32px; min-width: min(300px, 100%); }
-.gulp-banner.level strong { color: var(--g-blue); }
-.gulp-banner.good strong { color: #1a9c3c; }
-.gulp-banner.warn { background: #ffe9e6; box-shadow: 0 6px 0 #ffb3a8, var(--g-shadow); color: #b3261e; }
+/* In the stack, not placed over the screen: relative only so the bulbs can sit inside. */
+.gulp-banner { position: relative; top: auto; left: auto; transform: none; padding: 14px 32px; min-width: min(300px, 100%); }
+.gulp-banner.level strong { color: var(--g-cyan-d); }
+.gulp-banner.good strong { color: #1f9a52; }
+.gulp-banner.warn { background: #ffe9e6; color: #b3261e; }
 .gulp-banner.hurt strong { color: #b3261e; }
+/* Swallowing a hole: a purple marquee with flashing bulbs, and the points it scored. */
+.gulp-banner.prize { background: linear-gradient(180deg, var(--g-purple-t) 0%, var(--g-purple) 60%); color: #fff; }
+.gulp-banner.prize strong { color: #fff; text-shadow: 0 2px 0 rgba(42, 31, 74, 0.6); }
+.gulp-prize { margin-top: 2px; padding: 3px 14px; border: 1.5px solid var(--g-ink); border-radius: 999px; background: var(--g-paper); color: var(--g-ink); font-size: 18px; }
 
+/* The first hint, with a joystick: a red ball on a stick. */
 .gulp-hint {
-  padding: 10px 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 20px 7px 12px;
   border-radius: 999px;
-  background: rgba(29, 31, 51, 0.78);
-  color: #fff;
   font-size: 16px;
-  font-weight: 800;
   white-space: nowrap;
 }
+.gulp-joy { display: flex; flex-shrink: 0; }
+.gulp-joy ellipse { fill: currentColor; }
+.gulp-joy path { stroke-width: 2.6; }
+.gulp-joy circle { fill: var(--g-red); stroke-width: 1.5; }
 
-/* ----- the minimap, bottom right ----- */
+/* ----- the minimap, bottom right, in a cream bezel ----- */
 .gulp-minimap-slot {
   position: fixed;
   right: max(12px, env(safe-area-inset-right));
   bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 11;
+  padding: 5px;
+  border-radius: 18px;
+  line-height: 0;
   pointer-events: none;
 }
 .gulp-minimap {
@@ -774,10 +891,24 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
      iPad, 194px on a laptop and 259px on a big monitor. */
   width: clamp(104px, 18vmin, 300px);
   height: clamp(104px, 18vmin, 300px);
-  border-radius: 16px;
-  border: 3px solid #fff;
-  box-shadow: 0 5px 0 rgba(20, 40, 90, 0.18), var(--g-shadow);
+  box-sizing: border-box;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 12px;
 }
+
+/* Play together: the app's own pill, as a purple arcade piece inside Gulp.
+   It sits outside .gulp-root, so the colours are spelled out, not --g-*. */
+body:has(.gulp-root) .party-pill {
+  border: 1.5px solid #2a1f4a;
+  background: linear-gradient(180deg, #a77bff 0%, #7a3cf0 60%);
+  color: #fff;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35), 0 2px 0 #2a1f4a, 0 5px 10px rgba(42, 31, 74, 0.2);
+  backdrop-filter: none;
+  font-family: 'Gulp Rounded', ui-rounded, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 15px;
+}
+body:has(.gulp-root) .party-pill:hover { border-color: #2a1f4a; }
 
 /* ----- pause and results ----- */
 .gulp-modal-backdrop {
@@ -835,7 +966,6 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-results-list li.me { background: #fff3c4; box-shadow: inset 0 0 0 2px var(--g-yellow); }
 .gulp-results-list li.me .gulp-rank { background: var(--g-ink); color: #fff; }
 .gulp-results-list small { font-size: 14px; color: var(--g-muted); font-weight: 800; }
-.gulp-stats { margin: 4px 0; font-size: 16px; font-weight: 800; color: var(--g-muted); }
 .gulp-newbest {
   display: flex;
   align-items: baseline;
@@ -1059,27 +1189,28 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   .gulp-play { min-height: 56px; font-size: 28px; }
   .gulp-foot { display: none; }
 
-  .gulp-board { width: 156px; gap: 4px; }
+  /* The tray and the level meter narrow, which keeps the top row clear. */
+  .gulp-board { width: 140px; padding: 8px 3px 3px; border-radius: 15px; }
   .gulp-board .gulp-name { min-width: 3.2em; }
-  /* Power-ups go down the right side, under the stars and holes counters, clear of the leaderboard. */
   /* Centred without a transform, so the power-ups below can sit against the screen's edge. */
-  .gulp-center { left: 0; right: 0; transform: none; }
-  .gulp-powers { position: fixed; top: max(118px, calc(env(safe-area-inset-top) + 106px)); right: max(12px, env(safe-area-inset-right)); flex-direction: column; align-items: flex-end; gap: 6px; }
-  .gulp-board li { font-size: 14px; padding: 3px 8px 3px 3px; gap: 5px; }
+  .gulp-center { left: 0; right: 0; transform: none; gap: 6px; }
+  /* Power-ups go down the right side, under the buttons, clear of the leaderboard. */
+  .gulp-powers { position: fixed; top: max(76px, calc(env(safe-area-inset-top) + 64px)); right: max(12px, env(safe-area-inset-right)); flex-direction: column; align-items: flex-end; gap: 6px; }
+  .gulp-board li { padding: 2px 8px 2px 2px; gap: 5px; }
   .gulp-board li:nth-child(n + 4):not(.me) { display: none; }
-  .gulp-board .gulp-rank { width: 20px; height: 20px; font-size: 14px; }
   .gulp-board .gulp-dot { display: none; }
-  .gulp-clock { font-size: 20px; padding: 6px 12px; }
+  .gulp-clock { padding: 7px 14px; }
+  .gulp-clock span { font-size: 16px; }
+  .gulp-clock::before,
+  .gulp-clock::after { inset: 2px; border-width: 2px; }
   .gulp-level { padding: 3px 8px 3px 3px; gap: 5px; }
-  .gulp-lv { height: 30px; padding: 4px 10px 0; gap: 3px; }
+  .gulp-lv { height: 30px; padding: 0 10px; gap: 3px; }
   .gulp-lv-long { display: none; }
   .gulp-lv-short { display: inline; }
-  .gulp-lv b { font-size: 18px; }
-  .gulp-meter { width: 56px; }
+  .gulp-lv b { font-size: 15px; }
+  .gulp-meter { --meter: 40px; }
   .gulp-next { display: none; }
-  .gulp-right { flex-direction: column-reverse; align-items: flex-end; gap: 6px; }
-  .gulp-wonders,
-  .gulp-kills { height: 34px; font-size: 16px; padding: 0 12px 0 8px; }
+  .gulp-buttons { gap: 10px; }
   .gulp-minimap-slot { bottom: max(64px, env(safe-area-inset-bottom)); }
   .gulp-pause-label { display: none; }
   .gulp-round.gulp-pause-btn { padding: 0; width: 44px; justify-content: center; }
@@ -1088,7 +1219,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   /* Above the minimap, so a long message never runs under it. */
   .gulp-messages { bottom: max(186px, calc(env(safe-area-inset-bottom) + 178px)); }
   .gulp-hint { white-space: normal; text-align: center; }
-  .gulp-banner { padding: 12px 22px; }
+  .gulp-banner { padding: 12px 20px; }
   .gulp-banner strong { font-size: 24px; }
 
   /* The results card and Scores dialog, slimmer to fit the family board. */
@@ -1113,6 +1244,11 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .gulp-clock::after,
+  .gulp-banner.prize::after { animation: gulp-bulbs 0.8s steps(1, end) infinite; }
+  @keyframes gulp-bulbs {
+    50% { opacity: 1; }
+  }
   .gulp-pointer { animation: gulp-pulse 0.8s ease-in-out infinite alternate; }
   @keyframes gulp-pulse {
     from { opacity: 0.65; }

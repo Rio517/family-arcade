@@ -78,6 +78,7 @@ export class GulpScene {
   /** Points gathered over a quarter second show as one "+n" over the hole. */
   private pending = 0;
   private pendingAt = new THREE.Vector3();
+  private gulpAt = new THREE.Vector3();
   private pendingFor = 0;
   /** People and street clutter hidden, the camera being high above them. */
   private tinyHidden = false;
@@ -206,6 +207,10 @@ export class GulpScene {
         this.props.vanish(e.prop);
       } else if (e.type === 'regrow') {
         this.props.show(e.prop);
+      } else if (e.type === 'gulp' && e.eater === this.follow) {
+        // A swallowed hole's points rise in gold over the mouth that did it.
+        const h = world.holes[e.eater];
+        this.effects.popup(e.points, this.gulpAt.set(h.x, 2 + h.r * 1.2, h.z), 'big');
       } else if (e.type === 'level') {
         this.holes.flash(e.hole);
       } else if (e.type === 'boom') {

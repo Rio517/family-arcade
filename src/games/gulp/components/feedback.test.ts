@@ -46,6 +46,16 @@ describe('feedback', () => {
     expect(feedbackFor({ type: 'combo', hole: 1, mult: 2 }, w, fresh())).toBeNull();
   });
 
+  it('a swallow says whose and what it scored; a computer hole swallowing is not announced', () => {
+    const w = world();
+    expect(feedbackFor({ type: 'gulp', eater: 0, eaten: 1, points: 25 }, w, fresh())?.banner).toEqual({
+      kind: 'good',
+      text: 'You swallowed Big Gulp!',
+      points: 25,
+    });
+    expect(feedbackFor({ type: 'gulp', eater: 1, eaten: 0, points: 25 }, w, fresh())).toBeNull();
+  });
+
   it('says the police are coming once a round', () => {
     const w = world();
     const said = fresh();

@@ -554,3 +554,14 @@ export const SpeakerOffIcon = (p: IconProps) =>
     </>,
     p,
   );
+
+/** An arcade joystick: a ball on a stick in its base. */
+export const JoystickIcon = (p: IconProps) =>
+  svg(
+    <>
+      <ellipse cx="12" cy="19" rx="8" ry="2.6" />
+      <path d="M12 18.4v-7.6" />
+      <circle cx="12" cy="7.2" r="4.2" />
+    </>,
+    p,
+  );
