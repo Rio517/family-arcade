@@ -41,14 +41,13 @@ for good news), the 14px text floor and a visible keyboard focus ring.
   trim, burnt-orange numbers, a slim 70s sunset ring round the clock, domed
   push-buttons, an LED level meter and the map on a little CRT. Name tags are
   retro signs with an orange offset shadow.
-- **D, Kitty.** A cute Japanese arcade game. Candy colours (pink, sky,
-  sunshine, mint) with a plum outline and a hard drop under every piece. Cat
-  ears on the leaderboard, clock, Pause, map and the player's name tag;
-  rank badges are little cat heads. The level bar is candy-striped, the hint
-  is a speech bubble, and the swallow banner is a pink ribbon. Game text is
-  white with a plum edge in a chunky rounded Japanese font, M PLUS Rounded
-  1c Black, bundled as a 7 KB Latin subset so the PWA stays offline. Points
-  tilt like an arcade score.
+- **D, Kitty.** A cute Japanese arcade game. Candy colours (sky, sunshine,
+  mint) with a plum outline and a hard drop under every piece, and caramel
+  for the player's row, the level stripes and the swallow banner. The hint is
+  a speech bubble and the swallow banner is a ribbon. Game text is white with
+  a plum edge in a chunky rounded Japanese font, M PLUS Rounded 1c Black,
+  bundled as a 7 KB Latin subset so the PWA stays offline. Points tilt like
+  an arcade score.
 
 ## What each costs
 
@@ -60,7 +59,7 @@ components stay, apart from the counters `GulpHud.tsx` stops rendering.
 | A | A light layer and a lip on every piece; the Pause shine behind `prefers-reduced-motion` | Tag: gradient, lip, highlight. Bubble: lip instead of an outline | Points: a coloured side and a shine | — |
 | B | White edge, shadow, grain as an inline SVG, three tilts | A white edge round the tag and bubble | A white edge round the points | `holeView.ts`: the label sprites grow a little to fit the edge |
 | C | Panels, push-buttons, LED meter, CRT map | Sign tag with an offset shadow | Striped sunset fill on the points | — |
-| D | Ears, cat-head badges, ribbon, bubble tail: the most CSS of the four | Eared tag and bubble in the new font | Tilted numbers in the new font | The font file (OFL licence), loaded with `@font-face` inside Gulp only |
+| D | Outlines, ribbon, bubble tail, striped level bar | Tag and bubble in the new font | Tilted numbers in the new font | The font file (OFL licence), loaded with `@font-face` inside Gulp only |
 
 The changes every option shares:
 
