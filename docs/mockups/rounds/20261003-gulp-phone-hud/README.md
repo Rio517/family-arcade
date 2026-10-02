@@ -1,3 +1,11 @@
+---
+title: 'Gulp: the round''s HUD on a phone'
+question: How does every score stay readable on a phone with no HUD piece covering another?
+status: built
+picked: A, clock on the right
+tested_with: family
+date: '2026-10-03'
+---
 # Gulp Universe: the round's HUD on a phone
 
 **Requirement:** on a phone, every score in the leaderboard is readable, and
@@ -42,11 +50,11 @@ different piece to make room.
 ## How the options were checked
 
 The pictures are a production build of the real HUD and 3D city
-(`preview-gulp-hud.html`, built under `BUILD_HARNESS=1`). Each option is the
-phone layout rules in `src/games/gulp/styles/phone-hud-options.css`, switched
-on with `?o=a`, `b` or `c`. The round is held still with the longest likely
-values: a rival named "Captain Crumbs" at 9,999, both power-ups running, and
-the player fourth, so the tray shows its tallest version.
+(`preview-gulp-hud.html`, built under `BUILD_HARNESS=1`), with each option's
+phone layout rules switched on in the harness. The round is held still with
+the longest likely values: a rival named "Captain Crumbs" at 9,999, both
+power-ups running, and the player fourth, so the tray shows its tallest
+version.
 
 A script measured every piece at 375×812, 393×852 and 430×932 in Chromium and
 WebKit. In both engines, today overlaps and cuts off scores at every width,
@@ -55,10 +63,6 @@ and A, B and C have no overlaps and no cut-off scores at any width.
 ## What it costs
 
 About ten lines in the phone block of `gulp.css`, with no component changes.
-The chosen option's rules move from the harness stylesheet into `gulp.css`, and
-the harness stylesheet and the `?o=` switch go. A phone shot at 375 and 430
-then checks that the pieces don't overlap and that the scores aren't cut off,
-so the shot fails if a later change breaks the layout.
 
 ## The page
 
@@ -68,4 +72,7 @@ between 375, 393 and 430. The names in the pictures are examples.
 
 ## Outcome
 
-**Pending.** The family picks A, B or C.
+**A, clock on the right: built.** The rules are in the phone block of
+`gulp.css`. The shots `gulp-hud-phone` (430×932) and `gulp-hud-phone-small`
+(375×812) load the harness round and fail if a HUD piece covers another or a
+score is cut off. The family sees it on their devices before it ships.

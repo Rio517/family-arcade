@@ -1225,13 +1225,21 @@ body:has(.gulp-root) .party-pill:hover { border-color: #2a1f4a; }
   .gulp-play { min-height: 56px; font-size: 28px; }
   .gulp-foot { display: none; }
 
-  /* The tray and the level meter narrow, which keeps the top row clear. */
-  .gulp-board { width: 140px; padding: 8px 3px 3px; border-radius: 15px; }
+  /* The tray keeps the top left, wide enough for "9,999" beside a name, the
+     lives and the rank coin (pixel digits are 1em wide, the comma too). */
+  .gulp-board { width: 200px; padding: 8px 3px 3px; border-radius: 15px; }
   .gulp-board .gulp-name { min-width: 3.2em; }
-  /* Centred without a transform, so the power-ups below can sit against the screen's edge. */
-  .gulp-center { left: 0; right: 0; transform: none; gap: 6px; }
-  /* Power-ups go down the right side, under the buttons, clear of the leaderboard. */
-  .gulp-powers { position: fixed; top: max(76px, calc(env(safe-area-inset-top) + 64px)); right: max(12px, env(safe-area-inset-right)); flex-direction: column; align-items: flex-end; gap: 6px; }
+  /* The clock and the level meter go down the right side, under the buttons. */
+  .gulp-center {
+    left: auto;
+    right: max(12px, env(safe-area-inset-right));
+    top: max(64px, calc(env(safe-area-inset-top) + 52px));
+    transform: none;
+    gap: 6px;
+    align-items: flex-end;
+  }
+  /* Power-ups follow them down the right side, clear of the leaderboard. */
+  .gulp-powers { position: fixed; top: max(154px, calc(env(safe-area-inset-top) + 142px)); right: max(12px, env(safe-area-inset-right)); flex-direction: column; align-items: flex-end; gap: 6px; }
   .gulp-board li { padding: 2px 8px 2px 2px; gap: 5px; }
   .gulp-board li:nth-child(n + 4):not(.me) { display: none; }
   .gulp-board .gulp-dot { display: none; }
