@@ -50,7 +50,7 @@ export interface ConnectionConfig<TMessage> {
 }
 
 const DIAL_RETRY_MS = 2500;
-const DIAL_TIMEOUT_MS = 20000;
+export const DIAL_TIMEOUT_MS = 20000;
 
 /** Characters chosen to avoid look-alikes (no O/0, I/1, L). */
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -70,7 +70,8 @@ export function normalizeCode(raw: string): string {
     .slice(0, 4);
 }
 
-const ICE = {
+/** Shared with `GameHost` so every channel in a game uses the same NAT setup. */
+export const ICE = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
