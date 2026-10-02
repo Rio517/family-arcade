@@ -1,0 +1,721 @@
+/* Gulp Universe: playing with friends — the menu's two play buttons, a linked
+   friend's invitation, the question, the letter keys and PLAYER SELECT
+   (docs/mockups/20261002-gulp-play-together). The round's Coin-op look:
+   cream pieces with a thin ink edge and a hard drop, red and purple marquee
+   signs ringed with bulbs, and holes with googly eyes. The colours and the
+   two fonts are the .gulp-root tokens in gulp.css. Scoped under .gulp-tg-. */
+
+.gulp-tg {
+  /* The focus ring: purple on cream, yellow on the dark screens. */
+  --gt-ring: var(--g-purple);
+  font-family: var(--g-words);
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--g-ink);
+}
+:where(.gulp-tg) :where(button) {
+  font-family: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+:where(.gulp-tg) :where(h2, p, ol, ul) { margin: 0; }
+:where(.gulp-tg) :where(ol, ul) { padding: 0; list-style: none; }
+
+/* Higher than gulp.css's own button ring, so these pieces keep theirs. */
+.gulp-tg :is(.gulp-tg-ab, .gulp-tg-ans, .gulp-tg-key, .gulp-tg-opt, .gulp-tg-skin, .gulp-tg-link):focus-visible {
+  outline: 4px solid var(--gt-ring);
+  outline-offset: 3px;
+}
+.gulp-tg .gulp-tg-rb:focus-visible { outline: 4px solid var(--gt-ring); outline-offset: 7px; }
+
+/* ----- a full screen over the city ----- */
+.gulp-tg-screen {
+  --gt-ring: #ffe066;
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: linear-gradient(180deg, rgba(38, 22, 78, 0.92), rgba(24, 14, 52, 0.95));
+  font-size: 16px;
+  /* Focused when it opens, for the keyboard path; its buttons carry the ring. */
+  outline: none;
+}
+/* Centred while it fits; taller than the screen, it scrolls from the top. */
+.gulp-tg-col {
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ----- buttons ----- */
+.gulp-tg-ab {
+  appearance: none;
+  min-height: 52px;
+  padding: 0 22px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--g-ink);
+  font-size: 18px;
+  white-space: nowrap;
+  background: linear-gradient(180deg, #fff, #efe8f7);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--g-ink);
+}
+.gulp-tg-ab:active:not(:disabled, [aria-disabled='true']) {
+  transform: translateY(3px);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 1px 0 var(--g-ink);
+}
+.gulp-tg-ab.y { background: linear-gradient(180deg, var(--g-yellow-t), var(--g-yellow) 55%, var(--g-yellow-deep)); }
+.gulp-tg-ab.p {
+  color: #fff;
+  background: linear-gradient(180deg, var(--g-purple-t), var(--g-purple) 60%);
+  text-shadow: 0 1.5px 0 rgba(42, 31, 74, 0.5);
+}
+.gulp-tg-ab.g { background: linear-gradient(180deg, #9af2bb, var(--g-green) 60%); }
+.gulp-tg-ab.big { min-height: 68px; padding: 0 34px; font-size: 28px; }
+.gulp-tg-ab:disabled,
+.gulp-tg-ab[aria-disabled='true'] {
+  cursor: not-allowed;
+  color: #5f5878;
+  background: #e7e1d7;
+  border-color: #8d869c;
+  box-shadow: 0 3px 0 #a79fb8;
+  text-shadow: none;
+}
+.gulp-tg-ab svg { flex: none; }
+
+/* The round cyan button in a cream bezel, as on the HUD. */
+.gulp-tg-rb {
+  appearance: none;
+  flex: none;
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  cursor: pointer;
+  background: radial-gradient(circle at 50% 30%, var(--g-cyan-t) 0%, var(--g-cyan) 55%, var(--g-cyan-d) 100%);
+  box-shadow: inset 0 3px 1px rgba(255, 255, 255, 0.6), 0 0 0 3px var(--g-paper), 0 0 0 4.5px var(--g-ink), 0 4px 0 4.5px var(--g-ink);
+}
+.gulp-tg-rb svg { filter: drop-shadow(0 1.5px 0 rgba(42, 31, 74, 0.5)); }
+.gulp-tg-rb:active { transform: translateY(3px); }
+.gulp-tg-rb.corner {
+  position: absolute;
+  z-index: 3;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+}
+
+.gulp-tg-lab {
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--g-muted);
+}
+
+/* ----- holes ----- */
+.gulp-tg-hole {
+  --d: 44px;
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--d);
+  height: var(--d);
+  border-radius: 50%;
+  border: calc(var(--d) * 0.11) solid var(--hole, #3d7bff);
+  background: radial-gradient(
+    circle at 50% 55%,
+    #000 0 42%,
+    color-mix(in srgb, var(--hole, #3d7bff) 40%, #000) 70%,
+    color-mix(in srgb, var(--hole, #3d7bff) 70%, #000) 100%
+  );
+  box-shadow: 0 0 0 1.5px var(--g-ink);
+}
+/* Two googly eyes on the rim. */
+.gulp-tg-hole::before,
+.gulp-tg-hole::after {
+  content: '';
+  position: absolute;
+  top: calc(var(--d) * -0.2);
+  width: calc(var(--d) * 0.27);
+  height: calc(var(--d) * 0.27);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 62%, #111 0 34%, #fff 38%);
+  box-shadow: 0 0 0 1.2px var(--g-ink);
+}
+.gulp-tg-hole::before { left: calc(var(--d) * 0.14); }
+.gulp-tg-hole::after { right: calc(var(--d) * 0.14); }
+.gulp-tg-hole.free {
+  border-style: dashed;
+  border-color: #8d869c;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: none;
+}
+.gulp-tg-hole.wait {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--hole, #3d7bff) 22%, #fff);
+  box-shadow: none;
+}
+.gulp-tg-hole:is(.free, .wait)::before,
+.gulp-tg-hole:is(.free, .wait)::after { display: none; }
+/* Away: grey, with its eyes shut. */
+.gulp-tg-hole.off { --hole: #9a93a8; }
+.gulp-tg-hole.off::before,
+.gulp-tg-hole.off::after { background: linear-gradient(180deg, #e8e3f0 0 46%, var(--g-ink) 46% 60%, #e8e3f0 60%); }
+
+/* ----- the four letter tiles ----- */
+.gulp-tg-code {
+  --ts: 72px;
+  display: flex;
+  gap: calc(var(--ts) * 0.12);
+}
+.gulp-tg-ct {
+  width: calc(var(--ts) * 0.8);
+  height: var(--ts);
+  display: grid;
+  place-items: center;
+  padding-top: calc(var(--ts) * 0.06);
+  border: 2px solid var(--g-ink);
+  border-radius: calc(var(--ts) * 0.2);
+  background: linear-gradient(180deg, var(--tc) 0 11%, var(--g-paper) 11%);
+  box-shadow: 0 4px 0 var(--g-ink);
+  color: var(--g-ink);
+  font-size: calc(var(--ts) * 0.62);
+  line-height: 1;
+}
+.gulp-tg-ct.empty { color: #b3abc6; background: linear-gradient(180deg, var(--tc) 0 11%, #f1ecf8 11%); }
+.gulp-tg-ct.cur { outline: 4px solid var(--gt-ring); outline-offset: 3px; }
+.gulp-tg-caret { width: 3px; height: 56%; background: var(--g-ink); }
+/* Small tiles inside a line of text. */
+.gulp-tg-mini {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 30px;
+  margin: 0 2px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 7px;
+  background: linear-gradient(180deg, var(--tc, var(--g-orange)) 0 12%, var(--g-paper) 12%);
+  color: var(--g-ink);
+  font-size: 18px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* ----- the menu: PLAY and PLAY WITH FRIENDS ----- */
+.gulp-tg-playrow { display: flex; gap: 10px; align-items: stretch; }
+.gulp-tg-playrow > .gulp-tg-ab { flex: 1; min-width: 0; }
+.gulp-tg-ab.bigbtn {
+  flex-direction: column;
+  gap: 8px;
+  min-height: 108px;
+  padding: 10px 12px;
+  border-radius: 26px;
+  font-size: 24px;
+  line-height: 1.1;
+  text-align: center;
+  white-space: normal;
+  box-shadow: inset 0 3px 1px rgba(255, 255, 255, 0.55), 0 5px 0 var(--g-ink);
+}
+.gulp-tg-ab.bigbtn:active { box-shadow: inset 0 3px 1px rgba(255, 255, 255, 0.55), 0 2px 0 var(--g-ink); }
+.gulp-tg-ab.bigbtn .gulp-tg-hole { --d: 38px; margin-top: 8px; }
+.gulp-tg-trio { display: flex; padding-left: 10px; }
+.gulp-tg-trio .gulp-tg-hole { margin-left: -10px; }
+
+/* ----- a linked friend's invitation ----- */
+.gulp-tg-invite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 12px 10px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 22px;
+  background: linear-gradient(180deg, #e9fbee, #c4f1d0);
+  box-shadow: 0 4px 0 var(--g-ink), 0 0 0 5px rgba(53, 208, 127, 0.45);
+}
+.gulp-tg-invite .hw { flex: none; width: 58px; display: grid; place-items: center; padding-top: 12px; }
+.gulp-tg-invite .tx { flex: 1; min-width: 0; font-size: 22px; line-height: 1.15; }
+.gulp-tg-ab.join { min-height: 60px; padding: 0 26px; font-size: 24px; }
+.gulp-tg-err {
+  flex: 1 1 100%;
+  padding: 8px 14px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 14px;
+  background: #ffe9e6;
+  color: #b3261e;
+  font-size: 16px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+/* ----- the question ----- */
+.gulp-tg-q { gap: 26px; padding: max(20px, env(safe-area-inset-top)) max(40px, env(safe-area-inset-right)) max(30px, env(safe-area-inset-bottom)) max(40px, env(safe-area-inset-left)); }
+.gulp-tg-q h2 {
+  color: #fff;
+  font-size: 46px;
+  line-height: 1.12;
+  text-align: center;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
+}
+.gulp-tg-answers { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; width: 100%; max-width: 940px; }
+.gulp-tg-ans {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 330px;
+  padding: 22px 20px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 30px;
+  color: var(--g-ink);
+  font-size: 32px;
+  line-height: 1.12;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: inset 0 3px 1px rgba(255, 255, 255, 0.7), 0 7px 0 var(--g-ink), 0 14px 22px rgba(0, 0, 0, 0.3);
+}
+.gulp-tg-ans:active { transform: translateY(4px); }
+.gulp-tg-ans.gold { background: linear-gradient(180deg, #fff3c4, var(--g-yellow)); }
+.gulp-tg-ans.sky { background: linear-gradient(180deg, #d9f4ff, var(--g-cyan)); }
+.gulp-tg-ans .pic { height: 120px; display: grid; place-items: center; }
+.gulp-tg-ans .gulp-tg-code { --ts: 66px; }
+.gulp-tg-ans .crown {
+  width: 112px;
+  height: 112px;
+  border: 2px solid var(--g-ink);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 40% 34%, #fff8c4 0 16%, #ffd23f 20% 58%, #f0a800 62% 100%);
+  color: #5a3d00;
+  box-shadow: 0 4px 0 var(--g-ink);
+}
+.gulp-tg-ans .crown svg { width: 64px; height: 64px; }
+
+/* ----- the player select and the letter screen ----- */
+.gulp-tg-psel { gap: 14px; padding: max(20px, env(safe-area-inset-top)) max(32px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(32px, env(safe-area-inset-left)); }
+.gulp-tg-top {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gulp-tg-top .gulp-tg-rb { position: absolute; left: 0; top: 4px; }
+
+/* A marquee sign ringed with bulbs. */
+.gulp-tg-sign {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 34px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 999px;
+  color: #fff;
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, var(--g-red-t), var(--g-red) 55%);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 3px 0 var(--g-ink), 0 8px 16px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 2px 0 rgba(42, 31, 74, 0.55);
+}
+.gulp-tg-sign::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 3px dotted #ffe066;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.gulp-tg-sign.purple { background: linear-gradient(180deg, var(--g-purple-t), var(--g-purple) 60%); }
+
+/* A link or a host that dropped: a red banner under the sign. */
+.gulp-tg-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 8px 24px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--g-red-t), var(--g-red) 55%);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4), 0 3px 0 var(--g-ink), 0 6px 12px rgba(42, 31, 74, 0.25);
+  color: #fff;
+  font-size: 22px;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 rgba(42, 31, 74, 0.5);
+}
+.gulp-tg-spin { display: inline-flex; }
+
+.gulp-tg-coderow { display: flex; align-items: center; gap: 22px; color: #fff; }
+.gulp-tg-coderow .tl { font-size: 22px; color: var(--g-yellow); text-align: right; }
+.gulp-tg-select.guest .gulp-tg-coderow { gap: 16px; }
+.gulp-tg-select.guest .gulp-tg-coderow .tl { font-size: 18px; }
+.gulp-tg-select.guest .gulp-tg-coderow .gulp-tg-code { --ts: 52px; }
+
+.gulp-tg-howto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 8px;
+  padding: 10px 16px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 18px;
+  background: var(--g-yellow-t);
+  box-shadow: 0 3px 0 var(--g-ink);
+  color: var(--g-ink);
+  font-size: 17px;
+  line-height: 1.3;
+  text-align: center;
+}
+.gulp-tg-howto svg { color: var(--g-purple); }
+
+/* The four slots, 1P to 4P: a row on an iPad, a list on a phone. */
+.gulp-tg-slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; width: 100%; }
+.gulp-tg-slot {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 290px;
+  padding: 26px 12px 14px;
+  overflow: hidden;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 22px;
+  background: var(--g-paper);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 5px 0 var(--g-ink), 0 12px 20px rgba(0, 0, 0, 0.3);
+  color: var(--g-ink);
+  text-align: center;
+}
+/* The rainbow marquee stripe along the top. */
+.gulp-tg-slot::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 8px;
+  background: var(--g-rainbow);
+  border-bottom: 1.5px solid var(--g-ink);
+}
+.gulp-tg-slot .pn {
+  position: absolute;
+  left: 10px;
+  top: 16px;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 40% 34%, #fff8c4 0 16%, #ffd23f 20% 58%, #f0a800 62% 100%);
+  color: #5a3d00;
+  font-size: 18px;
+}
+.gulp-tg-slot .hw { height: 130px; display: grid; place-items: center; padding-top: 14px; }
+.gulp-tg-slot .gulp-tg-hole { --d: 96px; }
+.gulp-tg-slot .mid { display: contents; }
+.gulp-tg-slot .nm { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 26px; }
+.gulp-tg-slot .st {
+  padding: 3px 12px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 999px;
+  background: #d9f7e3;
+  font-size: 15px;
+}
+.gulp-tg-slot .st.soon { background: var(--g-yellow-t); }
+.gulp-tg-slot .st.away { background: #e7e1d7; }
+.gulp-tg-slot .ins { color: #c2410c; font-size: 21px; }
+.gulp-tg-slot .sub { color: var(--g-muted); font-size: 14px; }
+.gulp-tg-slot.free { background: repeating-linear-gradient(45deg, var(--g-paper) 0 12px, #f6efe0 12px 24px); }
+.gulp-tg-slot.you { outline: 4px solid var(--gt-ring); outline-offset: 3px; }
+
+/* The host's settings bar: map, time and level. */
+.gulp-tg-bar {
+  --gt-ring: var(--g-purple);
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 22px;
+  background: var(--g-paper);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--g-ink);
+}
+.gulp-tg-grp { display: flex; align-items: center; gap: 8px; }
+.gulp-tg-seg { display: grid; grid-auto-flow: column; grid-auto-columns: auto; gap: 6px; }
+.gulp-tg-opt {
+  appearance: none;
+  min-height: 46px;
+  padding: 4px 12px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1ecf8;
+  box-shadow: 0 3px 0 rgba(42, 31, 74, 0.35);
+  color: var(--g-ink);
+  font-size: 16px;
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.gulp-tg-opt.on { background: linear-gradient(180deg, var(--g-cyan-t), var(--g-cyan) 60%); box-shadow: 0 3px 0 var(--g-ink); }
+
+/* What a guest sees of the host's choices. */
+.gulp-tg-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.gulp-tg-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 999px;
+  background: var(--g-paper);
+  box-shadow: 0 2px 0 var(--g-ink);
+  color: var(--g-ink);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* The guest's colour picker. */
+.gulp-tg-pick {
+  --gt-ring: var(--g-purple);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 22px;
+  background: var(--g-paper);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--g-ink);
+}
+.gulp-tg-pick .head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.gulp-tg-skins { display: grid; grid-template-columns: repeat(10, 1fr); gap: 8px; }
+.gulp-tg-skin {
+  appearance: none;
+  position: relative;
+  min-width: 0;
+  min-height: 74px;
+  padding: 14px 4px 6px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: #f1ecf8;
+  box-shadow: 0 3px 0 rgba(42, 31, 74, 0.35);
+  color: var(--g-ink);
+  cursor: pointer;
+}
+.gulp-tg-skin .gulp-tg-hole { --d: 34px; }
+.gulp-tg-skin.on { background: linear-gradient(180deg, var(--g-cyan-t), var(--g-cyan) 60%); box-shadow: 0 3px 0 var(--g-ink); }
+.gulp-tg-skin.taken { background: #e7e1d7; cursor: not-allowed; }
+.gulp-tg-skin.taken .gulp-tg-hole { opacity: 0.45; }
+.gulp-tg-skin .by {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--g-paper);
+  font-size: 14px;
+  line-height: 1;
+}
+.gulp-tg-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 14px;
+  background: #d9f7e3;
+  color: var(--g-ink);
+  font-size: 15px;
+}
+.gulp-tg-note svg { flex: none; }
+
+.gulp-tg-startrow { width: 100%; display: flex; align-items: center; justify-content: center; gap: 18px; }
+.gulp-tg-startrow .note { color: #efe7ff; font-size: 16px; }
+
+.gulp-tg-link {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: #fff;
+  font-size: 16px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+/* The letter keys: the 23 code letters and delete, nine to a row on an iPad. */
+.gulp-tg-codekeys .gulp-tg-code { --ts: 110px; }
+.gulp-tg-hint { color: #efe7ff; font-size: 19px; text-align: center; }
+.gulp-tg-keys {
+  width: 100%;
+  max-width: calc(9 * 84px + 8 * 10px + 1px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+.gulp-tg-key {
+  appearance: none;
+  width: 84px;
+  height: 66px;
+  padding: 0;
+  border: 1.5px solid var(--g-ink);
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #fff, #efe8f7);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--g-ink);
+  color: var(--g-ink);
+  font-size: 30px;
+  line-height: 1;
+  cursor: pointer;
+}
+.gulp-tg-key:active:not([aria-disabled='true']) { transform: translateY(3px); box-shadow: 0 1px 0 var(--g-ink); }
+.gulp-tg-key.del { background: linear-gradient(180deg, var(--g-red-t), var(--g-red) 55%); color: #fff; }
+.gulp-tg-codekeys.busy .gulp-tg-key { cursor: not-allowed; opacity: 0.6; }
+.gulp-tg-ab.go { min-width: 300px; }
+.gulp-tg-codekeys .gulp-tg-err { flex: none; max-width: 520px; }
+
+/* ----- a phone upright ----- */
+@media (max-width: 600px) {
+  .gulp-tg-ab.bigbtn { min-height: 100px; padding: 8px; font-size: 20px; }
+
+  .gulp-tg-invite .tx { flex: 1 1 60%; font-size: 19px; }
+  .gulp-tg-invite .gulp-tg-ab.join { flex: 1 1 100%; }
+
+  .gulp-tg-q { gap: 16px; padding: max(70px, calc(env(safe-area-inset-top) + 58px)) 16px max(24px, env(safe-area-inset-bottom)); }
+  .gulp-tg-q h2 { font-size: 30px; }
+  .gulp-tg-answers { grid-template-columns: 1fr; gap: 16px; }
+  .gulp-tg-ans { min-height: 190px; gap: 10px; padding: 14px 16px; font-size: 24px; }
+  .gulp-tg-ans .pic { height: 84px; }
+  .gulp-tg-ans .gulp-tg-code { --ts: 40px; }
+  .gulp-tg-ans .crown { width: 84px; height: 84px; }
+  .gulp-tg-ans .crown svg { width: 48px; height: 48px; }
+
+  .gulp-tg-psel { gap: 8px; padding: max(14px, env(safe-area-inset-top)) 16px max(14px, env(safe-area-inset-bottom)); }
+  .gulp-tg-top { min-height: 52px; justify-content: flex-end; }
+  .gulp-tg-top .gulp-tg-rb { top: 1px; }
+  .gulp-tg-sign { margin-right: 10px; padding: 9px 22px; font-size: 24px; }
+  .gulp-tg-banner { padding: 7px 18px; font-size: 19px; }
+
+  .gulp-tg-coderow { gap: 12px; }
+  .gulp-tg-coderow .tl { font-size: 17px; }
+  .gulp-tg-coderow .gulp-tg-code { --ts: 46px; }
+  .gulp-tg-select.guest .gulp-tg-coderow .tl { font-size: 15px; }
+  .gulp-tg-select.guest .gulp-tg-coderow .gulp-tg-code { --ts: 38px; }
+  .gulp-tg-howto { gap: 2px 6px; padding: 8px 10px; font-size: 15px; }
+
+  .gulp-tg-slots { grid-template-columns: 1fr; gap: 7px; }
+  .gulp-tg-slot {
+    flex-direction: row;
+    gap: 10px;
+    min-height: 66px;
+    padding: 8px 12px 8px 10px;
+    border-radius: 18px;
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 4px 0 var(--g-ink);
+    text-align: left;
+  }
+  .gulp-tg-slot::before { display: none; }
+  .gulp-tg-slot .pn { position: static; flex: none; width: 36px; height: 36px; font-size: 15px; }
+  .gulp-tg-slot .hw { width: 50px; height: auto; padding-top: 8px; }
+  .gulp-tg-slot .gulp-tg-hole { --d: 40px; }
+  .gulp-tg-slot .mid { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .gulp-tg-slot .nm { font-size: 20px; }
+  .gulp-tg-slot .ins { font-size: 17px; }
+
+  .gulp-tg-bar { flex-direction: column; align-items: stretch; gap: 6px; padding: 8px 12px; }
+  .gulp-tg-grp { display: grid; grid-template-columns: 62px 1fr; }
+  .gulp-tg-seg { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); }
+  .gulp-tg-grp.maps .gulp-tg-seg { grid-template-columns: 1fr 1fr; }
+  .gulp-tg-opt { min-height: 42px; }
+
+  .gulp-tg-skins { grid-template-columns: repeat(5, 1fr); }
+  .gulp-tg-skin { min-height: 66px; }
+
+  .gulp-tg-startrow { flex-direction: column; gap: 4px; }
+  .gulp-tg-startrow .gulp-tg-ab { width: 100%; }
+  .gulp-tg-startrow .note { order: 2; font-size: 14px; text-align: center; }
+
+  .gulp-tg-codekeys .gulp-tg-code { --ts: 66px; }
+  .gulp-tg-hint { font-size: 16px; }
+  .gulp-tg-keys { max-width: calc(7 * 50px + 6 * 6px + 1px); gap: 8px 6px; }
+  .gulp-tg-key { width: 50px; height: 56px; border-radius: 12px; font-size: 24px; }
+  .gulp-tg-ab.go { width: 100%; min-width: 0; }
+}
+
+/* ----- motion ----- */
+@media (prefers-reduced-motion: no-preference) {
+  .gulp-tg-ab,
+  .gulp-tg-ans,
+  .gulp-tg-key { transition: transform 0.08s ease, box-shadow 0.08s ease; }
+  .gulp-tg-sign::before { animation: gulp-tg-bulbs 1s steps(1) infinite; }
+  .gulp-tg-invite { animation: gulp-tg-lit 1.6s ease-in-out infinite; }
+  .gulp-tg-caret { animation: gulp-tg-blink 1s steps(1) infinite; }
+  .gulp-tg-slot .ins { animation: gulp-tg-dim 1.1s steps(1) infinite; }
+  .gulp-tg-spin svg { animation: gulp-tg-spin 1.6s linear infinite; }
+  @keyframes gulp-tg-bulbs {
+    50% { border-color: #fff; }
+  }
+  @keyframes gulp-tg-lit {
+    50% { box-shadow: 0 4px 0 var(--g-ink), 0 0 0 10px rgba(53, 208, 127, 0.25); }
+  }
+  @keyframes gulp-tg-blink {
+    50% { opacity: 0; }
+  }
+  @keyframes gulp-tg-dim {
+    50% { opacity: 0.4; }
+  }
+  @keyframes gulp-tg-spin {
+    to { transform: rotate(360deg); }
+  }
+}

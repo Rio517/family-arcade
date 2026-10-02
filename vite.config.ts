@@ -102,6 +102,7 @@ export default defineConfig({
             'preview-party-states': fileURLToPath(new URL('./preview-party-states.html', import.meta.url)),
             'preview-mirror': fileURLToPath(new URL('./preview-mirror.html', import.meta.url)),
             'preview-gulp': fileURLToPath(new URL('./preview-gulp.html', import.meta.url)),
+            'preview-gulp-together': fileURLToPath(new URL('./preview-gulp-together.html', import.meta.url)),
           },
         }
       : {},
