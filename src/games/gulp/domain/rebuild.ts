@@ -229,12 +229,14 @@ export function rebuild(w: World, events: WorldEvent[]): void {
  * Which waiting lot to work on next, of those due with no hole close by. The
  * airport's and the army base's buildings come first: they are landmarks, and
  * the airport looks empty without them. Then, turn and turn about, the lot nearest
- * the child (so the city grows back where the child can see it, ready to eat
+ * a child (so the city grows back where the child can see it, ready to eat
  * again) and the lot that has waited longest (so no corner of the map is
- * left bare for good). Lots are kept in the order they were eaten.
+ * left bare for good). With several children, the lot nearest each of them
+ * in turn. Lots are kept in the order they were eaten.
  */
 function nextLot(w: World): Lot | null {
-  const me = w.holes.find((h) => h.isPlayer && h.alive);
+  const children = w.holes.filter((h) => h.isPlayer && h.alive);
+  const me = children.length ? children[w.rebuildTurn % children.length] : undefined;
   let oldest: Lot | null = null;
   let nearest: Lot | null = null;
   let nearestD = Infinity;
@@ -251,7 +253,10 @@ function nextLot(w: World): Lot | null {
       }
     }
   }
-  return (w.rng() < 0.5 ? nearest : oldest) ?? oldest;
+  const lot = (w.rng() < 0.5 ? nearest : oldest) ?? oldest;
+  // The next child's turn once one has had a lot nearby.
+  if (lot && lot === nearest) w.rebuildTurn += 1;
+  return lot;
 }
 
 /** One rung above what stood here, no higher than the city's age allows, and it must fit. */

@@ -9,7 +9,7 @@ import { createWorld, endRound, levelOf, stepWorld, type WorldEvent } from './wo
 
 describe('the round', () => {
   it('counts down, plays, and ends on time', () => {
-    const w = createWorld(seededRng(2), { name: 'You', skin: 0 }, [], { duration: 2 });
+    const w = createWorld(seededRng(2), [{ name: 'You', skin: 0 }], [], { duration: 2 });
     expect(w.status).toBe('countdown');
     for (let i = 0; i < 3.1 * 60; i++) stepWorld(w, 1 / 60, still);
     expect(w.status).toBe('playing');
@@ -26,7 +26,7 @@ describe('the round', () => {
   });
 
   it('attract mode is just rivals roaming', () => {
-    const w = createWorld(seededRng(5), null, rivals(5));
+    const w = createWorld(seededRng(5), [], rivals(5));
     expect(w.status).toBe('playing');
     expect(w.holes.every((h) => !h.isPlayer)).toBe(true);
     for (let i = 0; i < 60 * 10; i++) stepWorld(w, 1 / 60, null);

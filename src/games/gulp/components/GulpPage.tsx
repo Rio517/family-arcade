@@ -89,7 +89,7 @@ const SHOWCASE: MapId = 'region';
 function attract(key: number, rng: () => number): Round {
   const map = SHOWCASE;
   const rivals = rivalsFor(-1, MAPS[map].rivals);
-  const world = createWorld(rng, null, rivals, { map, duration: 0, powerups: false, fightBack: false });
+  const world = createWorld(rng, [], rivals, { map, duration: 0, powerups: false, fightBack: false });
   return { world, key, looks: rivals.map((r) => ({ color: SKINS[r.skin].color, label: r.name })), follow: 0, playing: false };
 }
 
@@ -174,7 +174,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     soundsRef.current?.unlock();
     const s = settings;
     const rivals = rivalsFor(s.skin, MAPS[s.map].rivals);
-    const world = createWorld(rng, { name: myName, skin: s.skin }, rivals, {
+    const world = createWorld(rng, [{ name: myName, skin: s.skin }], rivals, {
       map: s.map,
       duration: durationOf(s),
       powerups: s.powerups,
