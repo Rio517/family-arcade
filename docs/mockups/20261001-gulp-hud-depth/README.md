@@ -41,17 +41,21 @@ for good news), the 14px text floor and a visible keyboard focus ring.
   trim, burnt-orange numbers, a slim 70s sunset ring round the clock, domed
   push-buttons, an LED level meter and the map on a little CRT. Name tags are
   retro signs with an orange offset shadow.
-- **D, Kitty.** A cute Japanese arcade game. Candy colours (sky, sunshine,
-  mint) with a plum outline and a hard drop under every piece, and caramel
-  for the player's row, the level stripes and the swallow banner. The hint is
-  a speech bubble and the swallow banner is a ribbon. Game text is white with
-  a plum edge in a chunky rounded Japanese font, M PLUS Rounded 1c Black,
-  bundled as a 7 KB Latin subset so the PWA stays offline. Points tilt like
-  an arcade score.
+- **D, Coin-op.** A happy arcade with thin edges. Cream pieces with a thin
+  ink outline and a small hard drop. A rainbow marquee stripe tops the
+  leaderboard, and the top three ranks are gold, silver and bronze coins.
+  The clock is a red marquee sign ringed with bulbs that flash, and the
+  swallow banner is a purple one. The level meter is a rainbow of LED
+  segments, sound and Pause are round arcade buttons, the hint carries a
+  joystick, and points rise with a coin. Digits are pixel-style (Press
+  Start 2P, a 1 KB digits-only subset) and words are a chunky rounded
+  Japanese font (M PLUS Rounded 1c Black, a 7 KB Latin subset), both
+  bundled so the PWA stays offline. The bulbs stay lit, without flashing,
+  under reduced motion.
 
 ## What each costs
 
-All four are CSS and canvas drawing for the look; D also bundles a font. The layout and the
+All four are CSS and canvas drawing for the look; D also bundles two small fonts and a joystick icon. The layout and the
 components stay, apart from the counters `GulpHud.tsx` stops rendering.
 
 | | `gulp.css` | `canvasTextures.ts` | `effects.ts` | Other |
@@ -59,7 +63,7 @@ components stay, apart from the counters `GulpHud.tsx` stops rendering.
 | A | A light layer and a lip on every piece; the Pause shine behind `prefers-reduced-motion` | Tag: gradient, lip, highlight. Bubble: lip instead of an outline | Points: a coloured side and a shine | — |
 | B | White edge, shadow, grain as an inline SVG, three tilts | A white edge round the tag and bubble | A white edge round the points | `holeView.ts`: the label sprites grow a little to fit the edge |
 | C | Panels, push-buttons, LED meter, CRT map | Sign tag with an offset shadow | Striped sunset fill on the points | — |
-| D | Outlines, ribbon, bubble tail, striped level bar | Tag and bubble in the new font | Tilted numbers in the new font | The font file (OFL licence), loaded with `@font-face` inside Gulp only |
+| D | Marquee stripe and bulbs (flashing behind `prefers-reduced-motion`), coins, LED meter, arcade buttons | Tag and bubble in the new font | Coin points in pixel digits | The two font files (OFL), loaded with `@font-face` inside Gulp only; a joystick icon in `icons.tsx` |
 
 The changes every option shares:
 

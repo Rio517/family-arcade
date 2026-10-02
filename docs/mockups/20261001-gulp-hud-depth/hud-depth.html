@@ -866,12 +866,14 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 }
 
 /* =====================================================================
-   D — Kitty: a cute Japanese arcade game. Candy colours with a plum
-   outline and a hard drop under every piece, caramel for the player,
-   a striped level bar, a speech-bubble hint, a ribbon banner, and game
-   text: white letters with a plum edge in a chunky rounded font
-   (M PLUS Rounded 1c Black, bundled, 7 KB).
-   Each piece can set --bg (fill) and --c (text).
+   D — Coin-op: a happy arcade. Cream pieces with a thin ink outline and
+   a small hard drop, a rainbow marquee stripe on the leaderboard, a red
+   marquee clock ringed with bulbs that flash, gold/silver/bronze coins
+   for the top three, a rainbow LED level meter, round arcade buttons, a
+   joystick on the hint, and pixel digits for the clock and scores.
+   Fonts, both bundled: M PLUS Rounded 1c Black for words (7 KB) and
+   Press Start 2P for digits only (1 KB).
+   Each piece can set --bg (fill), --c (text), --sh (shadows).
    ===================================================================== */
 @font-face {
   font-family: 'Gulp Rounded';
@@ -879,122 +881,151 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   font-weight: 900;
   font-display: block;
 }
+@font-face {
+  font-family: 'Gulp Pixel';
+  src: url('pixel-digits.woff2') format('woff2');
+  font-display: block;
+  unicode-range: U+30-3A, U+2B, U+2C, U+6B;
+}
 .opt-d {
   --kfont: 'Gulp Rounded', var(--round);
-  --plum: #4a2a5e;
-  --caramel: #d99a52; --caramel-t: #efc48a; --caramel-deep: #9a5e22; --caramel-soft: #f5e1c4;
-  --sky: #45bdff; --sky-t: #8ad7ff;
-  --sun: #ffcf2e; --sun-t: #ffe684;
-  --mint: #3fd4a8; --mint-t: #8debd0;
-  --cream: #fffaf4;
-  --dots: radial-gradient(circle, rgba(185, 130, 70, 0.13) 0 2px, transparent 2.5px) 0 0 / 14px 14px;
-  --ring: #4a2a5e;
+  --pix: 'Gulp Pixel', 'Gulp Rounded', var(--round);
+  --ink: #2a1f4a;
+  --paper: #fffaf0;
+  --red: #ff4d5e; --red-t: #ff8a8f;
+  --orange: #ff9f1c;
+  --yellow: #ffd23f; --yellow-t: #ffe98a;
+  --green: #35d07f;
+  --cyan: #2ec4ff; --cyan-t: #9be3ff; --cyan-d: #1590cc;
+  --purple: #7a3cf0; --purple-t: #a77bff;
+  --rainbow: linear-gradient(90deg, #ff4d5e 0%, #ff9f1c 20%, #ffd23f 40%, #35d07f 60%, #2ec4ff 80%, #9b5cff 100%);
+  --coin: radial-gradient(circle at 40% 34%, #fff8c4 0 16%, #ffd23f 20% 58%, #f0a800 62% 100%);
+  --ring: #7a3cf0;
 }
 .opt-d :is(.gulp-board, .gulp-clock, .gulp-level, .gulp-round, .gulp-hint, .gulp-explore, .party-pill, .gulp-minimap) {
-  border: 2.5px solid var(--plum);
-  background: var(--bg, var(--cream));
-  box-shadow: inset 0 0 0 2px var(--rim, rgba(255, 255, 255, 0.85)), 0 var(--drop, 3px) 0 var(--plum), 0 6px 10px rgba(74, 42, 94, 0.25), var(--focus, 0 0 0 0 transparent);
-  color: var(--c, var(--plum));
+  border: 1.5px solid var(--ink);
+  background: var(--bg, var(--paper));
+  box-shadow: var(--sh, inset 0 2px 0 rgba(255, 255, 255, 0.7)), 0 var(--drop, 2px) 0 var(--ink), 0 5px 10px rgba(42, 31, 74, 0.2), var(--focus, 0 0 0 0 transparent);
+  color: var(--c, var(--ink));
   font-family: var(--kfont);
   font-weight: 900;
-  transform: translateY(var(--dy, 0px)) scale(var(--sx, 1), var(--sy, 1));
+  transform: translateY(var(--dy, 0px)) scale(var(--sc, 1));
   backdrop-filter: none;
 }
-.opt-d :is(.gulp-clock, .gulp-round, .gulp-hint, .party-pill) { position: relative; }
-/* Game text: white letters with a plum edge and a hard drop. */
-.opt-d :is(.gulp-clock span, .gulp-lv, .gulp-board li.me, .gulp-pause-label, .party-pill, .gulp-banner strong, .gulp-prize) {
-  color: #fff;
-  -webkit-text-stroke: 4px var(--plum);
-  paint-order: stroke fill;
-  text-shadow: 0 2px 0 var(--plum);
-}
-.opt-d .gulp-board { --bg: var(--dots), var(--cream); border-radius: 18px; padding: 5px; }
+
+/* Leaderboard: a rainbow marquee stripe along the top; coins for the top three. */
+.opt-d .gulp-board { padding: 10px 5px 5px; border-radius: 16px; overflow: hidden; }
+.opt-d .gulp-board::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 5px; background: var(--rainbow); border-bottom: 1.5px solid var(--ink); }
 .opt-d .gulp-board li:not(.gulp-gap) { font-family: var(--kfont); font-weight: 900; }
-.opt-d .gulp-board li.me {
-  background: linear-gradient(180deg, var(--caramel-t) 0%, var(--caramel) 60%);
-  box-shadow: inset 0 0 0 2px var(--plum), inset 0 3px 0 rgba(255, 255, 255, 0.4), 0 2px 0 var(--plum);
-}
-.opt-d .gulp-board li.me .gulp-name,
-.opt-d .gulp-board li.me b { -webkit-text-stroke: 3.5px var(--plum); }
-/* Rank badges: candy buttons. */
-.opt-d .gulp-rank {
-  border: 2px solid var(--plum);
-  background: var(--sky);
-  color: #fff;
-  -webkit-text-stroke: 3px var(--plum);
-  paint-order: stroke fill;
-  text-shadow: none;
-}
-.opt-d li:first-child > .gulp-rank { background: var(--sun); }
-.opt-d li.me > .gulp-rank { background: #fff; color: var(--plum); -webkit-text-stroke: 0; }
-.opt-d .gulp-dot { box-shadow: 0 0 0 2px var(--plum); }
+.opt-d .gulp-board b { font-family: var(--pix); font-size: 14px; font-weight: 400; letter-spacing: -0.5px; }
+.opt-d .gulp-board li.me { background: linear-gradient(180deg, var(--yellow-t) 0%, var(--yellow) 60%); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.opt-d .gulp-rank { border: 1.5px solid var(--ink); background: var(--cyan); color: var(--ink); }
+.opt-d li:nth-child(1) > .gulp-rank { background: var(--coin); color: #5a3d00; box-shadow: inset 0 0 0 2px rgba(201, 138, 0, 0.6); }
+.opt-d li:nth-child(2) > .gulp-rank { background: radial-gradient(circle at 40% 34%, #fff 0 16%, #dfe6f2 20% 58%, #aab6cc 62%); box-shadow: inset 0 0 0 2px rgba(120, 135, 160, 0.5); }
+.opt-d li:nth-child(3) > .gulp-rank { background: radial-gradient(circle at 40% 34%, #ffe2c4 0 16%, #f2a86a 20% 58%, #c9733a 62%); color: #4a2408; box-shadow: inset 0 0 0 2px rgba(150, 80, 30, 0.5); }
+.opt-d li:nth-child(5) > .gulp-rank { background: var(--purple-t); }
+.opt-d li.me > .gulp-rank { background: var(--ink); color: #fff; box-shadow: none; }
+.opt-d .gulp-dot { box-shadow: 0 0 0 1.5px var(--ink); }
 
+/* The clock: a red marquee sign ringed with bulbs. */
 .opt-d .gulp-center { gap: 8px; }
-.opt-d .gulp-clock { --bg: linear-gradient(180deg, var(--sky-t) 0%, var(--sky) 60%); padding: 6px 18px; }
-.opt-d .gulp-clock svg { color: #fff; stroke-width: 2.6; filter: drop-shadow(0 0 0.5px var(--plum)) drop-shadow(0 1.5px 0 var(--plum)); }
-.opt-d .gulp-level { padding: 4px 12px 4px 4px; }
-.opt-d .gulp-lv { border: 2px solid var(--plum); background: linear-gradient(180deg, var(--sun-t) 0%, var(--sun) 60%); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55); }
-.opt-d .gulp-meter { height: 14px; border: 2px solid var(--plum); background: #fff; box-sizing: content-box; }
-.opt-d .gulp-meter-fill { background: repeating-linear-gradient(-45deg, var(--caramel) 0 6px, var(--caramel-t) 6px 12px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5); }
-.opt-d .gulp-next { font-family: var(--kfont); }
-.opt-d .gulp-next b { color: var(--caramel-deep); }
-
-.opt-d .gulp-round { --bg: linear-gradient(180deg, var(--mint-t) 0%, var(--mint) 60%); border-radius: 16px; transition: transform 0.08s ease, box-shadow 0.08s ease; }
-.opt-d .gulp-round svg { stroke-width: 2.4; }
-.opt-d .gulp-round.gulp-pause-btn { --bg: linear-gradient(180deg, var(--sun-t) 0%, var(--sun) 60%); }
-.opt-d .gulp-round:active,
-.opt-d .gulp-round.is-pressed { --dy: 3px; --drop: 0px; --sy: 0.93; }
-/* The hint speaks: a bubble with a tail. */
-.opt-d .gulp-hint { padding: 9px 22px; }
-.opt-d .gulp-hint::after {
+.opt-d .gulp-clock {
+  position: relative;
+  --bg: linear-gradient(180deg, var(--red-t) 0%, var(--red) 55%);
+  --c: #fff;
+  padding: 10px 24px;
+}
+.opt-d .gulp-clock span { font-family: var(--pix); font-size: 22px; font-weight: 400; text-shadow: 0 2px 0 rgba(42, 31, 74, 0.55); }
+.opt-d .gulp-clock svg { stroke-width: 2.4; filter: drop-shadow(0 1.5px 0 rgba(42, 31, 74, 0.55)); }
+.opt-d :is(.gulp-clock, .gulp-banner)::before,
+.opt-d :is(.gulp-clock, .gulp-banner)::after {
   content: '';
   position: absolute;
-  left: 34px;
-  bottom: -8px;
-  width: 13px;
-  height: 13px;
-  background: var(--cream);
-  border-right: 2.5px solid var(--plum);
-  border-bottom: 2.5px solid var(--plum);
-  border-bottom-right-radius: 3px;
-  transform: rotate(45deg);
+  inset: 3px;
+  border: 3px dotted #ffe066;
+  border-radius: inherit;
+  pointer-events: none;
 }
+.opt-d :is(.gulp-clock, .gulp-banner)::after { border-color: #fff; opacity: 0; }
+
+/* Level: a cyan badge and a rainbow LED meter. */
+.opt-d .gulp-level { padding: 4px 12px 4px 4px; }
+.opt-d .gulp-lv { border: 1.5px solid var(--ink); background: linear-gradient(180deg, var(--cyan-t) 0%, var(--cyan) 60%); color: var(--ink); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55); }
+.opt-d .gulp-lv b { font-family: var(--pix); font-size: 17px; font-weight: 400; }
+.opt-d .gulp-meter { height: 12px; padding: 2px; border: 1.5px solid var(--ink); border-radius: 6px; background: #efe8f7; box-sizing: content-box; }
+.opt-d .gulp-meter-fill { border-radius: 3px; background: repeating-linear-gradient(90deg, transparent 0 8px, #efe8f7 8px 10px), var(--rainbow); background-size: auto, 194px 100%; }
+.opt-d .gulp-next { font-family: var(--kfont); }
+.opt-d .gulp-next b { color: var(--purple); }
+
+/* Arcade buttons: round domes in a thin cream bezel. */
+.opt-d .gulp-buttons { gap: 12px; margin: 0 3px; }
+.opt-d .gulp-round {
+  border-radius: 50%;
+  --bg: radial-gradient(circle at 50% 30%, var(--cyan-t) 0%, var(--cyan) 55%, var(--cyan-d) 100%);
+  --c: #fff;
+  --sh: inset 0 3px 1px rgba(255, 255, 255, 0.6), 0 0 0 3px var(--paper), 0 0 0 4.5px var(--ink);
+  --drop: 4px;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.opt-d .gulp-round svg { stroke-width: 2.4; filter: drop-shadow(0 1.5px 0 rgba(42, 31, 74, 0.5)); }
+.opt-d .gulp-round.gulp-pause-btn { border-radius: 999px; --bg: radial-gradient(ellipse at 50% 25%, var(--yellow-t) 0%, var(--yellow) 55%, #f0a800 100%); --c: var(--ink); }
+.opt-d .gulp-round.gulp-pause-btn svg { filter: none; }
+.opt-d .gulp-round:active,
+.opt-d .gulp-round.is-pressed { --dy: 3px; --drop: 1px; --sc: 0.96; }
+
+/* The hint, with a joystick. */
+.opt-d .gulp-hint { display: flex; align-items: center; gap: 8px; padding: 7px 20px 7px 12px; }
+.gulp-joy { display: none; }
+.opt-d .gulp-joy { display: block; flex-shrink: 0; }
 .opt-d .gulp-explore { font-size: 16px; }
-.opt-d .party-pill { --bg: linear-gradient(180deg, var(--caramel-t) 0%, var(--caramel) 60%); font-size: 15px; }
-.opt-d .party-pill svg { color: #fff; stroke-width: 2.2; filter: drop-shadow(0 1.5px 0 var(--plum)); }
-.opt-d .gulp-minimap { --bg: var(--sky); padding: 5px; border-radius: 20px; overflow: visible; }
-.opt-d .gulp-minimap img { border-radius: 14px; box-shadow: 0 0 0 2px #fff; }
-.opt-d :is(button:focus-visible, .is-focus) { outline: 3px solid #fff; outline-offset: 4px; --focus: 0 0 0 10px var(--ring); }
+.opt-d .party-pill { --bg: linear-gradient(180deg, var(--purple-t) 0%, var(--purple) 60%); --c: #fff; font-size: 15px; }
+.opt-d .party-pill svg { stroke-width: 2.2; }
+.opt-d .gulp-minimap { padding: 5px; border-radius: 18px; overflow: visible; }
+.opt-d .gulp-minimap img { border-radius: 12px; box-shadow: 0 0 0 1.5px var(--ink); }
+.opt-d :is(button:focus-visible, .is-focus) { outline: 3px solid #fff; outline-offset: 3px; --focus: 0 0 0 9px var(--ring); }
+.opt-d .gulp-round:is(:focus-visible, .is-focus) { outline-offset: 6px; --focus: 0 0 0 11px var(--ring); }
 .phone.opt-d .gulp-center { gap: 6px; }
-.phone.opt-d .gulp-board { padding: 4px; }
-.phone.opt-d .gulp-clock { padding: 5px 12px; }
-/* In the city: a plum-edged tag, a bubble with a plum edge, tilted game numbers. */
+.phone.opt-d .gulp-clock { padding: 7px 14px; }
+.phone.opt-d .gulp-clock span { font-size: 16px; }
+.phone.opt-d .gulp-clock::before,
+.phone.opt-d .gulp-clock::after { inset: 2px; border-width: 2px; }
+.phone.opt-d .gulp-lv b { font-size: 15px; }
+.phone.opt-d .gulp-buttons { gap: 10px; }
+
+/* In the city: cream tags with a thin outline, a cream bubble, coin points in pixel digits. */
 .opt-d .w-tag {
   font-family: var(--kfont);
   font-weight: 900;
-  border: calc(4px * var(--k)) solid var(--plum);
-  background: var(--plum);
-  color: #fff;
-  box-shadow: 0 calc(4px * var(--k)) 0 rgba(74, 42, 94, 0.55);
+  border: calc(3px * var(--k)) solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 calc(3px * var(--k)) 0 var(--ink);
 }
-.opt-d .w-tag.mine { background: #fff; color: var(--hole); }
-.opt-d .w-bubble {
-  font-family: var(--kfont);
-  border-color: var(--plum);
-  color: var(--caramel-deep);
-  filter: drop-shadow(0 calc(5px * var(--k)) 0 var(--plum));
-}
+.opt-d .w-tag.mine { color: color-mix(in srgb, var(--hole) 85%, #000); }
+.opt-d .w-bubble { font-family: var(--kfont); border-width: calc(4px * var(--k)); border-color: var(--ink); background: var(--paper); color: #e8501e; }
 .opt-d .w-bubble.healthy { color: #1f9a52; }
-.opt-d .w-bubble::before { background: var(--plum); }
+.opt-d .w-bubble::before { background: var(--ink); }
+.opt-d .w-bubble::after { background: var(--paper); }
 .opt-d .w-pop {
-  rotate: -6deg;
-  font-family: var(--kfont);
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6px * var(--k));
+  font-family: var(--pix);
+  font-weight: 400;
   color: #fff;
-  -webkit-text-stroke: calc(10px * var(--k) * var(--t)) var(--plum);
-  filter: drop-shadow(0 calc(5px * var(--k)) 0 var(--plum));
+  -webkit-text-stroke: calc(8px * var(--k) * var(--t)) var(--ink);
+  filter: drop-shadow(0 calc(4px * var(--k)) 0 var(--ink));
 }
-.opt-d .w-pop.big { color: var(--sun); }
-.opt-d .w-pop.huge { color: var(--caramel-t); }
+.opt-d .w-pop::before {
+  content: '';
+  width: 0.9em;
+  height: 0.9em;
+  border-radius: 50%;
+  background: var(--coin);
+  box-shadow: inset 0 0 0 calc(3px * var(--k)) #c98a00, 0 0 0 calc(3px * var(--k)) var(--ink);
+}
+.opt-d .w-pop.big { color: var(--yellow); }
+.opt-d .w-pop.huge { color: var(--cyan-t); }
 
 /* =====================================================================
    Swallowing a hole. Today the banner says who, and the points go on
@@ -1034,37 +1065,34 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .opt-b .gulp-prize { background: #ffc62e; color: #2a1d00; box-shadow: 0 0 0 2.5px #fff, 0 3px 6px rgba(0, 0, 0, 0.3); transform: rotate(3deg); }
 .opt-c .gulp-banner { border: 1.5px solid var(--trim); background: var(--cab); box-shadow: var(--panel-sh); color: var(--brown); }
 .opt-c .gulp-prize { background: linear-gradient(180deg, #ffc566 0%, #ff9a2a 60%, #f68300 100%); color: #2a1300; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 0 var(--trim-l); }
+
+/* D: the banner is a purple marquee with flashing bulbs; the prize is a coin. */
 .opt-d .gulp-banner {
   position: relative;
-  border: 2.5px solid var(--plum);
-  border-radius: 16px;
-  background: linear-gradient(180deg, var(--caramel-t) 0%, var(--caramel) 60%);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6), 0 4px 0 var(--plum);
+  border: 1.5px solid var(--ink);
+  border-radius: 20px;
+  background: linear-gradient(180deg, var(--purple-t) 0%, var(--purple) 60%);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35), 0 3px 0 var(--ink), 0 6px 12px rgba(42, 31, 74, 0.25);
+  color: #fff;
   font-family: var(--kfont);
-  padding: 8px 34px 10px;
+  padding: 14px 32px;
 }
-.opt-d .gulp-banner::before,
-.opt-d .gulp-banner::after {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  top: 18px;
-  width: 40px;
-  height: calc(100% - 22px);
-  border: 2.5px solid var(--plum);
-  background: var(--caramel-deep);
+.opt-d .gulp-banner.good strong { color: #fff; text-shadow: 0 2px 0 rgba(42, 31, 74, 0.6); }
+.opt-d .gulp-prize { gap: 6px; border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink); font-family: var(--kfont); }
+.opt-d .gulp-prize::before { content: ''; width: 18px; height: 18px; border-radius: 50%; background: var(--coin); box-shadow: inset 0 0 0 2px #c98a00, 0 0 0 1.5px var(--ink); }
+.phone.opt-d .gulp-banner { padding: 12px 20px; }
+
+
+/* D's bulbs flash. Off under reduced motion, where they stay lit. */
+@media (prefers-reduced-motion: no-preference) {
+  .opt-d :is(.gulp-clock, .gulp-banner)::after { animation: bulbs 0.8s steps(1, end) infinite; }
+  @keyframes bulbs {
+    50% { opacity: 1; }
+  }
 }
-.opt-d .gulp-banner::before { left: -28px; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 34% 50%); }
-.opt-d .gulp-banner::after { right: -28px; clip-path: polygon(0 0, 100% 0, 66% 50%, 100% 100%, 0 100%); }
-.opt-d .gulp-prize { border: 2px solid var(--plum); background: linear-gradient(180deg, var(--sun-t) 0%, var(--sun) 60%); rotate: -3deg; }
 
-.opt-d .gulp-banner.good strong { color: #fff; }
-.opt-d .gulp-lv small { -webkit-text-stroke-width: 3px; }
-.opt-d .party-pill { -webkit-text-stroke-width: 3.5px; }
-
-.phone.opt-d .gulp-messages > .gulp-banner { margin: 0 22px; padding: 8px 18px 10px; }
-.phone.opt-d .gulp-banner::before { left: -20px; width: 30px; }
-.phone.opt-d .gulp-banner::after { right: -20px; width: 30px; }
+.opt-d .gulp-board b { position: relative; top: 1.5px; }
+.opt-d .w-pop { font-size: calc(34px * var(--k) * var(--t)); }
 
 /* Motion: A's Pause gets a slow shine. Off under reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
@@ -1140,14 +1168,14 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
     { id: 'a', key: 'A', name: 'Toy plastic', line: 'Moulded pieces lit from above: a glossy highlight, a darker lip underneath and a soft shadow on the city. Buttons press down onto their lip.' },
     { id: 'b', key: 'B', name: 'Sticker', line: 'Die-cut stickers: a thick white edge, a soft shadow that lifts them off the city, a faint paper grain. The player’s row, the clock and Pause sit at a slight tilt.' },
     { id: 'c', key: 'C', name: 'Arcade', line: 'A light arcade cabinet: cream laminate with a thin orange trim, burnt-orange numbers, a slim 70s sunset ring round the clock, push-buttons, an LED level meter, the map on a little CRT.' },
-    { id: 'd', key: 'D', name: 'Kitty', line: 'A cute Japanese arcade game: candy colours with a plum outline and a hard drop, caramel for the player\u2019s row and the ribbon banner, a striped level bar, a speech-bubble hint, and white game text with a plum edge in a chunky rounded font.' },
+    { id: 'd', key: 'D', name: 'Coin-op', line: 'A happy arcade: cream pieces with a thin outline, a rainbow marquee stripe on the leaderboard, a red marquee clock ringed with flashing bulbs, gold, silver and bronze coins for the top three, a rainbow LED level meter, round arcade buttons, a joystick on the hint, coins on the points, and pixel digits for the clock and scores.' },
   ];
   const COST = {
     cur: 'Nothing to build. Swallowing a hole scores, but the banner does not say how much and no points rise.',
     a: '<b>Builds in:</b> gulp.css (a light layer and a lip on each piece; a shine on Pause, off under reduced motion), canvasTextures.ts (tags and bubble), effects.ts (block numbers).',
     b: '<b>Builds in:</b> gulp.css (white edge, shadow, grain, three tilts), canvasTextures.ts and effects.ts (a white edge round each label), holeView.ts (labels grow a little).',
     c: '<b>Builds in:</b> gulp.css (panels, push-buttons, LED meter, CRT map), canvasTextures.ts (sign tags with an offset shadow), effects.ts (striped numbers).',
-    d: '<b>Builds in:</b> gulp.css (outlines, ribbon, bubble tail, striped bar), a bundled 7 KB font (M PLUS Rounded 1c Black, OFL), canvasTextures.ts (tags and bubble in the new font), effects.ts (tilted numbers).',
+    d: '<b>Builds in:</b> gulp.css (marquee stripe and bulbs, coins, LED meter, arcade buttons; the bulbs flash only without reduced motion), two bundled fonts (M PLUS Rounded 1c Black for words, 7 KB; Press Start 2P for digits, 1 KB; both OFL), a joystick icon in icons.tsx, canvasTextures.ts (tags and bubble), effects.ts (coin points in pixel digits).',
   };
   const DEVS = {
     ipad: { label: 'iPad', size: '1180 × 820', w: 1180, h: 820, tag: [590, 334], hole: [590, 461], touch: false },
@@ -1201,7 +1229,8 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
     </div>`;
   };
   const swallowed = () => '<div class="gulp-banner good"><strong>You swallowed Nom Nom!</strong><span class="gulp-prize">+25 points</span></div>';
-  const hint = (touch) => `<div class="gulp-hint">${touch ? 'Drag anywhere to move' : 'Point with the mouse, or use the arrow keys'}</div>`;
+  const JOY = '<svg class="gulp-joy" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="12" cy="19.5" rx="8.5" ry="3" fill="#2a1f4a"/><rect x="10.8" y="9" width="2.4" height="10" rx="1.2" fill="#2a1f4a"/><circle cx="12" cy="7.5" r="5" fill="#ff4d5e" stroke="#2a1f4a" stroke-width="1.5"/><circle cx="10.4" cy="6" r="1.5" fill="#fff" opacity=".85"/></svg>';
+  const hint = (touch) => `<div class="gulp-hint">${JOY}<span>${touch ? 'Drag anywhere to move' : 'Point with the mouse, or use the arrow keys'}</span></div>`;
   const minimap = (dev) => `<div class="gulp-minimap-slot"><div class="gulp-minimap"><img src="minimap-${dev}.webp" alt=""></div></div>`;
   const explore = (live) => `<button type="button" class="gulp-explore"${live ? '' : ' tabindex="-1"'}>Explore</button>`;
   const party = (live) => `<div class="party-root"><button type="button" class="party-pill"${live ? '' : ' tabindex="-1"'}>${ICON.party(16)} Play together</button></div>`;
