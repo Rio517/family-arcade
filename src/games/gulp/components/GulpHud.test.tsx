@@ -20,6 +20,20 @@ describe('GulpHud', () => {
     expect(screen.getByTestId('gulp-banner')).toHaveTextContent('Fuel truck!');
   });
 
+  it('lists the friends it waits for as a sentence does', () => {
+    const waitFor = (waiting: string[]) => {
+      const { unmount } = render(
+        <GulpHud hud={{ ...hudOf(round(), 0), waiting }} banners={[]} muted={false} onMute={() => {}} onPause={() => {}} touch={false} />,
+      );
+      const text = screen.getByTestId('gulp-notice').textContent;
+      unmount();
+      return text;
+    };
+    expect(waitFor(['Rio'])).toBe('Waiting for Rio…');
+    expect(waitFor(['Rio', 'Mina'])).toBe('Waiting for Rio and Mina…');
+    expect(waitFor(['Rio', 'Mina', 'Oskar'])).toBe('Waiting for Rio, Mina and Oskar…');
+  });
+
   it('shows no star or hole counters during a round', () => {
     show([]);
     expect(screen.queryByTestId('gulp-kills')).toBeNull();

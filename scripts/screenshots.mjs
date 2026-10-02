@@ -1004,6 +1004,15 @@ const SHOTS = [
     prep: waitForGulpRound,
   },
   {
+    // Three devices dropped, on a phone: the names listed as a sentence does.
+    name: 'gulp-together-waiting-three',
+    path: '/preview-gulp-together.html?s=round-waiting-three',
+    viewport: PHONE,
+    fits: true,
+    expect: '[data-testid="gulp-notice"]',
+    prep: waitForGulpRound,
+  },
+  {
     // A guest's screen when the host's device goes quiet: everything holds still.
     name: 'gulp-together-host-waiting',
     path: '/preview-gulp-together.html?s=round-host-waiting',

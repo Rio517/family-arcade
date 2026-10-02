@@ -28,7 +28,7 @@ import { GulpMenu } from './GulpMenu';
 import { GulpMinimap } from './GulpMinimap';
 import { GulpStage } from './GulpStage';
 import { ResultsCard, type RoundResult } from './ResultsCard';
-import { durationOf, hudOf, loadScene, type Banner, type Hud, type SceneLoader, type Settings } from './round';
+import { durationOf, hudOf, loadScene, namesList, type Banner, type Hud, type SceneLoader, type Settings } from './round';
 import {
   addRound,
   adoptLegacyBests,
@@ -244,7 +244,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
         survivingCells: 0,
         code: GAME_ID,
         game: GAME_ID,
-        opponent: w.holes.filter((h) => h.isPlayer && h !== me).map((h) => h.name).join(' and ') || 'Computer holes',
+        opponent: namesList(w.holes.filter((h) => h.isPlayer && h !== me).map((h) => h.name)) || 'Computer holes',
         finishedAt: now,
       });
     },
