@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gulp phone HUD</title>
+<style>
+  :root {
+    --bg: #1d1f33;
+    --card: #fff8ec;
+    --ink: #2a1f4a;
+    --muted: #6b6488;
+    --accent: #8b5cf6;
+    --good: #1f9a52;
+    --bad: #c2362b;
+    --line: #e6dccb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--card);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 1400px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.2; }
+  .lede { margin: 0 0 20px; max-width: 70ch; color: #d8d2ec; }
+  .problem {
+    display: grid;
+    grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+    margin: 0 0 28px;
+    padding: 16px;
+    border-radius: 18px;
+    background: #2a2c45;
+  }
+  .problem img { width: 100%; border-radius: 12px; display: block; }
+  .problem h2 { margin: 0 0 6px; font-size: 20px; }
+  .problem ul { margin: 0; padding-left: 20px; }
+  .problem li { margin: 4px 0; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 16px; }
+  .bar span { color: #d8d2ec; font-weight: 600; }
+  .bar button {
+    min-height: 44px;
+    padding: 0 16px;
+    border: 2px solid #4a4c6e;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--card);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .bar button[aria-pressed="true"] { background: var(--card); color: var(--ink); border-color: var(--card); }
+  .bar button:focus-visible { outline: 3px solid #ffd23f; outline-offset: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .opt {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 18px;
+    background: var(--card);
+    color: var(--ink);
+  }
+  .opt.today { background: #e9e4f5; }
+  .opt h3 { margin: 0; font-size: 20px; line-height: 1.2; }
+  .tag {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 1px 10px;
+    border-radius: 999px;
+    background: var(--ink);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 800;
+    vertical-align: 2px;
+  }
+  .opt.today .tag { background: var(--muted); }
+  .rec { color: var(--good); font-size: 14px; font-weight: 800; }
+  .opt p { margin: 0; }
+  .opt img { width: 100%; height: auto; border-radius: 12px; display: block; background: #ccc; }
+  .opt ul { margin: 0; padding-left: 20px; }
+  .opt li { margin: 3px 0; }
+  .plus::marker { content: "+  "; color: var(--good); font-weight: 800; }
+  .minus::marker { content: "–  "; color: var(--bad); font-weight: 800; }
+  .check { font-size: 14px; color: var(--muted); }
+  .check b { color: var(--good); }
+  .opt.today .check b { color: var(--bad); }
+  footer { margin-top: 28px; max-width: 80ch; color: #d8d2ec; font-size: 15px; }
+  @media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) {
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .problem { grid-template-columns: minmax(0, 1fr); }
+    .problem img { max-width: 240px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Gulp on a phone: room for the scores</h1>
+  <p class="lede">On a phone, the leaderboard tray is 140px wide and shares the top row with the clock, the level meter and the buttons. Most phones don't have room for all of that, and four-digit scores don't fit in the tray. Each option below gives the tray room for a full score and moves one other piece. Nothing changes on iPad.</p>
+
+  <section class="problem" aria-labelledby="today-h">
+    <img src="real-round-393.webp" alt="A real Medium round on a 393px phone: the clock covers the right half of the leaderboard, hiding every score.">
+    <div>
+      <h2 id="today-h">Today, in a real round on a 393px phone (iPhone 15 size)</h2>
+      <ul>
+        <li>The clock and the level meter sit on top of the tray, so the scores are hidden from the start of the round.</li>
+        <li>Score digits are square pixels, so "9,999" is 67.5px wide. The tray has 61px left for the name and the score together, and every score of 1,000 or more is cut off, at every difficulty. Medium rounds end at about 4,000 to 5,000.</li>
+        <li>Two power-ups running overlap the level meter at 375 and 393px.</li>
+        <li>Only the 430px phone clears the clock, by 3px, and its scores are still cut off.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="bar" role="group" aria-label="Phone width">
+    <span>Phone width:</span>
+    <button type="button" data-w="375" aria-pressed="false">375 (small)</button>
+    <button type="button" data-w="393" aria-pressed="true">393 (most phones)</button>
+    <button type="button" data-w="430" aria-pressed="false">430 (large)</button>
+  </div>
+
+  <div class="grid">
+    <article class="opt today">
+      <h3><span class="tag">Today</span>As it ships</h3>
+      <img data-o="today" src="today-393.webp" alt="Today's phone HUD">
+      <p class="check">Checked at 375, 393 and 430 in Chromium and WebKit: <b>overlaps and cut-off scores at every width</b>.</p>
+    </article>
+
+    <article class="opt">
+      <h3><span class="tag">A</span>Clock on the right <span class="rec">Recommended</span></h3>
+      <img data-o="a" src="a-393.webp" alt="Option A: the tray top left, with the clock, level meter and power-ups down the right under the buttons">
+      <p>The tray stays top left and grows to fit. The clock, the level meter and the power-ups line up down the right side, under the buttons.</p>
+      <ul>
+        <li class="plus">Your rank and score stay in the corner where they are on every screen.</li>
+        <li class="plus">Everything about the round's time and power sits in one column.</li>
+        <li class="minus">The clock leaves the middle; on iPad it stays centred.</li>
+      </ul>
+      <p class="check">Checked at 375, 393 and 430 in Chromium and WebKit: <b>no overlaps, every score whole</b>.</p>
+    </article>
+
+    <article class="opt">
+      <h3><span class="tag">B</span>Tray under the clock</h3>
+      <img data-o="b" src="b-393.webp" alt="Option B: the clock and level meter centred on the top row, the tray below them on the left">
+      <p>The clock and the level meter keep the middle of the top row, as on iPad. The tray drops below them on the left, and the power-ups sit beside it on the right.</p>
+      <ul>
+        <li class="plus">The top row looks the same on a phone and on iPad.</li>
+        <li class="minus">The tray sits about 90px lower, a little closer to the hole.</li>
+        <li class="minus">The top left corner is empty.</li>
+      </ul>
+      <p class="check">Checked at 375, 393 and 430 in Chromium and WebKit: <b>no overlaps, every score whole</b>.</p>
+    </article>
+
+    <article class="opt">
+      <h3><span class="tag">C</span>Tray at the bottom</h3>
+      <img data-o="c" src="c-393.webp" alt="Option C: clock, level meter and buttons on the top row, the tray bottom left beside the mini map">
+      <p>The top row is the clock, the level meter and the buttons. The tray moves to the bottom left, level with the mini map, and the messages sit above both.</p>
+      <ul>
+        <li class="plus">The calmest top of the three, with the tray and the map together.</li>
+        <li class="minus">A thumb that drags near the bottom left covers the tray.</li>
+        <li class="minus">The biggest change from iPad, where the tray is top left.</li>
+      </ul>
+      <p class="check">Checked at 375, 393 and 430 in Chromium and WebKit: <b>no overlaps, every score whole</b>; it clears the Play together button by 8px.</p>
+    </article>
+  </div>
+
+  <footer>
+    <p>Every picture is the real game: the HUD components and the 3D city from a production build, with phone layout rules added for each option. The tray is 200px wide in all three, which fits a four-digit score beside the rank coin, a name of at least three letters and the lives. The round is held still with the longest likely values: "Captain Crumbs" at 9,999, both power-ups running, and the player fourth, so the tray shows its tallest version. The names are examples. The harness is <code>preview-gulp-hud.html?o=a</code> (or b or c) in a <code>BUILD_HARNESS=1</code> build.</p>
+  </footer>
+</main>
+<script>
+  const buttons = document.querySelectorAll('.bar button');
+  const pick = (w) => {
+    buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.w === w)));
+    document.querySelectorAll('img[data-o]').forEach((img) => { img.src = `${img.dataset.o}-${w}.webp`; });
+  };
+  buttons.forEach((b) => b.addEventListener('click', () => pick(b.dataset.w)));
+</script>
+</body>
+</html>
