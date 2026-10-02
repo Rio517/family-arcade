@@ -1,6 +1,7 @@
 import { util } from 'peerjs';
 import { describe, expect, it } from 'vitest';
 import { MAPS } from '../domain/city';
+import { AWAY_WAIT } from '../domain/holes';
 import { rivals } from '../domain/testing';
 import type { Input } from '../domain/world';
 import { isGulpMsg, type GulpMsg, type RoundSettings } from './protocol';
@@ -191,6 +192,57 @@ describe('a Gulp table', () => {
     play(net, host, [again], 2, (i) => ({ x: i ? 1 : 0, z: 0 }));
     expect(again.world!.props.size).toBe(world.props.size);
     expect(host.seats.map((s) => s.connected)).toEqual([true, true]);
+  });
+
+  it('a guest gone quiet drops out: its hole waits, a computer plays it, and it is the guest\'s again on return', () => {
+    const { net, host, guests } = seat(1);
+    const world = start(host, 2);
+    net.flush();
+    play(net, host, guests, 5, (i) => ({ x: i ? 1 : 0, z: 0 }));
+    // The guest's app is put away: its link stays open, but it says nothing.
+    const hostOnly = (secs: number) => {
+      for (let f = 0; f < secs / DT; f++) {
+        host.hostStep(DT, { x: 0, z: 0 });
+        net.flush();
+      }
+    };
+    hostOnly(4);
+    const friend = world.holes[1];
+    expect(friend.away).not.toBeNull();
+    expect(world.brains[1]).toBeNull();
+    hostOnly(AWAY_WAIT);
+    expect(world.brains[1]).not.toBeNull();
+    // Back again: the hole is the guest's, and both devices have it in the same place.
+    play(net, host, guests, 2, (i) => ({ x: i ? -1 : 0, z: 0 }));
+    expect(friend.away).toBeNull();
+    expect(world.brains[1]).toBeNull();
+    const mine = guests[0].world!.holes[1];
+    expect(Math.hypot(mine.x - friend.x, mine.z - friend.z)).toBeLessThan(mine.r + 2);
+  });
+
+  it('a host gone for a minute: the guest waits, then its round ends with the standings it had', () => {
+    const { net, host, guests } = seat(1);
+    start(host, 2);
+    net.flush();
+    play(net, host, guests, 5, () => ({ x: 0, z: 0 }));
+    const guest = guests[0];
+    const guestOnly = (secs: number) => {
+      for (let f = 0; f < secs / DT; f++) guest.guestStep(DT, { x: 1, z: 0 });
+    };
+    guestOnly(2);
+    expect(guest.hostWaiting).toBe(true);
+    // Waiting, the guest's own hole stays where the host last had it.
+    const mine = guest.world!.holes[1];
+    const x = mine.x;
+    guestOnly(1);
+    expect(Math.abs(mine.x - x)).toBeLessThan(0.5);
+    guestOnly(58);
+    expect(guest.endedEarly).toBe(true);
+    expect(guest.world!.status).toBe('over');
+    expect(guest.order).toHaveLength(guest.world!.holes.length);
+    // The host turns up after all: this round stays over on the guest's device.
+    play(net, host, guests, 1, () => ({ x: 0, z: 0 }));
+    expect(guest.world!.status).toBe('over');
   });
 
   it('tells every guest the standings when the round ends', () => {

@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { FIT, type Prop } from '../domain/catalog';
-import { POWER_TIME, type Hole } from '../domain/world';
+import { POWER_TIME, waiting, type Hole } from '../domain/world';
 import { BUBBLE_HEIGHT, auraTexture, bubbleTexture, countTexture, labelTexture, smearTexture, type Smear } from './canvasTextures';
 import type { Effects } from './effects';
 import { THROAT_DEPTH, throatRadius } from './fall';
@@ -384,12 +384,14 @@ export class HoleViews {
     // is theirs, and the tag would sit up under the scoreboard. It also steps
     // aside while the hole speaks, so the bubble does not sit half over it.
     const speaking = this.bubble !== null && this.bubble.hole === h.id && this.bubble.life > 0;
-    if (h.isPlayer) obj.label.visible = r < 9 && !speaking;
+    // A child's hole waiting for their device keeps its tag, so everyone sees whose it is.
+    const away = waiting(h);
+    if (h.isPlayer) obj.label.visible = (r < 9 || away) && !speaking;
     else obj.label.visible = !speaking;
     this.syncPowerShow(obj, h, r);
 
-    // Blinking while it is safe after coming back.
-    const blink = h.safe > 0 && !this.reducedMotion ? 0.55 + 0.45 * Math.sin(time * 18) : 1;
+    // Faint while it waits for its device; blinking while it is safe after coming back.
+    const blink = away ? 0.4 : h.safe > 0 && !this.reducedMotion ? 0.55 + 0.45 * Math.sin(time * 18) : 1;
     for (const m of obj.materials) {
       m.transparent = blink < 1;
       m.opacity = blink;

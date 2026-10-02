@@ -56,12 +56,27 @@ export interface Hole {
   /** Things eaten in a row, each within COMBO_WINDOW of the last. */
   streak: number;
   comboTime: number;
+  /**
+   * Seconds since this child's device dropped out of a shared round, or null
+   * while it is here. The hole waits for it (see AWAY_WAIT).
+   */
+  away: number | null;
 }
 
 export type HurtCause = 'chem' | 'tanker' | 'bomb';
 
 /** Seconds a swallowed hole waits before it comes back. */
 export const RESPAWN = 3;
+/**
+ * Seconds a child's hole waits for its dropped device: it stands still, can
+ * neither swallow nor be swallowed, and the city leaves it alone. After that
+ * a computer brain plays it until the device is back, so the round stays
+ * lively.
+ */
+export const AWAY_WAIT = 20;
+
+/** Waiting for its device to come back (see AWAY_WAIT). */
+export const waiting = (h: Hole): boolean => h.away !== null && h.away < AWAY_WAIT;
 /**
  * Lives each hole starts a round with: on Medium five, on Hard three, for
  * the children and every computer hole alike. Easy has none to lose (no one
@@ -124,6 +139,7 @@ export function newHole(id: number, name: string, skin: number, isPlayer: boolea
     comboTime: 0,
     wonders: 0,
     wonderKinds: [],
+    away: null,
   };
 }
 
@@ -202,7 +218,7 @@ export function gobble(w: World, h: Hole, p: Prop, events: WorldEvent[]): void {
 /** Every hole swallows any hole it is much bigger than and nearly covers. */
 export function eatHoles(w: World, events: WorldEvent[]): void {
   for (const a of w.holes) {
-    if (!a.alive) continue;
+    if (!a.alive || waiting(a)) continue;
     for (const b of w.holes) {
       if (a === b || !b.alive || b.safe > 0) continue;
       // On Easy nobody swallows a child, neither a computer hole nor another

@@ -5,7 +5,7 @@
  */
 import { MAPS, type MapId, type Side } from '../domain/city';
 import type { Difficulty } from '../domain/rivals';
-import { EAT_HOLE, POWER_TIME, comboOf, levelOf, levelProgress, nextLabel, standings, type World } from '../domain/world';
+import { EAT_HOLE, POWER_TIME, comboOf, levelOf, levelProgress, nextLabel, standings, waiting, type World } from '../domain/world';
 import type { Settings } from '../storage/settings';
 import type { GulpScene } from '../three/scene';
 import { SKINS } from './skins';
@@ -71,6 +71,8 @@ export interface Hud {
   elapsed: number;
   /** Arrows at the edge of the screen toward danger on its way: attacks coming for the child, and bigger holes close by. */
   pointers: Pointer[];
+  /** Other children whose holes wait for their dropped devices, by name. */
+  waiting: string[];
 }
 
 export interface Pointer {
@@ -130,6 +132,7 @@ export function hudOf(w: World, me: number): Hud {
     respawnIn: Math.max(1, Math.ceil(h.respawnIn)),
     elapsed: w.elapsed,
     pointers: h.alive ? pointersFor(w, h) : [],
+    waiting: w.holes.filter((o) => o.id !== me && waiting(o)).map((o) => o.name),
   };
 }
 

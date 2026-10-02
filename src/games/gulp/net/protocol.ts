@@ -235,9 +235,10 @@ function isClock(v: unknown): v is ClockWire {
 }
 
 function isHole(v: unknown): v is HoleWire {
-  if (!isTuple(v, 16) || !v.every(isNum)) return false;
+  if (!isTuple(v, 17) || !v.every(isNum)) return false;
   const [, , , , r, score, lives, alive, respawnIn, ...rest] = v as number[];
-  return r > 0 && score >= 0 && lives >= -1 && (alive === 0 || alive === 1) && respawnIn >= -1 && rest.every((n) => n >= 0);
+  const away = rest.pop()!;
+  return r > 0 && score >= 0 && lives >= -1 && (alive === 0 || alive === 1) && respawnIn >= -1 && rest.every((n) => n >= 0) && away >= -1;
 }
 
 const isPower = (v: unknown): v is PowerWire =>

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { makeProp } from './catalog';
 import { MAPS, type MapId } from './city';
 import { speedOf } from './growth';
-import { LIVES } from './holes';
+import { AWAY_WAIT, LIVES } from './holes';
 import { POWER_SPEED } from './powerups';
 import { steerRival, type Difficulty } from './rivals';
 import { grow, only, round, still, together } from './testing';
-import { standings, stepWorld, type HoleReport, type World, type WorldEvent } from './world';
+import { comeBack, dropOut, standings, stepWorld, type HoleReport, type World, type WorldEvent } from './world';
 
 const MAP_IDS: MapId[] = ['town', 'city', 'mega', 'region'];
 const LEVELS: Difficulty[] = ['easy', 'medium', 'hard'];
@@ -183,6 +183,70 @@ describe('several children in one round', () => {
     step(v);
     expect(v.status).toBe('over');
     expect(v.endedBy).toBe('last');
+  });
+});
+
+describe('a child whose device drops out', () => {
+  it('their hole waits, still and safe: it swallows nobody, nobody swallows it, and it eats nothing', () => {
+    const w = quiet('medium');
+    const [me, friend] = w.holes;
+    dropOut(w, 1);
+    const at = { x: friend.x, z: friend.z };
+    // A report that turns up late is no use: the hole stays where it was.
+    step(w, report(1, { x: at.x + 1, z: at.z, vx: 6, vz: 0 }));
+    expect({ x: friend.x, z: friend.z, vx: friend.vx }).toEqual({ ...at, vx: 0 });
+    expect(friend.safe).toBeGreaterThan(0);
+    grow(w, 0, 400);
+    me.x = at.x + 1;
+    me.z = at.z;
+    expect(step(w).filter((e) => e.type === 'gulp')).toEqual([]);
+    grow(w, 0, 0);
+    grow(w, 1, 400);
+    only(w, [makeProp(1, 'cone', at.x - 2, at.z, 0)]);
+    expect(step(w).filter((e) => e.type === 'gulp' || e.type === 'eat')).toEqual([]);
+    expect(me.alive).toBe(true);
+    expect(w.props.has(1)).toBe(true);
+  });
+
+  it('after a while a computer brain plays their hole, and hands it back when the device returns', () => {
+    const w = quiet('medium');
+    const friend = w.holes[1];
+    dropOut(w, 1);
+    for (let t = 0; t < AWAY_WAIT - 1; t += 1 / 60) step(w);
+    expect(w.brains[1]).toBeNull();
+    for (let t = 0; t < 2; t += 1 / 60) step(w);
+    expect(w.brains[1]).not.toBeNull();
+    // A moment of safety as the wait ends, as after coming back; then it plays like anyone.
+    expect(friend.safe).toBe(0);
+    expect(comeBack(w, 1)).toBe(true);
+    expect(w.brains[1]).toBeNull();
+    expect(friend.away).toBeNull();
+    const x = friend.x;
+    step(w, report(1, { x: x + 0.1, z: friend.z, vx: 6, vz: 0 }));
+    expect(friend.x).toBeCloseTo(x + 0.1, 9);
+    // Back before the wait was over: nobody played it.
+    dropOut(w, 1);
+    step(w);
+    expect(comeBack(w, 1)).toBe(false);
+  });
+
+  it("the rivals' kindness is measured against the children still playing", () => {
+    const w = quiet('easy', 2, 1);
+    const [me, friend] = w.holes;
+    me.score = 500;
+    friend.score = 0;
+    dropOut(w, 1);
+    const brain = { skill: 0.7, pace: 1, target: null, rethink: 0, wobble: 0 };
+    const rival = w.holes[2];
+    rival.score = 600;
+    steerRival(brain, rival, w, 1 / 60, me);
+    const near = brain.pace;
+    steerRival(brain, rival, w, 1 / 60, friend);
+    // Measured against the friend far behind, a rival would crawl; the step uses me.
+    expect(brain.pace).toBeLessThan(near);
+    w.brains[2] = brain;
+    step(w);
+    expect(brain.pace).toBeCloseTo(near, 9);
   });
 });
 

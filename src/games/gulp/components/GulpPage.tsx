@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
+import { useWakeLock } from '@shared/ui/useWakeLock';
 import { useDialogFocus } from './useDialogFocus';
 import { recordResultFor } from '@shared/profile/results';
 import { useProfile } from '@shared/profile/useProfile';
@@ -339,6 +340,8 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     return () => window.removeEventListener('keydown', key);
   }, [phase]);
   useDismissOnEscape(phase === 'over', toMenu);
+  // A shared round stops for everyone when the host's screen sleeps, and for a guest when theirs does.
+  useWakeLock(!!round.shared && phase === 'play');
   // The pause and results cards keep keyboard focus while they are open.
   const pauseRef = useRef<HTMLDivElement | null>(null);
   const resultsRef = useRef<HTMLDivElement | null>(null);
@@ -349,7 +352,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
   const hostName = table.seats[0]?.name ?? 'your friend';
   const linkDown = table.role === 'guest' && table.status !== 'connected';
   const selectStatus = linkDown ? (table.status === 'dialing' ? `Finding ${hostName}'s game…` : 'Reconnecting…') : null;
-  const roundNotice = linkDown ? `Waiting for ${hostName}…` : null;
+  const roundNotice = linkDown || table.hostWaiting ? `Waiting for ${hostName}…` : null;
   const mine = table.seats[table.mySeat];
   const swapNote =
     mine && mine.skin !== settings.skin ? `${SKINS[settings.skin % SKINS.length].name} was taken, so you got ${SKINS[mine.skin % SKINS.length].name}` : null;
@@ -567,6 +570,11 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
                 </section>
               </div>
             </div>
+            {round.shared && table.endedEarly && (
+              <p className="gulp-again-note" data-testid="gulp-ended-early">
+                {hostName}&apos;s game stopped, so the round ended early.
+              </p>
+            )}
             {round.shared && together.again && <p className="gulp-again-note">{together.again} wants to play again!</p>}
             {round.shared && asked && <p className="gulp-again-note">Asked {hostName} for another round!</p>}
             <div className="gulp-modal-row">

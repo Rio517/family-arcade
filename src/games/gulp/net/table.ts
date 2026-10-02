@@ -21,7 +21,7 @@
  */
 import { GameHost } from '@shared/net/host';
 import { GameConnection, type ConnStatus } from '@shared/net/peer';
-import { stepWorld, type HoleReport, type Input, type Racer, type World, type WorldEvent } from '../domain/world';
+import { comeBack, dropOut, standings, stepWorld, type HoleReport, type Input, type Racer, type World, type WorldEvent } from '../domain/world';
 import { reportFrom, snapshotOf, tickOf } from './codec';
 import { applySnapshot, applyTick, createMirror, reportOf, stepMirror, type Mirror } from './mirror';
 import { GULP_PREFIX, MAX_CHILDREN, isGulpMsg, type GulpMsg, type RoundSettings, type Seat, type SnapshotMsg, type StartMsg, type TickMsg } from './protocol';
@@ -31,6 +31,12 @@ export type Role = 'host' | 'guest';
 
 /** How often the host ticks and a guest reports, in seconds (20 a second). */
 const SEND_EVERY = 0.05;
+/** Host: a guest silent this long, link or no link, has dropped out; its hole waits for it. */
+const GUEST_SILENT = 3;
+/** Guest: the host silent this long, the round waits and says so. */
+const HOST_SILENT = 1.5;
+/** Guest: the host silent this long, the round is over on this device with the standings as they were. */
+const HOST_GONE = 60;
 
 /** What the host's link must do: `GameHost` in the game, a fake in tests. */
 export interface HostLink {
@@ -108,6 +114,10 @@ export class GulpTable {
   order: number[] | null = null;
   /** My seat at the table: 0 for the host, the one the host gave a guest. */
   mySeat = 0;
+  /** Guest: the host has gone quiet in the round, so it waits. */
+  hostWaiting = false;
+  /** Guest: the host stayed away and this device ended the round (see HOST_GONE). */
+  endedEarly = false;
 
   private hostSeats: HostSeat[] = [];
   private hostLink: HostLink | null = null;
@@ -125,6 +135,11 @@ export class GulpTable {
   /** Guest: the host has sent its seat list since I dialled. */
   private seated = false;
   private lastStart: Omit<StartMsg, 'you'> | null = null;
+  /** Host: seconds of the round so far, and when each guest's hole was last reported, by hole. */
+  private clock = 0;
+  private heard = new Map<number, number>();
+  /** Guest: seconds since the host last said anything. */
+  private hostQuiet = 0;
 
   constructor(
     private me: Me,
@@ -184,6 +199,10 @@ export class GulpTable {
     this.inbox = [];
     this.reports.clear();
     this.lastPos.clear();
+    this.heard.clear();
+    this.hostQuiet = 0;
+    this.hostWaiting = false;
+    this.endedEarly = false;
   }
 
   /** Host: the menu changed. */
@@ -217,6 +236,8 @@ export class GulpTable {
     this.world = buildRound(this.lastStart);
     this.reports.clear();
     this.lastPos.clear();
+    this.clock = 0;
+    this.heard = new Map(playing.map((s) => [s.hole!, 0]));
     this.pending = [];
     this.seq = 0;
     this.since = 0;
@@ -232,6 +253,11 @@ export class GulpTable {
   hostStep(dt: number, input: Input | null): WorldEvent[] {
     const w = this.world;
     if (!w) return [];
+    this.clock += dt;
+    // A guest gone quiet has dropped out, whether or not its link has closed yet.
+    for (const s of this.hostSeats.slice(1)) {
+      if (s.hole !== null && (!s.connected || this.clock - (this.heard.get(s.hole) ?? 0) > GUEST_SILENT)) dropOut(w, s.hole);
+    }
     const events = stepWorld(w, dt, input, this.reports);
     this.pending.push(...events);
     this.since += dt;
@@ -254,6 +280,23 @@ export class GulpTable {
     const m = this.mirror;
     if (!m) return [];
     const events: WorldEvent[] = [];
+    if (this.endedEarly) return events;
+    this.hostQuiet += dt;
+    const waiting = this.hostQuiet > HOST_SILENT && m.world.status !== 'over';
+    if (waiting !== this.hostWaiting) {
+      this.hostWaiting = waiting;
+      this.events.onChange();
+    }
+    if (this.hostQuiet > HOST_GONE && m.world.status !== 'over') {
+      // The host never came back: the round ends here, as it stood.
+      m.world.status = 'over';
+      m.world.endedBy = 'ended';
+      this.order = standings(m.world).map((h) => h.id);
+      this.endedEarly = true;
+      this.hostWaiting = false;
+      this.events.onChange();
+      return events;
+    }
     for (const msg of this.inbox.splice(0)) {
       if (msg.t === 'tick') events.push(...applyTick(m, msg));
       else {
@@ -266,7 +309,8 @@ export class GulpTable {
       this.asked = true;
       this.guestLink?.send({ t: 'resync' });
     }
-    events.push(...stepMirror(m, dt, input));
+    // While the host is quiet my hole waits too, so it is where the host has it when the host is back.
+    events.push(...stepMirror(m, dt, this.hostWaiting ? null : input));
     this.since += dt;
     if (this.since >= SEND_EVERY) {
       this.since = 0;
@@ -298,6 +342,10 @@ export class GulpTable {
         this.lastPos.set(seat.hole, m.seq);
         // With the life it was sent in, so one from before a respawn is ignored.
         this.reports.set(seat.hole, reportFrom(m));
+        this.heard.set(seat.hole, this.clock);
+        // Back from a quiet spell: the hole is the child's again, and if a brain
+        // played it meanwhile, the device hears where it is now.
+        if (comeBack(this.world, seat.hole)) this.hostLink?.send(guestId, snapshotOf(this.world, this.seq));
         break;
       }
       case 'resync':
@@ -335,6 +383,9 @@ export class GulpTable {
       // Its own round: the start first if it lost it, then where things stand.
       if (!inRound) this.hostLink?.send(guestId, { ...this.lastStart, you: seat.hole });
       this.lastPos.delete(seat.hole);
+      // Its hole is its own again; a reloaded device has a few seconds to build the city.
+      comeBack(w, seat.hole);
+      this.heard.set(seat.hole, this.clock);
       this.hostLink?.send(guestId, snapshotOf(w, this.seq));
     }
   }
@@ -346,7 +397,10 @@ export class GulpTable {
     seat.guestId = null;
     // In the lobby the seat is given up; in a round it is kept for the child's return.
     if (seat.hole === null || !this.world || this.world.status === 'over') this.hostSeats.splice(this.hostSeats.indexOf(seat), 1);
-    else this.reports.delete(seat.hole);
+    else {
+      this.reports.delete(seat.hole);
+      dropOut(this.world, seat.hole);
+    }
     this.sendLobby();
   }
 
@@ -379,6 +433,7 @@ export class GulpTable {
   // ── guest side ────────────────────────────────────────────────────────
 
   private fromHost(m: GulpMsg): void {
+    this.hostQuiet = 0;
     switch (m.t) {
       case 'lobby':
         this.settings = m.settings;
@@ -391,6 +446,8 @@ export class GulpTable {
         this.events.onChange();
         break;
       case 'start':
+        this.endedEarly = false;
+        this.hostWaiting = false;
         this.mirror = createMirror(m);
         this.world = this.mirror.world;
         this.inbox = [];
@@ -404,9 +461,10 @@ export class GulpTable {
       case 'tick':
       case 'snap':
         // Played in the frame loop, in order, so the scene sees them as they land.
-        if (this.mirror) this.inbox.push(m);
+        if (this.mirror && !this.endedEarly) this.inbox.push(m);
         break;
       case 'over':
+        if (this.endedEarly) break;
         this.order = m.order;
         this.events.onChange();
         break;
