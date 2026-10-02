@@ -5,13 +5,14 @@
  * behind Options, with the difficulty named on the Options button. The
  * trophy beside Options opens the family's scores.
  */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { PlayingAs } from '@shared/profile/PlayingAs';
 import { CloseIcon, TrophyIcon } from '@shared/ui/icons';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { MAPS, type MapId } from '../domain/city';
 import type { Difficulty } from '../domain/rivals';
 import { ScoresDialog } from './ScoresDialog';
+import { PlayRow } from './together/PlayRow';
 import { SKINS } from './skins';
 import { DIFFICULTY_TITLE, MAP_ORDER, type Settings } from './round';
 import type { ScoreRound } from '../storage/scores';
@@ -39,6 +40,8 @@ export function GulpMenu({
   settings,
   onChange,
   onPlay,
+  onFriends,
+  invite,
   best,
   rounds,
   userId,
@@ -46,6 +49,10 @@ export function GulpMenu({
   settings: Settings;
   onChange: (s: Settings) => void;
   onPlay: () => void;
+  /** PLAY WITH FRIENDS: a round with friends, each on their own device. */
+  onFriends: () => void;
+  /** A linked friend's game, ready to join: shown above the play buttons. */
+  invite?: ReactNode;
   best: number;
   /** Every round kept on this device, for the Scores dialog. */
   rounds: ScoreRound[];
@@ -135,10 +142,9 @@ export function GulpMenu({
               <small data-testid="gulp-difficulty-shown">{level.title}</small>
             </span>
           </button>
-          <button type="button" className="gulp-play" onClick={onPlay} data-testid="gulp-play">
-            PLAY
-          </button>
         </div>
+        {invite}
+        <PlayRow onPlay={onPlay} onFriends={onFriends} />
         {best > 0 && (
           <p className="gulp-foot">
             Best on {MAPS[settings.map].label}

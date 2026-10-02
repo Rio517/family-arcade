@@ -19,7 +19,7 @@ import { useProfile } from '@shared/profile/useProfile';
 import { SpeakerIcon, SpeakerOffIcon, TrophyIcon } from '@shared/ui/icons';
 import { KINDS } from '../domain/catalog';
 import { MAPS, type MapId } from '../domain/city';
-import { createWorld, endRound, levelOf, standings, type World, type WorldEvent } from '../domain/world';
+import { createWorld, endRound, levelOf, standings, type Input, type World, type WorldEvent } from '../domain/world';
 import type { HoleLook } from '../three/scene';
 import { feedbackFor, type Said } from './feedback';
 import { GulpHud } from './GulpHud';
@@ -43,6 +43,11 @@ import {
 import { dealRoundWonders, loadSettings, saveSettings } from '../storage/settings';
 import { SKINS, rivalsFor } from './skins';
 import { Sounds } from './sounds';
+import { CodeKeys } from './together/CodeKeys';
+import { JoinCard } from './together/JoinCard';
+import { PlayerSelect } from './together/PlayerSelect';
+import { WhoStarts } from './together/WhoStarts';
+import { useTogether, type SharedRound } from './useTogether';
 
 /** The registry id — the `game` on a credited history row. */
 const GAME_ID = 'gulp';
@@ -61,6 +66,18 @@ interface Round {
   looks: HoleLook[];
   follow: number;
   playing: boolean;
+  /** Played with friends on other devices: it never pauses, and the table steps it. */
+  shared?: boolean;
+  step?: (dt: number, input: Input | null) => WorldEvent[];
+}
+
+/** Each hole's colour and name tag. */
+const looksOf = (w: World): HoleLook[] => w.holes.map((h) => ({ color: SKINS[h.skin % SKINS.length].color, label: h.name }));
+
+/** The menu's Time choice for a round length the player select sent. */
+function lengthOf(duration: number, map: MapId): Settings['length'] {
+  if (duration === 0) return 'endless';
+  return duration <= MAPS[map].minutes * 60 ? 'short' : 'long';
 }
 
 type Phase = 'menu' | 'play' | 'over';
@@ -110,6 +127,8 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
   const [hud, setHud] = useState<Hud | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [paused, setPaused] = useState(false);
+  /** A guest asked the host for another round from the results card. */
+  const [asked, setAsked] = useState(false);
   const [storedScores, setStoredScores] = useState(loadScores);
   const [legacyBests] = useState(loadLegacyBests);
   const [result, setResult] = useState<{
@@ -131,6 +150,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     place: number;
   } | null>(null);
   const pausedRef = useRef(false);
+  const neverPaused = useRef(false);
   const soundsRef = useRef<Sounds | null>(null);
   const beatRef = useRef(0);
   const bannerId = useRef(0);
@@ -198,7 +218,24 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
     setPhase('play');
   };
 
+  const startShared = useCallback((r: SharedRound) => {
+    soundsRef.current?.unlock();
+    setRound((prev) => ({ world: r.world, key: prev.key + 1, looks: looksOf(r.world), follow: r.follow, playing: true, shared: true, step: r.step }));
+    setHud(hudOf(r.world, r.follow));
+    setBanners([]);
+    setResult(null);
+    setPaused(false);
+    setAsked(false);
+    lastCount.current = 0;
+    said.current = { police: false, combo: false };
+    doneRef.current = false;
+    setPhase('play');
+  }, []);
+  const together = useTogether({ name: myName, settings, rng, onRound: startShared });
+  const table = together.table;
+
   const toMenu = () => {
+    if (round.shared || together.screen) together.leave();
     setPaused(false);
     setResult(null);
     setHud(null);
@@ -246,7 +283,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
         survivingCells: 0,
         code: GAME_ID,
         game: GAME_ID,
-        opponent: 'Computer holes',
+        opponent: w.holes.filter((h) => h.isPlayer && h !== me).map((h) => h.name).join(' and ') || 'Computer holes',
         finishedAt: now,
       });
     },
@@ -308,6 +345,21 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
   useDialogFocus(paused && phase === 'play', pauseRef);
   useDialogFocus(phase === 'over' && !!result, resultsRef);
 
+  // Playing with friends: what the screens say about the link and the colours.
+  const hostName = table.seats[0]?.name ?? 'your friend';
+  const linkDown = table.role === 'guest' && table.status !== 'connected';
+  const selectStatus = linkDown ? (table.status === 'dialing' ? `Finding ${hostName}'s game…` : 'Reconnecting…') : null;
+  const roundNotice = linkDown ? `Waiting for ${hostName}…` : null;
+  const mine = table.seats[table.mySeat];
+  const swapNote =
+    mine && mine.skin !== settings.skin ? `${SKINS[settings.skin % SKINS.length].name} was taken, so you got ${SKINS[mine.skin % SKINS.length].name}` : null;
+  const playAgain = () => {
+    if (!round.shared) return play();
+    if (table.role === 'host') return together.start();
+    table.askAgain();
+    setAsked(true);
+  };
+
   const muted = settings.muted;
   const toggleMute = () => setSettings((s) => ({ ...s, muted: !s.muted }));
 
@@ -319,8 +371,9 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
         looks={round.looks}
         follow={round.follow}
         playing={round.playing}
-        pausedRef={pausedRef}
+        pausedRef={round.shared ? neverPaused : pausedRef}
         onFrame={onFrame}
+        step={round.step}
         load={load}
       />
 
@@ -337,19 +390,77 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
             </button>
             <FullscreenButton />
           </div>
-          <GulpMenu
-            settings={settings}
-            onChange={changeSettings}
-            onPlay={play}
-            best={bestOf(scores.rounds, player, settings.map, level)}
-            rounds={scores.rounds}
-            userId={player}
-          />
+          {!together.screen && (
+            <GulpMenu
+              settings={settings}
+              onChange={changeSettings}
+              onPlay={play}
+              onFriends={together.friends}
+              invite={
+                together.invite && (
+                  <JoinCard
+                    name={together.invite.name}
+                    busy={!!together.joining}
+                    error={together.joinError ? `${together.joinError}'s game isn't open any more.` : null}
+                    onJoin={() => together.join(together.invite!.code, together.invite!.name)}
+                  />
+                )
+              }
+              best={bestOf(scores.rounds, player, settings.map, level)}
+              rounds={scores.rounds}
+              userId={player}
+            />
+          )}
         </>
+      )}
+      {phase === 'menu' && together.screen === 'who' && (
+        <WhoStarts onMe={together.startHere} onFriend={() => together.setScreen('code')} onBack={() => together.setScreen(null)} />
+      )}
+      {phase === 'menu' && together.screen === 'code' && (
+        <CodeKeys
+          busy={!!together.joining}
+          error={together.joinError ? "We couldn't find that game. Check the letters with your friend." : null}
+          onCode={(code) => together.join(code, 'your friend')}
+          onBack={() => together.setScreen('who')}
+        />
+      )}
+      {phase === 'menu' && together.screen === 'select' && table.role && table.settings && (
+        <PlayerSelect
+          role={table.role}
+          code={table.code}
+          seats={together.slots}
+          mySeat={table.mySeat}
+          settings={table.settings}
+          onSettings={
+            table.role === 'host'
+              ? (rs) => changeSettings({ ...settings, map: rs.map, difficulty: rs.difficulty, length: lengthOf(rs.duration, rs.map), powerups: rs.powerups, fightBack: rs.fightBack })
+              : undefined
+          }
+          onSkin={(skin) => {
+            changeSettings({ ...settings, skin });
+            together.setSkin(skin);
+          }}
+          note={swapNote}
+          holesLeft={Math.max(0, MAPS[table.settings.map].rivals + 1 - table.seats.filter((x) => x.connected).length)}
+          canStart={table.role === 'host' && table.seats.filter((x) => x.connected).length > 1}
+          onStart={table.role === 'host' ? together.start : undefined}
+          joinInstead={table.role === 'host' && together.linked ? () => together.joinInstead() : undefined}
+          status={selectStatus}
+          onBack={together.leave}
+        />
       )}
 
       {phase !== 'menu' && hud && (
-        <GulpHud over={phase === 'over'} hud={hud} banners={banners} muted={muted} onMute={toggleMute} onPause={() => setPaused(true)} touch={touch} />
+        <GulpHud
+          over={phase === 'over'}
+          hud={hud}
+          banners={banners}
+          muted={muted}
+          onMute={toggleMute}
+          onPause={() => setPaused(true)}
+          touch={touch}
+          notice={round.shared ? roundNotice : null}
+        />
       )}
       {phase === 'play' && (
         <div className="gulp-minimap-slot">
@@ -360,11 +471,12 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
       {paused && phase === 'play' && (
         <div className="gulp-modal-backdrop">
           <div ref={pauseRef} className="gulp-modal" role="dialog" aria-modal="true" aria-label="Paused" data-testid="gulp-paused">
-            <h2>Paused</h2>
+            <h2>{round.shared ? 'The round goes on' : 'Paused'}</h2>
+            {round.shared && <p className="gulp-pause-note">Your friends are still playing, so the round doesn't stop.</p>}
             <button type="button" className="gulp-play small" onClick={() => setPaused(false)} data-testid="gulp-resume">
               Keep going
             </button>
-            {round.world.options.duration === 0 && (
+            {round.world.options.duration === 0 && (!round.shared || table.role === 'host') && (
               <button
                 type="button"
                 className="gulp-button"
@@ -377,11 +489,13 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
                 End round
               </button>
             )}
-            <button type="button" className="gulp-button" onClick={play} data-testid="gulp-restart">
-              Start again
-            </button>
+            {!round.shared && (
+              <button type="button" className="gulp-button" onClick={play} data-testid="gulp-restart">
+                Start again
+              </button>
+            )}
             <button type="button" className="gulp-button ghost" onClick={toMenu} data-testid="gulp-menu-btn">
-              Menu
+              {round.shared ? 'Leave round' : 'Menu'}
             </button>
           </div>
         </div>
@@ -396,7 +510,7 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
               <section className="gulp-results-round" aria-label="This round">
                 <ol className="gulp-results-list">
                   {standings(round.world).map((h, i) => (
-                    <li key={h.id} className={h.isPlayer ? 'me' : ''}>
+                    <li key={h.id} className={h.id === round.follow ? 'me' : ''}>
                       <span className="gulp-rank">{i + 1}</span>
                       <span className="gulp-dot" style={{ background: SKINS[h.skin % SKINS.length].css }} aria-hidden="true" />
                       <span className="gulp-name">{h.name}</span>
@@ -453,8 +567,10 @@ export function GulpPage({ rng = Math.random, load = loadScene }: GulpPageProps)
                 </section>
               </div>
             </div>
+            {round.shared && together.again && <p className="gulp-again-note">{together.again} wants to play again!</p>}
+            {round.shared && asked && <p className="gulp-again-note">Asked {hostName} for another round!</p>}
             <div className="gulp-modal-row">
-              <button type="button" className="gulp-play small" onClick={play} data-testid="gulp-again">
+              <button type="button" className="gulp-play small" onClick={playAgain} data-testid="gulp-again">
                 Play again
               </button>
               <button type="button" className="gulp-button ghost" onClick={toMenu} data-testid="gulp-results-menu">

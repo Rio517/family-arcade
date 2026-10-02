@@ -30,7 +30,7 @@ export const GULP_PREFIX = 'gulp-v1-';
 /** Children in one round: the host and three guests. */
 export const MAX_CHILDREN = 4;
 /** Every hole in a round, children and computer: more than the biggest map holds. */
-export const MAX_HOLES = 12;
+const MAX_HOLES = 12;
 const MAX_NAME_LEN = 40;
 const MAX_TOKEN_LEN = 40;
 const SKIN_COUNT = SKINS.length;
