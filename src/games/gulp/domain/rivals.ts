@@ -4,9 +4,11 @@
  * Each one flees anything that could swallow it, hunts smaller holes, and
  * otherwise heads for the best food nearby. The kindness rule keeps a round
  * fun for a young child: a rival slows down when it is ahead of the child
- * and hurries when behind, and only goes after the child's hole when the
- * child is clearly winning. The difficulty sets how much of that kindness
- * is left: Easy is all of it, Hard none.
+ * and hurries when behind, and only goes after a child's hole when that
+ * child is clearly winning. With several children, the pace is set by the
+ * child furthest behind, and the hunting and food rules hold for each child.
+ * The difficulty sets how much of that kindness is left: Easy is all of it,
+ * Hard none.
  */
 import { KINDS, type Prop } from './catalog';
 import { EAT_HOLE } from './growth';
@@ -68,15 +70,20 @@ export function createBrain(rng: Rng, difficulty: Difficulty): Brain {
   return { skill: t.skill + rng() * t.spread, pace: 1, target: null, rethink: 0, wobble: rng() * 10 };
 }
 
-export function steerRival(b: Brain, me: Hole, w: World, dt: number, player: Hole | null): Input {
+/**
+ * Where a computer hole wants to go this step. `trailing` is the child the
+ * kindness rule measures against (the one furthest behind), or null when no
+ * child is playing.
+ */
+export function steerRival(b: Brain, me: Hole, w: World, dt: number, trailing: Hole | null): Input {
   b.wobble += dt;
   b.rethink -= dt;
 
   // Kindness: a rival is a touch slower than the child to begin with, eases
   // off further when ahead of the child, and only hurries when well behind.
-  if (player) {
+  if (trailing) {
     // The lead as a share of the child's score, so it means the same early and late.
-    const lead = (me.score - player.score) / Math.max(100, player.score);
+    const lead = (me.score - trailing.score) / Math.max(100, trailing.score);
     // A runaway lead eases right off: a big hole still eats plenty at a crawl.
     const pace = lead > 0.8 ? 0.35 : lead > 0.4 ? 0.5 : lead > 0.12 ? 0.6 : lead > 0 ? 0.7 : lead > -0.3 ? 0.85 : 1;
     // Harder rivals keep only part of that slow-down; Easy keeps the whole of it.
@@ -148,7 +155,7 @@ export function steerRival(b: Brain, me: Hole, w: World, dt: number, player: Hol
     }
   }
   if (!b.target || b.rethink <= 0) {
-    b.target = choose(b, me, w, player);
+    b.target = choose(b, me, w);
     b.rethink = 0.8 + w.rng() * 0.8;
   }
   const t = b.target;
@@ -169,14 +176,14 @@ export function steerRival(b: Brain, me: Hole, w: World, dt: number, player: Hol
 /** Below this radius the countryside is not worth the trip (see `choose`). */
 const COUNTRY_R = 12;
 
-function choose(b: Brain, me: Hole, w: World, player: Hole | null): Brain['target'] {
+function choose(b: Brain, me: Hole, w: World): Brain['target'] {
   const temper = temperOf(w);
-  // A smaller hole close by is the best meal.
+  // A smaller hole close by is the best meal; a child's only when that child is far enough ahead.
   let prey: Hole | null = null;
   let preyD = 26 + me.r * 2;
   for (const o of w.holes) {
     if (o === me || !o.alive || o.safe > 0 || o.r * EAT_HOLE > me.r) continue;
-    if (o.isPlayer && (!player || (player.score - me.score) / Math.max(100, me.score) < temper.huntLead)) continue;
+    if (o.isPlayer && (o.score - me.score) / Math.max(100, me.score) < temper.huntLead) continue;
     const d = Math.hypot(o.x - me.x, o.z - me.z);
     if (d < preyD) {
       prey = o;
@@ -199,6 +206,7 @@ function choose(b: Brain, me: Hole, w: World, player: Hole | null): Brain['targe
 
   // Otherwise the best food nearby: worth the most for the shortest trip.
   const look = 24 + me.r * 3;
+  const children = w.holes.filter((c) => c.isPlayer && c !== me && c.alive);
   let best: Prop | null = null;
   let bestScore = 0;
   for (const p of propsNear(w, me.x, me.z, look)) {
@@ -209,9 +217,9 @@ function choose(b: Brain, me: Hole, w: World, player: Hole | null): Brain['targe
     if (KINDS[p.kind].wonder) continue;
     const d = Math.hypot(p.x - me.x, p.z - me.z);
     if (d > look) continue;
-    // Food right by the child is the child's: a rival values it less, unless
+    // Food right by a child is that child's: a rival values it less, unless
     // the difficulty says otherwise.
-    const theirs = player && player.alive && Math.hypot(p.x - player.x, p.z - player.z) < 12 + player.r ? temper.theirs : 1;
+    const theirs = children.some((c) => Math.hypot(p.x - c.x, p.z - c.z) < 12 + c.r) ? temper.theirs : 1;
     // Out of town the food is thin until a hole can take barns and turbines:
     // a small hole that follows a trail of hay bales out there starves.
     const country = me.r < COUNTRY_R && Math.max(Math.abs(p.x), Math.abs(p.z)) > w.city.half ? 0.35 : 1;

@@ -4,7 +4,7 @@ import { LEVELS, makeProp } from '../domain/catalog';
 import { createWorld } from '../domain/world';
 import { feedbackFor, type Said } from './feedback';
 
-const world = () => createWorld(seededRng(1), { name: 'Clara', skin: 0 }, [{ name: 'Big Gulp', skin: 1 }], { duration: 60, countdown: 0 });
+const world = () => createWorld(seededRng(1), [{ name: 'Clara', skin: 0 }], [{ name: 'Big Gulp', skin: 1 }], { duration: 60, countdown: 0 });
 const fresh = (): Said => ({ police: false, combo: false });
 
 describe('feedback', () => {

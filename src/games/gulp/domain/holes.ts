@@ -59,8 +59,8 @@ export type HurtCause = 'chem' | 'tanker' | 'bomb';
 export const RESPAWN = 3;
 /**
  * Lives each hole starts a round with: on Medium five, on Hard three, for
- * the child and every computer hole alike. Easy has none to lose (no one
- * swallows the child there).
+ * the children and every computer hole alike. Easy has none to lose (no one
+ * swallows a child there).
  */
 export const LIVES: Record<Difficulty, number> = { easy: Infinity, medium: 5, hard: 3 };
 /** How much of its size a swallowed hole keeps: the child keeps more. */
@@ -176,7 +176,7 @@ export function gobble(w: World, h: Hole, p: Prop, events: WorldEvent[]): void {
   const combo = info.wonder ? base : base + Math.min(base * (mult - 1), COMBO_EXTRA_MAX);
   const gained = Math.round(combo * (!info.wonder && h.doubleTime > 0 ? 2 : 1) * share);
   h.score += gained;
-  if (h.isPlayer && info.tier <= 5) w.police.eaten += 1;
+  if (h.isPlayer && info.tier <= 5) w.police[h.id].eaten += 1;
   if (info.wonder) {
     // A set (the Easter Island Heads) counts as one wonder, however many pieces are eaten.
     if (!h.wonderKinds.includes(p.kind)) {
@@ -199,9 +199,10 @@ export function eatHoles(w: World, events: WorldEvent[]): void {
     if (!a.alive) continue;
     for (const b of w.holes) {
       if (a === b || !b.alive || b.safe > 0) continue;
-      // On Easy the computer holes never swallow the child: a young player
-      // who wanders into a big one should not lose their round to it.
-      if (b.isPlayer && !a.isPlayer && w.options.difficulty === 'easy') continue;
+      // On Easy nobody swallows a child, neither a computer hole nor another
+      // child: a young player who wanders into a big one should not lose
+      // their round to it. On Medium and Hard children can swallow each other.
+      if (b.isPlayer && w.options.difficulty === 'easy') continue;
       if (a.r < b.r * EAT_HOLE) continue;
       if (Math.hypot(a.x - b.x, a.z - b.z) > a.r - b.r * 0.4) continue;
       const before = levelOf(a.r);

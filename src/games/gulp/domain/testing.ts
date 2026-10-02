@@ -8,18 +8,24 @@ import { indexProps } from './space';
 import { createWorld, levelOf, standings, stepWorld, type Options, type World } from './world';
 
 const NAMES = ['Big Gulp', 'Sir Slurps', 'Nom Nom', 'Hungry Hattie', 'Captain Crumbs', 'Munch Bunch', 'Gobbler', 'Chompers', 'Slurpy Sue'];
+const CHILDREN = ['You', 'Ada', 'Bea', 'Cy'];
 export const rivals = (n: number) => NAMES.slice(0, n).map((name, i) => ({ name, skin: i + 1 }));
 export const still = { x: 0, z: 0 };
 
+/**
+ * A round with no countdown, `kids` children (holes 0 onwards, the first
+ * called "You") and `n` computer holes, nothing switched on.
+ */
+export const together = (seed = 1, kids = 2, n = 0, opts: Partial<Options> = {}) =>
+  createWorld(
+    seededRng(seed),
+    CHILDREN.slice(0, kids).map((name, i) => ({ name, skin: i })),
+    rivals(n),
+    { duration: 120, countdown: 0, powerups: false, fightBack: false, ...opts },
+  );
+
 /** A round with no countdown, the child and `n` computer holes, nothing switched on. */
-export const round = (seed = 1, n = 0, opts: Partial<Options> = {}) =>
-  createWorld(seededRng(seed), { name: 'You', skin: 0 }, rivals(n), {
-    duration: 120,
-    countdown: 0,
-    powerups: false,
-    fightBack: false,
-    ...opts,
-  });
+export const round = (seed = 1, n = 0, opts: Partial<Options> = {}) => together(seed, 1, n, opts);
 
 /**
  * Put `h` still on the crossing nearest the middle of the map, clear of the

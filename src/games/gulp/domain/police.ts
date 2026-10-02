@@ -1,8 +1,9 @@
 /**
- * When the child's hole has eaten a good few things, someone calls the
- * police: two cars race down the nearest street and park near the hole, and
- * the officers get out and stand round it, waving their batons. They do no
- * harm; the cars and the officers are there to be swallowed.
+ * When a child's hole has eaten a good few things, someone calls the police:
+ * two cars race down the nearest street and park near the hole, and the
+ * officers get out and stand round it, waving their batons. They do no harm;
+ * the cars and the officers are there to be swallowed. Each child has a count
+ * of their own; one call is out at a time.
  */
 import { FIT, footSize, makeProp, type PropKind } from './catalog';
 import { levelOf } from './growth';
@@ -13,6 +14,8 @@ import type { World, WorldEvent } from './world';
 export interface Responder {
   id: number;
   kind: 'car' | 'officer';
+  /** The child they were called to, by hole id. */
+  child: number;
   x: number;
   z: number;
   heading: number;
@@ -26,20 +29,24 @@ export interface Responder {
   done: boolean;
 }
 
-/** Things the child eats before someone calls the police, and seconds between calls. */
+/** Things a child eats before someone calls the police on them, and seconds between that child's calls. */
 const POLICE_AFTER = 35;
 export const POLICE_COOL = 50;
 const POLICE_STAY = 25;
 /** Seconds an officer takes to stroll off once it leaves. */
 const LEAVE_TIME = 6;
 
-export function police(w: World, dt: number, me: Hole, events: WorldEvent[]): void {
-  w.police.cool = Math.max(0, w.police.cool - dt);
-  const small = levelOf(me.r) <= 5;
-  if (me.alive && small && w.police.cool === 0 && w.police.eaten >= POLICE_AFTER && !w.responders.length) {
-    w.police.eaten = 0;
-    w.police.cool = POLICE_COOL;
-    callPolice(w, me, events);
+export function police(w: World, dt: number, events: WorldEvent[]): void {
+  for (const me of w.holes) {
+    if (!me.isPlayer) continue;
+    const count = w.police[me.id];
+    count.cool = Math.max(0, count.cool - dt);
+    const small = levelOf(me.r) <= 5;
+    if (me.alive && small && count.cool === 0 && count.eaten >= POLICE_AFTER && !w.responders.length) {
+      count.eaten = 0;
+      count.cool = POLICE_COOL;
+      callPolice(w, me, events);
+    }
   }
   const reach = (kind: PropKind, x: number, z: number) =>
     w.holes.find((h) => h.alive && footSize(kind) <= h.r * FIT && Math.hypot(h.x - x, h.z - z) < h.r - 0.3);
@@ -65,6 +72,7 @@ export function police(w: World, dt: number, me: Hole, events: WorldEvent[]): vo
           w.responders.push({
             id: w.nextId++,
             kind: 'officer',
+            child: r.child,
             x: r.tx + Math.cos(r.heading) * side * 1.8,
             z: r.tz - Math.sin(r.heading) * side * 1.8,
             heading: r.heading,
@@ -88,6 +96,7 @@ export function police(w: World, dt: number, me: Hole, events: WorldEvent[]): vo
       gobble(w, eater, makeProp(-r.id, 'police', r.x, r.z, r.heading), events);
       continue;
     }
+    const me = w.holes[r.child];
     const dx = me.x - r.x;
     const dz = me.z - r.z;
     const d = Math.hypot(dx, dz) || 1;
@@ -131,7 +140,7 @@ function callPolice(w: World, me: Hole, events: WorldEvent[]): void {
     const sz = alongZ ? clampE(startAlong) : nearZ + lane;
     const tx = alongZ ? nearX + lane : clampE(stopAlong);
     const tz = alongZ ? clampE(stopAlong) : nearZ + lane;
-    w.responders.push({ id: w.nextId++, kind: 'car', x: sx, z: sz, heading: Math.atan2(tx - sx, tz - sz), tx, tz, state: 'drive', t: 0, done: false });
+    w.responders.push({ id: w.nextId++, kind: 'car', child: me.id, x: sx, z: sz, heading: Math.atan2(tx - sx, tz - sz), tx, tz, state: 'drive', t: 0, done: false });
   }
   events.push({ type: 'police', x: me.x, z: me.z });
 }

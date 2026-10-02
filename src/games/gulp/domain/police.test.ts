@@ -6,8 +6,8 @@ import { stepWorld, type WorldEvent, type World } from './world';
 function called(): World {
   const w = round(1, 0);
   only(w, []);
-  w.police.eaten = 35;
-  w.police.cool = 0;
+  w.police[0].eaten = 35;
+  w.police[0].cool = 0;
   return w;
 }
 

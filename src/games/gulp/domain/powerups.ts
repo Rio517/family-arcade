@@ -21,7 +21,7 @@ export const POWER_SPEED = 1.6;
 const POWER_LIFE = 20;
 const POWER_MAX = 2;
 
-export function spawnPowerups(w: World, dt: number, player: Hole | null): void {
+export function spawnPowerups(w: World, dt: number): void {
   for (const p of w.powerups) p.life -= dt;
   w.powerups = w.powerups.filter((p) => p.life > 0);
   w.nextPower -= dt;
@@ -29,9 +29,14 @@ export function spawnPowerups(w: World, dt: number, player: Hole | null): void {
   // Now and then, not all the time: a boost should feel like a treat.
   w.nextPower = 18 + w.rng() * 10;
   if (w.powerups.length >= POWER_MAX) return;
-  // Mostly within the child's sight, so the child finds most of them.
+  // Mostly within sight of a child (one picked by chance when there are
+  // several), so the children find most of them.
   const alive = w.holes.filter((h) => h.alive);
-  const near = player && player.alive && w.rng() < 0.75 ? player : alive[Math.floor(w.rng() * alive.length)];
+  const children = alive.filter((h) => h.isPlayer);
+  const near =
+    children.length && w.rng() < 0.75
+      ? children[children.length > 1 ? Math.floor(w.rng() * children.length) : 0]
+      : alive[Math.floor(w.rng() * alive.length)];
   if (!near) return;
   const spot = spotNear(w, near.x, near.z, 14 + near.r * 2, 30 + near.r * 3);
   w.powerups.push({ id: w.nextId++, kind: w.rng() < 0.5 ? 'speed' : 'double', ...spot, life: POWER_LIFE });
