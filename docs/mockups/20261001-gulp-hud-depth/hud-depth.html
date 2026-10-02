@@ -867,12 +867,11 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 
 /* =====================================================================
    D — Kitty: a cute Japanese arcade game. Candy colours with a plum
-   outline and a hard drop under every piece, cat ears on the
-   leaderboard, clock, Pause and map, cat-head rank badges, a striped
-   level bar, a speech-bubble hint, a ribbon banner, and game text: white
-   letters with a plum edge in a chunky rounded font (M PLUS Rounded 1c
-   Black, bundled, 7 KB).
-   Each piece can set --bg (fill), --ear (ear colour), --c (text).
+   outline and a hard drop under every piece, caramel for the player,
+   a striped level bar, a speech-bubble hint, a ribbon banner, and game
+   text: white letters with a plum edge in a chunky rounded font
+   (M PLUS Rounded 1c Black, bundled, 7 KB).
+   Each piece can set --bg (fill) and --c (text).
    ===================================================================== */
 @font-face {
   font-family: 'Gulp Rounded';
@@ -883,13 +882,13 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .opt-d {
   --kfont: 'Gulp Rounded', var(--round);
   --plum: #4a2a5e;
-  --pink: #ff5c9a; --pink-t: #ff8bbb; --pink-deep: #d92f72; --pink-soft: #ffc2da;
+  --caramel: #d99a52; --caramel-t: #efc48a; --caramel-deep: #9a5e22; --caramel-soft: #f5e1c4;
   --sky: #45bdff; --sky-t: #8ad7ff;
   --sun: #ffcf2e; --sun-t: #ffe684;
   --mint: #3fd4a8; --mint-t: #8debd0;
   --cream: #fffaf4;
-  --dots: radial-gradient(circle, rgba(255, 92, 154, 0.14) 0 2px, transparent 2.5px) 0 0 / 14px 14px;
-  --ring: #ff5c9a;
+  --dots: radial-gradient(circle, rgba(185, 130, 70, 0.13) 0 2px, transparent 2.5px) 0 0 / 14px 14px;
+  --ring: #4a2a5e;
 }
 .opt-d :is(.gulp-board, .gulp-clock, .gulp-level, .gulp-round, .gulp-hint, .gulp-explore, .party-pill, .gulp-minimap) {
   border: 2.5px solid var(--plum);
@@ -909,35 +908,16 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   paint-order: stroke fill;
   text-shadow: 0 2px 0 var(--plum);
 }
-/* Cat ears: a rounded triangle on each top corner, pink inside. */
-.opt-d :is(.gulp-board, .gulp-clock, .gulp-minimap, .gulp-round.gulp-pause-btn, .w-tag.mine)::before,
-.opt-d :is(.gulp-board, .gulp-clock, .gulp-minimap, .gulp-round.gulp-pause-btn, .w-tag.mine)::after {
-  content: '';
-  position: absolute;
-  top: calc(var(--es, 18px) * -0.56);
-  width: var(--es, 18px);
-  height: var(--es, 18px);
-  border: 2.5px solid var(--plum);
-  border-radius: 5px 2px 2px 2px;
-  background: radial-gradient(circle at 34% 34%, var(--pink-soft) 0 30%, var(--ear, var(--cream)) 33%);
-  transform: rotate(45deg);
-  clip-path: polygon(-20% -20%, 120% -20%, -20% 120%);
-  pointer-events: none;
-}
-.opt-d :is(.gulp-board, .gulp-clock, .gulp-minimap, .gulp-round.gulp-pause-btn, .w-tag.mine)::before { left: var(--ex, 16px); }
-.opt-d :is(.gulp-board, .gulp-clock, .gulp-minimap, .gulp-round.gulp-pause-btn, .w-tag.mine)::after { right: var(--ex, 16px); }
-
-.opt-d .gulp-board { --bg: var(--dots), var(--cream); border-radius: 18px; padding: 5px; margin-top: 8px; }
+.opt-d .gulp-board { --bg: var(--dots), var(--cream); border-radius: 18px; padding: 5px; }
 .opt-d .gulp-board li:not(.gulp-gap) { font-family: var(--kfont); font-weight: 900; }
 .opt-d .gulp-board li.me {
-  background: linear-gradient(180deg, var(--pink-t) 0%, var(--pink) 60%);
+  background: linear-gradient(180deg, var(--caramel-t) 0%, var(--caramel) 60%);
   box-shadow: inset 0 0 0 2px var(--plum), inset 0 3px 0 rgba(255, 255, 255, 0.4), 0 2px 0 var(--plum);
 }
 .opt-d .gulp-board li.me .gulp-name,
 .opt-d .gulp-board li.me b { -webkit-text-stroke: 3.5px var(--plum); }
-/* Rank badges: little cat heads. */
+/* Rank badges: candy buttons. */
 .opt-d .gulp-rank {
-  position: relative;
   border: 2px solid var(--plum);
   background: var(--sky);
   color: #fff;
@@ -945,38 +925,23 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   paint-order: stroke fill;
   text-shadow: none;
 }
-.opt-d .gulp-rank::before,
-.opt-d .gulp-rank::after {
-  content: '';
-  position: absolute;
-  top: -5px;
-  width: 7px;
-  height: 7px;
-  border: 2px solid var(--plum);
-  border-radius: 2px 1px 1px 1px;
-  background: inherit;
-  transform: rotate(45deg);
-  clip-path: polygon(-30% -30%, 130% -30%, -30% 130%);
-}
-.opt-d .gulp-rank::before { left: -2px; }
-.opt-d .gulp-rank::after { right: -2px; }
 .opt-d li:first-child > .gulp-rank { background: var(--sun); }
 .opt-d li.me > .gulp-rank { background: #fff; color: var(--plum); -webkit-text-stroke: 0; }
 .opt-d .gulp-dot { box-shadow: 0 0 0 2px var(--plum); }
 
 .opt-d .gulp-center { gap: 8px; }
-.opt-d .gulp-clock { --bg: linear-gradient(180deg, var(--sky-t) 0%, var(--sky) 60%); --ear: var(--sky); margin-top: 8px; padding: 6px 18px; }
+.opt-d .gulp-clock { --bg: linear-gradient(180deg, var(--sky-t) 0%, var(--sky) 60%); padding: 6px 18px; }
 .opt-d .gulp-clock svg { color: #fff; stroke-width: 2.6; filter: drop-shadow(0 0 0.5px var(--plum)) drop-shadow(0 1.5px 0 var(--plum)); }
 .opt-d .gulp-level { padding: 4px 12px 4px 4px; }
 .opt-d .gulp-lv { border: 2px solid var(--plum); background: linear-gradient(180deg, var(--sun-t) 0%, var(--sun) 60%); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55); }
 .opt-d .gulp-meter { height: 14px; border: 2px solid var(--plum); background: #fff; box-sizing: content-box; }
-.opt-d .gulp-meter-fill { background: repeating-linear-gradient(-45deg, var(--pink) 0 6px, var(--pink-t) 6px 12px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5); }
+.opt-d .gulp-meter-fill { background: repeating-linear-gradient(-45deg, var(--caramel) 0 6px, var(--caramel-t) 6px 12px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5); }
 .opt-d .gulp-next { font-family: var(--kfont); }
-.opt-d .gulp-next b { color: var(--pink-deep); }
+.opt-d .gulp-next b { color: var(--caramel-deep); }
 
 .opt-d .gulp-round { --bg: linear-gradient(180deg, var(--mint-t) 0%, var(--mint) 60%); border-radius: 16px; transition: transform 0.08s ease, box-shadow 0.08s ease; }
 .opt-d .gulp-round svg { stroke-width: 2.4; }
-.opt-d .gulp-round.gulp-pause-btn { --bg: linear-gradient(180deg, var(--sun-t) 0%, var(--sun) 60%); --ear: var(--sun); --es: 13px; --ex: 9px; }
+.opt-d .gulp-round.gulp-pause-btn { --bg: linear-gradient(180deg, var(--sun-t) 0%, var(--sun) 60%); }
 .opt-d .gulp-round:active,
 .opt-d .gulp-round.is-pressed { --dy: 3px; --drop: 0px; --sy: 0.93; }
 /* The hint speaks: a bubble with a tail. */
@@ -995,15 +960,15 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   transform: rotate(45deg);
 }
 .opt-d .gulp-explore { font-size: 16px; }
-.opt-d .party-pill { --bg: linear-gradient(180deg, var(--pink-t) 0%, var(--pink) 60%); font-size: 15px; }
+.opt-d .party-pill { --bg: linear-gradient(180deg, var(--caramel-t) 0%, var(--caramel) 60%); font-size: 15px; }
 .opt-d .party-pill svg { color: #fff; stroke-width: 2.2; filter: drop-shadow(0 1.5px 0 var(--plum)); }
-.opt-d .gulp-minimap { --bg: var(--sky); --ear: var(--sky); --es: 22px; --ex: 18px; padding: 5px; border-radius: 20px; overflow: visible; }
+.opt-d .gulp-minimap { --bg: var(--sky); padding: 5px; border-radius: 20px; overflow: visible; }
 .opt-d .gulp-minimap img { border-radius: 14px; box-shadow: 0 0 0 2px #fff; }
 .opt-d :is(button:focus-visible, .is-focus) { outline: 3px solid #fff; outline-offset: 4px; --focus: 0 0 0 10px var(--ring); }
 .phone.opt-d .gulp-center { gap: 6px; }
-.phone.opt-d .gulp-board { margin-top: 7px; padding: 4px; --es: 14px; --ex: 12px; }
-.phone.opt-d .gulp-clock { padding: 5px 12px; --es: 15px; --ex: 12px; }
-/* In the city: an eared tag, a bubble with a plum edge, tilted game numbers. */
+.phone.opt-d .gulp-board { padding: 4px; }
+.phone.opt-d .gulp-clock { padding: 5px 12px; }
+/* In the city: a plum-edged tag, a bubble with a plum edge, tilted game numbers. */
 .opt-d .w-tag {
   font-family: var(--kfont);
   font-weight: 900;
@@ -1012,13 +977,11 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   color: #fff;
   box-shadow: 0 calc(4px * var(--k)) 0 rgba(74, 42, 94, 0.55);
 }
-.opt-d .w-tag.mine { --es: calc(22px * var(--k)); --ex: calc(14px * var(--k)); --ear: #fff; background: #fff; color: var(--hole); }
-.opt-d .w-tag.mine::before,
-.opt-d .w-tag.mine::after { border-width: calc(4px * var(--k)); }
+.opt-d .w-tag.mine { background: #fff; color: var(--hole); }
 .opt-d .w-bubble {
   font-family: var(--kfont);
   border-color: var(--plum);
-  color: var(--pink-deep);
+  color: var(--caramel-deep);
   filter: drop-shadow(0 calc(5px * var(--k)) 0 var(--plum));
 }
 .opt-d .w-bubble.healthy { color: #1f9a52; }
@@ -1031,7 +994,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   filter: drop-shadow(0 calc(5px * var(--k)) 0 var(--plum));
 }
 .opt-d .w-pop.big { color: var(--sun); }
-.opt-d .w-pop.huge { color: var(--pink-t); }
+.opt-d .w-pop.huge { color: var(--caramel-t); }
 
 /* =====================================================================
    Swallowing a hole. Today the banner says who, and the points go on
@@ -1075,7 +1038,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   position: relative;
   border: 2.5px solid var(--plum);
   border-radius: 16px;
-  background: linear-gradient(180deg, var(--pink-t) 0%, var(--pink) 60%);
+  background: linear-gradient(180deg, var(--caramel-t) 0%, var(--caramel) 60%);
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6), 0 4px 0 var(--plum);
   font-family: var(--kfont);
   padding: 8px 34px 10px;
@@ -1089,7 +1052,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   width: 40px;
   height: calc(100% - 22px);
   border: 2.5px solid var(--plum);
-  background: var(--pink-deep);
+  background: var(--caramel-deep);
 }
 .opt-d .gulp-banner::before { left: -28px; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 34% 50%); }
 .opt-d .gulp-banner::after { right: -28px; clip-path: polygon(0 0, 100% 0, 66% 50%, 100% 100%, 0 100%); }
@@ -1177,14 +1140,14 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
     { id: 'a', key: 'A', name: 'Toy plastic', line: 'Moulded pieces lit from above: a glossy highlight, a darker lip underneath and a soft shadow on the city. Buttons press down onto their lip.' },
     { id: 'b', key: 'B', name: 'Sticker', line: 'Die-cut stickers: a thick white edge, a soft shadow that lifts them off the city, a faint paper grain. The player’s row, the clock and Pause sit at a slight tilt.' },
     { id: 'c', key: 'C', name: 'Arcade', line: 'A light arcade cabinet: cream laminate with a thin orange trim, burnt-orange numbers, a slim 70s sunset ring round the clock, push-buttons, an LED level meter, the map on a little CRT.' },
-    { id: 'd', key: 'D', name: 'Kitty', line: 'A cute Japanese arcade game: candy colours with a plum outline and a hard drop, cat ears on the leaderboard, clock, Pause and map, cat-head rank badges, a striped level bar, a speech-bubble hint, a ribbon banner, and white game text with a plum edge in a chunky rounded font.' },
+    { id: 'd', key: 'D', name: 'Kitty', line: 'A cute Japanese arcade game: candy colours with a plum outline and a hard drop, caramel for the player\u2019s row and the ribbon banner, a striped level bar, a speech-bubble hint, and white game text with a plum edge in a chunky rounded font.' },
   ];
   const COST = {
     cur: 'Nothing to build. Swallowing a hole scores, but the banner does not say how much and no points rise.',
     a: '<b>Builds in:</b> gulp.css (a light layer and a lip on each piece; a shine on Pause, off under reduced motion), canvasTextures.ts (tags and bubble), effects.ts (block numbers).',
     b: '<b>Builds in:</b> gulp.css (white edge, shadow, grain, three tilts), canvasTextures.ts and effects.ts (a white edge round each label), holeView.ts (labels grow a little).',
     c: '<b>Builds in:</b> gulp.css (panels, push-buttons, LED meter, CRT map), canvasTextures.ts (sign tags with an offset shadow), effects.ts (striped numbers).',
-    d: '<b>Builds in:</b> gulp.css (ears, cat-head badges, ribbon, bubble tail: the most CSS of the four), a bundled 7 KB font (M PLUS Rounded 1c Black, OFL), canvasTextures.ts (eared tags in the new font), effects.ts (tilted numbers).',
+    d: '<b>Builds in:</b> gulp.css (outlines, ribbon, bubble tail, striped bar), a bundled 7 KB font (M PLUS Rounded 1c Black, OFL), canvasTextures.ts (tags and bubble in the new font), effects.ts (tilted numbers).',
   };
   const DEVS = {
     ipad: { label: 'iPad', size: '1180 × 820', w: 1180, h: 820, tag: [590, 334], hole: [590, 461], touch: false },
