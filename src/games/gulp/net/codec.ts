@@ -109,6 +109,7 @@ const holeOf = (h: Hole): HoleWire => [
   tenths(h.burn),
   h.streak,
   h.respawns,
+  h.away === null ? -1 : tenths(h.away),
 ];
 
 const tallyOf = (h: Hole): TallyWire => [h.kills, h.gulped, [...h.wonderKinds], h.biggest ? [h.biggest.kind, h.biggest.points] : null, h.eatenBy];

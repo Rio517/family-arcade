@@ -221,7 +221,7 @@ function takeState(m: Mirror, s: TickMsg | SnapshotMsg, snap: boolean): void {
  */
 function setHole(m: Mirror, i: number, wire: HoleWire, snap: boolean): void {
   const h = m.world.holes[i];
-  const [x, z, vx, vz, r, score, lives, alive, respawnIn, safe, speedTime, doubleTime, stun, burn, streak, respawns] = wire;
+  const [x, z, vx, vz, r, score, lives, alive, respawnIn, safe, speedTime, doubleTime, stun, burn, streak, respawns, away] = wire;
   const back = respawns !== h.respawns;
   h.r = fromHundredths(r);
   h.score = score;
@@ -235,6 +235,7 @@ function setHole(m: Mirror, i: number, wire: HoleWire, snap: boolean): void {
   h.burn = fromTenths(burn);
   h.streak = streak;
   h.respawns = respawns;
+  h.away = away < 0 ? null : fromTenths(away);
   const at = { x: fromHundredths(x), z: fromHundredths(z), heading: 0 };
   if (i === m.you) {
     m.life = respawns;

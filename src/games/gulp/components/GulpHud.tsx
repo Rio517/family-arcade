@@ -30,6 +30,8 @@ export function GulpHud({
   /** A shared round's link is down: "Waiting for Klara…", over everything else at the bottom. */
   notice?: string | null;
 }) {
+  // A friend's device has dropped out and their hole waits for them.
+  const shown = notice ?? (hud.waiting.length ? `Waiting for ${hud.waiting.join(' and ')}…` : null);
   const row = (r: HudRow) => (
     <li key={r.id} className={`${r.me ? 'me' : ''}${r.out ? ' out' : ''}`}>
       <span className={r.rank <= 3 ? `gulp-rank coin-${r.rank}` : 'gulp-rank'}>{r.rank}</span>
@@ -188,9 +190,9 @@ export function GulpHud({
 
       {/* Messages stack at the bottom, one above the other, so they never overlap. */}
       <div className="gulp-messages">
-        {notice && (
+        {shown && (
           <div className="gulp-notice" role="status" data-testid="gulp-notice">
-            {notice}
+            {shown}
           </div>
         )}
         {top && hud.alive && (

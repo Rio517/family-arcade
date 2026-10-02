@@ -19,7 +19,7 @@ import type { Prop, PropKind } from './catalog';
 import { PARK_PLAZA, createCity, type City, type MapId } from './city';
 import { berthOf } from './city/ports';
 import { EAT_HOLE, speedOf } from './growth';
-import { LIVES, eatHoles, eatProps, newHole, type Hole, type HurtCause } from './holes';
+import { AWAY_WAIT, LIVES, eatHoles, eatProps, newHole, waiting, type Hole, type HurtCause } from './holes';
 import { createPeople, walkPeople, type Person } from './people';
 import { POLICE_COOL, police, type Responder } from './police';
 import { POWER_SPEED, spawnPowerups, takePowerups, type PowerKind, type PowerUp } from './powerups';
@@ -29,7 +29,7 @@ import { indexProps, inRect } from './space';
 
 export type { Attack } from './attacks';
 export { EAT_HOLE, comboOf, levelOf, levelProgress, nextLabel } from './growth';
-export { canEat, type Hole } from './holes';
+export { canEat, waiting, type Hole } from './holes';
 export type { Person } from './people';
 export { POWER_TIME, type PowerKind, type PowerUp } from './powerups';
 export { BUILD_TIME } from './rebuild';
@@ -284,10 +284,16 @@ export function stepWorld(w: World, dt: number, input: Input | null, reports?: R
   }
 
   const children = w.holes.filter((h) => h.isPlayer);
-  // The rivals' kindness is measured against the child furthest behind who is still in the round.
-  const trailing = children.reduce<Hole | null>((last, h) => (h.lives > 0 && (!last || h.score < last.score) ? h : last), null);
+  // The rivals' kindness is measured against the child furthest behind who is
+  // still in the round and playing (not one whose device has dropped out).
+  const trailing = children.reduce<Hole | null>((last, h) => (h.lives > 0 && h.away === null && (!last || h.score < last.score) ? h : last), null);
   for (let i = 0; i < w.holes.length; i++) {
     const h = w.holes[i];
+    if (h.away !== null) {
+      h.away += dt;
+      // Waited long enough: a computer brain plays for the child until they are back.
+      if (h.away >= AWAY_WAIT && !w.brains[i]) w.brains[i] = createBrain(w.rng, w.options.difficulty);
+    }
     if (!h.alive) {
       h.respawnIn -= dt;
       if (h.respawnIn <= 0) {
@@ -303,6 +309,12 @@ export function stepWorld(w: World, dt: number, input: Input | null, reports?: R
     h.burn = Math.max(0, h.burn - dt);
     h.comboTime = Math.max(0, h.comboTime - dt);
     if (h.comboTime === 0) h.streak = 0;
+    if (waiting(h)) {
+      // Still and safe; safe a moment longer once the wait is over, as after coming back.
+      h.vx = h.vz = 0;
+      h.safe = Math.max(h.safe, 1);
+      continue;
+    }
     const brain = w.brains[i];
     if (brain) move(w, h, steerRival(brain, h, w, dt, trailing), dt, brain.pace);
     else if (h.isPlayer && h.id !== 0) place(w, h, reports?.get(h.id), dt);
@@ -339,6 +351,25 @@ export function stepWorld(w: World, dt: number, input: Input | null, reports?: R
   if (w.options.powerups) spawnPowerups(w, dt);
   if (w.options.fightBack) fightBack(w, dt, events);
   return events;
+}
+
+/**
+ * A child's device has dropped out of a shared round: their hole waits for
+ * them, then a computer brain plays it (see AWAY_WAIT).
+ */
+export function dropOut(w: World, id: number): void {
+  const h = w.holes[id];
+  if (h?.isPlayer && h.away === null) h.away = 0;
+}
+
+/** A child's device is back: the hole is theirs again. Whether a brain played it. */
+export function comeBack(w: World, id: number): boolean {
+  const h = w.holes[id];
+  if (!h || h.away === null) return false;
+  h.away = null;
+  const played = !!w.brains[id];
+  w.brains[id] = null;
+  return played;
 }
 
 /** End a round early (the endless round's "End round"). */

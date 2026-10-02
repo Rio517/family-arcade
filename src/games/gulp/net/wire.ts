@@ -67,8 +67,8 @@ export const EV = {
 
 /**
  * A hole: where it is and how it moves, its size, score and lives (-1: none
- * to lose), whether it is in play, its timers, its combo streak, and how many
- * times it has come back.
+ * to lose), whether it is in play, its timers, its combo streak, how many
+ * times it has come back, and how long its device has been gone (-1: here).
  */
 export type HoleWire = [
   x: number,
@@ -87,6 +87,7 @@ export type HoleWire = [
   burn: number,
   streak: number,
   respawns: number,
+  away: number,
 ];
 
 /** The round's clock and how it stands (see STATUS and ENDED). */
