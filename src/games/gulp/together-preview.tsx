@@ -1,6 +1,7 @@
 /**
  * Harness: every play-together screen in each of its states, over a picture
- * of the city, so the screens can be checked without a second device.
+ * of the city, so the screens can be checked without a second device. The
+ * shared round's states (together-round-preview.tsx) run on the real stage.
  *
  *   /preview-gulp-together.html            the list of states
  *   /preview-gulp-together.html?s=guest    one state, full screen
@@ -19,6 +20,7 @@ import { JoinCard } from './components/together/JoinCard';
 import { PlayerSelect, type PlayerSelectProps, type SelectSeat } from './components/together/PlayerSelect';
 import { PlayRow } from './components/together/PlayRow';
 import { WhoStarts } from './components/together/WhoStarts';
+import { EndedEarly, LiveRound, SharedResults } from './together-round-preview';
 
 const noop = () => {};
 const phone = typeof matchMedia === 'function' && matchMedia('(max-width: 600px)').matches;
@@ -113,6 +115,12 @@ const STATES: Array<[id: string, title: string, render: () => ReactNode]> = [
   ['guest', 'Guest: my slot and my colour', () => guest()],
   ['guest-recon', 'Guest: my link dropped', () => guest({ status: 'Reconnecting…', note: null })],
   ['guest-host-away', 'Guest: the host dropped', () => guest({ seats: [{ ...KLARA, state: 'away' }, MINA, OSKAR, null], status: 'Waiting for Klara…', note: null })],
+  ['round-waiting', 'Round (host): Rio dropped out, their hole waits', () => <LiveRound seats={2} follow={0} away={[1]} />],
+  ['round-waiting-two', 'Round (host): Rio and Mina dropped out', () => <LiveRound seats={3} follow={0} away={[1, 2]} />],
+  ['round-waiting-three', 'Round (host): all three guests dropped out', () => <LiveRound seats={4} follow={0} away={[1, 2, 3]} />],
+  ['round-host-waiting', 'Round (guest): Klara’s device went quiet', () => <LiveRound seats={2} follow={1} frozen notice="Waiting for Klara…" />],
+  ['results-shared', 'Results (host): Mina asks to play again', () => <SharedResults />],
+  ['results-ended-early', 'Results (guest): Klara’s game stopped', () => <EndedEarly />],
 ];
 
 function Index() {
