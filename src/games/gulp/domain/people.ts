@@ -10,7 +10,7 @@ import type { World, WorldEvent } from './world';
 type Rng = () => number;
 
 /** A walk round a square: the pavement round a block, or a path inside a park. */
-interface Loop {
+export interface Loop {
   x0: number;
   z0: number;
   side: number;
@@ -43,8 +43,8 @@ export interface Person {
   runZ: number;
 }
 
-/** People are 'person' things with ids above every building's. */
-const PERSON_ID = 1_000_000;
+/** People are 'person' things with ids above every building's, in the order `createPeople` makes them. */
+export const PERSON_ID = 1_000_000;
 const PEOPLE_PER_BLOCK = 2.5;
 const WALK = 1.4;
 /** How far off a hole is noticed, beyond its rim, and how fast people run. */
@@ -58,7 +58,7 @@ const RUN = 7;
 const NO_WALK = ['farm', 'forest', 'windfarm', 'mountain', 'military', 'helipad', 'airport', 'arena'];
 
 /** The pavement round a block. */
-const pavement = (b: Block): Loop => ({ x0: b.x + SIDEWALK / 2, z0: b.z + SIDEWALK / 2, side: BLOCK - SIDEWALK });
+export const pavement = (b: Block): Loop => ({ x0: b.x + SIDEWALK / 2, z0: b.z + SIDEWALK / 2, side: BLOCK - SIDEWALK });
 /** A path inside a park, `inset` in from the block's edge. */
 const parkPath = (b: Block, inset: number): Loop => ({ x0: b.x + inset, z0: b.z + inset, side: BLOCK - inset * 2 });
 
@@ -151,14 +151,18 @@ function nearestOnLoop(loop: Loop, x: number, z: number): number {
  * Everyone walks round their loop. A hole close by sends them sprinting away
  * along the street (they can't outrun it for long, but they try); when it
  * has gone they walk back to their loop. One close enough falls in.
+ *
+ * With `rules` off (a guest's copy of a shared round) they only walk and
+ * run: the host's device says who falls in and who comes back.
  */
-export function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
+export function walkPeople(w: World, dt: number, events: WorldEvent[], rules = true): void {
   const edge = w.city.half - 1;
   const home = { x: 0, z: 0 };
   for (const p of w.people) {
     if (!p.alive) {
+      if (!rules) continue;
       p.respawnIn -= dt;
-      if (p.respawnIn <= 0) comeBack(w, p);
+      if (p.respawnIn <= 0) comeBack(w, p, events);
       continue;
     }
     let eaten: Hole | null = null;
@@ -167,7 +171,7 @@ export function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
     for (const h of w.holes) {
       if (!h.alive) continue;
       const d = Math.hypot(h.x - p.x, h.z - p.z);
-      if (d < h.r - 0.3) {
+      if (rules && d < h.r - 0.3) {
         eaten = h;
         break;
       }
@@ -180,7 +184,9 @@ export function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
     if (eaten) {
       p.alive = false;
       p.respawnIn = 8 + w.rng() * 6;
-      if (!isCrumb(eaten, p.kind)) gobble(w, eaten, makeProp(p.id, p.kind, p.x, p.z, p.heading, p.variant), events);
+      const prop = makeProp(p.id, p.kind, p.x, p.z, p.heading, p.variant);
+      if (!isCrumb(eaten, p.kind)) gobble(w, eaten, prop, events);
+      else if (w.options.shared) events.push({ type: 'crumb', prop });
       continue;
     }
     if (threat) {
@@ -226,7 +232,7 @@ export function walkPeople(w: World, dt: number, events: WorldEvent[]): void {
 }
 
 /** Back into town, on a block well away from every hole (a dog goes back to its park). */
-function comeBack(w: World, p: Person): void {
+function comeBack(w: World, p: Person, events: WorldEvent[]): void {
   const blocks = w.city.blockList;
   for (let tries = 0; tries < 6; tries++) {
     const b = blocks[Math.floor(w.rng() * blocks.length)];
@@ -235,13 +241,19 @@ function comeBack(w: World, p: Person): void {
     const cx = b.x + b.size / 2;
     const cz = b.z + b.size / 2;
     if (w.holes.some((h) => h.alive && Math.hypot(h.x - cx, h.z - cz) < h.r + b.size)) continue;
-    if (p.kind === 'person') p.loop = pavement(b);
-    p.t = w.rng();
-    p.alive = true;
-    p.state = 'walk';
-    p.panic = 0;
-    walkTo(p);
+    returnPerson(p, p.kind === 'person' ? pavement(b) : p.loop, w.rng());
+    if (w.options.shared) events.push({ type: 'back', person: p });
     return;
   }
   p.respawnIn = 2;
+}
+
+/** Someone swallowed back on their feet, walking round `loop` from `t` of the way round. */
+export function returnPerson(p: Person, loop: Loop, t: number): void {
+  p.loop = loop;
+  p.t = t;
+  p.alive = true;
+  p.state = 'walk';
+  p.panic = 0;
+  walkTo(p);
 }
