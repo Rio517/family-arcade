@@ -14,6 +14,7 @@ what was set aside.
 | [20260831-party-ui](./20260831-party-ui/) | Visual design is fine; the UX needs work | 6 of 10 shipped in [#145](https://github.com/Rio517/family-arcade/pull/145) |
 | [20261001-far-models](./20261001-far-models/) | Smooth late-game play; simpler buildings from high up, shown before they go in | Detailed models stay; the simpler ones looked less friendly in play |
 | [20261001-gulp-hud-depth](./20261001-gulp-hud-depth/) | Gulp's round controls look flat; give them depth | D, Coin-op: built |
+| [20261002-gulp-play-together](./20261002-gulp-play-together/) | How up to four children join and play one Gulp round, each on their own device | Pending |
 
 ## What goes in a pitch folder
 
