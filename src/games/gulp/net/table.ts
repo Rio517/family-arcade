@@ -102,6 +102,8 @@ export class GulpTable {
   mirror: Mirror | null = null;
   /** The standings the host sent when the round ended (hole ids, best first). */
   order: number[] | null = null;
+  /** My seat at the table: 0 for the host, the one the host gave a guest. */
+  mySeat = 0;
 
   private hostSeats: HostSeat[] = [];
   private hostLink: HostLink | null = null;
@@ -165,6 +167,7 @@ export class GulpTable {
     this.guestLink = null;
     this.role = null;
     this.code = '';
+    this.mySeat = 0;
     this.status = 'idle';
     this.seats = [];
     this.hostSeats = [];
@@ -353,7 +356,11 @@ export class GulpTable {
   private sendLobby(): void {
     this.syncSeats();
     if (this.role === 'host' && this.settings) {
-      this.hostLink?.broadcast({ t: 'lobby', settings: this.settings, children: this.seats.map(({ name, skin, human }) => ({ name, skin, human })) });
+      const children = this.seats.map(({ name, skin, human }) => ({ name, skin, human }));
+      // Each guest is told which seat is theirs.
+      this.hostSeats.forEach((s, you) => {
+        if (s.guestId && s.connected) this.hostLink?.send(s.guestId, { t: 'lobby', settings: this.settings!, children, you });
+      });
     }
     this.events.onChange();
   }
@@ -369,6 +376,7 @@ export class GulpTable {
       case 'lobby':
         this.settings = m.settings;
         this.seats = m.children.map((c) => ({ ...c, connected: true }));
+        this.mySeat = m.you;
         this.events.onChange();
         break;
       case 'start':

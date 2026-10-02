@@ -121,8 +121,11 @@ describe('a Gulp table', () => {
   it('seats a host and up to three guests, and turns a fifth device away', () => {
     const { net, host, guests } = seat(3);
     expect(host.seats.map((s) => s.name)).toEqual(['Klara', 'Rio', 'Mina', 'Oskar']);
-    // Every guest hears who is at the table.
-    for (const g of guests) expect(g.seats.map((s) => s.name)).toEqual(['Klara', 'Rio', 'Mina', 'Oskar']);
+    // Every guest hears who is at the table, and which seat is theirs.
+    guests.forEach((g, i) => {
+      expect(g.seats.map((s) => s.name)).toEqual(['Klara', 'Rio', 'Mina', 'Oskar']);
+      expect(g.mySeat).toBe(i + 1);
+    });
     const late = table(net, me('Ada', 5));
     late.join('KQZT');
     net.flush();

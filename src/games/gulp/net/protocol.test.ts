@@ -17,7 +17,7 @@ describe('Gulp wire protocol', () => {
 
   it('accepts the joining messages', () => {
     expect(isGulpMsg({ t: 'hello', name: 'Klara', skin: 0, token: 'a1b2', inRound: false })).toBe(true);
-    expect(isGulpMsg({ t: 'lobby', settings, children: [seat('Klara'), seat('Rio')] })).toBe(true);
+    expect(isGulpMsg({ t: 'lobby', settings, children: [seat('Klara'), seat('Rio')], you: 1 })).toBe(true);
     expect(isGulpMsg({ t: 'start', seed: 12345, settings, wonders: ['irontower'], seats: [seat('Klara'), seat('Rio'), seat('Big Gulp', false)], you: 1 })).toBe(true);
     expect(isGulpMsg({ t: 'ready' })).toBe(true);
     expect(isGulpMsg({ t: 'pos', seq: 3, x: 1234, z: -560, vx: 12, vz: 0 })).toBe(true);
@@ -30,8 +30,10 @@ describe('Gulp wire protocol', () => {
     expect(isGulpMsg(null)).toBe(false);
     expect(isGulpMsg({ t: 'nope' })).toBe(false);
     expect(isGulpMsg({ t: 'hello', name: 'x'.repeat(500), skin: 0, token: 't', inRound: false })).toBe(false);
-    expect(isGulpMsg({ t: 'lobby', settings: { ...settings, map: 'moon' }, children: [seat('Klara')] })).toBe(false);
-    expect(isGulpMsg({ t: 'lobby', settings, children: Array.from({ length: 5 }, (_, i) => seat(`k${i}`)) })).toBe(false);
+    expect(isGulpMsg({ t: 'lobby', settings: { ...settings, map: 'moon' }, children: [seat('Klara'), seat('Rio')], you: 1 })).toBe(false);
+    expect(isGulpMsg({ t: 'lobby', settings, children: Array.from({ length: 5 }, (_, i) => seat(`k${i}`)), you: 1 })).toBe(false);
+    // A guest's own seat is one of the guests' seats.
+    expect(isGulpMsg({ t: 'lobby', settings, children: [seat('Klara'), seat('Rio')], you: 2 })).toBe(false);
     // The host is seat 0: a guest is told a seat from 1 to 3, inside the seat list.
     expect(isGulpMsg({ t: 'start', seed: 1, settings, wonders: [], seats: [seat('Klara'), seat('Rio')], you: 0 })).toBe(false);
     expect(isGulpMsg({ t: 'start', seed: 1, settings, wonders: [], seats: [seat('Klara'), seat('Rio')], you: 2 })).toBe(false);

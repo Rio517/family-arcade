@@ -71,6 +71,8 @@ export interface LobbyMsg {
   settings: RoundSettings;
   /** The children at the table so far, host first. */
   children: Seat[];
+  /** Which of them is the guest it is sent to. */
+  you: number;
 }
 
 /** Guest → host: the colour this child wants (taken colours go to the next free one). */
@@ -376,7 +378,7 @@ export function isGulpMsg(value: unknown): value is GulpMsg {
     case 'hello':
       return isStr(m.name, MAX_NAME_LEN) && inRange(m.skin, 0, SKIN_COUNT - 1) && isStr(m.token, MAX_TOKEN_LEN) && isBool(m.inRound);
     case 'lobby':
-      return isSettings(m.settings) && isSeats(m.children, MAX_CHILDREN);
+      return isSettings(m.settings) && isSeats(m.children, MAX_CHILDREN) && inRange(m.you, 1, MAX_CHILDREN - 1) && m.you < m.children.length;
     case 'pick':
       return inRange(m.skin, 0, SKIN_COUNT - 1);
     case 'start':
