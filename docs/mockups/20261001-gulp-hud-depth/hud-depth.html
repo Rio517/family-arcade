@@ -736,18 +736,17 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   --cream: #fff6e6;
   --divider: #f0cf9c;
   --ring: #c2410c;
-  --panel-sh: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(170, 100, 30, 0.2), 0 3px 0 var(--trim-l), 0 6px 12px rgba(90, 45, 0, 0.24);
+  --panel-sh: inset 0 1px 0 #fff, 0 2px 0 var(--trim-l), 0 4px 10px rgba(90, 45, 0, 0.16);
   --stripe-sh: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(170, 100, 30, 0.2), 0 2px 0 #ffd23f, 0 4px 0 #ff9f1c, 0 6px 0 #ff6b2b, 0 8px 0 #e8322b, 0 12px 14px rgba(90, 45, 0, 0.24);
 }
 .opt-c :is(.gulp-board, .gulp-clock, .gulp-level, .gulp-hint, .gulp-explore, .party-pill) {
-  border: var(--bw, 2px) solid var(--trim);
+  border: var(--bw, 1.5px) solid var(--trim);
   background: var(--cab);
   box-shadow: var(--sh, var(--panel-sh)), var(--focus, 0 0 0 0 transparent);
   color: var(--c, var(--brown));
   font-family: var(--round);
   backdrop-filter: none;
 }
-.opt-c .gulp-board { --sh: var(--stripe-sh); }
 .opt-c .gulp-board b { color: var(--num); }
 .opt-c .gulp-board li.me {
   background: linear-gradient(180deg, #ffc566 0%, #ff9a2a 60%, #f68300 100%);
@@ -759,15 +758,14 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .opt-c li:first-child > .gulp-rank { background: radial-gradient(circle at 50% 30%, #fff1b8, #ffc23d 55%, #ea8d00); color: #2a1300; box-shadow: 0 0 0 1.5px var(--trim-l); }
 .opt-c li.me > .gulp-rank { background: #2a1300; color: #ffd27a; }
 .opt-c .gulp-dot { box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(74, 37, 8, 0.25); }
-.opt-c .gulp-center { gap: 12px; }
+.opt-c .gulp-center { gap: 9px; }
 .opt-c .gulp-clock {
   --bw: 0px;
   --c: var(--num);
-  --sh: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(170, 100, 30, 0.2), 0 0 0 1.5px #ffd23f, 0 0 0 3px #ff9f1c, 0 0 0 4.5px #ff6b2b, 0 0 0 6px #e8322b, 0 3px 0 6px #9c2a12, 0 10px 16px 4px rgba(90, 45, 0, 0.24);
-  margin-top: 6px;
+  --sh: inset 0 1px 0 #fff, 0 0 0 1px #ffd23f, 0 0 0 2px #ff9f1c, 0 0 0 3px #ff6b2b, 0 0 0 4px #e8322b, 0 6px 12px 2px rgba(90, 45, 0, 0.18);
+  margin-top: 4px;
 }
 .opt-c .gulp-clock svg { color: var(--brown); }
-.opt-c .gulp-level { --sh: var(--stripe-sh); }
 .opt-c .gulp-lv {
   background: linear-gradient(180deg, #ffb347 0%, #ff8a1f 60%, #e86f00 100%);
   color: #2a1300;
@@ -783,10 +781,10 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .opt-c .gulp-meter-fill { border-radius: 1px; background: repeating-linear-gradient(90deg, #ff7a12 0 8px, transparent 8px 11px); }
 .opt-c .gulp-next b { color: var(--num); }
 /* Push-buttons: a domed cap in a brown bezel with the orange trim. */
-.opt-c .gulp-buttons { gap: 12px; margin: 0 4px; }
+.opt-c .gulp-buttons { gap: 10px; margin: 0 2px; }
 .opt-c .gulp-round {
   --cap: radial-gradient(ellipse at 50% 28%, #fffaf0 0%, #ffe9be 42%, #e2b56a 100%);
-  --sh: inset 0 3px 1px rgba(255, 255, 255, 0.75), inset 0 -4px 0 rgba(90, 50, 0, 0.25), 0 0 0 3px var(--brown), 0 0 0 4.5px var(--trim), 0 4px 0 3px var(--brown), 0 4px 0 4.5px var(--trim-l), 0 10px 14px 3px rgba(90, 45, 0, 0.28);
+  --sh: inset 0 3px 1px rgba(255, 255, 255, 0.75), inset 0 -4px 0 rgba(90, 50, 0, 0.22), 0 0 0 2px var(--trim-l), 0 0 0 3.5px var(--trim), 0 3px 0 2px var(--trim-l), 0 6px 10px 2px rgba(90, 45, 0, 0.2);
   border: 0;
   border-radius: 50%;
   background: var(--cap);
@@ -799,24 +797,24 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .opt-c .gulp-round:active,
 .opt-c .gulp-round.is-pressed {
   transform: translateY(3px);
-  --sh: inset 0 2px 2px rgba(90, 50, 0, 0.3), inset 0 -1px 0 rgba(255, 255, 255, 0.4), 0 0 0 3px var(--brown), 0 0 0 4.5px var(--trim), 0 1px 0 3px var(--brown), 0 1px 0 4.5px var(--trim-l), 0 5px 8px 3px rgba(90, 45, 0, 0.24);
+  --sh: inset 0 2px 2px rgba(90, 50, 0, 0.3), inset 0 -1px 0 rgba(255, 255, 255, 0.4), 0 0 0 2px var(--trim-l), 0 0 0 3.5px var(--trim), 0 1px 0 2px var(--trim-l), 0 3px 6px 2px rgba(90, 45, 0, 0.18);
 }
 .opt-c .gulp-explore { font-size: 16px; }
 .opt-c .party-pill { font-size: 15px; }
 /* The map as a little CRT in a cream bezel: curved glass, scanlines, a glare. */
 .opt-c .gulp-minimap {
-  padding: 6px;
-  border: 2px solid var(--trim);
-  border-radius: 21px;
+  padding: 5px;
+  border: 1.5px solid var(--trim);
+  border-radius: 20px;
   background: var(--cab);
-  box-shadow: inset 0 1px 0 #fff, 0 3px 0 var(--trim-l), 0 8px 14px rgba(90, 45, 0, 0.28);
+  box-shadow: inset 0 1px 0 #fff, 0 2px 0 var(--trim-l), 0 5px 10px rgba(90, 45, 0, 0.18);
   overflow: visible;
 }
 .opt-c .gulp-minimap img { border-radius: 16px / 20px; }
 .opt-c .gulp-minimap::after {
   content: '';
   position: absolute;
-  inset: 6px;
+  inset: 5px;
   border-radius: 16px / 20px;
   background:
     linear-gradient(155deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 38%),
@@ -825,14 +823,13 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   pointer-events: none;
 }
 .opt-c :is(button:focus-visible, .is-focus) { outline: 3px solid #fff; outline-offset: 3px; --focus: 0 0 0 9px var(--ring); }
-.opt-c .gulp-round:is(:focus-visible, .is-focus) { outline-offset: 8px; --focus: 0 0 0 12px var(--ring); }
+.opt-c .gulp-round:is(:focus-visible, .is-focus) { outline-offset: 6px; --focus: 0 0 0 11px var(--ring); }
 .phone.opt-c .gulp-center { gap: 8px; }
 .phone.opt-c .gulp-clock {
   margin-top: 3px;
   padding: 5px 10px;
   --sh: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(170, 100, 30, 0.2), 0 0 0 1px #ffd23f, 0 0 0 2px #ff9f1c, 0 0 0 3px #ff6b2b, 0 0 0 4px #e8322b, 0 2px 0 4px #9c2a12, 0 8px 12px 3px rgba(90, 45, 0, 0.24);
 }
-.phone.opt-c :is(.gulp-board, .gulp-level) { --sh: inset 0 1px 0 #fff, 0 1.5px 0 #ffd23f, 0 3px 0 #ff9f1c, 0 4.5px 0 #ff6b2b, 0 6px 0 #e8322b, 0 9px 12px rgba(90, 45, 0, 0.24); }
 /* In the city: retro sign tags, a comic bubble, sunset numbers. */
 .opt-c .w-tag {
   height: calc(48px * var(--k));
@@ -869,113 +866,172 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 }
 
 /* =====================================================================
-   D — Mochi: the soft East Asian look of pastel mobile games. Puffy
-   cream pieces with a soft inner shade and a diffuse shadow, a faint
-   washi grain, sakura pink for the player, matcha green for progress,
-   and rank badges as red seal stamps.
-   Each piece can set --bg (surface) and --c (text).
+   D — Kitty: a cute Japanese arcade game. Candy colours with a plum
+   outline and a hard drop under every piece, cat ears on the
+   leaderboard, clock, Pause and map, cat-head rank badges, a striped
+   level bar, a speech-bubble hint, a ribbon banner, and game text: white
+   letters with a plum edge in a chunky rounded font (M PLUS Rounded 1c
+   Black, bundled, 7 KB).
+   Each piece can set --bg (fill), --ear (ear colour), --c (text).
    ===================================================================== */
+@font-face {
+  font-family: 'Gulp Rounded';
+  src: url('rounded-black.woff2') format('woff2');
+  font-weight: 900;
+  font-display: block;
+}
 .opt-d {
-  --washi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.55 .9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .62 0 0 0 0 .48 0 0 0 0 .55 0.10 0 0 0 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-  --mochi: linear-gradient(180deg, #fffdfa 0%, #fff3ec 100%);
-  --ink: #3b3355;
-  --plum: #6b5a8e;
-  --sakura: linear-gradient(180deg, #ffe1e9 0%, #ffc6d5 100%);
-  --sakura-deep: #c94069;
-  --matcha: linear-gradient(180deg, #d6efc2 0%, #a9d78b 100%);
-  --matcha-deep: #3f7a28;
-  --butter: linear-gradient(180deg, #fff6cf 0%, #ffe08a 100%);
-  --seal: #d4402f;
-  --puff: inset 0 2px 1px rgba(255, 255, 255, 0.95), inset 0 -3px 6px rgba(206, 168, 190, 0.45);
-  --hair: 0 0 0 1px rgba(140, 110, 150, 0.16);
-  --soft: 0 6px 14px rgba(100, 70, 115, 0.22), 0 1px 2px rgba(100, 70, 115, 0.16);
-  --divider: rgba(150, 120, 160, 0.25);
-  --ring: #c94069;
+  --kfont: 'Gulp Rounded', var(--round);
+  --plum: #4a2a5e;
+  --pink: #ff5c9a; --pink-t: #ff8bbb; --pink-deep: #d92f72; --pink-soft: #ffc2da;
+  --sky: #45bdff; --sky-t: #8ad7ff;
+  --sun: #ffcf2e; --sun-t: #ffe684;
+  --mint: #3fd4a8; --mint-t: #8debd0;
+  --cream: #fffaf4;
+  --dots: radial-gradient(circle, rgba(255, 92, 154, 0.14) 0 2px, transparent 2.5px) 0 0 / 14px 14px;
+  --ring: #ff5c9a;
 }
 .opt-d :is(.gulp-board, .gulp-clock, .gulp-level, .gulp-round, .gulp-hint, .gulp-explore, .party-pill, .gulp-minimap) {
-  border: 0;
-  background: var(--washi), var(--bg, var(--mochi));
-  box-shadow: var(--puff), var(--hair), var(--soft), var(--focus, 0 0 0 0 transparent);
-  color: var(--c, var(--ink));
-  font-family: var(--round);
-  transform: translateY(var(--dy, 0px)) scale(var(--sc, 1));
+  border: 2.5px solid var(--plum);
+  background: var(--bg, var(--cream));
+  box-shadow: inset 0 0 0 2px var(--rim, rgba(255, 255, 255, 0.85)), 0 var(--drop, 3px) 0 var(--plum), 0 6px 10px rgba(74, 42, 94, 0.25), var(--focus, 0 0 0 0 transparent);
+  color: var(--c, var(--plum));
+  font-family: var(--kfont);
+  font-weight: 900;
+  transform: translateY(var(--dy, 0px)) scale(var(--sx, 1), var(--sy, 1));
   backdrop-filter: none;
 }
-.opt-d .gulp-board { border-radius: 18px; }
-.opt-d .gulp-board li.me { background: var(--sakura); box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 2px 5px rgba(201, 64, 105, 0.22); }
-/* Seal stamps: a red outline for every place, filled red for first. */
-.opt-d .gulp-rank {
-  border-radius: 7px;
-  background: rgba(212, 64, 47, 0.07);
-  color: var(--seal);
-  box-shadow: inset 0 0 0 1.5px var(--seal);
+.opt-d :is(.gulp-clock, .gulp-round, .gulp-hint, .party-pill) { position: relative; }
+/* Game text: white letters with a plum edge and a hard drop. */
+.opt-d :is(.gulp-clock span, .gulp-lv, .gulp-board li.me, .gulp-pause-label, .party-pill, .gulp-banner strong, .gulp-prize) {
+  color: #fff;
+  -webkit-text-stroke: 4px var(--plum);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 var(--plum);
 }
-.opt-d li:first-child > .gulp-rank { background: var(--seal); color: #fff8f0; box-shadow: inset 0 0 0 1.5px var(--seal), inset 0 0 0 3px rgba(255, 248, 240, 0.35); }
-.opt-d li.me > .gulp-rank { background: var(--sakura-deep); color: #fff; box-shadow: none; }
-.opt-d .gulp-dot { box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(100, 70, 115, 0.35); }
-.opt-d .gulp-center { gap: 8px; }
-.opt-d .gulp-clock svg { color: var(--sakura-deep); }
-.opt-d .gulp-lv { background: var(--matcha); color: #24451a; box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.85), 0 1px 3px rgba(63, 122, 40, 0.3); }
-.opt-d .gulp-meter { height: 12px; background: #f3e8ee; box-shadow: inset 0 2px 3px rgba(150, 110, 140, 0.3); }
-.opt-d .gulp-meter-fill { background: linear-gradient(180deg, #c9eab0 0%, #8cc66b 100%); box-shadow: inset 0 2px 1px rgba(255, 255, 255, 0.7); }
-.opt-d .gulp-next b { color: var(--matcha-deep); }
-.opt-d .gulp-round { --c: var(--plum); transition: transform 0.1s ease, box-shadow 0.1s ease; }
-.opt-d .gulp-round.gulp-pause-btn { --bg: var(--butter); --c: #5a4300; }
-.opt-d .gulp-round:active,
-.opt-d .gulp-round.is-pressed { --dy: 2px; --sc: 0.96; --soft: 0 2px 5px rgba(100, 70, 115, 0.22); }
-.opt-d .gulp-explore { font-size: 16px; }
-.opt-d .party-pill { font-size: 15px; }
-.opt-d .gulp-minimap { padding: 5px; border-radius: 22px; overflow: visible; }
-.opt-d .gulp-minimap img { border-radius: 17px; }
-.opt-d .gulp-minimap::after { content: ''; position: absolute; inset: 5px; border-radius: 17px; box-shadow: inset 0 2px 6px rgba(100, 70, 115, 0.3); pointer-events: none; }
-.opt-d :is(button:focus-visible, .is-focus) { outline: 3px solid #fff; outline-offset: 3px; --focus: 0 0 0 9px var(--ring); }
-.phone.opt-d .gulp-center { gap: 6px; }
-/* In the city: a soft cream tag, a cloud bubble, pastel points with a plum edge. */
-.opt-d .w-tag {
-  background: linear-gradient(180deg, #fffdfa 0%, #fff1ea 100%);
-  color: var(--ink);
-  box-shadow: inset 0 2px 1px #fff, inset 0 -3px 5px rgba(206, 168, 190, 0.45), 0 calc(5px * var(--k)) calc(10px * var(--k)) rgba(100, 70, 115, 0.3);
-}
-.opt-d .w-tag.mine { color: color-mix(in srgb, var(--hole) 85%, #000); }
-.opt-d .w-bubble {
-  border: 0;
-  border-radius: calc(46px * var(--k));
-  background: linear-gradient(180deg, #fffdfa 0%, #fff1ea 100%);
-  color: var(--sakura-deep);
-  filter: drop-shadow(0 calc(6px * var(--k)) calc(8px * var(--k)) rgba(100, 70, 115, 0.3));
-}
-.opt-d .w-bubble.healthy { color: var(--matcha-deep); }
-.opt-d .w-bubble::before { display: none; }
-/* A cloud's tail: two little puffs instead of a point. */
-.opt-d .w-bubble::after {
-  left: calc(24px * var(--k));
-  top: calc(100% + 4px * var(--k));
-  width: calc(26px * var(--k));
-  height: calc(18px * var(--k));
-  border-radius: 50%;
-  background: #fff3ed;
-  clip-path: none;
-  box-shadow: calc(-16px * var(--k)) calc(14px * var(--k)) 0 calc(-3px * var(--k)) #fff3ed;
-}
-.opt-d .w-pop {
-  --plum-edge: #5b4a7e;
-  color: #fff4d6;
-  -webkit-text-stroke: calc(7px * var(--k) * var(--t)) var(--plum-edge);
-  filter: drop-shadow(0 calc(4px * var(--k)) calc(5px * var(--k)) rgba(90, 60, 110, 0.45));
-}
-.opt-d .w-pop.big { color: #ffd66b; }
-.opt-d .w-pop.huge { color: #ffa3c6; }
-.opt-d .w-pop::after {
-  content: attr(data-t);
+/* Cat ears: a rounded triangle on each top corner, pink inside. */
+.opt-d :is(.gulp-board, .gulp-clock, .gulp-minimap, .gulp-round.gulp-pause-btn, .w-tag.mine)::before,
+.opt-d :is(.gulp-board, .gulp-clock, .gulp-minimap, .gulp-round.gulp-pause-btn, .w-tag.mine)::after {
+  content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  -webkit-text-stroke: 0;
-  color: transparent;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 45%);
-  -webkit-background-clip: text;
-  background-clip: text;
+  top: calc(var(--es, 18px) * -0.56);
+  width: var(--es, 18px);
+  height: var(--es, 18px);
+  border: 2.5px solid var(--plum);
+  border-radius: 5px 2px 2px 2px;
+  background: radial-gradient(circle at 34% 34%, var(--pink-soft) 0 30%, var(--ear, var(--cream)) 33%);
+  transform: rotate(45deg);
+  clip-path: polygon(-20% -20%, 120% -20%, -20% 120%);
+  pointer-events: none;
 }
+.opt-d :is(.gulp-board, .gulp-clock, .gulp-minimap, .gulp-round.gulp-pause-btn, .w-tag.mine)::before { left: var(--ex, 16px); }
+.opt-d :is(.gulp-board, .gulp-clock, .gulp-minimap, .gulp-round.gulp-pause-btn, .w-tag.mine)::after { right: var(--ex, 16px); }
+
+.opt-d .gulp-board { --bg: var(--dots), var(--cream); border-radius: 18px; padding: 5px; margin-top: 8px; }
+.opt-d .gulp-board li:not(.gulp-gap) { font-family: var(--kfont); font-weight: 900; }
+.opt-d .gulp-board li.me {
+  background: linear-gradient(180deg, var(--pink-t) 0%, var(--pink) 60%);
+  box-shadow: inset 0 0 0 2px var(--plum), inset 0 3px 0 rgba(255, 255, 255, 0.4), 0 2px 0 var(--plum);
+}
+.opt-d .gulp-board li.me .gulp-name,
+.opt-d .gulp-board li.me b { -webkit-text-stroke: 3.5px var(--plum); }
+/* Rank badges: little cat heads. */
+.opt-d .gulp-rank {
+  position: relative;
+  border: 2px solid var(--plum);
+  background: var(--sky);
+  color: #fff;
+  -webkit-text-stroke: 3px var(--plum);
+  paint-order: stroke fill;
+  text-shadow: none;
+}
+.opt-d .gulp-rank::before,
+.opt-d .gulp-rank::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--plum);
+  border-radius: 2px 1px 1px 1px;
+  background: inherit;
+  transform: rotate(45deg);
+  clip-path: polygon(-30% -30%, 130% -30%, -30% 130%);
+}
+.opt-d .gulp-rank::before { left: -2px; }
+.opt-d .gulp-rank::after { right: -2px; }
+.opt-d li:first-child > .gulp-rank { background: var(--sun); }
+.opt-d li.me > .gulp-rank { background: #fff; color: var(--plum); -webkit-text-stroke: 0; }
+.opt-d .gulp-dot { box-shadow: 0 0 0 2px var(--plum); }
+
+.opt-d .gulp-center { gap: 8px; }
+.opt-d .gulp-clock { --bg: linear-gradient(180deg, var(--sky-t) 0%, var(--sky) 60%); --ear: var(--sky); margin-top: 8px; padding: 6px 18px; }
+.opt-d .gulp-clock svg { color: #fff; stroke-width: 2.6; filter: drop-shadow(0 0 0.5px var(--plum)) drop-shadow(0 1.5px 0 var(--plum)); }
+.opt-d .gulp-level { padding: 4px 12px 4px 4px; }
+.opt-d .gulp-lv { border: 2px solid var(--plum); background: linear-gradient(180deg, var(--sun-t) 0%, var(--sun) 60%); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55); }
+.opt-d .gulp-meter { height: 14px; border: 2px solid var(--plum); background: #fff; box-sizing: content-box; }
+.opt-d .gulp-meter-fill { background: repeating-linear-gradient(-45deg, var(--pink) 0 6px, var(--pink-t) 6px 12px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5); }
+.opt-d .gulp-next { font-family: var(--kfont); }
+.opt-d .gulp-next b { color: var(--pink-deep); }
+
+.opt-d .gulp-round { --bg: linear-gradient(180deg, var(--mint-t) 0%, var(--mint) 60%); border-radius: 16px; transition: transform 0.08s ease, box-shadow 0.08s ease; }
+.opt-d .gulp-round svg { stroke-width: 2.4; }
+.opt-d .gulp-round.gulp-pause-btn { --bg: linear-gradient(180deg, var(--sun-t) 0%, var(--sun) 60%); --ear: var(--sun); --es: 13px; --ex: 9px; }
+.opt-d .gulp-round:active,
+.opt-d .gulp-round.is-pressed { --dy: 3px; --drop: 0px; --sy: 0.93; }
+/* The hint speaks: a bubble with a tail. */
+.opt-d .gulp-hint { padding: 9px 22px; }
+.opt-d .gulp-hint::after {
+  content: '';
+  position: absolute;
+  left: 34px;
+  bottom: -8px;
+  width: 13px;
+  height: 13px;
+  background: var(--cream);
+  border-right: 2.5px solid var(--plum);
+  border-bottom: 2.5px solid var(--plum);
+  border-bottom-right-radius: 3px;
+  transform: rotate(45deg);
+}
+.opt-d .gulp-explore { font-size: 16px; }
+.opt-d .party-pill { --bg: linear-gradient(180deg, var(--pink-t) 0%, var(--pink) 60%); font-size: 15px; }
+.opt-d .party-pill svg { color: #fff; stroke-width: 2.2; filter: drop-shadow(0 1.5px 0 var(--plum)); }
+.opt-d .gulp-minimap { --bg: var(--sky); --ear: var(--sky); --es: 22px; --ex: 18px; padding: 5px; border-radius: 20px; overflow: visible; }
+.opt-d .gulp-minimap img { border-radius: 14px; box-shadow: 0 0 0 2px #fff; }
+.opt-d :is(button:focus-visible, .is-focus) { outline: 3px solid #fff; outline-offset: 4px; --focus: 0 0 0 10px var(--ring); }
+.phone.opt-d .gulp-center { gap: 6px; }
+.phone.opt-d .gulp-board { margin-top: 7px; padding: 4px; --es: 14px; --ex: 12px; }
+.phone.opt-d .gulp-clock { padding: 5px 12px; --es: 15px; --ex: 12px; }
+/* In the city: an eared tag, a bubble with a plum edge, tilted game numbers. */
+.opt-d .w-tag {
+  font-family: var(--kfont);
+  font-weight: 900;
+  border: calc(4px * var(--k)) solid var(--plum);
+  background: var(--plum);
+  color: #fff;
+  box-shadow: 0 calc(4px * var(--k)) 0 rgba(74, 42, 94, 0.55);
+}
+.opt-d .w-tag.mine { --es: calc(22px * var(--k)); --ex: calc(14px * var(--k)); --ear: #fff; background: #fff; color: var(--hole); }
+.opt-d .w-tag.mine::before,
+.opt-d .w-tag.mine::after { border-width: calc(4px * var(--k)); }
+.opt-d .w-bubble {
+  font-family: var(--kfont);
+  border-color: var(--plum);
+  color: var(--pink-deep);
+  filter: drop-shadow(0 calc(5px * var(--k)) 0 var(--plum));
+}
+.opt-d .w-bubble.healthy { color: #1f9a52; }
+.opt-d .w-bubble::before { background: var(--plum); }
+.opt-d .w-pop {
+  rotate: -6deg;
+  font-family: var(--kfont);
+  color: #fff;
+  -webkit-text-stroke: calc(10px * var(--k) * var(--t)) var(--plum);
+  filter: drop-shadow(0 calc(5px * var(--k)) 0 var(--plum));
+}
+.opt-d .w-pop.big { color: var(--sun); }
+.opt-d .w-pop.huge { color: var(--pink-t); }
 
 /* =====================================================================
    Swallowing a hole. Today the banner says who, and the points go on
@@ -1013,11 +1069,39 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .opt-a .gulp-prize { background: linear-gradient(180deg, #ffe68a 0%, #ffc62e 60%); color: #3d2a00; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 3px 0 #cf8600, 0 4px 6px rgba(0, 0, 0, 0.2); }
 .opt-b .gulp-banner { border: 3px solid #fff; background: var(--grain), var(--sheen), #fff; box-shadow: inset 0 0 0 1.5px #d5dcec, var(--lift); transform: rotate(-1.5deg); }
 .opt-b .gulp-prize { background: #ffc62e; color: #2a1d00; box-shadow: 0 0 0 2.5px #fff, 0 3px 6px rgba(0, 0, 0, 0.3); transform: rotate(3deg); }
-.opt-c .gulp-banner { border: 2px solid var(--trim); background: var(--cab); box-shadow: var(--stripe-sh); color: var(--brown); }
+.opt-c .gulp-banner { border: 1.5px solid var(--trim); background: var(--cab); box-shadow: var(--panel-sh); color: var(--brown); }
 .opt-c .gulp-prize { background: linear-gradient(180deg, #ffc566 0%, #ff9a2a 60%, #f68300 100%); color: #2a1300; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 0 var(--trim-l); }
-.opt-d .gulp-banner { background: var(--washi), var(--mochi); box-shadow: var(--puff), var(--hair), var(--soft); color: var(--ink); }
-.opt-d .gulp-banner.good strong { color: var(--matcha-deep); }
-.opt-d .gulp-prize { background: var(--sakura); color: #8a1f43; box-shadow: inset 0 1px 1px #fff, 0 2px 4px rgba(201, 64, 105, 0.25); }
+.opt-d .gulp-banner {
+  position: relative;
+  border: 2.5px solid var(--plum);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--pink-t) 0%, var(--pink) 60%);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6), 0 4px 0 var(--plum);
+  font-family: var(--kfont);
+  padding: 8px 34px 10px;
+}
+.opt-d .gulp-banner::before,
+.opt-d .gulp-banner::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 18px;
+  width: 40px;
+  height: calc(100% - 22px);
+  border: 2.5px solid var(--plum);
+  background: var(--pink-deep);
+}
+.opt-d .gulp-banner::before { left: -28px; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 34% 50%); }
+.opt-d .gulp-banner::after { right: -28px; clip-path: polygon(0 0, 100% 0, 66% 50%, 100% 100%, 0 100%); }
+.opt-d .gulp-prize { border: 2px solid var(--plum); background: linear-gradient(180deg, var(--sun-t) 0%, var(--sun) 60%); rotate: -3deg; }
+
+.opt-d .gulp-banner.good strong { color: #fff; }
+.opt-d .gulp-lv small { -webkit-text-stroke-width: 3px; }
+.opt-d .party-pill { -webkit-text-stroke-width: 3.5px; }
+
+.phone.opt-d .gulp-messages > .gulp-banner { margin: 0 22px; padding: 8px 18px 10px; }
+.phone.opt-d .gulp-banner::before { left: -20px; width: 30px; }
+.phone.opt-d .gulp-banner::after { right: -20px; width: 30px; }
 
 /* Motion: A's Pause gets a slow shine. Off under reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
@@ -1092,15 +1176,15 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
     { id: 'cur', key: 'Current', name: 'Current', line: 'What a round shows today.' },
     { id: 'a', key: 'A', name: 'Toy plastic', line: 'Moulded pieces lit from above: a glossy highlight, a darker lip underneath and a soft shadow on the city. Buttons press down onto their lip.' },
     { id: 'b', key: 'B', name: 'Sticker', line: 'Die-cut stickers: a thick white edge, a soft shadow that lifts them off the city, a faint paper grain. The player’s row, the clock and Pause sit at a slight tilt.' },
-    { id: 'c', key: 'C', name: 'Arcade', line: 'A light arcade cabinet: cream laminate with an orange trim, burnt-orange numbers, a 70s sunset ring round the clock and sunset stripes under the leaderboard, push-buttons, an LED level meter, the map on a little CRT.' },
-    { id: 'd', key: 'D', name: 'Mochi', line: 'The soft East Asian look of pastel mobile games: puffy cream pieces with a soft inner shade, a faint washi grain, sakura pink for the player, matcha green for progress, rank badges as red seal stamps.' },
+    { id: 'c', key: 'C', name: 'Arcade', line: 'A light arcade cabinet: cream laminate with a thin orange trim, burnt-orange numbers, a slim 70s sunset ring round the clock, push-buttons, an LED level meter, the map on a little CRT.' },
+    { id: 'd', key: 'D', name: 'Kitty', line: 'A cute Japanese arcade game: candy colours with a plum outline and a hard drop, cat ears on the leaderboard, clock, Pause and map, cat-head rank badges, a striped level bar, a speech-bubble hint, a ribbon banner, and white game text with a plum edge in a chunky rounded font.' },
   ];
   const COST = {
     cur: 'Nothing to build. Swallowing a hole scores, but the banner does not say how much and no points rise.',
     a: '<b>Builds in:</b> gulp.css (a light layer and a lip on each piece; a shine on Pause, off under reduced motion), canvasTextures.ts (tags and bubble), effects.ts (block numbers).',
     b: '<b>Builds in:</b> gulp.css (white edge, shadow, grain, three tilts), canvasTextures.ts and effects.ts (a white edge round each label), holeView.ts (labels grow a little).',
-    c: '<b>Builds in:</b> gulp.css (panels, stripes, push-buttons, LED meter, CRT map: the most CSS of the four), canvasTextures.ts (sign tags with an offset shadow), effects.ts (striped numbers).',
-    d: '<b>Builds in:</b> gulp.css (soft shading, washi grain, seal badges), canvasTextures.ts (cream tags, a cloud bubble), effects.ts (pastel numbers with a plum edge).',
+    c: '<b>Builds in:</b> gulp.css (panels, push-buttons, LED meter, CRT map), canvasTextures.ts (sign tags with an offset shadow), effects.ts (striped numbers).',
+    d: '<b>Builds in:</b> gulp.css (ears, cat-head badges, ribbon, bubble tail: the most CSS of the four), a bundled 7 KB font (M PLUS Rounded 1c Black, OFL), canvasTextures.ts (eared tags in the new font), effects.ts (tilted numbers).',
   };
   const DEVS = {
     ipad: { label: 'iPad', size: '1180 × 820', w: 1180, h: 820, tag: [590, 334], hole: [590, 461], touch: false },
