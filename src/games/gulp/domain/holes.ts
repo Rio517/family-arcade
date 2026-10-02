@@ -29,6 +29,11 @@ export interface Hole {
   alive: boolean;
   /** Seconds until it comes back, while swallowed (for ever once out of lives). */
   respawnIn: number;
+  /**
+   * Times it has come back after being swallowed. A device that steers this
+   * hole on its own screen jumps to where it came back when this changes.
+   */
+  respawns: number;
   /** Times it can still be swallowed and come back (Infinity where there are none to lose). */
   lives: number;
   /** Seconds of safety left after coming back. */
@@ -105,6 +110,7 @@ export function newHole(id: number, name: string, skin: number, isPlayer: boolea
     kills: 0,
     alive: true,
     respawnIn: 0,
+    respawns: 0,
     lives: Infinity,
     safe: 0,
     eatenBy: null,

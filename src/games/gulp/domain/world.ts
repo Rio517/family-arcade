@@ -65,7 +65,9 @@ export type WorldEvent =
   | { type: 'power'; hole: number; kind: PowerKind }
   | { type: 'hurt'; hole: number; cause: HurtCause }
   | { type: 'boom'; x: number; z: number; size: number }
-  | { type: 'incoming'; target: number; kind: Attack['kind'] };
+  | { type: 'incoming'; target: number; kind: Attack['kind'] }
+  /** Someone swallowed walks back into town (said only in a shared round, see `Options.shared`). */
+  | { type: 'back'; person: Person };
 
 export interface Input {
   /** Where the child wants to go, as a direction with strength 0..1. */
@@ -79,6 +81,12 @@ export interface HoleReport {
   z: number;
   vx: number;
   vz: number;
+  /**
+   * How many times the hole had come back (its `respawns`) when the device
+   * made the report. A report from before the hole last came back is old
+   * news: it would drag the hole back to where it was swallowed.
+   */
+  life?: number;
 }
 
 export interface Options {
@@ -94,6 +102,12 @@ export interface Options {
   countdown?: number;
   /** How hard the computer holes play; left out, they play Easy. */
   difficulty?: Difficulty;
+  /**
+   * A round shared with other devices. The rules then also say when a giant
+   * takes a person without a fuss and when someone walks back into town,
+   * which the other devices' copies of the round need and a solo round does not.
+   */
+  shared?: boolean;
 }
 
 export interface World {
@@ -342,7 +356,12 @@ const topSpeed = (h: Hole, pace: number) => speedOf(h.r) * pace * ((h.speedTime 
  */
 const REPORT_SLACK = 0.25;
 
-function move(w: World, h: Hole, want: Input, dt: number, pace: number): void {
+/**
+ * Steer a hole toward `want` at up to its top speed, sliding along the shore.
+ * A guest's device moves its own hole with this too, so it moves as it would
+ * on the host.
+ */
+export function move(w: World, h: Hole, want: Input, dt: number, pace: number): void {
   const len = Math.hypot(want.x, want.z);
   const k = len > 1 ? 1 / len : 1;
   const top = topSpeed(h, pace);
@@ -358,11 +377,12 @@ function move(w: World, h: Hole, want: Input, dt: number, pace: number): void {
 /**
  * A child's hole steered on another device goes where that device last said
  * it was, but never further in one step than the hole could go, and never off
- * the land. With no report (the device has not said, or has dropped), it
- * stays where it is.
+ * the land. With no report (the device has not said, or has dropped, or the
+ * report is from before the hole last came back), it stays where it is.
  */
 function place(w: World, h: Hole, at: HoleReport | undefined, dt: number): void {
-  if (!at || ![at.x, at.z, at.vx, at.vz].every(Number.isFinite)) {
+  const stale = at?.life !== undefined && at.life !== h.respawns;
+  if (!at || stale || ![at.x, at.z, at.vx, at.vz].every(Number.isFinite)) {
     h.vx = 0;
     h.vz = 0;
     return;
@@ -426,6 +446,7 @@ function respawn(w: World, h: Hole): void {
   h.alive = true;
   h.safe = SAFE;
   h.respawnIn = 0;
+  h.respawns += 1;
 }
 
 /** Everyone, best first: the leaderboard and the results. */
