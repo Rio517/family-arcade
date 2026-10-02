@@ -992,7 +992,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .phone.opt-d .gulp-lv b { font-size: 15px; }
 .phone.opt-d .gulp-buttons { gap: 10px; }
 
-/* In the city: cream tags with a thin outline, a cream bubble, coin points in pixel digits. */
+/* In the city: cream tags with a thin outline, a cream bubble, points in pixel digits. */
 .opt-d .w-tag {
   font-family: var(--kfont);
   font-weight: 900;
@@ -1007,22 +1007,11 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .opt-d .w-bubble::before { background: var(--ink); }
 .opt-d .w-bubble::after { background: var(--paper); }
 .opt-d .w-pop {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(6px * var(--k));
   font-family: var(--pix);
   font-weight: 400;
   color: #fff;
   -webkit-text-stroke: calc(8px * var(--k) * var(--t)) var(--ink);
   filter: drop-shadow(0 calc(4px * var(--k)) 0 var(--ink));
-}
-.opt-d .w-pop::before {
-  content: '';
-  width: 0.9em;
-  height: 0.9em;
-  border-radius: 50%;
-  background: var(--coin);
-  box-shadow: inset 0 0 0 calc(3px * var(--k)) #c98a00, 0 0 0 calc(3px * var(--k)) var(--ink);
 }
 .opt-d .w-pop.big { color: var(--yellow); }
 .opt-d .w-pop.huge { color: var(--cyan-t); }
@@ -1066,7 +1055,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 .opt-c .gulp-banner { border: 1.5px solid var(--trim); background: var(--cab); box-shadow: var(--panel-sh); color: var(--brown); }
 .opt-c .gulp-prize { background: linear-gradient(180deg, #ffc566 0%, #ff9a2a 60%, #f68300 100%); color: #2a1300; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 0 var(--trim-l); }
 
-/* D: the banner is a purple marquee with flashing bulbs; the prize is a coin. */
+/* D: the banner is a purple marquee with flashing bulbs; the prize is a cream pill. */
 .opt-d .gulp-banner {
   position: relative;
   border: 1.5px solid var(--ink);
@@ -1078,8 +1067,7 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
   padding: 14px 32px;
 }
 .opt-d .gulp-banner.good strong { color: #fff; text-shadow: 0 2px 0 rgba(42, 31, 74, 0.6); }
-.opt-d .gulp-prize { gap: 6px; border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink); font-family: var(--kfont); }
-.opt-d .gulp-prize::before { content: ''; width: 18px; height: 18px; border-radius: 50%; background: var(--coin); box-shadow: inset 0 0 0 2px #c98a00, 0 0 0 1.5px var(--ink); }
+.opt-d .gulp-prize { border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink); font-family: var(--kfont); }
 .phone.opt-d .gulp-banner { padding: 12px 20px; }
 
 
@@ -1093,6 +1081,11 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 
 .opt-d .gulp-board b { position: relative; top: 1.5px; }
 .opt-d .w-pop { font-size: calc(34px * var(--k) * var(--t)); }
+
+/* Pixel digits: one em tall, nudged down so the ink sits in the middle. */
+.opt-d .gulp-clock span { line-height: 1; position: relative; top: 0.2em; }
+.opt-d .gulp-lv { align-items: center; padding: 0 12px; }
+.opt-d .gulp-lv b { line-height: 1; position: relative; top: 0.23em; }
 
 /* Motion: A's Pause gets a slow shine. Off under reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
