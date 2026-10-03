@@ -303,6 +303,9 @@ export class RacerScene {
     looks: RacerLook[],
     private followIndex: number,
     private reducedMotion = false,
+    /** Builds each racer's character. The game always uses today's riders;
+     *  the cast preview passes another character kit to see it in the sky. */
+    private makeRider: typeof createRider = createRider,
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -674,7 +677,7 @@ export class RacerScene {
 
   private buildRacer(look: RacerLook, i: number): RacerObj {
     const holder = new THREE.Group();
-    const rider = createRider(look.character, look.color, {
+    const rider = this.makeRider(look.character, look.color, {
       reducedMotion: this.reducedMotion,
       seed: i + 1,
       mount: look.mount,

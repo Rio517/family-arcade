@@ -753,6 +753,28 @@ const SHOTS = [
       await page.waitForTimeout(5200);
     },
   },
+  // The chunky-cast pitch (docs/mockups/20261003-racer-chunky): the unicorn
+  // and the fairy today, in A (close match) and in B (in between), each as a
+  // turntable, a pick card and in the race sky at race size. Both engines:
+  // the race view is the game's own canvas.
+  ...['today', 'a', 'b'].flatMap((style) =>
+    [
+      { view: 'turntable', viewport: { width: 1200, height: 720 } },
+      { view: 'pick', viewport: { width: 760, height: 520 } },
+      { view: 'race', viewport: TABLET },
+    ].map(({ view, viewport }) => ({
+      name: `racer-chunky-${style}-${view}`,
+      path: `/preview-racer-cast.html?style=${style}&view=${view}`,
+      viewport,
+      fits: true,
+      selector: `[data-testid="cast-${view}"]`,
+      expect: '[data-ready="1"]',
+      engines: ['chromium', 'webkit'],
+      prep: async (page) => {
+        await page.waitForSelector('[data-ready="1"]', { timeout: 30000 });
+      },
+    })),
+  ),
   {
     // The mode screen on a phone: "Play together", and the rainbow heading
     // with its outline.
