@@ -320,34 +320,6 @@ export class BoomKit {
     this.mark(at, 1.5, 0.45, seconds, this.style === 'a' ? 0.95 : 0.7, 0.85, this.style === 'a' ? 0xff3355 : 0xffa040);
   }
 
-  /** A short glowing streak for a shell in flight; the caller moves it. */
-  shellSprite(): THREE.Sprite {
-    const P = PALETTE[this.style];
-    const s = new THREE.Sprite(
-      new THREE.SpriteMaterial({ map: this.style === 'a' ? starTexture() : puffTexture(), color: P.spark, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, premultipliedAlpha: true }),
-    );
-    s.scale.setScalar(this.style === 'a' ? 0.34 : 0.26);
-    s.renderOrder = 7;
-    this.group.add(s);
-    return s;
-  }
-
-  /** A fading glow left behind a shell. */
-  trail(at: THREE.Vector3, size: number): void {
-    const P = PALETTE[this.style];
-    this.puff(at.clone(), P.spark, new THREE.Vector3(), size, 0.2, -size * 2.5, { additive: true, opacity: 0.55 });
-  }
-
-  /** A smoke wisp off a trail (the cinematic take's shells leave a line in the sky). */
-  wisp(at: THREE.Vector3, size: number): void {
-    this.puff(at.clone(), 0x8a909c, new THREE.Vector3(0, 0.1, 0), size, 0.7, size * 0.8, { opacity: 0.22, tex: 'smoke' });
-  }
-
-  removeSprite(s: THREE.Sprite): void {
-    this.group.remove(s);
-    s.material.dispose();
-  }
-
   private puff(
     at: THREE.Vector3,
     color: number,

@@ -1,12 +1,14 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Battle } from './Battle';
+import { BEAT_MS, IN_MS, OUT_MS } from '@games/battleship/state/shotPlayback';
 
 // Warm the lazy 3D chunk once per worker: three.js + the ship models are a
 // heavy cold transform, and racing them inside a findBy timeout flakes when
 // the whole suite runs in parallel.
 beforeAll(async () => {
   await import('./Fleet3D');
+  await import('./RadarSinking');
 }, 30000);
 import { stackFleet } from '@test/helpers';
 import { resolveShot } from '@games/battleship/domain/engine';
@@ -281,6 +283,72 @@ describe('<Battle> watching the shots (the darker-arcade pitch)', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     fireEvent.click(toggle);
     expect(onWatch).toHaveBeenCalledWith(false);
+  });
+
+  it('holds our result a beat before their shell; a tap in the beat shows theirs at once', () => {
+    vi.useFakeTimers();
+    try {
+      const answered: GameLog = [...fired, { type: 'shot', by: 'guest', row: 9, col: 9, hit: false, sunk: null, allSunk: false }];
+      const { rerender } = render(battle(base));
+      rerender(battle(fired));
+      rerender(battle(answered));
+      act(() => vi.advanceTimersByTime(OUT_MS));
+      // Our hit is on the radar; their miss isn't shown yet, and the screen still skips.
+      expect(screen.getByLabelText('F6 — hit')).toBeInTheDocument();
+      expect(screen.queryByLabelText('K10 — miss')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('skip-shot'));
+      expect(screen.getByLabelText('K10 — miss')).toBeInTheDocument();
+      expect(screen.queryByTestId('skip-shot')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the result waits for their final shell after the beat, then the page moves on', () => {
+    vi.useFakeTimers();
+    try {
+      const onSettled = vi.fn();
+      const last: GameLog = [...fired, { type: 'shot', by: 'guest', row: 9, col: 9, hit: true, sunk: null, allSunk: false }];
+      const view = (log: GameLog) => (
+        <Battle log={log} side="host" myName="Rio" oppName="Kid" skinId="aqua" oppSkinId="ember" myFleet={stackFleet()} myTurn={false} pendingFire={null} onFire={vi.fn()} fx={FX} watchShots onWatchShots={vi.fn()} finished onSettled={onSettled} />
+      );
+      const { rerender } = render(view(base));
+      rerender(view(fired));
+      rerender(view(last));
+      act(() => vi.advanceTimersByTime(OUT_MS + BEAT_MS - 10));
+      expect(onSettled).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(10 + IN_MS));
+      expect(onSettled).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(1400));
+      expect(onSettled).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a ship we sink goes down on the radar first; with no 3D to show it, its sunk mark shows at once', async () => {
+    vi.useFakeTimers();
+    try {
+      const first: GameLog = [...fired];
+      const sank: GameLog = [...first, { type: 'shot', by: 'host', row: 5, col: 6, hit: true, sunk: 'destroyer', allSunk: false }];
+      const { rerender } = render(battle(first));
+      rerender(battle(sank));
+      // In flight: only our own destroyer is drawn; the radar has none yet.
+      expect(screen.getAllByTestId('ship-overlay-destroyer')).toHaveLength(1);
+      await act(async () => {
+        vi.advanceTimersByTime(OUT_MS);
+      });
+      // Landed. The 3D sinking cannot play here (no WebGL), so the flat mark
+      // shows straight away instead of after the sinking's time.
+      for (let i = 0; i < 5 && screen.getAllByTestId('ship-overlay-destroyer').length < 2; i++) {
+        await act(async () => {
+          await import('./RadarSinking');
+        });
+      }
+      expect(screen.getAllByTestId('ship-overlay-destroyer')).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("without the pitch, a shot shows at once as it always has", () => {

@@ -145,7 +145,8 @@ export function usePitch(): Pitch & { choose: (change: { look?: LookId; fx?: FxI
 
 const WATCH_KEY = 'bs-watch-shots-v1';
 
-const prefersReduced = () =>
+/** The device asks for reduced motion. */
+export const prefersReduced = () =>
   typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**

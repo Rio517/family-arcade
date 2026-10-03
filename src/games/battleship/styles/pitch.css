@@ -151,3 +151,127 @@
   from { transform: scale(1.25); opacity: 0.55; }
   to { transform: scale(0.8); opacity: 1; }
 }
+
+/* ── The radar's dark water (?fx=a sonar cast, ?fx=b plain night sea) ───────
+   A deep night-blue sea under the grid, its swell drawn as two layers of
+   soft crest lines drifting slowly against each other. Painted tiles moved
+   by transform only (the compositor's work, no repaint), each loop exactly
+   one tile long so it never jumps. Still under reduced motion. The cells go
+   see-through over it; every marker keeps its own colour on top. */
+.board.sea-dark {
+  --sea: transparent;
+  --sea-line: rgba(150, 190, 235, 0.11);
+}
+.board.sea-dark-a { --sea-line: rgba(94, 234, 212, 0.13); }
+.radar-sea {
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 26% 14%, rgba(56, 104, 168, 0.26), transparent 62%),
+    radial-gradient(130% 110% at 82% 104%, rgba(1, 5, 14, 0.75), transparent 68%),
+    linear-gradient(180deg, #071a31 0%, #04132a 52%, #030c1c 100%);
+}
+.radar-sea-a {
+  background:
+    repeating-radial-gradient(circle at 50% 50%, transparent 0 46px, rgba(94, 234, 212, 0.07) 47px, transparent 49px),
+    radial-gradient(120% 90% at 50% 50%, rgba(20, 90, 110, 0.22), transparent 70%),
+    linear-gradient(180deg, #04182a 0%, #031324 55%, #020c19 100%);
+}
+.rs-swell,
+.rs-glint {
+  position: absolute;
+  pointer-events: none;
+}
+.rs-swell {
+  inset: -130px;
+  background-repeat: repeat;
+  will-change: transform;
+}
+/* Short crests, one tile 120 x 80. */
+.rs-swell-1 {
+  background-size: 120px 80px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='80'%3E%3Cg fill='none' stroke='%239cc4ff' stroke-linecap='round'%3E%3Cpath d='M0 22C20 13 40 13 60 22S100 31 120 22' stroke-width='14' stroke-opacity='.035'/%3E%3Cpath d='M0 22C20 13 40 13 60 22S100 31 120 22' stroke-width='5' stroke-opacity='.05'/%3E%3Cpath d='M0 62C20 71 40 71 60 62S100 53 120 62' stroke-width='14' stroke-opacity='.03'/%3E%3Cpath d='M0 62C20 71 40 71 60 62S100 53 120 62' stroke-width='5' stroke-opacity='.045'/%3E%3C/g%3E%3C/svg%3E");
+}
+/* The long swell under them, one tile 180 x 110, crossing at an angle and
+   swaying back and forth (oversized to cover the board while turned). */
+.rs-swell-2 {
+  inset: calc(-14% - 70px);
+  background-size: 180px 110px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='110'%3E%3Cg fill='none' stroke='%237aa6e6' stroke-linecap='round'%3E%3Cpath d='M0 40C30 26 60 26 90 40S150 54 180 40' stroke-width='26' stroke-opacity='.05'/%3E%3Cpath d='M0 40C30 26 60 26 90 40S150 54 180 40' stroke-width='9' stroke-opacity='.04'/%3E%3C/g%3E%3C/svg%3E");
+  transform: rotate(-17deg);
+}
+/* The sonar take: thin phosphor crest lines, like a depth chart. */
+.radar-sea-a .rs-swell-1 {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='80'%3E%3Cg fill='none' stroke='%235eead4' stroke-linecap='round'%3E%3Cpath d='M0 22C20 13 40 13 60 22S100 31 120 22' stroke-width='8' stroke-opacity='.035'/%3E%3Cpath d='M0 22C20 13 40 13 60 22S100 31 120 22' stroke-width='1.3' stroke-opacity='.16'/%3E%3Cpath d='M0 62C20 71 40 71 60 62S100 53 120 62' stroke-width='8' stroke-opacity='.03'/%3E%3Cpath d='M0 62C20 71 40 71 60 62S100 53 120 62' stroke-width='1.3' stroke-opacity='.12'/%3E%3C/g%3E%3C/svg%3E");
+}
+.radar-sea-a .rs-swell-2 {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='110'%3E%3Cg fill='none' stroke='%2338bdf8' stroke-linecap='round'%3E%3Cpath d='M0 40C30 26 60 26 90 40S150 54 180 40' stroke-width='22' stroke-opacity='.04'/%3E%3Cpath d='M0 40C30 26 60 26 90 40S150 54 180 40' stroke-width='1' stroke-opacity='.09'/%3E%3C/g%3E%3C/svg%3E");
+}
+/* The plain night sea: its swell is seeded noise (the same every time),
+   stretched long and low across the board, with sparse, finer glints over
+   it; the two drift different ways, so the water never reads as a pattern. */
+.radar-sea-b .rs-swell-1 {
+  inset: -4px -4px -4px -244px; /* room for one tile of drift to the right */
+  background-size: 240px 160px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='160'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.0125 0.0375' numOctaves='3' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.55 0 0 0 0 0.72 0 0 0 0 1 2.2 0 0 0 -1.05'/%3E%3C/filter%3E%3Crect width='240' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.28;
+}
+.radar-sea-b .rs-swell-2 {
+  inset: -124px -164px -4px -4px; /* room for one tile of drift, down and to the left */
+  background-size: 160px 120px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='120'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.025 0.075' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.75 0 0 0 0 0.86 0 0 0 0 1 3.2 0 0 0 -1.9'/%3E%3C/filter%3E%3Crect width='160' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  transform: none;
+  opacity: 0.26;
+}
+/* A faint sheen of moonlight across the night sea (the sonar take has none). */
+.rs-glint {
+  inset: 0;
+  background: radial-gradient(60% 34% at 30% 22%, rgba(190, 215, 255, 0.07), transparent 70%);
+}
+.radar-sea-a .rs-glint { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .rs-swell-1 { animation: rs-drift-1 24s linear infinite; }
+  .rs-swell-2 { animation: rs-sway 11s ease-in-out infinite alternate; }
+  .rs-glint { animation: rs-glint 9s ease-in-out infinite alternate; }
+  .radar-sea-b .rs-swell-1 { animation: rs-b-swell 40s linear infinite; }
+  .radar-sea-b .rs-swell-2 { animation: rs-b-glint 26s linear infinite; }
+}
+@keyframes rs-b-swell {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(240px, 0, 0); }
+}
+@keyframes rs-b-glint {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-160px, 120px, 0); }
+}
+@keyframes rs-drift-1 {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(120px, 80px, 0); }
+}
+@keyframes rs-sway {
+  from { transform: rotate(-17deg) translate3d(-60px, 0, 0); }
+  to { transform: rotate(-17deg) translate3d(60px, 0, 0); }
+}
+@keyframes rs-glint {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+/* Markers read clearly on the water: misses as bright spray dots. */
+.board.sea-dark .cell.miss::after { background: #d6e6ff; opacity: 0.8; }
+/* The plain sea keeps the sweep, softer; the sonar take keeps it as it is. */
+.board.sea-dark-b.enemy.active::before { opacity: 0.32; }
+
+/* The radar's sinking ships: a 3D overlay on the grid, over the cells and the
+   sunk marks, under the blasts; never takes a tap. */
+.radar-sink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 12;
+}

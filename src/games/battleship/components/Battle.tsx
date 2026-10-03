@@ -2,12 +2,14 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Board, type BoardCell, type PlacedShip } from './Board';
 import type { Burst, ShellDrop } from './BoardFX';
 import { ShipProfile } from './ships';
-import { TODAY_FX, type PitchFx } from '@games/battleship/state/pitch';
-import { DROP_MS, OUT_MS, logUpTo, useShotPlayback } from '@games/battleship/state/shotPlayback';
+import { TODAY_FX, prefersReduced, type PitchFx } from '@games/battleship/state/pitch';
+import { DROP_MS, OUT_MS, RADAR_SINK_MS, WARN_MS, logUpTo, useShotPlayback } from '@games/battleship/state/shotPlayback';
 
 // three.js is heavy, so the 3D ocean loads on demand — staying in 2D never
-// downloads it.
+// downloads it. The radar's sinking ships are 3D too; only the pitch's guns
+// ever mount them.
 const Fleet3D = lazy(() => import('./Fleet3D'));
+const RadarSinking = lazy(() => import('./RadarSinking'));
 import { FLEET, shipSpec, skinById } from '@games/battleship/domain/constants';
 import { COLUMN_LABELS, shipCells } from '@games/battleship/domain/board';
 import { ownBoardView, radarGrid, shipName, sunkByAttacker, type CellState } from '@games/battleship/domain/engine';
@@ -126,15 +128,42 @@ export function Battle({
     ? { id: play.last.id, row: play.last.shot.row, col: play.last.shot.col, kind: play.last.kind, onEnemy: play.last.mine }
     : null;
 
-  // The skip: Escape, or a tap anywhere on the battle while a shot plays.
-  useDismissOnEscape(current !== null, play.skip);
-
-  // Once the final shot has played out, the page moves on to the result.
+  // A ship we sink, watched in full, goes down in 3D on the radar before its
+  // sunk mark shows. A skip cuts it short.
+  // (Under reduced motion it is simply sunk, as today.)
+  const sinks = playing && !prefersReduced();
+  const sinkingShot = sinks && play.last && play.last.mine && play.last.kind === 'sunk' && play.last.watched ? play.last : null;
+  const sinkingId = sinkingShot?.id ?? -1;
+  const [sankId, setSankId] = useState(-1);
   useEffect(() => {
-    if (!finished || current || !onSettled) return;
-    const t = setTimeout(onSettled, 1400);
+    if (sinkingId < 0) return;
+    const t = setTimeout(() => setSankId(sinkingId), RADAR_SINK_MS);
     return () => clearTimeout(t);
-  }, [finished, current, onSettled]);
+  }, [sinkingId]);
+  const sinking = sinkingShot && sinkingId !== sankId ? sinkingShot : null;
+  // Its 3D canvas exists only around a sinking: from the moment our sinking
+  // shot is fired (its flight gives the canvas time to get ready) until the
+  // ship is under. No second WebGL context sits over the radar otherwise.
+  const sinkAhead = sinks && current !== null && current.mine && current.kind === 'sunk';
+
+  // The skip: Escape, or a tap anywhere on the battle while a shot plays, our
+  // result holds before their answer, or a ship goes down on the radar.
+  const skippable = current !== null || play.beat || sinking !== null;
+  const skip = () => {
+    play.skip();
+    if (sinking) setSankId(sinking.id);
+  };
+  useDismissOnEscape(skippable, skip);
+
+  // Once the final shot has played out (and any sinking has gone under), the
+  // page moves on to the result after a moment on the final blast.
+  const last = play.last;
+  const settleMs = last && last.kind === 'sunk' && !last.mine ? 2200 : last?.mine && last.watched && last.kind === 'sunk' ? 500 : 1400;
+  useEffect(() => {
+    if (!finished || skippable || !onSettled) return;
+    const t = setTimeout(onSettled, settleMs);
+    return () => clearTimeout(t);
+  }, [finished, skippable, onSettled, settleMs]);
 
   const isFresh = (onEnemy: boolean, r: number, c: number) =>
     impact !== null && impact.onEnemy === onEnemy && impact.row === r && impact.col === c;
@@ -170,7 +199,7 @@ export function Battle({
     ? { id: current.id, row: aimed.row, col: aimed.col, ms: DROP_MS, delay: OUT_MS - DROP_MS }
     : null;
   const ownShell: ShellDrop | null = current && !current.mine
-    ? { id: current.id, row: current.shot.row, col: current.shot.col, ms: current.ms }
+    ? { id: current.id, row: current.shot.row, col: current.shot.col, ms: current.ms, theirs: true, warn: WARN_MS }
     : null;
 
   // Ships are drawn as top-down overlays (see ownShips); un-hit ship cells stay
@@ -208,6 +237,9 @@ export function Battle({
   // The enemy's sunk ships, reconstructed so they show as grey silhouettes on
   // the radar just like my own sunk ships do on my board.
   const enemyShips = sunkEnemyShips(radar, viewLog, side);
+  // While one goes down in 3D, its flat sunk mark waits underneath.
+  const sinkingShip = sinking ? enemyShips.find((s) => s.shipId === sinking.shot.sunk) ?? null : null;
+  const radarShips = sinkingShip ? enemyShips.filter((s) => s !== sinkingShip) : enemyShips;
 
   const radarBoard = (
     <div className="panel">
@@ -226,7 +258,23 @@ export function Battle({
         fx={fxFor(true)}
         fxLook={fx.boom}
         shell={radarShell}
-        ships={enemyShips}
+        ships={radarShips}
+        sea={fx.water === 'today' ? undefined : fx.water}
+        overlay={
+          sinkAhead || sinking ? (
+            <Suspense fallback={null}>
+              <RadarSinking
+                ship={sinkingShip}
+                id={sinking?.id ?? -1}
+                era={era}
+                skinColor={skinById(oppSkinId).color}
+                look={fx.boom === 'b' ? 'b' : 'a'}
+                upcoming={sinkAhead ? current.shot.sunk : null}
+                onCannot={setSankId}
+              />
+            </Suspense>
+          ) : undefined
+        }
         onCell={myTurn && !current ? (r, c) => onFire({ row: r, col: c }) : undefined}
         disabled={!myTurn || current !== null}
       />
@@ -273,7 +321,8 @@ export function Battle({
 
   // Watching the shots on a phone, the screen follows the shell: the radar
   // for ours, the fleet for theirs. The player's own pick returns after.
-  const shownView: View = playing && current ? (current.mine ? 'radar' : 'fleet') : view;
+  // Our result holds on the radar (and a sinking plays there) before theirs.
+  const shownView: View = playing && current ? (current.mine ? 'radar' : 'fleet') : playing && (play.beat || sinking) ? 'radar' : view;
 
   const footer = (
     <div className="bs-battle-foot">
@@ -296,13 +345,13 @@ export function Battle({
 
   return (
     <div className="stack bs-battle">
-      {current && (
+      {skippable && (
         // While a shot plays, a tap anywhere on the battle skips it (and
         // Escape does too). Skipping only shows the result sooner.
         <button
           type="button"
           className="bs-skip"
-          onClick={play.skip}
+          onClick={skip}
           aria-label="Skip the shot"
           data-testid="skip-shot"
         >

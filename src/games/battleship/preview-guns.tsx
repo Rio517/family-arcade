@@ -8,15 +8,19 @@
  *   &watch=0                          Watch the shots off
  *   &demo=1                           play an exchange of shots every few seconds
  *
- * window.__bs.mine('hit'|'miss'|'sunk') and .theirs(...) fire one shot each,
- * for the screenshot and frame-time scripts. Built only under BUILD_HARNESS.
+ * window.__bs.mine('hit'|'miss'|'sunk') and .theirs(kind, 'shell'|'plane')
+ * fire one shot each, for the screenshot and frame-time scripts (a sinking of
+ * ours lays the whole ship's hits first; asking for a plane pads silent
+ * misses until the playback sends one). Built only under BUILD_HARNESS.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Battle } from './components/Battle';
 import { shipCells } from './domain/board';
+import { shipSpec } from './domain/constants';
 import type { Fleet, GameLog, ShipId, ShotEvent } from './domain/types';
 import { usePitch } from './state/pitch';
+import { viaOf, type Via } from './state/shotPlayback';
 import '@shared/styles/tokens.css';
 import '@games/battleship/styles/battleship.css';
 import '@games/battleship/styles/pitch.css';
@@ -46,7 +50,7 @@ type Kind = 'hit' | 'miss' | 'sunk';
 
 declare global {
   interface Window {
-    __bs?: { mine: (k: Kind) => void; theirs: (k: Kind) => void };
+    __bs?: { mine: (k: Kind) => void; theirs: (k: Kind, via?: Via) => void };
   }
 }
 
@@ -63,32 +67,71 @@ function App() {
 
   const mine = useCallback((kind: Kind) => {
     setLog((l) => {
-      const taken = new Set(l.filter((e): e is ShotEvent => e.type === 'shot' && e.by === 'host').map((e) => `${e.row},${e.col}`));
-      // Walk the radar for an open cell, seeded by how many shots are down.
+      const ours = l.filter((e): e is ShotEvent => e.type === 'shot' && e.by === 'host');
+      const taken = new Set(ours.map((e) => `${e.row},${e.col}`));
       const n = l.length;
+      if (kind === 'sunk') {
+        // A real sinking: the next of their ships still afloat, laid along an
+        // open stretch of the radar, its other cells hit first (silently).
+        const sunk = new Set(ours.map((e) => e.sunk));
+        const id = (['battleship', 'submarine', 'carrier'] as const).find((s) => !sunk.has(s));
+        if (!id) return l;
+        const size = shipSpec(id).size;
+        for (let i = 0; i < 100; i++) {
+          const k = (n * 37 + i * 13) % 100;
+          const row = Math.floor(k / 10);
+          const col = k % 10;
+          if (col + size > 10) continue;
+          // Clear water around it too, so the radar reads the hit run as this ship alone.
+          const run = Array.from({ length: size + 2 }, (_, j) => `${row},${col - 1 + j}`);
+          if (run.some((c) => taken.has(c))) continue;
+          const fill = Array.from({ length: size - 1 }, (_, j) => S('host', row, col + j, true));
+          return [...l, ...fill, S('host', row, col + size - 1, true, id)];
+        }
+        return l;
+      }
+      // Walk the radar for an open cell, seeded by how many shots are down.
       for (let i = 0; i < 100; i++) {
         const k = (n * 37 + i * 13) % 100;
         const row = Math.floor(k / 10);
         const col = k % 10;
         if (taken.has(`${row},${col}`)) continue;
-        return [...l, S('host', row, col, kind !== 'miss', kind === 'sunk' ? 'submarine' : null)];
+        return [...l, S('host', row, col, kind !== 'miss')];
       }
       return l;
     });
   }, []);
 
-  const theirs = useCallback((kind: Kind) => {
+  const theirs = useCallback((kind: Kind, via?: Via) => {
     setLog((l) => {
       const taken = new Set(l.filter((e): e is ShotEvent => e.type === 'shot' && e.by === 'guest').map((e) => `${e.row},${e.col}`));
-      if (kind === 'miss') {
+      const water = (salt: number) => {
         for (let i = 0; i < 100; i++) {
-          const k = (l.length * 41 + i * 7) % 100;
+          const k = (l.length * 41 + salt * 17 + i * 7) % 100;
           const row = Math.floor(k / 10);
           const col = k % 10;
           const onShip = myFleet.some((p) => shipCells(p).some((c) => c.row === row && c.col === col));
-          if (!onShip && !taken.has(`${row},${col}`)) return [...l, S('guest', row, col, false)];
+          if (!onShip && !taken.has(`${row},${col}`)) {
+            taken.add(`${row},${col}`);
+            return S('guest', row, col, false);
+          }
         }
-        return l;
+        return null;
+      };
+      // Asked for a shell or a plane: silent misses first, until the attack
+      // that plays comes the way asked.
+      const pad: ShotEvent[] = [];
+      if (via) {
+        const shots = l.filter((e): e is ShotEvent => e.type === 'shot');
+        for (let i = 0; i < 3 && viaOf([...shots, ...pad], shots.length + pad.length, 'host') !== via; i++) {
+          const m = water(i + 5);
+          if (m) pad.push(m);
+        }
+        l = [...l, ...pad];
+      }
+      if (kind === 'miss') {
+        const m = water(0);
+        return m ? [...l, m] : l;
       }
       // A hit on the first ship still afloat; its last cell sinks it.
       for (const p of myFleet) {

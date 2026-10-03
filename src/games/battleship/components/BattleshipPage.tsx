@@ -188,8 +188,9 @@ export function BattleshipPage() {
   const settleBattle = useCallback(() => setBattleSeen(false), []);
   useEffect(() => {
     if (!holdBattle) return;
-    // Never longer than the shot itself: a backstop in case it can't play.
-    const t = setTimeout(() => setBattleSeen(false), 4000);
+    // A backstop in case it can't play: never longer than the slowest last
+    // exchange (a sinking on the radar, the beat, their final shell).
+    const t = setTimeout(() => setBattleSeen(false), 7000);
     return () => clearTimeout(t);
   }, [holdBattle]);
 

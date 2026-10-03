@@ -22,6 +22,8 @@ import { FireField, type FireSpot } from './fx/fire';
 import { bearingTo, muzzleWorld, poseRig, rigGuns, type ShipGuns } from './fx/guns';
 import { buildSea, type Sea } from './fx/water';
 import { isSharedFxTexture } from './fx/textures';
+import { Tracer, type TracerKind } from './fx/tracers';
+import { cubic, disposePlane, findJet, jetPlane, poseFlight, propPlane, type Flight, type JetTemplate } from './fx/planes';
 
 export interface SceneShip {
   shipId: ShipId;
@@ -37,25 +39,38 @@ const HALF = (BOARD_SIZE - 1) / 2; // board cell → world offset
 /** A freshly-sunk hull takes this long to slip under the water. */
 const SINK_MS = 30_000;
 
+/** The pitch: a ship we lose lists, settles and goes down over this long, then stays as a wreck. */
+const WRECK_MS = 3200;
+
 /** A gun trains on its bearing over this long, then fires. */
 const TRAIN_MS = 380;
-/** An outgoing shell's flight from the muzzle into the haze over the enemy's waters. */
-const OUT_FLIGHT_MS = 680;
+/** An outgoing shell's flight from the muzzle, up and away east over the enemy's waters. */
+const OUT_FLIGHT_MS = 900;
+/** How far the barrels lift to fire: the shells climb steeply to clear our own ships. */
+const FIRE_ELEV = 0.42;
+/** Planes fly bigger than life, so a launch reads at board scale. */
+const PLANE_GROW = 2;
 
-/** One shell in the air: a glowing streak on a ballistic arc, leaving a trail. */
+/**
+ * One trail in the sky: a shell (or bomb) on its arc, or a plane's contrail.
+ * Where it is at t (0..1), and from which t it is drawn (a plane leaves no
+ * trail on its take-off run).
+ */
 interface Shell {
-  sprite: THREE.Sprite;
-  from: THREE.Vector3;
-  ctrl: THREE.Vector3;
-  to: THREE.Vector3;
+  tracer: Tracer;
+  path: (t: number, out: THREE.Vector3) => THREE.Vector3;
   start: number;
   dur: number;
-  lastTrail: number;
-  /** Rises straight up first (a missile out of a hatch). */
-  boost?: number;
-  /** Where it was last frame, for the tracer. */
-  lastPos?: THREE.Vector3;
-  onArrive?: () => void;
+  from: number;
+}
+
+/** A lost ship going down (the pitch): its list and trim at rest, and how far it settles. */
+interface Wreck {
+  g: THREE.Group;
+  start: number;
+  roll: number;
+  trim: number;
+  drop: number;
 }
 
 /** A gun's pose kept per ship, so it survives the per-shot hull rebuilds. */
@@ -88,6 +103,10 @@ export class FleetScene {
   private bobbing: THREE.Group[] = [];
   /** Hulls partway through their 30-second foundering, advanced by the loop. */
   private sinkers: { g: THREE.Group; start: number; drop: number; baseList: number }[] = [];
+  /** The pitch's lost ships, partway down to where they rest as wrecks. */
+  private wrecks: Wreck[] = [];
+  /** shipId → its hull this update (the carrier's deck, for the planes). */
+  private hulls = new Map<ShipId, THREE.Group>();
   /** shipId → when its foundering began. Survives the per-shot rebuilds. */
   private sunkSince = new Map<ShipId, number>();
   /** Ships an earlier update showed afloat — a sink after that is fresh news. */
@@ -105,8 +124,15 @@ export class FleetScene {
   private aims = new Map<ShipId, Aim>();
   private salvos: Salvo[] = [];
   private shells: Shell[] = [];
-  /** Incoming shells still to land: cancelled (and landed at once) by a skip. */
-  private pendingImpacts: { row: number; col: number; kind: 'hit' | 'miss' | 'sunk'; shell: Shell | null; timer: number }[] = [];
+  /** Shell heads and streaks. */
+  private tracerGroup = new THREE.Group();
+  /** Planes in the air: ours climbing away off the carrier, theirs diving in. */
+  private flights: Flight[] = [];
+  private planeGroup = new THREE.Group();
+  /** The modern carrier's deck jet, to clone for each launch (found once the models load). */
+  private jetTemplate: JetTemplate | null = null;
+  /** Incoming attacks still to land: cancelled (and landed at once) by a skip. */
+  private pendingImpacts: { row: number; col: number; kind: 'hit' | 'miss' | 'sunk'; timer: number }[] = [];
   /** Cycles the firing ship, so every hull gets its turn at the guns. */
   private salvoCount = 0;
   private lastNow = 0;
@@ -218,6 +244,7 @@ export class FleetScene {
       this.booms = new BoomKit(this.fx.boom === 'today' ? 'a' : this.fx.boom, opts.reducedMotion);
       this.scene.add(this.booms.group);
     }
+    if (this.fx.guns) this.scene.add(this.tracerGroup, this.planeGroup);
     // The rim floats just above the crests, as four bars, so the swell rolls
     // under it — the old slab sat at wave height and flickered as the sea
     // lapped its lip, and the dark floor that hid the flicker hid the sea.
@@ -264,6 +291,12 @@ export class FleetScene {
   private async loadModels() {
     await loadShipModels(this.opts.era ?? 'classic');
     if (this.disposed) return;
+    // The modern carrier's own deck jet is the one that flies (a clean hull,
+    // so a sunk carrier's darkened paint never reaches it).
+    if (this.fx.guns && this.opts.era === 'modern') {
+      const ford = buildModelShip('carrier', 5, false, this.opts.skinColor, 'modern');
+      this.jetTemplate = ford ? findJet(ford) : null;
+    }
     if (this.lastState) this.update(this.lastState.ships, this.lastState.incoming);
     this.opts.onFleetReady?.();
   }
@@ -287,6 +320,8 @@ export class FleetScene {
     this.smokes = [];
     this.bobbing = [];
     this.sinkers = [];
+    this.wrecks = [];
+    this.hulls.clear();
     this.guns.clear();
 
     for (const ship of ships) {
@@ -309,7 +344,33 @@ export class FleetScene {
       const cz = (horiz ? ship.row : ship.row + (ship.size - 1) / 2) - HALF;
       g.position.set(cx, 0, cz);
       if (!horiz) g.rotation.y = Math.PI / 2;
-      if (ship.sunk) {
+      this.hulls.set(ship.shipId, g);
+      if (ship.sunk && this.fx.guns) {
+        // The pitch: a lost ship lists, settles and goes down, then rests as
+        // a dark wreck low in the water (its smoulder rides above it), so the
+        // fleet still shows what was lost. Under reduced motion, and for a
+        // ship lost before this scene opened, it is simply there as a wreck.
+        g.rotation.order = 'YXZ'; // roll about the hull's length, trim about its beam
+        const wreck: Wreck = {
+          g,
+          start: 0,
+          roll: (ship.row + ship.col) % 2 ? 0.24 : -0.24,
+          trim: ship.shipId.length % 2 ? 0.045 : -0.045,
+          // Settled by about a third of its height: the deck at the waterline, the upper works showing.
+          drop: new THREE.Box3().setFromObject(g).max.y * 0.3,
+        };
+        if (this.seenAfloat.has(ship.shipId) && !this.sunkSince.has(ship.shipId)) {
+          this.sunkSince.set(ship.shipId, performance.now());
+        }
+        const start = this.sunkSince.get(ship.shipId);
+        if (start === undefined || this.opts.reducedMotion || performance.now() - start >= WRECK_MS) {
+          poseWreck(wreck, 1);
+        } else {
+          wreck.start = start;
+          poseWreck(wreck, (performance.now() - start) / WRECK_MS);
+          this.wrecks.push(wreck);
+        }
+      } else if (ship.sunk) {
         // Sunk: settle low and list, fires out — then the sea takes it. A
         // fresh sink founders over SINK_MS in the render loop until the hull
         // slips fully underwater (the water is opaque, so gone is gone; the
@@ -435,6 +496,12 @@ export class FleetScene {
       // The list deepens as the hull floods.
       s.g.rotation.z = s.baseList * (1 + 1.6 * e);
     }
+    for (let i = this.wrecks.length - 1; i >= 0; i--) {
+      const w = this.wrecks[i];
+      const t = (now - w.start) / WRECK_MS;
+      poseWreck(w, t);
+      if (t >= 1) this.wrecks.splice(i, 1);
+    }
 
     if (!this.opts.reducedMotion) {
       // Roll the sea: one number, the shader does the rest.
@@ -488,21 +555,31 @@ export class FleetScene {
 
   private joltBy = new THREE.Vector3();
 
-  // ── Guns and shells (the pitch) ─────────────────────────────────────────
+  // ── Guns, shells and planes (the pitch) ─────────────────────────────────
+  //
+  // The enemy's waters lie to the east, off the board's right edge in the
+  // default camera. Our guns train to the right and our shells climb away
+  // over the right edge out of the frame; the enemy's shells and bombers come
+  // in from the same side, high and steep.
 
-  /** The world point a shot at the enemy's (row, col) flies to: their waters, beyond our horizon. */
+  /** The world point a shot at the enemy's (row, col) flies to: their waters, far off to the east. */
   private enemyWaters(row: number, col: number): THREE.Vector3 {
-    return new THREE.Vector3((col - HALF) * 1.7, 0, -15 - row * 0.55);
+    return new THREE.Vector3(HALF + 10 + col * 0.5, 0, (row - HALF) * 0.9);
   }
 
   private cellWorld(row: number, col: number, y = 0): THREE.Vector3 {
     return new THREE.Vector3(col - HALF, y, row - HALF);
   }
 
+  private get trailStyle(): 'a' | 'b' {
+    return this.fx.boom === 'b' ? 'b' : 'a';
+  }
+
   /**
-   * Our salvo at the enemy's (row, col): the next afloat ship in turn trains
-   * every main gun on the bearing, fires in a ripple, and the shells arc away
-   * over the horizon. (The impact itself plays on the radar.)
+   * Our shot at the enemy's (row, col): the next afloat ship in turn trains
+   * every main gun east on the bearing, fires in a ripple, and the shells
+   * climb away out of the frame. On the carrier's turn, planes launch
+   * instead. (The impact itself plays on the radar.)
    */
   fireAt(row: number, col: number): void {
     if (!this.fx.guns || !this.booms) return;
@@ -512,13 +589,18 @@ export class FleetScene {
     const guns = this.guns.get(ship.shipId)!;
     const target = this.enemyWaters(row, col);
     const now = performance.now();
+    if (ship.shipId === 'carrier') {
+      // A carrier has planes, not guns.
+      this.launchPlanes(ship.shipId, target, now);
+      return;
+    }
     if (guns.rigs.length === 0) {
       // No gun on this hull (the Virginia): a missile out of a deck hatch.
       const hatch = guns.hatches[(this.salvoCount * 3) % Math.max(1, guns.hatches.length)];
       if (!hatch) return;
       const from = new THREE.Vector3().setFromMatrixPosition(hatch.matrixWorld);
       this.booms.muzzle(from, new THREE.Vector3(0, 1, 0), 0.3);
-      this.launch(from, target, now + TRAIN_MS * 0.5, OUT_FLIGHT_MS + 200, 0.9);
+      if (!this.opts.reducedMotion) this.launch(from, target, now + TRAIN_MS * 0.5, OUT_FLIGHT_MS + 200, { side: 'ours', boost: 1.2 });
       return;
     }
     const aim = this.aimFor(ship.shipId, guns.rigs.length);
@@ -535,20 +617,31 @@ export class FleetScene {
   }
 
   /**
-   * A shell from the enemy, over the horizon, landing on our (row, col) in
-   * `ms`: a warning ring tightens on the water, then the blast or the splash.
+   * Their attack landing on our (row, col) `ms` from now: a warning ring
+   * tightens on the water, and after `warn` a shell comes in from the east,
+   * high and steep, or a plane dives in and lets its bomb go. Then the blast
+   * or the splash.
    */
-  incoming(row: number, col: number, kind: 'hit' | 'miss' | 'sunk', ms: number): void {
+  incoming(row: number, col: number, kind: 'hit' | 'miss' | 'sunk', ms: number, warn = 0, via: 'shell' | 'plane' = 'shell'): void {
     if (!this.booms) return;
     const to = this.cellWorld(row, col, kind === 'miss' ? 0.02 : 0.22);
     const now = performance.now();
     this.booms.telegraph(to, ms / 1000);
-    let shell: Shell | null = null;
+    const flight = Math.max(200, ms - warn);
     if (!this.opts.reducedMotion) {
-      const from = new THREE.Vector3(to.x * 0.4 - 1.5, 6.5, -16);
-      shell = this.launch(from, to, now, ms);
+      if (via === 'plane') {
+        this.diveBomb(to, now + warn, flight);
+      } else {
+        // In through the frame's right edge, high, then steeply down onto the
+        // cell. The default camera sees less sky over the far rows, so a
+        // shell for them flies a little lower, under the frame's top.
+        const high = 2.7 + 0.11 * row;
+        const from = new THREE.Vector3(to.x + 7.5, high, to.z + 0.5);
+        const ctrl = new THREE.Vector3(to.x + 1.5, high + 0.5, to.z + 0.15);
+        this.launch(from, to, now + warn, flight, { side: 'theirs', ctrl });
+      }
     }
-    const pending = { row, col, kind, shell, timer: 0 };
+    const pending = { row, col, kind, timer: 0 };
     pending.timer = window.setTimeout(() => {
       this.pendingImpacts = this.pendingImpacts.filter((p) => p !== pending);
       this.impact(row, col, kind);
@@ -581,22 +674,24 @@ export class FleetScene {
   }
 
   /**
-   * Skip: guns snap to their bearings, shells in flight vanish, and a shell
-   * still on its way lands now. Only the picture changes; the game is
-   * whatever the log says, before and after.
+   * Skip: guns snap to their bearings, shells and planes in flight vanish,
+   * and an attack still on its way lands now. Only the picture changes; the
+   * game is whatever the log says, before and after.
    */
   skip(): void {
     for (const s of this.salvos) {
       const aim = this.aimFor(s.shipId, s.to.length);
       s.to.forEach((t, i) => {
         aim.turn[i] = t;
-        aim.elev[i] = 0.16;
+        aim.elev[i] = FIRE_ELEV * 0.8;
         aim.recoil[i] = 0;
       });
     }
     this.salvos = [];
-    for (const sh of this.shells) this.booms?.removeSprite(sh.sprite);
+    for (const sh of this.shells) sh.tracer.dispose();
     this.shells = [];
+    for (const f of this.flights) disposePlane(f.plane);
+    this.flights = [];
     const pending = this.pendingImpacts;
     this.pendingImpacts = [];
     for (const p of pending) {
@@ -614,15 +709,132 @@ export class FleetScene {
     return aim;
   }
 
-  private launch(from: THREE.Vector3, to: THREE.Vector3, start: number, dur: number, boost = 0): Shell {
-    const sprite = this.booms!.shellSprite();
-    sprite.position.copy(from);
-    sprite.visible = false;
-    const mid = from.clone().lerp(to, 0.5);
-    const apex = Math.max(1.6, from.distanceTo(to) * 0.22);
-    const shell: Shell = { sprite, from: from.clone(), ctrl: mid.setY(Math.max(from.y, to.y) + apex), to: to.clone(), start, dur, lastTrail: 0, boost };
+  /**
+   * Put a shell (or a bomb) in the air from `from` to `to`, on a quadratic
+   * arc through `ctrl`; without one, it climbs steeply out of the muzzle so it
+   * clears our own ships well above their decks.
+   */
+  private launch(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    start: number,
+    dur: number,
+    o: { side: TracerKind; ctrl?: THREE.Vector3; boost?: number; scale?: number },
+  ): Shell {
+    const a = from.clone();
+    const b = to.clone();
+    // Up out of the muzzle at about 50 degrees, over the top of its arc as it
+    // leaves the frame's top-right corner, far off to the east.
+    const c = o.ctrl?.clone() ?? a.clone().lerp(b, 0.26).setY(Math.max(a.y, b.y) + 5.5 + a.distanceTo(b) * 0.06);
+    const boost = o.boost ?? 0;
+    const path = (t: number, out: THREE.Vector3): THREE.Vector3 => {
+      const k = Math.max(0, Math.min(1, t));
+      const u = 1 - k;
+      out.copy(a).multiplyScalar(u * u).addScaledVector(c, 2 * u * k).addScaledVector(b, k * k);
+      // A missile first climbs straight out of its tube.
+      if (boost) out.y += boost * Math.sin(Math.min(1, k * 2.5) * Math.PI * 0.5) * (1 - k);
+      return out;
+    };
+    const tracer = new Tracer(this.tracerGroup, this.trailStyle, o.side, o.scale ?? 1);
+    const shell: Shell = { tracer, path, start, dur, from: 0 };
     this.shells.push(shell);
     return shell;
+  }
+
+  /** A plane's flight, and the contrail (of `kind`) it draws once it is off the deck. */
+  private fly(flight: Flight, kind: TracerKind, trailFrom = 0): void {
+    flight.plane.root.visible = false;
+    this.planeGroup.add(flight.plane.root);
+    this.flights.push(flight);
+    const tracer = new Tracer(this.tracerGroup, this.trailStyle, kind, PLANE_GROW / 1.6);
+    this.shells.push({ tracer, path: flight.path, start: flight.start, dur: flight.dur, from: trailFrom });
+  }
+
+  /**
+   * The carrier's turn: two or three planes roll down the flight deck in a
+   * short ripple, lift off the bow, climb and turn east toward `target`, and
+   * fly out of the frame. Classic carriers fly propeller planes, modern ones
+   * the Ford's jets.
+   */
+  private launchPlanes(shipId: ShipId, target: THREE.Vector3, now: number): void {
+    const g = this.hulls.get(shipId);
+    if (!g || this.opts.reducedMotion) return;
+    g.updateMatrixWorld(true);
+    let deck: THREE.Object3D | null = null;
+    g.traverse((o) => {
+      if (!deck && /Flight_Deck$/.test(o.name)) deck = o;
+    });
+    const box = new THREE.Box3().setFromObject(deck ?? g);
+    const centre = box.getCenter(new THREE.Vector3());
+    const bow = new THREE.Vector3(Math.cos(g.rotation.y), 0, -Math.sin(g.rotation.y));
+    const across = new THREE.Vector3(-bow.z, 0, bow.x);
+    const half = Math.abs(bow.x) > 0.5 ? (box.max.x - box.min.x) / 2 : (box.max.z - box.min.z) / 2;
+    const jets = (this.opts.era ?? 'classic') === 'modern' && this.jetTemplate !== null;
+    const count = jets ? 2 : 3;
+    const deckY = box.max.y + (jets ? 0.03 : 0.045);
+    for (let i = 0; i < count; i++) {
+      const plane = jets ? jetPlane(this.jetTemplate!, 'ours', PLANE_GROW) : propPlane('ours', this.opts.skinColor, PLANE_GROW);
+      const lane = (i % 2 ? 1 : -1) * 0.07;
+      // Jets go off the bow catapults; the props take a longer run from aft.
+      const startAt = jets ? half * 0.1 : -half * (0.1 + i * 0.16);
+      const p0 = centre.clone().addScaledVector(bow, startAt).addScaledVector(across, lane).setY(deckY);
+      const lift = centre.clone().addScaledVector(bow, half * 1.02).addScaledVector(across, lane).setY(deckY + 0.02);
+      // Off the bow, climbing; then a climbing turn east, out through the
+      // frame's right edge well above the ships.
+      const exit = new THREE.Vector3(HALF + 6.5 + i * 0.6, 4.2 + i * 0.35, lift.z * 0.4 + target.z * 0.15 + (i - 1) * 0.7);
+      const p1 = lift.clone().addScaledVector(bow, 1.5).setY(lift.y + 0.9);
+      const p2 = new THREE.Vector3(Math.max(lift.x + 2.5, HALF - 1.5), lift.y + 2.6, (lift.z + exit.z) / 2);
+      const roll = jets ? 0.22 : 0.3;
+      const path = (u: number, out: THREE.Vector3): THREE.Vector3 => {
+        if (u < roll) {
+          // The take-off run: gathering speed down the deck.
+          const k = u / roll;
+          return out.copy(p0).lerp(lift, k * k);
+        }
+        return cubic(lift, p1, p2, exit, (u - roll) / (1 - roll), out);
+      };
+      this.fly({ plane, path, start: now + i * (jets ? 260 : 220), dur: jets ? 1500 : 1800 }, jets ? 'jet' : 'prop', roll + 0.02);
+    }
+  }
+
+  /**
+   * Their bomber: it dives out of the east at our cell, lets its bomb go low,
+   * and pulls up and away; the bomb lands `dur` after `start`.
+   */
+  private diveBomb(to: THREE.Vector3, start: number, dur: number): void {
+    const jets = (this.opts.era ?? 'classic') === 'modern' && this.jetTemplate !== null;
+    const plane = jets ? jetPlane(this.jetTemplate!, 'theirs', PLANE_GROW) : propPlane('theirs', '#e0483a', PLANE_GROW);
+    // The dive: in from off the right edge, steepening onto the cell, down to
+    // where the bomb goes (low, just short of it)…
+    const r = new THREE.Vector3(to.x + 1.3, 0.95, to.z + 0.25);
+    const d0 = new THREE.Vector3(to.x + 8, 4.6, to.z + 2);
+    const d1 = new THREE.Vector3(to.x + 5.2, 4.4, to.z + 1.3);
+    const d2 = new THREE.Vector3(to.x + 2.9, 2.4, to.z + 0.45);
+    // …then it pulls out of the dive over our fleet and climbs away.
+    const q1 = r.clone().add(r.clone().sub(d2).multiplyScalar(0.7));
+    const q2 = new THREE.Vector3(to.x - 1.4, 1.5, to.z - 1.4);
+    const q3 = new THREE.Vector3(to.x - 3.5, 5.2, to.z - 4.5);
+    // The bomb goes at 62% of the attack's time, 55% of the way through the flight.
+    const release = 0.55;
+    const planeDur = (dur * 0.62) / release;
+    const path = (u: number, out: THREE.Vector3): THREE.Vector3 =>
+      u < release ? cubic(d0, d1, d2, r, u / release, out) : cubic(r, q1, q2, q3, (u - release) / (1 - release), out);
+    this.fly({
+      plane,
+      path,
+      start,
+      dur: planeDur,
+      release: {
+        at: release,
+        fn: (pos) => {
+          const left = start + dur - performance.now();
+          if (left < 60) return;
+          // The bomb falls the last short way onto the cell.
+          const ctrl = pos.clone().lerp(to, 0.4).setY(pos.y);
+          this.launch(pos, to, performance.now(), left, { side: 'theirs', ctrl, scale: 0.65 });
+        },
+      },
+    }, 'bomber');
   }
 
   private stepGuns(now: number): void {
@@ -641,7 +853,7 @@ export class FleetScene {
         // Shortest way round to the new bearing.
         const d = Math.atan2(Math.sin(to - s.from[i]), Math.cos(to - s.from[i]));
         aim.turn[i] = s.from[i] + d * e;
-        aim.elev[i] = s.fromElev[i] + (0.2 - s.fromElev[i]) * e;
+        aim.elev[i] = s.fromElev[i] + (FIRE_ELEV - s.fromElev[i]) * e;
         // A ripple salvo: each gun fires a beat after the one before.
         const fireAt = s.start + TRAIN_MS + i * 70;
         if (!s.fired[i] && now >= fireAt && guns?.rigs[i]) {
@@ -651,8 +863,8 @@ export class FleetScene {
           muzzleWorld(rig, tmpPos, tmpDir);
           this.booms!.muzzle(tmpPos, tmpDir, 0.22);
           if (!reduced) {
-            const spread = new THREE.Vector3(Math.sin(i * 2.1) * 0.6, 0, Math.cos(i * 1.7) * 0.6);
-            this.launch(tmpPos, s.target.clone().add(spread), now, OUT_FLIGHT_MS);
+            const spread = new THREE.Vector3(Math.cos(i * 1.7) * 0.6, 0, Math.sin(i * 2.1) * 0.6);
+            this.launch(tmpPos, s.target.clone().add(spread), now, OUT_FLIGHT_MS, { side: 'ours' });
           }
         }
         // The barrels run back on firing and ease out again.
@@ -679,28 +891,19 @@ export class FleetScene {
       const sh = this.shells[k];
       const t = (now - sh.start) / sh.dur;
       if (t < 0) continue;
-      sh.sprite.visible = true;
-      if (t >= 1) {
-        this.booms.removeSprite(sh.sprite);
+      // The head, its tapering streak and the smoke hanging behind it; once
+      // the shell is gone, the smoke thins away where it was laid.
+      if (!sh.tracer.draw(sh.path, t, sh.dur, this.camera, sh.from)) {
+        sh.tracer.dispose();
         this.shells.splice(k, 1);
-        sh.onArrive?.();
-        continue;
       }
-      // A quadratic arc; a missile first climbs straight out of its tube.
-      const u = 1 - t;
-      const p = tmpPos.copy(sh.from).multiplyScalar(u * u).addScaledVector(sh.ctrl, 2 * u * t).addScaledVector(sh.to, t * t);
-      if (sh.boost) p.y += sh.boost * Math.sin(Math.min(1, t * 2.5) * Math.PI * 0.5) * (1 - t);
-      sh.sprite.position.copy(p);
-      // A continuous tracer: glow laid every short step along the path flown
-      // since the last frame, so a fast shell draws a streak, not dots.
-      const last = sh.lastPos ?? p.clone();
-      const steps = Math.min(5, Math.ceil(last.distanceTo(p) / 0.18));
-      for (let k = 1; k <= steps; k++) this.booms.trail(last.clone().lerp(p, k / steps), 0.19);
-      if ((this.fx.boom === 'b' || sh.boost) && now - sh.lastTrail > 30) {
-        sh.lastTrail = now;
-        this.booms.wisp(p, 0.12);
+    }
+    for (let k = this.flights.length - 1; k >= 0; k--) {
+      const f = this.flights[k];
+      if (!poseFlight(f, now)) {
+        disposePlane(f.plane);
+        this.flights.splice(k, 1);
       }
-      sh.lastPos = p.clone();
     }
   }
 
@@ -709,6 +912,10 @@ export class FleetScene {
     cancelAnimationFrame(this.raf);
     for (const p of this.pendingImpacts) clearTimeout(p.timer);
     this.pendingImpacts = [];
+    for (const sh of this.shells) sh.tracer.dispose();
+    this.shells = [];
+    for (const f of this.flights) disposePlane(f.plane);
+    this.flights = [];
     this.resizeObs?.disconnect();
     this.controls.dispose();
     // The pitch's systems free their own pooled buffers; the shared effect
@@ -724,6 +931,25 @@ export class FleetScene {
       this.container.removeChild(this.renderer.domElement);
     }
   }
+}
+
+const smooth = (a: number, b: number, t: number): number => {
+  const k = Math.max(0, Math.min(1, (t - a) / (b - a)));
+  return k * k * (3 - 2 * k);
+};
+
+/**
+ * A lost ship at `t` (0..1) of going down: it lists, then settles and goes
+ * down by one end (the other lifting), then eases toward an even keel as a
+ * wreck resting low in the water.
+ */
+function poseWreck(w: Wreck, t: number): void {
+  const list = smooth(0, 0.3, t);
+  const down = smooth(0.22, 0.7, t);
+  const rest = smooth(0.62, 1, t);
+  w.g.position.y = -w.drop * (0.18 * list + 0.82 * down);
+  w.g.rotation.x = w.roll * (0.8 * list + 0.45 * down - 0.25 * rest);
+  w.g.rotation.z = w.trim * (2.6 * down - 1.6 * rest);
 }
 
 /**
