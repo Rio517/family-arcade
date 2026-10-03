@@ -1,4 +1,5 @@
 import '../styles/battleship.css';
+import '../styles/pitch.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProfile } from '@shared/profile/useProfile';
@@ -15,6 +16,8 @@ import { Placement } from './Placement';
 import { Battle } from './Battle';
 import { CaptainChips } from './CaptainChips';
 import { Result } from './Result';
+import { PitchSwitcher } from './PitchSwitcher';
+import { usePitch } from '@games/battleship/state/pitch';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
@@ -44,6 +47,8 @@ export function BattleshipPage() {
   const [copied, setCopied] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   useDismissOnEscape(shareOpen, () => setShareOpen(false));
+  // The darker-arcade pitch under review (?look= / ?fx=); today's game without it.
+  const pitch = usePitch();
 
   // Which navy this captain sails in 3D — classic or modern. Purely cosmetic
   // and purely local (nothing crosses the wire), remembered per device.
@@ -188,7 +193,8 @@ export function BattleshipPage() {
 
   return (
     <div
-      className={`app ${bs.phase === 'battle' ? 'bs-app-wide' : ''}`}
+      className={`app ${bs.phase === 'battle' ? 'bs-app-wide' : ''} ${pitch.look !== 'today' ? `bs-look bs-look-${pitch.look}` : ''}`}
+      data-phase={bs.phase}
       // The link's state, readable even when no badge shows it (a computer
       // game hides the badge; the tests still need to know the captain is on).
       data-conn={bs.side ? bs.status : undefined}
@@ -333,6 +339,7 @@ export function BattleshipPage() {
             onHostTable={(code) => sitDown('host', code)}
             onSolo={(personaId) => bs.startSoloGame(personaId, profile.userId)}
             initialJoinCode={joinCode ?? undefined}
+            look={pitch.look}
           />
         </div>
       )}
@@ -350,6 +357,7 @@ export function BattleshipPage() {
             }}
             onUnlock={(id) => profile.update((p) => buySkin(p, id))}
             onContinue={bs.confirmSkin}
+            look={pitch.look}
           />
         </div>
       )}
@@ -362,6 +370,7 @@ export function BattleshipPage() {
           onReady={bs.confirmReady}
           waiting={bs.phase === 'waiting'}
           onPlayComputer={awaitingJoin ? playComputerInstead : undefined}
+          look={pitch.look}
         />
       )}
 
@@ -400,6 +409,8 @@ export function BattleshipPage() {
       <div className="footer">
         <Link to="/">Family game console</Link>
       </div>
+
+      {pitch.showBar && <PitchSwitcher look={pitch.look} fx={pitch.fxPack} onChoose={pitch.choose} />}
     </div>
   );
 }

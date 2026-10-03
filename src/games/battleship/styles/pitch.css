@@ -1,0 +1,57 @@
+/* Ship Battle — the darker-arcade pitch: the reviewer's switcher, and the
+   battle-screen controls the guns bring (skip, Watch the shots). Only shown
+   while a pitch is under review (?look= / ?fx=). */
+
+/* ── The reviewer's switcher ─────────────────────────────────────────────── */
+.bs-pitchbar {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 60;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 14px;
+}
+.bs-pitchbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px dashed rgba(251, 191, 36, 0.7);
+  background: rgba(8, 12, 22, 0.92);
+  color: #fde68a;
+  font: 600 14px/1 var(--mono, ui-monospace, monospace);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+.bs-pitchbar.open .bs-pitchbar-toggle svg { transform: rotate(180deg); }
+.bs-pitchbar-body {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(8, 12, 22, 0.96);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.bs-pitchbar-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bs-pitchbar-k { min-width: 104px; color: #cbd5e1; font-weight: 600; }
+.bs-pitchbar-row button {
+  min-width: 44px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid #475569;
+  background: #111827;
+  color: #e2e8f0;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+.bs-pitchbar-row button[aria-pressed='true'] { border-color: #fbbf24; background: rgba(251, 191, 36, 0.18); color: #fde68a; }
+.bs-pitchbar button:focus-visible { outline: 2px solid #fbbf24; outline-offset: 2px; }
