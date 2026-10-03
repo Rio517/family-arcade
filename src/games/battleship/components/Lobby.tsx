@@ -5,6 +5,8 @@ import { useParty } from '@shared/party/PartyContext';
 import { PlayingAs } from '@shared/profile/PlayingAs';
 import { BotIcon, PartyIcon, PersonIcon } from '@shared/ui/icons';
 import { CAPTAIN_PERSONAS } from '../domain/bots/personas';
+import { DoorTag, LookHero } from './look/LookParts';
+import { arcadeLook } from './look/arcadeLook';
 
 /** Ship Battle's registry id — what the party's table and knock carry. */
 const GAME_ID = 'battleship';
@@ -40,7 +42,8 @@ interface LobbyProps {
  * tap; the guest sees the waiting door here while the page's `usePartyDoor`
  * knocks and walks them in the moment it opens), and only the solo door stays.
  */
-export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode }: LobbyProps) {
+export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode, look }: LobbyProps) {
+  const arcade = arcadeLook(look);
   const party = useParty();
   const [mode, setMode] = useState<'choose' | 'join' | 'solo'>(initialJoinCode ? 'join' : 'choose');
   const [code, setCode] = useState(initialJoinCode ? normalizeCode(initialJoinCode) : '');
@@ -50,13 +53,17 @@ export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode }: 
   const partyGuest = party.inParty && party.role === 'guest';
   // While the party is (re)linking or linked, codes are its business, not the player's.
   const partyBusy = party.reconnecting || party.inParty;
+  // The doors are showing (not the captain ladder or the join form).
+  const choosing = mode !== 'solo' && !(mode === 'join' && !partyBusy);
 
   return (
     <div className="stack">
+      {arcade && <LookHero look={arcade} compact={!choosing} />}
       <PlayingAs />
 
       {mode === 'solo' ? (
         <div className="panel stack lobby-door lobby-door-solo">
+          {arcade && <DoorTag players={1} />}
           <span className="lobby-eyebrow">
             <BotIcon size={15} /> Play solo — just you
           </span>
@@ -127,6 +134,7 @@ export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode }: 
               party, the together door is the party itself. */}
           {party.reconnecting ? (
             <div className="panel stack lobby-door lobby-door-duo" data-testid="battle-party-reconnecting">
+              {arcade && <DoorTag players={2} />}
               <span className="lobby-eyebrow">
                 <PartyIcon size={15} /> Play together — your party
               </span>
@@ -152,6 +160,7 @@ export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode }: 
             </div>
           ) : partyHost ? (
             <div className="panel stack lobby-door lobby-door-duo">
+              {arcade && <DoorTag players={2} />}
               <span className="lobby-eyebrow">
                 <PartyIcon size={15} /> Play together — your party
               </span>
@@ -166,6 +175,7 @@ export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode }: 
             </div>
           ) : partyGuest ? (
             <div className="panel stack lobby-door lobby-door-duo" data-testid="battle-party-waiting">
+              {arcade && <DoorTag players={2} />}
               <span className="lobby-eyebrow">
                 <PartyIcon size={15} /> Play together — your party
               </span>
@@ -191,6 +201,7 @@ export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode }: 
             </div>
           ) : (
             <div className="panel stack lobby-door lobby-door-duo">
+              {arcade && <DoorTag players={2} />}
               <span className="lobby-eyebrow">
                 <PersonIcon size={14} />
                 <PersonIcon size={14} /> Play together — two devices
@@ -214,6 +225,7 @@ export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode }: 
           )}
 
           <div className="panel stack lobby-door lobby-door-solo">
+            {arcade && <DoorTag players={1} />}
             <span className="lobby-eyebrow">
               <BotIcon size={15} /> Play solo — just you
             </span>

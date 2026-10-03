@@ -5,6 +5,9 @@ import { isSkinUnlocked } from '@games/battleship/domain/skins';
 import type { FleetEra } from '@games/battleship/domain/types';
 import type { Profile } from '@shared/profile/profile';
 import { InfoIcon, LockIcon, SkinGlyph } from '@shared/ui/icons';
+import { LookSteps } from './look/LookParts';
+import { arcadeLook } from './look/arcadeLook';
+import { NavyLineup } from './look/NavyLineup';
 
 interface FleetSelectProps {
   profile: Profile;
@@ -41,7 +44,8 @@ const ERAS: { id: FleetEra; name: string; sub: string; ships: string }[] = [
  * identity, and a fleet change is announced to a connected opponent.
  * Free skins are always available; premium skins are unlocked by spending points.
  */
-export function FleetSelect({ profile, selectedSkinId, era, onEra, onSelect, onUnlock, onContinue }: FleetSelectProps) {
+export function FleetSelect({ profile, selectedSkinId, era, onEra, onSelect, onUnlock, onContinue, look }: FleetSelectProps) {
+  const arcade = arcadeLook(look);
   const [toast, setToast] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
 
@@ -67,6 +71,7 @@ export function FleetSelect({ profile, selectedSkinId, era, onEra, onSelect, onU
   // screen without scrolling. Three stacked panels used to run ~2300px tall.
   return (
     <div className="stack fleet-setup">
+      {arcade && <LookSteps at="fleet" />}
       <div className="panel">
         <div className="fleet-top">
           <div className="fleet-points">
@@ -153,6 +158,7 @@ export function FleetSelect({ profile, selectedSkinId, era, onEra, onSelect, onU
                 onClick={() => onEra(e.id)}
                 data-testid={`era-${e.id}`}
               >
+                {arcade && <NavyLineup era={e.id} />}
                 <div className="era-name">{e.name}</div>
                 <div className="era-sub">{e.sub}</div>
                 <div className="era-ships">{e.ships}</div>
