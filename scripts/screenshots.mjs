@@ -58,12 +58,103 @@ const LAPTOP = { width: 1920, height: 1080 };
 const MONITOR = { width: 2560, height: 1440 };
 
 /**
+ * The darker-arcade pitch (docs/mockups/20261003-battle-arcade): each
+ * start-screen look — today, A, B, C — on the lobby, the captain ladder, the
+ * fleet screen and the placing screen at tablet size, and the three new looks
+ * at phone size too. `bar=0` keeps the reviewer's switcher out of the picture.
+ */
+const LOOK_SCREENS = {
+  lobby: {
+    expect: '[data-testid="solo-game"]',
+    dressed: '[data-testid="look-hero"]',
+    prep: async (page) => {
+      await page.getByTestId('solo-game').waitFor();
+      await page.waitForTimeout(400);
+    },
+  },
+  captains: {
+    expect: '[data-testid="captain-grimtide"]',
+    dressed: '[data-testid="look-hero"]',
+    prep: async (page) => {
+      await page.getByTestId('solo-game').click();
+      await page.getByTestId('captain-grimtide').waitFor();
+      await page.waitForTimeout(400);
+    },
+  },
+  join: {
+    expect: '[data-testid="code-input"]',
+    dressed: '[data-testid="look-hero"]',
+    prep: async (page) => {
+      await page.getByTestId('show-join').click();
+      await page.getByTestId('code-input').fill('K7QX');
+      await page.waitForTimeout(400);
+    },
+  },
+  fleet: {
+    expect: '[data-testid="fleet-continue"]',
+    dressed: '[data-testid="look-steps"]',
+    prep: async (page) => {
+      await page.getByTestId('solo-game').click();
+      await page.getByTestId('captain-grimtide').click();
+      await page.getByTestId('era-modern').waitFor();
+      // The captain row sits low on the ladder; tapping it leaves the window
+      // scrolled, so frame the new screen from its top.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(400);
+    },
+  },
+  placing: {
+    expect: '[data-testid="ready"]',
+    dressed: '[data-testid="look-steps"]',
+    prep: async (page) => {
+      await page.getByTestId('solo-game').click();
+      await page.getByTestId('captain-grimtide').click();
+      await page.getByTestId('fleet-continue').click();
+      await page.getByTestId('auto-place').click();
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(400);
+    },
+  },
+};
+const LOOK_SHOTS = [];
+for (const look of ['today', 'a', 'b', 'c']) {
+  for (const [screen, s] of Object.entries(LOOK_SCREENS)) {
+    LOOK_SHOTS.push({
+      name: `bs-look-${look}-${screen}`,
+      path: `/#/play?look=${look}&bar=0`,
+      viewport: TABLET,
+      noSideScroll: true,
+      // Masks, reflections and clipped-text titles: checked where the family plays.
+      engines: look !== 'today' && (screen === 'lobby' || screen === 'fleet') ? ['chromium', 'webkit'] : undefined,
+      // Today must render no look markup at all; a look must render its own.
+      expect: look === 'today' ? s.expect : s.dressed,
+      prep: s.prep,
+    });
+  }
+}
+for (const look of ['a', 'b', 'c']) {
+  for (const screen of ['lobby', 'fleet', 'placing']) {
+    const s = LOOK_SCREENS[screen];
+    LOOK_SHOTS.push({
+      name: `bs-look-${look}-${screen}-phone`,
+      path: `/#/play?look=${look}&bar=0`,
+      viewport: PHONE,
+      fullPage: true,
+      noSideScroll: true,
+      expect: s.dressed,
+      prep: s.prep,
+    });
+  }
+}
+
+/**
  * Each shot: where to go, how big, and an optional `prep` that runs before
  * the capture (dismiss an overlay, wait for a canvas to paint, …).
  *
  *   expect    a selector that must be on the page after `prep`; the shot
  *             fails without it (a shot of the wrong page is worse than none)
  *   fits      the page must not scroll in either direction at this viewport
+ *   noSideScroll  the page may scroll down but never across (a long phone page)
  *   engines   ['chromium'] by default; add 'webkit' for canvas and alpha work
  *             (saved as <name>.webkit.png)
  *   scale     device pixel ratio, 2 by default; 1 keeps monitor shots small
@@ -228,6 +319,7 @@ const SHOTS = [
       await page.waitForTimeout(300);
     },
   },
+  ...LOOK_SHOTS,
   {
     // The galaxy set in 3D — where the family's generated ships live (the
     // X-wing pawns lead; more authored pieces land here as they're made).
@@ -963,6 +1055,10 @@ async function main() {
           const problems = [];
           if (shot.expect && (await page.locator(shot.expect).count()) === 0) {
             problems.push(`expected ${shot.expect} on the page and it isn't there`);
+          }
+          if (shot.noSideScroll && !shot.fits) {
+            const over = await page.evaluate(overflow);
+            if (over.across > 0) problems.push(`scrolls ${over.across}px across at ${viewport.width}px wide`);
           }
           if (shot.fits) {
             const over = await page.evaluate(overflow);

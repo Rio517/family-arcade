@@ -17,6 +17,8 @@ import { BOARD_SIZE, type Fleet, type Orientation, type Placement as ShipPlaceme
 import { useShipDrag } from '@games/battleship/state/useShipDrag';
 import { BoltIcon, CloseIcon, RotateIcon, ShuffleIcon } from '@shared/ui/icons';
 import { ShipProfile, ShipTopDown } from './ships';
+import { LookSteps } from './look/LookParts';
+import { arcadeLook } from './look/arcadeLook';
 
 interface PlacementProps {
   skinId: string;
@@ -31,7 +33,8 @@ interface PlacementProps {
 }
 
 /** Screen 2 of setup: position your ships on your own board. */
-export function Placement({ skinId, fleet, onChange, onReady, waiting, onPlayComputer }: PlacementProps) {
+export function Placement({ skinId, fleet, onChange, onReady, waiting, onPlayComputer, look }: PlacementProps) {
+  const arcade = arcadeLook(look);
   const firstUnplaced = FLEET.find((s) => !fleet.some((p) => p.shipId === s.id))?.id ?? FLEET[0].id;
   const [selected, setSelected] = useState<ShipId>(firstUnplaced);
   const [orientation, setOrientation] = useState<Orientation>('H');
@@ -124,6 +127,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting, onPlayCom
 
   return (
     <div className="stack">
+      {arcade && <LookSteps at="place" />}
       {/* A "carried" ship that follows the cursor from the sidebar until it
           reaches the board, where the in-grid preview takes over. */}
       {drag?.isNew && !drag.onBoard && (
