@@ -110,16 +110,19 @@ Measured on a Mac at iPad size (1180×820, DPR 2), Chromium on Metal, the
 harness playing an exchange of fire on a loop for 14 s
 (`node scripts/perf-battle-fx.mjs`):
 
-| | p50 | p95 | frames over 33 ms | peak draw calls |
-|---|---|---|---|---|
-| Today | 10.2 ms | 18.6 ms | 1 | 996 |
-| A | 10.3 ms | 26.3 ms | 0 | 1105 |
-| B | 10.3 ms | 26.4 ms | 0 | 1143 |
-| Today, CPU 4× slower | 11.4 ms | 26.2 ms | 8 | 996 |
-| A, CPU 4× slower | 11.4 ms | 26.2 ms | 9 | 1108 |
-| B, CPU 4× slower | 11.3 ms | 26.2 ms | 9 | 1139 |
+| | p50 | p95 | p99 | max | frames over 33 ms | peak draw calls |
+|---|---|---|---|---|---|---|
+| Today | 10.3 ms | 25.6 ms | 27.3 ms | 28 ms | 0 | 996 |
+| A | 10.2 ms | 18.4 ms | 27.2 ms | 27 ms | 0 | 1106 |
+| B | 10.4 ms | 26.1 ms | 27.3 ms | 27 ms | 0 | 1157 |
+| Today, CPU 4× slower | 11.5 ms | 26.2 ms | 27.3 ms | 63 ms | 7 | 996 |
+| A, CPU 4× slower | 11.3 ms | 26.1 ms | 28.4 ms | 49 ms | 5 | 1110 |
+| B, CPU 4× slower | 11.3 ms | 25.9 ms | 32.9 ms | 52 ms | 8 | 1137 |
 
-Nothing was simplified to get there. Not yet verified on an iPad.
+The effects add about 11% (A) and 15% (B) to the peak draw calls. The frame
+times are within run-to-run noise of today's: the unthrottled p95 moved
+between 18 and 26 ms from one run to the next for every option, today's
+included. Nothing was simplified to get there. Not yet verified on an iPad.
 
 ## Where the pieces are
 
