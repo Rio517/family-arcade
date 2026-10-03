@@ -494,6 +494,78 @@ const SHOTS = [
     },
   },
   {
+    // The mode screen on a phone: "Play together", and the rainbow heading
+    // with its outline.
+    name: 'racer-mode-phone',
+    path: '/#/racer',
+    viewport: PHONE,
+    expect: '[data-testid="racer-mode-net"]',
+  },
+  {
+    // The lobby on a phone: "Play together" and a readable "Switch player".
+    name: 'racer-lobby-phone',
+    path: '/#/racer',
+    viewport: PHONE,
+    expect: '[data-testid="racer-create"]',
+    prep: async (page) => {
+      await page.getByTestId('racer-mode-net').click();
+      await page.getByTestId('racer-driver-unicorn').click();
+    },
+  },
+  {
+    // The controls hint, clear of the Play together pill, on a phone.
+    name: 'racer-hint-phone',
+    path: '/#/racer',
+    viewport: PHONE,
+    expect: '.racer-hint',
+    prep: async (page) => {
+      await page.getByTestId('racer-mode-solo').click();
+      await page.getByTestId('racer-driver-unicorn').click();
+      await page.waitForSelector('.racer-canvas canvas', { timeout: 20000 });
+      await page.waitForTimeout(1500);
+    },
+  },
+  {
+    // The same on an iPad.
+    name: 'racer-hint',
+    path: '/#/racer',
+    viewport: TABLET,
+    expect: '.racer-hint',
+    prep: async (page) => {
+      await page.getByTestId('racer-mode-solo').click();
+      await page.getByTestId('racer-driver-unicorn').click();
+      await page.waitForSelector('.racer-canvas canvas', { timeout: 20000 });
+      await page.waitForTimeout(1500);
+    },
+  },
+  {
+    // The corner ‹ in a race asks "Leave the race?" first.
+    name: 'racer-leave-phone',
+    path: '/#/racer',
+    viewport: PHONE,
+    expect: '[data-testid="racer-leave"]',
+    prep: async (page) => {
+      await page.getByTestId('racer-mode-solo').click();
+      await page.getByTestId('racer-driver-unicorn').click();
+      await page.waitForSelector('.racer-canvas canvas', { timeout: 20000 });
+      await page.waitForTimeout(1500);
+      await page.getByTestId('racer-back').click();
+    },
+  },
+  {
+    name: 'racer-leave',
+    path: '/#/racer',
+    viewport: TABLET,
+    expect: '[data-testid="racer-leave"]',
+    prep: async (page) => {
+      await page.getByTestId('racer-mode-solo').click();
+      await page.getByTestId('racer-driver-unicorn').click();
+      await page.waitForSelector('.racer-canvas canvas', { timeout: 20000 });
+      await page.waitForTimeout(1500);
+      await page.getByTestId('racer-back').click();
+    },
+  },
+  {
     // The Magic Mirror: the glass itself, with the effects panel on it. The
     // glass is cut to the window, so this page never scrolls — on an iPad in
     // landscape least of all.
