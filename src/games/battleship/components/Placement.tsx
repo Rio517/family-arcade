@@ -1,4 +1,5 @@
 import { useMemo, useState, type PointerEvent } from 'react';
+import type { LookId } from '@games/battleship/state/pitch';
 import { Board, type BoardCell, type PlacedShip } from './Board';
 import { CaptainChips } from './CaptainChips';
 import { FLEET, shipSpec, skinById } from '@games/battleship/domain/constants';
@@ -25,6 +26,8 @@ interface PlacementProps {
   waiting: boolean;
   /** Set while the host waits on an empty table: a computer captain instead. */
   onPlayComputer?: (personaId: string) => void;
+  /** The darker-arcade pitch's start-screen look under review; 'today' is the shipped one. */
+  look?: LookId;
 }
 
 /** Screen 2 of setup: position your ships on your own board. */

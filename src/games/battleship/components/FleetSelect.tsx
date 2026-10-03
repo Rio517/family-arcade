@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { LookId } from '@games/battleship/state/pitch';
 import { SKINS, skinById } from '@games/battleship/domain/constants';
 import { isSkinUnlocked } from '@games/battleship/domain/skins';
 import type { FleetEra } from '@games/battleship/domain/types';
@@ -14,6 +15,8 @@ interface FleetSelectProps {
   onSelect: (skinId: string) => void;
   onUnlock: (skinId: string) => boolean;
   onContinue: () => void;
+  /** The darker-arcade pitch's start-screen look under review; 'today' is the shipped one. */
+  look?: LookId;
 }
 
 /** The two navies, spelled out so every captain knows what they're picking. */

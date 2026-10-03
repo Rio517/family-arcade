@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { LookId } from '@games/battleship/state/pitch';
 import { normalizeCode } from '@shared/net/peer';
 import { useParty } from '@shared/party/PartyContext';
 import { PlayingAs } from '@shared/profile/PlayingAs';
@@ -28,6 +29,8 @@ interface LobbyProps {
   onHostTable: (code: string) => void;
   /** Pre-filled join code from a shared link (?g=CODE). */
   initialJoinCode?: string;
+  /** The darker-arcade pitch's start-screen look under review; 'today' is the shipped one. */
+  look?: LookId;
 }
 
 /**
