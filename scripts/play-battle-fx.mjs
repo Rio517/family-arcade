@@ -60,7 +60,9 @@ let lastLen = 0;
 let sawHoldBeforeResult = false;
 const cells = [];
 for (let r = 0; r < 10; r++) for (let c = 0; c < 10; c++) cells.push([r, c]);
-const deadline = Date.now() + 240_000;
+// A long game (a hundred shots of ours, every fifth watched in full with the
+// beat and their answer) takes about five minutes.
+const deadline = Date.now() + 420_000;
 while (Date.now() < deadline) {
   if (await page.getByTestId('rematch').count().catch(() => 0)) break;
   if (await page.locator('[data-testid="result"], .result-hero').count()) break;
