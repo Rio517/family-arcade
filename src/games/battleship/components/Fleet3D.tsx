@@ -21,8 +21,12 @@ export interface SceneCue {
   row: number;
   col: number;
   kind: 'hit' | 'miss' | 'sunk';
-  /** For 'incoming': how long the shell is in the air. */
+  /** For 'incoming': how long until it lands, warning included. */
   ms: number;
+  /** For 'incoming': how long the warning ring shows before the attack appears. */
+  warn: number;
+  /** For 'incoming': a shell, or a diving plane's bomb. */
+  via: 'shell' | 'plane';
 }
 
 interface Fleet3DProps {
@@ -82,7 +86,7 @@ export default function Fleet3D({ ships, incoming, skinColor, era = 'classic', f
     if (!cue || !scene || cue.id === playedCue.current) return;
     playedCue.current = cue.id;
     if (cue.type === 'fire') scene.fireAt(cue.row, cue.col);
-    else if (cue.type === 'incoming') scene.incoming(cue.row, cue.col, cue.kind, cue.ms);
+    else if (cue.type === 'incoming') scene.incoming(cue.row, cue.col, cue.kind, cue.ms, cue.warn, cue.via);
     else if (cue.type === 'impact') scene.impact(cue.row, cue.col, cue.kind);
     else scene.skip();
   }, [cue]);

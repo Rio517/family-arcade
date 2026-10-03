@@ -278,7 +278,7 @@ export class FireField {
       }
       for (let k = 0; k < SMOKE_PER; k++) {
         const j = i * SMOKE_PER + k;
-        const grey = s.smoulder ? 0.17 : a ? 0.24 : 0.2;
+        const grey = s.smoulder ? 0.26 : a ? 0.24 : 0.2;
         this.smoke.color.set(a ? [grey, grey * 0.92, grey * 1.25] : [grey, grey, grey * 1.08], j * 3);
         this.smoke.spin[j] = (i * 1.7 + k * 2.1) % 6.28;
       }

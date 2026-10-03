@@ -1,4 +1,4 @@
-import type { PointerEvent } from 'react';
+import type { PointerEvent, ReactNode } from 'react';
 import { skinById } from '@games/battleship/domain/constants';
 import { COLUMN_LABELS } from '@games/battleship/domain/board';
 import type { CellState } from '@games/battleship/domain/engine';
@@ -48,6 +48,10 @@ interface BoardProps {
   fxLook?: FxId;
   /** A shell dropping onto a cell before its impact (the pitch's guns). */
   shell?: ShellDrop | null;
+  /** The pitch's dark water under the grid: 'a' with a sonar cast, 'b' plain night sea. */
+  sea?: 'a' | 'b';
+  /** Drawn over the cells and under the blasts (the radar's sinking ships), never taking taps. */
+  overlay?: ReactNode;
   /** Top-down ships to draw over the grid (placement board). */
   ships?: PlacedShip[];
   /** Set while any ship is dragging so overlays let pointer hit-tests reach cells. */
@@ -77,6 +81,8 @@ export function Board({
   fx,
   fxLook = 'today',
   shell = null,
+  sea,
+  overlay,
   ships,
   dragging = false,
   selectedShipId,
@@ -97,7 +103,7 @@ export function Board({
 
   return (
     <div
-      className={`board ${variant} ${active ? 'active' : ''} ${shakeClass} ${dragging ? 'dragging' : ''}`}
+      className={`board ${variant} ${active ? 'active' : ''} ${shakeClass} ${dragging ? 'dragging' : ''} ${sea ? `sea-dark sea-dark-${sea}` : ''}`}
       style={{ ['--skin' as string]: skin.color }}
       onMouseLeave={onCellLeave}
     >
@@ -106,6 +112,15 @@ export function Board({
           overlays are explicitly-placed items too, and an auto-flowed cell would
           skip past the cells they occupy, shifting the whole grid out of line. */}
       <div className="hdr" aria-hidden="true" style={{ gridColumn: 1, gridRow: 1 }} />
+      {sea && (
+        // The water under the grid: painted layers that drift slowly (held
+        // still under reduced motion); the cells above stay the tap targets.
+        <div className={`radar-sea radar-sea-${sea}`} aria-hidden="true" style={{ gridColumn: '2 / span 10', gridRow: '2 / span 10' }}>
+          <span className="rs-swell rs-swell-1" />
+          <span className="rs-swell rs-swell-2" />
+          <span className="rs-glint" />
+        </div>
+      )}
       {COLUMN_LABELS.map((c, ci) => (
         <div key={`col-${c}`} className="hdr" style={{ gridColumn: ci + 2, gridRow: 1 }}>
           {c}
@@ -180,6 +195,7 @@ export function Board({
         );
       })}
 
+      {overlay}
       {fx !== undefined && <BoardFX burst={fx} look={fxLook} shell={shell} />}
     </div>
   );

@@ -16,6 +16,9 @@ export interface ShellDrop {
   col: number;
   ms: number;
   delay?: number;
+  /** The enemy's: it comes from their side (the east) in their colour, after `warn` ms of the ring alone. */
+  theirs?: boolean;
+  warn?: number;
 }
 
 interface Particle {
@@ -50,6 +53,8 @@ interface Drop {
   y: number;
   start: number;
   ms: number;
+  theirs: boolean;
+  warn: number;
 }
 
 const TAU = Math.PI * 2;
@@ -157,7 +162,7 @@ export function BoardFX({ burst, look = 'today', shell = null }: { burst: Burst 
     if (prefersReduced()) return;
     const at = locate(shell.row, shell.col);
     if (!at) return;
-    drops.current.push({ x: at.cx, y: at.cy, start: performance.now() + (shell.delay ?? 0), ms: shell.ms });
+    drops.current.push({ x: at.cx, y: at.cy, start: performance.now() + (shell.delay ?? 0), ms: shell.ms, theirs: shell.theirs === true, warn: shell.warn ?? 0 });
     kick();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- plays once per shell id; the helpers only read refs
   }, [shell]);
@@ -355,43 +360,93 @@ function drawShaped(ctx: CanvasRenderingContext2D, p: Particle): void {
   }
 }
 
-/** A shell dropping onto its cell, seen from above: a closing streak and a tightening ring. */
+/** Our shells are white-gold; theirs burn red-orange. [streak, halo, smoke] per take. */
+const DROP_INK = {
+  ours: { a: ['255, 244, 196', '255, 214, 120', '#c4d2e4'], b: ['255, 230, 180', '255, 200, 120', '#9aa1ab'] },
+  theirs: { a: ['255, 110, 80', '255, 59, 47', '#a3949a'], b: ['255, 150, 90', '255, 100, 32', '#857c7a'] },
+} as const;
+
+/**
+ * A shell dropping onto its cell, seen from above. Ours comes in from our
+ * side (the west, the board's left), theirs from the east; a bright head on
+ * a thin streak that tapers and fades, a little smoke hanging behind. A ring
+ * tightens on the water where it will land (theirs shows the ring alone for
+ * `warn` first).
+ */
 function drawDrop(ctx: CanvasRenderingContext2D, d: Drop, now: number, look: FxId): void {
-  const t = Math.min(1, (now - d.start) / d.ms);
+  const ring = Math.min(1, (now - d.start) / d.ms);
   const arcade = look === 'a';
+  const [streakRgb, haloRgb, smoke] = DROP_INK[d.theirs ? 'theirs' : 'ours'][arcade ? 'a' : 'b'];
   // The ring on the water, closing in.
   ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = 0.25 + 0.6 * t;
+  ctx.globalAlpha = 0.25 + 0.6 * ring;
   ctx.strokeStyle = arcade ? '#ff3355' : '#ffb347';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(d.x, d.y, 4 + 26 * (1 - t), 0, TAU);
+  ctx.arc(d.x, d.y, 4 + 26 * (1 - ring), 0, TAU);
   ctx.stroke();
-  // The shell, coming in from the upper left and growing as it nears.
-  const fromX = d.x - 120;
-  const fromY = d.y - 150;
-  const e = t * t;
-  const x = fromX + (d.x - fromX) * e;
-  const y = fromY + (d.y - fromY) * e;
-  const tailT = Math.max(0, e - 0.18);
-  const tx = fromX + (d.x - fromX) * tailT;
-  const ty = fromY + (d.y - fromY) * tailT;
-  const g = ctx.createLinearGradient(tx, ty, x, y);
-  g.addColorStop(0, 'rgba(255, 200, 120, 0)');
-  g.addColorStop(1, arcade ? 'rgba(255, 240, 122, 0.95)' : 'rgba(255, 210, 140, 0.9)');
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = g;
-  ctx.lineWidth = 2 + 3 * t;
-  ctx.lineCap = 'round';
+  const t = Math.min(1, (now - d.start - d.warn) / Math.max(1, d.ms - d.warn));
+  if (t <= 0) {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    return;
+  }
+  // Where the shell is at k (0..1): along a line from its side, high up,
+  // gathering speed as it falls.
+  const fromX = d.theirs ? d.x + 165 : d.x - 165;
+  const fromY = d.y - 105;
+  const at = (k: number): [number, number] => {
+    const e = k * k;
+    return [fromX + (d.x - fromX) * e, fromY + (d.y - fromY) * e];
+  };
+  const [x, y] = at(t);
+  // Smoke left hanging along the way (the cinematic take leaves more).
+  ctx.globalCompositeOperation = 'source-over';
+  const puffs = arcade ? 4 : 7;
+  for (let i = 1; i <= puffs; i++) {
+    const k = t - i * (arcade ? 0.09 : 0.06);
+    if (k <= 0) break;
+    const [px, py] = at(k);
+    const age = i / puffs;
+    ctx.globalAlpha = (arcade ? 0.16 : 0.2) * (1 - age);
+    ctx.fillStyle = smoke;
+    ctx.beginPath();
+    ctx.arc(px, py, 2 + 5 * age, 0, TAU);
+    ctx.fill();
+  }
+  // The streak: a sliver from nothing at the tail to the head's width.
+  const [tx, ty] = at(Math.max(0, t - (arcade ? 0.26 : 0.32)));
+  const len = Math.hypot(x - tx, y - ty);
+  if (len > 0.5) {
+    const nx = -(y - ty) / len;
+    const ny = (x - tx) / len;
+    const w = (arcade ? 1.4 : 1.0) + 1.6 * t;
+    const g = ctx.createLinearGradient(tx, ty, x, y);
+    g.addColorStop(0, `rgba(${streakRgb}, 0)`);
+    g.addColorStop(1, `rgba(${streakRgb}, ${arcade ? 0.95 : 0.75})`);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(x + nx * w, y + ny * w);
+    ctx.lineTo(x - nx * w, y - ny * w);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // The head: a white-hot core in its side's halo.
+  const r = (arcade ? 5 : 4) + 3 * t;
+  const head = ctx.createRadialGradient(x, y, 0, x, y, r);
+  head.addColorStop(0, 'rgba(255, 255, 255, 1)');
+  head.addColorStop(0.3, 'rgba(255, 248, 230, 1)');
+  head.addColorStop(0.55, `rgba(${haloRgb}, ${arcade ? 0.7 : 0.55})`);
+  head.addColorStop(1, `rgba(${haloRgb}, 0)`);
+  ctx.fillStyle = head;
   ctx.beginPath();
-  ctx.moveTo(tx, ty);
-  ctx.lineTo(x, y);
-  ctx.stroke();
-  ctx.fillStyle = '#fffbe8';
-  ctx.beginPath();
-  ctx.arc(x, y, 1.5 + 2.5 * t, 0, TAU);
+  ctx.arc(x, y, r, 0, TAU);
   ctx.fill();
   ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
 }
 
 /** The pitch's blast, splash or sinking, after Gulp's explosions, flattened onto the radar. */

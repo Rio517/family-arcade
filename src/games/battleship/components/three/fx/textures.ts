@@ -94,6 +94,48 @@ export function starTexture(): THREE.CanvasTexture {
   });
 }
 
+/** A shell's head: a white-hot core inside a coloured halo that falls away to nothing. */
+export function glowTexture(core: string, halo: string): THREE.CanvasTexture {
+  return paint(`glow:${core}:${halo}`, 64, 64, (g) => {
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    // '#rrggbb' as canvas channels (THREE.Color would hand back linear values).
+    const rgb = [1, 3, 5].map((i) => parseInt(halo.slice(i, i + 2), 16)).join(', ');
+    grad.addColorStop(0, core);
+    grad.addColorStop(0.14, core);
+    grad.addColorStop(0.26, `rgba(${rgb}, 0.95)`);
+    grad.addColorStop(0.5, `rgba(${rgb}, 0.32)`);
+    grad.addColorStop(1, `rgba(${rgb}, 0)`);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+  });
+}
+
+/**
+ * A shell's smoke trail, as an alpha map (grey is how dense): soft across
+ * its width, lumpy along its length, repeating seamlessly along u.
+ */
+export function ribbonTexture(): THREE.CanvasTexture {
+  const t = paint('ribbon', 128, 32, (g) => {
+    const img = g.createImageData(128, 32);
+    for (let x = 0; x < 128; x++) {
+      const u = (x / 128) * Math.PI * 2;
+      // Whole numbers of waves, so the far edge meets the near one.
+      const lump = 0.72 + 0.16 * Math.sin(u * 3 + 0.7) + 0.08 * Math.sin(u * 7 + 2.1) + 0.04 * Math.sin(u * 13 + 4.4);
+      for (let y = 0; y < 32; y++) {
+        const v = (y + 0.5) / 32 - 0.5;
+        const across = Math.exp(-((v / 0.24) ** 2)) * (1 - (2 * Math.abs(v)) ** 6);
+        const k = Math.round(255 * Math.max(0, Math.min(1, across * lump)));
+        const o = (y * 128 + x) * 4;
+        img.data[o] = img.data[o + 1] = img.data[o + 2] = k;
+        img.data[o + 3] = 255;
+      }
+    }
+    g.putImageData(img, 0, 0);
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
 /** A tall plume of spray, wide at the foot: the column a shell throws up from the sea. */
 export function sprayTexture(): THREE.CanvasTexture {
   return paint('spray', 64, 128, (g) => {
