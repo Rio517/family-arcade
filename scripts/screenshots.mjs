@@ -151,20 +151,25 @@ for (const look of ['a', 'b', 'c']) {
  * The darker-arcade pitch's effects (?fx=), on preview-guns.html: the real
  * battle screen fed shots on demand through `window.__bs`. Effects only exist
  * in motion, so these shots run without reduced motion (`motion`) and are
- * timed from the moment the shot goes into the log: a salvo mid-flight, the
- * enemy's shell coming in, the blast, a sinking, a splash, the radar hit.
- * Close-ups move the ocean's camera through the harness's `__fleet` hook.
+ * timed from the moment the shot goes into the log: a salvo mid-flight and
+ * its trail, the carrier's planes, the enemy's shell (and bomber) coming in,
+ * the blast, a sinking and the wreck it leaves, a splash, and on the radar
+ * the dark water, our hit and an enemy ship going down. Close-ups move the
+ * ocean's camera through the harness's `__fleet` hook.
  */
 const FX_READY = async (page) => {
   await page.waitForSelector('[data-testid="fleet3d"], [data-testid="fleet3d-fallback"]', { timeout: 20000 });
   await page.waitForTimeout(3000);
 };
-/** Fire one harness shot (`mine` or `theirs`, a kind), then wait until `ms` after it landed in the log. */
-const fxShot = async (page, who, kind, ms) => {
-  const t0 = await page.evaluate(([w, k]) => {
-    window.__bs[w](k);
+/**
+ * Fire one harness shot (`mine` or `theirs`, a kind; theirs can ask to come
+ * by 'plane'), then wait until `ms` after it landed in the log.
+ */
+const fxShot = async (page, who, kind, ms, via) => {
+  const t0 = await page.evaluate(([w, k, v]) => {
+    window.__bs[w](k, v);
     return performance.now();
-  }, [who, kind]);
+  }, [who, kind, via]);
   const now = await page.evaluate(() => performance.now());
   if (ms - (now - t0) > 0) await page.waitForTimeout(ms - (now - t0));
 };
@@ -176,13 +181,16 @@ const fxCamera = (page, at, look) =>
     f.controls.target.set(...t);
     f.controls.update();
   }, [at, look]);
-// The harness's first salvo goes to the carrier; the second, framed close, to the battleship.
-const fxSalvo = (ms) => async (page) => {
+// The harness's first shot goes to the carrier (its planes); the second to
+// the battleship's guns, after their answer (the beat, their shell) has played.
+const fxSalvo = (ms, camera) => async (page) => {
   await FX_READY(page);
   await fxShot(page, 'mine', 'miss', 1300);
-  await fxShot(page, 'theirs', 'miss', 1200);
-  await fxCamera(page, [0.2, 2.3, 3.4], [-2.4, 0.25, 0.2]);
-  await page.waitForTimeout(300);
+  await fxShot(page, 'theirs', 'miss', 2500);
+  if (camera) {
+    await fxCamera(page, ...camera);
+    await page.waitForTimeout(300);
+  }
   await fxShot(page, 'mine', 'hit', ms);
 };
 const FX_SHOTS = [];
@@ -221,15 +229,30 @@ for (const fx of ['a', 'b']) {
   const path = `/preview-guns.html?fx=${fx}&bar=0`;
   const both = ['chromium', 'webkit'];
   const close = { path, viewport: TABLET, motion: true, engines: both, selector: '[data-testid="fleet3d"]' };
+  const radar = { path, viewport: TABLET, motion: true, engines: both, selector: '.board.enemy' };
   FX_SHOTS.push(
-    { ...close, name: `bs-fx-${fx}-salvo`, prep: fxSalvo(470) },
-    { ...close, name: `bs-fx-${fx}-salvo-modern`, path: `${path}&era=modern`, prep: fxSalvo(470) },
+    // Our salvo in the default view: the battleship's shells climbing away
+    // to the right, toward the enemy in the east.
+    { ...close, name: `bs-fx-${fx}-salvo`, prep: fxSalvo(650) },
+    { ...close, name: `bs-fx-${fx}-salvo-modern`, path: `${path}&era=modern`, prep: fxSalvo(650) },
+    // The trail up close: the head, the tapering streak, the smoke left hanging.
+    { ...close, name: `bs-fx-${fx}-trail`, prep: fxSalvo(640, [[2.6, 1.7, 5.2], [-0.9, 1.5, -1.2]]) },
     {
+      // The carrier's turn: planes off the deck, climbing away east.
+      ...close,
+      name: `bs-fx-${fx}-carrier`,
+      prep: async (page) => {
+        await FX_READY(page);
+        await fxShot(page, 'mine', 'hit', 1000);
+      },
+    },
+    {
+      // Their shell, in their colour, coming in high from the east.
       ...close,
       name: `bs-fx-${fx}-incoming`,
       prep: async (page) => {
         await FX_READY(page);
-        await fxShot(page, 'theirs', 'hit', 560);
+        await fxShot(page, 'theirs', 'hit', 1000);
       },
     },
     {
@@ -239,7 +262,7 @@ for (const fx of ['a', 'b']) {
         await FX_READY(page);
         // The harness's next hit lands on the carrier's third cell (D2).
         await fxCamera(page, [1.4, 2.5, 0.2], [-1.5, 0.3, -3.3]);
-        await fxShot(page, 'theirs', 'hit', 1020);
+        await fxShot(page, 'theirs', 'hit', 1470);
       },
     },
     {
@@ -247,7 +270,17 @@ for (const fx of ['a', 'b']) {
       name: `bs-fx-${fx}-sinking`,
       prep: async (page) => {
         await FX_READY(page);
-        await fxShot(page, 'theirs', 'sunk', 1150);
+        await fxShot(page, 'theirs', 'sunk', 1600);
+      },
+    },
+    {
+      // A ship we lost, settled as a dark wreck low in the water, smouldering.
+      ...close,
+      name: `bs-fx-${fx}-wreck`,
+      prep: async (page) => {
+        await FX_READY(page);
+        await fxCamera(page, [2.2, 2.0, 0.4], [-0.6, 0.2, -3.5]);
+        await fxShot(page, 'theirs', 'sunk', 5600);
       },
     },
     {
@@ -257,7 +290,26 @@ for (const fx of ['a', 'b']) {
         await FX_READY(page);
         // The harness's next miss falls on E8.
         await fxCamera(page, [1.2, 2.4, 6.4], [-0.5, 0.3, 2.5]);
-        await fxShot(page, 'theirs', 'miss', 1120);
+        await fxShot(page, 'theirs', 'miss', 1570);
+      },
+    },
+    {
+      // The radar's dark water, with a miss, two sunk ships and the sweep on it.
+      ...radar,
+      name: `bs-fx-${fx}-radar-sea`,
+      prep: async (page) => {
+        await FX_READY(page);
+        await fxShot(page, 'mine', 'miss', 1300);
+        await fxShot(page, 'theirs', 'miss', 2600);
+      },
+    },
+    {
+      // An enemy ship we sank going down on the radar, over its own cells.
+      ...radar,
+      name: `bs-fx-${fx}-radar-sink`,
+      prep: async (page) => {
+        await FX_READY(page);
+        await fxShot(page, 'mine', 'sunk', 2150);
       },
     },
     {
@@ -267,6 +319,32 @@ for (const fx of ['a', 'b']) {
         await FX_READY(page);
         await fxCamera(page, [-0.2, 1.9, -0.1], [-2.6, 0.3, -2.8]);
         await page.waitForTimeout(400);
+      },
+    },
+  );
+}
+{
+  // The modern carrier's jets, and the enemy's dive bomber (while their
+  // carrier is afloat, every third attack of theirs comes by plane).
+  const path = '/preview-guns.html?fx=a&bar=0';
+  const close = { viewport: TABLET, motion: true, engines: ['chromium', 'webkit'], selector: '[data-testid="fleet3d"]' };
+  FX_SHOTS.push(
+    {
+      ...close,
+      name: 'bs-fx-a-carrier-modern',
+      path: `${path}&era=modern`,
+      prep: async (page) => {
+        await FX_READY(page);
+        await fxShot(page, 'mine', 'hit', 900);
+      },
+    },
+    {
+      ...close,
+      name: 'bs-fx-a-bomber',
+      path,
+      prep: async (page) => {
+        await FX_READY(page);
+        await fxShot(page, 'theirs', 'hit', 1000, 'plane');
       },
     },
   );
