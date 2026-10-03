@@ -263,7 +263,7 @@ export function Track3D({
           driven by `hud.elapsed`, already sampled a few times a second above,
           rather than a timer of its own. */}
       <p className={`racer-hint${hud.racing && hud.elapsed > 4.5 ? ' racer-hint-faded' : ''}`}>
-        Touch or arrow keys: left and right turn · high or up climbs · low or down dives
+        Touch left or right to turn, high to climb, low to dive. Arrow keys work too.
       </p>
     </div>
   );

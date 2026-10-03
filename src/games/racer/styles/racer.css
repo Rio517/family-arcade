@@ -663,3 +663,7 @@
   outline: 3px solid var(--r-blue-ink);
   outline-offset: 3px;
 }
+
+/* On the mode screen the "Play together" card is the door, so the floating
+   pill steps aside, as on the Gulp menu (a lit invitation still shows). */
+body:has(.racer-choices) .party-pill:not(.invite) { display: none; }
