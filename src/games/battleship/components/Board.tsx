@@ -4,7 +4,8 @@ import { COLUMN_LABELS } from '@games/battleship/domain/board';
 import type { CellState } from '@games/battleship/domain/engine';
 import type { Orientation, ShipId } from '@games/battleship/domain/types';
 import { ShipTopDown } from './ships';
-import { BoardFX, type Burst } from './BoardFX';
+import { BoardFX, type Burst, type ShellDrop } from './BoardFX';
+import type { FxId } from '@games/battleship/state/pitch';
 import { CloseIcon, RotateIcon } from '@shared/ui/icons';
 
 export interface BoardCell {
@@ -13,6 +14,8 @@ export interface BoardCell {
   preview?: 'ok' | 'bad';
   /** Marks the just-resolved cell so it plays its impact animation once. */
   fresh?: boolean;
+  /** A shot is on its way to this cell (the pitch's guns): a lock-on reticle. */
+  locked?: boolean;
 }
 
 /** A ship drawn as a top-down overlay spanning its cells. */
@@ -41,6 +44,10 @@ interface BoardProps {
   shake?: 'soft' | 'hard' | null;
   /** When present, overlays a particle canvas; change `fx.id` to burst. */
   fx?: Burst | null;
+  /** The darker-arcade pitch's blasts ('today' is the shipped particles). */
+  fxLook?: FxId;
+  /** A shell dropping onto a cell before its impact (the pitch's guns). */
+  shell?: ShellDrop | null;
   /** Top-down ships to draw over the grid (placement board). */
   ships?: PlacedShip[];
   /** Set while any ship is dragging so overlays let pointer hit-tests reach cells. */
@@ -68,6 +75,8 @@ export function Board({
   active = false,
   shake = null,
   fx,
+  fxLook = 'today',
+  shell = null,
   ships,
   dragging = false,
   selectedShipId,
@@ -171,7 +180,7 @@ export function Board({
         );
       })}
 
-      {fx !== undefined && <BoardFX burst={fx} />}
+      {fx !== undefined && <BoardFX burst={fx} look={fxLook} shell={shell} />}
     </div>
   );
 }
@@ -205,6 +214,7 @@ function Row({
         if (cell.preview === 'ok') cls.push('preview');
         if (cell.preview === 'bad') cls.push('preview', 'bad');
         if (cell.fresh) cls.push('fresh');
+        if (cell.locked) cls.push('locked');
         if (clickable) cls.push('clickable');
         if (clickable && variant === 'enemy') cls.push('target');
 

@@ -87,6 +87,7 @@ export default defineConfig({
           input: {
             index: fileURLToPath(new URL('./index.html', import.meta.url)),
             'preview-b': fileURLToPath(new URL('./preview-b.html', import.meta.url)),
+            'preview-guns': fileURLToPath(new URL('./preview-guns.html', import.meta.url)),
             'preview-ship': fileURLToPath(new URL('./preview-ship.html', import.meta.url)),
             'preview-carrier': fileURLToPath(new URL('./preview-carrier.html', import.meta.url)),
             'preview-battleship': fileURLToPath(

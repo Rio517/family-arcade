@@ -17,7 +17,7 @@ import { Battle } from './Battle';
 import { CaptainChips } from './CaptainChips';
 import { Result } from './Result';
 import { PitchSwitcher } from './PitchSwitcher';
-import { usePitch } from '@games/battleship/state/pitch';
+import { usePitch, useWatchShots } from '@games/battleship/state/pitch';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
@@ -49,6 +49,7 @@ export function BattleshipPage() {
   useDismissOnEscape(shareOpen, () => setShareOpen(false));
   // The darker-arcade pitch under review (?look= / ?fx=); today's game without it.
   const pitch = usePitch();
+  const [watchShots, setWatchShots] = useWatchShots();
 
   // Which navy this captain sails in 3D — classic or modern. Purely cosmetic
   // and purely local (nothing crosses the wire), remembered per device.
@@ -175,6 +176,23 @@ export function BattleshipPage() {
   // (compared at render, so a Change on the result screen hides it too).
   const seatSignedIn = finish !== null && finish.seatedUserId !== null && finish.seatedUserId === profile.userId;
 
+  // With the pitch's guns and Watch the shots on, the battle stays up after
+  // the last shot until it has played out (a blast, a sinking), then the
+  // result shows. View only: the result was recorded the moment it happened,
+  // and a tap skips the wait.
+  const watching = pitch.fx.guns && watchShots;
+  const [battleSeen, setBattleSeen] = useState(false);
+  if (bs.phase === 'battle' && !battleSeen) setBattleSeen(true);
+  if (bs.phase !== 'battle' && bs.phase !== 'over' && battleSeen) setBattleSeen(false);
+  const holdBattle = watching && bs.phase === 'over' && battleSeen;
+  const settleBattle = useCallback(() => setBattleSeen(false), []);
+  useEffect(() => {
+    if (!holdBattle) return;
+    // Never longer than the shot itself: a backstop in case it can't play.
+    const t = setTimeout(() => setBattleSeen(false), 4000);
+    return () => clearTimeout(t);
+  }, [holdBattle]);
+
   const isSetup = bs.phase === 'fleet' || bs.phase === 'placing' || bs.phase === 'waiting';
   const showCode = !solo && bs.side === 'host' && isSetup && !bs.oppConnected;
 
@@ -193,7 +211,7 @@ export function BattleshipPage() {
 
   return (
     <div
-      className={`app ${bs.phase === 'battle' ? 'bs-app-wide' : ''} ${pitch.look !== 'today' ? `bs-look bs-look-${pitch.look}` : ''}`}
+      className={`app ${bs.phase === 'battle' || holdBattle ? 'bs-app-wide' : ''} ${pitch.look !== 'today' ? `bs-look bs-look-${pitch.look}` : ''}`}
       data-phase={bs.phase}
       // The link's state, readable even when no badge shows it (a computer
       // game hides the badge; the tests still need to know the captain is on).
@@ -374,7 +392,7 @@ export function BattleshipPage() {
         />
       )}
 
-      {bs.phase === 'battle' && bs.side && (
+      {(bs.phase === 'battle' || holdBattle) && bs.side && (
         <Battle
           log={bs.log}
           side={bs.side}
@@ -387,10 +405,15 @@ export function BattleshipPage() {
           myTurn={bs.myTurn}
           pendingFire={bs.pendingFire}
           onFire={bs.fire}
+          fx={pitch.fx}
+          watchShots={watchShots}
+          onWatchShots={setWatchShots}
+          finished={holdBattle}
+          onSettled={settleBattle}
         />
       )}
 
-      {bs.phase === 'over' && finish && (
+      {bs.phase === 'over' && finish && !holdBattle && (
         <div className="narrow-col">
           <Result
             won={finish.won}

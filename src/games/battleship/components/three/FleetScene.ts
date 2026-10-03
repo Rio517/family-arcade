@@ -15,7 +15,13 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { CellState } from '@games/battleship/domain/engine';
 import { BOARD_SIZE, type FleetEra, type Orientation, type ShipId } from '@games/battleship/domain/types';
 import { disposeDeep } from '@shared/three/disposeDeep';
+import { TODAY_FX, type PitchFx } from '@games/battleship/state/pitch';
 import { buildModelShip, loadShipModels } from './shipModels';
+import { BoomKit } from './fx/booms';
+import { FireField, type FireSpot } from './fx/fire';
+import { bearingTo, muzzleWorld, poseRig, rigGuns, type ShipGuns } from './fx/guns';
+import { buildSea, type Sea } from './fx/water';
+import { isSharedFxTexture } from './fx/textures';
 
 export interface SceneShip {
   shipId: ShipId;
@@ -30,6 +36,43 @@ const HALF = (BOARD_SIZE - 1) / 2; // board cell → world offset
 
 /** A freshly-sunk hull takes this long to slip under the water. */
 const SINK_MS = 30_000;
+
+/** A gun trains on its bearing over this long, then fires. */
+export const TRAIN_MS = 380;
+/** An outgoing shell's flight from the muzzle into the haze over the enemy's waters. */
+const OUT_FLIGHT_MS = 680;
+
+/** One shell in the air: a glowing streak on a ballistic arc, leaving a trail. */
+interface Shell {
+  sprite: THREE.Sprite;
+  from: THREE.Vector3;
+  ctrl: THREE.Vector3;
+  to: THREE.Vector3;
+  start: number;
+  dur: number;
+  lastTrail: number;
+  /** Rises straight up first (a missile out of a hatch). */
+  boost?: number;
+  onArrive?: () => void;
+}
+
+/** A gun's pose kept per ship, so it survives the per-shot hull rebuilds. */
+interface Aim {
+  turn: number[];
+  elev: number[];
+  recoil: number[];
+}
+
+/** A salvo in progress: which ship, each gun's start and target bearing, when it fires. */
+interface Salvo {
+  shipId: ShipId;
+  start: number;
+  from: number[];
+  to: number[];
+  fromElev: number[];
+  fired: boolean[];
+  target: THREE.Vector3;
+}
 
 export class FleetScene {
   private renderer: THREE.WebGLRenderer;
@@ -50,6 +93,21 @@ export class FleetScene {
   private water: THREE.Mesh;
   /** The sea's clock, read by its vertex shader; frozen under reduced motion. */
   private seaTime = { value: 0 };
+  /** The darker-arcade pitch's effects; today's look when absent. */
+  private fx: PitchFx;
+  private sea: Sea | null = null;
+  private fireField: FireField | null = null;
+  private booms: BoomKit | null = null;
+  /** The guns found on each authored hull (rebuilt with the hull). */
+  private guns = new Map<ShipId, ShipGuns>();
+  private aims = new Map<ShipId, Aim>();
+  private salvos: Salvo[] = [];
+  private shells: Shell[] = [];
+  /** Incoming shells still to land: cancelled (and landed at once) by a skip. */
+  private pendingImpacts: { row: number; col: number; kind: 'hit' | 'miss' | 'sunk'; shell: Shell | null; timer: number }[] = [];
+  /** Cycles the firing ship, so every hull gets its turn at the guns. */
+  private salvoCount = 0;
+  private lastNow = 0;
   private raf = 0;
   private resizeObs: ResizeObserver | null = null;
   private disposed = false;
@@ -65,8 +123,11 @@ export class FleetScene {
       reducedMotion: boolean;
       /** Fires once the ship meshes have decoded and the fleet is rebuilt. */
       onFleetReady?: () => void;
+      /** The darker-arcade pitch's fire, blasts, sea and guns (today's when absent). */
+      fx?: PitchFx;
     },
   ) {
+    this.fx = opts.fx ?? TODAY_FX;
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
@@ -112,27 +173,48 @@ export class FleetScene {
     // per-frame loop over the vertices: no CPU cost, so the mesh can be fine
     // enough for the swell to read as water rather than a wobbling sheet. A
     // standard material keeps the moon, the fog, and the ships' shadows.
-    const waterGeo = new THREE.PlaneGeometry(13.5, 13.5, 72, 72);
-    waterGeo.rotateX(-Math.PI / 2);
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: '#0f3d55',
-      roughness: 0.42,
-      metalness: 0.12,
-    });
-    waterMat.onBeforeCompile = (shader) => {
-      shader.uniforms.uTime = this.seaTime;
-      shader.vertexShader = seaSwell(shader.vertexShader);
-    };
-    this.water = new THREE.Mesh(waterGeo, waterMat);
-    this.water.receiveShadow = true;
-    this.scene.add(this.water);
+    if (this.fx.water !== 'today') {
+      // The pitch's sea reaches the horizon and brings its own sky and fog.
+      this.sea = buildSea(this.fx.water, this.seaTime, opts.skinColor);
+      this.water = this.sea.mesh;
+      this.scene.add(this.water, ...this.sea.extras);
+      this.scene.background = this.sea.background;
+      this.scene.fog = this.sea.fog;
+    } else {
+      const waterGeo = new THREE.PlaneGeometry(13.5, 13.5, 72, 72);
+      waterGeo.rotateX(-Math.PI / 2);
+      const waterMat = new THREE.MeshStandardMaterial({
+        color: '#0f3d55',
+        roughness: 0.42,
+        metalness: 0.12,
+      });
+      waterMat.onBeforeCompile = (shader) => {
+        shader.uniforms.uTime = this.seaTime;
+        shader.vertexShader = seaSwell(shader.vertexShader);
+      };
+      this.water = new THREE.Mesh(waterGeo, waterMat);
+      this.water.receiveShadow = true;
+      this.scene.add(this.water);
+    }
 
     // ── The targeting grid + a thin rim in the fleet's colour ──
     const grid = new THREE.GridHelper(BOARD_SIZE, BOARD_SIZE, '#3d6d8a', '#28546e');
     (grid.material as THREE.Material & { opacity: number; transparent: boolean }).transparent = true;
-    (grid.material as THREE.Material & { opacity: number }).opacity = 0.5;
+    (grid.material as THREE.Material & { opacity: number }).opacity = this.sea ? 0.32 : 0.5;
     grid.position.y = 0.06;
+    // The Night Ops sea draws its grid into the water itself.
+    grid.visible = !this.sea || this.sea.keepGridHelper;
     this.scene.add(grid);
+
+    // ── The pitch's fires, blasts and guns ──
+    if (this.fx.fire !== 'today') {
+      this.fireField = new FireField(this.fx.fire, opts.reducedMotion);
+      this.scene.add(this.fireField.group);
+    }
+    if (this.fx.boom !== 'today' || this.fx.guns) {
+      this.booms = new BoomKit(this.fx.boom === 'today' ? 'a' : this.fx.boom, opts.reducedMotion);
+      this.scene.add(this.booms.group);
+    }
     // The rim floats just above the crests, as four bars, so the swell rolls
     // under it — the old slab sat at wave height and flickered as the sea
     // lapped its lip, and the dark floor that hid the flicker hid the sea.
@@ -159,6 +241,9 @@ export class FleetScene {
 
     this.scene.add(this.shipsGroup, this.markGroup);
 
+    // The effects harness frames close-ups through this; the app never sets it.
+    const harness = window as unknown as { __bsHarness?: boolean; __fleet?: FleetScene };
+    if (harness.__bsHarness) harness.__fleet = this;
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(container);
     this.resize();
@@ -199,6 +284,7 @@ export class FleetScene {
     this.smokes = [];
     this.bobbing = [];
     this.sinkers = [];
+    this.guns.clear();
 
     for (const ship of ships) {
       // Generated mesh where we have one; procedural hull everywhere else.
@@ -207,6 +293,14 @@ export class FleetScene {
       // Marks whether this hull's resources belong to the GLB cache (see the
       // selective disposal above).
       g.userData.cachedResources = model !== null;
+      // The pitch's guns: find the authored turrets and put them back on the
+      // bearing they last trained to (the hull is rebuilt every shot).
+      if (this.fx.guns && model && !ship.sunk) {
+        const guns = rigGuns(model);
+        this.guns.set(ship.shipId, guns);
+        const aim = this.aims.get(ship.shipId);
+        guns.rigs.forEach((rig, i) => poseRig(rig, aim?.turn[i] ?? 0, aim?.elev[i] ?? 0, aim?.recoil[i] ?? 0));
+      }
       const horiz = ship.orientation === 'H';
       const cx = (horiz ? ship.col + (ship.size - 1) / 2 : ship.col) - HALF;
       const cz = (horiz ? ship.row : ship.row + (ship.size - 1) / 2) - HALF;
@@ -263,6 +357,7 @@ export class FleetScene {
       return 3;
     };
     const foamMat = new THREE.MeshBasicMaterial({ color: '#cfe8f2', transparent: true, opacity: 0.55 });
+    const fireSpots: FireSpot[] = [];
     for (let r = 0; r < BOARD_SIZE; r++) {
       for (let c = 0; c < BOARD_SIZE; c++) {
         const state = incoming[r][c];
@@ -278,6 +373,10 @@ export class FleetScene {
           ring2.rotation.x = Math.PI / 2;
           ring2.position.set(x, 0.07, z);
           this.markGroup.add(ring2);
+        } else if (this.fireField) {
+          // The pitch's fires: one instanced field draws every blaze on the board.
+          const grew = 0.72 + 0.12 * shipSizeAt(r, c);
+          fireSpots.push(state === 'sunk' ? { x, y: 0.05, z, size: 1.1, smoulder: true } : { x, y: 0.2, z, size: grew });
         } else if (state === 'sunk') {
           // A dead hull smoulders: heavy dark smoke hanging low, no live flame.
           const smoke = buildSmoke(1.15, r * BOARD_SIZE + c, '#2b303a', 0.14, 0.16);
@@ -302,6 +401,7 @@ export class FleetScene {
         }
       }
     }
+    this.fireField?.setFires(fireSpots);
   }
 
   private resize() {
@@ -310,12 +410,17 @@ export class FleetScene {
     this.renderer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.fireField?.setViewport(h * this.renderer.getPixelRatio(), this.camera.fov);
   }
 
   private loop = (now: number) => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
     this.controls.update();
+    // rAF stamps a frame with its start, which can fall before the
+    // performance.now() of the first, direct call: never step backwards.
+    const dt = this.lastNow ? Math.max(0, Math.min((now - this.lastNow) / 1000, 0.05)) : 0;
+    this.lastNow = now;
 
     // Foundering hulls go down whatever else animates — this is game state
     // playing out, not decoration. (Under reduced motion sinkers stays empty:
@@ -361,14 +466,247 @@ export class FleetScene {
       }
     }
 
+    // The pitch's sea, fires, guns and blasts.
+    this.sea?.step(this.opts.reducedMotion ? 0 : now / 1000, this.camera);
+    this.fireField?.step(now);
+    this.stepGuns(now);
+    this.booms?.step(dt);
+    // A blast jolts the camera for a moment (never under reduced motion).
+    const shake = this.booms?.shake() ?? 0;
+    const jolt = shake > 0.001;
+    if (jolt) {
+      this.joltBy.set(Math.sin(now * 0.091) * shake, Math.sin(now * 0.077 + 1) * shake * 0.6, Math.sin(now * 0.063 + 2) * shake);
+      this.camera.position.add(this.joltBy);
+    }
+
     this.renderer.render(this.scene, this.camera);
+    if (jolt) this.camera.position.sub(this.joltBy);
   };
+
+  private joltBy = new THREE.Vector3();
+
+  // ── Guns and shells (the pitch) ─────────────────────────────────────────
+
+  /** The world point a shot at the enemy's (row, col) flies to: their waters, beyond our horizon. */
+  private enemyWaters(row: number, col: number): THREE.Vector3 {
+    return new THREE.Vector3((col - HALF) * 1.7, 0, -15 - row * 0.55);
+  }
+
+  private cellWorld(row: number, col: number, y = 0): THREE.Vector3 {
+    return new THREE.Vector3(col - HALF, y, row - HALF);
+  }
+
+  /**
+   * Our salvo at the enemy's (row, col): the next afloat ship in turn trains
+   * every main gun on the bearing, fires in a ripple, and the shells arc away
+   * over the horizon. (The impact itself plays on the radar.)
+   */
+  fireAt(row: number, col: number): void {
+    if (!this.fx.guns || !this.booms) return;
+    const afloat = (this.lastState?.ships ?? []).filter((s) => !s.sunk && this.guns.has(s.shipId));
+    if (afloat.length === 0) return;
+    const ship = afloat[this.salvoCount++ % afloat.length];
+    const guns = this.guns.get(ship.shipId)!;
+    const target = this.enemyWaters(row, col);
+    const now = performance.now();
+    if (guns.rigs.length === 0) {
+      // No gun on this hull (the Virginia): a missile out of a deck hatch.
+      const hatch = guns.hatches[(this.salvoCount * 3) % Math.max(1, guns.hatches.length)];
+      if (!hatch) return;
+      const from = new THREE.Vector3().setFromMatrixPosition(hatch.matrixWorld);
+      this.booms.muzzle(from, new THREE.Vector3(0, 1, 0), 0.3);
+      this.launch(from, target, now + TRAIN_MS * 0.5, OUT_FLIGHT_MS + 200, 0.9);
+      return;
+    }
+    const aim = this.aimFor(ship.shipId, guns.rigs.length);
+    const to = guns.rigs.map((rig) => bearingTo(rig, target));
+    this.salvos.push({
+      shipId: ship.shipId,
+      start: now,
+      from: [...aim.turn],
+      to,
+      fromElev: [...aim.elev],
+      fired: guns.rigs.map(() => false),
+      target,
+    });
+  }
+
+  /**
+   * A shell from the enemy, over the horizon, landing on our (row, col) in
+   * `ms`: a warning ring tightens on the water, then the blast or the splash.
+   */
+  incoming(row: number, col: number, kind: 'hit' | 'miss' | 'sunk', ms: number): void {
+    if (!this.booms) return;
+    const to = this.cellWorld(row, col, kind === 'miss' ? 0.02 : 0.22);
+    const now = performance.now();
+    this.booms.telegraph(to, ms / 1000);
+    let shell: Shell | null = null;
+    if (!this.opts.reducedMotion) {
+      const from = new THREE.Vector3(to.x * 0.4 - 1.5, 6.5, -16);
+      shell = this.launch(from, to, now, ms);
+    }
+    const pending = { row, col, kind, shell, timer: 0 };
+    pending.timer = window.setTimeout(() => {
+      this.pendingImpacts = this.pendingImpacts.filter((p) => p !== pending);
+      this.impact(row, col, kind);
+    }, ms);
+    this.pendingImpacts.push(pending);
+  }
+
+  /** The blast or splash at our (row, col), now. */
+  impact(row: number, col: number, kind: 'hit' | 'miss' | 'sunk'): void {
+    if (!this.booms) return;
+    if (kind === 'miss') {
+      this.booms.splash(this.cellWorld(row, col, 0.02), 0.62);
+      return;
+    }
+    let along: THREE.Vector3[] | undefined;
+    if (kind === 'sunk') {
+      const ship = (this.lastState?.ships ?? []).find((s) =>
+        s.orientation === 'H' ? s.row === row && col >= s.col && col < s.col + s.size : s.col === col && row >= s.row && row < s.row + s.size,
+      );
+      if (ship) {
+        along = [];
+        for (let i = 0; i < ship.size; i++) {
+          const r = ship.orientation === 'V' ? ship.row + i : ship.row;
+          const c = ship.orientation === 'H' ? ship.col + i : ship.col;
+          if (r !== row || c !== col) along.push(this.cellWorld(r, c, 0.2));
+        }
+      }
+    }
+    this.booms.boom(this.cellWorld(row, col, 0.24), kind === 'sunk' ? 1.3 : 0.95, kind === 'sunk', along);
+  }
+
+  /**
+   * Skip: guns snap to their bearings, shells in flight vanish, and a shell
+   * still on its way lands now. Only the picture changes; the game is
+   * whatever the log says, before and after.
+   */
+  skip(): void {
+    for (const s of this.salvos) {
+      const aim = this.aimFor(s.shipId, s.to.length);
+      s.to.forEach((t, i) => {
+        aim.turn[i] = t;
+        aim.elev[i] = 0.16;
+        aim.recoil[i] = 0;
+      });
+    }
+    this.salvos = [];
+    for (const sh of this.shells) this.booms?.removeSprite(sh.sprite);
+    this.shells = [];
+    const pending = this.pendingImpacts;
+    this.pendingImpacts = [];
+    for (const p of pending) {
+      clearTimeout(p.timer);
+      this.impact(p.row, p.col, p.kind);
+    }
+  }
+
+  private aimFor(shipId: ShipId, n: number): Aim {
+    let aim = this.aims.get(shipId);
+    if (!aim || aim.turn.length !== n) {
+      aim = { turn: new Array(n).fill(0), elev: new Array(n).fill(0), recoil: new Array(n).fill(0) };
+      this.aims.set(shipId, aim);
+    }
+    return aim;
+  }
+
+  private launch(from: THREE.Vector3, to: THREE.Vector3, start: number, dur: number, boost = 0): Shell {
+    const sprite = this.booms!.shellSprite();
+    sprite.position.copy(from);
+    sprite.visible = false;
+    const mid = from.clone().lerp(to, 0.5);
+    const apex = Math.max(1.6, from.distanceTo(to) * 0.22);
+    const shell: Shell = { sprite, from: from.clone(), ctrl: mid.setY(Math.max(from.y, to.y) + apex), to: to.clone(), start, dur, lastTrail: 0, boost };
+    this.shells.push(shell);
+    return shell;
+  }
+
+  private stepGuns(now: number): void {
+    if (!this.booms) return;
+    const reduced = this.opts.reducedMotion;
+    const tmpPos = new THREE.Vector3();
+    const tmpDir = new THREE.Vector3();
+    for (let k = this.salvos.length - 1; k >= 0; k--) {
+      const s = this.salvos[k];
+      const guns = this.guns.get(s.shipId);
+      const aim = this.aimFor(s.shipId, s.to.length);
+      const t = Math.max(0, (now - s.start) / TRAIN_MS);
+      const e = reduced ? 1 : t >= 1 ? 1 : t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      let done = true;
+      s.to.forEach((to, i) => {
+        // Shortest way round to the new bearing.
+        const d = Math.atan2(Math.sin(to - s.from[i]), Math.cos(to - s.from[i]));
+        aim.turn[i] = s.from[i] + d * e;
+        aim.elev[i] = s.fromElev[i] + (0.2 - s.fromElev[i]) * e;
+        // A ripple salvo: each gun fires a beat after the one before.
+        const fireAt = s.start + TRAIN_MS + i * 70;
+        if (!s.fired[i] && now >= fireAt && guns?.rigs[i]) {
+          s.fired[i] = true;
+          const rig = guns.rigs[i];
+          poseRig(rig, aim.turn[i], aim.elev[i], 0);
+          muzzleWorld(rig, tmpPos, tmpDir);
+          this.booms!.muzzle(tmpPos, tmpDir, 0.22);
+          if (!reduced) {
+            const spread = new THREE.Vector3(Math.sin(i * 2.1) * 0.6, 0, Math.cos(i * 1.7) * 0.6);
+            this.launch(tmpPos, s.target.clone().add(spread), now, OUT_FLIGHT_MS);
+          }
+        }
+        // The barrels run back on firing and ease out again.
+        const since = now - fireAt;
+        aim.recoil[i] = reduced || !s.fired[i] ? 0 : since < 60 ? since / 60 : Math.max(0, 1 - (since - 60) / 320);
+        if (!s.fired[i] || since < 400) done = false;
+      });
+      guns?.rigs.forEach((rig, i) => poseRig(rig, aim.turn[i], aim.elev[i], aim.recoil[i]));
+      if (done) this.salvos.splice(k, 1);
+    }
+    // Barrels settle back toward level once the salvo is away.
+    for (const [shipId, aim] of this.aims) {
+      if (this.salvos.some((s) => s.shipId === shipId)) continue;
+      let moved = false;
+      aim.elev.forEach((el, i) => {
+        if (el > 0.001) {
+          aim.elev[i] = Math.max(0, el - 0.0025);
+          moved = true;
+        }
+      });
+      if (moved) this.guns.get(shipId)?.rigs.forEach((rig, i) => poseRig(rig, aim.turn[i], aim.elev[i], 0));
+    }
+    for (let k = this.shells.length - 1; k >= 0; k--) {
+      const sh = this.shells[k];
+      const t = (now - sh.start) / sh.dur;
+      if (t < 0) continue;
+      sh.sprite.visible = true;
+      if (t >= 1) {
+        this.booms.removeSprite(sh.sprite);
+        this.shells.splice(k, 1);
+        sh.onArrive?.();
+        continue;
+      }
+      // A quadratic arc; a missile first climbs straight out of its tube.
+      const u = 1 - t;
+      const p = tmpPos.copy(sh.from).multiplyScalar(u * u).addScaledVector(sh.ctrl, 2 * u * t).addScaledVector(sh.to, t * t);
+      if (sh.boost) p.y += sh.boost * Math.sin(Math.min(1, t * 2.5) * Math.PI * 0.5) * (1 - t);
+      sh.sprite.position.copy(p);
+      if (now - sh.lastTrail > 22) {
+        sh.lastTrail = now;
+        this.booms.trail(p, 0.16);
+        if (this.fx.boom === 'b' || sh.boost) this.booms.wisp(p, 0.12);
+      }
+    }
+  }
 
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
+    for (const p of this.pendingImpacts) clearTimeout(p.timer);
+    this.pendingImpacts = [];
     this.resizeObs?.disconnect();
     this.controls.dispose();
+    // The pitch's systems free their own pooled buffers; the shared effect
+    // textures are freed with the scene below and repainted on next use.
+    this.fireField?.dispose();
+    this.booms?.dispose();
     // Actually free the GPU on teardown — the scene rebuilds on every skin
     // change, and leaked WebGL contexts eventually kill 3D on iPads.
     disposeDeep(this.scene);
@@ -394,7 +732,7 @@ function disposeMarks(root: THREE.Object3D): void {
     const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
     for (const m of mats) {
       const map = (m as THREE.MeshBasicMaterial).map;
-      if (map && map !== flameTextureCache && map !== smokeTextureCache) map.dispose();
+      if (map && map !== flameTextureCache && map !== smokeTextureCache && !isSharedFxTexture(map)) map.dispose();
       m.dispose();
     }
   });
