@@ -335,7 +335,7 @@ export class BoomKit {
   /** A fading glow left behind a shell. */
   trail(at: THREE.Vector3, size: number): void {
     const P = PALETTE[this.style];
-    this.puff(at.clone(), P.spark, new THREE.Vector3(), size, 0.28, -size * 1.5, { additive: true, opacity: 0.7 });
+    this.puff(at.clone(), P.spark, new THREE.Vector3(), size, 0.2, -size * 2.5, { additive: true, opacity: 0.55 });
   }
 
   /** A smoke wisp off a trail (the cinematic take's shells leave a line in the sky). */

@@ -2,6 +2,7 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
     "src/games/battleship/preview-b.tsx",
+    "src/games/battleship/preview-guns.tsx",
     "src/games/battleship/preview-ship.tsx",
     "src/games/battleship/preview-carrier.tsx",
     "src/games/battleship/preview-battleship.tsx",

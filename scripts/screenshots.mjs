@@ -148,6 +148,131 @@ for (const look of ['a', 'b', 'c']) {
 }
 
 /**
+ * The darker-arcade pitch's effects (?fx=), on preview-guns.html: the real
+ * battle screen fed shots on demand through `window.__bs`. Effects only exist
+ * in motion, so these shots run without reduced motion (`motion`) and are
+ * timed from the moment the shot goes into the log: a salvo mid-flight, the
+ * enemy's shell coming in, the blast, a sinking, a splash, the radar hit.
+ * Close-ups move the ocean's camera through the harness's `__fleet` hook.
+ */
+const FX_READY = async (page) => {
+  await page.waitForSelector('[data-testid="fleet3d"], [data-testid="fleet3d-fallback"]', { timeout: 20000 });
+  await page.waitForTimeout(3000);
+};
+/** Fire one harness shot (`mine` or `theirs`, a kind), then wait until `ms` after it landed in the log. */
+const fxShot = async (page, who, kind, ms) => {
+  const t0 = await page.evaluate(([w, k]) => {
+    window.__bs[w](k);
+    return performance.now();
+  }, [who, kind]);
+  const now = await page.evaluate(() => performance.now());
+  if (ms - (now - t0) > 0) await page.waitForTimeout(ms - (now - t0));
+};
+const fxCamera = (page, at, look) =>
+  page.evaluate(([p, t]) => {
+    const f = window.__fleet;
+    f.controls.minDistance = 1;
+    f.camera.position.set(...p);
+    f.controls.target.set(...t);
+    f.controls.update();
+  }, [at, look]);
+// The harness's first salvo goes to the carrier; the second, framed close, to the battleship.
+const fxSalvo = (ms) => async (page) => {
+  await FX_READY(page);
+  await fxShot(page, 'mine', 'miss', 1300);
+  await fxShot(page, 'theirs', 'miss', 1200);
+  await fxCamera(page, [0.2, 2.3, 3.4], [-2.4, 0.25, 0.2]);
+  await page.waitForTimeout(300);
+  await fxShot(page, 'mine', 'hit', ms);
+};
+const FX_SHOTS = [];
+for (const fx of ['today', 'a', 'b']) {
+  const path = `/preview-guns.html?fx=${fx}&bar=0`;
+  const both = ['chromium', 'webkit'];
+  FX_SHOTS.push(
+    { name: `bs-fx-${fx}-board`, path, viewport: TABLET, motion: true, engines: both, expect: '[data-testid="fleet3d"]', prep: FX_READY },
+    {
+      name: `bs-fx-${fx}-board-phone`,
+      path,
+      viewport: PHONE,
+      motion: true,
+      engines: both,
+      expect: '[data-testid="fleet3d"]',
+      prep: async (page) => {
+        await page.getByRole('button', { name: 'My Fleet' }).click();
+        await FX_READY(page);
+      },
+    },
+    {
+      // Our shot coming down on the radar: today it lands at once.
+      name: `bs-fx-${fx}-radar-hit`,
+      path,
+      viewport: TABLET,
+      motion: true,
+      engines: both,
+      prep: async (page) => {
+        await FX_READY(page);
+        await fxShot(page, 'mine', 'hit', fx === 'today' ? 140 : 1230);
+      },
+    },
+  );
+}
+for (const fx of ['a', 'b']) {
+  const path = `/preview-guns.html?fx=${fx}&bar=0`;
+  const both = ['chromium', 'webkit'];
+  const close = { path, viewport: TABLET, motion: true, engines: both, selector: '[data-testid="fleet3d"]' };
+  FX_SHOTS.push(
+    { ...close, name: `bs-fx-${fx}-salvo`, prep: fxSalvo(470) },
+    { ...close, name: `bs-fx-${fx}-salvo-modern`, path: `${path}&era=modern`, prep: fxSalvo(470) },
+    {
+      ...close,
+      name: `bs-fx-${fx}-incoming`,
+      prep: async (page) => {
+        await FX_READY(page);
+        await fxShot(page, 'theirs', 'hit', 560);
+      },
+    },
+    {
+      ...close,
+      name: `bs-fx-${fx}-blast`,
+      prep: async (page) => {
+        await FX_READY(page);
+        // The harness's next hit lands on the carrier's third cell (D2).
+        await fxCamera(page, [1.4, 2.5, 0.2], [-1.5, 0.3, -3.3]);
+        await fxShot(page, 'theirs', 'hit', 1020);
+      },
+    },
+    {
+      ...close,
+      name: `bs-fx-${fx}-sinking`,
+      prep: async (page) => {
+        await FX_READY(page);
+        await fxShot(page, 'theirs', 'sunk', 1150);
+      },
+    },
+    {
+      ...close,
+      name: `bs-fx-${fx}-splash`,
+      prep: async (page) => {
+        await FX_READY(page);
+        // The harness's next miss falls on E8.
+        await fxCamera(page, [1.2, 2.4, 6.4], [-0.5, 0.3, 2.5]);
+        await fxShot(page, 'theirs', 'miss', 1120);
+      },
+    },
+    {
+      ...close,
+      name: `bs-fx-${fx}-fire`,
+      prep: async (page) => {
+        await FX_READY(page);
+        await fxCamera(page, [-0.2, 1.9, -0.1], [-2.6, 0.3, -2.8]);
+        await page.waitForTimeout(400);
+      },
+    },
+  );
+}
+
+/**
  * Each shot: where to go, how big, and an optional `prep` that runs before
  * the capture (dismiss an overlay, wait for a canvas to paint, …).
  *
@@ -158,6 +283,7 @@ for (const look of ['a', 'b', 'c']) {
  *   engines   ['chromium'] by default; add 'webkit' for canvas and alpha work
  *             (saved as <name>.webkit.png)
  *   scale     device pixel ratio, 2 by default; 1 keeps monitor shots small
+ *   motion    run without reduced motion (effects caught mid-flight)
  *   camera    'portrait' | 'portrait-tilt' — a real face in the fake camera,
  *             from MIRROR_PORTRAIT; saved outside the repo; skipped when
  *             it isn't set
@@ -320,6 +446,7 @@ const SHOTS = [
     },
   },
   ...LOOK_SHOTS,
+  ...FX_SHOTS,
   {
     // The galaxy set in 3D — where the family's generated ships live (the
     // X-wing pawns lead; more authored pieces land here as they're made).
@@ -1035,7 +1162,8 @@ async function main() {
             deviceScaleFactor: shot.scale ?? 2,
             // Screenshots are documentation, not a motion demo — and the arcade
             // gates its animations on this, so shots come out settled.
-            reducedMotion: 'reduce',
+            // (Effects shots opt out with `motion`: an explosion held still is no explosion.)
+            reducedMotion: shot.motion ? 'no-preference' : 'reduce',
           });
           const roster =
             shot.seed === 'signedOut' ? { ...SEED_ROSTER, activeId: null } : SEED_ROSTER;

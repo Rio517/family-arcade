@@ -398,7 +398,7 @@ function drawDrop(ctx: CanvasRenderingContext2D, d: Drop, now: number, look: FxI
 function spawnTake(out: Particle[], look: 'a' | 'b', kind: Burst['kind'], cx: number, cy: number, cell: number, reduced: boolean): void {
   const T = TAKES[look];
   const arcade = look === 'a';
-  const s = cell / 40; // scale everything to the board's cell size
+  const s = (cell / 40) * 1.35; // scale everything to the board's cell size, a touch over it
   const push = (p: Partial<Particle> & { life: number; size: number; color: string }) =>
     out.push({ x: cx, y: cy, vx: 0, vy: 0, maxLife: p.life, glow: false, gravity: 0, grow: 0, alphaScale: 1, ...p });
 
@@ -433,7 +433,7 @@ function spawnTake(out: Particle[], look: 'a' | 'b', kind: Burst['kind'], cx: nu
   for (let i = 0; i < balls; i++) {
     const a = (i / balls) * TAU + rand(0, 0.6);
     const v = rand(18, 60) * s * k;
-    push({ shape: 'soft', life: rand(0.5, 0.9), size: rand(7, 12) * s * k, grow: 16 * s, color: '#fff', hot: T.hot, cold: T.cold, glow: true, vx: Math.cos(a) * v, vy: Math.sin(a) * v, drag: 2.6, x: cx + Math.cos(a) * 3 * s, y: cy + Math.sin(a) * 3 * s });
+    push({ shape: 'soft', life: rand(0.6, 1.0), size: rand(8, 13) * s * k, grow: 16 * s, color: '#fff', hot: T.hot, cold: T.cold, glow: true, vx: Math.cos(a) * v, vy: Math.sin(a) * v, drag: 2.6, x: cx + Math.cos(a) * 3 * s, y: cy + Math.sin(a) * 3 * s });
   }
   // Smoke that lingers and drifts.
   for (let i = 0; i < (arcade ? 6 : 9); i++) {
