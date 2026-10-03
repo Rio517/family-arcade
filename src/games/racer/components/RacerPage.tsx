@@ -18,6 +18,7 @@ import { DRIVERS, driverById, lookOf, rivalsFor, type Driver } from './cast';
 import { ModeScreen, PickScreen, RacerLobby, RideScreen } from './RacerSetup';
 import { Track3D, type RaceCtx } from './Track3D';
 import { WinOverlay } from './WinOverlay';
+import { LeaveRaceDialog } from './LeaveRaceDialog';
 
 type Phase = 'mode' | 'pick' | 'ride' | 'lobby' | 'race' | 'over';
 
@@ -35,6 +36,8 @@ export function RacerPage() {
   const profile = useProfile();
   const party = useParty();
   const [raceKey, setRaceKey] = useState(0);
+  /** The "Leave the race?" confirm is up (only ever during a race). */
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
 
   // The ticket gate guarantees a signed-in name; no fallback of our own.
   const myName = profile.profile.name.trim();
@@ -79,6 +82,7 @@ export function RacerPage() {
       ctxRef.current = ctx;
       setRace(ctx);
       setRaceKey((k) => k + 1);
+      setConfirmingLeave(false);
       setPhase('race');
     },
     [net, myName],
@@ -129,6 +133,7 @@ export function RacerPage() {
     ctxRef.current = null;
     setRace(null);
     lastStartRef.current = 0;
+    setConfirmingLeave(false);
     setPhase('mode');
   };
 
@@ -196,9 +201,12 @@ export function RacerPage() {
 
   // race | over
   return (
-    <Shell onMenu={leaveToMenu}>
+    <Shell onMenu={phase === 'race' ? () => setConfirmingLeave(true) : leaveToMenu}>
       {race && <Track3D key={raceKey} ctxRef={ctxRef} start={race} net={net} onOver={finishRace} />}
       {phase === 'over' && race && <WinOverlay ctx={race} onAgain={playAgain} onMenu={leaveToMenu} />}
+      {phase === 'race' && confirmingLeave && (
+        <LeaveRaceDialog onKeep={() => setConfirmingLeave(false)} onLeave={leaveToMenu} />
+      )}
     </Shell>
   );
 }

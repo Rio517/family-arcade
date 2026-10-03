@@ -16,7 +16,7 @@ vi.mock('@shared/party/PartyContext', () => ({ useParty: () => noParty.value }))
  * Two-player integration tests: real <RacerPage> clients wired together through
  * an in-memory stand-in for the WebRTC transport (same pattern as battleship's
  * app.integration.test.tsx). They walk the actual multiplayer journey — pick
- * 2 Players, choose a driver, create/join by code — and assert the racer
+ * Play together, choose a driver, create/join by code — and assert the racer
  * handshake (hello ⇄, host's go) on the wire plus the phase transitions.
  *
  * jsdom has no WebGL, so once a client reaches the race the 3D scene fails to
@@ -214,7 +214,7 @@ function renderClient(ticket = '') {
 
 type Client = ReturnType<typeof renderClient>;
 
-/** 2 Players → pick a driver (and a ride, for a princess or a bunny) → arrive at the net lobby. */
+/** Play together → pick a driver (and a ride, for a princess or a bunny) → arrive at the net lobby. */
 function toNetLobby(app: Client, driverId: string, mount = 'cloud') {
   fireEvent.click(app.getByTestId('racer-mode-net'));
   fireEvent.click(app.getByTestId(`racer-driver-${driverId}`));
@@ -264,7 +264,7 @@ beforeEach(() => {
 });
 
 describe('two-player racer: lobby flows', () => {
-  it('host: 2 Players → pick driver → Create a game shows a shareable 4-char code and waiting copy', () => {
+  it('host: Play together → pick driver → Create a game shows a shareable 4-char code and waiting copy', () => {
     const app = renderClient();
 
     toNetLobby(app, 'unicorn');

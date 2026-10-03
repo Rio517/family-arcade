@@ -134,7 +134,7 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('<RacerPage> — the party table', () => {
-  /** Mode screen → 2 Players → pick a driver → the lobby. */
+  /** Mode screen → Play together → pick a driver → the lobby. */
   function goToNetLobby() {
     fireEvent.click(screen.getByTestId('racer-mode-net'));
     fireEvent.click(screen.getByTestId('racer-driver-unicorn'));
@@ -159,6 +159,7 @@ describe('<RacerPage> — the party table', () => {
     fireEvent.click(screen.getByTestId('racer-driver-unicorn'));
 
     fireEvent.click(screen.getByTestId('racer-back'));
+    fireEvent.click(screen.getByTestId('racer-leave-confirm'));
     expect(mockParty.value.closeTable).not.toHaveBeenCalled();
     expect(screen.getByTestId('racer-mode-solo')).toBeInTheDocument();
   });
@@ -186,11 +187,89 @@ describe('<RacerPage> — the party table', () => {
   });
 });
 
+describe('<RacerPage> — one name for playing with another device', () => {
+  it('the mode screen and the lobby both say "Play together", with a plain helper line', () => {
+    renderRacer();
+    const net = screen.getByTestId('racer-mode-net');
+    expect(net).toHaveTextContent('Play together');
+    expect(net).toHaveTextContent('Race a friend on another device');
+    expect(screen.queryByText(/2 Players/)).toBeNull();
+
+    fireEvent.click(net);
+    fireEvent.click(screen.getByTestId('racer-driver-unicorn'));
+    expect(screen.getByRole('heading', { name: 'Play together' })).toBeInTheDocument();
+    expect(screen.queryByText(/Play with a friend/)).toBeNull();
+  });
+});
+
+describe('<RacerPage> — leaving a race asks first', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it('the setup screens step back at once, with no confirm', () => {
+    renderRacer();
+    goToPicker();
+    fireEvent.click(screen.getByTestId('racer-back'));
+    expect(screen.queryByTestId('racer-leave')).toBeNull();
+    expect(screen.getByTestId('racer-mode-solo')).toBeInTheDocument();
+  });
+
+  it('‹ during a race opens "Leave the race?" and Keep racing keeps the race', () => {
+    renderRacer();
+    startSoloRace('unicorn');
+    fireEvent.click(screen.getByTestId('racer-back'));
+
+    const dialog = screen.getByRole('dialog', { name: 'Leave the race?' });
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByTestId('racer-leave-keep')).toHaveTextContent('Keep racing');
+    expect(screen.getByTestId('racer-leave-keep')).toHaveFocus();
+
+    fireEvent.click(screen.getByTestId('racer-leave-keep'));
+    expect(screen.queryByTestId('racer-leave')).toBeNull();
+    expect(screen.getByTestId('racer-score-0')).toBeInTheDocument();
+  });
+
+  it('Escape closes the confirm and keeps racing', () => {
+    renderRacer();
+    startSoloRace('fairy');
+    fireEvent.click(screen.getByTestId('racer-back'));
+    expect(screen.getByTestId('racer-leave')).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByTestId('racer-leave')).toBeNull();
+    expect(screen.getByTestId('racer-score-0')).toBeInTheDocument();
+  });
+
+  it('Leave goes back to the mode screen', () => {
+    renderRacer();
+    startSoloRace('unicorn');
+    fireEvent.click(screen.getByTestId('racer-back'));
+    expect(screen.queryByTestId('racer-mode-solo')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('racer-leave-confirm'));
+    expect(screen.getByTestId('racer-mode-solo')).toBeInTheDocument();
+    expect(screen.queryByTestId('racer-leave')).toBeNull();
+  });
+
+  it('Tab wraps between the two buttons so focus stays in the confirm', () => {
+    renderRacer();
+    startSoloRace('unicorn');
+    fireEvent.click(screen.getByTestId('racer-back'));
+    const leave = screen.getByTestId('racer-leave-confirm');
+    leave.focus();
+    fireEvent.keyDown(leave, { key: 'Tab' });
+    expect(screen.getByTestId('racer-leave-keep')).toHaveFocus();
+    fireEvent.keyDown(screen.getByTestId('racer-leave-keep'), { key: 'Tab', shiftKey: true });
+    expect(leave).toHaveFocus();
+  });
+});
+
 describe('<RacerPage> — solo setup flow', () => {
   it('offers 1-player and 2-player modes, and picking solo advances to the driver picker', () => {
     renderRacer();
     expect(screen.getByTestId('racer-mode-solo')).toHaveTextContent('1 Player');
-    expect(screen.getByTestId('racer-mode-net')).toHaveTextContent('2 Players');
+    expect(screen.getByTestId('racer-mode-net')).toHaveTextContent('Play together');
 
     goToPicker();
     expect(screen.getByText('Pick your racer')).toBeInTheDocument();
@@ -368,7 +447,7 @@ describe('<RacerPage> — a two-player finish credits the racer on this device',
     resetUsersStore();
   });
 
-  /** 2 Players → pick the fairy → take a seat at a table by code. Returns that code. */
+  /** Play together → pick the fairy → take a seat at a table by code. Returns that code. */
   function sitDown(role: 'host' | 'guest'): string {
     fireEvent.click(screen.getByTestId('racer-mode-net'));
     fireEvent.click(screen.getByTestId('racer-driver-fairy'));

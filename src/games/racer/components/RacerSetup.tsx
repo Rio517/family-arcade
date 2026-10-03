@@ -44,7 +44,7 @@ export function ModeScreen({ onPick }: { onPick: (m: RaceMode) => void }) {
             <img className="racer-big-pic" src={driverById('unicorn').portrait} alt="" />
             <img className="racer-big-pic" src={driverById('fairy').portrait} alt="" />
           </span>
-          <span className="racer-big-label">2 Players</span>
+          <span className="racer-big-label">Play together</span>
           <span className="racer-big-sub">Race a friend on another device</span>
         </button>
       </div>
@@ -172,7 +172,7 @@ export function RacerLobby({
           <div className="racer-lobby-card">
             <h2>Share this code</h2>
             <div className="racer-code" data-testid="racer-code">{net.code}</div>
-            <p>Ask your friend to open Rainbow Racer → 2 Players → Join, and type this code.</p>
+            <p>Ask your friend to open Rainbow Racer, choose Play together, then Join with a code, and type this code.</p>
             <p className="racer-lobby-status">
               {net.connected ? 'Connected! Starting…' : 'Waiting for your friend to join…'}
             </p>
@@ -263,7 +263,7 @@ export function RacerLobby({
         </div>
       ) : (
         <div className="racer-lobby-card">
-          <h2>Play with a friend</h2>
+          <h2>Play together</h2>
           <button
             className="racer-primary"
             onClick={() => startTable({ role: 'host', code: generateCode(), seatedUserId })}
