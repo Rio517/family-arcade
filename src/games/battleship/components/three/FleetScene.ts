@@ -38,7 +38,7 @@ const HALF = (BOARD_SIZE - 1) / 2; // board cell → world offset
 const SINK_MS = 30_000;
 
 /** A gun trains on its bearing over this long, then fires. */
-export const TRAIN_MS = 380;
+const TRAIN_MS = 380;
 /** An outgoing shell's flight from the muzzle into the haze over the enemy's waters. */
 const OUT_FLIGHT_MS = 680;
 
@@ -53,6 +53,8 @@ interface Shell {
   lastTrail: number;
   /** Rises straight up first (a missile out of a hatch). */
   boost?: number;
+  /** Where it was last frame, for the tracer. */
+  lastPos?: THREE.Vector3;
   onArrive?: () => void;
 }
 
@@ -164,7 +166,8 @@ export class FleetScene {
     moon.shadow.camera.top = 7; moon.shadow.camera.bottom = -7;
     moon.shadow.bias = -0.0004;
     this.scene.add(moon);
-    const rim = new THREE.DirectionalLight(opts.skinColor, 0.4);
+    // The pitch's seas reflect a low light as a long streak: keep the rim faint there.
+    const rim = new THREE.DirectionalLight(opts.skinColor, (opts.fx ?? TODAY_FX).water === 'today' ? 0.4 : 0.12);
     rim.position.set(-6, 3, -6);
     this.scene.add(rim);
 
@@ -688,11 +691,16 @@ export class FleetScene {
       const p = tmpPos.copy(sh.from).multiplyScalar(u * u).addScaledVector(sh.ctrl, 2 * u * t).addScaledVector(sh.to, t * t);
       if (sh.boost) p.y += sh.boost * Math.sin(Math.min(1, t * 2.5) * Math.PI * 0.5) * (1 - t);
       sh.sprite.position.copy(p);
-      if (now - sh.lastTrail > 22) {
+      // A continuous tracer: glow laid every short step along the path flown
+      // since the last frame, so a fast shell draws a streak, not dots.
+      const last = sh.lastPos ?? p.clone();
+      const steps = Math.min(5, Math.ceil(last.distanceTo(p) / 0.18));
+      for (let k = 1; k <= steps; k++) this.booms.trail(last.clone().lerp(p, k / steps), 0.19);
+      if ((this.fx.boom === 'b' || sh.boost) && now - sh.lastTrail > 30) {
         sh.lastTrail = now;
-        this.booms.trail(p, 0.16);
-        if (this.fx.boom === 'b' || sh.boost) this.booms.wisp(p, 0.12);
+        this.booms.wisp(p, 0.12);
       }
+      sh.lastPos = p.clone();
     }
   }
 

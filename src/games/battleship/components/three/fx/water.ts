@@ -95,7 +95,7 @@ const A_FRAG_BODY = /* glsl */ `
     float R = mod(uTime, period) / period * 13.0;
     float ring = exp(-pow((r - R) * 3.2, 2.0)) * (1.0 - R / 13.0);
     float wake = exp(-max(0.0, R - r) * 1.4) * step(r, R) * (1.0 - R / 13.0);
-    totalEmissiveRadiance += uGlow * (grid * (0.15 + 0.75 * ring + 0.3 * wake) + ring * 0.22);
+    totalEmissiveRadiance += uGlow * (grid * (0.15 + 0.6 * ring + 0.25 * wake) + ring * 0.12);
     // A faint deep glow under the board, so the play area reads as lit.
     totalEmissiveRadiance += uGlow * 0.035 * inBoard;
   }
@@ -192,9 +192,9 @@ const B_FRAG_BODY = /* glsl */ `
     totalEmissiveRadiance += uSky * fres * 0.55;
     // The moon's glitter path: a hard specular lobe, broken into sparkles.
     vec3 H = normalize(uMoonView + V);
-    float spec = pow(clamp(dot(N, H), 0.0, 1.0), 220.0);
-    float sparkle = step(0.55, seaNoise(vSeaPos * 18.0 + uTime * 1.7));
-    totalEmissiveRadiance += vec3(0.95, 0.97, 1.0) * spec * (0.6 + 2.4 * sparkle);
+    float spec = pow(clamp(dot(N, H), 0.0, 1.0), 320.0);
+    float sparkle = step(0.62, seaNoise(vSeaPos * 18.0 + uTime * 1.7));
+    totalEmissiveRadiance += vec3(0.95, 0.97, 1.0) * spec * (0.4 + 1.4 * sparkle);
     // Whitecaps where the crests run tallest.
     // Whitecaps: flecks of foam on the tallest crests only.
     float foamN = seaNoise(vSeaPos * 9.0 + vec2(uTime * 0.3, uTime * 0.2));
