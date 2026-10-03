@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chunky racers</title>
+<style>
+  :root {
+    --bg: #f3f1f8; --surface: #ffffff; --border: #ddd7ee; --text: #2b2a45; --muted: #5c6b85;
+    --today: #8a94a6; --a: #ff7fc4; --b: #8b5cf6; --ref: #22b5b0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+    font-size: 16px; line-height: 1.5; padding: 32px 24px 64px;
+  }
+  main { max-width: 1760px; margin: 0 auto; display: grid; gap: 40px; }
+  h1 { font-size: 30px; margin: 0 0 6px; }
+  h2 { font-size: 22px; margin: 0 0 4px; }
+  p { margin: 0; }
+  .lede { color: var(--muted); max-width: 80ch; }
+  section { display: grid; gap: 14px; }
+  section > p { color: var(--muted); max-width: 85ch; }
+  .row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 1100px) { .row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  figure { margin: 0; display: grid; gap: 8px; align-content: start; }
+  figure a { display: block; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
+  figure a:focus-visible { outline: 3px solid var(--b); outline-offset: 3px; }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption { font-size: 14px; color: var(--muted); }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 14px; font-weight: 800; color: #fff; margin-right: 6px; }
+  .tag.t { background: var(--today); }
+  .tag.a { background: var(--a); }
+  .tag.b { background: var(--b); }
+  .tag.r { background: var(--ref); }
+  .note { border: 1px dashed var(--border); border-radius: 12px; padding: 16px; color: var(--muted); font-size: 15px; background: var(--surface); }
+  table { border-collapse: collapse; background: var(--surface); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+  th, td { text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 15px; vertical-align: top; }
+  th { background: #ece8f7; }
+  .pick { background: var(--surface); border: 2px solid var(--b); border-radius: 14px; padding: 16px 18px; display: grid; gap: 8px; max-width: 90ch; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Chunky racers: the unicorn and the fairy as game characters</h1>
+    <p class="lede">
+      The unicorn and the fairy built straight in three.js from a handful of blocks, in two looks, beside
+      today's riders and the approved Mallow sheets. Left to right runs the spectrum: <b>Today</b>,
+      <b>A, close match</b> (boxy, hard-edged, flat colour, in the style of the kart-game reference),
+      <b>B, in between</b> (A's blocks, softened, with the Mallow faces, curls and feathers), and the
+      <b>Mallow sheet</b> as reference. Every picture except the Mallow sheet is a render of the real code;
+      click any picture for full size.
+    </p>
+  </header>
+
+  <section>
+    <h2>Turntable</h2>
+    <p>Front, three-quarter, side and back, in the flying pose. Both characters at the same scale.</p>
+    <div class="row">
+      <figure><a href="../../screenshots/racer-chunky-today-turntable.png"><img src="../../screenshots/racer-chunky-today-turntable.png" alt="Today's unicorn and fairy from four sides" /></a><figcaption><span class="tag t">Today</span>46 and 23 draw calls</figcaption></figure>
+      <figure><a href="../../screenshots/racer-chunky-a-turntable.png"><img src="../../screenshots/racer-chunky-a-turntable.png" alt="Style A unicorn and fairy from four sides" /></a><figcaption><span class="tag a">A</span>Close match: 5 and 4 draw calls</figcaption></figure>
+      <figure><a href="../../screenshots/racer-chunky-b-turntable.png"><img src="../../screenshots/racer-chunky-b-turntable.png" alt="Style B unicorn and fairy from four sides" /></a><figcaption><span class="tag b">B</span>In between: 6 and 5 draw calls</figcaption></figure>
+      <figure>
+        <a href="mallow-unicorn-turnaround.webp"><img src="mallow-unicorn-turnaround.webp" alt="Approved Mallow unicorn turnaround sheet" /></a>
+        <a href="mallow-fairy-turnaround.webp"><img src="mallow-fairy-turnaround.webp" alt="Approved Mallow fairy turnaround sheet" /></a>
+        <figcaption><span class="tag r">Mallow</span>The approved sheets, for reference (not rebuilt)</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>Pick card</h2>
+    <p>The real pick-screen card and badge, with each look's portrait rendered the way the portrait script frames it.</p>
+    <div class="row">
+      <figure><a href="../../screenshots/racer-chunky-today-pick.png"><img src="../../screenshots/racer-chunky-today-pick.png" alt="Pick cards with today's portraits" /></a><figcaption><span class="tag t">Today</span></figcaption></figure>
+      <figure><a href="../../screenshots/racer-chunky-a-pick.png"><img src="../../screenshots/racer-chunky-a-pick.png" alt="Pick cards with style A portraits" /></a><figcaption><span class="tag a">A</span>Close match</figcaption></figure>
+      <figure><a href="../../screenshots/racer-chunky-b-pick.png"><img src="../../screenshots/racer-chunky-b-pick.png" alt="Pick cards with style B portraits" /></a><figcaption><span class="tag b">B</span>In between</figcaption></figure>
+      <figure>
+        <a href="mallow-unicorn-hero.webp"><img src="mallow-unicorn-hero.webp" alt="Approved Mallow unicorn hero render" /></a>
+        <a href="mallow-fairy-hero.webp"><img src="mallow-fairy-hero.webp" alt="Approved Mallow fairy hero render" /></a>
+        <figcaption><span class="tag r">Mallow</span>The approved hero renders</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>In race</h2>
+    <p>
+      Both flying in the real racer sky (the game's own scene, camera and light) at race size, banking into a
+      turn so the chase camera sees them from behind and to the side. The chip in each corner is measured from
+      the models: the share of the frame's height each one fills. iPad landscape, 1180 by 820.
+    </p>
+    <div class="row">
+      <figure><a href="../../screenshots/racer-chunky-today-race.png"><img src="../../screenshots/racer-chunky-today-race.png" alt="Today's unicorn and fairy in the race sky" /></a><figcaption><span class="tag t">Today</span>16% and 12% of frame height</figcaption></figure>
+      <figure><a href="../../screenshots/racer-chunky-a-race.png"><img src="../../screenshots/racer-chunky-a-race.png" alt="Style A unicorn and fairy in the race sky" /></a><figcaption><span class="tag a">A</span>17% and 18%</figcaption></figure>
+      <figure><a href="../../screenshots/racer-chunky-b-race.png"><img src="../../screenshots/racer-chunky-b-race.png" alt="Style B unicorn and fairy in the race sky" /></a><figcaption><span class="tag b">B</span>17% and 17%</figcaption></figure>
+      <figure><div class="note">The Mallow look has no in-race view: it was never buildable as a game model at this size. This is the gap A and B close.</div></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>What each costs</h2>
+    <table>
+      <tr><th></th><th>Draw calls (unicorn / fairy)</th><th>Triangles (unicorn / fairy)</th><th>Code per character</th><th>Another character in this look</th></tr>
+      <tr><td><span class="tag t">Today</span></td><td>46 / 23</td><td>4,156 / 2,688</td><td>in riders.ts</td><td>shipped</td></tr>
+      <tr><td><span class="tag a">A</span></td><td>5 / 4</td><td>612 / 588</td><td>about 70 / 60 lines</td><td>about 1 to 2 hours of agent time, three review renders</td></tr>
+      <tr><td><span class="tag b">B</span></td><td>6 / 5</td><td>7,126 / 7,126</td><td>about 90 / 75 lines</td><td>about 2 to 3 hours: A's frame plus the face and curls</td></tr>
+    </table>
+    <p>Both looks share a 150-line kit (boxes, rounded blocks, balls, pills, curls merged into one mesh per part) and a 190-line rider with the game's flight feel. No textures, no models, no Blender.</p>
+  </section>
+
+  <section>
+    <div class="pick">
+      <h2>Recommendation: B, in between</h2>
+      <p>
+        B keeps what was approved in the Mallow sheets: big glossy violet and teal eyes with lashes, blush, a
+        small open smile, the spiral gold horn, rainbow locks, layered feathers and butterfly wings. It still reads
+        as a game character, both read at race size, and each costs five or six draw calls against today's 23 and 46.
+      </p>
+      <p>
+        <b>The weakest option is A's fairy.</b> From the chase camera she is a cluster of lavender panels, and up
+        close her square face looks plain beside the Mallow sheet. A's unicorn is good; A as a whole is the
+        cheapest and most consistent with the reference, but it gives up the faces.
+      </p>
+    </div>
+  </section>
+</main>
+</body>
+</html>
