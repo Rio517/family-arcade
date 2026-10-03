@@ -172,7 +172,7 @@ export function RacerLobby({
           <div className="racer-lobby-card">
             <h2>Share this code</h2>
             <div className="racer-code" data-testid="racer-code">{net.code}</div>
-            <p>Ask your friend to open Rainbow Racer, choose Play together, then Join with a code, and type this code.</p>
+            <p>On your friend&apos;s device: open Rainbow Racer, tap Play together, then Join with a code.</p>
             <p className="racer-lobby-status">
               {net.connected ? 'Connected! Starting…' : 'Waiting for your friend to join…'}
             </p>
