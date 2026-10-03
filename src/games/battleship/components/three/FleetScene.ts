@@ -200,7 +200,7 @@ export class FleetScene {
     // ── The targeting grid + a thin rim in the fleet's colour ──
     const grid = new THREE.GridHelper(BOARD_SIZE, BOARD_SIZE, '#3d6d8a', '#28546e');
     (grid.material as THREE.Material & { opacity: number; transparent: boolean }).transparent = true;
-    (grid.material as THREE.Material & { opacity: number }).opacity = this.sea ? 0.32 : 0.5;
+    (grid.material as THREE.Material & { opacity: number }).opacity = this.sea ? 0.45 : 0.5;
     grid.position.y = 0.06;
     // The Night Ops sea draws its grid into the water itself.
     grid.visible = !this.sea || this.sea.keepGridHelper;

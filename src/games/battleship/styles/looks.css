@@ -299,7 +299,7 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 
 /* Steps: a terminal status line. */
 .bs-look-a .lk-step { font-family: var(--lk-mono); text-transform: uppercase; letter-spacing: 0.14em; color: #4f7d70; }
-.bs-look-a .lk-step-n { border-radius: 6px; border: 1px solid #1d4148; color: #4f7d70; font-family: 'Ship Battle Pixel', var(--lk-mono); font-size: 12px; }
+.bs-look-a .lk-step-n { border-radius: 6px; border: 1px solid #1d4148; color: #4f7d70; font-family: 'Ship Battle Pixel', var(--lk-mono); font-size: 14px; }
 .bs-look-a .lk-step + .lk-step::before {
   content: ''; width: 44px; height: 0; border-top: 2px dashed #1d4148; margin-right: 2px;
 }

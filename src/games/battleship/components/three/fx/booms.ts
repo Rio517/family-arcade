@@ -64,7 +64,7 @@ const PALETTE = {
   a: {
     flash: 0xfff4c8,
     fireHot: 0xffe95c,
-    fireCold: 0xff2d55,
+    fireCold: 0xe0301c,
     smoke: 0x2a2440,
     smokeCold: 0x4a4466,
     spark: 0xfff07a,
@@ -230,10 +230,10 @@ export class BoomKit {
         new THREE.Vector3(at.x + Math.cos(a) * size * 0.4, 0.05, at.z + Math.sin(a) * size * 0.4),
         P.spray,
         new THREE.Vector3(Math.cos(a) * size * 0.4, size * (1 + r()), Math.sin(a) * size * 0.4),
-        size * 0.22,
+        size * 0.1,
         0.6 + r() * 0.3,
-        size * 0.3,
-        { gravity: size * 4, opacity: 0.7 },
+        size * 0.15,
+        { gravity: size * 4, opacity: 0.5 },
       );
     }
     // A sinking ship goes up in a chain along its hull.
@@ -273,8 +273,8 @@ export class BoomKit {
     col.position.copy(at).setY(0.02);
     col.renderOrder = 6;
     this.group.add(col);
-    const height = size * (this.style === 'a' ? 1.9 : 2.3);
-    this.columns.push({ sprite: col, life: 1.0, total: 1.0, height, width: size * 0.7 });
+    const height = size * (this.style === 'a' ? 2.4 : 2.8);
+    this.columns.push({ sprite: col, life: 1.1, total: 1.1, height, width: size * 1.15 });
     for (let i = 0; i < 16; i++) {
       const a = r() * Math.PI * 2;
       const out = size * (0.3 + r() * 0.9);
@@ -282,10 +282,10 @@ export class BoomKit {
         at.clone().setY(0.1),
         P.spray,
         new THREE.Vector3(Math.cos(a) * out, size * (2.2 + r() * 2.2), Math.sin(a) * out),
-        size * (0.1 + r() * 0.12),
+        size * (0.05 + r() * 0.07),
         0.75 + r() * 0.35,
         size * 0.05,
-        { gravity: size * 7.5, opacity: 0.9 },
+        { gravity: size * 7.5, opacity: 0.85 },
       );
     }
     this.mark(at, size * 0.2, size * 1.6, 0.9, 0.8, 0, P.spray);

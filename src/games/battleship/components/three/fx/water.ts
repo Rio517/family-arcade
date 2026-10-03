@@ -104,7 +104,7 @@ const A_FRAG_BODY = /* glsl */ `
 function nightOps(seaTime: { value: number }, glow: string): Sea {
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
   geo.rotateX(-Math.PI / 2);
-  const mat = new THREE.MeshStandardMaterial({ color: '#06202e', roughness: 0.38, metalness: 0.25 });
+  const mat = new THREE.MeshStandardMaterial({ color: '#06202e', roughness: 0.55, metalness: 0.2 });
   const uGlow = { value: new THREE.Color(glow).lerp(new THREE.Color('#38e8ff'), 0.6) };
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = seaTime;
@@ -196,10 +196,11 @@ const B_FRAG_BODY = /* glsl */ `
     float sparkle = step(0.55, seaNoise(vSeaPos * 18.0 + uTime * 1.7));
     totalEmissiveRadiance += vec3(0.95, 0.97, 1.0) * spec * (0.6 + 2.4 * sparkle);
     // Whitecaps where the crests run tallest.
-    float foamN = seaNoise(vSeaPos * 3.0 + vec2(uTime * 0.3, uTime * 0.2));
-    float foam = smoothstep(0.30, 0.42, vSeaCrest + (foamN - 0.5) * 0.18);
-    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.86, 0.92), foam * 0.6);
-    totalEmissiveRadiance += vec3(0.15, 0.2, 0.24) * foam;
+    // Whitecaps: flecks of foam on the tallest crests only.
+    float foamN = seaNoise(vSeaPos * 9.0 + vec2(uTime * 0.3, uTime * 0.2));
+    float foam = smoothstep(0.56, 0.66, vSeaCrest) * smoothstep(0.55, 0.8, foamN);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.7, 0.8, 0.86), foam * 0.35);
+    totalEmissiveRadiance += vec3(0.08, 0.11, 0.14) * foam;
   }
 `;
 
@@ -235,7 +236,7 @@ const SKY_FRAG = /* glsl */ `
 function moonlit(seaTime: { value: number }): Sea {
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
   geo.rotateX(-Math.PI / 2);
-  const mat = new THREE.MeshStandardMaterial({ color: '#0a2638', roughness: 0.22, metalness: 0.05 });
+  const mat = new THREE.MeshStandardMaterial({ color: '#0a2638', roughness: 0.34, metalness: 0.05 });
   const horizon = new THREE.Color('#1b2c4a');
   const zenith = new THREE.Color('#03060d');
   // The moon hangs low over the far side of the board, so its path runs toward the viewer.

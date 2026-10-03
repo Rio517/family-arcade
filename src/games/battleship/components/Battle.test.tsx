@@ -215,3 +215,83 @@ describe('<Battle> — 3D fleet view', () => {
     expect(localStorage.getItem('bs-fleet-view-v1')).toBe('2d');
   });
 });
+
+describe('<Battle> watching the shots (the darker-arcade pitch)', () => {
+  beforeEach(() => localStorage.setItem('bs-fleet-view-v1', '2d'));
+  const FX = { fire: 'a', boom: 'a', water: 'a', guns: true } as const;
+  const base: GameLog = [{ type: 'start', first: 'host' }];
+  const fired: GameLog = [...base, { type: 'shot', by: 'host', row: 5, col: 5, hit: true, sunk: null, allSunk: false }];
+
+  const battle = (log: GameLog, onFire = vi.fn()) => (
+    <Battle
+      log={log}
+      side="host"
+      myName="Rio"
+      oppName="Kid"
+      skinId="aqua"
+      oppSkinId="ember"
+      myFleet={stackFleet()}
+      myTurn
+      pendingFire={null}
+      onFire={onFire}
+      fx={FX}
+      watchShots
+      onWatchShots={vi.fn()}
+    />
+  );
+
+  it('holds the result until the shell lands; a tap skips straight to it', () => {
+    const onFire = vi.fn();
+    const { rerender } = render(battle(base, onFire));
+    rerender(battle(fired, onFire));
+    // In flight: the cell isn't revealed yet, the radar takes no shots, and
+    // the whole screen is a skip button.
+    expect(screen.getByLabelText('F6 — not fired at')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('skip-shot'));
+    expect(screen.getByLabelText('F6 — hit')).toBeInTheDocument();
+    expect(screen.queryByTestId('skip-shot')).not.toBeInTheDocument();
+    // Skipping only changed the picture: no shot was fired by the tap.
+    expect(onFire).not.toHaveBeenCalled();
+  });
+
+  it('Escape skips too, and the setting is a labelled switch', () => {
+    const onWatch = vi.fn();
+    const { rerender } = render(battle(base));
+    rerender(battle(fired));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByLabelText('F6 — hit')).toBeInTheDocument();
+    rerender(
+      <Battle
+        log={fired}
+        side="host"
+        myName="Rio"
+        oppName="Kid"
+        skinId="aqua"
+        oppSkinId="ember"
+        myFleet={stackFleet()}
+        myTurn
+        pendingFire={null}
+        onFire={vi.fn()}
+        fx={FX}
+        watchShots
+        onWatchShots={onWatch}
+      />,
+    );
+    const toggle = screen.getByRole('switch', { name: /watch the shots/i });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(toggle);
+    expect(onWatch).toHaveBeenCalledWith(false);
+  });
+
+  it("without the pitch, a shot shows at once as it always has", () => {
+    const { rerender } = render(
+      <Battle log={base} side="host" myName="Rio" oppName="Kid" skinId="aqua" oppSkinId="ember" myFleet={stackFleet()} myTurn pendingFire={null} onFire={vi.fn()} />,
+    );
+    rerender(
+      <Battle log={fired} side="host" myName="Rio" oppName="Kid" skinId="aqua" oppSkinId="ember" myFleet={stackFleet()} myTurn pendingFire={null} onFire={vi.fn()} />,
+    );
+    expect(screen.getByLabelText('F6 — hit')).toBeInTheDocument();
+    expect(screen.queryByTestId('skip-shot')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('watch-shots')).not.toBeInTheDocument();
+  });
+});
