@@ -1,7 +1,9 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Board, type BoardCell, type PlacedShip } from './Board';
-import type { Burst } from './BoardFX';
+import type { Burst, ShellDrop } from './BoardFX';
 import { ShipProfile } from './ships';
+import { TODAY_FX, type PitchFx } from '@games/battleship/state/pitch';
+import { DROP_MS, OUT_MS, logUpTo, useShotPlayback } from '@games/battleship/state/shotPlayback';
 
 // three.js is heavy, so the 3D ocean loads on demand — staying in 2D never
 // downloads it.
@@ -50,6 +52,15 @@ interface BattleProps {
   myTurn: boolean;
   pendingFire: Coord | null;
   onFire: (coord: Coord) => void;
+  /** The darker-arcade pitch's effects and guns (today's when absent). */
+  fx?: PitchFx;
+  /** The per-device "Watch the shots" setting (only offered with the pitch's guns). */
+  watchShots?: boolean;
+  onWatchShots?: (on: boolean) => void;
+  /** The game is over and this screen is staying up to play the final shot. */
+  finished?: boolean;
+  /** The final shot has played out: the page can move on to the result. */
+  onSettled?: () => void;
 }
 
 type View = 'radar' | 'fleet';
@@ -66,6 +77,11 @@ export function Battle({
   myTurn,
   pendingFire,
   onFire,
+  fx = TODAY_FX,
+  watchShots = false,
+  onWatchShots,
+  finished = false,
+  onSettled,
 }: BattleProps) {
   // On narrow screens we show one board at a time; default to the radar so the
   // player is looking at their attack board when it's their move.
@@ -94,26 +110,31 @@ export function Battle({
     try { localStorage.setItem('bs-fleet-view-v1', d); } catch { /* ignore */ }
   };
 
-  // Detect the just-resolved shot and flag it for a one-shot impact animation
-  // (shockwave / ripple / explosion + a board shake). The flag auto-clears so
-  // the next shot re-triggers even on the same board.
-  const [impact, setImpact] = useState<{ id: number; row: number; col: number; kind: 'miss' | 'hit' | 'sunk'; onEnemy: boolean } | null>(null);
-  const shotCountRef = useRef(0);
-  const impactTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Each shot as it lands. With the pitch's guns and "Watch the shots" on, a
+  // new shot plays first (our salvo, or their shell coming in) and its result
+  // is drawn on impact; otherwise it is drawn at once. Either way only the
+  // picture waits — the log, and the game, are never touched.
+  const playing = fx.guns && watchShots;
+  const play = useShotPlayback(log, side, playing);
+  const shotTotal = useMemo(() => log.filter((e) => e.type === 'shot').length, [log]);
+  const viewLog = useMemo(() => (play.shown >= shotTotal ? log : logUpTo(log, play.shown)), [log, play.shown, shotTotal]);
+  const current = play.current;
+
+  // The just-resolved shot, flagged for a one-shot impact animation
+  // (shockwave / ripple / explosion + a board shake) while it is fresh.
+  const impact = play.last && play.last.fresh
+    ? { id: play.last.id, row: play.last.shot.row, col: play.last.shot.col, kind: play.last.kind, onEnemy: play.last.mine }
+    : null;
+
+  // The skip: Escape, or a tap anywhere on the battle while a shot plays.
+  useDismissOnEscape(current !== null, play.skip);
+
+  // Once the final shot has played out, the page moves on to the result.
   useEffect(() => {
-    const shots = log.filter((e): e is ShotEvent => e.type === 'shot');
-    if (shots.length > shotCountRef.current) {
-      const last = shots[shots.length - 1];
-      const kind = last.allSunk || last.sunk ? 'sunk' : last.hit ? 'hit' : 'miss';
-      setImpact({ id: shots.length, row: last.row, col: last.col, kind, onEnemy: last.by === side });
-      if (impactTimer.current) clearTimeout(impactTimer.current);
-      impactTimer.current = setTimeout(() => setImpact(null), 700);
-    }
-    shotCountRef.current = shots.length;
-  }, [log, side]);
-  useEffect(() => () => {
-    if (impactTimer.current) clearTimeout(impactTimer.current);
-  }, []);
+    if (!finished || current || !onSettled) return;
+    const t = setTimeout(onSettled, 1400);
+    return () => clearTimeout(t);
+  }, [finished, current, onSettled]);
 
   const isFresh = (onEnemy: boolean, r: number, c: number) =>
     impact !== null && impact.onEnemy === onEnemy && impact.row === r && impact.col === c;
@@ -128,17 +149,29 @@ export function Battle({
   // ocean, whose update() tears down and rebuilds every hull. Fresh objects on
   // every render (an aiming tap, the impact flag flipping) meant a full fleet
   // rebuild per re-render — felt as a hitch on every tap on an iPad.
-  const radar = useMemo(() => radarGrid(log, side), [log, side]);
-  const own = useMemo(() => ownBoardView(log, myFleet, side), [log, myFleet, side]);
+  const radar = useMemo(() => radarGrid(viewLog, side), [viewLog, side]);
+  const own = useMemo(() => ownBoardView(viewLog, myFleet, side), [viewLog, myFleet, side]);
 
+  // Our shot in flight: the target cell holds a lock-on until the shell lands.
+  const aimed = current && current.mine ? current.shot : null;
   const enemyCells: BoardCell[][] = radar.map((r, ri) =>
     r.map((state, ci) => {
+      if (aimed && aimed.row === ri && aimed.col === ci) {
+        return { state: 'water', preview: 'ok', locked: true };
+      }
       if (pendingFire && pendingFire.row === ri && pendingFire.col === ci) {
-        return { state: 'water', preview: 'ok' };
+        return { state: 'water', preview: 'ok', locked: fx.guns };
       }
       return { state: state === 'unknown' ? 'water' : state, fresh: isFresh(true, ri, ci) };
     }),
   );
+  // The shell's last stretch, drawn coming down on the board it lands on.
+  const radarShell: ShellDrop | null = aimed && current
+    ? { id: current.id, row: aimed.row, col: aimed.col, ms: DROP_MS, delay: OUT_MS - DROP_MS }
+    : null;
+  const ownShell: ShellDrop | null = current && !current.mine
+    ? { id: current.id, row: current.shot.row, col: current.shot.col, ms: current.ms }
+    : null;
 
   // Ships are drawn as top-down overlays (see ownShips); un-hit ship cells stay
   // water so the silhouette shows, and incoming shots draw over them.
@@ -169,12 +202,12 @@ export function Battle({
     [myFleet, own],
   );
 
-  const mySunk = sunkByAttacker(log, side);
+  const mySunk = sunkByAttacker(viewLog, side);
   const enemySunkCount = mySunk.length;
   const myLostCount = own.sunkShips.size;
   // The enemy's sunk ships, reconstructed so they show as grey silhouettes on
   // the radar just like my own sunk ships do on my board.
-  const enemyShips = sunkEnemyShips(radar, log, side);
+  const enemyShips = sunkEnemyShips(radar, viewLog, side);
 
   const radarBoard = (
     <div className="panel">
@@ -188,12 +221,14 @@ export function Battle({
         cells={enemyCells}
         skinId={oppSkinId}
         variant="enemy"
-        active={myTurn}
+        active={myTurn && !current}
         shake={boardShake(true)}
         fx={fxFor(true)}
+        fxLook={fx.boom}
+        shell={radarShell}
         ships={enemyShips}
-        onCell={myTurn ? (r, c) => onFire({ row: r, col: c }) : undefined}
-        disabled={!myTurn}
+        onCell={myTurn && !current ? (r, c) => onFire({ row: r, col: c }) : undefined}
+        disabled={!myTurn || current !== null}
       />
       <FleetRoster sunkIds={mySunk} skinColor={skinById(oppSkinId).color} />
     </div>
@@ -217,7 +252,7 @@ export function Battle({
             {/* While the pop-out is open it owns the ocean — mounting both
                 runs two WebGL contexts + render loops at once. */}
             {!popped && (
-              <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} era={era} />
+              <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} era={era} fx={fx} cue={play.cue} />
             )}
             <button
               className="bs3d-expand"
@@ -230,14 +265,50 @@ export function Battle({
           </div>
         </Suspense>
       ) : (
-        <Board cells={ownCells} skinId={skinId} variant="own" ships={ownShips} shake={boardShake(false)} fx={fxFor(false)} />
+        <Board cells={ownCells} skinId={skinId} variant="own" ships={ownShips} shake={boardShake(false)} fx={fxFor(false)} fxLook={fx.boom} shell={ownShell} />
       )}
       <FleetRoster sunkIds={[...own.sunkShips]} skinColor={skinById(skinId).color} />
     </div>
   );
 
+  // Watching the shots on a phone, the screen follows the shell: the radar
+  // for ours, the fleet for theirs. The player's own pick returns after.
+  const shownView: View = playing && current ? (current.mine ? 'radar' : 'fleet') : view;
+
+  const footer = (
+    <div className="bs-battle-foot">
+      <LogStrip log={viewLog} side={side} myName={myName} oppName={oppName} onOpen={() => setLogOpen(true)} />
+      {fx.guns && onWatchShots && (
+        <button
+          type="button"
+          className="bs-watch"
+          role="switch"
+          aria-checked={watchShots}
+          onClick={() => onWatchShots(!watchShots)}
+          data-testid="watch-shots"
+        >
+          <span className="bs-watch-k">Watch the shots</span>
+          <span className="bs-watch-v">{watchShots ? 'On' : 'Off'}</span>
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="stack">
+    <div className="stack bs-battle">
+      {current && (
+        // While a shot plays, a tap anywhere on the battle skips it (and
+        // Escape does too). Skipping only shows the result sooner.
+        <button
+          type="button"
+          className="bs-skip"
+          onClick={play.skip}
+          aria-label="Skip the shot"
+          data-testid="skip-shot"
+        >
+          <span className="bs-skip-pill">Tap to skip</span>
+        </button>
+      )}
       {popped && (
         /* Backdrop click is a mouse convenience; Escape (above) and the Close
            button are the keyboard path. */
@@ -251,7 +322,7 @@ export function Battle({
           <div className="bs3d-pop" role="dialog" aria-label="Your fleet in 3D">
             <div className="bs3d-holder">
               <Suspense fallback={<p className="subtle center bs3d-hint">Launching the fleet…</p>}>
-                <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} era={era} />
+                <Fleet3D ships={ownShips} incoming={own.incoming} skinColor={skinById(skinId).color} era={era} fx={fx} cue={play.cue} />
               </Suspense>
               <button
                 className="bs3d-expand"
@@ -287,7 +358,7 @@ export function Battle({
                 <CloseIcon size={18} />
               </button>
             </div>
-            <LogEntries log={log} side={side} myName={myName} oppName={oppName} />
+            <LogEntries log={viewLog} side={side} myName={myName} oppName={oppName} />
           </div>
         </div>
       )}
@@ -298,21 +369,21 @@ export function Battle({
             {radarBoard}
             {fleetBoard}
           </div>
-          <LogStrip log={log} side={side} myName={myName} oppName={oppName} onOpen={() => setLogOpen(true)} />
+          {footer}
         </div>
       ) : (
         /* Narrow (< 720px): tab between one board at a time, log strip below. */
         <div className="battle-narrow">
           <div className="view-tabs">
-            <button data-active={view === 'radar'} onClick={() => setView('radar')} aria-pressed={view === 'radar'}>
+            <button data-active={shownView === 'radar'} onClick={() => setView('radar')} aria-pressed={shownView === 'radar'}>
               <RadarIcon size={16} /> Radar
             </button>
-            <button data-active={view === 'fleet'} onClick={() => setView('fleet')} aria-pressed={view === 'fleet'}>
+            <button data-active={shownView === 'fleet'} onClick={() => setView('fleet')} aria-pressed={shownView === 'fleet'}>
               <ShieldIcon size={16} /> My Fleet
             </button>
           </div>
-          {view === 'radar' ? radarBoard : fleetBoard}
-          <LogStrip log={log} side={side} myName={myName} oppName={oppName} onOpen={() => setLogOpen(true)} />
+          {shownView === 'radar' ? radarBoard : fleetBoard}
+          {footer}
         </div>
       )}
     </div>

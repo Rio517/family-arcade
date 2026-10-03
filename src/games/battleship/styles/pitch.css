@@ -55,3 +55,98 @@
 }
 .bs-pitchbar-row button[aria-pressed='true'] { border-color: #fbbf24; background: rgba(251, 191, 36, 0.18); color: #fde68a; }
 .bs-pitchbar button:focus-visible { outline: 2px solid #fbbf24; outline-offset: 2px; }
+
+/* ── The guns: skip, Watch the shots, the lock-on ────────────────────────── */
+/* While a shot plays, the whole screen is the skip button; dialogs (z 60)
+   stay above it. The pill says so without covering the shot. */
+.bs-skip {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.bs-skip-pill {
+  position: absolute;
+  left: 50%;
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+  transform: translateX(-50%);
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(6, 10, 20, 0.82);
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+.bs-skip:focus-visible { outline: none; }
+.bs-skip:focus-visible .bs-skip-pill { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .bs-skip-pill { animation: bs-skip-in 260ms ease-out both; }
+}
+@keyframes bs-skip-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.bs-battle-foot { display: flex; align-items: stretch; gap: 10px; }
+.bs-battle-foot .log-strip { flex: 1; min-width: 0; }
+.bs-watch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bs-watch-v {
+  min-width: 38px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 800;
+  text-align: center;
+}
+.bs-watch[aria-checked='true'] { border-color: var(--accent); color: var(--text); }
+.bs-watch[aria-checked='true'] .bs-watch-v { background: var(--accent); color: #04121a; }
+.bs-watch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 480px) {
+  .bs-battle-foot { flex-direction: column; }
+}
+
+/* The target of a shot in flight: crosshair brackets locked on. */
+.cell.locked {
+  background: color-mix(in srgb, #ff3355 22%, var(--sea));
+  box-shadow: inset 0 0 0 2px #ff5470, 0 0 14px -2px #ff3355;
+  z-index: 7;
+}
+.cell.locked::before {
+  content: '';
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  border: 2px solid #ffd1d9;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cell.locked::before { animation: bs-lock 520ms ease-in-out infinite alternate; }
+}
+@keyframes bs-lock {
+  from { transform: scale(1.25); opacity: 0.55; }
+  to { transform: scale(0.8); opacity: 1; }
+}
