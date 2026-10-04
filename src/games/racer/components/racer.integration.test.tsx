@@ -263,6 +263,18 @@ beforeEach(() => {
   setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
 });
 
+// Pay both lazy imports once, before any test. Left to the first race, the
+// two clients ask for the scene at the same moment, and one of them can slip
+// past the mock and load the real module; on a loaded worker that real load
+// finishes later, inside the reconnect test, where it hands that client a
+// scene that cannot build and its race loop never starts. Both modules are
+// mocked here, so this is cheap when nothing is stalled, and the hook gets a
+// generous budget for when it is.
+beforeAll(async () => {
+  await import('./Track3D');
+  await import('../three/scene');
+}, 60000);
+
 describe('two-player racer: lobby flows', () => {
   it('host: Play together → pick driver → Create a game shows a shareable 4-char code and waiting copy', () => {
     const app = renderClient();
@@ -420,17 +432,6 @@ describe('two-player racer: handshake and race start', () => {
 describe('two-player racer: reconnect re-sync', () => {
   let frames: FrameRequestCallback[];
   let now: number;
-
-  // Pay both lazy imports once, before the timed waits below. Track3D's own
-  // `import('../three/scene')` is what outlived the ceilings on a loaded
-  // worker: a failed run's DOM shows the guest's scene resolving only AFTER
-  // the timeout (the mock had been switched off by then, so the fallback
-  // rendered). Both modules are mocked here, so this is cheap when it isn't
-  // stalled — and the hook gets a generous budget for when it is.
-  beforeAll(async () => {
-    await import('./Track3D');
-    await import('../three/scene');
-  }, 60000);
 
   beforeEach(() => {
     fake3d.enabled = true;
