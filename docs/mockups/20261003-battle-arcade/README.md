@@ -219,10 +219,12 @@ fall where a shot starts or lands (the battle screen re-renders and the
 fleet is rebuilt, as today, but a watched exchange has more of those
 moments) and while a ship goes down on the radar, which draws in its own
 small WebGL canvas for those 2.6 s. Run to run, today's own count moved
-between 11 and 17. The picked default (`?fx=default`) measured the same way, on a busier
-machine where today's own 4× count was 22: unthrottled p50 11.1 ms, p99
-26.4 ms, 0 frames over 33 ms, 1036 peak draw calls; 4× slower, 91 frames over
-33 ms against 82 for B and 62 for A in that run. Not yet verified on an iPad.
+between 11 and 17. The picked default (`?fx=default`), measured the same way
+in two later runs, is about as fast as today unthrottled (p99 26 ms, 0 to 2
+frames over 33 ms, 1036 peak draw calls). With the CPU 4× slower the counts
+swing with what else the Mac is doing: 91 frames over 33 ms against today's
+22 on a busy machine, 29 against today's 48 on a quieter one. The desktop
+can't settle it; `?fps` on an iPad will. Not yet verified on an iPad.
 
 ## Where the pieces are
 
