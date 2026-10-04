@@ -54,6 +54,8 @@ const BASE = `http://localhost:${PORT}`;
  */
 const PHONE = { width: 430, height: 932 };
 const TABLET = { width: 1180, height: 820 };
+/** The smaller phones (393×852), where the racer's cast has least room. */
+const PHONE_SMALL = { width: 393, height: 852 };
 const LAPTOP = { width: 1920, height: 1080 };
 const MONITOR = { width: 2560, height: 1440 };
 
@@ -716,64 +718,80 @@ const SHOTS = [
       await page.getByTestId('racer-party-waiting').waitFor();
     },
   },
-  {
-    // Who can race, and how each one flies.
-    name: 'racer-cast',
-    path: '/#/racer',
-    viewport: TABLET,
-    expect: '[data-testid="racer-driver-princess"]',
-    prep: async (page) => {
-      await page.getByTestId('racer-mode-solo').click();
-    },
-  },
-  {
-    // A princess or a bunny picks a ride: a cloud, a bird or a unicorn.
-    name: 'racer-rides',
-    path: '/#/racer',
-    viewport: TABLET,
-    expect: '[data-testid="racer-mount-bird"]',
-    prep: async (page) => {
-      await page.getByTestId('racer-mode-solo').click();
-      await page.getByTestId('racer-driver-bunny').click();
-    },
-  },
-  {
-    // The open sky a few seconds after Go: the unicorn, three rivals, rings,
-    // islands. Pickups land randomly, so the pixels churn a little on every
-    // regeneration — that's expected.
-    name: 'racer-sky',
-    path: '/#/racer',
-    viewport: TABLET,
-    expect: '[data-testid="racer-score-3"]',
-    prep: async (page) => {
-      await page.getByTestId('racer-mode-solo').click();
-      await page.getByTestId('racer-driver-unicorn').click();
-      await page.waitForSelector('.racer-canvas canvas', { timeout: 20000 });
-      // The countdown, then a moment of flight so the pack spreads out.
-      await page.waitForTimeout(5200);
-    },
-  },
-  // The chunky-cast pitch (docs/mockups/20261003-racer-chunky): the unicorn
-  // and the fairy today, in A (close match) and in B (in between), each as a
-  // turntable, a pick card and in the race sky at race size. Both engines:
-  // the race view is the game's own canvas.
-  ...['today', 'a', 'b'].flatMap((style) =>
-    [
-      { view: 'turntable', viewport: { width: 1200, height: 720 } },
-      { view: 'pick', viewport: { width: 760, height: 520 } },
-      { view: 'race', viewport: TABLET },
-    ].map(({ view, viewport }) => ({
-      name: `racer-chunky-${style}-${view}`,
-      path: `/preview-racer-cast.html?style=${style}&view=${view}`,
-      viewport,
-      fits: true,
-      selector: `[data-testid="cast-${view}"]`,
-      expect: '[data-ready="1"]',
-      engines: ['chromium', 'webkit'],
+  // Who can race and how each one flies; what a princess or the bunny rides;
+  // the open sky a few seconds after Go (the unicorn, three rivals, rings,
+  // islands). The racers' pictures and the sky are canvas and 3D, so both
+  // engines, at the iPad and a small phone. Pickups land randomly, so the sky's
+  // pixels churn a little on every regeneration; that's expected.
+  ...[
+    {
+      name: 'racer-cast',
+      expect: '[data-testid="racer-driver-princess"]',
       prep: async (page) => {
-        await page.waitForSelector('[data-ready="1"]', { timeout: 30000 });
+        await page.getByTestId('racer-mode-solo').click();
       },
+    },
+    {
+      name: 'racer-rides',
+      expect: '[data-testid="racer-mount-bird"]',
+      prep: async (page) => {
+        await page.getByTestId('racer-mode-solo').click();
+        await page.getByTestId('racer-driver-bunny').click();
+      },
+    },
+    {
+      name: 'racer-sky',
+      expect: '[data-testid="racer-score-3"]',
+      prep: async (page) => {
+        await page.getByTestId('racer-mode-solo').click();
+        await page.getByTestId('racer-driver-unicorn').click();
+        await page.waitForSelector('.racer-canvas canvas', { timeout: 20000 });
+        // The countdown, then a moment of flight so the pack spreads out.
+        await page.waitForTimeout(5200);
+      },
+    },
+  ].flatMap((shot) =>
+    [
+      { suffix: '', viewport: TABLET },
+      { suffix: '-phone', viewport: PHONE_SMALL },
+    ].map(({ suffix, viewport }) => ({
+      ...shot,
+      name: `${shot.name}${suffix}`,
+      path: '/#/racer',
+      viewport,
+      engines: ['chromium', 'webkit'],
     })),
+  ),
+  // The whole cast in look B (docs/mockups/20261003-racer-chunky), on the
+  // harness: each racer turning round (on their usual ride, then the other
+  // rides), every pick card, and the four in the race sky at race size. At
+  // the iPad and a small phone, in both engines: the race is the game's canvas.
+  ...[
+    { name: 'racer-cast-turntable', view: 'turntable', fits: true },
+    { name: 'racer-cast-turntable-rides', view: 'turntable&cast=rides', fits: true },
+    { name: 'racer-cast-pick', view: 'pick', fits: true },
+    { name: 'racer-cast-race', view: 'race', fits: true },
+  ].flatMap(({ name, view, fits }) =>
+    [
+      { suffix: '', viewport: TABLET },
+      { suffix: '-phone', viewport: PHONE_SMALL },
+    ].map(({ suffix, viewport }) => {
+      const tall = suffix && view === 'pick';
+      return {
+        name: `${name}${suffix}`,
+        path: `/preview-racer-cast.html?view=${view}`,
+        viewport,
+        // Eight cards are taller than a phone: the whole page, then.
+        fits: tall ? undefined : fits,
+        fullPage: tall ? true : undefined,
+        selector: tall ? undefined : `[data-testid="cast-${view.split('&')[0]}"]`,
+        expect: '[data-ready="1"]',
+        engines: ['chromium', 'webkit'],
+        prep: async (page) => {
+          await page.waitForSelector('[data-ready="1"]', { timeout: 30000 });
+        },
+      };
+    }),
   ),
   {
     // The mode screen on a phone: "Play together", and the rainbow heading

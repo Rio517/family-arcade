@@ -162,9 +162,7 @@ export function Track3D({
     // three.js loads on demand, same as chess and battleship — visiting the
     // arcade menu (or racing later) must not front-load the 3D library.
     import('../three/scene')
-      .then(async ({ RacerScene: Scene, loadRacerAssets }) => {
-        // The racers' models first; the countdown only starts once the loop does.
-        await loadRacerAssets();
+      .then(({ RacerScene: Scene }) => {
         if (gone) return;
         const reducedMotion =
           typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;

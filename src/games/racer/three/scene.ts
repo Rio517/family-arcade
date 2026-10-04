@@ -9,9 +9,8 @@
  * and the cloud sea travel with the camera.
  *
  * Framework-free: the page builds one of these, then each frame hands it a
- * plain view (racers, coins, stars) to mirror. Everything is procedural apart
- * from the artist-made bunny, which rides a cloud (see riders.ts), so the PWA
- * stays offline.
+ * plain view (racers, coins, stars) to mirror. Everything is procedural,
+ * the racers included (see riders.ts), so the PWA stays offline.
  */
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -30,7 +29,7 @@ import {
 import type { Flyer } from '../domain/flight';
 import type { MountId } from '../domain/mounts';
 import type { Coin, PowerKind, Star } from '../domain/pickups';
-import { createRider, preloadRiderAssets, type CharacterId, type Rider } from './riders';
+import { createRider, type CharacterId, type Rider } from './riders';
 
 /** How many cells either side of the camera are built. */
 const VIEW_CELLS = 3;
@@ -257,15 +256,6 @@ interface CellObj {
   group: THREE.Group;
 }
 
-/**
- * Load what the racers are made of (the bunny's model) before building a
- * scene, so nobody starts the race as a stand-in. Never rejects: a model
- * that fails to load leaves its procedural stand-in in place.
- */
-export function loadRacerAssets(): Promise<void> {
-  return preloadRiderAssets();
-}
-
 export class RacerScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
@@ -303,8 +293,8 @@ export class RacerScene {
     looks: RacerLook[],
     private followIndex: number,
     private reducedMotion = false,
-    /** Builds each racer's character. The game always uses today's riders;
-     *  the cast preview passes another character kit to see it in the sky. */
+    /** Builds each racer's character. The cast preview passes its own, to
+     *  hide the racer its camera follows. */
     private makeRider: typeof createRider = createRider,
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -399,7 +389,6 @@ export class RacerScene {
       blending: THREE.AdditiveBlending,
     });
 
-    // Riders are built from models already loaded — see `loadRacerAssets`.
     looks.forEach((look, i) => this.racers.push(this.buildRacer(look, i)));
 
     this.updateCells(0, 0);
