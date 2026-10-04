@@ -244,20 +244,10 @@ export class Part {
     this.add(new THREE.CylinderGeometry(rTop, rBot, h, seg[0], seg[1], o.open ?? false), paint, place(at, rot), o);
   }
 
-  /** A flat round disc facing +z: a highlight in an eye. */
-  disc(paint: Paint, r: number, at: V3, o: Finish & { rot?: Rot; scale?: V3; seg?: number } = {}): void {
-    this.add(new THREE.CircleGeometry(r, o.seg ?? 8), paint, place(at, o.rot, o.scale ?? ONE), o);
-  }
-
   /** A flowing lock of hair in rainbow stripes along `path` (see `lockGeometry`). */
   lock(colors: readonly number[], path: readonly V3[], shape: LockShape, o: Finish = {}): void {
     const { geo, band } = lockGeometry(colors, path, shape);
     this.add(geo, (_p, f) => colors[band(f)], new THREE.Matrix4(), o);
-  }
-
-  /** How many triangles so far. */
-  get triangles(): number {
-    return this.pieces.reduce((n, g) => n + g.getAttribute('position').count / 3, 0);
   }
 
   /** The part as one merged geometry. */
