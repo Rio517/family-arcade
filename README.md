@@ -42,7 +42,7 @@ game? `npm run new-game` puts a starter on the wall;
 
 | The console | Choose your navy |
 | --- | --- |
-| ![The Midnight Carnival arcade landing page](docs/screenshots/arcade-landing.png) | ![The fleet screen: colours plus the Classic/Modern navy choice](docs/screenshots/battle-fleet-select.png) |
+| ![The Midnight Carnival arcade landing page](docs/screenshots/arcade-landing.png) | ![Ship Battle: Classic or Modern ships, then play together or pick a level against the computer](docs/screenshots/battle-lobby.png) |
 
 | The classic fleet | The modern fleet |
 | --- | --- |
