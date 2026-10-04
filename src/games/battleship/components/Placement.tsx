@@ -273,7 +273,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting, onPlayCom
           </p>
         )}
         {waiting && onPlayComputer && <CaptainChips onPick={onPlayComputer} />}
-        <p className="subtle" style={{ marginTop: 10 }}>
+        <p className="subtle placement-status" data-testid="placement-status">
           Selected: <strong>{shipSpec(selected).name}</strong>
           {selectedPlaced ? ' (already placed — tap it on the board to move it)' : ''}
         </p>
