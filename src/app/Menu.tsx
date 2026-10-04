@@ -4,6 +4,7 @@ import type { GamePreview } from '@shared/game';
 import { BotIcon, GridIcon, PersonIcon } from '@shared/ui/icons';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
 import { GAMES } from './registry';
+import { MovedNotice } from './MovedNotice';
 import { PlayerBooth } from './PlayerBooth';
 import yahtzeePreview from './assets/yahtzee-preview.webp';
 
@@ -307,6 +308,8 @@ export function Menu() {
           <a href="https://github.com/Rio517/yahtzee-calculator">View the source on GitHub ›</a>
         </p>
       </div>
+
+      <MovedNotice />
     </div>
   );
 }

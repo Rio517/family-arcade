@@ -731,3 +731,44 @@
   font-size: 18px;
   font-weight: 700;
 }
+
+/* ── The arcade's new home: a once-per-device note on the old address ───── */
+.moved-card {
+  max-width: 400px;
+  padding: 24px 20px 20px;
+  text-align: center;
+  border: 2px solid var(--gold);
+  border-radius: 22px;
+  background: linear-gradient(180deg, #1d2a44, var(--night) 85%);
+  box-shadow: 0 0 44px -10px rgba(255, 176, 87, 0.45), 0 20px 60px -20px rgba(0, 0, 0, 0.7);
+}
+.moved-title { margin: 0 0 10px; font-size: 24px; font-weight: 900; line-height: 1.2; color: var(--gold); }
+.moved-body { margin: 0 0 18px; font-size: 17px; line-height: 1.45; color: var(--text); }
+.moved-body b { color: #fff; }
+.moved-btns { display: grid; gap: 10px; }
+.moved-go,
+.moved-stay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: 14px;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+.moved-go { color: #0b1020; background: linear-gradient(90deg, var(--gold), color-mix(in srgb, var(--gold) 70%, #fff)); border: 0; }
+.moved-stay { color: var(--text); background: transparent; border: 2px solid var(--border); }
+.moved-go:hover,
+.moved-stay:hover { filter: brightness(1.08); }
+.moved-go:focus-visible,
+.moved-stay:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .moved-card { animation: moved-rise 0.25s ease-out; }
+}
+@keyframes moved-rise {
+  from { opacity: 0; transform: translateY(12px); }
+}
