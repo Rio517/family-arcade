@@ -83,7 +83,7 @@ using **rebase merges** (sometimes squash). Therefore:
 6. The owner develops on main concurrently (they've added whole games —
    Magic Coins, Rainbow Racer). Expect main to move several times per hour.
 7. PR bodies: lead with what the family asked for; include screenshots as
-   `https://raw.githubusercontent.com/Rio517/yahtzee-calculator/<sha>/docs/screenshots/<file>.png`
+   `https://raw.githubusercontent.com/family-arcade/family-arcade/<sha>/docs/screenshots/<file>.png`
    pinned to the pushed commit; end with the Claude Code attribution footer.
 
 ## Verification protocol (every change)

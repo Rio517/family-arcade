@@ -305,7 +305,7 @@ export function Menu() {
         <p>
           <Link to="/privacy">Privacy &amp; safety</Link>
           {' · '}
-          <a href="https://github.com/Rio517/yahtzee-calculator">View the source on GitHub ›</a>
+          <a href="https://github.com/family-arcade/family-arcade">View the source on GitHub ›</a>
         </p>
       </div>
 
