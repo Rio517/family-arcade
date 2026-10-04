@@ -83,7 +83,7 @@ export function LookHero({ look, compact = false }: { look: ArcadeLook; compact?
         {!compact && (
           <p className="lk-c-coin" aria-hidden="true">
             <span className="lk-c-slot" />
-            Insert coin to fire
+            <span className="lk-c-coin-t">Insert coin to fire</span>
           </p>
         )}
       </div>

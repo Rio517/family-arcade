@@ -181,6 +181,10 @@ between 11 and 17. Not yet verified on an iPad.
 ## Where the pieces are
 
 - Start screens: `src/games/battleship/components/look/`, `styles/looks.css`.
+  Look C's labels sit on the middle of their capitals (DIN Condensed's ride
+  high): `look/capCentre.ts` measures the face the device draws, and
+  `node scripts/check-text-centre.mjs <running build>` checks every box in
+  pixels in Chromium and WebKit.
 - Effects: `src/games/battleship/components/three/fx/` (fire, booms, water,
   guns, tracers for the shell trails and contrails, planes), the radar's
   blasts and falling shells in `components/BoardFX.tsx`, its dark water in

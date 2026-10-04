@@ -802,7 +802,7 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 }
 .bs-look-c .lobby-door-solo .lobby-eyebrow { color: var(--lk-steel-text); }
 .bs-look-c .lk-door-tag {
-  position: absolute; top: 22px; right: 20px; padding: 3px 9px 1px;
+  position: absolute; top: 22px; right: 20px; padding: 2px 9px;
   font-family: var(--lk-cond); font-weight: 700; font-size: 22px; letter-spacing: 0.08em;
   color: var(--door); background: #0b0d0f; border: 2px solid var(--door); border-radius: 4px;
   box-shadow: 0 0 14px -4px var(--door);
@@ -841,14 +841,15 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 /* Steps: chevron plates. */
 .bs-look-c .lk-steps { gap: 4px; }
 .bs-look-c .lk-step {
-  padding: 8px 30px 6px 24px; min-height: 44px;
+  padding: 7px 30px 7px 24px; min-height: 44px;
   font-family: var(--lk-cond); font-weight: 700; font-size: 19px; letter-spacing: 0.1em; text-transform: uppercase;
   color: #6f7b86; background: #1d2329;
   clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%);
 }
 .bs-look-c .lk-step:first-child { clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%); padding-left: 16px; }
 .bs-look-c .lk-step-n {
-  display: inline-flex; width: auto; height: auto; padding: 1px 7px 0; border-radius: 3px;
+  display: inline-flex; width: auto; height: auto; border-radius: 3px; line-height: 1;
+  padding: calc(4.5px + var(--lk-dy, 0em)) 7px calc(4.5px - var(--lk-dy, 0em));
   font-size: 19px; background: rgba(0, 0, 0, 0.3);
 }
 .bs-look-c .lk-step[data-state='done'] { color: var(--accent); background: #2a2f22; }
@@ -857,7 +858,11 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 /* Fleet */
 .bs-look-c .fleet-points { border-radius: 6px; background: #08090b; border: 2px solid #4b5762; box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8); }
 .bs-look-c .fleet-points .k { font-family: var(--lk-cond); font-size: 17px; color: var(--muted); }
-.bs-look-c .fleet-points .v { font-family: 'Ship Battle Pixel', var(--lk-cond); font-size: 17px; color: #ff6a5e; text-shadow: 0 0 10px rgba(255, 75, 62, 0.8); }
+.bs-look-c .fleet-points .v {
+  font-family: 'Ship Battle Pixel', var(--lk-cond); font-size: 17px; color: #ff6a5e; text-shadow: 0 0 10px rgba(255, 75, 62, 0.8);
+  /* The bundled pixel face rides 3px high at this size; whole pixels keep it crisp. */
+  position: relative; top: 3px;
+}
 .bs-look-c .info-btn { border-radius: 6px; font-family: var(--lk-cond); font-size: 17px; text-transform: uppercase; letter-spacing: 0.06em; }
 .bs-look-c .skin {
   border-radius: 6px; border-color: #3f4a55; padding-top: 16px;
@@ -901,6 +906,40 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 .bs-look-c:not([data-phase='battle'], [data-phase='over']) .placement-layout .btn-primary:disabled { background: #3a3522; }
 .bs-look-c .toast { border-radius: 6px; font-family: var(--lk-cond); font-size: 19px; letter-spacing: 0.06em; }
 
+/* Labels on the middle of their capitals. DIN Condensed's capitals ride high
+   in their line; --lk-dy (capCentre.ts, measured on the face the device draws)
+   moves each label down by that much. A button moves the shift from its bottom
+   padding to its top, so its size holds, and its icon moves back up. A set
+   line height keeps the line to DIN's own metrics: with `normal`, an arrow
+   drawn from a fallback font stretches the line and drops the label. */
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) :is(.btn:not(.lobby-captain), .back-link, .info-btn, .pas .pas-change) {
+  line-height: 1.2;
+}
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn:not(.lobby-captain) {
+  padding-top: calc(12px + var(--lk-dy, 0em)); padding-bottom: calc(12px - var(--lk-dy, 0em));
+}
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn-lg:not(.lobby-captain) {
+  padding-top: calc(16px + var(--lk-dy, 0em)); padding-bottom: calc(16px - var(--lk-dy, 0em));
+}
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) .back-link {
+  padding-top: calc(7px + var(--lk-dy, 0em)); padding-bottom: calc(7px - var(--lk-dy, 0em));
+}
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) .pas .pas-change {
+  padding-top: calc(8px + var(--lk-dy, 0em)); padding-bottom: calc(8px - var(--lk-dy, 0em));
+}
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) .info-btn {
+  padding-top: calc(5px + var(--lk-dy, 0em)); padding-bottom: calc(5px - var(--lk-dy, 0em));
+}
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) .field .code-input {
+  line-height: 1.2; padding-top: calc(12px + var(--lk-dy, 0em)); padding-bottom: calc(12px - var(--lk-dy, 0em));
+}
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) :is(.btn:not(.lobby-captain), .info-btn) > svg {
+  translate: 0 calc(-1 * var(--lk-dy, 0em));
+}
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) :is(.pas-who, .ship-chip .nm, .lk-step-t, .lk-door-tag-n, .lk-c-coin-t) {
+  position: relative; top: var(--lk-dy, 0em);
+}
+
 /* ════════════════════════════════════════════════════════════════════════
    Phones
    ════════════════════════════════════════════════════════════════════════ */
@@ -938,7 +977,7 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
   .bs-look-b .lk-step + .lk-step::after { width: 14px; }
   .bs-look-b .lk-step { padding-right: 10px; letter-spacing: 0.02em; }
   .bs-look-c .lk-steps { gap: 2px; }
-  .bs-look-c .lk-step { padding: 8px 22px 6px 22px; font-size: 17px; letter-spacing: 0.06em; }
+  .bs-look-c .lk-step { padding: 7px 22px; font-size: 17px; letter-spacing: 0.06em; }
   .bs-look-c .lk-step:first-child { padding-left: 12px; }
 
   .bs-look-b .lobby-door { padding-right: 72px; }
