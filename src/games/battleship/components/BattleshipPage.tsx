@@ -17,6 +17,7 @@ import { Battle } from './Battle';
 import { CaptainChips } from './CaptainChips';
 import { Result } from './Result';
 import { PitchSwitcher } from './PitchSwitcher';
+import { useCapCentre } from './look/capCentre';
 import { usePitch, useWatchShots } from '@games/battleship/state/pitch';
 import { ConnectionBadge } from '@shared/ui/ConnectionBadge';
 import { FullscreenButton } from '@shared/ui/FullscreenButton';
@@ -50,6 +51,7 @@ export function BattleshipPage() {
   // The darker-arcade pitch: look C's start screens by default; ?look= / ?fx= compare the options.
   const pitch = usePitch();
   const [watchShots, setWatchShots] = useWatchShots();
+  const pageRef = useRef<HTMLDivElement>(null);
 
   // Which navy this captain sails in 3D — classic or modern. Purely cosmetic
   // and purely local (nothing crosses the wire), remembered per device.
@@ -209,9 +211,11 @@ export function BattleshipPage() {
     if (hostWaiting) setShareOpen(true);
     else if (bs.phase === 'battle') setShareOpen(false);
   }, [hostWaiting, bs.phase]);
+  useCapCentre(pageRef, pitch.look, bs.phase);
 
   return (
     <div
+      ref={pageRef}
       className={`app ${bs.phase === 'battle' || holdBattle ? 'bs-app-wide' : ''} ${pitch.look !== 'today' ? `bs-look bs-look-${pitch.look}` : ''}`}
       data-phase={bs.phase}
       // The link's state, readable even when no badge shows it (a computer
