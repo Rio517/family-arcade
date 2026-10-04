@@ -5,8 +5,9 @@
  *   • The host registers a peer whose id is derived from the code, then waits.
  *   • The guest dials that same id.
  *
- * PeerJS's free public broker handles only the initial handshake; game data
- * then flows directly device-to-device. This class is deliberately dumb about
+ * The arcade's own connection service (`CONNECTION_SERVICE`, ADR 0013) handles
+ * only the initial handshake; game data then flows directly device-to-device.
+ * This class is deliberately dumb about
  * game rules — it moves opaque `Message`s and reports connection status. All
  * the resume/replay intelligence lives in the game layer, so when a link drops
  * and re-opens the app just re-runs its sync handshake over the new channel.
@@ -18,7 +19,7 @@
  * reconcile prefix-compatible logs.
  */
 
-import Peer, { type DataConnection } from 'peerjs';
+import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
 
 export type ConnStatus =
   | 'idle'
@@ -70,12 +71,21 @@ export function normalizeCode(raw: string): string {
     .slice(0, 4);
 }
 
-/** Shared with `GameHost` so every channel in a game uses the same NAT setup. */
-export const ICE = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' },
-  ],
+/**
+ * The arcade's own connection service on its server in Germany (ADR 0013),
+ * the one place every channel names it: `GameConnection`, `GameHost` and
+ * `MediaLink` all pass this to `new Peer`.
+ *   • The broker at familyarcade.eu/connect passes the first hello between two
+ *     devices (WebSocket /connect/peerjs) and keeps no log.
+ *   • The STUN server tells each device the address the internet sees for it,
+ *     so the two can reach each other directly. STUN only: it relays nothing.
+ */
+export const CONNECTION_SERVICE: PeerOptions = {
+  host: 'familyarcade.eu',
+  port: 443,
+  secure: true,
+  path: '/connect',
+  config: { iceServers: [{ urls: 'stun:familyarcade.eu:3478' }] },
 };
 
 export class GameConnection<TMessage> {
@@ -145,7 +155,7 @@ export class GameConnection<TMessage> {
   // ── internals ─────────────────────────────────────────────────────────
 
   private createPeer(id: string | undefined): void {
-    const peer = id ? new Peer(id, { config: ICE }) : new Peer({ config: ICE });
+    const peer = id ? new Peer(id, CONNECTION_SERVICE) : new Peer(CONNECTION_SERVICE);
     this.peer = peer;
 
     peer.on('open', () => {
@@ -156,8 +166,8 @@ export class GameConnection<TMessage> {
     peer.on('connection', (conn) => {
       if (this.destroyed) return;
       // One guest at a time. While a channel is live, a NEW incoming
-      // connection is a stranger who learned the code (the ids are guessable
-      // on the public broker) — refuse it rather than adopt it, or they'd be
+      // connection is a stranger who learned the code (the ids are guessable,
+      // and anyone may use the broker) — refuse it rather than adopt it, or they'd be
       // handed the hello + full log sync and kick the real guest off. The
       // legitimate guest reconnecting only ever arrives after their old
       // channel closed, so this never blocks a resume.

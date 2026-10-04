@@ -1,8 +1,9 @@
 /**
  * Privacy & safety page (/privacy). Written to be readable by a parent deciding
  * whether it's OK for their kid to play with a friend — plain language, honest
- * about the one thing that isn't literally "no servers" (the free WebRTC broker
- * + STUN), and clear about the kid-safety choices we made.
+ * about the one thing that isn't literally "no servers" (the arcade's own
+ * connection service: broker + STUN, ADR 0013), and clear about the
+ * kid-safety choices we made.
  */
 import { Link } from 'react-router-dom';
 import './privacy.css';
@@ -20,7 +21,7 @@ export function Privacy() {
           The Kny-Flores Family Arcade is a small, free set of games made for family game night. Here's
           exactly what happens with your information — and the choices we made to keep kids safe.
         </p>
-        <p className="pv-updated">Plain-language summary · last updated August 2026</p>
+        <p className="pv-updated">Plain-language summary · last updated October 2026</p>
       </header>
 
       <section className="pv-card pv-tldr">
@@ -54,11 +55,12 @@ export function Privacy() {
           <b> device-to-device</b>, not through us.
         </p>
         <p className="pv-note">
-          To help two devices find each other on the internet, WebRTC uses a couple of small, free,
-          public helpers: a matchmaking “broker” (PeerJS) that only passes the initial hello, and public
-          “STUN” servers (Google, Twilio) that help each device learn its address. They set up the
-          connection; they don't carry or store your game, video, or voice. This is the one part that
-          isn't literally “no servers,” and we want to be upfront about it.
+          Devices find each other through the Family Arcade's own connection service, on our server in
+          Germany. It passes only the first hello between the two devices and helps each one learn its
+          internet address. Like any website, it sees that address while it helps; it keeps no log of it
+          or of anything else. Then your game moves, and any video or voice, go directly between the
+          devices: the connection service never carries or stores them. This is the one part that isn't
+          literally “no servers,” and we want to be upfront about it.
         </p>
       </section>
 

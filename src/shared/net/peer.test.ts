@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GameConnection, generateCode, normalizeCode } from './peer';
+import { CONNECTION_SERVICE, GameConnection, generateCode, normalizeCode } from './peer';
 import { seededRng } from '@test/helpers';
 
 // A minimal in-memory PeerJS stand-in: just enough surface for GameConnection
@@ -47,10 +47,13 @@ const { FakePeer, FakeDataConnection, fakePeers } = vi.hoisted(() => {
   const fakePeers: FakePeer[] = [];
   class FakePeer extends FakeEmitter {
     id: string | undefined;
+    /** What `new Peer` was handed: broker host, port, path and ICE servers. */
+    options: unknown;
     destroyed = false;
     constructor(...args: unknown[]) {
       super();
       this.id = typeof args[0] === 'string' ? args[0] : undefined;
+      this.options = typeof args[0] === 'string' ? args[1] : args[0];
       fakePeers.push(this);
     }
     connect() {
@@ -82,6 +85,34 @@ function hostedConnection() {
   peer.emit('open');
   return { gc, peer, statuses, messages };
 }
+
+describe('GameConnection — the arcade’s own connection service', () => {
+  beforeEach(() => {
+    fakePeers.length = 0;
+  });
+
+  it('is familyarcade.eu: the broker on /connect and STUN on 3478, nothing else', () => {
+    expect(CONNECTION_SERVICE).toEqual({
+      host: 'familyarcade.eu',
+      port: 443,
+      secure: true,
+      path: '/connect',
+      config: { iceServers: [{ urls: 'stun:familyarcade.eu:3478' }] },
+    });
+  });
+
+  it('the host and the guest both register with it', () => {
+    hostedConnection();
+    const gc = new GameConnection<Msg>(
+      { onStatus: () => {}, onMessage: () => {}, onOpen: () => {} },
+      { prefix: 'test-v1-', isMessage: isMsg },
+    );
+    gc.join('KXQZ');
+    expect(fakePeers.map((p) => p.options)).toEqual([CONNECTION_SERVICE, CONNECTION_SERVICE]);
+    expect(fakePeers[1].id).toBeUndefined(); // the guest takes an id from the broker
+    gc.destroy();
+  });
+});
 
 describe('GameConnection — one guest at a time', () => {
   beforeEach(() => {
