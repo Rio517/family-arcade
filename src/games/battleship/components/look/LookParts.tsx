@@ -1,8 +1,7 @@
 /**
  * The pieces the darker-arcade looks add to the start screens: a title on
- * the lobby, the 1P/2P tag on each door, and the Fleet → Place → Battle
- * steps. Each look draws them its own way in styles/looks.css; the markup is
- * shared. Shown only while a look is under review (`look` is a, b or c) —
+ * the lobby, the 1P/2P tag on each door, and the Place → Battle steps. Each
+ * look draws them its own way in styles/looks.css; the markup is shared. Shown only while a look is under review (`look` is a, b or c) —
  * today's screens never render them.
  */
 import '../../styles/looks.css';
@@ -10,8 +9,8 @@ import type { ArcadeLook } from './arcadeLook';
 import { PixelText } from './PixelText';
 
 /**
- * The lobby's title. `compact` is the slim band over the captain ladder and
- * the join form, where the screen is needed for choosing.
+ * The lobby's title. `compact` is the slim band over the join form, where the
+ * screen is needed for typing the code.
  */
 export function LookHero({ look, compact = false }: { look: ArcadeLook; compact?: boolean }) {
   const cls = `lk-hero lk-hero-${look} ${compact ? 'compact' : ''}`;
@@ -103,14 +102,13 @@ export function DoorTag({ players }: { players: 1 | 2 }) {
 }
 
 const STEPS = [
-  { id: 'fleet', label: 'Fleet' },
   { id: 'place', label: 'Place' },
   { id: 'battle', label: 'Battle' },
 ] as const;
 
-/** Where the captain is in getting ready: pick a fleet, place it, battle. */
-export function LookSteps({ at }: { at: 'fleet' | 'place' }) {
-  const here = STEPS.findIndex((s) => s.id === at);
+/** Where the captain is in getting ready: place the ships, then battle. */
+export function LookSteps() {
+  const here = 0;
   return (
     <ol className="lk-steps" aria-label="Getting ready" data-testid="look-steps">
       {STEPS.map((s, i) => (

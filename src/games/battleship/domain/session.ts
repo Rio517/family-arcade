@@ -32,7 +32,7 @@ import {
 import { PROTOCOL_VERSION, reconcileLogs, type Message } from './protocol';
 import type { Coord, Fleet, GameLog, Side } from './types';
 
-export type SetupPhase = 'fleet' | 'placing' | 'waiting';
+export type SetupPhase = 'placing' | 'waiting';
 export type Phase = SetupPhase | 'battle' | 'over';
 
 export interface SessionState {
@@ -115,7 +115,7 @@ export function createSession(
     oppWantsRematch: false,
     log: [],
     pendingFire: null,
-    setupPhase: 'fleet',
+    setupPhase: 'placing',
     epoch: 0,
   };
 }
@@ -137,10 +137,6 @@ export function winnerSide(s: SessionState): Side | null {
 }
 
 // ── Setup transitions (local, no messages) ──────────────────────────────────
-
-export function toPlacing(s: SessionState): SessionState {
-  return { ...s, setupPhase: 'placing' };
-}
 
 export function setFleet(s: SessionState, fleet: Fleet): SessionState {
   return { ...s, myFleet: fleet };

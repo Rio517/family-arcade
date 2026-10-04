@@ -5,19 +5,12 @@ import { useParty } from '@shared/party/PartyContext';
 import { PlayingAs } from '@shared/profile/PlayingAs';
 import { BotIcon, PartyIcon, PersonIcon } from '@shared/ui/icons';
 import { CAPTAIN_PERSONAS } from '../domain/bots/personas';
+import type { FleetEra } from '../domain/types';
 import { DoorTag, LookHero } from './look/LookParts';
 import { arcadeLook } from './look/arcadeLook';
 
 /** Ship Battle's registry id — what the party's table and knock carry. */
 const GAME_ID = 'battleship';
-
-/** Kid-readable difficulty words for the four rungs of the captain ladder. */
-const RUNG_WORDS: Record<number, string> = {
-  1: 'easiest',
-  2: 'a fair fight',
-  3: 'sharp shooter',
-  4: 'the boss',
-};
 
 interface LobbyProps {
   /** Create a game on your own: the page draws the code and seats the ticket. */
@@ -25,8 +18,11 @@ interface LobbyProps {
   /** Join a game by code — typed in or from a shared link. (A code the party
    * hands over goes through the page's door, never through here.) */
   onJoin: (code: string) => void;
-  /** Start a game against a computer captain (ADR 0009). */
+  /** Start a game against a computer captain (ADR 0009): a level tap does it. */
   onSolo: (personaId: string) => void;
+  /** Which ships sail for you in 3D, and how to change it. */
+  era: FleetEra;
+  onEra: (era: FleetEra) => void;
   /** Host the table the party just opened under this code. */
   onHostTable: (code: string) => void;
   /** Pre-filled join code from a shared link (?g=CODE). */
@@ -35,17 +31,24 @@ interface LobbyProps {
   look?: LookId;
 }
 
+/** The two sets of ships a captain can sail. */
+const ERAS: { id: FleetEra; name: string }[] = [
+  { id: 'classic', name: 'Classic' },
+  { id: 'modern', name: 'Modern' },
+];
+
 /**
- * Entry screen: create a game, join by code, or battle a computer captain.
+ * Entry screen: pick classic or modern ships, then create a game, join by
+ * code, or tap a level to play the computer. Every road ends at placing ships.
  * Nobody is asked for a name — the signed-in ticket is the captain. In a party
  * the code doors close: the party is the table (the host opens it with one
  * tap; the guest sees the waiting door here while the page's `usePartyDoor`
  * knocks and walks them in the moment it opens), and only the solo door stays.
  */
-export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode, look }: LobbyProps) {
+export function Lobby({ onHost, onJoin, onSolo, era, onEra, onHostTable, initialJoinCode, look }: LobbyProps) {
   const arcade = arcadeLook(look);
   const party = useParty();
-  const [mode, setMode] = useState<'choose' | 'join' | 'solo'>(initialJoinCode ? 'join' : 'choose');
+  const [mode, setMode] = useState<'choose' | 'join'>(initialJoinCode ? 'join' : 'choose');
   const [code, setCode] = useState(initialJoinCode ? normalizeCode(initialJoinCode) : '');
 
   const friend = party.theirName ?? 'your friend';
@@ -53,50 +56,15 @@ export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode, lo
   const partyGuest = party.inParty && party.role === 'guest';
   // While the party is (re)linking or linked, codes are its business, not the player's.
   const partyBusy = party.reconnecting || party.inParty;
-  // The doors are showing (not the captain ladder or the join form).
-  const choosing = mode !== 'solo' && !(mode === 'join' && !partyBusy);
+  // The doors are showing (not the join form).
+  const choosing = !(mode === 'join' && !partyBusy);
 
   return (
     <div className="stack">
       {arcade && <LookHero look={arcade} compact={!choosing} />}
       <PlayingAs />
 
-      {mode === 'solo' ? (
-        <div className="panel stack lobby-door lobby-door-solo">
-          {arcade && <DoorTag players={1} />}
-          <span className="lobby-eyebrow">
-            <BotIcon size={15} /> Play solo — just you
-          </span>
-          <h2>Choose your captain</h2>
-          <p className="subtle">Level 1 is the gentlest — climb the ladder as you win.</p>
-          {CAPTAIN_PERSONAS.map((p) => (
-            <button
-              key={p.id}
-              className="btn btn-block lobby-captain"
-              onClick={() => onSolo(p.id)}
-              data-testid={`captain-${p.id}`}
-            >
-              <span className="lobby-captain-level" aria-hidden="true">
-                <strong>Lv {p.rung}</strong>
-                <span className="lobby-captain-pips">
-                  {Array.from({ length: 4 }, (_, i) => (
-                    <i key={i} className={i < p.rung ? 'on' : ''} />
-                  ))}
-                </span>
-              </span>
-              <span className="lobby-captain-who">
-                <strong>
-                  {p.name} <em className="lobby-captain-rank">— level {p.rung}, {RUNG_WORDS[p.rung]}</em>
-                </strong>
-                <span className="subtle lobby-captain-tag">{p.tagline}</span>
-              </span>
-            </button>
-          ))}
-          <button className="btn btn-ghost btn-block" onClick={() => setMode('choose')}>
-            ← Back
-          </button>
-        </div>
-      ) : mode === 'join' && !partyBusy ? (
+      {mode === 'join' && !partyBusy ? (
         <div className="panel stack">
           <h2>Join a game</h2>
           <div className="field">
@@ -128,7 +96,26 @@ export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode, lo
           </button>
         </div>
       ) : (
-        <div className="lobby-doors">
+        <>
+          <div className="lobby-ships" data-testid="lobby-ships">
+            <span className="lobby-ships-label" id="lobby-ships-label">Ships</span>
+            <div className="ships-switch" role="group" aria-labelledby="lobby-ships-label">
+              {ERAS.map((e) => (
+                <button
+                  key={e.id}
+                  type="button"
+                  className="ships-opt"
+                  data-selected={era === e.id}
+                  aria-pressed={era === e.id}
+                  onClick={() => onEra(e.id)}
+                  data-testid={`ships-${e.id}`}
+                >
+                  <span className="ships-t">{e.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="lobby-doors">
           {/* Two rooms, clearly signposted: play together across two devices,
               or play alone against a captain — each with its own colour. In a
               party, the together door is the party itself. */}
@@ -204,7 +191,7 @@ export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode, lo
               {arcade && <DoorTag players={2} />}
               <span className="lobby-eyebrow">
                 <PersonIcon size={14} />
-                <PersonIcon size={14} /> Play together — two devices
+                <PersonIcon size={14} /> Play together
               </span>
               <button
                 className="btn btn-primary btn-lg btn-block"
@@ -227,18 +214,27 @@ export function Lobby({ onHost, onJoin, onSolo, onHostTable, initialJoinCode, lo
           <div className="panel stack lobby-door lobby-door-solo">
             {arcade && <DoorTag players={1} />}
             <span className="lobby-eyebrow">
-              <BotIcon size={15} /> Play solo — just you
+              <BotIcon size={15} /> Play the computer
             </span>
-            <button
-              className="btn btn-amber btn-lg btn-block"
-              onClick={() => setMode('solo')}
-              data-testid="solo-game"
-            >
-              Battle the computer
-            </button>
-            <p className="subtle center">Four captains, from easiest to the boss.</p>
+            <p className="lobby-pick" id="lobby-pick">Pick a level</p>
+            <div className="level-grid" role="group" aria-labelledby="lobby-pick">
+              {CAPTAIN_PERSONAS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="level-btn"
+                  onClick={() => onSolo(p.id)}
+                  aria-label={`Level ${p.rung}, ${p.level}`}
+                  data-testid={`level-${p.rung}`}
+                >
+                  <span className="level-n" aria-hidden="true">{p.rung}</span>
+                  <span className="level-w" aria-hidden="true">{p.level}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+        </>
       )}
     </div>
   );

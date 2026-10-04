@@ -26,19 +26,22 @@ const LIMIT = { webkit: 1, chromium: 2 };
 
 /** box: what the text should centre in; text: whose ink to measure; clip: what to screenshot. */
 const T = (box, text = box, clip = box, label = text) => ({ box, text, clip, label });
-const toFleet = async (p) => {
-  await p.getByTestId('solo-game').click();
-  await p.getByTestId('captain-grimtide').click();
-  await p.getByTestId('era-modern').waitFor();
-};
 const SCREENS = [
   {
     name: 'lobby',
-    prep: async (p) => p.getByTestId('solo-game').waitFor(),
+    prep: async (p) => p.getByTestId('level-1').waitFor(),
     targets: [
       T('[data-testid="back"]'), T('.pas-pill', '.pas-who'), T('.pas-change'), T('.lk-door-tag'),
-      T('[data-testid="create-game"]'), T('[data-testid="show-join"]'), T('[data-testid="solo-game"]'),
+      T('[data-testid="create-game"]'), T('[data-testid="show-join"]'),
       T('.lk-c-slot', '.lk-c-coin-t', '.lk-c-coin', 'coin text against its slot'),
+      T('.lobby-ships-label', '.lobby-ships-label', '.lobby-ships-label', 'Ships label'),
+      T('[data-testid="ships-classic"]', '[data-testid="ships-classic"] .ships-t', '[data-testid="ships-classic"]', 'Classic (chosen)'),
+      T('[data-testid="ships-modern"]', '[data-testid="ships-modern"] .ships-t', '[data-testid="ships-modern"]', 'Modern'),
+      T('.lobby-pick'),
+      ...['Easy', 'Fair', 'Sharp', 'Boss'].flatMap((word, i) => [
+        T(`[data-testid="level-${i + 1}"] .level-n`, undefined, undefined, `level ${i + 1} number`),
+        T(`[data-testid="level-${i + 1}"] .level-w`, undefined, undefined, `level ${i + 1} word (${word})`),
+      ]),
     ],
   },
   {
@@ -50,22 +53,13 @@ const SCREENS = [
     targets: [T('[data-testid="join-game"]'), T('[data-testid="code-input"]')],
   },
   {
-    name: 'fleet',
-    prep: toFleet,
-    targets: [
-      T('.lk-step', '.lk-step-t', '.lk-step', 'step label'), T('.lk-step-n'), T('[data-testid="fleet-info"]'),
-      T('[data-testid="fleet-continue"]'), T('.fleet-points', '.fleet-points .k', '.fleet-points', 'points label'),
-      T('.fleet-points', '.fleet-points .v', '.fleet-points', 'points number'),
-    ],
-  },
-  {
     name: 'placing',
     prep: async (p) => {
-      await toFleet(p);
-      await p.getByTestId('fleet-continue').click();
+      await p.getByTestId('level-4').click();
       await p.getByTestId('auto-place').click();
     },
     targets: [
+      T('.lk-step', '.lk-step-t', '.lk-step', 'step label'), T('.lk-step-n'),
       T('[data-testid="ship-chip-carrier"]', '[data-testid="ship-chip-carrier"] .nm'),
       T('[data-testid="rotate"]'), T('[data-testid="auto-place"]'), T('[data-testid="clear-fleet"]'),
       T('[data-testid="ready"]'), T('[data-testid="fast-start"]'),

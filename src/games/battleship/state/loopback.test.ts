@@ -29,7 +29,7 @@ function humanHarness(conn: () => LoopbackConnection) {
       onMessage: (msg: Message) => apply(Session.applyMessage(state, msg, seededRng(9))),
     },
     placeAndReady() {
-      state = Session.setFleet(Session.toPlacing(state), stackFleet());
+      state = Session.setFleet(state, stackFleet());
       apply(Session.confirmReady(state, seededRng(2)));
     },
     fire(target: Coord) {

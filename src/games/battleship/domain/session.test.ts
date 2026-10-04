@@ -10,7 +10,6 @@ import {
   proposeRematch,
   releaseUnansweredFire,
   setFleet,
-  toPlacing,
   type SessionState,
 } from './session';
 import { autoPlace, shipCells } from './board';
@@ -41,13 +40,11 @@ describe('createSession', () => {
 });
 
 describe('setup transitions', () => {
-  it('starts in the fleet phase', () => {
-    expect(phase(newSession('host'))).toBe('fleet');
+  it('starts straight in placing, with no fleet screen before it', () => {
+    expect(phase(newSession('host'))).toBe('placing');
   });
-  it('toPlacing / setFleet advance the wizard', () => {
-    let s = toPlacing(newSession('host'));
-    expect(phase(s)).toBe('placing');
-    s = setFleet(s, autoPlace(seededRng(1)));
+  it('setFleet records the placed ships', () => {
+    const s = setFleet(newSession('host'), autoPlace(seededRng(1)));
     expect(s.myFleet).toHaveLength(5);
   });
 });

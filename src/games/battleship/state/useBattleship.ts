@@ -80,7 +80,6 @@ export interface UseBattleshipResult {
    */
   switchToComputer: (personaId: string) => void;
   resumeGame: (code: string) => void;
-  confirmSkin: () => void;
   setFleet: (fleet: Fleet) => void;
   confirmReady: () => void;
   fire: (coord: Coord) => void;
@@ -253,7 +252,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     // for on open carries `myReady`, and the captain's own ready, when it
     // lands, is what lets the host author the start.
     const table = Session.createSession('host', 'SOLO', s.myName, s.mySkinId, s.seatedUserId);
-    const placed = Session.setFleet(Session.toPlacing(table), s.myFleet);
+    const placed = Session.setFleet(table, s.myFleet);
     setSessionState(Session.confirmReady(placed).state);
     conn.host('SOLO');
   }, [makeLoopback, setSessionState]);
@@ -287,7 +286,6 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     if (s) applyOutcome(fn(s));
   }, [applyOutcome]);
 
-  const confirmSkin = useCallback(() => withSession(Session.toPlacing), [withSession]);
   const setFleet = useCallback((fleet: Fleet) => withSession((s) => Session.setFleet(s, fleet)), [withSession]);
   const confirmReady = useCallback(() => withOutcome((s) => Session.confirmReady(s)), [withOutcome]);
   const requestRematch = useCallback(() => withOutcome(Session.proposeRematch), [withOutcome]);
@@ -346,7 +344,6 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     startSoloGame,
     switchToComputer,
     resumeGame,
-    confirmSkin,
     setFleet,
     confirmReady,
     fire,

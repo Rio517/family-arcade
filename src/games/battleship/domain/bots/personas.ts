@@ -1,16 +1,16 @@
 /**
  * The computer captains — four characters, weakest to strongest, per
- * ADR 0009: picking your opponent IS picking the difficulty. The rung selects
- * the gunner's algorithm (random → hunt/target → parity → probability
- * density); the name is pure flavour the existing opponent UI displays through
- * the normal hello handshake.
+ * ADR 0009: picking your opponent IS picking the difficulty. The lobby shows
+ * the level number and word; the name appears in the game (battle log, result)
+ * through the normal hello handshake. The rung selects the gunner's algorithm
+ * (random → hunt/target → parity → probability density).
  */
 export interface CaptainPersona {
   id: string;
   /** The name on the enemy flag — flows through oppName like a real peer. */
   name: string;
-  /** One warm line for the lobby ladder. */
-  tagline: string;
+  /** The one word the lobby's level button wears. */
+  level: 'Easy' | 'Fair' | 'Sharp' | 'Boss';
   rung: 1 | 2 | 3 | 4;
 }
 
@@ -18,25 +18,25 @@ export const CAPTAIN_PERSONAS: readonly CaptainPersona[] = [
   {
     id: 'bobble',
     name: 'Deckhand Bobble',
-    tagline: 'Fires wherever the seagull points.',
+    level: 'Easy',
     rung: 1,
   },
   {
     id: 'marlin',
     name: 'Bosun Marlin',
-    tagline: 'Smells a wounded ship from a mile off.',
+    level: 'Fair',
     rung: 2,
   },
   {
     id: 'wake',
     name: 'Captain Wake',
-    tagline: 'Sweeps the sea in neat, patient lines.',
+    level: 'Sharp',
     rung: 3,
   },
   {
     id: 'grimtide',
     name: 'Admiral Grimtide',
-    tagline: 'Counts every place your ships could hide.',
+    level: 'Boss',
     rung: 4,
   },
 ];
