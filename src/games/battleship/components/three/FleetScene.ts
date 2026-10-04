@@ -506,12 +506,13 @@ export class FleetScene {
     if (!this.opts.reducedMotion) {
       // Roll the sea: one number, the shader does the rest.
       this.seaTime.value = now / 1000;
+      const pace = this.sea?.pace ?? 1;
 
       // Ships ride the swell; fires gutter and dance.
       for (const g of this.bobbing) {
         const p = g.userData.phase as number;
-        g.position.y = Math.sin(now / 1300 + p) * 0.02;
-        g.rotation.x = Math.sin(now / 1700 + p) * 0.012;
+        g.position.y = Math.sin((now * pace) / 1300 + p) * 0.02;
+        g.rotation.x = Math.sin((now * pace) / 1700 + p) * 0.012;
       }
       for (const flame of this.fires) {
         const seed = flame.userData.seed as number;

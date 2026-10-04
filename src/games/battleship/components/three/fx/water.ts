@@ -25,9 +25,14 @@ export interface Sea {
   fog: THREE.Fog;
   /** Whether the old floating grid lines still belong over this sea. */
   keepGridHelper: boolean;
+  /** How fast this sea's clock runs against real time; ships on it bob at the same pace. */
+  pace: number;
   /** Per-frame: the sea's clock, and the camera for the glitter path. */
   step(timeSec: number, camera: THREE.Camera): void;
 }
+
+/** Night Ops runs at half speed: the swell, the contours, the ping's cadence and its sweep. */
+const NIGHT_OPS_PACE = 0.5;
 
 const SIZE = 48;
 const SEGMENTS = 176;
@@ -131,8 +136,9 @@ function nightOps(seaTime: { value: number }, glow: string): Sea {
     background: bg,
     fog: new THREE.Fog(bg, 15, 32),
     keepGridHelper: false,
+    pace: NIGHT_OPS_PACE,
     step: (t) => {
-      seaTime.value = t;
+      seaTime.value = t * NIGHT_OPS_PACE;
     },
   };
 }
@@ -286,6 +292,7 @@ function moonlit(seaTime: { value: number }): Sea {
     background: horizon.clone(),
     fog: new THREE.Fog(horizon.clone(), 16, 40),
     keepGridHelper: true,
+    pace: 1,
     step: (t, camera) => {
       seaTime.value = t;
       // The moon's direction in view space, for the glitter path.
