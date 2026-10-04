@@ -309,8 +309,8 @@ export class ChessScene {
   /**
    * The rest of the galaxy: a handful of bright named-feeling stars that
    * twinkle, two slow planets (one ringed, one banded moonlet), and a pair of
-   * tiny ships that occasionally cross the far background — a rebel dart one
-   * pass, an imperial trifoil the next. Everything is seeded and lives far
+   * tiny ships that occasionally cross the far background — a Comet Guard dart one
+   * pass, a Nebula Fleet fin-ship the next. Everything is seeded and lives far
    * outside orbit range so it dresses the room without stealing the game.
    */
   private buildDeepSpace(rand: () => number) {
@@ -382,7 +382,7 @@ export class ChessScene {
     this.scene.add(ice);
 
     // Flyby ships: built once, hidden between passes (no allocation churn).
-    const dart = new THREE.Group(); // a rebel courier
+    const dart = new THREE.Group(); // a Comet Guard courier
     {
       const hull = new THREE.MeshStandardMaterial({ color: '#d9dee8', roughness: 0.4 });
       const body = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.9, 6), hull);
@@ -398,7 +398,7 @@ export class ChessScene {
       trail.position.z = -1.7;
       dart.add(body, wing, glow, trail);
     }
-    const trifoil = new THREE.Group(); // an imperial patrol
+    const finShip = new THREE.Group(); // a Nebula Fleet patrol
     {
       const hull = new THREE.MeshStandardMaterial({ color: '#78859c', roughness: 0.4 });
       const ball = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), hull);
@@ -406,7 +406,7 @@ export class ChessScene {
       for (const side of [-1, 1]) {
         const wing = new THREE.Mesh(winGeo, hull);
         wing.position.x = side * 0.3;
-        trifoil.add(wing);
+        finShip.add(wing);
       }
       const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#8fd0ff', transparent: true, depthWrite: false, opacity: 1 }));
       glow.scale.setScalar(0.6);
@@ -414,9 +414,9 @@ export class ChessScene {
       const trail = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#8fd0ff', transparent: true, depthWrite: false, opacity: 0.45 }));
       trail.scale.set(2.2, 0.2, 1);
       trail.position.z = -1.4;
-      trifoil.add(ball, glow, trail);
+      finShip.add(ball, glow, trail);
     }
-    for (const ship of [dart, trifoil]) {
+    for (const ship of [dart, finShip]) {
       ship.scale.setScalar(1.6); // far away — needs presence to read at all
       ship.visible = false;
       this.flyShips.push(ship);
@@ -613,25 +613,25 @@ export class ChessScene {
       roughness: this.palette.pieceRoughness,
       metalness: ships ? 0.45 : color === 'b' && !this.palette.accent ? 0.12 : 0.05,
       // Starships get a faint self-glow so hulls read against the night board
-      // — the dark side especially, which used to melt into the dark tiles.
+      // — the Nebula Fleet especially, which used to melt into the dark tiles.
       ...(ships ? { emissive: new THREE.Color(hex), emissiveIntensity: color === 'b' ? 0.34 : 0.12 } : {}),
     });
   }
 
   /**
    * Decode the galaxy set's authored piece models and swap them in for the
-   * procedural stand-ins already on the board. White flies a rebel X-wing at
-   * pawn; black fields a whole imperial fleet — TIE pawns, landing-craft
-   * bishops, Vader's TIE at knight, Star Destroyer rooks, the Executor as
-   * queen, and the Death Star itself as king.
+   * procedural stand-ins already on the board. White flies a Comet Guard
+   * arrow fighter at pawn; black fields a whole Nebula Fleet — twin-panel
+   * pawns, pod-lander bishops, a dark-blue dagger flyer at knight, wedge
+   * cruiser rooks, a blade flagship as queen, and the moon fortress as king.
    */
   private async loadShipModels() {
     const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
     // `greyward`: lerp every material toward studio grey by this amount. The
-    // TIE arrived nearly black and read as a silhouette under the night
+    // twin-panel fighter arrived nearly black and read as a silhouette under the night
     // lighting — the family asked for more grey, film-style. `glass` names
     // the materials that stay black glass instead (the cockpit window).
-    // `fit` overrides the standard 0.68-square footprint. The TIE flies 40%
+    // `fit` overrides the standard 0.68-square footprint. The twin-panel fighter flies 40%
     // smaller by the family's call: at full size its panel tips grazed the
     // board at the bottom of the hover bob (0.045 clearance vs 0.022 bob).
     // `hover` overrides the pawns' 0.34 float — pieces rise with rank, same
@@ -644,20 +644,20 @@ export class ChessScene {
       fit?: number;
       hover?: number;
       /** Yaw correction for ships exported nose-backwards (the family caught
-       *  the rook and Vader's TIE flying stern-first at the rebels). */
+       *  the rook and the dagger flyer flying stern-first at the Comet Guard). */
       face?: number;
     }[] = [
       // Family sizing pass (review night, 2026-08-23): the fighters read too
-      // big once the capitals landed. X-wing and the TIE family shrink 20%
+      // big once the capitals landed. The arrow fighter and the panel-fighter family shrink 20%
       // together (they were proportioned right relative to each other), the
-      // A-wing comes down 30%, and the Y-wing grows into its bishop rank.
+      // dart ship comes down 30%, and the twin-engine hauler grows into its bishop rank.
       { key: 'wp', url: galaxyWhitePawnUrl, fit: 0.54 },
-      // The white queen is the fastest hunk of junk in the galaxy — fully
+      // The white queen is the beloved saucer freighter — fully
       // textured and watertight from the artist, so no regrade, no baffle.
       // First codex export with the nose already at +z: the standard
       // white-side flip is all she needs.
       { key: 'wq', url: galaxyWhiteQueenUrl, fit: 0.85, hover: 0.5 },
-      // The rest of the rebel fleet, one drop: all textured, watertight,
+      // The rest of the Comet Guard, one drop: all textured, watertight,
       // noses at +z, engines glowing — every convention landed, so these
       // four need nothing but a footprint and a hover height.
       { key: 'wn', url: galaxyWhiteKnightUrl, fit: 0.43, hover: 0.38 },
@@ -665,22 +665,22 @@ export class ChessScene {
       { key: 'wr', url: galaxyWhiteRookUrl, fit: 0.85, hover: 0.44 },
       { key: 'wk', url: galaxyWhiteKingUrl, fit: 1.0, hover: 0.5 },
       { key: 'bp', url: galaxyBlackPawnUrl, greyward: 0.62, glass: ['DarkWindow'], fit: 0.33 },
-      // The imperial landing craft — same dark material family as the TIE,
+      // The Nebula Fleet pod lander — same dark material family as the twin-panel fighter,
       // so the same grey regrade and black cockpit glass apply.
       { key: 'bb', url: galaxyBlackBishopUrl, greyward: 0.62, glass: ['DarkWindow'], fit: 0.5, hover: 0.42 },
-      // Vader's TIE — dark blue hull, so the pawns' full regrade would wash
-      // out what makes it *his*; a lighter pull keeps it a shade meaner than
+      // The dagger flyer — dark blue hull, so the pawns' full regrade would wash
+      // out what makes it its own; a lighter pull keeps it a shade sharper than
       // the rank-and-file. Its cockpit pane is named per-part, not DarkWindow.
-      // Vader's TIE exports nose at -z (cockpit-window centroid z=-0.83) —
-      // `face` spins it to fly at the rebels like everyone else.
+      // The dagger flyer exports nose at -z (cockpit-window centroid z=-0.83) —
+      // `face` spins it to fly at the Comet Guard like everyone else.
       { key: 'bn', url: galaxyBlackKnightUrl, greyward: 0.5, glass: ['Sphere04_windowblack'], fit: 0.37, hover: 0.38, face: Math.PI },
-      // The capital ships are daggers — the Executor famously eleven times
+      // The capital ships are daggers — the blade flagship many times
       // longer than wide — so square-sized lengths render them as slivers.
       // They overhang their square along the file instead (they fly with
       // their noses at the enemy, and everything nearby hovers lower).
-      // The Star Destroyer also exports backwards (wide stern at +z), and
+      // The wedge cruiser also exports backwards (wide stern at +z), and
       // its hull read too dark on the family's screens — it takes the same
-      // regrade as the approved TIE pawns now, not the gentler capital pull.
+      // regrade as the approved twin-panel pawns now, not the gentler capital pull.
       { key: 'br', url: galaxyBlackRookUrl, greyward: 0.62, fit: 0.72, hover: 0.44, face: Math.PI },
       { key: 'bq', url: galaxyBlackQueenUrl, greyward: 0.4, fit: 1.05, hover: 0.5 },
       { key: 'bk', url: galaxyBlackKingUrl, greyward: 0.4, fit: 0.5, hover: 0.5 },
@@ -1495,7 +1495,7 @@ function buildPrincess(g: THREE.Group, mat: THREE.Material, accent: THREE.Materi
 /**
  * The Galaxy Fleet — every piece a little display-model starship hovering on
  * a slender pylon, nose toward the enemy, engines burning in the side's glow
- * colour. Light flies the rebel fleet, dark the Empire; the sculpts are
+ * colour. Light flies the Comet Guard, dark the Nebula Fleet; the sculpts are
  * loving procedural nods to the ships every kid knows.
  */
 function buildShip(
@@ -1553,8 +1553,8 @@ function buildShip(
   };
 
   void accent; // referenced through `detail`'s default
-  if (black) buildEmpireShip(type, ship, mat, glow, f, { zcone, zcyl, engine, detail, wedge });
-  else buildRebelShip(type, ship, mat, glow, f, { zcone, zcyl, engine, detail, wedge });
+  if (black) buildNebulaShip(type, ship, mat, glow, f, { zcone, zcyl, engine, detail, wedge });
+  else buildCometShip(type, ship, mat, glow, f, { zcone, zcyl, engine, detail, wedge });
 }
 
 interface ShipKit {
@@ -1565,8 +1565,8 @@ interface ShipKit {
   wedge: (r: number, len: number, widen: number, flatten: number) => THREE.Mesh;
 }
 
-/** The rebel fleet (light side). */
-function buildRebelShip(
+/** The Comet Guard (light side). */
+function buildCometShip(
   type: PieceType,
   ship: THREE.Group,
   mat: THREE.Material,
@@ -1576,21 +1576,21 @@ function buildRebelShip(
 ) {
   const { zcone, zcyl, engine, detail, wedge } = kit;
   switch (type) {
-    case 'p': { // X-wing — long fuselage, four S-foils, wingtip cannons
+    case 'p': { // arrow fighter — long fuselage, four open fins, wingtip lights
       zcyl(0.03, 0.3, mat, 0, 0, f * 0.02);
       const nose = zcone(0.028, 0.16, mat);
       nose.position.z = f * 0.24;
       const tail = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.048, 0.14), mat);
       tail.position.set(0, 0.002, -f * 0.1);
       ship.add(tail); // the boxy engine block behind the cockpit
-      detail(0, 0.038, 0.06, 0.026); // canopy stripe in rebel red
+      detail(0, 0.038, 0.06, 0.026); // canopy stripe in Comet Guard red
       for (const sx of [-1, 1]) {
         for (const sy of [-1, 1]) {
           const foil = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.012, 0.085), mat);
           foil.position.set(sx * 0.11, sy * 0.03, -f * 0.09);
           foil.rotation.z = sx * sy * 0.28; // the open X
           ship.add(foil);
-          // Wingtip laser cannon, poking ahead of each foil.
+          // Wingtip light, poking ahead of each foil.
           const cannon = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.16, 6), mat);
           cannon.rotation.x = Math.PI / 2;
           cannon.position.set(sx * 0.09, 0.004, f * 0.06);
@@ -1603,7 +1603,7 @@ function buildRebelShip(
       }
       break;
     }
-    case 'n': { // A-wing — a darting little delta with twin tail fins
+    case 'n': { // dart ship — a darting little delta with twin tail fins
       wedge(0.1, 0.3, 1.25, 0.5);
       detail(0, 0.03, 0.04, 0.026);
       for (const sx of [-1, 1]) {
@@ -1615,7 +1615,7 @@ function buildRebelShip(
       engine(0.045, 0.17, 0.028);
       break;
     }
-    case 'b': { // Y-wing — cockpit up front, two long engine nacelles behind
+    case 'b': { // twin-engine hauler — cockpit up front, two long engine nacelles behind
       zcyl(0.03, 0.3, mat, 0, 0, f * 0.06);
       const pod = detail(0, 0.005, 0.2, 0.05, mat);
       pod.scale.set(0.85, 0.75, 1.5);
@@ -1627,7 +1627,7 @@ function buildRebelShip(
       }
       break;
     }
-    case 'r': { // blockade runner — hammerhead bow, banked engine cluster
+    case 'r': { // hammerhead cruiser — hammerhead bow, banked engine cluster
       zcyl(0.05, 0.36, mat);
       const head = detail(0, 0, 0.2, 0.075, mat);
       head.scale.set(1.15, 0.7, 0.85); // the hammerhead
@@ -1669,14 +1669,14 @@ function buildRebelShip(
       ship.add(band); // the long blue-white engine strip
       break;
     }
-    case 'k': { // Mon Cal flagship — whale-backed cruiser, bristling with domes
+    case 'k': { // whale-back flagship — whale-backed cruiser, bristling with domes
       const hull = new THREE.Mesh(new THREE.SphereGeometry(0.1, 22, 16), mat);
       hull.scale.set(0.9, 0.55, 2.4);
       ship.add(hull);
       detail(-0.035, 0.05, 0.08, 0.018, mat);
       detail(0.04, 0.055, -0.02, 0.022, mat);
       detail(-0.02, 0.05, -0.1, 0.016, mat);
-      detail(0.02, 0.06, 0.14, 0.014); // command dome, in rebel red
+      detail(0.02, 0.06, 0.14, 0.014); // command dome, in Comet Guard red
       const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.16, 8), mat);
       mast.position.y = 0.12;
       ship.add(mast);
@@ -1691,8 +1691,8 @@ function buildRebelShip(
   }
 }
 
-/** The Empire (dark side). */
-function buildEmpireShip(
+/** The Nebula Fleet (black pieces). */
+function buildNebulaShip(
   type: PieceType,
   ship: THREE.Group,
   mat: THREE.Material,
@@ -1702,9 +1702,9 @@ function buildEmpireShip(
 ) {
   const { engine, detail, wedge } = kit;
   const bodyColor = (mat as THREE.MeshStandardMaterial).color;
-  /** Darker imperial plating — solar panels, trenches, hull plates. */
+  /** Darker Nebula Fleet plating — solar panels, trenches, hull plates. */
   const plateMat = new THREE.MeshStandardMaterial({ color: bodyColor.clone().multiplyScalar(0.55), roughness: 0.7 });
-  /** The TIE ball cockpit with its round viewport. */
+  /** The ball cockpit with its round viewport. */
   const ball = (r: number) => {
     const b = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 14), mat);
     ship.add(b);
@@ -1713,11 +1713,11 @@ function buildEmpireShip(
     return b;
   };
   /**
-   * A proper TIE wing: a hexagonal frame with a darker solar panel inset,
-   * joined to the ball by a strut. `rake` angles interceptor daggers toward
+   * A proper panel wing: a hexagonal frame with a darker solar panel inset,
+   * joined to the ball by a strut. `rake` angles dagger flyers toward
    * the enemy; `stretch` elongates the hex vertically.
    */
-  const hexWing = (x: number, r: number, rake = 0, stretch = 1) => {
+  const panelWing = (x: number, r: number, rake = 0, stretch = 1) => {
     const wing = new THREE.Group();
     const frame = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.016, 6), mat);
     frame.rotation.z = Math.PI / 2; // hex face out along x
@@ -1735,20 +1735,20 @@ function buildEmpireShip(
     ship.add(strut);
   };
   switch (type) {
-    case 'p': // TIE fighter — ball cockpit between two hex solar wings
+    case 'p': // twin-panel fighter — ball cockpit between two hex solar wings
       ball(0.06);
-      hexWing(-0.115, 0.095);
-      hexWing(0.115, 0.095);
+      panelWing(-0.115, 0.095);
+      panelWing(0.115, 0.095);
       engine(0, 0.068, 0.018);
       break;
-    case 'n': // TIE interceptor — stretched daggers raked at the enemy
+    case 'n': // dagger flyer — stretched daggers raked at the enemy
       ball(0.056);
-      hexWing(-0.115, 0.085, 0.5, 1.35);
-      hexWing(0.115, 0.085, 0.5, 1.35);
+      panelWing(-0.115, 0.085, 0.5, 1.35);
+      panelWing(0.115, 0.085, 0.5, 1.35);
       engine(-0.028, 0.066, 0.016);
       engine(0.028, 0.066, 0.016);
       break;
-    case 'b': { // the trifoil shuttle — tall dorsal fin, drooped wings
+    case 'b': { // the fin shuttle — tall dorsal fin, drooped wings
       const body = kit.zcone(0.06, 0.3, mat);
       body.position.z = f * 0.03;
       detail(0, 0.035, 0.13, 0.026); // cockpit
@@ -1765,7 +1765,7 @@ function buildEmpireShip(
       engine(0, 0.13, 0.032);
       break;
     }
-    case 'r': { // Star Destroyer — tiered wedge hull, neck, twin-domed bridge
+    case 'r': { // wedge cruiser — tiered wedge hull, neck, twin-domed bridge
       wedge(0.15, 0.55, 1.4, 0.45);
       const tier = wedge(0.095, 0.36, 1.3, 0.5); // the raised city deck
       tier.position.set(0, 0.03, -f * 0.07);
@@ -1782,7 +1782,7 @@ function buildEmpireShip(
       engine(0.06, 0.29, 0.024);
       break;
     }
-    case 'q': { // the Executor — a long blade with a superstructure city
+    case 'q': { // the blade flagship — a long blade with a superstructure city
       wedge(0.13, 0.82, 1.5, 0.32);
       const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.026, 0.42), plateMat);
       ridge.position.set(0, 0.026, -f * 0.06);
@@ -1802,7 +1802,7 @@ function buildEmpireShip(
       engine(0.05, 0.42, 0.02);
       break;
     }
-    case 'k': { // the battle station — sphere, trench, dish, hull plates
+    case 'k': { // the moon fortress — sphere, trench, dish, hull plates
       const core = new THREE.Mesh(new THREE.SphereGeometry(0.17, 28, 22), mat);
       ship.add(core);
       const trench = new THREE.Mesh(new THREE.TorusGeometry(0.169, 0.012, 8, 40), plateMat);

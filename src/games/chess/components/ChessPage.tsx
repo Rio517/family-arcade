@@ -43,7 +43,7 @@ const GAME_ID = 'chess';
 const THEME_BLURBS: Record<ChessThemeId, string> = {
   classic: 'The leather-and-brass War Room',
   unicorn: 'The Cloud Kingdom, high above the clouds',
-  galaxy: 'Rebel starships against the dark side',
+  galaxy: 'Comet Guard starships against the Nebula Fleet',
 };
 
 interface ResultSummary {
