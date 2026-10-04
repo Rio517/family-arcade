@@ -47,7 +47,7 @@ export function BattleshipPage() {
   const [copied, setCopied] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   useDismissOnEscape(shareOpen, () => setShareOpen(false));
-  // The darker-arcade pitch under review (?look= / ?fx=); today's game without it.
+  // The darker-arcade pitch: look C's start screens by default; ?look= / ?fx= compare the options.
   const pitch = usePitch();
   const [watchShots, setWatchShots] = useWatchShots();
 

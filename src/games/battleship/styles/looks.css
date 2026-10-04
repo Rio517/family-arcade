@@ -657,6 +657,9 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
   --sea: #0b1822;
   --sea-line: rgba(255, 196, 0, 0.1);
   --lk-red: #ff4b3e;
+  /* Solo play and Fast Start: steel blue. Red stays on the alarm lights. */
+  --lk-steel: #5fa8e6;
+  --lk-steel-text: #9ccfff;
   --lk-cond: 'DIN Condensed', 'Avenir Next Condensed', 'Roboto Condensed', 'Arial Narrow', Impact, sans-serif;
   --lk-rivets:
     radial-gradient(circle, #9aa6b2 0 1.6px, #333c45 2.3px, transparent 3px) left 7px top 7px / 8px 8px no-repeat,
@@ -717,9 +720,10 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
   color: #fff; border-color: #a6d6ff; background: linear-gradient(180deg, #4f88b6, #34648c);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 5px 0 #17324a;
 }
-.bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn-amber {
-  color: #fff; border-color: #ff9d94; background: linear-gradient(180deg, #ff5d50, #d53022);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 5px 0 #64120b, 0 0 26px -10px rgba(255, 75, 62, 0.8);
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn-amber,
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) .fast-start {
+  color: #fff; border-color: #a6d6ff; background: linear-gradient(180deg, #4f88b6, #34648c);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 5px 0 #17324a, 0 0 26px -10px rgba(95, 168, 230, 0.8);
 }
 .bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn-ghost { background: transparent; box-shadow: none; }
 .bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn-danger { background: transparent; box-shadow: none; border-color: var(--lk-red); color: #ff8178; }
@@ -788,7 +792,7 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
   --door: var(--accent);
   position: relative; padding-top: 34px; border-top: 1px solid #3f4a55; overflow: hidden;
 }
-.bs-look-c .lobby-door-solo { --door: var(--lk-red); }
+.bs-look-c .lobby-door-solo { --door: var(--lk-steel); }
 .bs-look-c .lobby-door::before {
   content: ''; position: absolute; left: 0; right: 0; top: 0; height: 12px;
   background: repeating-linear-gradient(-45deg, var(--door) 0 12px, #121212 12px 24px);
@@ -796,14 +800,14 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 .bs-look-c .lobby-door .lobby-eyebrow {
   font-family: var(--lk-cond); font-size: 19px; letter-spacing: 0.12em; color: var(--door);
 }
-.bs-look-c .lobby-door-solo .lobby-eyebrow { color: #ff8178; }
+.bs-look-c .lobby-door-solo .lobby-eyebrow { color: var(--lk-steel-text); }
 .bs-look-c .lk-door-tag {
   position: absolute; top: 22px; right: 20px; padding: 3px 9px 1px;
   font-family: var(--lk-cond); font-weight: 700; font-size: 22px; letter-spacing: 0.08em;
   color: var(--door); background: #0b0d0f; border: 2px solid var(--door); border-radius: 4px;
   box-shadow: 0 0 14px -4px var(--door);
 }
-.bs-look-c .lobby-door-solo .lk-door-tag { color: #ff8178; }
+.bs-look-c .lobby-door-solo .lk-door-tag { color: var(--lk-steel-text); }
 .bs-look-c .lobby-door .subtle { font-size: 15px; }
 
 /* Captain ladder: dog tags, rank in chevrons. */
@@ -811,7 +815,7 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
   border-radius: 8px; min-height: 72px; text-transform: none; letter-spacing: 0; font-size: 16px;
   background: var(--lk-rivets), linear-gradient(180deg, #2c343c, #20262d);
 }
-.bs-look-c .lobby-captain:hover { border-color: var(--lk-red); }
+.bs-look-c .lobby-captain:hover { border-color: var(--lk-steel); }
 .bs-look-c .lobby-captain-level {
   min-width: 64px; border-radius: 6px; background: #0b0d0f; border: 2px solid #4b5762; color: var(--accent);
   font-family: var(--lk-cond); font-size: 19px; text-transform: uppercase;
@@ -823,7 +827,7 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 }
 .bs-look-c .lobby-captain-pips i.on { background: var(--accent); }
 .bs-look-c .lobby-captain-who strong { font-family: var(--lk-cond); font-size: 21px; letter-spacing: 0.05em; text-transform: uppercase; }
-.bs-look-c .lobby-captain-rank { font-family: var(--lk-cond); font-size: 17px; letter-spacing: 0.04em; color: #ff8178; }
+.bs-look-c .lobby-captain-rank { font-family: var(--lk-cond); font-size: 17px; letter-spacing: 0.04em; color: var(--lk-steel-text); }
 .bs-look-c .lobby-captain-tag { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 500; }
 
 .bs-look-c .field label { font-family: var(--lk-cond); font-size: 18px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); }
@@ -895,10 +899,6 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
     linear-gradient(180deg, #ffd43f, #f0b400);
 }
 .bs-look-c:not([data-phase='battle'], [data-phase='over']) .placement-layout .btn-primary:disabled { background: #3a3522; }
-.bs-look-c:not([data-phase='battle'], [data-phase='over']) .fast-start {
-  color: #fff; border-color: #ff9d94; background: linear-gradient(180deg, #ff5d50, #d53022);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 5px 0 #64120b, 0 0 26px -10px rgba(255, 75, 62, 0.8);
-}
 .bs-look-c .toast { border-radius: 6px; font-family: var(--lk-cond); font-size: 19px; letter-spacing: 0.06em; }
 
 /* ════════════════════════════════════════════════════════════════════════

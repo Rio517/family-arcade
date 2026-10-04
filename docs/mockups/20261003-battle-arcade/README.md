@@ -28,9 +28,12 @@ than classic players looking for a board game. Main areas:
 The Storybook branch is not used. Today's Classic and Modern navies are the
 starting point, and every option below is built from the real game behind an
 address parameter, so it can be played in a production build on an iPad.
-Without a parameter the game is exactly today's.
+Without a parameter the start screens are look C and the effects are today's.
 
-**Outcome:** Pending. The page to review is
+**Outcome:** start screens **C, Battle Station**, now the default. Its solo
+door, the Battle the computer button and Fast Start are steel blue instead of
+red: red stays on the alarm lights. Still pending: the effects (A or B) and
+whether Watch the shots is on by default. The page to review is
 [battle-arcade.html](./battle-arcade.html) (opens from disk).
 
 ## Try it
@@ -64,7 +67,8 @@ what they do are unchanged.
   hung with marquee bulbs over dark harbour water, ticket-stub doors
   ("ADMIT TWO", "ADMIT ONE"), candy-bright buttons.
 - **C, Battle Station.** Gunmetal plates and rivets, yellow-and-black hazard
-  stripes, red alarm lights either side of the title, "INSERT COIN TO FIRE".
+  stripes, red alarm lights either side of the title, "INSERT COIN TO FIRE";
+  solo play and Fast Start in steel blue. **Picked.**
 
 ## Effects (`?fx=`)
 
