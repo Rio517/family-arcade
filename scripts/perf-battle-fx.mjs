@@ -95,12 +95,12 @@ const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--stric
 try {
   await waitForServer(BASE);
   const rows = [];
-  for (const fx of ['today', 'a', 'b']) {
+  for (const fx of ['today', 'a', 'b', 'default']) {
     for (const throttle of [false, true]) {
       const r = await pass(fx, throttle);
       rows.push(r);
       console.log(
-        `fx=${r.fx.padEnd(5)} cpu ${r.throttle}  frames ${String(r.frames).padStart(4)}  ` +
+        `fx=${r.fx.padEnd(7)} cpu ${r.throttle}  frames ${String(r.frames).padStart(4)}  ` +
           `p50 ${r.p50.toFixed(1)}ms  p95 ${r.p95.toFixed(1)}ms  p99 ${r.p99.toFixed(1)}ms  max ${r.max.toFixed(0)}ms  ` +
           `>33ms ${r.over33}  peak draws ${r.peakDrawCalls}`,
       );

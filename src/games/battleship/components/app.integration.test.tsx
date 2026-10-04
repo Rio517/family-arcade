@@ -154,6 +154,9 @@ beforeEach(() => {
   // This flow exercises the radar and the wire, not the 3D ocean — pin the
   // fleet tile to the 2D grid so the lazy three.js chunk never enters the run.
   localStorage.setItem('bs-fleet-view-v1', '2d');
+  // Shots play out by default; this flow fires many in a row and wants each
+  // result at once, so it turns Watch the shots off.
+  localStorage.setItem('bs-watch-shots-v1', 'off');
   // One ticket signed in — the games never ask for a name any more.
   resetUsersStore();
   setUsersState(setActiveUser(addUser(emptyUsersState(), 'u1', 'Rio'), 'u1'));
