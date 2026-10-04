@@ -50,7 +50,7 @@ game? `npm run new-game` puts a starter on the wall;
 
 | Galaxy chess | Risk |
 | --- | --- |
-| ![The galaxy chess set in 3D — rebels vs the dark side](docs/screenshots/galaxy-space.png) | ![The Risk war room mid-campaign](docs/screenshots/risk-board.png) |
+| ![The galaxy chess set in 3D — Comet Guard vs the Nebula Fleet](docs/screenshots/galaxy-space.png) | ![The Risk war room mid-campaign](docs/screenshots/risk-board.png) |
 
 | Magic Coins | Rainbow Racer |
 | --- | --- |
@@ -117,8 +117,8 @@ A full-rules chess game playable two ways and dressed three ways:
   Battle (host plays White, guest plays Black). Reconnects and resumes the
   same way.
 - **Three worlds** — the classic leather-and-brass **War Room**, the unicorn
-  **Cloud Kingdom** on a floating terrace, and the **Galaxy**: rebel ships vs
-  the dark side over a starfield, where authored, textured models are joining
+  **Cloud Kingdom** on a floating terrace, and the **Galaxy**: Comet Guard ships vs
+  the Nebula Fleet over a starfield, where authored, textured models are joining
   the set piece by piece.
 - **A real 3D board** — orbit, pinch, and **drag the pieces themselves** to
   move (taps work too); legal targets light up under a lifted piece.

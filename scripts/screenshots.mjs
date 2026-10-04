@@ -490,7 +490,7 @@ const SHOTS = [
   ...FX_SHOTS,
   {
     // The galaxy set in 3D — where the family's generated ships live (the
-    // X-wing pawns lead; more authored pieces land here as they're made).
+    // arrow-fighter pawns lead; more authored pieces land here as they're made).
     name: 'chess-galaxy-3d',
     path: '/#/chess',
     viewport: TABLET,

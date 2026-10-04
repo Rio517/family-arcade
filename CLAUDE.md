@@ -7,7 +7,7 @@ hard way. Read it before touching anything.
 ## Who this is for
 
 A real family plays this every week: daughters who love unicorns and rainbows,
-a son who loves Star Wars and 3D and suggests features, and parents with a
+a son who loves space and 3D and suggests features, and parents with a
 taste for retro (70s orange, neon signs). Kid-facing copy is warm and playful;
 nothing needs a manual. Big visual changes are pitched as **mockups first**
 (a local HTML page with ~3 labelled options), built only after the family
@@ -171,7 +171,7 @@ using **rebase merges** (sometimes squash). Therefore:
   Station (all resumable games), the Prize Counter. Single committed dark look.
 - Chess themes (`chessTheme.tsx`): classic "War Room" (leather/marble/brass,
   matches Risk), unicorn "Cloud Kingdom" (floating terrace, cloud sea,
-  rainbows), galaxy (rebels vs the dark side; original-but-evocative ships).
+  rainbows), galaxy (Comet Guard vs Nebula Fleet starships over a starfield).
   Theme = data (`ScenePalette`, 2D piece art) + small builders; per-theme page
   chrome is scoped CSS under `.chess-theme-<id>` overriding shared tokens.
 - Risk: "The War Room" (`risk.css`) — mahogany/brass/parchment, serif display.

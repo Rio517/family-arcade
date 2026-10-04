@@ -131,13 +131,12 @@ const UNICORN_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
 };
 
 /**
- * The Galaxy Fleet, rebel side (light) — nose up: X-wing pawns with open
- * S-foils, an A-wing knight, a twin-nacelle Y-wing bishop, a hammerhead
- * blockade-runner rook, the beloved saucer freighter as queen, and the
- * whale-backed Mon Cal flagship as king. Red squadron markings; engines
- * burn warm.
+ * The Galaxy Fleet, Comet Guard side (light) — nose up: arrow-fighter pawns
+ * with four open fins, a dart-ship knight, a twin-engine hauler bishop, a
+ * hammerhead cruiser rook, the beloved saucer freighter as queen, and the
+ * whale-backed flagship as king. Red markings; engines burn warm.
  */
-const REBEL_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
+const COMET_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
   p: (c) => (
     <>
       <path d="M20.5 19 L9.5 12.5 L20.5 22 Z" />
@@ -207,11 +206,11 @@ const REBEL_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
 };
 
 /**
- * The Galaxy Fleet, dark side — TIE-style ball-and-panel fighters, a
- * trifoil shuttle, wedge destroyers (the queen a longer, crueller blade),
- * and the moon-sized battle station as king, dish and trench included.
+ * The Galaxy Fleet, Nebula Fleet side (dark) — twin-panel ball fighters, a
+ * fin shuttle, wedge cruisers (the queen a longer, sharper blade), and the
+ * moon fortress as king, dish and trench included.
  */
-const EMPIRE_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
+const NEBULA_PIECES: Record<PieceType, (c: PieceColors) => JSX.Element> = {
   p: (c) => (
     <>
       <path d="M13.5 10 L16 12.5 V27.5 L13.5 30 L11 27.5 V12.5 Z" />
@@ -286,7 +285,7 @@ const THEMED_SETS: Record<'unicorn' | 'galaxy', ThemedSet> = {
     shadow: 'drop-shadow(0 2px 2px rgba(60,20,60,0.35))',
   },
   galaxy: {
-    art: { w: REBEL_PIECES, b: EMPIRE_PIECES },
+    art: { w: COMET_PIECES, b: NEBULA_PIECES },
     colors: GALAXY_2D,
     shadow: 'drop-shadow(0 0 4px rgba(90,169,255,0.35)) drop-shadow(0 2px 2px rgba(0,0,10,0.6))',
   },
