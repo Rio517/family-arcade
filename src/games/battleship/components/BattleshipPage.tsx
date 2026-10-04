@@ -9,7 +9,6 @@ import { usePartyDoor } from '@shared/party/usePartyDoor';
 import { generateCode } from '@shared/net/peer';
 import { useBattleship } from '@games/battleship/state/useBattleship';
 import { pointsForResult } from '@shared/profile/profile';
-import { buySkin, currentSkinId, selectSkin } from '@games/battleship/domain/skins';
 import { Lobby } from './Lobby';
 import { FleetSelect } from './FleetSelect';
 import { Placement } from './Placement';
@@ -88,7 +87,6 @@ export function BattleshipPage() {
 
   const bs = useBattleship({
     name: profile.profile.name,
-    skinId: currentSkinId(profile.profile),
     onFinish,
   });
 
@@ -370,15 +368,8 @@ export function BattleshipPage() {
       {bs.phase === 'fleet' && (
         <div className="fleet-col">
           <FleetSelect
-            profile={profile.profile}
-            selectedSkinId={bs.mySkinId}
             era={fleetEra}
             onEra={pickFleetEra}
-            onSelect={(id) => {
-              profile.update((p) => selectSkin(p, id));
-              bs.chooseSkin(id);
-            }}
-            onUnlock={(id) => profile.update((p) => buySkin(p, id))}
             onContinue={bs.confirmSkin}
             look={pitch.look}
           />

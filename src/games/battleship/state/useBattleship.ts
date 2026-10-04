@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { GameConnection, type ConnStatus } from '@shared/net/peer';
 import { isMessage, type Message } from '@games/battleship/domain/protocol';
 import { LoopbackConnection } from './loopback';
+import { STANDARD_SKIN } from '@games/battleship/domain/constants';
 import * as Session from '@games/battleship/domain/session';
 import type { FinishInfo, Outcome, Phase as GamePhase, SessionState } from '@games/battleship/domain/session';
 import {
@@ -79,7 +80,6 @@ export interface UseBattleshipResult {
    */
   switchToComputer: (personaId: string) => void;
   resumeGame: (code: string) => void;
-  chooseSkin: (skinId: string) => void;
   confirmSkin: () => void;
   setFleet: (fleet: Fleet) => void;
   confirmReady: () => void;
@@ -90,7 +90,6 @@ export interface UseBattleshipResult {
 
 interface UseBattleshipOptions {
   name: string;
-  skinId: string;
   onFinish: (info: FinishInfo) => void;
 }
 
@@ -109,8 +108,8 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
   // freshest state/identity/onFinish without stale closures.
   const onFinishRef = useRef(opts.onFinish);
   onFinishRef.current = opts.onFinish;
-  const identityRef = useRef({ name: opts.name, skinId: opts.skinId });
-  identityRef.current = { name: opts.name, skinId: opts.skinId };
+  const nameRef = useRef(opts.name);
+  nameRef.current = opts.name;
 
   const setSessionState = useCallback((s: SessionState) => {
     sessionRef.current = s;
@@ -226,8 +225,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
         return;
       }
       const conn = ensureConn();
-      const { name, skinId } = identityRef.current;
-      setSessionState(Session.createSession(role, code, name, skinId, seatedUserId));
+      setSessionState(Session.createSession(role, code, nameRef.current, STANDARD_SKIN.id, seatedUserId));
       if (role === 'host') conn.host(code);
       else conn.join(code);
     },
@@ -236,8 +234,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
 
   const startSoloGame = useCallback((personaId: string, seatedUserId: string | null) => {
     const conn = makeLoopback(personaId);
-    const { name, skinId } = identityRef.current;
-    setSessionState(Session.createSession('host', 'SOLO', name, skinId, seatedUserId));
+    setSessionState(Session.createSession('host', 'SOLO', nameRef.current, STANDARD_SKIN.id, seatedUserId));
     conn.host('SOLO');
   }, [makeLoopback, setSessionState]);
 
@@ -290,16 +287,6 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     if (s) applyOutcome(fn(s));
   }, [applyOutcome]);
 
-  // Broadcast my current identity (name + fleet) so a connected opponent sees
-  // edits made on the setup page, not just the values from the first handshake.
-  const announceIdentity = useCallback(() => {
-    const s = sessionRef.current;
-    if (s) connRef.current?.send(Session.helloOf(s));
-  }, []);
-  const chooseSkin = useCallback((skinId: string) => {
-    withSession((s) => Session.chooseSkin(s, skinId));
-    announceIdentity();
-  }, [withSession, announceIdentity]);
   const confirmSkin = useCallback(() => withSession(Session.toPlacing), [withSession]);
   const setFleet = useCallback((fleet: Fleet) => withSession((s) => Session.setFleet(s, fleet)), [withSession]);
   const confirmReady = useCallback(() => withOutcome((s) => Session.confirmReady(s)), [withOutcome]);
@@ -341,7 +328,7 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     status,
     statusDetail,
     myName: s?.myName ?? opts.name,
-    mySkinId: s?.mySkinId ?? opts.skinId,
+    mySkinId: s?.mySkinId ?? STANDARD_SKIN.id,
     seatedUserId: s?.seatedUserId ?? null,
     myFleet: s?.myFleet ?? [],
     myReady: s?.myReady ?? false,
@@ -359,7 +346,6 @@ export function useBattleship(opts: UseBattleshipOptions): UseBattleshipResult {
     startSoloGame,
     switchToComputer,
     resumeGame,
-    chooseSkin,
     confirmSkin,
     setFleet,
     confirmReady,

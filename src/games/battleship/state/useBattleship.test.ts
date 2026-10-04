@@ -41,7 +41,7 @@ import { useBattleship } from './useBattleship';
 
 /** Mount the hook for a signed-in captain; the name comes from the ticket, never from the lobby. */
 function mount(name = 'Rio') {
-  return renderHook(() => useBattleship({ name, skinId: 'aqua', onFinish: vi.fn() }));
+  return renderHook(() => useBattleship({ name, onFinish: vi.fn() }));
 }
 
 /** A legal, hand-placed fleet: five ships on even rows, all pointing east. */
@@ -113,6 +113,12 @@ describe('useBattleship.startTable', () => {
     expect(wire.join).toEqual(['WXYZ']);
     expect(wire.host).toEqual([]);
     expect(loadSession('WXYZ')?.seatedUserId).toBe('u-kai');
+  });
+
+  it('sails every fleet in the standard colour', () => {
+    const { result } = mount('Klara');
+    act(() => result.current.startSoloGame('bobble', 'u-klara'));
+    expect(result.current.mySkinId).toBe('aqua');
   });
 
   it('seats nobody when the ticket id is unknown', () => {
@@ -217,7 +223,7 @@ describe('useBattleship reports the finish for the seat', () => {
   it('hands onFinish the ticket that sat down at this table', () => {
     seedSave('guest', 'QRST');
     const onFinish = vi.fn();
-    const { result } = renderHook(() => useBattleship({ name: 'Kai', skinId: 'aqua', onFinish }));
+    const { result } = renderHook(() => useBattleship({ name: 'Kai', onFinish }));
     act(() => result.current.startTable({ role: 'guest', code: 'QRST', seatedUserId: 'u-kai' }));
 
     // The host's winning shot arrives in a catch-up sync (the reconnect race).

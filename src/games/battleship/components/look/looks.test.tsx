@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { resetUsersStore, setUsersState } from '@shared/profile/usersStore';
 import { addUser, emptyUsersState, setActiveUser } from '@shared/profile/users';
-import { defaultProfile } from '@shared/profile/profile';
 import type { PartyValue } from '@shared/party/PartyContext';
 import { fakeParty } from '@shared/party/testing';
 import type { LookId } from '@games/battleship/state/pitch';
@@ -27,12 +26,8 @@ const lobby = (look?: LookId) =>
 const fleet = (look?: LookId) =>
   render(
     <FleetSelect
-      profile={defaultProfile()}
-      selectedSkinId="aqua"
       era="classic"
       onEra={vi.fn()}
-      onSelect={vi.fn()}
-      onUnlock={() => false}
       onContinue={vi.fn()}
       look={look}
     />,

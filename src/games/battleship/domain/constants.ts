@@ -21,32 +21,21 @@ export function otherSide(side: Side): Side {
   return side === 'host' ? 'guest' : 'host';
 }
 
-// ── Cosmetic fleet skins ───────────────────────────────────────────────────
-// Skins are pure cosmetics — they never affect the game rules. Free skins are
-// available to everyone; premium skins are unlocked by spending points earned
-// from playing.
+// ── Fleet colour ───────────────────────────────────────────────────────────
+// Every fleet wears one standard colour (Aqua Corps). The id still travels in
+// the `hello` message so a peer on an older build keeps working; whatever id
+// arrives, it is drawn in the standard colour.
 
 export interface Skin {
   id: string;
   name: string;
-  /** Accent colour (CSS) used for the hull glow and the skin emblem. */
+  /** Accent colour (CSS) used for the hull glow and the board rim. */
   color: string;
-  /** Points required to unlock. 0 = free. */
-  cost: number;
-  blurb: string;
 }
 
-export const SKINS: readonly Skin[] = [
-  { id: 'aqua', name: 'Aqua Corps', color: '#22d3ee', cost: 0, blurb: 'Standard-issue hydrofoils.' },
-  { id: 'ember', name: 'Ember Raiders', color: '#fb923c', cost: 0, blurb: 'Runs hot, hits hard.' },
-  { id: 'verdant', name: 'Verdant Wing', color: '#4ade80', cost: 0, blurb: 'Bio-armoured cruisers.' },
-  { id: 'void', name: 'Void Stalkers', color: '#a78bfa', cost: 300, blurb: 'Cloaked until they strike.' },
-  { id: 'solar', name: 'Solar Flare', color: '#fbbf24', cost: 600, blurb: 'Plasma-forged hulls.' },
-  { id: 'phantom', name: 'Phantom Fleet', color: '#e2e8f0', cost: 1000, blurb: 'The last thing they see.' },
-];
+export const STANDARD_SKIN: Skin = { id: 'aqua', name: 'Aqua Corps', color: '#22d3ee' };
 
-export const DEFAULT_UNLOCKED = SKINS.filter((s) => s.cost === 0).map((s) => s.id);
-
-export function skinById(id: string): Skin {
-  return SKINS.find((s) => s.id === id) ?? SKINS[0];
+/** The standard colour, for any id (an older peer may send any string). */
+export function skinById(_id: string): Skin {
+  return STANDARD_SKIN;
 }
