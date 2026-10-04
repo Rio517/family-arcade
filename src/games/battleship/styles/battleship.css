@@ -255,7 +255,7 @@
 .ship-chip[data-selected='true'] { border-color: var(--skin); background: color-mix(in srgb, var(--skin) 14%, var(--surface-2)); }
 .ship-chip[data-placed='true'] .nm { color: var(--muted); }
 .ship-art { display: inline-flex; align-items: center; min-width: 64px; }
-.chip-actions { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.chip-actions { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; min-height: 36px; }
 .chip-btn {
   display: grid; place-items: center; width: 36px; height: 36px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
@@ -265,6 +265,10 @@
 .chip-btn.danger:hover { color: var(--bad); border-color: var(--bad); }
 .ship-chip .status { font-size: 14px; color: var(--warn); }
 .ship-chip .status.todo { color: var(--warn); }
+
+/* The status line holds two lines whether or not its note is showing, so
+   placing a ship never moves what sits below it. */
+.placement-status { margin-top: 10px; line-height: 1.4; min-height: calc(2 * 1.4em); }
 
 /* "or" divider above the Fast Start express lane. */
 .or-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; color: var(--muted); font-size: 14px; }
