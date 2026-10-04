@@ -11,6 +11,7 @@
  * people never download it.
  */
 import { autoPlace } from '../domain/board';
+import { STANDARD_SKIN } from '../domain/constants';
 import * as Session from '../domain/session';
 import type { Message } from '../domain/protocol';
 import type { ConnectionHandlers } from '@shared/net/peer';
@@ -111,7 +112,7 @@ export class LoopbackConnection {
     const { captainById } = await this.bots;
     if (this.dead) return;
     const persona = captainById(this.opts.personaId);
-    const fresh = Session.createSession('guest', code, persona.name, persona.skinId);
+    const fresh = Session.createSession('guest', code, persona.name, STANDARD_SKIN.id);
     const r = this.opts.resume;
     this.bot = r
       ? {

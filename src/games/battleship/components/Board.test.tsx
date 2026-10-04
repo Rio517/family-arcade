@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Board, type BoardCell, type PlacedShip } from './Board';
+import { STANDARD_SKIN } from '@games/battleship/domain/constants';
 import { BOARD_SIZE } from '@games/battleship/domain/types';
 
 function waterGrid(): BoardCell[][] {
@@ -13,6 +14,16 @@ describe('<Board>', () => {
   it('renders a full 10×10 grid of cells', () => {
     render(<Board cells={waterGrid()} skinId="aqua" variant="own" />);
     expect(screen.getAllByRole('button')).toHaveLength(BOARD_SIZE * BOARD_SIZE);
+  });
+
+  it('draws every fleet in the standard colour, whatever skin id it is given', () => {
+    const colours = ['aqua', 'ember', 'void', 'from-an-older-build'].map((id) => {
+      const { container, unmount } = render(<Board cells={waterGrid()} skinId={id} variant="own" />);
+      const c = (container.firstElementChild as HTMLElement).style.getPropertyValue('--skin');
+      unmount();
+      return c;
+    });
+    expect(new Set(colours)).toEqual(new Set([STANDARD_SKIN.color]));
   });
 
   it('fires onCell for an enemy target when active', () => {

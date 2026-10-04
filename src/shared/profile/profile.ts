@@ -5,9 +5,9 @@
  * exact same transitions. Reading/writing localStorage lives in profileStore.ts.
  *
  * This module is deliberately game-agnostic: `unlocked` / `lastSkinId` are
- * opaque cosmetic ids and `survivingCells` is just a bonus amount the calling
- * game supplies. Each game layers its own meaning on top (see, e.g.,
- * games/battleship/domain/skins.ts). Nothing here imports a game.
+ * opaque cosmetic ids kept as stored (no game reads them today) and
+ * `survivingCells` is just a bonus amount the calling game supplies. Nothing
+ * here imports a game.
  */
 
 // Points economy (shared across games).
@@ -94,30 +94,6 @@ export function recordResult(profile: Profile, input: ResultInput): Profile {
     losses: profile.losses + (input.won ? 0 : 1),
     history: [entry, ...profile.history].slice(0, MAX_HISTORY),
   };
-}
-
-/** Has the player unlocked this cosmetic id? (A game may also treat free ones as owned.) */
-export function isUnlocked(profile: Profile, id: string): boolean {
-  return profile.unlocked.includes(id);
-}
-
-export function canAfford(profile: Profile, cost: number): boolean {
-  return profile.points >= cost;
-}
-
-/**
- * Spend points to unlock a cosmetic. Returns the updated profile, or `null` if
- * it's already owned or unaffordable (so the caller can show feedback).
- */
-export function unlockSkin(profile: Profile, id: string, cost: number): Profile | null {
-  if (isUnlocked(profile, id)) return null;
-  if (!canAfford(profile, cost)) return null;
-  return { ...profile, points: profile.points - cost, unlocked: [...profile.unlocked, id] };
-}
-
-/** Choose a cosmetic as current. The caller decides ownership rules. */
-export function selectSkin(profile: Profile, id: string): Profile {
-  return { ...profile, lastSkinId: id };
 }
 
 export function setName(profile: Profile, name: string): Profile {

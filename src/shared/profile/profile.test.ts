@@ -1,18 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  canAfford,
   DEFAULT_PRONOUNS,
   defaultProfile,
-  isUnlocked,
   normalizePronouns,
   normalizeProfile,
   pointsForResult,
   pronounCodePointLength,
   recordResult,
-  selectSkin,
   setName,
   setPronouns,
-  unlockSkin,
 } from './profile';
 
 describe('pointsForResult', () => {
@@ -56,30 +52,6 @@ describe('recordResult', () => {
     expect(p.history).toHaveLength(25);
     expect(p.history[0].code).toBe('G29'); // newest kept
     expect(p.history.some((h) => h.code === 'G4')).toBe(false); // oldest dropped
-  });
-});
-
-describe('cosmetic unlocks (game-neutral)', () => {
-  it('refuses to unlock when the player cannot afford it', () => {
-    expect(canAfford(defaultProfile(), 300)).toBe(false);
-    expect(unlockSkin(defaultProfile(), 'void', 300)).toBeNull();
-  });
-
-  it('deducts points and grants the cosmetic when affordable', () => {
-    const rich = { ...defaultProfile(), points: 500 };
-    const updated = unlockSkin(rich, 'void', 300);
-    expect(updated).not.toBeNull();
-    expect(updated!.points).toBe(200);
-    expect(isUnlocked(updated!, 'void')).toBe(true);
-  });
-
-  it('refuses to double-unlock', () => {
-    const p = { ...defaultProfile(), points: 999, unlocked: ['void'] };
-    expect(unlockSkin(p, 'void', 300)).toBeNull();
-  });
-
-  it('selectSkin records the chosen id', () => {
-    expect(selectSkin(defaultProfile(), 'ember').lastSkinId).toBe('ember');
   });
 });
 

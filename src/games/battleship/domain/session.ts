@@ -138,10 +138,6 @@ export function winnerSide(s: SessionState): Side | null {
 
 // ── Setup transitions (local, no messages) ──────────────────────────────────
 
-export function chooseSkin(s: SessionState, skinId: string): SessionState {
-  return { ...s, mySkinId: skinId };
-}
-
 export function toPlacing(s: SessionState): SessionState {
   return { ...s, setupPhase: 'placing' };
 }
@@ -152,8 +148,8 @@ export function setFleet(s: SessionState, fleet: Fleet): SessionState {
 
 // ── Local player actions (produce messages) ──────────────────────────────────
 
-/** My identity announcement — re-sent whenever my name or fleet changes. */
-export function helloOf(s: SessionState): Message {
+/** My identity announcement, sent with every (re)connect handshake. */
+function helloOf(s: SessionState): Message {
   return { t: 'hello', v: PROTOCOL_VERSION, side: s.side, name: s.myName, skinId: s.mySkinId };
 }
 

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyMessage,
-  chooseSkin,
   confirmReady,
   connectHandshake,
   createSession,
@@ -45,10 +44,8 @@ describe('setup transitions', () => {
   it('starts in the fleet phase', () => {
     expect(phase(newSession('host'))).toBe('fleet');
   });
-  it('chooseSkin / toPlacing / setFleet advance the wizard', () => {
-    let s = chooseSkin(newSession('host'), 'ember');
-    expect(s.mySkinId).toBe('ember');
-    s = toPlacing(s);
+  it('toPlacing / setFleet advance the wizard', () => {
+    let s = toPlacing(newSession('host'));
     expect(phase(s)).toBe('placing');
     s = setFleet(s, autoPlace(seededRng(1)));
     expect(s.myFleet).toHaveLength(5);
@@ -159,6 +156,10 @@ describe('connectHandshake', () => {
     const msgs = connectHandshake(s);
     expect(msgs.map((m) => m.t)).toEqual(['hello', 'sync']);
     expect(msgs.find((m) => m.t === 'sync')).toMatchObject({ log: s.log, ready: true, epoch: 0 });
+  });
+
+  it('still carries a skinId in the hello, so a peer on an older build can play', () => {
+    expect(connectHandshake(newSession('host'))[0]).toMatchObject({ t: 'hello', skinId: 'aqua' });
   });
 
   it('carries the current epoch after a rematch', () => {
