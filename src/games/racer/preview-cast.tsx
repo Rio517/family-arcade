@@ -1,16 +1,19 @@
 /**
- * Rainbow Racer cast preview: the unicorn and the fairy in one look, the
- * three ways a child meets them.
+ * Rainbow Racer cast preview: every racer, on every ride, the three ways a
+ * child meets them.
  *
- *   1. Turntable: front, three-quarter, side and back on a studio backdrop.
- *   2. Pick card: the circle portrait from the pick screen, in its real card.
- *   3. In race: both flying in the real racer sky (RacerScene) at race size,
- *      seen from the chase camera as they bank into a turn.
+ *   1. Turntable: front, three-quarter, side and back on a studio backdrop,
+ *      four racers at a time: `cast=racers` (each on their usual ride) or
+ *      `cast=rides` (the princess and the bunny on their other rides).
+ *   2. Pick card: the circle portrait from the pick screen, in its real card,
+ *      for all eight.
+ *   3. In race: the four racers flying in the real racer sky (RacerScene) at
+ *      race size, seen from the chase camera as they bank into a turn.
  *
- *   /preview-racer-cast.html?style=today   today's riders (three/riders.ts)
- *   /preview-racer-cast.html?style=a       A, close match (three/chunky)
- *   /preview-racer-cast.html?style=b       B, in between (three/chunky)
- *   …&view=turntable | pick | race         one section alone, for screenshots
+ *   /preview-racer-cast.html                         all three, racers
+ *   …?view=turntable | pick | race                   one section alone, for screenshots
+ *   …&cast=rides                                     the other rides on the turntable
+ *   …&cast=fairy,princess-bird                       any racers, for a closer look
  *
  * The wings flap and the riders bob unless the browser asks for reduced
  * motion; then (and in the screenshot run) every view is one still frame.
@@ -20,47 +23,49 @@ import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { driverById, type Driver } from './components/cast';
+import { driverById } from './components/cast';
 import { CRUISE_SPEED, createFlyer, type Flyer } from './domain/flight';
-import { createChunkyRider, drawCost, type ChunkyStyle } from './three/chunky';
-import { createRider, type Rider, type RiderPose } from './three/riders';
+import type { MountId } from './domain/mounts';
+import { createRider, drawCost, type CharacterId, type Rider, type RiderPose } from './three/riders';
 import { RacerScene, type RacerLook } from './three/scene';
 import '@shared/styles/tokens.css';
 import './styles/racer.css';
 
-type Look = 'today' | ChunkyStyle;
-
-const LOOKS: ReadonlyArray<{ id: Look; name: string }> = [
-  { id: 'today', name: 'Today' },
-  { id: 'a', name: 'A · Close match' },
-  { id: 'b', name: 'B · In between' },
+interface Entry {
+  id: CharacterId;
+  mount?: MountId;
+}
+const RIDE_NAME: Record<MountId, string> = { cloud: 'a cloud', bird: 'the bird', unicorn: 'the unicorn' };
+const RACERS: Entry[] = [{ id: 'unicorn' }, { id: 'fairy' }, { id: 'princess', mount: 'unicorn' }, { id: 'bunny', mount: 'cloud' }];
+const RIDES: Entry[] = [
+  { id: 'princess', mount: 'cloud' },
+  { id: 'princess', mount: 'bird' },
+  { id: 'bunny', mount: 'bird' },
+  { id: 'bunny', mount: 'unicorn' },
 ];
+const ALL = [...RACERS, ...RIDES];
+const nameOf = (e: Entry): string => driverById(e.id).name;
+const subtitle = (e: Entry): string => (e.mount ? `on ${RIDE_NAME[e.mount]}` : driverById(e.id).flies);
 
 const params = new URLSearchParams(location.search);
-const look: Look = LOOKS.find((l) => l.id === params.get('style'))?.id ?? 'today';
 const only = params.get('view');
+/** `racers`, `rides`, or a list such as `unicorn,princess-bird` for a closer look. */
+function castFrom(param: string | null): Entry[] {
+  if (param === 'rides') return RIDES;
+  const listed = (param ?? '')
+    .split(',')
+    .map((s) => s.split('-'))
+    .filter(([id]) => ALL.some((e) => e.id === id))
+    .map(([id, mount]) => ALL.find((e) => e.id === id && (!mount || e.mount === mount)) ?? { id: id as CharacterId });
+  return listed.length ? listed : RACERS;
+}
+const turntableCast = castFrom(params.get('cast'));
 const reducedMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const CAST: Driver[] = [driverById('unicorn'), driverById('fairy')];
 const CRUISE: RiderPose = { speed: CRUISE_SPEED, bank: 0, climb: 0, tier: 0, boosting: false, wings: 0 };
 
-/** Nothing at all: the race view's camera follows one of these, so both racers can be seen side by side. */
-function emptyRider(): Rider {
-  return { group: new THREE.Group(), update: () => {}, dispose: () => {} };
-}
-
-/**
- * The rider factory for this look. The race view adds a princess as its
- * invisible camera kart, so she builds as nothing.
- */
-function factoryFor(l: Look): typeof createRider {
-  return (character, color, opts) => {
-    if (character === 'princess') return emptyRider();
-    if (l === 'today' || character === 'bunny') return createRider(character, color, opts);
-    return createChunkyRider(l, character, color, opts);
-  };
-}
-const makeRider = factoryFor(look);
+const build = (e: Entry, motion = reducedMotion): Rider =>
+  createRider(e.id, driverById(e.id).color, { reducedMotion: motion, seed: 1, mount: e.mount });
 
 /** The game's own light: soft room reflections, sky fill and a warm sun. */
 function lightScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene): () => void {
@@ -133,7 +138,7 @@ function Turntable({ onReady }: { onReady: () => void }) {
     const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false });
     const shadowGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
 
-    const riders = CAST.map((d) => makeRider(d.id, d.color, { reducedMotion, seed: 1 }));
+    const riders = turntableCast.map((e) => build(e));
     riders.forEach((r) => r.update(0.016, CRUISE));
     const frames = riders.map((r) => {
       const { centre, radius, box } = bounds(r.group);
@@ -143,7 +148,7 @@ function Turntable({ onReady }: { onReady: () => void }) {
       shadow.position.set(centre.x, box.min.y - 0.5, centre.z);
       return { centre, radius, shadow };
     });
-    // One scale for both rows, so the two characters compare at true size.
+    // One scale for every row, so the racers compare at true size.
     const radius = Math.max(...frames.map((f) => f.radius));
     const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 400);
 
@@ -154,9 +159,11 @@ function Turntable({ onReady }: { onReady: () => void }) {
       const h = canvas.clientHeight;
       if (canvas.width !== Math.round(w * renderer.getPixelRatio())) renderer.setSize(w, h, false);
       const cw = w / ANGLES.length;
-      const ch = h / CAST.length;
+      const ch = h / turntableCast.length;
       camera.aspect = cw / ch;
-      const dist = (radius / Math.sin(THREE.MathUtils.degToRad(14))) * 1.02;
+      // Fit the widest racer into the narrower side of a cell.
+      const fov = THREE.MathUtils.degToRad(14);
+      const dist = (radius / Math.sin(fov)) * 1.02 * Math.max(1, 1 / camera.aspect);
       camera.updateProjectionMatrix();
       riders.forEach((rider, row) => {
         const { centre, shadow } = frames[row];
@@ -195,13 +202,18 @@ function Turntable({ onReady }: { onReady: () => void }) {
   }, [onReady]);
 
   return (
-    <div className="cp-turntable">
+    <div className="cp-turntable" style={{ '--rows': turntableCast.length } as React.CSSProperties}>
       <canvas ref={ref} />
       <div className="cp-grid" aria-hidden="true">
-        {CAST.map((d) =>
+        {turntableCast.map((e) =>
           ANGLES.map((a, i) => (
-            <div key={`${d.id}-${a.name}`} className="cp-cell">
-              {i === 0 && <span className="cp-who">{d.name}</span>}
+            <div key={`${e.id}-${e.mount}-${a.name}`} className="cp-cell">
+              {i === 0 && (
+                <span className="cp-who">
+                  {nameOf(e)}
+                  {e.mount && e.id !== 'unicorn' ? <small> {subtitle(e)}</small> : null}
+                </span>
+              )}
               <span className="cp-angle">{a.name}</span>
             </div>
           )),
@@ -246,7 +258,7 @@ function trimToSquare(source: HTMLCanvasElement, size: number): string {
 }
 
 /** The portrait as `npm run racer-portraits` frames it: three-quarter front, on the model's bounds. */
-function portrait(d: Driver, size: number): string {
+function portrait(e: Entry, size: number): string {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(1);
   renderer.setSize(size, size);
@@ -255,7 +267,7 @@ function portrait(d: Driver, size: number): string {
   renderer.toneMappingExposure = 1.05;
   const scene = new THREE.Scene();
   const freeLight = lightScene(renderer, scene);
-  const rider = makeRider(d.id, d.color, { reducedMotion: true, seed: 1 });
+  const rider = build(e, true);
   rider.update(0.016, CRUISE);
   scene.add(rider.group);
   const { centre, radius } = bounds(rider.group);
@@ -273,8 +285,7 @@ function portrait(d: Driver, size: number): string {
 }
 
 function PickCards({ onReady }: { onReady: () => void }) {
-  // Today's cards show the shipped pictures; a chunky look renders its own once.
-  const [pics] = useState(() => CAST.map((d) => (look === 'today' ? d.portrait : portrait(d, 480))));
+  const [pics] = useState(() => ALL.map((e) => portrait(e, 480)));
   useEffect(() => {
     // Wait for the pictures to decode, so a screenshot never catches an empty badge.
     const imgs = Array.from(document.querySelectorAll<HTMLImageElement>('.cp-pick img'));
@@ -287,13 +298,13 @@ function PickCards({ onReady }: { onReady: () => void }) {
           <h1>Pick your racer</h1>
         </div>
         <div className="racer-cast">
-          {CAST.map((d, i) => (
-            <div key={d.id} className="racer-cast-btn" style={{ '--rc': d.css } as React.CSSProperties}>
+          {ALL.map((e, i) => (
+            <div key={`${e.id}-${e.mount}`} className="racer-cast-btn" style={{ '--rc': driverById(e.id).css } as React.CSSProperties}>
               <span className="racer-cast-badge">
                 <img className="racer-cast-pic" src={pics[i]} alt="" />
               </span>
-              <span className="racer-cast-name">{d.name}</span>
-              <span className="racer-cast-flies">{d.flies}</span>
+              <span className="racer-cast-name">{nameOf(e)}</span>
+              <span className="racer-cast-flies">{subtitle(e)}</span>
             </div>
           ))}
         </div>
@@ -305,14 +316,18 @@ function PickCards({ onReady }: { onReady: () => void }) {
 // ---------------------------------------------------------------------------
 // 3. In race
 
-/** Both racers banking gently into a left turn, side by side on the road out of the start. */
+/** The four banking gently into a left turn on the road out of the start, two by two. */
 function flyers(): Flyer[] {
   const turn = 0.5;
-  const unicorn = { ...createFlyer(4, 41, turn, 30.5), bank: -0.25, trail: 1 };
-  const fairy = { ...createFlyer(-4.5, 42, turn, 31.5), bank: -0.25, trail: 1 };
-  // The camera kart: on the line both are flying, a few lengths behind them.
-  const camera = { ...createFlyer(0, 38, 0, 30), trail: 1 };
-  return [unicorn, fairy, camera];
+  const at = (x: number, z: number, y: number): Flyer => ({ ...createFlyer(x, z, turn, y), bank: -0.25, trail: 1 });
+  return [
+    at(4.4, 41, 30.5),
+    at(-4.4, 42, 31.5),
+    at(-2.4, 54, 35),
+    at(7, 55, 34),
+    // The camera kart: on the line they are flying, a few lengths behind them.
+    { ...createFlyer(0, 38, 0, 30), trail: 1 },
+  ];
 }
 
 function Race({ onReady }: { onReady: () => void }) {
@@ -323,12 +338,13 @@ function Race({ onReady }: { onReady: () => void }) {
     if (!container) return;
     const built: Rider[] = [];
     const looks: RacerLook[] = [
-      { portrait: '', color: CAST[0].color, character: 'unicorn', label: '' },
-      { portrait: '', color: CAST[1].color, character: 'fairy', label: CAST[1].rival },
-      { portrait: '', color: 0xffffff, character: 'princess', label: '' },
+      ...RACERS.map((e, i) => ({ portrait: '', color: driverById(e.id).color, character: e.id, mount: e.mount, label: i ? driverById(e.id).rival : '' })),
+      { portrait: '', color: 0xffffff, character: 'princess' as const, label: '' },
     ];
-    const race = new RacerScene(container, looks, 2, reducedMotion, (character, color, opts) => {
-      const rider = makeRider(character, color, opts);
+    // The last racer is the camera's, and builds as nothing.
+    const race = new RacerScene(container, looks, looks.length - 1, reducedMotion, (character, color, opts) => {
+      const rider =
+        built.length === looks.length - 1 ? { group: new THREE.Group(), update: () => {}, dispose: () => {} } : createRider(character, color, opts);
       built.push(rider);
       return rider;
     });
@@ -345,7 +361,7 @@ function Race({ onReady }: { onReady: () => void }) {
       const p = new THREE.Vector3();
       r.group.traverse((o) => {
         const mesh = o as THREE.Mesh;
-        if (!mesh.isMesh) return;
+        if (!mesh.isMesh || !mesh.visible) return;
         const pos = mesh.geometry.getAttribute('position');
         for (let i = 0; i < pos.count; i++) {
           p.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).project(camera);
@@ -355,7 +371,7 @@ function Race({ onReady }: { onReady: () => void }) {
       });
       return Math.round(((hi - lo) / 2) * 100);
     };
-    setHeights(`${CAST[0].name} ${share(built[0])}% · ${CAST[1].name} ${share(built[1])}% of frame height`);
+    setHeights(RACERS.map((e, i) => `${nameOf(e)} ${share(built[i])}%`).join(' · ') + ' of frame height');
     onReady();
 
     let raf = 0;
@@ -385,11 +401,11 @@ function Race({ onReady }: { onReady: () => void }) {
 // ---------------------------------------------------------------------------
 
 function Budget() {
-  const rows = CAST.map((d) => {
-    const r = makeRider(d.id, d.color, { reducedMotion: true, seed: 1 });
+  const rows = ALL.map((e) => {
+    const r = build(e, true);
     const cost = drawCost(r.group);
     r.dispose();
-    return { name: d.name, ...cost };
+    return { name: `${nameOf(e)}${e.mount ? ` ${subtitle(e)}` : ''}`, ...cost };
   });
   return (
     <p className="cp-budget" data-testid="cast-budget">
@@ -413,29 +429,32 @@ export function CastPreview() {
         .cast-preview header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: baseline; margin-bottom: 12px; }
         .cast-preview header h1 { font-size: 22px; margin: 0; }
         .cast-preview header a { color: #5b3fc4; font-weight: 700; }
-        .cast-preview header a[aria-current] { color: #2b2a45; text-decoration: none; }
         .cast-preview h2 { font-size: 16px; margin: 20px 0 8px; }
         .cp-budget { margin: 0; font-size: 14px; color: #5c6b85; }
-        .cp-turntable { position: relative; width: 1200px; height: 720px; }
+        .cp-turntable { position: relative; width: ${only ? '100vw' : '1180px'}; height: ${only ? '100vh' : '820px'}; }
         .cp-turntable canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-        .cp-grid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); pointer-events: none; }
+        .cp-grid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(var(--rows), 1fr); pointer-events: none; }
         .cp-cell { position: relative; }
-        .cp-who { position: absolute; top: 12px; left: 14px; font-weight: 800; font-size: 18px; color: #4a3d7a; }
-        .cp-angle { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); padding: 3px 14px; border-radius: 999px; background: #fff; box-shadow: 0 2px 0 #d5cfe8; font-weight: 800; font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; color: #3a3360; }
-        .cp-pick.racer-root { min-height: 0; width: 760px; padding: 28px 24px 34px; }
-        .cp-pick .racer-cast { grid-template-columns: repeat(2, 200px); justify-content: center; }
-        .cp-race { position: relative; width: 1180px; height: 820px; overflow: hidden; }
+        .cp-who { position: absolute; top: 8px; left: 10px; font-weight: 800; font-size: 16px; color: #4a3d7a; white-space: nowrap; }
+        .cp-who small { font-size: 14px; font-weight: 700; color: #6a5d9a; }
+        .cp-angle { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); padding: 2px 10px; border-radius: 999px; background: #fff; box-shadow: 0 2px 0 #d5cfe8; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; color: #3a3360; }
+        .cp-pick.racer-root { min-height: 0; padding: 24px 16px 34px; }
+        .cp-pick .racer-setup { min-height: 0; }
+        .cp-pick .racer-cast { gap: 14px; }
+        .cp-race { position: relative; width: ${only ? '100vw' : '1180px'}; height: ${only ? '100vh' : '820px'}; overflow: hidden; }
         .cp-race canvas { display: block; }
-        .cp-chip { position: absolute; z-index: 1; top: 12px; left: 12px; padding: 4px 12px; border-radius: 999px; background: rgba(255,255,255,0.85); font-size: 14px; font-weight: 700; color: #3a3360; }
+        .cp-chip { position: absolute; z-index: 1; top: 12px; left: 12px; right: 12px; width: fit-content; padding: 4px 12px; border-radius: 16px; background: rgba(255,255,255,0.85); font-size: 14px; font-weight: 700; color: #3a3360; }
+        @media (max-width: 600px) {
+          .cp-who { font-size: 14px; }
+          .cp-who small { display: block; }
+          .cp-angle { padding: 1px 6px; letter-spacing: 0; }
+        }
       `}</style>
       {!only && (
         <header>
-          <h1>Rainbow Racer cast: {LOOKS.find((l) => l.id === look)?.name}</h1>
-          {LOOKS.map((l) => (
-            <a key={l.id} href={`?style=${l.id}`} aria-current={l.id === look ? 'page' : undefined}>
-              {l.name}
-            </a>
-          ))}
+          <h1>Rainbow Racer cast</h1>
+          <a href="?cast=racers">Racers</a>
+          <a href="?cast=rides">Other rides</a>
           <Budget />
         </header>
       )}

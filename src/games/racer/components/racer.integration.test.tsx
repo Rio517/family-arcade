@@ -59,7 +59,7 @@ vi.mock('../three/scene', () => {
     render(): void {}
     dispose(): void {}
   }
-  return { RacerScene, loadRacerAssets: () => Promise.resolve() };
+  return { RacerScene };
 });
 
 // A race a test can finish in a couple of frames: no countdown, and every coin

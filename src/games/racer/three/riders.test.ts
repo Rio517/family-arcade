@@ -2,258 +2,218 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
 import { MOUNT_IDS, type MountId } from '../domain/mounts';
-import { createRider, preloadRiderAssets, type CharacterId, type RiderPose } from './riders';
-
-const CHARACTERS: CharacterId[] = ['fairy', 'princess', 'unicorn', 'bunny'];
+import { createRider, drawCost, type CharacterId, type RiderPose } from './riders';
 
 const CRUISE: RiderPose = { speed: 26, bank: 0, climb: 0, tier: 0, boosting: false };
 
-function poses(): RiderPose[] {
-  return [
-    { speed: 26, bank: 0, climb: 0, tier: 0, boosting: false },
-    { speed: 60, bank: 1, climb: 1, tier: 3, boosting: true },
-    { speed: 12, bank: -1, climb: -1, tier: 1.6, boosting: false },
-    { speed: 0, bank: 0, climb: 0, tier: 3, boosting: true },
-  ];
+const POSES: RiderPose[] = [
+  CRUISE,
+  { speed: 60, bank: 1, climb: 1, tier: 3, boosting: true, wings: 1 },
+  { speed: 12, bank: -1, climb: -1, tier: 1.6, boosting: false, wings: 0.4 },
+  { speed: Number.NaN, bank: Number.POSITIVE_INFINITY, climb: 0, tier: -2, boosting: false, wings: Number.NaN },
+];
+
+/** Every racer as it can fly: the two who fly alone, and the two riders on each ride. */
+const CAST: Array<[CharacterId, MountId | undefined]> = [
+  ['unicorn', undefined],
+  ['fairy', undefined],
+  ...(['princess', 'bunny'] as const).flatMap((c) => MOUNT_IDS.map((m) => [c, m] as [CharacterId, MountId])),
+];
+
+/** The budget: a handful of draw calls and under 3,000 triangles, rider and ride together. */
+const MIN_CALLS = 4;
+const MAX_CALLS = 6;
+const MAX_TRIANGLES = 3000;
+
+/** group > tilt > bob > scaleRoot: the node whose scale carries star growth. */
+const scaleRootOf = (group: THREE.Object3D): THREE.Object3D => group.children[0].children[0].children[0];
+
+function wingsOf(group: THREE.Object3D): THREE.Object3D[] {
+  const out: THREE.Object3D[] = [];
+  group.traverse((o) => {
+    if (o.name === 'wing') out.push(o);
+  });
+  return out;
 }
 
-/** Every world-space number under `group` must stay finite (no NaN/Infinity
- *  from a bad rotation/scale slipping through). */
 function assertFiniteTree(group: THREE.Object3D): void {
   group.updateWorldMatrix(true, true);
   group.traverse((o) => {
-    for (const v of [o.position, o.scale]) {
-      expect(Number.isFinite(v.x)).toBe(true);
-      expect(Number.isFinite(v.y)).toBe(true);
-      expect(Number.isFinite(v.z)).toBe(true);
-    }
-    expect(Number.isFinite(o.rotation.x)).toBe(true);
-    expect(Number.isFinite(o.rotation.y)).toBe(true);
-    expect(Number.isFinite(o.rotation.z)).toBe(true);
-    const m = o.matrixWorld.elements;
-    for (const n of m) expect(Number.isFinite(n)).toBe(true);
+    for (const n of o.matrixWorld.elements) expect(Number.isFinite(n)).toBe(true);
   });
-}
-
-function countMeshes(group: THREE.Object3D): number {
-  let n = 0;
-  group.traverse((o) => {
-    if ((o as THREE.Mesh).isMesh) n++;
-  });
-  return n;
 }
 
 describe('createRider', () => {
-  it.each(CHARACTERS)('%s builds a non-empty group without WebGL', (character) => {
-    const rider = createRider(character, 0xff5d8f, { reducedMotion: false, seed: 7 });
-    expect(rider.group).toBeInstanceOf(THREE.Group);
-    expect(countMeshes(rider.group)).toBeGreaterThan(0);
+  it.each(CAST)('%s (on %s) stays inside the draw budget, with one material', (character, mount) => {
+    const rider = createRider(character, 0xff7fc4, { reducedMotion: true, seed: 1, mount });
+    const { calls, triangles } = drawCost(rider.group);
+    expect(calls).toBeGreaterThanOrEqual(MIN_CALLS);
+    expect(calls).toBeLessThanOrEqual(MAX_CALLS);
+    expect(triangles).toBeGreaterThan(500);
+    expect(triangles).toBeLessThan(MAX_TRIANGLES);
+    const materials = new Set<THREE.Material>();
+    rider.group.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) materials.add(mesh.material as THREE.Material);
+    });
+    expect(materials.size).toBe(1);
     rider.dispose();
   });
 
-  it.each(CHARACTERS)('%s update() runs every pose (including reducedMotion) without throwing and stays finite', (character) => {
+  it.each(CAST)('%s (on %s) stays finite through every pose, a stalled tab, and a second dispose', (character, mount) => {
     for (const reducedMotion of [false, true]) {
-      const rider = createRider(character, 0x4aa3ff, { reducedMotion, seed: 42 });
-      for (const pose of poses()) {
-        expect(() => rider.update(1 / 60, pose)).not.toThrow();
+      const rider = createRider(character, 0x6cc6ff, { reducedMotion, seed: 9, mount });
+      for (const pose of POSES) {
+        rider.update(1 / 60, pose);
+        rider.update(Number.NaN, pose);
         assertFiniteTree(rider.group);
       }
-      // A large dt (tab was backgrounded) must not blow up the easing.
-      expect(() => rider.update(5, CRUISE)).not.toThrow();
+      rider.update(5, CRUISE);
       assertFiniteTree(rider.group);
-      rider.dispose();
-    }
-  });
-
-  it.each(CHARACTERS)('%s dispose() runs cleanly and repeatedly', (character) => {
-    const rider = createRider(character, 0x9b6bff, { reducedMotion: false, seed: 3 });
-    rider.update(1 / 60, CRUISE);
-    expect(() => rider.dispose()).not.toThrow();
-    // A second dispose (e.g. an unmount race) must not throw either.
-    expect(() => rider.dispose()).not.toThrow();
-  });
-
-  /** group > tilt > bob > scaleRoot (see `makeRig`) — the node whose own
-   *  `.scale` carries tier growth for every character but the fairy. */
-  function scaleRootOf(group: THREE.Object3D): THREE.Object3D {
-    return group.children[0].children[0].children[0];
-  }
-
-  it.each(['unicorn', 'bunny'] as const)('%s tier growth increases overall scale', (character) => {
-    const low = createRider(character, 0xffe14a, { reducedMotion: true, seed: 1 });
-    low.update(1 / 60, { ...CRUISE, tier: 0 });
-    const lowScale = scaleRootOf(low.group).scale.x;
-    low.dispose();
-
-    const high = createRider(character, 0xffe14a, { reducedMotion: true, seed: 1 });
-    high.update(1 / 60, { ...CRUISE, tier: 3 });
-    const highScale = scaleRootOf(high.group).scale.x;
-    high.dispose();
-
-    expect(highScale).toBeGreaterThan(lowScale);
-  });
-
-  it('princess tier growth grows the whole mount', () => {
-    const low = createRider('princess', 0xffe14a, { reducedMotion: true, seed: 1 });
-    low.update(1 / 60, { ...CRUISE, tier: 0 });
-    const lowScale = scaleRootOf(low.group).scale.x;
-    low.dispose();
-
-    const high = createRider('princess', 0xffe14a, { reducedMotion: true, seed: 1 });
-    high.update(1 / 60, { ...CRUISE, tier: 3 });
-    const highScale = scaleRootOf(high.group).scale.x;
-    high.dispose();
-
-    expect(highScale).toBeGreaterThan(lowScale);
-  });
-
-  it('fairy wings grow with tier while the body does not', () => {
-    // The fairy's body sits at rig.scaleRoot's first child (`body`), whose
-    // scale must stay pinned at 1 regardless of tier; only the wings group
-    // (the scaleRoot's other child) should grow.
-    function bodyAndWingScale(tier: number): { body: number; wings: number } {
-      const rider = createRider('fairy', 0xff5d8f, { reducedMotion: true, seed: 5 });
-      rider.update(1 / 60, { ...CRUISE, tier });
-      const scaleRoot = rider.group.children[0].children[0].children[0]; // group>tilt>bob>scaleRoot
-      const [body, wings] = scaleRoot.children;
-      const result = { body: body.scale.x, wings: wings.scale.x };
-      rider.dispose();
-      return result;
-    }
-
-    const t0 = bodyAndWingScale(0);
-    const t3 = bodyAndWingScale(3);
-    expect(t0.body).toBeCloseTo(1, 5);
-    expect(t3.body).toBeCloseTo(1, 5);
-    expect(t3.wings).toBeGreaterThan(t0.wings);
-  });
-
-  it('two riders of the same character do not share tinted materials', () => {
-    const a = createRider('bunny', 0xff0000, { reducedMotion: false, seed: 9 });
-    const b = createRider('bunny', 0x00ff00, { reducedMotion: false, seed: 9 });
-    const materialsOf = (group: THREE.Object3D): THREE.Material[] => {
-      const list: THREE.Material[] = [];
-      group.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (mesh.isMesh && mesh.material) list.push(mesh.material as THREE.Material);
-      });
-      return list;
-    };
-    const aMats = materialsOf(a.group);
-    const bMats = materialsOf(b.group);
-    for (const m of aMats) expect(bMats).not.toContain(m);
-    a.dispose();
-    b.dispose();
-  });
-});
-
-const RIDERS_WITH_MOUNTS = ['princess', 'bunny'] as const;
-
-describe('mounts', () => {
-  const combos = RIDERS_WITH_MOUNTS.flatMap((character) => MOUNT_IDS.map((mount) => [character, mount] as const));
-
-  it.each(combos)('%s on a %s builds, runs every pose finite, and disposes', (character, mount) => {
-    for (const reducedMotion of [false, true]) {
-      const rider = createRider(character, 0xffa94d, { reducedMotion, seed: 11, mount });
-      expect(countMeshes(rider.group)).toBeGreaterThan(0);
-      for (const pose of [...poses(), { ...CRUISE, wings: 1 }, { ...CRUISE, wings: 0.4, boosting: true }]) {
-        expect(() => rider.update(1 / 60, pose)).not.toThrow();
-        assertFiniteTree(rider.group);
-      }
-      expect(() => rider.update(5, CRUISE)).not.toThrow();
-      assertFiniteTree(rider.group);
+      expect(() => rider.dispose()).not.toThrow();
       expect(() => rider.dispose()).not.toThrow();
     }
   });
 
-  it.each(['fairy', 'unicorn'] as const)('%s ignores the mount option', (character) => {
-    const plain = createRider(character, 0xff7fc4, { reducedMotion: true, seed: 4 });
-    const plainCount = countMeshes(plain.group);
-    plain.dispose();
-    for (const mount of MOUNT_IDS) {
-      const rider = createRider(character, 0xff7fc4, { reducedMotion: true, seed: 4, mount });
-      expect(countMeshes(rider.group)).toBe(plainCount);
-      rider.dispose();
-    }
+  it.each(CAST)('%s (on %s) has two wings on hinges that flap in mirror, and hold still under reduced motion', (character, mount) => {
+    const moving = createRider(character, 0xff7fc4, { reducedMotion: false, seed: 3, mount });
+    const wings = wingsOf(moving.group);
+    expect(wings).toHaveLength(2);
+    const before = wings[0].rotation.z;
+    moving.update(0.1, { ...CRUISE, wings: 1 });
+    expect(wings[0].rotation.z).not.toBeCloseTo(before, 4);
+    expect(wings[1].rotation.z).toBeCloseTo(-wings[0].rotation.z, 6);
+    moving.dispose();
+
+    const still = createRider(character, 0xff7fc4, { reducedMotion: true, seed: 3, mount });
+    const rest = wingsOf(still.group)[0].rotation.z;
+    still.update(0.1, CRUISE);
+    still.update(0.37, CRUISE);
+    expect(wingsOf(still.group)[0].rotation.z).toBeCloseTo(rest, 6);
+    still.dispose();
   });
 
-  it('keeps the default rides: princess on a unicorn, bunny on a cloud', () => {
-    const count = (character: CharacterId, mount?: MountId): number => {
-      const rider = createRider(character, 0x6cc6ff, { reducedMotion: true, seed: 2, mount });
-      const n = countMeshes(rider.group);
-      rider.dispose();
-      return n;
-    };
-    expect(count('princess')).toBe(count('princess', 'unicorn'));
-    expect(count('bunny')).toBe(count('bunny', 'cloud'));
-    expect(count('princess', 'bird')).not.toBe(count('princess', 'unicorn'));
-  });
-
-  it('the bird is deterministic for a seed', () => {
-    const a = createRider('bunny', 0x6cc6ff, { reducedMotion: true, seed: 6, mount: 'bird' });
-    const b = createRider('bunny', 0x6cc6ff, { reducedMotion: true, seed: 6, mount: 'bird' });
-    a.update(1 / 60, CRUISE);
-    b.update(1 / 60, CRUISE);
-    a.group.updateWorldMatrix(true, true);
-    b.group.updateWorldMatrix(true, true);
-    const positions = (g: THREE.Object3D): number[] => {
+  it('builds the same racer for the same seed', () => {
+    const positions = (seed: number): number[] => {
+      const rider = createRider('bunny', 0x6cc6ff, { reducedMotion: false, seed, mount: 'bird' });
+      rider.update(1 / 60, CRUISE);
+      rider.group.updateWorldMatrix(true, true);
       const list: number[] = [];
-      g.traverse((o) => list.push(o.position.x, o.position.y, o.position.z));
+      rider.group.traverse((o) => list.push(...o.matrixWorld.elements));
+      rider.dispose();
       return list;
     };
-    expect(positions(a.group)).toEqual(positions(b.group));
+    expect(positions(6)).toEqual(positions(6));
+  });
+
+  it('two riders never share a material', () => {
+    const materialsOf = (group: THREE.Object3D): THREE.Material[] => {
+      const list: THREE.Material[] = [];
+      group.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (mesh.isMesh) list.push(mesh.material as THREE.Material);
+      });
+      return list;
+    };
+    const a = createRider('bunny', 0xff0000, { reducedMotion: false, seed: 9 });
+    const b = createRider('bunny', 0x00ff00, { reducedMotion: false, seed: 9 });
+    for (const m of materialsOf(a.group)) expect(materialsOf(b.group)).not.toContain(m);
     a.dispose();
     b.dispose();
   });
+});
 
-  /** Shoulder pivots: groups whose first child group carries extruded wing panels. */
-  function wingPivotsOf(group: THREE.Object3D): THREE.Object3D[] {
-    const pivots: THREE.Object3D[] = [];
-    group.traverse((o) => {
-      const panel = o.children[0];
-      const first = panel?.children[0] as THREE.Mesh | undefined;
-      if (first?.geometry?.type === 'ExtrudeGeometry') pivots.push(o);
-    });
-    return pivots;
-  }
-
-  it.each(RIDERS_WITH_MOUNTS)('the bird under a %s has two wing pivots that grow with the wings power-up', (character) => {
-    const scales = [0, 1].map((wings) => {
-      const rider = createRider(character, 0x6cc6ff, { reducedMotion: true, seed: 1, mount: 'bird' });
-      rider.update(1 / 60, { ...CRUISE, wings });
-      const pivots = wingPivotsOf(rider.group);
-      expect(pivots).toHaveLength(2);
-      const s = pivots[0].scale.x;
+describe('stars and power-ups', () => {
+  it.each(CAST.filter(([c]) => c !== 'fairy'))('a star makes %s (on %s) bigger', (character, mount) => {
+    const scaleAt = (tier: number): number => {
+      const rider = createRider(character, 0xffe14a, { reducedMotion: true, seed: 1, mount });
+      rider.update(1 / 60, { ...CRUISE, tier });
+      const s = scaleRootOf(rider.group).scale.x;
       rider.dispose();
       return s;
-    });
-    expect(scales[1]).toBeGreaterThan(scales[0]);
+    };
+    expect(scaleAt(0)).toBeCloseTo(1, 6);
+    expect(scaleAt(1)).toBeGreaterThan(scaleAt(0));
+    expect(scaleAt(3)).toBeGreaterThan(scaleAt(1));
   });
 
-  it('the cloud opens its wings with the wings power-up', () => {
+  it('a star grows the fairy’s wings, not her', () => {
+    const at = (tier: number): { body: number; wing: number } => {
+      const rider = createRider('fairy', 0xa78bfa, { reducedMotion: true, seed: 5 });
+      rider.update(1 / 60, { ...CRUISE, tier });
+      const out = { body: scaleRootOf(rider.group).scale.x, wing: wingsOf(rider.group)[0].scale.x };
+      rider.dispose();
+      return out;
+    };
+    expect(at(3).body).toBeCloseTo(1, 6);
+    expect(at(3).wing).toBeGreaterThan(at(1).wing);
+    expect(at(1).wing).toBeGreaterThan(at(0).wing);
+  });
+
+  it('growth eases in over a few frames instead of snapping, unless motion is reduced', () => {
+    const rider = createRider('unicorn', 0xff7fc4, { reducedMotion: false, seed: 1 });
+    rider.update(1 / 60, { ...CRUISE, tier: 3 });
+    const first = scaleRootOf(rider.group).scale.x;
+    for (let i = 0; i < 120; i++) rider.update(1 / 60, { ...CRUISE, tier: 3 });
+    expect(first).toBeLessThan(scaleRootOf(rider.group).scale.x);
+    expect(scaleRootOf(rider.group).scale.x).toBeCloseTo(1.66, 2);
+    rider.dispose();
+  });
+
+  it.each([
+    ['unicorn', undefined],
+    ['fairy', undefined],
+    ['princess', 'bird'],
+    ['bunny', 'unicorn'],
+  ] as Array<[CharacterId, MountId | undefined]>)('the wings power-up makes %s’s wings (on %s) bigger', (character, mount) => {
+    const rider = createRider(character, 0xff7fc4, { reducedMotion: true, seed: 1, mount });
+    rider.update(1 / 60, CRUISE);
+    const plain = wingsOf(rider.group)[0].scale.x;
+    rider.update(1 / 60, { ...CRUISE, wings: 1 });
+    expect(wingsOf(rider.group)[0].scale.x).toBeGreaterThan(plain * 1.5);
+    rider.dispose();
+  });
+
+  it('a cloud has no wings until the wings power-up opens a pair', () => {
     const rider = createRider('bunny', 0x6cc6ff, { reducedMotion: true, seed: 1, mount: 'cloud' });
     rider.update(1 / 60, { ...CRUISE, wings: 0 });
-    const closed = wingPivotsOf(rider.group).map((p) => p.visible);
+    expect(wingsOf(rider.group).map((w) => w.visible)).toEqual([false, false]);
     rider.update(1 / 60, { ...CRUISE, wings: 1 });
-    const open = wingPivotsOf(rider.group).map((p) => p.visible);
-    expect(closed).toEqual([false, false]);
-    expect(open).toEqual([true, true]);
+    expect(wingsOf(rider.group).map((w) => w.visible)).toEqual([true, true]);
     rider.dispose();
   });
 });
 
-describe('preloadRiderAssets', () => {
-  it('resolves in jsdom without rejecting, even after a failed GLB load', async () => {
-    await expect(preloadRiderAssets()).resolves.toBeUndefined();
-    // Calling it again returns the same settled (cached) promise.
-    await expect(preloadRiderAssets()).resolves.toBeUndefined();
+describe('rides', () => {
+  const triangles = (character: CharacterId, mount?: MountId): number => {
+    const rider = createRider(character, 0x6cc6ff, { reducedMotion: true, seed: 2, mount });
+    const n = drawCost(rider.group).triangles;
+    rider.dispose();
+    return n;
+  };
+
+  it('keeps the usual rides: the princess on the unicorn, the bunny on a cloud', () => {
+    expect(triangles('princess')).toBe(triangles('princess', 'unicorn'));
+    expect(triangles('bunny')).toBe(triangles('bunny', 'cloud'));
+    expect(triangles('princess', 'bird')).not.toBe(triangles('princess', 'unicorn'));
   });
 
-  it('bunny still builds a usable group after preload settles (GLB or fallback)', async () => {
-    await preloadRiderAssets();
-    const rider = createRider('bunny', 0x53d08a, { reducedMotion: false, seed: 2 });
-    expect(countMeshes(rider.group)).toBeGreaterThan(0);
-    expect(() => rider.update(1 / 60, CRUISE)).not.toThrow();
+  it.each(['fairy', 'unicorn'] as const)('%s flies alone, whatever ride is asked for', (character) => {
+    for (const mount of MOUNT_IDS) expect(triangles(character, mount)).toBe(triangles(character));
+  });
+
+  it.each(['princess', 'bunny'] as const)('%s turns their head on a hinge of their own', (character) => {
+    const rider = createRider(character, 0xffa94d, { reducedMotion: false, seed: 4 });
+    const before = new Map<THREE.Object3D, number>();
+    rider.group.traverse((o) => before.set(o, o.rotation.z));
+    rider.update(0.4, CRUISE);
+    let turned = 0;
+    rider.group.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) return;
+      if (o.name !== 'wing' && o.children.some((c) => (c as THREE.Mesh).isMesh) && o.rotation.z !== before.get(o)) turned += 1;
+    });
+    // The ride's head (the cloud has none) and the rider's head.
+    expect(turned).toBeGreaterThanOrEqual(1);
     rider.dispose();
   });
 });

@@ -40,10 +40,9 @@ const ENTRY = '/racer-portrait-entry.js';
 const entrySource = `
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { createRider, preloadRiderAssets } from '/src/games/racer/three/riders.ts';
+import { createRider } from '/src/games/racer/three/riders.ts';
 
 export async function portrait(character, color, mount, size) {
-  await preloadRiderAssets();
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(1);
   renderer.setSize(size, size);
