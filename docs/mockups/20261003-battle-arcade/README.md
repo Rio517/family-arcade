@@ -28,12 +28,15 @@ than classic players looking for a board game. Main areas:
 The Storybook branch is not used. Today's Classic and Modern navies are the
 starting point, and every option below is built from the real game behind an
 address parameter, so it can be played in a production build on an iPad.
-Without a parameter the start screens are look C and the effects are today's.
+Without a parameter the start screens are look C and the effects are the picked set (below).
 
 **Outcome:** start screens **C, Battle Station**, now the default. Its solo
 door, the Battle the computer button and Fast Start are steel blue instead of
-red: red stays on the alarm lights. Still pending: the effects (A or B) and
-whether Watch the shots is on by default. The page to review is
+red: red stays on the alarm lights. Effects: **B, cinematic**, with
+**A's sea** (Night Ops, at half its first speed) and A's sonar water on the
+radar (calmer), the **HIT!, SUNK! and MISS words** on the radar, and the guns
+on. Watch the shots is on by default, and off when the device asks for
+reduced motion. A and today's effects stay behind `?fx=`. The page to review is
 [battle-arcade.html](./battle-arcade.html) (opens from disk).
 
 ## Try it
@@ -42,6 +45,7 @@ On the iPad (a production build served over Tailscale), or any build:
 
 | What | Address |
 |---|---|
+| The picked effects (the default) | no parameter, or `#/play?fx=default` |
 | Today | `#/play?look=today&fx=today` |
 | Start screens A, B, C | `#/play?look=a`, `?look=b`, `?look=c` |
 | Effects A (arcade), B (cinematic) | `#/play?fx=a`, `?fx=b` |
@@ -72,17 +76,24 @@ what they do are unchanged.
 
 ## Effects (`?fx=`)
 
+**Played by default:** B's fire, blasts and shell trails; A's sea in the
+fleet view; A's sonar water on the radar, calmer than first drawn; the
+HIT!, SUNK! and MISS words on the radar; the guns on. `?fx=a`, `?fx=b`,
+`?fx=today` and `fire=`, `boom=`, `water=` still play the other options, and
+the Pitch switcher's Picked button returns to the default.
+
 Each package changes the deck fires, the hits and misses, the sea and the
-radar's water; the guns come with either, drawn in the package's style.
+radar's water; the guns come with either, drawn in the package's style. The
+radar's HIT!, SUNK! and MISS words show with A and B.
 
 | | Today | A, arcade | B, cinematic |
 |---|---|---|---|
 | Fire on a damaged ship | Small crossed flame cards | The same small fire as crisp cel-shaded tongues that lick and flicker, with rising embers, a warm glow on the deck and a smoke wisp | A soft, roaring blaze with a heavier smoke column |
-| A hit | Sparks on the board | After Gulp's booms: a flash, a fireball cooling from yellow to red, a shock ring on the water, star sparks, debris that splashes into the sea, smoke; "HIT!" and "SUNK!" pop on the radar | The same layers, heavier and realistic, with a flash of light on the water |
+| A hit | Sparks on the board | After Gulp's booms: a flash, a fireball cooling from yellow to red, a shock ring on the water, star sparks, debris that splashes into the sea, smoke; "HIT!" and "SUNK!" pop on the radar | The same layers, heavier and realistic, with a flash of light on the water; "HIT!" and "SUNK!" pop too |
 | A sinking | Sparks | A bigger blast, then a chain of blasts down the hull | As A, cinematic |
-| A miss | Droplets | A column of spray, droplets and rings spreading on the water | Taller spray |
-| The sea | A dark square of swell | **Night Ops:** contour lines of the swell like a sonar chart, the targeting grid glowing in the water, a sonar ping sweeping out every few seconds | **Moonlit Swell:** a rolling sea (Gerstner waves), flecks of whitecap, the moon's glitter path, a night sky with stars; it reaches the horizon |
-| The radar's water | A flat navy grid | A dark teal sonar sea under the grid: faint range rings and phosphor crest lines drifting slowly; the sweep as today | A plain night-blue sea: a long, low swell and sparse glints, both from seeded noise, drifting different ways; the sweep softened |
+| A miss | Droplets | A column of spray, droplets and rings spreading on the water; "MISS" pops | Taller spray; "MISS" pops |
+| The sea | A dark square of swell | **Night Ops:** contour lines of the swell like a sonar chart, the targeting grid glowing in the water, a sonar ping sweeping out every nine seconds; the whole sea runs at half its first speed | **Moonlit Swell:** a rolling sea (Gerstner waves), flecks of whitecap, the moon's glitter path, a night sky with stars; it reaches the horizon |
+| The radar's water | A flat navy grid | A dark teal sonar sea under the grid: faint, widely spaced range rings and phosphor crest lines drifting slowly (a loop takes 44 s); the sweep as today | A plain night-blue sea: a long, low swell and sparse glints, both from seeded noise, drifting different ways; the sweep softened |
 | Shell trails | No guns | A bright head, a crisp streak that tapers and fades, a short puff of smoke left hanging | A smaller head, a finer streak, more smoke that hangs longer |
 
 ## The guns
@@ -176,7 +187,10 @@ fall where a shot starts or lands (the battle screen re-renders and the
 fleet is rebuilt, as today, but a watched exchange has more of those
 moments) and while a ship goes down on the radar, which draws in its own
 small WebGL canvas for those 2.6 s. Run to run, today's own count moved
-between 11 and 17. Not yet verified on an iPad.
+between 11 and 17. The picked default (`?fx=default`) measured the same way, on a busier
+machine where today's own 4× count was 22: unthrottled p50 11.1 ms, p99
+26.4 ms, 0 frames over 33 ms, 1036 peak draw calls; 4× slower, 91 frames over
+33 ms against 82 for B and 62 for A in that run. Not yet verified on an iPad.
 
 ## Where the pieces are
 

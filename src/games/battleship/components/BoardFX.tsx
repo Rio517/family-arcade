@@ -342,7 +342,7 @@ function drawShaped(ctx: CanvasRenderingContext2D, p: Particle): void {
     ctx.fill();
     ctx.restore();
   } else if (p.shape === 'text' && p.text) {
-    // The arcade take's pop word: chunky, outlined, swelling as it fades.
+    // The pop word (both takes show it): chunky, outlined, swelling as it fades.
     const s = p.size * (1 + 0.25 * Math.min(1, t * 4));
     ctx.save();
     ctx.translate(p.x, p.y);
@@ -462,7 +462,7 @@ function spawnTake(out: Particle[], look: 'a' | 'b', kind: Burst['kind'], cx: nu
     push({ shape: 'soft', life: 0.35, size: 14 * s, grow: 30 * s, color: T.spray, alphaScale: 0.9 });
     push({ shape: 'ring', life: 0.8, size: 6 * s, grow: 46 * s, color: T.spray, alphaScale: 0.9 });
     push({ shape: 'ring', life: 0.9, size: 3 * s, grow: 30 * s, color: T.spray, alphaScale: 0.6, delay: 0.15 });
-    if (arcade) push({ shape: 'text', text: 'MISS', life: 0.75, size: 15 * s, color: '#bfe9ff', vy: -26 * s, x: cx, y: cy - 8 * s });
+    push({ shape: 'text', text: 'MISS', life: 0.75, size: 15 * s, color: '#bfe9ff', vy: -26 * s, x: cx, y: cy - 8 * s });
     if (reduced) return;
     for (let i = 0; i < 16; i++) {
       const a = rand(0, TAU);
@@ -476,7 +476,7 @@ function spawnTake(out: Particle[], look: 'a' | 'b', kind: Burst['kind'], cx: nu
   const k = big ? 1.45 : 1;
   // The flash and the shock ring (both even under reduced motion, held still).
   push({ shape: 'soft', life: 0.18, size: 20 * s * k, grow: 60 * s, color: `rgb(${T.flash.join(',')})`, glow: true });
-  if (arcade) push({ shape: 'text', text: big ? 'SUNK!' : 'HIT!', life: 0.9, size: (big ? 19 : 17) * s, color: big ? '#ffd23f' : '#ff7a3c', vy: -24 * s, x: cx, y: cy - 10 * s });
+  push({ shape: 'text', text: big ? 'SUNK!' : 'HIT!', life: 0.9, size: (big ? 19 : 17) * s, color: big ? '#ffd23f' : '#ff7a3c', vy: -24 * s, x: cx, y: cy - 10 * s });
   if (reduced) {
     push({ shape: 'soft', life: 0.6, size: 14 * s * k, color: `rgb(${T.hot.join(',')})`, glow: true });
     return;

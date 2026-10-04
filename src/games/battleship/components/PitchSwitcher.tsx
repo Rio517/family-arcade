@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { ChevronDownIcon } from '@shared/ui/icons';
-import type { FxId, LookId } from '../state/pitch';
+import type { FxPackId, LookId } from '../state/pitch';
 
 interface PitchSwitcherProps {
   look: LookId;
-  fx: FxId;
-  onChoose: (change: { look?: LookId; fx?: FxId }) => void;
+  fx: FxPackId;
+  onChoose: (change: { look?: LookId; fx?: FxPackId }) => void;
 }
 
 const LOOK_LABEL: Record<LookId, string> = { today: 'Today', a: 'A', b: 'B', c: 'C' };
-const FX_LABEL: Record<FxId, string> = { today: 'Today', a: 'A', b: 'B' };
+const FX_LABEL: Record<FxPackId, string> = { default: 'Picked', today: 'Today', a: 'A', b: 'B' };
 
 /**
  * The reviewer's switcher, shown only while a pitch is being reviewed (a
@@ -48,7 +48,7 @@ export function PitchSwitcher({ look, fx, onChoose }: PitchSwitcherProps) {
           </div>
           <div className="bs-pitchbar-row" role="group" aria-label="Effects">
             <span className="bs-pitchbar-k">Effects</span>
-            {(Object.keys(FX_LABEL) as FxId[]).map((id) => (
+            {(Object.keys(FX_LABEL) as FxPackId[]).map((id) => (
               <button
                 key={id}
                 type="button"

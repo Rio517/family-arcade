@@ -5,19 +5,25 @@
  *
  *   #/play?look=a|b|c        the lobby, fleet and placing screens
  *   #/play?fx=a|b            fire, explosions, water and the guns together
+ *   #/play?fx=default        the picked effects (the same as no parameter)
  *   #/play?fire=b&water=a    any one effect overridden on its own
  *   #/play?look=today&fx=today   the game before the pitch
  *
- * The start screens default to look C, Battle Station, the family's pick; the
- * effects default to today's until one is picked. A choice is kept
- * for the browser tab (sessionStorage), so ‹ Menu and back again keeps the
- * option being reviewed. Purely cosmetic and purely local: nothing here
- * reaches the game log or the other device.
+ * With no parameter the start screens are look C, Battle Station, and the
+ * effects are the picked set: cinematic fire (B), cinematic blasts and shell
+ * trails (B), the arcade sea (A) in the fleet view, the radar's arcade sonar
+ * water, and the guns on. The radar's HIT!, SUNK! and MISS words show with
+ * every effects option but today's. A choice is kept for the browser tab
+ * (sessionStorage), so ‹ Menu and back again keeps the option being reviewed.
+ * Purely cosmetic and purely local: nothing here reaches the game log or the
+ * other device.
  */
 import { useCallback, useEffect, useState } from 'react';
 
 export type LookId = 'today' | 'a' | 'b' | 'c';
 export type FxId = 'today' | 'a' | 'b';
+/** A whole effects package: today's, A, B, or the picked set (the default). */
+export type FxPackId = FxId | 'default';
 
 export interface PitchFx {
   fire: FxId;
@@ -31,7 +37,7 @@ export interface Pitch {
   look: LookId;
   fx: PitchFx;
   /** The effects package as chosen (single-effect overrides aside). */
-  fxPack: FxId;
+  fxPack: FxPackId;
   /** A pitch parameter was given in this tab: show the reviewer's switcher. */
   reviewing: boolean;
   /** `?bar=0` hides the switcher (screenshots of an option). */
@@ -43,12 +49,15 @@ const LOOKS: readonly LookId[] = ['today', 'a', 'b', 'c'];
 /** The start screens the family picked. */
 const DEFAULT_LOOK: LookId = 'c';
 const FXS: readonly FxId[] = ['today', 'a', 'b'];
+const PACKS: readonly FxPackId[] = ['default', 'today', 'a', 'b'];
+/** The picked effects: cinematic fire and blasts, the arcade sea, guns on. */
+const DEFAULT_FX: PitchFx = { fire: 'b', boom: 'b', water: 'a', guns: true };
 
 export const TODAY_FX: PitchFx = { fire: 'today', boom: 'today', water: 'today', guns: false };
 
 interface Stored {
   look?: LookId;
-  fx?: FxId;
+  fx?: FxPackId;
   fire?: FxId;
   boom?: FxId;
   water?: FxId;
@@ -95,7 +104,7 @@ function resolveStored(): Stored {
   const s = loadStored();
   const next: Stored = { ...s };
   const look = pick(p.get('look'), LOOKS);
-  const fx = pick(p.get('fx'), FXS);
+  const fx = pick(p.get('fx'), PACKS);
   if (look) next.look = look;
   if (fx) {
     // A whole-package choice resets any single-effect override.
@@ -115,12 +124,13 @@ function resolveStored(): Stored {
 }
 
 function toPitch(s: Stored): Pitch {
-  const pack = s.fx ?? 'today';
+  const pack: FxPackId = s.fx ?? 'default';
+  const base: PitchFx = pack === 'default' ? DEFAULT_FX : { fire: pack, boom: pack, water: pack, guns: pack !== 'today' };
   const fx: PitchFx = {
-    fire: s.fire ?? pack,
-    boom: s.boom ?? pack,
-    water: s.water ?? pack,
-    guns: pack !== 'today',
+    fire: s.fire ?? base.fire,
+    boom: s.boom ?? base.boom,
+    water: s.water ?? base.water,
+    guns: base.guns,
   };
   const look = s.look ?? DEFAULT_LOOK;
   const reviewing = s.look !== undefined || s.fx !== undefined || s.fire !== undefined || s.boom !== undefined || s.water !== undefined;
@@ -128,14 +138,14 @@ function toPitch(s: Stored): Pitch {
 }
 
 /** The pitch for this tab, re-read whenever the address changes. */
-export function usePitch(): Pitch & { choose: (change: { look?: LookId; fx?: FxId }) => void } {
+export function usePitch(): Pitch & { choose: (change: { look?: LookId; fx?: FxPackId }) => void } {
   const [pitch, setPitch] = useState<Pitch>(() => toPitch(resolveStored()));
   useEffect(() => {
     const onHash = () => setPitch(toPitch(resolveStored()));
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  const choose = useCallback((change: { look?: LookId; fx?: FxId }) => {
+  const choose = useCallback((change: { look?: LookId; fx?: FxPackId }) => {
     const s = loadStored();
     const next: Stored = { ...s, ...change };
     if (change.fx) {
