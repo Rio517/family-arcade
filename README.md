@@ -285,7 +285,7 @@ Deployment is automated by GitHub Actions (`.github/workflows/deploy.yml`): ever
 1. In the repo, go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
 2. **Custom domain** — the arcade is served at `arcade.knyflores.com`:
    - `public/CNAME` pins the domain (it ships in `dist/`).
-   - At the DNS provider for `knyflores.com`, add a `CNAME` record: `arcade` → `rio517.github.io`.
+   - At the DNS provider for `knyflores.com`, add a `CNAME` record: `arcade` → `family-arcade.github.io`.
    - In **Settings → Pages → Custom domain**, confirm `arcade.knyflores.com` and enable **Enforce HTTPS** once the certificate is issued.
    - The app is built with a root base path (`/`) for the custom domain. To serve from the bare `github.io` project URL instead, build with `BASE_PATH=/yahtzee-calculator/`.
 
