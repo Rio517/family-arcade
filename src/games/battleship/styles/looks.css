@@ -83,17 +83,6 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
   .bs-look .placement-layout { grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); }
 }
 
-.lk-lineup {
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 6px;
-  margin: 0 0 10px; padding: 6px 4px 4px;
-  overflow: hidden;
-}
-.lk-lineup svg { flex: 0 1 auto; min-width: 0; width: auto; height: 30px; }
-.lk-navy { display: block; }
-.lk-lineup-reflect { display: none; }
-/* A card never grows past its column to fit the lineup: the hulls shrink instead. */
-.bs-look .eras { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.bs-look .era-card { min-width: 0; }
 
 /* ════════════════════════════════════════════════════════════════════════
    A — NIGHT OPS: a sonar arcade. Phosphor green on navy-black.
@@ -272,21 +261,6 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 .bs-look-a .lobby-doors .lobby-door { gap: 12px; }
 .bs-look-a .lobby-door .subtle { font-size: 14px; }
 
-/* Captain ladder: target dossiers. */
-.bs-look-a .lobby-door .lobby-captain {
-  background: rgba(255, 192, 77, 0.04); border-color: rgba(255, 192, 77, 0.24);
-  text-transform: none; letter-spacing: 0; min-height: 70px;
-}
-.bs-look-a .lobby-captain-tag { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 15px; }
-.bs-look-a .lobby-captain:hover { border-color: var(--lk-amber); box-shadow: 0 0 20px -8px var(--lk-amber); }
-.bs-look-a .lobby-captain-level {
-  background: #02070b; border-color: rgba(255, 192, 77, 0.55); color: var(--lk-amber);
-  font-family: var(--lk-mono); min-width: 64px; box-shadow: inset 0 0 12px -4px rgba(255, 192, 77, 0.6);
-}
-.bs-look-a .lobby-captain-pips i { width: 9px; height: 5px; border-radius: 1px; background: #1a2a2a; border-color: #2c4544; }
-.bs-look-a .lobby-captain-pips i.on { background: var(--lk-amber); border-color: var(--lk-amber); box-shadow: 0 0 6px var(--lk-amber); }
-.bs-look-a .lobby-captain-who strong { font-family: var(--lk-mono); font-size: 16px; }
-.bs-look-a .lobby-captain-rank { font-family: var(--lk-mono); color: var(--lk-amber); opacity: 0.85; }
 
 /* Join: a four-key code entry. */
 .bs-look-a .field label { font-family: var(--lk-mono); text-transform: uppercase; letter-spacing: 0.14em; color: var(--accent); }
@@ -310,15 +284,6 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 .bs-look-a .lk-step[data-state='done'] + .lk-step::before,
 .bs-look-a .lk-step[data-state='current'] + .lk-step::before { border-top-color: rgba(61, 255, 176, 0.45); }
 
-.bs-look-a .era-card {
-  background: linear-gradient(180deg, #051520, #020b11); border-color: rgba(61, 255, 176, 0.2); border-radius: 10px;
-}
-.bs-look-a .era-card .lk-lineup {
-  color: #2f6b5a; border-bottom: 1px dashed rgba(61, 255, 176, 0.3);
-}
-.bs-look-a .era-card[data-selected='true'] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 28px -8px var(--accent); }
-.bs-look-a .era-card[data-selected='true'] .lk-lineup { color: var(--accent); filter: drop-shadow(0 0 5px rgba(61, 255, 176, 0.7)); }
-.bs-look-a .era-name { font-family: var(--lk-mono); text-transform: uppercase; letter-spacing: 0.12em; }
 
 /* Placement */
 .bs-look-a .board { background: #020b11; border-color: rgba(61, 255, 176, 0.38); box-shadow: 0 0 30px -12px rgba(61, 255, 176, 0.5); }
@@ -532,22 +497,6 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
   color: var(--door); text-shadow: 0 0 12px color-mix(in srgb, var(--door) 70%, transparent);
 }
 
-/* Captain ladder: a strip of tickets with a coin for the level. */
-.bs-look-b .lobby-captain {
-  background: linear-gradient(180deg, #1a2546, #131c38); border: 1px dashed rgba(255, 215, 106, 0.4);
-  border-radius: 14px; min-height: 70px; font-family: inherit; font-weight: 600;
-}
-.bs-look-b .lobby-captain:hover { border-style: solid; border-color: var(--lk-gold); }
-.bs-look-b .lobby-captain-level {
-  min-width: 60px; border-radius: 12px; border-color: rgba(255, 215, 106, 0.6);
-  background: radial-gradient(circle at 40% 30%, #3a3110, #1a1606); color: var(--lk-gold);
-  font-family: var(--lk-round); font-weight: 900;
-}
-.bs-look-b .lobby-captain-pips i { border-radius: 50%; background: #2a2f45; border-color: #3a4160; }
-.bs-look-b .lobby-captain-pips i.on { background: #fff0b0; border-color: var(--lk-gold); box-shadow: 0 0 6px 1px rgba(255, 215, 106, 0.9); }
-.bs-look-b .lobby-captain-who strong { font-family: var(--lk-round); font-weight: 900; font-size: 17px; letter-spacing: 0.02em; }
-.bs-look-b .lobby-captain-rank { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--lk-gold); }
-.bs-look-b .lobby-captain-tag { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-weight: 500; font-size: 15px; }
 
 .bs-look-b .field label { color: var(--lk-gold); letter-spacing: 0.08em; }
 .bs-look-b .code-input {
@@ -577,22 +526,7 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 .bs-look-b .lk-step[data-state='done'] + .lk-step::after,
 .bs-look-b .lk-step[data-state='current'] + .lk-step::after { opacity: 1; filter: drop-shadow(0 0 3px rgba(255, 215, 106, 0.9)); }
 
-.bs-look-b .era-card { border-radius: 16px; background: linear-gradient(180deg, #0c1636 0%, #0d1a3a 55%, #0a1430 100%); border-color: #2e3d6b; }
-.bs-look-b .era-card .lk-lineup {
-  color: #6f7aa3; padding-bottom: 2px; margin-bottom: 0; border-bottom: 1px solid rgba(62, 230, 255, 0.25);
-}
 /* The fleet lies on still harbour water: its reflection, flipped and fading. */
-.bs-look-b .era-card .lk-lineup-reflect {
-  display: flex; height: 18px; margin: 0 0 8px; padding-top: 0; padding-bottom: 0; border: 0;
-  /* The strip shows the hulls' lower half, then flips it under the waterline. */
-  align-items: flex-end; overflow: hidden;
-  transform: scaleY(-1); opacity: 0.32;
-  -webkit-mask-image: linear-gradient(0deg, #000, transparent 85%);
-  mask-image: linear-gradient(0deg, #000, transparent 85%);
-}
-.bs-look-b .era-card[data-selected='true'] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 30px -8px var(--accent); }
-.bs-look-b .era-card[data-selected='true'] .lk-lineup { color: #c9f8ff; filter: drop-shadow(0 0 6px rgba(62, 230, 255, 0.8)); }
-.bs-look-b .era-name { font-family: var(--lk-round); font-weight: 900; letter-spacing: 0.04em; }
 
 /* Placement */
 .bs-look-b .board { background: #0b1532; border-color: rgba(62, 230, 255, 0.45); border-radius: 16px; box-shadow: 0 0 34px -12px rgba(62, 230, 255, 0.55); }
@@ -778,25 +712,6 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 .bs-look-c .lobby-door-solo .lk-door-tag { color: var(--lk-steel-text); }
 .bs-look-c .lobby-door .subtle { font-size: 15px; }
 
-/* Captain ladder: dog tags, rank in chevrons. */
-.bs-look-c .lobby-door .lobby-captain {
-  border-radius: 8px; min-height: 72px; text-transform: none; letter-spacing: 0; font-size: 16px;
-  background: var(--lk-rivets), linear-gradient(180deg, #2c343c, #20262d);
-}
-.bs-look-c .lobby-captain:hover { border-color: var(--lk-steel); }
-.bs-look-c .lobby-captain-level {
-  min-width: 64px; border-radius: 6px; background: #0b0d0f; border: 2px solid #4b5762; color: var(--accent);
-  font-family: var(--lk-cond); font-size: 19px; text-transform: uppercase;
-}
-.bs-look-c .lobby-captain-pips { flex-direction: column-reverse; gap: 1px; }
-.bs-look-c .lobby-captain-pips i {
-  width: 22px; height: 5px; border: 0; border-radius: 0; background: #39424b;
-  clip-path: polygon(0 0, 50% 60%, 100% 0, 100% 40%, 50% 100%, 0 40%);
-}
-.bs-look-c .lobby-captain-pips i.on { background: var(--accent); }
-.bs-look-c .lobby-captain-who strong { font-family: var(--lk-cond); font-size: 21px; letter-spacing: 0.05em; text-transform: uppercase; }
-.bs-look-c .lobby-captain-rank { font-family: var(--lk-cond); font-size: 17px; letter-spacing: 0.04em; color: var(--lk-steel-text); }
-.bs-look-c .lobby-captain-tag { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 500; }
 
 .bs-look-c .field label { font-family: var(--lk-cond); font-size: 18px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); }
 .bs-look-c .code-input {
@@ -823,19 +738,6 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 .bs-look-c .lk-step[data-state='done'] { color: var(--accent); background: #2a2f22; }
 .bs-look-c .lk-step[data-state='current'] { color: #121212; background: linear-gradient(180deg, #ffd43f, #f0b400); }
 
-.bs-look-c .era-card {
-  border-radius: 6px; border-color: #3f4a55;
-  background: var(--lk-rivets), linear-gradient(180deg, #2a3239, #1e242a);
-}
-.bs-look-c .era-card .lk-lineup {
-  color: #66727e; margin: 0 6px 10px; padding: 8px 10px 0;
-  background: linear-gradient(180deg, transparent 72%, #0b1822 72%);
-  border-bottom: 2px solid #0b1822; border-radius: 3px;
-}
-.bs-look-c .era-card[data-selected='true'] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 0 26px -8px var(--accent); }
-.bs-look-c .era-card[data-selected='true'] .lk-lineup { color: #e9edf1; }
-.bs-look-c .era-name { font-family: var(--lk-cond); font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase; }
-.bs-look-c .era-sub { font-size: 15px; }
 
 /* Placement: a plotting table. */
 .bs-look-c .board { background: #0b1822; border: 2px solid #4b5762; border-radius: 8px; box-shadow: 0 0 0 4px #121518, inset 0 0 30px rgba(0, 0, 0, 0.6); }
@@ -863,13 +765,13 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
    padding to its top, so its size holds, and its icon moves back up. A set
    line height keeps the line to DIN's own metrics: with `normal`, an arrow
    drawn from a fallback font stretches the line and drops the label. */
-.bs-look-c:not([data-phase='battle'], [data-phase='over']) :is(.btn:not(.lobby-captain), .back-link, .pas .pas-change) {
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) :is(.btn, .back-link, .pas .pas-change) {
   line-height: 1.2;
 }
-.bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn:not(.lobby-captain) {
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn {
   padding-top: calc(12px + var(--lk-dy, 0em)); padding-bottom: calc(12px - var(--lk-dy, 0em));
 }
-.bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn-lg:not(.lobby-captain) {
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn-lg {
   padding-top: calc(16px + var(--lk-dy, 0em)); padding-bottom: calc(16px - var(--lk-dy, 0em));
 }
 .bs-look-c:not([data-phase='battle'], [data-phase='over']) .back-link {
@@ -881,11 +783,67 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 .bs-look-c:not([data-phase='battle'], [data-phase='over']) .field .code-input {
   line-height: 1.2; padding-top: calc(12px + var(--lk-dy, 0em)); padding-bottom: calc(12px - var(--lk-dy, 0em));
 }
-.bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn:not(.lobby-captain) > svg {
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) :is(.level-n, .level-w, .ships-t, .lobby-ships-label, .lobby-pick) {
+  line-height: 1.1; padding-top: calc(0.2em + var(--lk-dy, 0em)); padding-bottom: calc(0.2em - var(--lk-dy, 0em));
+}
+.bs-look-c:not([data-phase='battle'], [data-phase='over']) .btn > svg {
   translate: 0 calc(-1 * var(--lk-dy, 0em));
 }
 .bs-look-c:not([data-phase='battle'], [data-phase='over']) :is(.pas-who, .ship-chip .nm, .lk-step-t, .lk-door-tag-n, .lk-c-coin-t) {
   position: relative; top: var(--lk-dy, 0em);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   The lobby's two taps: the Ships switch and the four level keys
+   ════════════════════════════════════════════════════════════════════════ */
+/* A — sonar green, amber for the computer. */
+.bs-look-a .lobby-ships-label, .bs-look-a .ships-opt, .bs-look-a .level-w { font-family: var(--lk-mono); text-transform: uppercase; letter-spacing: 0.1em; }
+.bs-look-a .ships-switch { background: #02070b; border-color: rgba(61, 255, 176, 0.3); border-radius: 10px; }
+.bs-look-a .ships-opt[data-selected='true'] { color: #eafff7; border-color: var(--accent); background: rgba(61, 255, 176, 0.12); box-shadow: 0 0 16px -6px var(--accent); }
+.bs-look-a .level-btn { background: rgba(4, 14, 21, 0.95); border-color: rgba(255, 192, 77, 0.45); border-radius: 10px; }
+.bs-look-a .level-btn:hover { border-color: var(--lk-amber); box-shadow: 0 0 20px -8px var(--lk-amber); }
+.bs-look-a .level-n { font-family: 'Ship Battle Pixel', var(--lk-mono); color: var(--lk-amber); text-shadow: 0 0 10px rgba(255, 192, 77, 0.6); }
+
+/* B — neon: gold for the choice, a ticket for each level. */
+.bs-look-b .lobby-ships-label, .bs-look-b .ships-opt, .bs-look-b .level-w { font-family: var(--lk-round); letter-spacing: 0.04em; }
+.bs-look-b .ships-switch { background: #0c1636; border-color: #2e3d6b; border-radius: 999px; }
+.bs-look-b .ships-opt { border-radius: 999px; }
+.bs-look-b .ships-opt[data-selected='true'] { color: #1a1606; background: linear-gradient(180deg, #ffe58a, var(--lk-gold)); border-color: #fff0b0; box-shadow: 0 0 18px -4px rgba(255, 215, 106, 0.8); }
+.bs-look-b .level-btn { background: linear-gradient(180deg, #19244a, #111a33); border-color: #2e3d6b; border-radius: 16px; }
+.bs-look-b .level-btn:hover { border-color: var(--lk-gold); }
+.bs-look-b .level-n { font-family: var(--lk-round); color: #fff0b0; }
+
+/* C — gunmetal: a yellow plate marks the chosen ships, steel keys for the computer. */
+.bs-look-c .lobby-ships-label {
+  display: inline-block; font-family: var(--lk-cond); font-size: 22px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--lk-steel-text);
+}
+.bs-look-c .ships-switch { background: #08090b; border: 2px solid #4b5762; border-radius: 8px; box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.7); }
+.bs-look-c .ships-opt {
+  min-width: 150px; min-height: 52px; padding: 0 20px; border-radius: 5px;
+  font-family: var(--lk-cond); font-size: 22px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #8c98a4; background: linear-gradient(180deg, #2d353e, #232a31); border: 1px solid #3f4a55;
+  box-shadow: 0 3px 0 #08090b;
+}
+.bs-look-c .ships-opt:hover { color: #fff; border-color: #7a8894; }
+.bs-look-c .ships-opt[data-selected='true'] {
+  color: #121212; border-color: #ffe27a;
+  background: linear-gradient(180deg, #ffd43f, #f0b400);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 3px 0 #7e5c00, 0 0 22px -8px rgba(255, 196, 0, 0.7);
+}
+.bs-look-c .ships-opt:focus-visible, .bs-look-c .level-btn:focus-visible { outline-color: #fff; }
+.bs-look-c .lobby-pick { font-family: var(--lk-cond); font-size: 22px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--lk-steel-text); }
+.bs-look-c .level-btn {
+  min-height: 104px; border-radius: 8px; color: #fff; border: 2px solid #a6d6ff; gap: 0;
+  background: linear-gradient(180deg, #4f88b6, #34648c);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 5px 0 #17324a, 0 0 26px -10px rgba(95, 168, 230, 0.8);
+}
+.bs-look-c .level-btn:hover { border-color: #fff; }
+.bs-look-c .level-btn:active { transform: translateY(3px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 0 #17324a; }
+.bs-look-c .level-n { font-family: var(--lk-cond); font-size: 56px; font-weight: 700; color: #fff; }
+.bs-look-c .level-w { font-family: var(--lk-cond); font-size: 22px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+@media (prefers-reduced-motion: no-preference) {
+  .bs-look-c .level-btn { transition: transform 120ms; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -930,9 +888,6 @@ body:has(.bs-look-c:not([data-phase='battle'], [data-phase='over'])) { backgroun
 
   .bs-look-b .lobby-door { padding-right: 72px; }
   .bs-look-b .lobby-door { -webkit-mask: none; mask: none; }
-  .lk-lineup { gap: 3px; }
-  .lk-lineup svg { height: 22px; }
-  .bs-look .eras { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ════════════════════════════════════════════════════════════════════════

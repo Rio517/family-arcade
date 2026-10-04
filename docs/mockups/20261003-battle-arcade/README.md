@@ -30,13 +30,15 @@ starting point, and every option below is built from the real game behind an
 address parameter, so it can be played in a production build on an iPad.
 Without a parameter the start screens are look C and the effects are the picked set (below).
 
-**Outcome:** start screens **C, Battle Station**, now the default. Its solo
-door, the Battle the computer button and Fast Start are steel blue instead of
-red: red stays on the alarm lights. Effects: **B, cinematic**, with
-**A's sea** (Night Ops, at half its first speed) and A's sonar water on the
-radar (calmer), the **HIT!, SUNK! and MISS words** on the radar, and the guns
-on. Watch the shots is on by default, and off when the device asks for
-reduced motion. A and today's effects stay behind `?fx=`. The page to review is
+**Outcome:** start screens **C, Battle Station**, now the default. Its
+computer door, the level keys and Fast Start are steel blue instead of red:
+red stays on the alarm lights. Starting a game takes two taps, and every fleet
+sails in one standard colour (see Start screens below). Effects: **B,
+cinematic**, with **A's sea** (Night Ops, at half its first speed) and A's
+sonar water on the radar (calmer), the **HIT!, SUNK! and MISS words** on the
+radar, and the guns on. Watch the shots is on by default, and off when the
+device asks for reduced motion. A and today's effects stay behind `?fx=`.
+The page to review is
 [battle-arcade.html](./battle-arcade.html) (opens from disk).
 
 ## Try it
@@ -55,15 +57,44 @@ On the iPad (a production build served over Tailscale), or any build:
 Once a parameter is given, a small **Pitch** switcher sits in the bottom-left
 corner: it flips the start screens and the effects on the device itself, and
 the choice holds for the browser tab (Menu and back keeps it). `bar=0` hides
-the switcher. Play a game against Deckhand Bobble to see the guns.
+the switcher. Play a game at level 1 (Deckhand Bobble) to see the guns.
 
 ## Start screens (`?look=`)
 
-The lobby (both doors, the captain ladder, the join form), the fleet screen
-and the placing screen. Each look adds a title and a three-step strip (Fleet,
-Place, Battle), bigger primary buttons, and navy cards that show the five
-ships of each navy instead of their names alone. The flow, the buttons and
-what they do are unchanged.
+The lobby, the join form and the placing screen. Each look adds a title and
+a two-step strip (Place, Battle) and bigger primary buttons.
+
+**The start is two taps.** The lobby has a **Ships** switch, Classic or
+Modern, remembered on the device, and two doors:
+
+```
+SHIP BATTLE
+Ships:  [ CLASSIC ]  [ modern ]
++- PLAY TOGETHER ----+  +- PLAY THE COMPUTER -------+
+| [ CREATE A GAME ]  |  | Pick a level              |
+| [ JOIN WITH CODE ] |  | [ 1 ] [ 2 ] [ 3 ] [ 4 ]   |
+|                    |  | Easy  Fair  Sharp  Boss   |
++--------------------+  +---------------------------+
+```
+
+- Tapping a level goes straight to placing ships. The levels are the four
+  computer captains in order: Deckhand Bobble (1, Easy), Bosun Marlin (2,
+  Fair), Captain Wake (3, Sharp), Admiral Grimtide (4, Boss). The lobby shows
+  the number and the word; the names appear in the game, in the battle log and
+  on the result.
+- Create a game, Join with a code and, in a party, Play Ship Battle with
+  *name* also go straight to placing once connected.
+- There is no fleet screen and no captain ladder. The ships choice sits on the
+  lobby; the placing screen is the first screen of a game.
+- **One fleet colour.** Every fleet is Aqua Corps blue: ours, the opponent's
+  and the computer's. There is no colour shop. Points are still earned and
+  shown on the player's ticket. The `hello` message still carries a `skinId`
+  (the standard one) and accepts any string, so a device on an older build can
+  play; whatever arrives is drawn in the standard colour. Colours stored in a
+  profile are left alone and unused.
+- **The placing screen holds still.** Every row in Your ships is the same
+  height placed or not, and the status line keeps room for two lines, so
+  placing a ship moves nothing below it.
 
 - **A, Night Ops.** A sonar console: near-black navy, phosphor green and
   cyan, a sweeping radar scope beside a pixel-type SHIP BATTLE, "PRESS START".
@@ -72,7 +103,8 @@ what they do are unchanged.
   ("ADMIT TWO", "ADMIT ONE"), candy-bright buttons.
 - **C, Battle Station.** Gunmetal plates and rivets, yellow-and-black hazard
   stripes, red alarm lights either side of the title, "INSERT COIN TO FIRE";
-  solo play and Fast Start in steel blue. **Picked.**
+  the chosen ships on a yellow plate, the level keys and Fast Start in steel
+  blue. **Picked.**
 
 ## Effects (`?fx=`)
 

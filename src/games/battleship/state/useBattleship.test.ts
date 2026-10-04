@@ -93,7 +93,7 @@ describe('useBattleship.startTable', () => {
     const { result } = mount('Rio');
     act(() => result.current.startTable({ role: 'host', code: 'ABCD', seatedUserId: 'u-rio' }));
 
-    expect(result.current.phase).toBe('fleet');
+    expect(result.current.phase).toBe('placing');
     expect(result.current.side).toBe('host');
     expect(result.current.code).toBe('ABCD');
     expect(result.current.myName).toBe('Rio');
@@ -162,7 +162,6 @@ describe('useBattleship.switchToComputer', () => {
   function hostWaiting() {
     const hook = mount('Klara');
     act(() => hook.result.current.startTable({ role: 'host', code: 'ABCD', seatedUserId: 'u-klara' }));
-    act(() => hook.result.current.confirmSkin());
     act(() => hook.result.current.setFleet(FLEET));
     act(() => hook.result.current.confirmReady());
     expect(hook.result.current.phase).toBe('waiting');
@@ -270,7 +269,7 @@ describe('useBattleship.startTable picks a saved game back up', () => {
     const { result } = mount('Kai');
     act(() => result.current.startTable({ role: 'guest', code: 'QRST', seatedUserId: 'u-kai' }));
 
-    expect(result.current.phase).toBe('fleet');
+    expect(result.current.phase).toBe('placing');
     expect(result.current.side).toBe('guest');
     expect(result.current.myFleet).toEqual([]);
     expect(result.current.log).toEqual([]);
@@ -282,7 +281,7 @@ describe('useBattleship.startTable picks a saved game back up', () => {
     const { result } = mount('Kai');
     act(() => result.current.startTable({ role: 'guest', code: 'QRST', seatedUserId: 'u-kai' }));
 
-    expect(result.current.phase).toBe('fleet');
+    expect(result.current.phase).toBe('placing');
     expect(result.current.log).toEqual([]);
   });
 });
@@ -291,7 +290,7 @@ describe('useBattleship.leave', () => {
   it('drops the save and the seat, so the captain is back in the lobby', () => {
     const { result } = mount('Kai');
     act(() => result.current.startTable({ role: 'guest', code: 'WXYZ', seatedUserId: 'u-kai' }));
-    expect(result.current.phase).toBe('fleet');
+    expect(result.current.phase).toBe('placing');
 
     act(() => result.current.leave());
     expect(result.current.phase).toBe('lobby');

@@ -59,25 +59,16 @@ const MONITOR = { width: 2560, height: 1440 };
 
 /**
  * The darker-arcade pitch (docs/mockups/20261003-battle-arcade): each
- * start-screen look — today, A, B, C — on the lobby, the captain ladder, the
- * fleet screen and the placing screen at tablet size, and the three new looks
- * at phone size too. `bar=0` keeps the reviewer's switcher out of the picture.
+ * start-screen look — today, A, B, C — on the lobby (ships switch and the
+ * four levels), the join form and the placing screen at tablet size, and the
+ * three new looks at phone size too. `bar=0` keeps the reviewer's switcher out of the picture.
  */
 const LOOK_SCREENS = {
   lobby: {
-    expect: '[data-testid="solo-game"]',
+    expect: '[data-testid="level-1"]',
     dressed: '[data-testid="look-hero"]',
     prep: async (page) => {
-      await page.getByTestId('solo-game').waitFor();
-      await page.waitForTimeout(400);
-    },
-  },
-  captains: {
-    expect: '[data-testid="captain-grimtide"]',
-    dressed: '[data-testid="look-hero"]',
-    prep: async (page) => {
-      await page.getByTestId('solo-game').click();
-      await page.getByTestId('captain-grimtide').waitFor();
+      await page.getByTestId('level-1').waitFor();
       await page.waitForTimeout(400);
     },
   },
@@ -90,26 +81,11 @@ const LOOK_SCREENS = {
       await page.waitForTimeout(400);
     },
   },
-  fleet: {
-    expect: '[data-testid="fleet-continue"]',
-    dressed: '[data-testid="look-steps"]',
-    prep: async (page) => {
-      await page.getByTestId('solo-game').click();
-      await page.getByTestId('captain-grimtide').click();
-      await page.getByTestId('era-modern').waitFor();
-      // The captain row sits low on the ladder; tapping it leaves the window
-      // scrolled, so frame the new screen from its top.
-      await page.evaluate(() => window.scrollTo(0, 0));
-      await page.waitForTimeout(400);
-    },
-  },
   placing: {
     expect: '[data-testid="ready"]',
     dressed: '[data-testid="look-steps"]',
     prep: async (page) => {
-      await page.getByTestId('solo-game').click();
-      await page.getByTestId('captain-grimtide').click();
-      await page.getByTestId('fleet-continue').click();
+      await page.getByTestId('level-4').click();
       await page.getByTestId('auto-place').click();
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.waitForTimeout(400);
@@ -125,7 +101,7 @@ for (const look of ['today', 'a', 'b', 'c']) {
       viewport: TABLET,
       noSideScroll: true,
       // Masks, reflections and clipped-text titles: checked where the family plays.
-      engines: look !== 'today' && (screen === 'lobby' || screen === 'fleet') ? ['chromium', 'webkit'] : undefined,
+      engines: (look !== 'today' && screen === 'lobby') || (look === 'c' && screen === 'placing') ? ['chromium', 'webkit'] : undefined,
       // Today must render no look markup at all; a look must render its own.
       expect: look === 'today' ? s.expect : s.dressed,
       prep: s.prep,
@@ -133,7 +109,7 @@ for (const look of ['today', 'a', 'b', 'c']) {
   }
 }
 for (const look of ['a', 'b', 'c']) {
-  for (const screen of ['lobby', 'fleet', 'placing']) {
+  for (const screen of ['lobby', 'placing']) {
     const s = LOOK_SCREENS[screen];
     LOOK_SHOTS.push({
       name: `bs-look-${look}-${screen}-phone`,
@@ -501,26 +477,13 @@ const SHOTS = [
     },
   },
   {
-    // The Ship Battle lobby with the captain ladder open — the solo door.
+    // The Ship Battle lobby: the Ships switch, Create/Join, and the four levels.
     name: 'battle-lobby',
     path: '/#/play',
     viewport: TABLET,
+    expect: '[data-testid="level-4"]',
     prep: async (page) => {
-      await page.getByTestId('solo-game').click();
-      await page.getByTestId('captain-grimtide').waitFor();
-    },
-  },
-  {
-    // The fleet screen: colour picker plus the Classic/Modern navy choice.
-    name: 'battle-fleet-select',
-    path: '/#/play',
-    viewport: TABLET,
-    fullPage: true,
-    prep: async (page) => {
-      await page.getByTestId('solo-game').click();
-      await page.getByTestId('captain-grimtide').click();
-      await page.getByTestId('era-modern').waitFor();
-      await page.waitForTimeout(300);
+      await page.getByTestId('level-4').waitFor();
     },
   },
   ...LOOK_SHOTS,

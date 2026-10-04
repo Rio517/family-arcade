@@ -10,7 +10,6 @@ import { generateCode } from '@shared/net/peer';
 import { useBattleship } from '@games/battleship/state/useBattleship';
 import { pointsForResult } from '@shared/profile/profile';
 import { Lobby } from './Lobby';
-import { FleetSelect } from './FleetSelect';
 import { Placement } from './Placement';
 import { Battle } from './Battle';
 import { CaptainChips } from './CaptainChips';
@@ -194,7 +193,7 @@ export function BattleshipPage() {
     return () => clearTimeout(t);
   }, [holdBattle]);
 
-  const isSetup = bs.phase === 'fleet' || bs.phase === 'placing' || bs.phase === 'waiting';
+  const isSetup = bs.phase === 'placing' || bs.phase === 'waiting';
   const showCode = !solo && bs.side === 'host' && isSetup && !bs.oppConnected;
 
   // The host has readied up and is waiting. Two sub-states: nobody has joined
@@ -359,18 +358,9 @@ export function BattleshipPage() {
             onJoin={(code) => sitDown('guest', code)}
             onHostTable={(code) => sitDown('host', code)}
             onSolo={(personaId) => bs.startSoloGame(personaId, profile.userId)}
-            initialJoinCode={joinCode ?? undefined}
-            look={pitch.look}
-          />
-        </div>
-      )}
-
-      {bs.phase === 'fleet' && (
-        <div className="fleet-col">
-          <FleetSelect
             era={fleetEra}
             onEra={pickFleetEra}
-            onContinue={bs.confirmSkin}
+            initialJoinCode={joinCode ?? undefined}
             look={pitch.look}
           />
         </div>

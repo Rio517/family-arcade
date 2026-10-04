@@ -31,9 +31,7 @@ await page.addInitScript((r) => {
   localStorage.setItem('bs-watch-shots-v1', 'on');
 }, ROSTER);
 await page.goto(`${BASE}/#/play?fx=${FX}&bar=0`);
-await page.getByTestId('solo-game').click();
-await page.getByTestId('captain-bobble').click();
-await page.getByTestId('fleet-continue').click();
+await page.getByTestId('level-1').click();
 await page.getByTestId('fast-start').click();
 await page.getByTestId('turn-pill').waitFor({ timeout: 15000 });
 console.log('battle on');

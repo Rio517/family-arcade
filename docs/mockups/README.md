@@ -15,7 +15,7 @@ what was set aside.
 | [20261001-far-models](./20261001-far-models/) | Smooth late-game play; simpler buildings from high up, shown before they go in | Detailed models stay; the simpler ones looked less friendly in play |
 | [20261001-gulp-hud-depth](./20261001-gulp-hud-depth/) | Gulp's round controls look flat; give them depth | D, Coin-op: built |
 | [20261002-gulp-play-together](./20261002-gulp-play-together/) | One easy path for up to four children to join and play one Gulp round, each on their own device (full-screen player select) | Pending: question wording Q1 or Q2 |
-| [20261003-battle-arcade](./20261003-battle-arcade/) | Ship Battle as a darker arcade: nicer fire, fun explosions, cooler water, better start screens, guns that turn and fire with a skip | Start screens **C, Battle Station** and effects **B** (with A's sea and the HIT!/SUNK!/MISS words, guns on): built, the default. A and today's stay behind `?fx=` |
+| [20261003-battle-arcade](./20261003-battle-arcade/) | Ship Battle as a darker arcade: nicer fire, fun explosions, cooler water, better start screens (two taps: Ships switch, then a level or Create/Join), guns that turn and fire with a skip | Start screens **C, Battle Station** and effects **B** (with A's sea and the HIT!/SUNK!/MISS words, guns on): built, the default. A and today's stay behind `?fx=` |
 
 ## What goes in a pitch folder
 

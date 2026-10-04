@@ -127,7 +127,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting, onPlayCom
 
   return (
     <div className="stack">
-      {arcade && <LookSteps at="place" />}
+      {arcade && <LookSteps />}
       {/* A "carried" ship that follows the cursor from the sidebar until it
           reaches the board, where the in-grid preview takes over. */}
       {drag?.isNew && !drag.onBoard && (

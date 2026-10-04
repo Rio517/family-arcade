@@ -11,15 +11,24 @@ vi.mock('@shared/party/PartyContext', () => ({ useParty: () => mockParty.value }
 
 import { Lobby } from './Lobby';
 
-function setup(initialJoinCode?: string) {
+function setup(initialJoinCode?: string, era: 'classic' | 'modern' = 'classic') {
   const onHost = vi.fn();
+  const onEra = vi.fn();
   const onJoin = vi.fn();
   const onSolo = vi.fn();
   const onHostTable = vi.fn();
   render(
-    <Lobby onHost={onHost} onJoin={onJoin} onSolo={onSolo} onHostTable={onHostTable} initialJoinCode={initialJoinCode} />,
+    <Lobby
+      onHost={onHost}
+      onJoin={onJoin}
+      onSolo={onSolo}
+      era={era}
+      onEra={onEra}
+      onHostTable={onHostTable}
+      initialJoinCode={initialJoinCode}
+    />,
   );
-  return { onHost, onJoin, onSolo, onHostTable };
+  return { onHost, onJoin, onSolo, onEra, onHostTable };
 }
 
 beforeEach(() => {
@@ -61,27 +70,39 @@ describe('<Lobby> on your own', () => {
     expect((screen.getByTestId('code-input') as HTMLInputElement).value).toBe('WXYZ');
   });
 
-  it('signposts the two doors: play together and play solo', () => {
+  it('signposts the two doors: play together and play the computer', () => {
     setup();
-    expect(screen.getByText(/play together — two devices/i)).toBeInTheDocument();
-    expect(screen.getByText(/play solo — just you/i)).toBeInTheDocument();
+    expect(screen.getByText(/^play together$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^play the computer$/i)).toBeInTheDocument();
     expect(screen.queryByTestId('battle-party-play')).toBeNull();
     expect(screen.queryByTestId('battle-party-waiting')).toBeNull();
   });
 
-  it('offers a battle against the computer with a levelled captain ladder', () => {
+  it('one tap on a level starts that computer captain — no ladder, no second screen', () => {
     const { onSolo } = setup();
-    fireEvent.click(screen.getByTestId('solo-game'));
-    // Four captains, gentlest first — each says its level and what it means.
-    const ladder = ['bobble', 'marlin', 'wake', 'grimtide'].map((id) =>
-      screen.getByTestId(`captain-${id}`),
-    );
-    expect(ladder[0]).toHaveTextContent('Deckhand Bobble');
-    expect(ladder[0]).toHaveTextContent(/level 1, easiest/i);
-    expect(ladder[3]).toHaveTextContent('Admiral Grimtide');
-    expect(ladder[3]).toHaveTextContent(/level 4, the boss/i);
-    fireEvent.click(ladder[2]);
-    expect(onSolo).toHaveBeenCalledWith('wake');
+    expect(screen.getByText(/pick a level/i)).toBeInTheDocument();
+    const keys = [1, 2, 3, 4].map((n) => screen.getByTestId(`level-${n}`));
+    expect(keys.map((k) => k.textContent)).toEqual(['1Easy', '2Fair', '3Sharp', '4Boss']);
+    expect(keys[0]).toHaveAccessibleName('Level 1, Easy');
+    expect(screen.queryByTestId('solo-game')).toBeNull();
+    // The captains' names stay in the game, not on the keys.
+    expect(screen.queryByText(/Bobble|Marlin|Wake|Grimtide/)).toBeNull();
+    fireEvent.click(keys[0]);
+    expect(onSolo).toHaveBeenLastCalledWith('bobble');
+    fireEvent.click(keys[1]);
+    expect(onSolo).toHaveBeenLastCalledWith('marlin');
+    fireEvent.click(keys[2]);
+    expect(onSolo).toHaveBeenLastCalledWith('wake');
+    fireEvent.click(keys[3]);
+    expect(onSolo).toHaveBeenLastCalledWith('grimtide');
+  });
+
+  it('switches between classic and modern ships with one tap, showing the current choice', () => {
+    const { onEra } = setup(undefined, 'modern');
+    expect(screen.getByTestId('ships-modern')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('ships-classic')).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByTestId('ships-classic'));
+    expect(onEra).toHaveBeenCalledWith('classic');
   });
 });
 
@@ -94,8 +115,8 @@ describe('<Lobby> in a party', () => {
     expect(play).toHaveTextContent('Play Ship Battle with Kai');
     expect(screen.queryByTestId('create-game')).toBeNull();
     expect(screen.queryByTestId('show-join')).toBeNull();
-    // The computer captains are still there for a game on your own.
-    expect(screen.getByTestId('solo-game')).toBeInTheDocument();
+    // The levels are still there for a game on your own.
+    expect(screen.getByTestId('level-1')).toBeInTheDocument();
 
     fireEvent.click(play);
     expect(mockParty.value.openTable).toHaveBeenCalledWith('battleship');
@@ -110,7 +131,7 @@ describe('<Lobby> in a party', () => {
     expect(screen.getByTestId('battle-party-waiting')).toHaveTextContent('Waiting for Kai to open Ship Battle');
     expect(screen.queryByTestId('create-game')).toBeNull();
     expect(screen.queryByTestId('show-join')).toBeNull();
-    expect(screen.getByTestId('solo-game')).toBeInTheDocument();
+    expect(screen.getByTestId('level-1')).toBeInTheDocument();
     // The lobby only shows the door; usePartyDoor on the page knocks and seats.
     expect(mockParty.value.knockOn).not.toHaveBeenCalled();
     expect(onJoin).not.toHaveBeenCalled();
@@ -123,6 +144,6 @@ describe('<Lobby> in a party', () => {
     expect(screen.queryByTestId('create-game')).toBeNull();
     expect(screen.queryByTestId('show-join')).toBeNull();
     expect(screen.queryByTestId('battle-party-play')).toBeNull();
-    expect(screen.getByTestId('solo-game')).toBeInTheDocument();
+    expect(screen.getByTestId('level-1')).toBeInTheDocument();
   });
 });

@@ -11,7 +11,7 @@ import type { PartyValue } from '@shared/party/PartyContext';
 import { fakeParty, fakePartyWithKai } from '@shared/party/testing';
 
 // The party is mocked (its provider lives above the router): the page's door
-// and the lobby's ladder read it, and the tests below set it.
+// and the lobby's doors read it, and the tests below set it.
 const mockParty = vi.hoisted(() => ({ value: null as unknown as PartyValue }));
 vi.mock('@shared/party/PartyContext', () => ({ useParty: () => mockParty.value }));
 
@@ -214,7 +214,7 @@ describe('in a party, the party is the table', () => {
     expect(loadSession('QRST')?.side).toBe('guest');
     expect(loadSession('QRST')?.seatedUserId).toBe('u-kai');
     expect(app.queryByTestId('battle-party-waiting')).toBeNull();
-    expect(app.getByTestId('fleet-continue')).toBeInTheDocument();
+    expect(app.getByTestId('auto-place')).toBeInTheDocument(); // straight to placing
 
     // Still the same table on the next render — no double join.
     view.rerender(page());
@@ -258,8 +258,8 @@ describe('in a party, the party is the table', () => {
     const saved = loadSession('NOPE');
     expect(saved?.myFleet).toEqual(FLEET);
     expect(saved?.log).toEqual(MID_BATTLE);
-    // …and the captain is back on the battle board, not picking a fleet.
-    expect(app.queryByTestId('fleet-continue')).toBeNull();
+    // …and the captain is back on the battle board, not placing ships again.
+    expect(app.queryByTestId('auto-place')).toBeNull();
     expect(app.getByTestId('turn-pill')).toBeInTheDocument();
   });
 
@@ -311,8 +311,7 @@ describe('in a party, the party is the table', () => {
     const app = within(renderApp().container);
 
     fireEvent.click(app.getByTestId('battle-party-play'));
-    fireEvent.click(await app.findByTestId('fleet-continue'));
-    fireEvent.click(app.getByTestId('auto-place'));
+    fireEvent.click(await app.findByTestId('auto-place'));
     fireEvent.click(app.getByTestId('ready'));
     await waitFor(() => {
       expect(app.queryByText(/Waiting for opponent to join/)).toBeNull();
@@ -334,18 +333,16 @@ describe('solo games never ask you to invite anyone', () => {
   it('starting a game against a captain shows no code chip and no share modal', async () => {
     const app = within(renderApp().container);
 
-    fireEvent.click(app.getByTestId('solo-game'));
-    fireEvent.click(app.getByTestId('captain-grimtide'));
+    fireEvent.click(app.getByTestId('level-4'));
 
-    // On the fleet screen of a solo game: no "SOLO" code chip in the title
+    // On the placing screen of a solo game: no "SOLO" code chip in the title
     // bar, and the invite modal must not pop — the computer captain doesn't
     // scan QR codes. (It used to: the host-waiting logic didn't know solo.)
-    expect(app.getByTestId('fleet-continue')).toBeInTheDocument();
+    expect(app.getByTestId('auto-place')).toBeInTheDocument();
     expect(app.queryByTestId('share-chip')).toBeNull();
     expect(app.queryByText(/Waiting for opponent/)).toBeNull();
 
     // Through placement and into the wait, still nothing to share.
-    fireEvent.click(app.getByTestId('fleet-continue'));
     fireEvent.click(app.getByTestId('auto-place'));
     fireEvent.click(app.getByTestId('ready'));
     await waitFor(() => {
@@ -356,9 +353,31 @@ describe('solo games never ask you to invite anyone', () => {
 
   it('seats the signed-in ticket, so the win has somebody to land on', () => {
     const app = within(renderApp().container);
-    fireEvent.click(app.getByTestId('solo-game'));
-    fireEvent.click(app.getByTestId('captain-grimtide'));
+    fireEvent.click(app.getByTestId('level-4'));
     expect(loadSession('SOLO')?.seatedUserId).toBe('u1');
+  });
+
+  it('a level tap starts a solo game at that level: the captain of that level sits across the table', async () => {
+    const app = within(renderApp().container);
+    fireEvent.click(app.getByTestId('level-2'));
+    // Straight to placing — no captain ladder, no fleet screen in between.
+    expect(app.getByTestId('auto-place')).toBeInTheDocument();
+    expect(app.queryByTestId('level-2')).toBeNull();
+    await waitFor(() => expect(loadSession('SOLO')?.solo?.personaId).toBe('marlin'));
+  });
+
+  it('the ships switch is remembered on this device', () => {
+    const first = renderApp();
+    const app = within(first.container);
+    expect(app.getByTestId('ships-classic')).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(app.getByTestId('ships-modern'));
+    expect(app.getByTestId('ships-modern')).toHaveAttribute('aria-pressed', 'true');
+    expect(localStorage.getItem('bs-fleet-era-v1')).toBe('modern');
+    first.unmount();
+
+    const again = within(renderApp().container);
+    expect(again.getByTestId('ships-modern')).toHaveAttribute('aria-pressed', 'true');
+    expect(again.getByTestId('ships-classic')).toHaveAttribute('aria-pressed', 'false');
   });
 });
 
@@ -521,8 +540,7 @@ describe('two-player integration: create → place → fire', () => {
 
     // ── Both choose a fleet, auto-place ships, and ready up ───────────────
     for (const player of [host, guest]) {
-      fireEvent.click(player.getByTestId('fleet-continue'));
-      fireEvent.click(player.getByTestId('auto-place'));
+      fireEvent.click(await player.findByTestId('auto-place'));
       await waitFor(() => expect(player.getByTestId('ready')).not.toBeDisabled());
       fireEvent.click(player.getByTestId('ready'));
     }
@@ -631,7 +649,6 @@ describe('two-player integration: to the finish, and a rematch', () => {
     fireEvent.click(guest.getByTestId('join-game'));
     await waitFor(() => expect(host.getAllByText(/Connected/i).length).toBeGreaterThan(0));
 
-    for (const player of [host, guest]) fireEvent.click(player.getByTestId('fleet-continue'));
     await deployBoth(host, guest);
     await playToHostWin(host, guest);
 

@@ -185,12 +185,12 @@ export class LoopbackConnection {
     if (!bot) return;
     const phase = Session.phase(bot);
 
-    if ((phase === 'fleet' || phase === 'placing') && !bot.myReady && !this.placeQueued) {
+    if (phase === 'placing' && !bot.myReady && !this.placeQueued) {
       this.placeQueued = true;
       this.later(() => {
         this.placeQueued = false;
         if (!this.bot || this.bot.myReady) return;
-        const placed = Session.setFleet(Session.toPlacing(this.bot), autoPlace(this.rng));
+        const placed = Session.setFleet(this.bot, autoPlace(this.rng));
         this.apply(Session.confirmReady(placed, this.rng));
       }, this.thinkMs());
       return;
