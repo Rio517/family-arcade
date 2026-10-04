@@ -6,9 +6,10 @@
  *   #/play?look=a|b|c        the lobby, fleet and placing screens
  *   #/play?fx=a|b            fire, explosions, water and the guns together
  *   #/play?fire=b&water=a    any one effect overridden on its own
- *   #/play?look=today&fx=today   back to the shipped game
+ *   #/play?look=today&fx=today   the game before the pitch
  *
- * With none of these the game is exactly what ships today. A choice is kept
+ * The start screens default to look C, Battle Station, the family's pick; the
+ * effects default to today's until one is picked. A choice is kept
  * for the browser tab (sessionStorage), so ‹ Menu and back again keeps the
  * option being reviewed. Purely cosmetic and purely local: nothing here
  * reaches the game log or the other device.
@@ -39,6 +40,8 @@ export interface Pitch {
 
 const KEY = 'bs-pitch-v1';
 const LOOKS: readonly LookId[] = ['today', 'a', 'b', 'c'];
+/** The start screens the family picked. */
+const DEFAULT_LOOK: LookId = 'c';
 const FXS: readonly FxId[] = ['today', 'a', 'b'];
 
 export const TODAY_FX: PitchFx = { fire: 'today', boom: 'today', water: 'today', guns: false };
@@ -52,9 +55,14 @@ interface Stored {
   bar?: boolean;
 }
 
-/** Every query parameter in the address: the router's (after `#`) wins over the page's. */
+/**
+ * Every query parameter in the address: the router's (after `#`) wins over the
+ * page's. `look` comes from the router's part alone: a `?look=` before the `#`
+ * is the landing page's own option and must not restyle Ship Battle.
+ */
 function addressParams(): URLSearchParams {
   const out = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
+  out.delete('look');
   const hash = typeof location === 'undefined' ? '' : location.hash;
   const q = hash.indexOf('?');
   if (q >= 0) new URLSearchParams(hash.slice(q + 1)).forEach((v, k) => out.set(k, v));
@@ -114,7 +122,7 @@ function toPitch(s: Stored): Pitch {
     water: s.water ?? pack,
     guns: pack !== 'today',
   };
-  const look = s.look ?? 'today';
+  const look = s.look ?? DEFAULT_LOOK;
   const reviewing = s.look !== undefined || s.fx !== undefined || s.fire !== undefined || s.boom !== undefined || s.water !== undefined;
   return { look, fx, fxPack: pack, reviewing, showBar: reviewing && s.bar !== false };
 }
