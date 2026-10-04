@@ -17,9 +17,9 @@ spectrum left to right, each as a turntable, a pick card and in race:
 
 | Today | A, close match | B, in between | Mallow sheet |
 |-------|----------------|---------------|--------------|
-| ![](../../screenshots/racer-chunky-today-turntable.png) | ![](../../screenshots/racer-chunky-a-turntable.png) | ![](../../screenshots/racer-chunky-b-turntable.png) | ![](./mallow-unicorn-turnaround.webp) |
-| ![](../../screenshots/racer-chunky-today-pick.png) | ![](../../screenshots/racer-chunky-a-pick.png) | ![](../../screenshots/racer-chunky-b-pick.png) | ![](./mallow-fairy-hero.webp) |
-| ![](../../screenshots/racer-chunky-today-race.png) | ![](../../screenshots/racer-chunky-a-race.png) | ![](../../screenshots/racer-chunky-b-race.png) | not buildable at race size |
+| ![](./pitch-today-turntable.webp) | ![](./pitch-a-turntable.webp) | ![](./pitch-b-turntable.webp) | ![](./mallow-unicorn-turnaround.webp) |
+| ![](./pitch-today-pick.webp) | ![](./pitch-a-pick.webp) | ![](./pitch-b-pick.webp) | ![](./mallow-fairy-hero.webp) |
+| ![](./pitch-today-race.webp) | ![](./pitch-a-race.webp) | ![](./pitch-b-race.webp) | not buildable at race size |
 
 Every picture except the Mallow sheet is a render of the real code, from the
 harness `preview-racer-cast.html?style=today|a|b&view=turntable|pick|race`
