@@ -26,7 +26,8 @@ export function princess(color: number, scale: number): Rides {
     const k: V3 = [scale, scale, scale];
     body.within(place(seat, {}, k), () => {
       // A bell of a skirt over the ride's back with a pale frill at the hem, a fitted bodice.
-      body.cone((p) => (p.y < -0.26 ? frill : gown), 0.36, 0.74, 0.82, [12, 3], [0, 0.3, 0]);
+      // Open at both ends (the bodice and the ride hide them); the frill is the bottom row of faces.
+      body.cone((p) => (p.y < -0.2 ? frill : gown), 0.36, 0.74, 0.82, [12, 4], [0, 0.3, 0], {}, { open: true });
       body.blob(color, [0.66, 0.6, 0.5], [0, 0.76, 0.02], { round: 0.6, seg: [8, 4] });
       // Arms reaching forward to hold on.
       for (const s of SIDES) {

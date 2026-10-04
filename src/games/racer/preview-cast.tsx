@@ -321,10 +321,10 @@ function flyers(): Flyer[] {
   const turn = 0.5;
   const at = (x: number, z: number, y: number): Flyer => ({ ...createFlyer(x, z, turn, y), bank: -0.25, trail: 1 });
   return [
-    at(4.4, 41, 30.5),
-    at(-4.4, 42, 31.5),
-    at(-2.4, 54, 35),
-    at(7, 55, 34),
+    at(3.8, 41, 30.5),
+    at(-3.8, 42, 31.5),
+    at(-2, 54, 35),
+    at(6, 55, 34),
     // The camera kart: on the line they are flying, a few lengths behind them.
     { ...createFlyer(0, 38, 0, 30), trail: 1 },
   ];
