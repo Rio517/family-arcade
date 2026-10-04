@@ -67,8 +67,8 @@ export function unicorn(color: number, rides?: Rides): Figure {
   body.blob(PEARL, [1.15, 1.25, 1.0], [0, 2.45, 0.8], { round: 0.6, seg: [10, 5], rot: { rx: 0.4 } });
   for (const { hip, rot } of LEGS) {
     body.within(place(hip, rot), () => {
-      // One soft block per leg, lavender at the hoof.
-      body.blob((p) => (p.y < -0.38 ? HOOF : PEARL_SHADE), [0.54, 1.25, 0.54], [0, -0.55, 0], { round: 0.7, seg: [8, 5] });
+      // One soft block per leg, lavender at the hoof: the bottom two rows of faces, cut between rings.
+      body.blob((p) => (p.y < -0.3 ? HOOF : PEARL_SHADE), [0.54, 1.25, 0.54], [0, -0.55, 0], { round: 0.7, seg: [8, 5] });
     });
   }
 
