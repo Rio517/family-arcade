@@ -17,6 +17,7 @@
  * status. A game opts in by constructing a link with its code + role.
  */
 import Peer, { type MediaConnection } from 'peerjs';
+import { CONNECTION_SERVICE } from './peer';
 
 export type CallStatus = 'idle' | 'requesting' | 'connecting' | 'live' | 'denied' | 'error';
 
@@ -27,13 +28,6 @@ export interface MediaHandlers {
   onLocalStream: (stream: MediaStream | null) => void;
   onRemoteStream: (stream: MediaStream | null) => void;
 }
-
-const ICE = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' },
-  ],
-};
 
 const DIAL_RETRY_MS = 2500;
 
@@ -176,7 +170,7 @@ export class MediaLink {
     // Both roles register derived ids: the host so the guest can dial it, the
     // guest so the host can recognise it (see guestMediaId).
     const id = this.role === 'host' ? this.mediaId() : this.guestMediaId();
-    const peer = new Peer(id, { config: ICE });
+    const peer = new Peer(id, CONNECTION_SERVICE);
     this.peer = peer;
 
     peer.on('open', () => {

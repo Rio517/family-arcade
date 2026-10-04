@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameHost } from './host';
+import { CONNECTION_SERVICE } from './peer';
 
 // A minimal in-memory PeerJS stand-in, in the style of peer.test.ts: tests
 // drive it by emitting the events a real broker / data channel would.
@@ -44,10 +45,13 @@ const { FakePeer, FakeDataConnection, fakePeers } = vi.hoisted(() => {
   const fakePeers: FakePeer[] = [];
   class FakePeer extends FakeEmitter {
     id: string | undefined;
+    /** What `new Peer` was handed: broker host, port, path and ICE servers. */
+    options: unknown;
     destroyed = false;
     constructor(...args: unknown[]) {
       super();
       this.id = typeof args[0] === 'string' ? args[0] : undefined;
+      this.options = typeof args[0] === 'string' ? args[1] : args[0];
       fakePeers.push(this);
     }
     reconnect() {}
@@ -98,6 +102,11 @@ describe('GameHost', () => {
   it('registers the same broker id GameConnection.host would', () => {
     hosted();
     expect(fakePeers[0].id).toBe('test-v1-KXQZ');
+  });
+
+  it('registers with the arcade’s own connection service', () => {
+    hosted();
+    expect(fakePeers[0].options).toBe(CONNECTION_SERVICE);
   });
 
   it('accepts three guests and tells the game about each', () => {

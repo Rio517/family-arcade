@@ -20,3 +20,4 @@ These are backfilled from the invariants the codebase already lives by (see
 | [0008](./0008-app-level-party-layer.md) | An app-level party layer for connection, identity, and video | Accepted |
 | [0009](./0009-computer-players-without-llms.md) | Computer players are seeded domain policies, not LLMs | Proposed |
 | [0010](./0010-camera-effects-with-bundled-mediapipe.md) | Camera effects with bundled MediaPipe tracking | Accepted |
+| [0013](./0013-own-connection-service-in-the-eu.md) | The arcade runs its own connection service in the EU | Accepted |

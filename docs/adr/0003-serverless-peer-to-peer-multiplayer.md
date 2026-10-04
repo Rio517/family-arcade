@@ -1,6 +1,8 @@
 # 3. Serverless peer-to-peer multiplayer (WebRTC/PeerJS)
 
-Status: Accepted
+Status: Accepted. Signaling and STUN superseded by
+[ADR 0013](./0013-own-connection-service-in-the-eu.md): the arcade runs its
+own broker and STUN server.
 
 ## Context
 

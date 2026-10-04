@@ -14,7 +14,7 @@
  */
 
 import Peer, { type DataConnection } from 'peerjs';
-import { DIAL_TIMEOUT_MS, ICE, type ConnStatus, type ConnectionConfig } from './peer';
+import { CONNECTION_SERVICE, DIAL_TIMEOUT_MS, type ConnStatus, type ConnectionConfig } from './peer';
 
 export interface HostHandlers<TMessage> {
   onStatus: (status: ConnStatus, detail?: string) => void;
@@ -124,7 +124,7 @@ export class GameHost<TMessage> {
   }
 
   private createPeer(id: string): void {
-    const peer = new Peer(id, { config: ICE });
+    const peer = new Peer(id, CONNECTION_SERVICE);
     this.peer = peer;
 
     peer.on('open', () => {
@@ -136,8 +136,8 @@ export class GameHost<TMessage> {
       if (this.destroyed) return;
       const guestId = conn.peer;
       const existing = this.conns.get(guestId);
-      // A full table turns a newcomer away. The ids are guessable on the public
-      // broker, so a stranger must not be handed the sync. A known guest is
+      // A full table turns a newcomer away. The ids are guessable and anyone may
+      // use the broker, so a stranger must not be handed the sync. A known guest is
       // never "past the limit": they are coming back and take their own seat.
       if (!existing && this.conns.size >= this.maxGuests) {
         try {

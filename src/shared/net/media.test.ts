@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MediaLink } from './media';
+import { CONNECTION_SERVICE } from './peer';
 
 const noop = {
   onStatus: () => {},
@@ -48,9 +49,12 @@ const { FakeMediaPeer, FakeMediaConnection, fakeMediaPeers } = vi.hoisted(() => 
   const fakeMediaPeers: FakeMediaPeer[] = [];
   class FakeMediaPeer extends FakeEmitter {
     id: string | undefined;
+    /** What `new Peer` was handed: broker host, port, path and ICE servers. */
+    options: unknown;
     constructor(...args: unknown[]) {
       super();
       this.id = typeof args[0] === 'string' ? args[0] : undefined;
+      this.options = typeof args[0] === 'string' ? args[1] : args[0];
       fakeMediaPeers.push(this);
     }
     call(id: string) {
@@ -86,6 +90,16 @@ describe('MediaLink — only the party answers the party', () => {
     await link.start('KXQZ', 'guest');
     expect(fakeMediaPeers[fakeMediaPeers.length - 1].id).toBe('party-call-v1-KXQZ-guest');
     link.destroy();
+  });
+
+  it('both ends register with the arcade’s own connection service', async () => {
+    const host = new MediaLink(noop, 'party-call-v1-');
+    const guest = new MediaLink(noop, 'party-call-v1-');
+    await host.start('KXQZ', 'host');
+    await guest.start('KXQZ', 'guest');
+    expect(fakeMediaPeers.map((p) => p.options)).toEqual([CONNECTION_SERVICE, CONNECTION_SERVICE]);
+    host.destroy();
+    guest.destroy();
   });
 
   it('the host answers the party guest and refuses any other caller', async () => {
