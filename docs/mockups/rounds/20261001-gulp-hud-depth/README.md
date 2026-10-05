@@ -1,3 +1,11 @@
+---
+title: Gulp controls with depth
+question: Gulp's round controls look flat; how do we give them depth?
+status: built
+picked: D
+tested_with: family
+date: '2026-10-01'
+---
 # Gulp Universe: controls with depth
 
 **Product direction:** the controls over a round should look like pieces of

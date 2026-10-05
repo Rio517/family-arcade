@@ -23,7 +23,7 @@ import { WhoStarts } from './components/together/WhoStarts';
 const noop = () => {};
 const phone = typeof matchMedia === 'function' && matchMedia('(max-width: 600px)').matches;
 // The round captures from the pitch, served by the dev server from the repository.
-const CITY = `/docs/mockups/20261002-gulp-play-together/frame-${phone ? 'phone' : 'ipad'}.webp`;
+const CITY = `/docs/mockups/rounds/20261002-gulp-play-together/frame-${phone ? 'phone' : 'ipad'}.webp`;
 
 const CITY_SETTINGS: RoundSettings = { map: 'city', difficulty: 'medium', duration: 240, powerups: true, fightBack: true };
 const KLARA: SelectSeat = { name: 'Klara', skin: 1, state: 'host' };

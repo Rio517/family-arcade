@@ -159,7 +159,7 @@ facts are known:
 - **Rendering sets the frame rate late in a round.** A Chrome trace of a
   level-17 round had the graphics process busy 92% of the time. The game's own
   JavaScript took about 6 ms a frame
-  (`docs/mockups/20261001-far-models/README.md:3-8`).
+  (`docs/mockups/rounds/20261001-far-models/README.md:3-8`).
 - **Chromium with a 4x CPU throttle**, the stand-in for an older iPad
   (`scripts/perf-gulp.mjs:160-162`), at level 20: p50 22.4 ms, p95 34.8 ms,
   no frames over 50 ms (commit 3e33aa9). The budget is p95 45 ms throttled and

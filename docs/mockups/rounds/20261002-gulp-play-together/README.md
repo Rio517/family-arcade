@@ -1,3 +1,10 @@
+---
+title: 'Gulp: playing with friends'
+question: What is the one easy path for up to four children to join and play one Gulp round, each on their own device?
+status: open
+tested_with: family
+date: '2026-10-02'
+---
 # Gulp Universe: playing with friends
 
 **Product direction:** up to four children play one Gulp Universe round, each

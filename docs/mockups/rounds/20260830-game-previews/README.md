@@ -1,3 +1,11 @@
+---
+title: Game previews
+question: How do we sell a game before anyone signs in?
+status: built
+picked: B
+tested_with: family
+date: '2026-08-30'
+---
 # Game previews — three ways (2026-08-30)
 
 **Product direction:** don't ask for a player's name until after a game is

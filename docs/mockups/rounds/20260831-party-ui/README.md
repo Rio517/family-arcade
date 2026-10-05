@@ -1,3 +1,11 @@
+---
+title: Party and player UX
+question: The visual design is fine; what would fix the UX?
+status: built
+picked: 6 of 10 proposals
+tested_with: family
+date: '2026-08-31'
+---
 # Party & player UX (2026-08-31)
 
 **Product direction:** the visual design is fine; the UX needs work. Ten

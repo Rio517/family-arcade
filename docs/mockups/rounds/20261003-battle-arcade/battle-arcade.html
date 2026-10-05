@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ship Battle: a darker arcade</title>
+<style>
+  :root {
+    --bg: #070b14;
+    --panel: #0f1624;
+    --line: #1f2a3d;
+    --text: #e7edf7;
+    --muted: #93a1b8;
+    --accent: #22d3ee;
+    --warm: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 500px at 50% -10%, rgba(34, 211, 238, 0.08), transparent 60%), var(--bg);
+    color: var(--text);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  }
+  main { max-width: 1440px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 34px; margin: 0 0 6px; letter-spacing: 0.01em; }
+  h2 { font-size: 24px; margin: 48px 0 6px; padding-top: 16px; border-top: 1px solid var(--line); }
+  h3 { font-size: 17px; margin: 26px 0 10px; color: var(--accent); letter-spacing: 0.04em; text-transform: uppercase; }
+  p, li { color: var(--muted); max-width: 900px; }
+  strong { color: var(--text); }
+  blockquote {
+    margin: 16px 0; padding: 14px 18px; max-width: 900px;
+    border-left: 3px solid var(--warm); background: var(--panel); border-radius: 0 12px 12px 0; color: var(--text);
+  }
+  blockquote ul { margin: 8px 0 0; }
+  blockquote li { color: var(--text); }
+  code { font: 14px ui-monospace, 'SF Mono', Menlo, monospace; color: #fde68a; }
+  table { border-collapse: collapse; margin: 10px 0; }
+  td, th { padding: 6px 12px; border-bottom: 1px solid var(--line); text-align: left; font-size: 15px; }
+  th { color: var(--muted); font-weight: 600; }
+  nav { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 0; }
+  nav a {
+    color: var(--text); text-decoration: none; border: 1px solid var(--line); background: var(--panel);
+    padding: 8px 14px; border-radius: 999px; font-weight: 600; font-size: 15px;
+  }
+  nav a:hover, nav a:focus-visible { border-color: var(--accent); outline: none; }
+  .grid { display: grid; gap: 14px; }
+  .g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 900px) { .g4, .g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .g4, .g3, .g2 { grid-template-columns: 1fr; } }
+  figure { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  figure.today { border-style: dashed; }
+  figure a { display: block; }
+  figure img { display: block; width: 100%; height: auto; background: #000; }
+  figcaption { padding: 10px 12px 12px; font-size: 14px; color: var(--muted); }
+  figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 13px; font-weight: 700; margin-right: 6px; }
+  .t-today { background: #334155; color: #e2e8f0; }
+  .t-a { background: #0f766e; color: #ccfbf1; }
+  .t-b { background: #7c3aed; color: #ede9fe; }
+  .t-c { background: #a16207; color: #fef3c7; }
+  .phones figure img { max-height: 560px; object-fit: cover; object-position: top; }
+  .note { font-size: 14px; }
+  .empty { display: grid; place-items: center; min-height: 160px; padding: 18px; color: var(--muted); font-size: 14px; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ship Battle: a darker arcade</h1>
+  <p>Start screens, effects and guns, each built from the real game behind an address parameter. Today sits beside every option (dashed frame). Click any picture for full size.</p>
+  <blockquote>
+    “Revert the Storybook look (tiles, pegs): I don't like the new UI. I liked the little fire we had. I'd prefer it to stay cooler;
+    it's probably people who like battling rather than classic players looking for a board game. Main areas:
+    <ul>
+      <li>make that fire nicer;</li>
+      <li>improve the hit so it looks more fun, like an explosion (maybe borrow from the Gulp game);</li>
+      <li>improve the game-start user interface, which kind of sucks. I want a cool, darker ship experience, but blended a little with the playfulness of the arcade: a darker arcade;</li>
+      <li>the water could have been cooler;</li>
+      <li>I'd like to move towards ships rotating their guns and shooting on hits, with a skip option so you don't have to watch the animation every time.”</li>
+    </ul>
+  </blockquote>
+  <p><strong>Try it on the iPad:</strong> <code>#/play?look=a</code>, <code>?look=b</code>, <code>?look=c</code> for the start screens;
+    <code>#/play?fx=a</code> or <code>?fx=b</code> for the effects and guns; both together, e.g. <code>#/play?look=a&amp;fx=b</code>.
+    A Pitch switcher then sits in the bottom-left corner to flip between options on the device. <code>look=today&amp;fx=today</code> is the shipped game.</p>
+  <nav>
+    <a href="#start">Start screens</a>
+    <a href="#effects">Effects</a>
+    <a href="#guns">Guns</a>
+    <a href="#phone">Phone</a>
+  </nav>
+
+  <h2 id="start">Start screens (<code>?look=</code>)</h2>
+  <p><span class="tag t-a">A</span><strong>Night Ops</strong>: a sonar console, phosphor green and cyan, a radar scope and pixel type.
+    <span class="tag t-b">B</span><strong>Neon Harbor</strong>: the arcade's Midnight Carnival at sea, a neon sign hung with marquee bulbs, ticket-stub doors.
+    <span class="tag t-c">C</span><strong>Battle Station</strong>: gunmetal plates, hazard stripes, red alarm lights. Each adds a title, a Place, Battle strip and bigger buttons. The lobby is two taps: a Ships switch (Classic or Modern), then Create a game, Join with a code, or a level from 1 to 4 against the computer.</p>
+
+  <h3>Lobby: ships, doors and levels</h3>
+  <div class="grid g4">
+    <figure class="today"><a href="../../../screenshots/bs-look-today-lobby.png"><img src="../../../screenshots/bs-look-today-lobby.png" alt="Today's lobby" loading="lazy"></a><figcaption><b>Today</b></figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-a-lobby.png"><img src="../../../screenshots/bs-look-a-lobby.png" alt="Look A lobby" loading="lazy"></a><figcaption><span class="tag t-a">A</span>Night Ops</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-b-lobby.png"><img src="../../../screenshots/bs-look-b-lobby.png" alt="Look B lobby" loading="lazy"></a><figcaption><span class="tag t-b">B</span>Neon Harbor</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-c-lobby.png"><img src="../../../screenshots/bs-look-c-lobby.png" alt="Look C lobby" loading="lazy"></a><figcaption><span class="tag t-c">C</span>Battle Station</figcaption></figure>
+  </div>
+
+  <h3>Join with a code</h3>
+  <div class="grid g4">
+    <figure class="today"><a href="../../../screenshots/bs-look-today-join.png"><img src="../../../screenshots/bs-look-today-join.png" alt="Today's join form" loading="lazy"></a><figcaption><b>Today</b></figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-a-join.png"><img src="../../../screenshots/bs-look-a-join.png" alt="Look A join form" loading="lazy"></a><figcaption><span class="tag t-a">A</span>Night Ops</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-b-join.png"><img src="../../../screenshots/bs-look-b-join.png" alt="Look B join form" loading="lazy"></a><figcaption><span class="tag t-b">B</span>Neon Harbor</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-c-join.png"><img src="../../../screenshots/bs-look-c-join.png" alt="Look C join form" loading="lazy"></a><figcaption><span class="tag t-c">C</span>Battle Station</figcaption></figure>
+  </div>
+
+  <h3>Placing the fleet</h3>
+  <div class="grid g4">
+    <figure class="today"><a href="../../../screenshots/bs-look-today-placing.png"><img src="../../../screenshots/bs-look-today-placing.png" alt="Today's placing screen" loading="lazy"></a><figcaption><b>Today</b></figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-a-placing.png"><img src="../../../screenshots/bs-look-a-placing.png" alt="Look A placing screen" loading="lazy"></a><figcaption><span class="tag t-a">A</span>Night Ops</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-b-placing.png"><img src="../../../screenshots/bs-look-b-placing.png" alt="Look B placing screen" loading="lazy"></a><figcaption><span class="tag t-b">B</span>Neon Harbor</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-c-placing.png"><img src="../../../screenshots/bs-look-c-placing.png" alt="Look C placing screen" loading="lazy"></a><figcaption><span class="tag t-c">C</span>Battle Station</figcaption></figure>
+  </div>
+
+  <h2 id="effects">Effects (<code>?fx=</code>)</h2>
+  <p><span class="tag t-a">A</span><strong>Arcade</strong>: cel-shaded flame tongues, punchy blasts after Gulp's booms with star sparks and “HIT!”, and the Night Ops sea: contour lines, a glowing grid in the water, a sonar ping.
+    <span class="tag t-b">B</span><strong>Cinematic</strong>: a soft roaring blaze, heavier realistic blasts with a flash of light, and the Moonlit Swell: rolling waves, whitecap flecks, the moon's glitter path, stars.</p>
+
+  <h3>The battle board, mid-game</h3>
+  <div class="grid g3">
+    <figure class="today"><a href="../../../screenshots/bs-fx-today-board.png"><img src="../../../screenshots/bs-fx-today-board.png" alt="Today's battle board" loading="lazy"></a><figcaption><b>Today</b></figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-a-board.png"><img src="../../../screenshots/bs-fx-a-board.png" alt="Effects A battle board" loading="lazy"></a><figcaption><span class="tag t-a">A</span>Night Ops sea, toon fires</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-b-board.png"><img src="../../../screenshots/bs-fx-b-board.png" alt="Effects B battle board" loading="lazy"></a><figcaption><span class="tag t-b">B</span>Moonlit Swell, roaring fires</figcaption></figure>
+  </div>
+
+  <h3>The fire, close</h3>
+  <div class="grid g3">
+    <figure class="today"><a href="../../../screenshots/battle-fleet-3d-closeup.png"><img src="../../../screenshots/battle-fleet-3d-closeup.png" alt="Today's fires" loading="lazy"></a><figcaption><b>Today</b> the little fire</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-a-fire.png"><img src="../../../screenshots/bs-fx-a-fire.png" alt="Effects A fire close-up" loading="lazy"></a><figcaption><span class="tag t-a">A</span>Cel-shaded tongues, embers, deck glow</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-b-fire.png"><img src="../../../screenshots/bs-fx-b-fire.png" alt="Effects B fire close-up" loading="lazy"></a><figcaption><span class="tag t-b">B</span>A soft blaze, heavier smoke</figcaption></figure>
+  </div>
+
+  <h3>Our hit on the radar</h3>
+  <div class="grid g3">
+    <figure class="today"><a href="../../../screenshots/bs-fx-today-radar-hit.png"><img src="../../../screenshots/bs-fx-today-radar-hit.png" alt="Today's radar hit" loading="lazy"></a><figcaption><b>Today</b> sparks, at once</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-a-radar-hit.png"><img src="../../../screenshots/bs-fx-a-radar-hit.png" alt="Effects A radar hit" loading="lazy"></a><figcaption><span class="tag t-a">A</span>The shell drops, then a blast and “HIT!”</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-b-radar-hit.png"><img src="../../../screenshots/bs-fx-b-radar-hit.png" alt="Effects B radar hit" loading="lazy"></a><figcaption><span class="tag t-b">B</span>The shell drops, then a fireball and a shock ring</figcaption></figure>
+  </div>
+
+  <h3>Their hit on our fleet</h3>
+  <div class="grid g3">
+    <figure class="today"><div class="empty">Today a hit on our fleet appears at once: a new flame, no blast.</div><figcaption><b>Today</b></figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-a-blast.png"><img src="../../../screenshots/bs-fx-a-blast.png" alt="Effects A blast" loading="lazy"></a><figcaption><span class="tag t-a">A</span>Flash, fireball, shock ring, sparks, debris</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-b-blast.png"><img src="../../../screenshots/bs-fx-b-blast.png" alt="Effects B blast" loading="lazy"></a><figcaption><span class="tag t-b">B</span>Heavier, with a flash of light on the water</figcaption></figure>
+  </div>
+
+  <h3>A sinking, and a miss</h3>
+  <div class="grid g4">
+    <figure><a href="../../../screenshots/bs-fx-a-sinking.png"><img src="../../../screenshots/bs-fx-a-sinking.png" alt="Effects A sinking" loading="lazy"></a><figcaption><span class="tag t-a">A</span>A chain of blasts down the hull</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-b-sinking.png"><img src="../../../screenshots/bs-fx-b-sinking.png" alt="Effects B sinking" loading="lazy"></a><figcaption><span class="tag t-b">B</span>A chain of blasts down the hull</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-a-splash.png"><img src="../../../screenshots/bs-fx-a-splash.png" alt="Effects A splash" loading="lazy"></a><figcaption><span class="tag t-a">A</span>Spray column and rings</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-b-splash.png"><img src="../../../screenshots/bs-fx-b-splash.png" alt="Effects B splash" loading="lazy"></a><figcaption><span class="tag t-b">B</span>Taller spray</figcaption></figure>
+  </div>
+
+  <h2 id="guns">The guns</h2>
+  <p>Our shot: the target locks on the radar, the next ship still afloat trains its guns on the bearing (the enemy's waters lie past our horizon) and fires in a ripple; the shells arc away, then one drops on the radar. Their shot: a warning ring tightens on our water and a shell comes in over the horizon. A tap anywhere skips to the result; <strong>Watch the shots</strong> (beside the battle log) turns it off for the device, and is off by default under reduced motion. The game never waits on the picture.</p>
+  <div class="grid g2">
+    <figure><a href="../../../screenshots/bs-fx-a-salvo.png"><img src="../../../screenshots/bs-fx-a-salvo.png" alt="The Iowa's turrets trained and firing" loading="lazy"></a><figcaption><span class="tag t-a">A</span>The Iowa's three turrets turned to the bearing, firing</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-b-salvo.png"><img src="../../../screenshots/bs-fx-b-salvo.png" alt="The Iowa firing, cinematic" loading="lazy"></a><figcaption><span class="tag t-b">B</span>The same salvo, cinematic</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-a-salvo-modern.png"><img src="../../../screenshots/bs-fx-a-salvo-modern.png" alt="The modern navy firing" loading="lazy"></a><figcaption><span class="tag t-a">A</span>The modern navy's main gun</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-a-incoming.png"><img src="../../../screenshots/bs-fx-a-incoming.png" alt="An enemy shell coming in" loading="lazy"></a><figcaption><span class="tag t-a">A</span>Their shell coming in, the warning ring on our water</figcaption></figure>
+  </div>
+  <p class="note">The turrets are the ones already in the ship models (named pivots in every GLB); a hinge is added at each gun's breech for elevation and recoil. The Virginia has no gun and fires a missile from a deck hatch; the Ford uses its close-in guns.</p>
+
+  <h2 id="phone">Phone</h2>
+  <div class="grid g3 phones">
+    <figure><a href="../../../screenshots/bs-look-a-lobby-phone.png"><img src="../../../screenshots/bs-look-a-lobby-phone.png" alt="Look A lobby on a phone" loading="lazy"></a><figcaption><span class="tag t-a">A</span>Lobby</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-b-lobby-phone.png"><img src="../../../screenshots/bs-look-b-lobby-phone.png" alt="Look B lobby on a phone" loading="lazy"></a><figcaption><span class="tag t-b">B</span>Lobby</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-c-lobby-phone.png"><img src="../../../screenshots/bs-look-c-lobby-phone.png" alt="Look C lobby on a phone" loading="lazy"></a><figcaption><span class="tag t-c">C</span>Lobby</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-a-placing-phone.png"><img src="../../../screenshots/bs-look-a-placing-phone.png" alt="Look A placing on a phone" loading="lazy"></a><figcaption><span class="tag t-a">A</span>Placing</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-b-placing-phone.png"><img src="../../../screenshots/bs-look-b-placing-phone.png" alt="Look B placing on a phone" loading="lazy"></a><figcaption><span class="tag t-b">B</span>Placing</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-look-c-placing-phone.png"><img src="../../../screenshots/bs-look-c-placing-phone.png" alt="Look C placing on a phone" loading="lazy"></a><figcaption><span class="tag t-c">C</span>Placing</figcaption></figure>
+    <figure class="today"><a href="../../../screenshots/bs-fx-today-board-phone.png"><img src="../../../screenshots/bs-fx-today-board-phone.png" alt="Today's fleet on a phone" loading="lazy"></a><figcaption><b>Today</b> fleet in battle</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-a-board-phone.png"><img src="../../../screenshots/bs-fx-a-board-phone.png" alt="Effects A on a phone" loading="lazy"></a><figcaption><span class="tag t-a">A</span>Fleet in battle</figcaption></figure>
+    <figure><a href="../../../screenshots/bs-fx-b-board-phone.png"><img src="../../../screenshots/bs-fx-b-board-phone.png" alt="Effects B on a phone" loading="lazy"></a><figcaption><span class="tag t-b">B</span>Fleet in battle</figcaption></figure>
+  </div>
+  <p class="note">Every effects picture has a WebKit twin beside it in <code>docs/screenshots/</code> (<code>*.webkit.png</code>), the engine the family's iPads use.</p>
+</main>
+</body>
+</html>

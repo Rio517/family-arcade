@@ -1,3 +1,11 @@
+---
+title: Simpler buildings from high up
+question: Can simpler far models give smooth late-game play without looking less friendly?
+status: picked
+picked: Today
+tested_with: family
+date: '2026-10-01'
+---
 # Simpler buildings from high up
 
 **Product direction:** late in a round the game should run smoothly on the

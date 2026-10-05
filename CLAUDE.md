@@ -11,9 +11,11 @@ a son who loves space and 3D and suggests features, and parents with a
 taste for retro (70s orange, neon signs). Kid-facing copy is warm and playful;
 nothing needs a manual. Big visual changes are pitched as **mockups first**
 (a local HTML page with ~3 labelled options), built only after the family
-picks. Each pitch keeps its own folder, `docs/mockups/YYYYMMDD-<topic>/`,
-holding the write-up, the page, and its assets. The write-up records which
-option was chosen. `docs/README.md` says where every other kind of doc goes;
+picks. The mockup shelf lives in `docs/mockups/`: each pitch is a round in
+`docs/mockups/rounds/YYYYMMDD-<topic>/` (README front matter, the page, its
+assets; the write-up records which option was chosen), approved screens go in
+`screens/`, and `index.html` is generated (`npm start` in `docs/mockups/`
+serves it on port 4330). `docs/README.md` says where every other kind of doc goes;
 read it before adding a folder.
 
 **How to write docs here.** Use product terms: the requirement and the

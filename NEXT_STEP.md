@@ -17,7 +17,7 @@ effects — UX concept") plus 11 concept images in
 `docs/designs/party-mode-effects-concept/` (680K). Its branch,
 `codex/party-mode-mockups`, carries nothing that is not already in `main`.
 
-To land it, move both into `docs/mockups/20260830-party-camera-effects/`, write
+To land it, move both into `docs/mockups/rounds/20260830-party-camera-effects/`, write
 the pitch README, and commit from a branch cut fresh off `origin/main`. Once it
 is committed the worktree can go. Until then, do not remove it — the files
 exist nowhere else.
@@ -75,7 +75,7 @@ exist nowhere else.
   reintroduces them.
 
 - **Party and player UX, four proposals open.** The pitch and the state of all
-  ten proposals: `docs/mockups/20260831-party-ui/`. The four not built are
+  ten proposals: `docs/mockups/rounds/20260831-party-ui/`. The four not built are
   ticket tap semantics (play vs preview), the pill expanding into an
   invitation, the lobby mode titles (*Play here* / *Play Online* / *Free
   Board*), and the video-call full-screen control with a larger self-preview.
