@@ -1,31 +1,35 @@
 # Mockups
 
-One folder per pitch, named `YYYYMMDD-<topic>/`. Each folder holds the
-write-up, the HTML page the family looked at, and any images the page needs.
+The mockup shelf: one round per pitch in `rounds/YYYYMMDD-<topic>/`, approved
+screens in `screens/`, and a generated `index.html` that lists every round
+with its status, question and pick. Never hand-edit the index; it is rebuilt
+from each round's `README.md` front matter.
+
+```
+npm install
+npm start          # http://localhost:4330, live reload, rebuilds the index
+npm run index      # rebuild index.html only
+npm run shots      # headless screenshots of open rounds into shots/
+```
+
+The scripts live in `.shelf/` (see `.shelf/VERSION`). The pick page template
+is in `.shelf/pick-template/`.
 
 `CLAUDE.md` requires big visual changes to be pitched as mockups first, with
-about three labelled options, and built only after the family picks. The
-pitches are kept here so a later session can see the options, the choice, and
-what was set aside.
+about three labelled options, and built only after the family picks. A round
+keeps the options, the choice and what was set aside.
 
-| Pitch | Asked for | Outcome |
-|-------|-----------|---------|
-| [20260830-game-previews](./20260830-game-previews/) | A way to sell a game before anyone signs in | **B, poster strip** — shipped |
-| [20260831-party-ui](./20260831-party-ui/) | Visual design is fine; the UX needs work | 6 of 10 shipped in [#145](https://github.com/Rio517/family-arcade/pull/145) |
-| [20261001-far-models](./20261001-far-models/) | Smooth late-game play; simpler buildings from high up, shown before they go in | Detailed models stay; the simpler ones looked less friendly in play |
-| [20261001-gulp-hud-depth](./20261001-gulp-hud-depth/) | Gulp's round controls look flat; give them depth | D, Coin-op: built |
-| [20261002-gulp-play-together](./20261002-gulp-play-together/) | One easy path for up to four children to join and play one Gulp round, each on their own device (full-screen player select) | Pending: question wording Q1 or Q2 |
-| [20261003-battle-arcade](./20261003-battle-arcade/) | Ship Battle as a darker arcade: nicer fire, fun explosions, cooler water, better start screens (two taps: Ships switch, then a level or Create/Join), guns that turn and fire with a skip | Start screens **C, Battle Station** and effects **B** (with A's sea and the HIT!/SUNK!/MISS words, guns on): built, the default. A and today's stay behind `?fx=` |
-| [20261003-racer-chunky](./20261003-racer-chunky/) | Rainbow Racer's unicorn and fairy as chunky game characters built in code, not intricate renders | B, picked; built for the whole cast and its rides |
+## What goes in a round
 
-## What goes in a pitch folder
-
-- `README.md` — the requirement, each option, which one was picked and why,
-  and where it ended up. Record the outcome when it lands.
-- `<name>.html` — the page. It should open directly from disk. Link
-  screenshots with relative paths (`../../screenshots/foo.png`); an absolute
-  `file:///Users/...` path stops working as soon as the file moves.
+- `README.md`: front matter (`title`, `question`, `status` open, picked,
+  built or parked, `picked`, `tested_with`, `date`), then the requirement,
+  each option, which one was picked and why, and where it ended up.
+- The page, opening directly from disk. Link screenshots with relative paths
+  (`../../../screenshots/foo.png`); an absolute `file:///Users/...` path stops
+  working as soon as the file moves.
 - Any images the page needs, beside the page.
+- Rounds are not edited after the pick. Names: `YYYYMMDD-<topic>` in kebab
+  case, no `-v2` suffixes.
 
 ## Two rules
 
