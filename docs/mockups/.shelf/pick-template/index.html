@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pick</title>
+<link rel="stylesheet" href="pick.css">
+</head>
+<body>
+<!-- Pick page template. Edit the JSON below; keep pick.js and pick.css beside this file (or reference them from the shelf).
+  Fields: title, question, blind (true shuffles and hides labels until the vote), reasons (tag list),
+  options[]: id, label (A, B, C), name (one word), line (one short line), type (image | video | iframe), src.
+  A "Today" option (id "today") and "None of these" are always present; an option with id "today" overrides the placeholder. -->
+<script type="application/json" id="options">
+{
+  "title": "Round title",
+  "question": "Which option makes the next step obvious?",
+  "blind": false,
+  "reasons": ["Clearer", "Calmer", "More fun", "Easier to read", "Looks finished", "Feels like us", "Too busy", "Too plain"],
+  "options": [
+    { "id": "today", "label": "Today", "name": "Today", "line": "The current design.", "type": "image", "src": "today.png" },
+    { "id": "a", "label": "A", "name": "Name", "line": "One short line about this option.", "type": "iframe", "src": "a-name.html" },
+    { "id": "b", "label": "B", "name": "Name", "line": "One short line about this option.", "type": "iframe", "src": "b-name.html" },
+    { "id": "c", "label": "C", "name": "Name", "line": "One short line about this option.", "type": "image", "src": "shots/c-name-1440x900.png" }
+  ]
+}
+</script>
+<div id="app"></div>
+<script src="pick.js"></script>
+</body>
+</html>

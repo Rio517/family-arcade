@@ -1,0 +1,20 @@
+{
+  "name": "mockup-shelf-4330",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node .shelf/shelf.mjs --port 4330",
+    "index": "node .shelf/index.mjs .",
+    "shots": "node .shelf/shots.mjs ."
+  },
+  "dependencies": {
+    "browser-sync": "^3.0.4",
+    "playwright": "^1.63.0",
+    "yaml": "^2.8.1"
+  },
+  "shelf": {
+    "routes": {
+      "/screenshots": "../screenshots"
+    }
+  }
+}
