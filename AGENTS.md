@@ -71,6 +71,7 @@ files one by one.
 
 - **Art:** Blender is the default for anything sculpted, rigged, UV-mapped or with baked shading. Simple parametric props may be code. Systems (terrain, water, sky, particles, UI, placement) are code. Run the studio's `render-validate` before any GLB counts as delivered. No freelancers or paid art packs. Concept art is drawn at the real game camera.
 - **Mockups:** the shared standard is `docs/mockups/` with `screens/` (the spec) and `rounds/YYYYMMDD-<topic>/` (README front matter, a pick page with today's design and "none of these"; nothing is overwritten). Run `npm start`, `npm run shots`, `npm run index`. This repo's shelf port is 4330.
+- **Showing a round:** the shelf is running first. Start `npm start` in `docs/mockups` in the background on this repo's port, then `curl` the round's URL for a 200. The message to Mario is one picture (the ask) plus one line with the round's network URL. The server dies with the session that started it, so the next session that shows a round starts it again.
 - **Browsers:** all automation is headless. Never open the owner's browser (no `open http://...`, no Claude in Chrome) unless asked; hand over the URL.
 - **Blender:** short headless jobs (`blender -b`), at most three at once. The interactive MCP only when the owner is watching.
 - **Working with the owner:** when asked for research or plans, build nothing until told to go. Show results as old work next to new work.

@@ -16,7 +16,7 @@ Where they overlap, `CLAUDE.md` wins.
 |---|---|
 | A **new game** (not on `main` yet, even after the family has played a preview) | Build it locally and hand the owner the URL `http://127.0.0.1:5178/#/<id>`, or a LAN or Tailscale preview for the iPads. Playtest fixes go on local branches too. **No push and no PR** until the owner asks. |
 | A change to an **existing game** (on `main`) | Commit on its own branch, open a PR, and rebase-merge it after CI is green, using the `git cherry` routine in `CLAUDE.md`. Then watch the Pages deploy. |
-| A **big visual change**, including a new game's overall look | A mockup with about three labelled options first (`docs/mockups/YYYYMMDD-<topic>/`), built from the real components behind an opt-in harness. The family picks; build the look after the pick. The rules and the plain view can be built meanwhile. |
+| A **big visual change**, including a new game's overall look | A mockup with about three labelled options first (`docs/mockups/rounds/YYYYMMDD-<topic>/`), built from the real components behind an opt-in harness. The family picks; build the look after the pick. The rules and the plain view can be built meanwhile. |
 | **Less visual quality** (fewer shadows, lower DPR, simpler models, dropped effects, fewer things on screen) | Ask the owner first, with pictures. Never trade it away silently for speed. |
 | **Tuning** a value the owner or the children complained about, or making something bigger, clearer or higher-contrast so it can be seen | Straight in, small, one complaint per commit, with before and after evidence. A restyle is a mockup instead. |
 
