@@ -29,6 +29,7 @@
     "perf:gulp": "node scripts/perf-gulp.mjs"
   },
   "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
     "@mediapipe/tasks-vision": "^1.0.1",
     "d3-geo": "^3.1.1",
     "maplibre-gl": "^5.20.1",

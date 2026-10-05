@@ -13,7 +13,9 @@
     "src/games/mirror/preview.tsx",
     "src/games/gulp/preview-assets.tsx",
     "src/games/gulp/together-preview.tsx",
-    "src/games/racer/preview-cast.tsx"
+    "src/games/racer/preview-cast.tsx",
+    // A studio kit copied whole (see its README): its public API is an entry, so exports no game uses yet aren't dead code.
+    "src/vendor/arcade-physics/index.ts"
   ],
   "project": ["src/**/*.{ts,tsx}"],
   "ignoreExportsUsedInFile": { "interface": true, "type": true },
