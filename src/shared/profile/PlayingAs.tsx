@@ -4,7 +4,7 @@
  * Switching opens the picker over the page, so the wrong person at the iPad
  * is two taps from fixed without the lobby moving under their thumb. One
  * name, one verb: the gate, this line and the Ticket Booth all say "Switch
- * player" and open the same picker (the UX pass, docs/mockups/20260831-party-ui).
+ * player" and open the same picker (the UX pass, docs/mockups/rounds/20260831-party-ui).
  */
 
 import { useCallback, useRef, useState } from 'react';

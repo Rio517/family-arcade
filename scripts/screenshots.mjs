@@ -60,7 +60,7 @@ const LAPTOP = { width: 1920, height: 1080 };
 const MONITOR = { width: 2560, height: 1440 };
 
 /**
- * The darker-arcade pitch (docs/mockups/20261003-battle-arcade): each
+ * The darker-arcade pitch (docs/mockups/rounds/20261003-battle-arcade): each
  * start-screen look — today, A, B, C — on the lobby (ships switch and the
  * four levels), the join form and the placing screen at tablet size, and the
  * three new looks at phone size too. `bar=0` keeps the reviewer's switcher out of the picture.
@@ -762,7 +762,7 @@ const SHOTS = [
       engines: ['chromium', 'webkit'],
     })),
   ),
-  // The whole cast in look B (docs/mockups/20261003-racer-chunky), on the
+  // The whole cast in look B (docs/mockups/rounds/20261003-racer-chunky), on the
   // harness: each racer turning round (on their usual ride, then the other
   // rides), every pick card, and the four in the race sky at race size. At
   // the iPad and a small phone, in both engines: the race is the game's canvas.

@@ -1,3 +1,11 @@
+---
+title: 'Ship Battle: a darker arcade'
+question: Which darker arcade look (start screens, fire, explosions, water, guns) should Ship Battle have?
+status: built
+picked: C start screens, B effects
+tested_with: family
+date: '2026-10-03'
+---
 # Ship Battle: a darker arcade
 
 **Requirement, in the owner's words (lightly edited):** "Revert the Storybook

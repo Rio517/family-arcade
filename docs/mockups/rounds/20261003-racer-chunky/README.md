@@ -1,3 +1,11 @@
+---
+title: Chunky racers
+question: How do Rainbow Racer's unicorn and fairy become chunky game characters built in code?
+status: built
+picked: B
+tested_with: family
+date: '2026-10-03'
+---
 # Chunky racers
 
 **Product direction:** Rainbow Racer's unicorn and fairy become game
@@ -78,7 +86,7 @@ character.
 
 | Turntable | Other rides | Pick cards | In race |
 |-|-|-|-|
-| ![](../../screenshots/racer-cast-turntable.png) | ![](../../screenshots/racer-cast-turntable-rides.png) | ![](../../screenshots/racer-cast-pick.png) | ![](../../screenshots/racer-cast-race.png) |
+| ![](../../../screenshots/racer-cast-turntable.png) | ![](../../../screenshots/racer-cast-turntable-rides.png) | ![](../../../screenshots/racer-cast-pick.png) | ![](../../../screenshots/racer-cast-race.png) |
 
 The harness `preview-racer-cast.html?view=turntable|pick|race` (with
 `&cast=rides`, or a list such as `&cast=fairy,princess-bird`) renders them;

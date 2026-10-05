@@ -90,7 +90,7 @@ describe('<PlayingAs>', () => {
     expect(screen.getByTestId('switch-where')).toHaveTextContent(/never in the cloud/i);
   });
 
-  // The UX review's identity copy (docs/mockups/20260831-party-ui), now shipped: one name,
+  // The UX review's identity copy (docs/mockups/rounds/20260831-party-ui), now shipped: one name,
   // one verb, and the instruction every picker shares.
   it('shows the name and Switch player, with one picker instruction', () => {
     seed();

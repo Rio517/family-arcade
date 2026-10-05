@@ -1,5 +1,5 @@
 /* Ship Battle — the darker-arcade start screens, three looks under review
-   (docs/mockups/20261003-battle-arcade). The page root carries
+   (docs/mockups/rounds/20261003-battle-arcade). The page root carries
    `bs-look bs-look-<a|b|c>` and `data-phase`; every rule here is scoped to a
    look, and the page-wide ones to the setup phases only, so the battle and
    the result keep today's styling until a look is picked.
