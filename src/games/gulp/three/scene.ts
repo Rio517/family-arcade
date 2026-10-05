@@ -10,6 +10,7 @@
  *
  * - holeView.ts: the holes, their mouths, eyes, messes and power-up show
  * - propView.ts: the city's things, falling in, rising, wobbling
+ * - spillPhysics.ts: a swallowed ship's containers as real bodies (Rapier, loaded here on demand)
  * - seeThrough.ts: buildings in the way of the camera go see-through
  * - walkers.ts: people and police
  * - cameraRig.ts: the camera, the menu's tour, the shadow fit
@@ -28,6 +29,7 @@ import { buildGround, groundAt, type Ground } from './ground';
 import { GROUND_SHIFT, HoleViews, type HoleLook } from './holeView';
 import { ModelWarmup } from './models';
 import { PropView } from './propView';
+import { SpillPhysics, wantsSpillPhysics } from './spillPhysics';
 import { Walkers } from './walkers';
 
 export type { HoleLook } from './holeView';
@@ -64,6 +66,8 @@ export class GulpScene {
    */
   private primer = new THREE.Group();
   private props: PropView;
+  /** Real bodies for swallowed ships' containers, in a round with ships to spill (see `wantsSpillPhysics`). */
+  private spills: SpillPhysics | null;
   private walkers: Walkers;
   private holes: HoleViews;
   private rig: CameraRig;
@@ -135,7 +139,10 @@ export class GulpScene {
       byKind.set(p.kind, spot);
     }
     this.wonders = [...byKind.values()];
-    this.props = new PropView(this.scene, this.material, this.looseMaterial, world, reducedMotion);
+    this.spills = wantsSpillPhysics(world, menuTour, reducedMotion) ? new SpillPhysics() : null;
+    // Rapier loads while the round counts down, not on the frame the first ship goes in.
+    void this.spills?.load();
+    this.props = new PropView(this.scene, this.material, this.looseMaterial, world, reducedMotion, this.spills);
     this.walkers = new Walkers(this.scene, this.material, this.looseMaterial, world, reducedMotion);
     this.effects = new Effects(reducedMotion);
     this.scene.add(this.effects.group);
@@ -268,6 +275,14 @@ export class GulpScene {
     if (!this.reducedMotion) this.ground.water.offset.set(this.time * 0.004, this.time * 0.006);
   }
 
+  /**
+   * Resolves once spills can play out as real bodies (true), or once it is
+   * clear they stay scripted (false). Also a hook for the spill harness.
+   */
+  spillsReady(): Promise<boolean> {
+    return this.spills?.load() ?? Promise.resolve(false);
+  }
+
   /** Zoom in (negative) or out (positive) by `steps`, within a comfortable range. */
   /** Look round the city freely from `from` (a development tool), or go back to following the hole. */
   explore(on: boolean, from?: { x: number; z: number; r: number }): void {
@@ -296,6 +311,7 @@ export class GulpScene {
     this.ground.dispose();
     this.holes.dispose();
     this.props.dispose();
+    this.spills?.dispose();
     this.walkers.dispose();
     disposeDeep(this.scene);
     this.material.dispose();
