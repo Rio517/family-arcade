@@ -14,7 +14,7 @@ import type { Difficulty } from '../../domain/rivals';
 import type { RoundSettings } from '../../net/protocol';
 import { DIFFICULTY_TITLE, MAP_ORDER } from '../round';
 import { SKINS } from '../skins';
-import { BackButton, CheckIcon, ChevIcon, Hole, LeaveIcon, MiniTiles, PlugIcon, Tiles } from './parts';
+import { BackButton, CheckIcon, ChevIcon, Hole, LeaveIcon, MiniTiles, PlugIcon, Tiles, ScreenTitle } from './parts';
 import { useFocusOnOpen } from './useFocusOnOpen';
 
 export interface SelectSeat {
@@ -84,7 +84,7 @@ export function PlayerSelect(p: PlayerSelectProps) {
       <div className="gulp-tg-col gulp-tg-psel">
         <div className="gulp-tg-top">
           <BackButton onBack={p.onBack} testId="gulp-select-back" />
-          <h2 className="gulp-tg-sign">PLAYER SELECT</h2>
+          <ScreenTitle>PLAYER SELECT</ScreenTitle>
         </div>
         {p.status && (
           <p className="gulp-tg-banner" role="status" data-testid="gulp-select-status">

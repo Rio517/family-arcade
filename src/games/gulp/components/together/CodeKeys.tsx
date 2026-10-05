@@ -7,7 +7,7 @@
 import '../../styles/together.css';
 import { useEffect, useRef, useState } from 'react';
 import { useDismissOnEscape } from '@shared/ui/useDismissOnEscape';
-import { BackButton, CODE_LETTERS, DelIcon, Tiles } from './parts';
+import { BackButton, CODE_LETTERS, DelIcon, Tiles, ScreenTitle } from './parts';
 import { useFocusOnOpen } from './useFocusOnOpen';
 
 const KEYS = CODE_LETTERS.split('');
@@ -87,7 +87,7 @@ export function CodeKeys({
       <div className="gulp-tg-col gulp-tg-psel">
         <div className="gulp-tg-top">
           <BackButton onBack={onBack} testId="gulp-code-back" />
-          <h2 className="gulp-tg-sign purple">INSERT CODE</h2>
+          <ScreenTitle>INSERT CODE</ScreenTitle>
         </div>
         <Tiles code={code} cursor label={code ? `Letters ${code.split('').join(' ')}` : 'No letters typed yet'} testId="gulp-code-tiles" />
         <p className="gulp-tg-hint">Ask your friend for the four letters on their screen.</p>
