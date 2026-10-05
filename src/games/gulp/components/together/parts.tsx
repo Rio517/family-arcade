@@ -82,6 +82,29 @@ export function MiniTiles({ code }: { code: string }) {
   );
 }
 
+function StarIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.5Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** A screen's title: a kicker between two rainbow rules, a heading and nothing else. */
+export function ScreenTitle({ children }: { children: string }) {
+  return (
+    <h2 className="gulp-tg-sign">
+      <span className="rule l" aria-hidden="true" />
+      <span className="t">
+        <StarIcon />
+        {children}
+        <StarIcon />
+      </span>
+      <span className="rule" aria-hidden="true" />
+    </h2>
+  );
+}
+
 /** The round cyan Back button in its cream bezel. */
 export function BackButton({ onBack, className = '', testId }: { onBack: () => void; className?: string; testId?: string }) {
   return (
