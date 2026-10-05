@@ -6,7 +6,7 @@ Where each kind of doc goes. Each folder answers a different question.
 |--------|---------|-------|
 | [adr/](./adr/) | *Why is it built this way?* | Numbered, durable. `0001-…` |
 | [designs/](./designs/) | *How should it look and behave?* | `YYYY-MM-DD-<topic>-design.md` plus its concept art |
-| [mockups/](./mockups/) | *What did we offer the family, and what did they pick?* | One folder per pitch: `YYYYMMDD-<topic>/` |
+| [mockups/](./mockups/) | *What did we offer the family, and what did they pick?* | One folder per pitch: `rounds/YYYYMMDD-<topic>/` |
 | [plans/](./plans/) | *What are the exact steps to build it?* | `YYYY-MM-DD-<topic>.md`, one per build |
 | [ideas/](./ideas/) | *What are we still thinking about?* | Free-form; not yet agreed, may never be built |
 | [research/](./research/) | *Is this tool or library any good for us?* | `YYYY-MM-DD-<thing>.md`, a verdict and what would change it |

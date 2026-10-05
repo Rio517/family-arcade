@@ -21,7 +21,7 @@ formats are not in the precache list (below).
 
 ## Concept art first
 
-- A big visual change is a mockup with about three labelled options in `docs/mockups/YYYYMMDD-<topic>/` (README with the outcome, a page that opens from disk, its images). Build it from the real components, Today beside Proposed, as a `preview-*.html` harness under `BUILD_HARNESS=1` (`docs/mockups/README.md`).
+- A big visual change is a mockup with about three labelled options in `docs/mockups/rounds/YYYYMMDD-<topic>/` (README with the outcome, a page that opens from disk, its images). Build it from the real components, Today beside Proposed, as a `preview-*.html` harness under `BUILD_HARNESS=1` (`docs/mockups/README.md`).
 - For new art, brief the artist for a hero GLB with NOTES (triangles, materials, orientation), review renders, and one self-contained local page with today beside options A/B/C, the build cost and a recommendation, under `assets/<game>/review/`.
 - Look for existing concept art in `docs/` first.
 
