@@ -254,5 +254,8 @@ invariant and add weight for every player.
 - `/audit` (see `.claude/skills/audit/`) — a fresh forward-looking sweep of
   the current code: run it when asked, fix the small stuff directly, put the
   rest as findings in the PR body. No report files, no audit history.
+- `arcade-game-playbook` (see `.claude/skills/arcade-game-playbook/`) — the
+  working pattern for building, tuning and shipping a game; read it before
+  game work.
 - After any PR is opened, tell the owner; they merge fast, so re-check state
   before follow-up pushes (see workflow above).
