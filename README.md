@@ -237,7 +237,7 @@ The agent setup is in the repo, so it works for anyone who clones it:
 
 - **Instructions:** `CLAUDE.md` (the working agreements: architecture, the
   git workflow, how to verify a change), `AGENTS.md` (the short version for
-  every agent, pointing to `CLAUDE.md`) `.claude/skills/audit/` (the
+  every agent, pointing to `CLAUDE.md`), `.claude/skills/audit/` (the
   `/audit` codebase sweep), and `.claude/skills/arcade-game-playbook/` (how
   games get built, tuned and shipped here).
 - **Tidewave** (run code in the live app, read its logs, use the page): the
