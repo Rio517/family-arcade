@@ -54,8 +54,8 @@ Details in CLAUDE.md, verification step 2.
   runtime evaluation, logs, and real-player browser interactions.
 - Reuse the Tidewave-enabled server on `127.0.0.1:5178`; do not start a second
   Vite server or disturb unrelated servers on other ports. If Tidewave browser
-  control is disconnected, open `http://127.0.0.1:5178/tidewave` in the user's
-  main Chrome profile and reconnect it.
+  control is disconnected, hand the owner `http://127.0.0.1:5178/tidewave` to
+  open and reconnect; never open their browser yourself.
 - Tidewave complements Playwright rather than replacing it. Use Playwright MCP
   and the committed screenshot harnesses for repeatable viewport, DOM,
   geometry, network, and visual-regression evidence.
@@ -64,7 +64,14 @@ Details in CLAUDE.md, verification step 2.
 
 ## Shell rules
 
-One logical operation per command — no `&&`, `||`, or `;` chaining. Pipes are
-fine. A PreToolUse hook enforces this for Claude Code; other agents should
-follow it anyway so tool logs stay readable. Chaining inside `package.json`
-scripts is exempt.
+Chaining with `&&` is fine. Never `rm -rf`: it stalls on a prompt. Delete
+files one by one.
+
+## Studio standards (5 October 2026)
+
+- **Art:** Blender is the default for anything sculpted, rigged, UV-mapped or with baked shading. Simple parametric props may be code. Systems (terrain, water, sky, particles, UI, placement) are code. Run the studio's `render-validate` before any GLB counts as delivered. No freelancers or paid art packs. Concept art is drawn at the real game camera.
+- **Mockups:** the shared standard is `docs/mockups/` with `screens/` (the spec) and `rounds/YYYYMMDD-<topic>/` (README front matter, a pick page with today's design and "none of these"; nothing is overwritten). Run `npm start`, `npm run shots`, `npm run index`. This repo's shelf port is 4330.
+- **Browsers:** all automation is headless. Never open the owner's browser (no `open http://...`, no Claude in Chrome) unless asked; hand over the URL.
+- **Blender:** short headless jobs (`blender -b`), at most three at once. The interactive MCP only when the owner is watching.
+- **Working with the owner:** when asked for research or plans, build nothing until told to go. Show results as old work next to new work.
+- **Knowledge:** the `studio-handbook` skill holds the current answers; add findings there.

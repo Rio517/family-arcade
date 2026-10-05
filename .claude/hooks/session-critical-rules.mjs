@@ -15,16 +15,15 @@ const CONTEXT = `Family Arcade — critical session rules (read before any tool 
    \`-\` prefix means it already landed and you must re-cut a branch and
    cherry-pick. Never stack on merged history. Never create merge commits on
    a PR branch.
-2. NEVER chain shell commands with \`&&\`, \`||\`, or \`;\` — one logical operation
-   per Bash call. Pipes are fine. The no-compound-commands.mjs PreToolUse hook
-   blocks you. (npm-script chaining inside package.json is exempt.)
+2. NEVER \`rm -rf\`: it stalls on a prompt. Delete files one by one. Chaining
+   with \`&&\` is fine.
 3. VERIFY: \`npm run check\` (tsc + eslint + knip), \`npx vitest run\`, and
    \`npm run build\` must all be clean. The real typecheck is the \`tsc -b\` in
    build — delete stray *.tsbuildinfo before trusting it.
 4. TIDEWAVE FIRST: for application, UI, and TypeScript work, confirm and use
    the project Tidewave MCP for source-aware inspection, runtime evaluation,
    logs, and real-player interactions. Reuse port 5178; if browser control is
-   disconnected, connect /tidewave in the user's main Chrome profile. Keep
+   disconnected, hand the owner the /tidewave URL; never open their browser. Keep
    Playwright for repeatable viewport, DOM, network, and screenshot evidence.
 5. PROVE UI IN A BROWSER: \`npm run shots\` builds, serves, and screenshots into
    docs/screenshots/. A shot counts once you have OPENED it and said what it

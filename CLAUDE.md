@@ -182,11 +182,8 @@ using **rebase merges** (sometimes squash). Therefore:
 `.claude/settings.json` carries a read-mostly permission allowlist (npm
 scripts, vitest, tsc, eslint, knip, read-only git and gh) so routine work
 doesn't prompt; force-push, remote branch deletion, and `rm -rf` stay gated.
-Three hooks back the rules that sessions actually broke:
+Two hooks back the rules that sessions actually broke:
 
-- `.claude/hooks/no-compound-commands.mjs` (PreToolUse) blocks `&&`/`||`/`;`
-  chaining. Pipes, `$(...)`, and heredocs are fine. npm-script chaining inside
-  `package.json` is exempt — the rule is about tool calls.
 - `.claude/hooks/session-critical-rules.mjs` (SessionStart) injects the short
   rules block. Edit it when a rule changes; keep it short or it stops working.
 - `.claude/hooks/tidewave-autostart.mjs` (SessionStart) starts the Tidewave dev
@@ -234,8 +231,8 @@ Three consequences worth knowing:
   MCP connection, then use Tidewave for source-aware discovery, runtime
   evaluation, logs, and real-player interactions before reaching for generic
   inspection tools. If browser control reports that no browser is connected,
-  open `http://127.0.0.1:5178/tidewave` in the user's main Chrome profile and
-  reconnect it. Do not open a different Chrome profile for Tidewave work.
+  hand the owner `http://127.0.0.1:5178/tidewave` to open and reconnect; never
+  open their browser yourself.
 - **Reuse the server on port 5178.** Do not start another Vite server when the
   Tidewave server is already running, and do not stop or repurpose unrelated
   servers on other ports. If Tidewave is unavailable, report that explicitly,
