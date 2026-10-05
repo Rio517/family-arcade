@@ -231,6 +231,41 @@ npm run new-game   # scaffold a playable starter game (docs/development/adding-a
 npm run glb        # optimise a 3D model for the bundle (see scripts/optimize-glb.mjs)
 ```
 
+### Coding agents (Claude Code, Codex)
+
+The agent setup is in the repo, so it works for anyone who clones it:
+
+- **Instructions:** `CLAUDE.md` (the working agreements: architecture, the
+  git workflow, how to verify a change), `AGENTS.md` (the short version for
+  every agent, pointing to `CLAUDE.md`) and `.claude/skills/audit/` (the
+  `/audit` codebase sweep).
+- **Tidewave** (run code in the live app, read its logs, use the page): the
+  `tidewave()` Vite plugin serves it from the dev server,
+  `npm run dev:tidewave` on `127.0.0.1:5178`. `.mcp.json` (Claude Code) and
+  `.codex/config.toml` (Codex) connect to
+  `http://127.0.0.1:5178/tidewave/mcp`. The tools exist only while that
+  server runs, and a session looks for them when it starts. If the server
+  came up later, reconnect (`/mcp` in Claude Code) or restart the session.
+  The plugin turns itself off in `vite build`, so it never reaches the app.
+- **Hooks:** `.claude/settings.json` runs two at session start.
+  `session-critical-rules.mjs` gives the agent the rules sessions most
+  often broke. `tidewave-autostart.mjs` starts the Tidewave server when
+  port 5178 is free. Codex has no hooks here; it reads the same rules in
+  `AGENTS.md`.
+- **Permissions:** `.claude/settings.json` lets routine commands run
+  without a prompt: the npm scripts, the test and lint tools, everyday git
+  commands except push, and `gh pr` and `gh run`. It asks first before a
+  force-push, deleting a remote branch, `npm publish` or `rm -rf`. Personal
+  additions go in `.claude/settings.local.json`, which git ignores.
+- **Browsers** are headless: `npm run shots` drives Playwright's own
+  Chromium and WebKit. For measuring the page live, bring your own headless
+  Playwright or Chrome DevTools MCP; the repo doesn't configure one.
+
+What you bring yourself: Claude Code or Codex, signed in; Node 20 (from
+`mise.toml` or `.nvmrc`); and Playwright's browsers, installed once with
+`npx playwright install chromium webkit`. Nothing here depends on a
+particular machine or a parent folder.
+
 ### Project layout
 
 The app is organised so each game is **self-contained** and the shared platform

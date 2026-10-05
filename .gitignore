@@ -9,3 +9,6 @@ node_modules/.tmp/
 
 # Agent worktrees (transient working copies)
 .claude/worktrees/
+
+# Personal Claude Code settings (the shared ones are .claude/settings.json)
+.claude/settings.local.json
