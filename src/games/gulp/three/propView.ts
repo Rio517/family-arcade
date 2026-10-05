@@ -5,9 +5,11 @@
  * go into batches of their own, made as they are needed, and rise there; a
  * slot let go by an eaten one is used again. A swallowed thing tips into its hole
  * (`swallow`, `stepFallers`, and fall.ts for the way it moves), and a
- * swallowed ship's containers spill off on their own (`stepCargo`); one too
- * big to swallow rocks on the rim of the child's hole (`wobble`); one in the
- * way of the camera goes see-through (see seeThrough.ts).
+ * swallowed ship's containers spill off on their own (`stepCargo`), as real
+ * bodies that pile up in the hole once the physics has loaded (see
+ * spillPhysics.ts); one too big to swallow rocks on the rim of the child's
+ * hole (`wobble`); one in the way of the camera goes see-through (see
+ * seeThrough.ts).
  */
 import * as THREE from 'three';
 import { FIT, KINDS, isSite, type Prop } from '../domain/catalog';
@@ -18,6 +20,7 @@ import { groundAt } from './ground';
 import { containerModel, hullModel, modelOf } from './models';
 import { CONTAINER, shipCargo } from './park';
 import { SeeThrough } from './seeThrough';
+import type { Piece, Pile, SpillPhysics } from './spillPhysics';
 
 /**
  * How long a swallowed thing takes to go, in seconds: a cone is gone in half
@@ -134,6 +137,8 @@ interface CargoBox {
   off: boolean;
   u: number;
   time: number;
+  /** Its body in the ship's pile, once it has left the deck; null while riding or when it spills the scripted way. */
+  piece: Piece | null;
 }
 
 /** A swallowed ship's containers, one batch per colour. */
@@ -152,6 +157,8 @@ interface Cargo {
   cz: number;
   r: number;
   y0: number;
+  /** Its containers as real bodies piling up in the hole, or null to spill them the scripted way (see spillPhysics.ts). */
+  pile: Pile | null;
 }
 
 /** Something put up during the round, rising: `t` runs 0..1 over `time` seconds. */
@@ -210,6 +217,8 @@ export class PropView {
     private looseMaterial: THREE.MeshStandardMaterial,
     world: World,
     private reducedMotion: boolean,
+    /** Real bodies for a swallowed ship's containers, once loaded; without, they spill the scripted way. */
+    private spills: SpillPhysics | null = null,
   ) {
     this.lastWorld = world;
     this.seeThrough = new SeeThrough(scene, material, reducedMotion, (p, shown) => this.setShown(p, shown));
@@ -392,6 +401,7 @@ export class PropView {
     this.blobMat.dispose();
     for (const g of this.blobGeos.values()) g.dispose();
     this.seeThrough.dispose();
+    for (const c of this.cargo) c.pile?.finish();
   }
 
   private buildBatches(world: World): void {
@@ -655,7 +665,9 @@ export class PropView {
     }
     const seed = p.id * 7919;
     const { hole, cx, cz, r, y0 } = ship;
-    const cargo: Cargo = { ship, meshes: [...meshes.values()], boxes: [], left: boxes.length, seed, hole, cx, cz, r, y0 };
+    // The pile's floor and rim are at the mouth's level, where the hole is drawn.
+    const pile = this.spills?.pile(hole, cx, cz, groundAt(this.lastWorld.city, cx, cz), r, boxes.length) ?? null;
+    const cargo: Cargo = { ship, meshes: [...meshes.values()], boxes: [], left: boxes.length, seed, hole, cx, cz, r, y0, pile };
     const stacks = [...new Set(boxes.map((b) => `${b.x}:${b.z}`))];
     for (const b of boxes) {
       const mesh = meshes.get(b.color)!;
@@ -671,6 +683,7 @@ export class PropView {
         off: false,
         u: 0,
         time: SPILL_TIME * (0.85 + 0.3 * noise(seed, 100 + cargo.boxes.length)),
+        piece: null,
       });
     }
     this.cargo.push(cargo);
@@ -679,9 +692,21 @@ export class PropView {
 
   /** Swallowed ships' containers, riding and spilling; each ship's batches are freed once all of its containers are gone. */
   private stepCargo(world: World, dt: number): void {
+    if (this.cargo.length) this.spills?.step(dt);
     for (let i = this.cargo.length - 1; i >= 0; i--) {
       const c = this.cargo[i];
       this.moveCargo(c, world, dt);
+      // The pile has rested and sunk out of sight: its containers are gone.
+      if (c.pile?.update(dt)) {
+        for (const b of c.boxes) {
+          if (!b.piece || b.u >= 1) continue;
+          b.u = 1;
+          b.mesh.setMatrixAt(b.index, HIDDEN);
+          c.left--;
+        }
+        for (const m of c.meshes) m.instanceMatrix.needsUpdate = true;
+        c.pile = null;
+      }
       if (c.left > 0) continue;
       for (const m of c.meshes) {
         this.scene.remove(m);
@@ -705,6 +730,7 @@ export class PropView {
       c.cz = h.z;
       c.r = h.r;
     }
+    c.pile?.follow(c.cx, c.cz);
     const ship = c.ship;
     if (ship) ship.mesh.updateMatrix();
     for (let n = 0; n < c.boxes.length; n++) {
@@ -716,6 +742,7 @@ export class PropView {
           b.u = 1;
           b.mesh.setMatrixAt(b.index, HIDDEN);
           c.left--;
+          c.pile?.skip();
           continue;
         }
         this.boxAt.copy(b.local).applyMatrix4(ship.mesh.matrix);
@@ -727,18 +754,16 @@ export class PropView {
         }
         // Its turn: off the side of the deck, from where it is now.
         const rot = ship.fall.rot;
-        startSpill(
-          b.spill,
-          this.boxAt.x - c.cx,
-          this.boxAt.y - c.y0,
-          this.boxAt.z - c.cz,
-          ship.mesh.quaternion,
-          Math.cos(rot) * b.side,
-          -Math.sin(rot) * b.side,
-          c.r,
-          c.seed + 31 * n,
-        );
+        const sideX = Math.cos(rot) * b.side;
+        const sideZ = -Math.sin(rot) * b.side;
+        startSpill(b.spill, this.boxAt.x - c.cx, this.boxAt.y - c.y0, this.boxAt.z - c.cz, ship.mesh.quaternion, sideX, sideZ, c.r, c.seed + 31 * n);
         b.off = true;
+        // The same start, played out by the physics: it tumbles, knocks on the rim and lands on the pile.
+        b.piece = c.pile?.add(this.boxAt, ship.mesh.quaternion, b.spill, sideX, sideZ) ?? null;
+      }
+      if (b.piece) {
+        b.mesh.setMatrixAt(b.index, c.pile?.place(b.piece, this.boxMatrix) ? this.boxMatrix : HIDDEN);
+        continue;
       }
       b.u = Math.min(1, b.u + dt / b.time);
       spillPose(b.spill, b.u, c.r, pose);
