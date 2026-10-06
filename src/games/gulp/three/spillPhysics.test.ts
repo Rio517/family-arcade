@@ -123,6 +123,31 @@ describe('a swallowed ship spilling its containers as real bodies', () => {
     spills.dispose();
   });
 
+  it('never makes a container jump once the heap has formed', async () => {
+    // A body the physics rested while what it leant on still moved used to
+    // hang, sink into the one under it and then jump out, metres in a frame.
+    const { w, ships } = harbour();
+    const spills = new SpillPhysics();
+    await spills.load();
+    const { scene, props } = view(w, spills);
+    props.swallow(ships[0], 0);
+    for (let t = 0; t < 2; t += STEP) props.step(w, STEP);
+    let before = containers(scene);
+    let fastest = 0;
+    for (let t = 0; t < 1.5; t += STEP) {
+      props.step(w, STEP);
+      const now = containers(scene);
+      // Gone once the hole gulps the heap down; the check is over by then.
+      if (now.length !== before.length) break;
+      for (let i = 0; i < now.length; i++) fastest = Math.max(fastest, now[i].distanceTo(before[i]) / STEP);
+      before = now;
+    }
+    // World units a second: about 12 for a container settling into the heap; a jump was over 130.
+    expect(fastest).toBeLessThan(30);
+    props.dispose();
+    spills.dispose();
+  });
+
   it('piles up the same way every time, so its pictures repeat', async () => {
     const piles: string[][] = [];
     for (let run = 0; run < 2; run++) {
@@ -186,7 +211,7 @@ describe('a swallowed ship spilling its containers as real bodies', () => {
 
   it('gives up on a Rapier that never finishes starting, and spills the scripted way', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    // Loads, but its start-up never ends: the kit's own time limit covers only the download.
+    // Loads, but its start-up never ends: the kit's time limit covers the download and the start-up together.
     const stuck = { World: function World() {}, init: () => new Promise(() => {}) };
     const spills = new SpillPhysics(() => Promise.resolve(stuck), 50);
     expect(await spills.load()).toBe(false);

@@ -77,19 +77,14 @@ const SINK = 0.7;
 /**
  * The pile is still once no container has moved faster than this (lane
  * units a second) for `STILL_TIME`: a heap keeps jittering a hair long after
- * it looks settled, and the kit only puts a body to sleep once it is quite
- * still, so the pile does not wait for that.
+ * it looks settled, and Rapier puts a body to sleep only after it has been
+ * still for a while, so the pile does not wait for that.
  */
 const STILL_SPEED = 0.15;
 const STILL_TIME = 0.35;
-/** A push too small to see that wakes a body (Rapier ignores a zero one). */
-const WAKE = 1e-6;
 /** A container left lying still this long on the street outside the mouth is pushed back in, at most `NUDGES` times. */
 const NUDGE_AFTER = 0.3;
 const NUDGES = 3;
-
-/** Steps taken when the world is made, so the first spill does not pay for Rapier's start (see `warmUp`). */
-const WARM_STEPS = 30;
 
 const ONE = new THREE.Vector3(1, 1, 1);
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -239,13 +234,6 @@ export class Pile {
     for (const piece of this.pieces) {
       const body = piece.body;
       if (!body || body.removed) continue;
-      // The kit puts a body that has been slow for a moment to sleep, but
-      // while anything it touches still moves, Rapier goes on moving it
-      // under gravity without its contacts, and the kit stops drawing it: a
-      // container would hang, sink into the one under it, then jump out.
-      // Woken at once it stays solid and is drawn where it is; the pile
-      // comes to rest by `STILL_SPEED` instead.
-      if (body.asleep) body.applyImpulse(0, WAKE, 0);
       const p = piece.proxy.position;
       if (p.y < -FLOOR - MOUTH) {
         // Fell out of the world (it never should): it is gone.
@@ -306,7 +294,7 @@ export class SpillPhysics {
   constructor(
     /** For tests: load Rapier some other way (or fail to). */
     private loadRapier?: PhysicsOptions['loadRapier'],
-    /** Give up after this long and spill the scripted way: the kit's own limit covers the download, not Rapier's start-up after it. */
+    /** Give up on Rapier's download and start-up after this long, together, and spill the scripted way. */
     private loadLimitMs = 10_000,
   ) {}
 
@@ -385,24 +373,17 @@ export class SpillPhysics {
 
   private async make(): Promise<boolean> {
     let world: PhysicsWorld | null = null;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const made = createPhysics({
+      // The kit warms Rapier up before it resolves, so the first spill's
+      // first step is cheap.
+      world = await createPhysics({
         gravity: -GRAVITY,
         maxBodies: MAX_BODIES,
         loadRapier: this.loadRapier,
+        initTimeoutMs: this.loadLimitMs,
         onEvict: (body) => this.evicted(body),
         onFallback: (error) => console.warn('Gulp: no physics for spills, they stay scripted', error),
       });
-      const late = new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), this.loadLimitMs);
-      });
-      world = await Promise.race([made, late]);
-      if (!world) {
-        console.warn('Gulp: the spill physics took too long to start, spills stay scripted');
-        void made.then((w) => w.dispose());
-        return false;
-      }
       // The kit's own fallback has no walls and no contact between bodies:
       // fall.ts's scripted spill suits a Gulp hole better.
       if (this.disposed || world.backend !== 'rapier') {
@@ -410,15 +391,12 @@ export class SpillPhysics {
         return false;
       }
       for (const lane of this.lanes) build(world, lane.x);
-      warmUp(world);
       this.world = world;
       return true;
     } catch (error) {
       console.warn('Gulp: no physics for spills, they stay scripted', error);
       world?.dispose();
       return false;
-    } finally {
-      clearTimeout(timer);
     }
   }
 
@@ -443,20 +421,6 @@ export class SpillPhysics {
       // It is already broken; nothing more to free.
     }
   }
-}
-
-/**
- * Rapier's first steps are slow (about 30 ms on a fast Mac, many times that
- * on an old iPad): a box dropped into the first lane takes them now, while
- * the round counts down, instead of on the frame the first container leaves
- * a ship's deck.
- */
-function warmUp(world: PhysicsWorld): void {
-  const box = new THREE.Object3D();
-  box.position.set(0, -BOWL_DEEP + 2, 0);
-  const body = world.addBody(box, { size: { x: 1, y: 1, z: 2.5 } });
-  for (let i = 0; i < WARM_STEPS; i++) world.step(1 / 60);
-  body.remove();
 }
 
 /** A lane's colliders, its middle at `x`: the street round the mouth, the throat's wall, its floor. */
