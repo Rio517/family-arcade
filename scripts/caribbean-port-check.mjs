@@ -2763,7 +2763,7 @@ export async function runStrategicSailingJourney({
     await page.getByTestId('port-action-log').click();
     await page.getByTestId('captains-log-last-voyage').waitFor();
     const victoryReturnCopy = 'Victory — Red Jackdaw ready to board · Returned on day 4.';
-    const safeReturnCopy = 'Bridgetown’s harbour crew made Mistral ready for the next departure; the battle outcome remains in this log, but its damage is not carried onto the ready flagship.';
+    const safeReturnCopy = 'The harbour crew fixed Mistral for the next trip. The battle stays in this log, but its damage does not carry over.';
     invariant(await page.getByText(victoryReturnCopy, { exact: true }).isVisible(), 'victory return Log copy drifted');
     invariant(await page.getByText(safeReturnCopy, { exact: true }).isVisible(), 'safe-return Log copy drifted');
     completion = {
@@ -2812,8 +2812,8 @@ export async function runStrategicSailingJourney({
       raw: corruptRaw,
     });
     await page.reload({ waitUntil: 'networkidle' });
-    await page.getByRole('heading', { name: 'Campaign recovery required' }).waitFor();
-    await page.getByRole('button', { name: 'Recover known-good campaign' }).click();
+    await page.getByRole('heading', { name: 'Save needs repair' }).waitFor();
+    await page.getByRole('button', { name: 'Recover last save' }).click();
     await page.getByTestId('naval-elapsed').waitFor();
     const recoveryState = await page.evaluate(({ currentKey, prefix, corrupt }) => {
       const current = localStorage.getItem(currentKey);
@@ -3115,7 +3115,7 @@ export async function runPortMemoryWarningProbe(browser, baseUrl, viewport) {
     await readLayout(page, `memoryConsent${viewport.width}x${viewport.height}`, controlViewport);
     await page.getByRole('button', { name: 'Continue without saving' }).click();
     await page.getByTestId('caribbean-career-ready').waitFor();
-    await page.getByText('This career is not being saved. Keep this tab open.').waitFor();
+    await page.getByText('Not saving. Keep this tab open: progress is lost if you close it.').waitFor();
     await settle(page);
     const geometry = await page.evaluate((viewport) => {
       const wrapper = document.querySelector('.caribbean-production');
@@ -3412,7 +3412,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
       raw: corruptRaw,
     });
     await page.reload({ waitUntil: 'networkidle' });
-    await page.getByRole('heading', { name: 'Campaign recovery required' }).waitFor();
+    await page.getByRole('heading', { name: 'Save needs repair' }).waitFor();
     const recoveryLayout = await readLayout(page, 'recoveryDesktop', VIEWPORTS.setupDesktop);
     await capture(page, screenshots, runDirectory, 'recovery-desktop.png');
     await page.setViewportSize({ width: 960, height: 600 });
@@ -3441,7 +3441,7 @@ async function runJourney(browser, baseUrl, runDirectory, emittedArt, emittedNav
     });
     invariant(exportedRaw === expectedExport, 'Recovery export did not preserve the exact corrupt bytes/revision');
 
-    await page.getByRole('button', { name: 'Recover known-good campaign' }).click();
+    await page.getByRole('button', { name: 'Recover last save' }).click();
     await page.getByRole('heading', { name: 'Mario’s commission' }).waitFor();
     const recoveredStorage = await page.evaluate(({ prefix, currentKey, previousKey, corrupt }) => {
       const quarantineKeys = Object.keys(localStorage).filter((key) => key.startsWith(prefix));

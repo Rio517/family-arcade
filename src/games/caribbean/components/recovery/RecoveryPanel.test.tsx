@@ -131,17 +131,17 @@ describe('<RecoveryPanel>', () => {
     const view = controller();
     render(<RecoveryPanel controller={view} />);
 
-    expect(screen.getByRole('heading', { name: 'Campaign recovery required' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Save needs repair' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Download recovery file' }));
     expect(capturedBlob?.parts).toEqual([serializeRecoveryExport(REVISION, UNREADABLE)]);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:recovery');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Recover known-good campaign' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Recover last save' }));
     expect(view.recover).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Abandon campaign' }));
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
-    fireEvent.click(screen.getByRole('button', { name: 'Quarantine and abandon' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abandon it' }));
     expect(view.abandon).toHaveBeenCalledTimes(1);
   });
 
@@ -150,13 +150,13 @@ describe('<RecoveryPanel>', () => {
     render(<RecoveryPanel controller={view} />);
     expect(screen.getByRole('button', { name: 'Download recovery file' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Recover known-good campaign' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Recover last save' })).not.toBeInTheDocument();
   });
 
   it.each([
-    ['storage-unavailable', 'Storage became unavailable during read-quarantine.'],
-    ['partial-cleanup', 'Cleanup stopped during remove-current.'],
-    ['republish-failed', 'The recovered campaign could not be published during write-current.'],
+    ['storage-unavailable', 'Saving stopped partway. Your backup copy is safe. Try recovery again.'],
+    ['partial-cleanup', 'Cleanup stopped partway. Your backup copy is safe. Try again.'],
+    ['republish-failed', 'The recovered campaign could not be saved. Your backup copy is safe. Try again.'],
   ] as const)('keeps truthful %s continuation diagnostics and reuses the same continuation', (cause, copy) => {
     const view = controller({ persistence: continuationPhase(cause) });
     render(<RecoveryPanel controller={view} />);
@@ -165,7 +165,7 @@ describe('<RecoveryPanel>', () => {
     expect(screen.getByText(/quarantine:one · cleanup/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry recovery' }));
     expect(view.continueRecovery).toHaveBeenCalledWith('continue');
-    fireEvent.click(screen.getByRole('button', { name: 'Abandon from quarantine' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abandon campaign' }));
     expect(view.continueRecovery).toHaveBeenCalledWith('abandon');
   });
 
@@ -184,31 +184,31 @@ describe('<RecoveryPanel>', () => {
       },
     };
     render(<RecoveryPanel controller={controller({ persistence })} />);
-    expect(screen.getByRole('alert')).toHaveTextContent(/quarantine copy changed/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/backup copy changed/i);
     expect(screen.queryByRole('button', { name: /retry recovery/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /abandon from quarantine/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /abandon campaign/i })).not.toBeInTheDocument();
   });
 
   it.each([
     [
       'active revision conflict',
       { ok: false, reason: 'active-revision-conflict', expected: REVISION, actual: { currentRaw: '{new}', previousRaw: null } },
-      'The active campaign changed before quarantine.',
+      'The campaign changed before the backup finished.',
     ],
     [
       'quarantine collision',
       { ok: false, reason: 'quarantine-collision', quarantineKey: continuation.quarantineKey, expectedRaw: continuation.quarantineRaw, actualRaw: '{foreign}' },
-      'The selected quarantine key already belongs to a different recovery copy.',
+      'A different backup already uses this name.',
     ],
     [
       'storage failure before verification',
       { ok: false, reason: 'storage-unavailable', stage: 'before-quarantine', operation: 'verify-quarantine' },
-      'Storage became unavailable during verify-quarantine, before quarantine was verified.',
+      'Saving stopped before the backup was checked.',
     ],
     [
       'invalid recovery source',
       { ok: false, reason: 'invalid-recovery-source' },
-      'The loaded save is not a valid recovery source.',
+      'This save can’t be recovered from.',
     ],
   ] as const)('retains truthful blocked diagnostics for %s', (_label, result, copy) => {
     const persistence = { kind: 'recovery-blocked', result } as CaribbeanPersistencePhase;
@@ -235,7 +235,7 @@ describe('<RecoveryPanel>', () => {
     const view = controller({ persistence });
     render(<RecoveryPanel controller={view} />);
 
-    expect(screen.getByRole('button', { name: 'Download verified quarantine' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download backup' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reload newer save' }));
     expect(view.reloadExternalSave).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
@@ -249,9 +249,9 @@ describe('<RecoveryPanel>', () => {
     });
     render(<RecoveryPanel controller={view} />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/safe save ownership is unavailable/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/can’t change saves/i);
     expect(screen.getByRole('button', { name: 'Download recovery file' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Recover known-good campaign' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Recover last save' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeDisabled();
   });
 
@@ -264,8 +264,8 @@ describe('<RecoveryPanel>', () => {
     });
     render(<RecoveryPanel controller={view} />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/ownership was denied/i);
-    expect(screen.getByRole('button', { name: 'Recover known-good campaign' })).toBeEnabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/couldn’t change saves/i);
+    expect(screen.getByRole('button', { name: 'Recover last save' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeEnabled();
   });
 
@@ -287,11 +287,10 @@ describe('<RecoveryPanel>', () => {
     });
     render(<RecoveryPanel controller={view} />);
 
-    expect(screen.getByRole('heading', { name: 'Campaign storage must be reread' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Reload to continue' })).toBeInTheDocument();
     expect(screen.queryByText(/active save could not be used as-is/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent(/recovery completed/i);
-    expect(screen.getByRole('alert')).toHaveTextContent(/read-current/i);
-    expect(screen.getByRole('button', { name: 'Recover known-good campaign' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/recovery finished/i);
+    expect(screen.getByRole('button', { name: 'Recover last save' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeDisabled();
   });
 

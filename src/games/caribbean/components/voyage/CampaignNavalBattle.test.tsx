@@ -82,7 +82,7 @@ describe('<CampaignNavalBattle>', () => {
     expect(await screen.findByTestId('naval-battle-page')).toBeInTheDocument();
     expect(session.state.input).toEqual(savedInput(controller));
     expect(JSON.stringify(session.state.input)).toBe(JSON.stringify(savedInput(controller)));
-    expect(screen.getByText('Reloading restarts this engagement from first contact.')).toBeVisible();
+    expect(screen.getByText('Reloading restarts this battle from first contact.')).toBeVisible();
     act(() => session.deliverFrame(1 / 10));
     expect(session.state.tick).toBe(6);
     expect(controller.journal).toEqual(before);
@@ -188,7 +188,7 @@ describe('<CampaignNavalBattle>', () => {
       render(<CampaignNavalBattle controller={controller} />);
 
       fireEvent.click(screen.getByTestId('naval-result-action'));
-      expect(await screen.findByTestId('naval-resolution-error')).toHaveTextContent('Battle result could not be verified.');
+      expect(await screen.findByTestId('naval-resolution-error')).toHaveTextContent('The battle result could not be checked. Your campaign is safe. Restart or withdraw.');
       expect(screen.getByTestId('naval-resolution-restart')).toHaveFocus();
       expect(controller.resolveBattle).toHaveBeenCalledTimes(failure === 'reducer' ? 1 : 0);
       expect(controller.withdrawBattle).not.toHaveBeenCalled();
@@ -211,7 +211,7 @@ describe('<CampaignNavalBattle>', () => {
     render(<CampaignNavalBattle controller={controller} />);
 
     fireEvent.click(screen.getByTestId('naval-result-action'));
-    expect(await screen.findByText('Battle result was not saved.')).toHaveAttribute('role', 'status');
+    expect(await screen.findByText('Result not saved. Your campaign is safe. Try again.')).toHaveAttribute('role', 'status');
     expect(screen.getByTestId('naval-result-action')).toBeVisible();
     expect(screen.queryByTestId('naval-resolution-error')).not.toBeInTheDocument();
   });
@@ -235,7 +235,7 @@ describe('<CampaignNavalBattle>', () => {
     expect(session.state.tick).toBe(0);
 
     await act(async () => rejectWithdrawal?.(new Error('writer exploded')));
-    expect(await screen.findByTestId('naval-withdrawal-error')).toHaveTextContent('Withdrawal was not completed.');
+    expect(await screen.findByTestId('naval-withdrawal-error')).toHaveTextContent('Withdrawal didn’t finish. Your campaign is safe. Try again, or resume the battle.');
     expect(session.paused).toBe(true);
     expect(screen.getByTestId('naval-withdrawal-retry')).toBeVisible();
     expect(screen.getByTestId('naval-withdrawal-resume')).toBeVisible();

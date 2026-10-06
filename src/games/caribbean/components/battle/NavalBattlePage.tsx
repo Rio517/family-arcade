@@ -31,7 +31,7 @@ export interface NavalExitAction {
 }
 
 export interface NavalResolutionErrorAction {
-  message: 'Battle result could not be verified.';
+  message: 'The battle result could not be checked. Your campaign is safe. Restart or withdraw.';
   busy: boolean;
   restartLabel: 'Restart engagement';
   withdrawLabel: 'Withdraw to Bridgetown';
@@ -106,14 +106,13 @@ function outcomeCopy(
   }
   if (outcome.kind === 'escaped') {
     const ship = state.ships[outcome.shipId];
-    const distance = Math.hypot(ship.position.x, ship.position.z).toFixed(1);
-    return { heading: 'Escaped', detail: `${ship.name} crossed the ${state.input.arenaRadius}-unit boundary at radial range ${distance} while moving outward.`, action: 'Restart Battle Lab' };
+    return { heading: 'Escaped', detail: `${ship.name} sailed out of the battle area.`, action: 'Restart Battle Lab' };
   }
   if (outcome.kind === 'separated') {
     const separated = state.ships[outcome.shipId];
-    return { heading: 'Separated', detail: `${separated.name} remained in an undecided engagement when tick ${state.tick} reached the ${state.input.timeLimitTicks}-tick limit.`, action: 'Restart Battle Lab' };
+    return { heading: 'Separated', detail: 'Time ran out. Neither ship won.', action: 'Restart Battle Lab' };
   }
-  return { heading: 'Battle complete', detail: 'The engagement reached a decisive result.', action: 'Restart Battle Lab' };
+  return { heading: 'Battle complete', detail: 'The battle is over.', action: 'Restart Battle Lab' };
 }
 
 function useReducedMotionPreference(): boolean {
@@ -486,7 +485,7 @@ export function NavalBattlePage({
       {diagnostic && (
         <div className="naval-diagnostic" role="dialog" aria-modal="true" aria-labelledby="naval-diagnostic-title">
           <WarningIcon size={28} />
-          <div><strong id="naval-diagnostic-title">Battle state drift detected</strong><span>{diagnostic.issues.join(', ')}</span></div>
+          <div><strong id="naval-diagnostic-title">Battle error</strong><span>{diagnostic.issues.join(', ')}</span></div>
           <button
             ref={terminalActionRef}
             type="button"

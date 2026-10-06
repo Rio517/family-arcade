@@ -31,22 +31,22 @@ function recoveryActionCopy(
   failure: RecoveryActionFailure | null,
 ): string | null {
   if (failure?.kind === 'post-result-load') {
-    return `Campaign abandonment completed, but campaign storage could not be reread during ${failure.loadFailure.operation}. Reload before continuing.`;
+    return 'The campaign was abandoned, but saves could not be read again. Reload the page to continue.';
   }
   if (failure?.kind === 'writer') {
     if (failure.failure.kind === 'writer-denied') {
-      return 'Safe save ownership was denied. The campaign was not abandoned; you can try again.';
+      return 'Couldn’t abandon the campaign. It is untouched. Try again.';
     }
     if (failure.failure.kind === 'writer-unavailable') {
-      return 'Safe save ownership is unavailable. Campaign abandonment is disabled in this browser.';
+      return 'This browser can’t change saves, so the campaign can’t be abandoned here. It is untouched.';
     }
     if (failure.failure.writer.kind === 'operation-threw') {
-      return 'The campaign abandonment operation threw before its outcome could be confirmed. Reload before continuing.';
+      return 'Couldn’t confirm the campaign was abandoned. Reload the page to check.';
     }
-    return 'Safe save ownership returned an invalid protocol result during abandonment. Reload before continuing.';
+    return 'Something went wrong while abandoning the campaign. Reload the page, then try again.';
   }
   return capability === 'unavailable'
-    ? 'Safe save ownership is unavailable. Campaign abandonment is disabled in this browser.'
+    ? 'This browser can’t change saves, so the campaign can’t be abandoned here. It is untouched.'
     : null;
 }
 
@@ -95,7 +95,7 @@ function AbandonDialog({
         >
           <h2 id="campaign-abandon-title">Abandon this campaign?</h2>
           <p id="campaign-abandon-description">
-            The save will be copied to quarantine before its active slots are removed.
+            A copy of the save is kept first, then the campaign is removed.
           </p>
           <div className="caribbean-dialog-actions">
             <button data-testid="caribbean-abandon-cancel-button" ref={cancelRef} type="button" onClick={onClose}>Cancel</button>
@@ -105,7 +105,7 @@ function AbandonDialog({
               type="button"
               onClick={() => { onClose(); onConfirm(); }}
             >
-              Quarantine and abandon
+              Abandon it
             </button>
           </div>
         </section>
@@ -180,10 +180,10 @@ export function CampaignSetup({
 
         {state !== null && showResume ? (
           <div className="caribbean-save-summary">
-            <h1>{postResultLoadFailure ? 'Campaign storage must be reread' : `${state.captain.name}’s commission`}</h1>
+            <h1>{postResultLoadFailure ? 'Reload to continue' : `${state.captain.name}’s commission`}</h1>
             {postResultLoadFailure ? (
               <p>
-                The storage change completed, but this page will not infer the active campaign until storage can be read again.
+                The change went through. Reload the page to see your saved campaign.
               </p>
             ) : (
               <>
@@ -238,7 +238,7 @@ export function CampaignSetup({
           <form onSubmit={submit} noValidate>
             <PlayingAs />
             <h1>Sign a captain’s commission</h1>
-            <p className="caribbean-intro">Choose your captain and their starting talent. Adventure begins from Bridgetown.</p>
+            <p className="caribbean-intro">Pick your captain’s name and talent. You start in Bridgetown.</p>
             <div className="caribbean-form-grid">
               <div className="caribbean-field">
                 <label htmlFor="caribbean-captain-name">Captain name</label>
@@ -278,8 +278,8 @@ export function CampaignSetup({
         {!savingAvailable && persistence.kind === 'persisted' && (
           <p className="caribbean-status" role="status">
             {cleanLoad === null
-              ? 'Saving disabled. No campaign has been created yet.'
-              : 'Saving disabled. Resume requires explicit memory-only consent.'}
+              ? 'Saving is off in this browser. No campaign exists yet.'
+              : 'Saving is off in this browser. To resume, choose to play without saving.'}
           </p>
         )}
         {persistence.kind === 'consent-required' && (

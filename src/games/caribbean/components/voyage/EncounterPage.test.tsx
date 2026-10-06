@@ -72,7 +72,7 @@ describe('<EncounterPage>', () => {
     const controller = encounterController();
     render(<EncounterPage controller={controller} />);
     fireEvent.click(screen.getByTestId('encounter-pursue'));
-    await waitFor(() => expect(screen.getByTestId('voyage-status')).toHaveTextContent('Pursuit was not saved.'));
+    await waitFor(() => expect(screen.getByTestId('voyage-status')).toHaveTextContent('Pursuit not saved. Nothing changed. Try again.'));
     expect(screen.getByTestId('encounter-avoid')).toBeEnabled();
     expect(screen.getByTestId('encounter-pursue')).toBeEnabled();
   });

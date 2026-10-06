@@ -86,7 +86,7 @@ export default function CampaignNavalBattle({
       const validation = validateNavalResolution(savedInput, candidate);
       if (!validation.ok) throw new Error(`Invalid campaign naval resolution: ${validation.issues.join(', ')}`);
       const result = await controller.resolveBattle(validation.value);
-      if (result.kind === 'not-applied') setResultStatus('Battle result was not saved.');
+      if (result.kind === 'not-applied') setResultStatus('Result not saved. Your campaign is safe. Try again.');
     } catch {
       setResolutionError(true);
     } finally {
@@ -113,7 +113,7 @@ export default function CampaignNavalBattle({
     activate: () => { void withdraw(); },
   }), [controller.busy, withdraw, withdrawBusy]);
   const resolutionErrorAction = resolutionError ? {
-    message: 'Battle result could not be verified.' as const,
+    message: 'The battle result could not be checked. Your campaign is safe. Restart or withdraw.' as const,
     busy: withdrawBusy || controller.busy,
     restartLabel: 'Restart engagement' as const,
     withdrawLabel: 'Withdraw to Bridgetown' as const,
@@ -135,7 +135,7 @@ export default function CampaignNavalBattle({
           resolutionErrorAction={resolutionErrorAction}
           interactionBlocked={withdrawalError || persistenceDecisionRequired}
         />
-        <p className="campaign-naval-battle__restart-note">Reloading restarts this engagement from first contact.</p>
+        <p className="campaign-naval-battle__restart-note">Reloading restarts this battle from first contact.</p>
         {resultStatus && <p className="campaign-naval-battle__status" role="status">{resultStatus}</p>}
       </div>
 
@@ -150,7 +150,7 @@ export default function CampaignNavalBattle({
         >
           <span>Campaign withdrawal</span>
           <h2 id="naval-withdrawal-error-title">Withdrawal interrupted</h2>
-          <p>Withdrawal was not completed.</p>
+          <p>Withdrawal didn’t finish. Your campaign is safe. Try again, or resume the battle.</p>
           <div className="naval-result-actions">
             <button
               ref={withdrawalRetryRef}

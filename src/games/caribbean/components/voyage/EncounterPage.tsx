@@ -29,8 +29,8 @@ export function EncounterPage({ controller }: { controller: CaribbeanController 
         ? await controller.avoidEncounter()
         : await controller.engageEncounter();
       setStatus(outcome.kind === 'applied'
-        ? choice === 'avoid' ? 'Return to Bridgetown saved.' : 'Engagement saved.'
-        : choice === 'avoid' ? 'Return was not saved.' : 'Pursuit was not saved.');
+        ? choice === 'avoid' ? 'Return to Bridgetown saved.' : 'Battle saved.'
+        : choice === 'avoid' ? 'Return not saved. Nothing changed. Try again.' : 'Pursuit not saved. Nothing changed. Try again.');
     } catch {
       setStatus(choice === 'avoid' ? 'Return failed. Try again.' : 'Pursuit failed. Try again.');
     } finally {
