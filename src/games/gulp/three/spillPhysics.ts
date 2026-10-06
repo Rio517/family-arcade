@@ -303,6 +303,8 @@ export class SpillPhysics {
   constructor(
     /** For tests: load Rapier some other way (or fail to). */
     private loadRapier?: PhysicsOptions['loadRapier'],
+    /** Give up after this long and spill the scripted way: the kit's own limit covers the download, not Rapier's start-up after it. */
+    private loadLimitMs = 10_000,
   ) {}
 
   /** Load Rapier and build the lanes, once. True when real physics is there; false and spills stay scripted. */
@@ -380,14 +382,24 @@ export class SpillPhysics {
 
   private async make(): Promise<boolean> {
     let world: PhysicsWorld | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      world = await createPhysics({
+      const made = createPhysics({
         gravity: -GRAVITY,
         maxBodies: MAX_BODIES,
         loadRapier: this.loadRapier,
         onEvict: (body) => this.evicted(body),
         onFallback: (error) => console.warn('Gulp: no physics for spills, they stay scripted', error),
       });
+      const late = new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), this.loadLimitMs);
+      });
+      world = await Promise.race([made, late]);
+      if (!world) {
+        console.warn('Gulp: the spill physics took too long to start, spills stay scripted');
+        void made.then((w) => w.dispose());
+        return false;
+      }
       // The kit's own fallback has no walls and no contact between bodies:
       // fall.ts's scripted spill suits a Gulp hole better.
       if (this.disposed || world.backend !== 'rapier') {
@@ -401,6 +413,8 @@ export class SpillPhysics {
       console.warn('Gulp: no physics for spills, they stay scripted', error);
       world?.dispose();
       return false;
+    } finally {
+      clearTimeout(timer);
     }
   }
 

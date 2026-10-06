@@ -184,6 +184,18 @@ describe('a swallowed ship spilling its containers as real bodies', () => {
     spills.dispose();
   });
 
+  it('gives up on a Rapier that never finishes starting, and spills the scripted way', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Loads, but its start-up never ends: the kit's own time limit covers only the download.
+    const stuck = { World: function World() {}, init: () => new Promise(() => {}) };
+    const spills = new SpillPhysics(() => Promise.resolve(stuck), 50);
+    expect(await spills.load()).toBe(false);
+    expect(spills.world).toBeNull();
+    expect(warn).toHaveBeenCalled();
+    const { me } = harbour();
+    expect(spills.pile(0, me.x, me.z, 0, me.r, 37)).toBeNull();
+  });
+
   it('lets the pile sink away if Rapier throws mid-spill, and spills later ships the scripted way', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { w, ships } = harbour();
