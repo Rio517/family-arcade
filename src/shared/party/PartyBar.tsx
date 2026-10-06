@@ -125,13 +125,13 @@ export function PartyBar({
                 </div>
               ) : party.status === 'error' ? (
                 <div className="party-waiting" data-testid="party-error">
-                  <span className="party-eyebrow">No luck yet</span>
+                  <span className="party-eyebrow">Not linked yet</span>
                   {/* A still-useful code is never hidden by an error. */}
                   {party.code && <div className="party-code" data-testid="party-code">{party.code}</div>}
                   <p className="party-hint">
                     {party.role === 'host'
-                      ? 'The other iPad has not come in. Is it awake?'
-                      : 'No party with that code right now.'}
+                      ? 'Is the other iPad awake? Give it a tap.'
+                      : 'No party has that code. Check it and try again.'}
                   </p>
                   <button className="party-btn primary" onClick={party.retry} data-testid="party-retry">Try again</button>
                   <WayOut party={party} onCode={() => setJoining(true)} />

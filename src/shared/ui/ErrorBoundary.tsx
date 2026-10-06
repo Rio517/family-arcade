@@ -29,10 +29,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { broken: 
     return (
       <div className="app center" role="alert" data-testid="arcade-crash">
         <div className="panel" style={{ maxWidth: 420, margin: '15vh auto 0' }}>
-          <h2>Uh oh — that game hit a glitch!</h2>
-          <p className="subtle">Nothing is lost. Head back to the arcade and try again.</p>
+          <h2 style={{ textTransform: 'uppercase' }}>Out of order</h2>
+          <p className="subtle">A gremlin got in. Nothing is lost: go back and try again.</p>
           <button className="btn btn-primary btn-block" onClick={this.reset} data-testid="crash-home">
-            ← Back to the arcade
+            ← Back to arcade
           </button>
         </div>
       </div>
