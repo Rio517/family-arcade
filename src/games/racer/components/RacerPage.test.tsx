@@ -384,7 +384,7 @@ describe('<RacerPage> — solo win overlay', () => {
     await winTheRace();
 
     expect(screen.getByTestId('racer-win')).toBeInTheDocument();
-    expect(screen.getByText('You win!')).toBeInTheDocument();
+    expect(screen.getByText('You win')).toBeInTheDocument();
     expect(screen.getByText(/Time:/)).toBeInTheDocument();
   });
 
@@ -500,7 +500,7 @@ describe('<RacerPage> — a two-player finish credits the racer on this device',
   it('a race the host wins puts a racer win over the friend on the host ticket', async () => {
     const { code } = await startNetRace('host');
     await hostCollectsTwenty();
-    expect(screen.getByText('You win!')).toBeInTheDocument();
+    expect(screen.getByText('You win')).toBeInTheDocument();
 
     const kai = ticket('u-kai');
     expect(kai.wins).toBe(1);
@@ -515,7 +515,7 @@ describe('<RacerPage> — a two-player finish credits the racer on this device',
   it('a race the friend wins puts a loss on the guest ticket, named for the friend', async () => {
     await startNetRace('guest');
     await hostSaysOver(0);
-    expect(screen.getByText('Rio wins!')).toBeInTheDocument();
+    expect(screen.getByText('Rio wins')).toBeInTheDocument();
 
     const kai = ticket('u-kai');
     expect(kai.losses).toBe(1);
@@ -528,7 +528,7 @@ describe('<RacerPage> — a two-player finish credits the racer on this device',
   it('a guest that wins is credited the win — the seat, not the host, decides who "me" is', async () => {
     await startNetRace('guest');
     await hostSaysOver(1, [4, 20]);
-    expect(screen.getByText('You win!')).toBeInTheDocument();
+    expect(screen.getByText('You win')).toBeInTheDocument();
 
     expect(ticket('u-kai').wins).toBe(1);
     expect(ticket('u-kai').history[0]).toMatchObject({ game: 'racer', opponent: 'Rio', result: 'win' });
@@ -611,7 +611,7 @@ describe('<RacerPage> — a two-player finish credits the racer on this device',
     startSoloRace('unicorn');
     await waitFor(() => expect(frames.length).toBeGreaterThan(0));
     await hostCollectsTwenty();
-    expect(screen.getByText('You win!')).toBeInTheDocument();
+    expect(screen.getByText('You win')).toBeInTheDocument();
 
     expect(getUsersSnapshot()).toBe(before);
   });

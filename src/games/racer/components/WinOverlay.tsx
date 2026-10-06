@@ -9,11 +9,14 @@ export function WinOverlay({ ctx, onAgain, onMenu }: { ctx: RaceCtx; onAgain: ()
   const iWon = ctx.winner === ctx.myIndex;
   const tie = ctx.mode === 'net' && ctx.winner === null;
   const title = tie
-    ? 'A tie! You both win!'
+    ? 'It is a tie'
     : iWon
-      ? 'You win!'
-      : `${ctx.names[ctx.winner ?? 0]} wins!`;
-  const sub = tie || iWon ? `You got ${ctx.target} coins first.` : `So close — you got ${ctx.scores[ctx.myIndex]} coins.`;
+      ? 'You win'
+      : `${ctx.names[ctx.winner ?? 0]} wins`;
+  const sub =
+    tie || iWon
+      ? `You got ${ctx.target} coins first.`
+      : `You got ${ctx.scores[ctx.myIndex]} coins. The crowd wants a rematch.`;
   const order = ctx.looks.map((_, i) => i).sort((a, b) => ctx.scores[b] - ctx.scores[a]);
   return (
     <div className="racer-win" data-testid="racer-win">
