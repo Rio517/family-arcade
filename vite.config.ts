@@ -104,6 +104,7 @@ export default defineConfig({
             'preview-mirror': fileURLToPath(new URL('./preview-mirror.html', import.meta.url)),
             'preview-gulp': fileURLToPath(new URL('./preview-gulp.html', import.meta.url)),
             'preview-gulp-together': fileURLToPath(new URL('./preview-gulp-together.html', import.meta.url)),
+            'preview-gulp-spill': fileURLToPath(new URL('./preview-gulp-spill.html', import.meta.url)),
             'preview-racer-cast': fileURLToPath(new URL('./preview-racer-cast.html', import.meta.url)),
           },
         }

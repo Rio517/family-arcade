@@ -8,6 +8,11 @@
  *   npm run perf:gulp -- --strict  # exits 1 if any budget is missed
  *   npm run perf:gulp -- --map=region --frames-only
  *                                # frame times on another map, no Lighthouse
+ *   npm run perf:gulp -- --spill --dpr=2
+ *                                # frame times with ships spilling: a level 17
+ *                                # hole by the Region harbour, a ship going in
+ *                                # every 3 s (the preview-gulp-spill harness),
+ *                                # at device pixel ratio 2; no Lighthouse
  *
  * This is not a CI gate — `three/perf.test.ts` covers that with timing-free,
  * deterministic guards on triangle counts and build work. This script is for
@@ -52,7 +57,11 @@ const BASE = `http://localhost:${PORT}`;
 const STRICT = process.argv.includes('--strict');
 /** Which map the frame-time pass plays (the Town, City, Megalopolis or Region). */
 const MAP = (process.argv.find((a) => a.startsWith('--map=')) ?? '--map=city').slice('--map='.length);
-const FRAMES_ONLY = process.argv.includes('--frames-only');
+/** Ships spilling into a late-round hole, on the harness page, instead of a fresh round. */
+const SPILL = process.argv.includes('--spill');
+const FRAMES_ONLY = SPILL || process.argv.includes('--frames-only');
+/** The device pixel ratio the frame-time pass emulates (the scene draws at up to 1.5 of it). */
+const DPR = Number((process.argv.find((a) => a.startsWith('--dpr=')) ?? '--dpr=1').slice('--dpr='.length));
 
 /** Past the "who's playing" gate: one family member, no history to load. */
 const ROSTER = { activeId: 'k', users: [{ id: 'k', profile: { name: 'Clara', points: 0, wins: 0, losses: 0 } }] };
@@ -166,7 +175,7 @@ async function frameTimePass(label, throttle) {
     args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'],
   });
   try {
-    const context = await browser.newContext({ viewport: { width: 1180, height: 820 } });
+    const context = await browser.newContext({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: DPR });
     const page = await context.newPage();
     await page.addInitScript((state) => {
       try {
@@ -190,28 +199,41 @@ async function frameTimePass(label, throttle) {
       const client = await context.newCDPSession(page);
       await client.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     }
-    await page.goto(`${BASE}/#/gulp`, { waitUntil: 'load' });
-    await page.getByTestId(`gulp-map-${MAP}`).click();
-    await page.getByTestId('gulp-play').click();
-    await page.waitForSelector('[data-testid="gulp-hud"]', { state: 'attached', timeout: 20_000 });
-    // Drop the menu's own frames: only the round's gameplay counts.
-    await page.evaluate(() => {
-      window.__rafGaps = [];
-    });
-
     const durationMs = 20_000;
-    const start = Date.now();
-    const cx = 590;
-    const cy = 420;
-    const radius = 140;
-    while (Date.now() - start < durationMs) {
-      const t = (Date.now() - start) / 1000;
-      await page.mouse.move(cx + radius * Math.cos(t), cy + radius * Math.sin(t));
-      await page.waitForTimeout(16);
+    if (SPILL) {
+      // The harness steers the hole and swallows the ships itself.
+      await page.goto(`${BASE}/preview-gulp-spill.html?perf`, { waitUntil: 'load' });
+      await page.waitForSelector('[data-testid="gulp-spill-ready"]', { state: 'attached', timeout: 30_000 });
+      await page.evaluate(() => {
+        window.__rafGaps = [];
+        window.__frameWork.length = 0;
+      });
+      await page.waitForTimeout(durationMs);
+    } else {
+      await page.goto(`${BASE}/#/gulp`, { waitUntil: 'load' });
+      await page.getByTestId(`gulp-map-${MAP}`).click();
+      await page.getByTestId('gulp-play').click();
+      await page.waitForSelector('[data-testid="gulp-hud"]', { state: 'attached', timeout: 20_000 });
+      // Drop the menu's own frames: only the round's gameplay counts.
+      await page.evaluate(() => {
+        window.__rafGaps = [];
+      });
+
+      const start = Date.now();
+      const cx = 590;
+      const cy = 420;
+      const radius = 140;
+      while (Date.now() - start < durationMs) {
+        const t = (Date.now() - start) / 1000;
+        await page.mouse.move(cx + radius * Math.cos(t), cy + radius * Math.sin(t));
+        await page.waitForTimeout(16);
+      }
     }
 
     const gaps = await page.evaluate(() => window.__rafGaps);
-    return { label, ...frameStats(gaps) };
+    // The harness also times each frame's own work, which a throttled CPU shows even when the gaps don't.
+    const work = SPILL ? frameStats(await page.evaluate(() => window.__frameWork)) : null;
+    return { label, ...frameStats(gaps), work };
   } finally {
     await browser.close();
   }
@@ -250,10 +272,13 @@ function printTable(rows) {
   }
 }
 
+const WHAT = SPILL ? 'ships spilling into a level 17 hole (Region harbour)' : `a ${MAP} round`;
+
 async function main() {
   console.log('Building a production copy…');
   const buildDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gulp-perf-build-'));
-  await run('npx', ['vite', 'build', '--outDir', buildDir]);
+  // The spill harness is built only with BUILD_HARNESS, as for the screenshots.
+  await run('npx', ['vite', 'build', '--outDir', buildDir], SPILL ? { env: { ...process.env, BUILD_HARNESS: '1' } } : {});
 
   console.log(`Serving ${buildDir} on ${BASE}…`);
   const server = spawn('npx', ['vite', 'preview', '--outDir', buildDir, '--port', String(PORT), '--strictPort'], {
@@ -261,7 +286,7 @@ async function main() {
     stdio: 'ignore',
   });
 
-  const results = { at: new Date().toISOString(), lighthouse: {}, frames: {} };
+  const results = { at: new Date().toISOString(), what: WHAT, dpr: DPR, lighthouse: {}, frames: {} };
   try {
     await waitForServer(BASE);
 
@@ -272,9 +297,9 @@ async function main() {
       results.lighthouse.desktop = await lighthouseRun('desktop');
     }
 
-    console.log(`Playing a ${MAP} round for ~20s (unthrottled)…`);
+    console.log(`Playing ${WHAT} for ~20s at DPR ${DPR} (unthrottled)…`);
     results.frames.normal = await frameTimePass('unthrottled', false);
-    console.log(`Playing a ${MAP} round for ~20s (slow CPU, 4x throttled)…`);
+    console.log(`Playing ${WHAT} for ~20s at DPR ${DPR} (slow CPU, 4x throttled)…`);
     results.frames.throttled = await frameTimePass('slow CPU (4x)', true);
   } finally {
     server.kill();
@@ -299,7 +324,7 @@ async function main() {
   console.log('Budgets:');
   printTable(budgeted);
 
-  console.log(`\nFor context (no budget, just reported; frames on the ${MAP} map):`);
+  console.log(`\nFor context (no budget, just reported; frames for ${WHAT} at DPR ${DPR}):`);
   if (!FRAMES_ONLY) {
     console.log(`  Lighthouse score — mobile ${mobile.score.toFixed(2)}, desktop ${desktop.score.toFixed(2)}`);
     console.log(`  max potential FID — mobile ${mobile.maxPotentialFID.toFixed(0)}ms, desktop ${desktop.maxPotentialFID.toFixed(0)}ms`);
@@ -316,6 +341,10 @@ async function main() {
       `  frame gaps (${label}, ${f.count} frames) — p50 ${f.p50.toFixed(0)}ms, p99 ${f.p99.toFixed(0)}ms, max ${f.max.toFixed(0)}ms, ` +
         `${f.over25} over 25ms, ${f.over50} over 50ms`,
     );
+    if (f.work) {
+      const w = f.work;
+      console.log(`  frame work (${label}, step + sync + draw call) — p50 ${w.p50.toFixed(1)}ms, p95 ${w.p95.toFixed(1)}ms, p99 ${w.p99.toFixed(1)}ms, max ${w.max.toFixed(1)}ms`);
+    }
   }
 
   const missed = budgeted.filter((r) => !r.ok);
