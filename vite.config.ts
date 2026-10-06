@@ -1,4 +1,5 @@
 /// <reference types="vitest/config" />
+import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -16,6 +17,14 @@ const alias = {
 // requested with that prefix. Locally (dev/preview) BASE is unset and Vite
 // falls back to '/'.
 const base = process.env.BASE_PATH ?? '/'; // custom domain serves from the root
+
+// A newer Node's own localStorage shadows jsdom's and fails hundreds of tests
+// with "reading 'clear'" (see mise.toml). Say so once instead.
+const pinnedNode = readFileSync(new URL('./.nvmrc', import.meta.url), 'utf8').trim();
+const nodeMajor = process.versions.node.split('.')[0];
+if (process.env.VITEST && nodeMajor !== pinnedNode) {
+  throw new Error(`Tests need Node ${pinnedNode} (.nvmrc), this is Node ${nodeMajor}: run \`mise exec -- npx vitest run\``);
+}
 
 export default defineConfig({
   base,
