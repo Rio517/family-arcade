@@ -42,7 +42,7 @@ function deleteTsbuildinfo(dir = root) {
 const num = (s) => Number(String(s).replace(/,/g, ''))
 const fmt = (n) => (n == null ? '?' : n.toLocaleString('en-US'))
 
-const check = step('check', 'check', 'npm run check')
+const check = step('check', 'test', 'npm run check')
 const test = step('vitest', 'test', 'npx vitest run')
 deleteTsbuildinfo()
 const build = step('build', 'build', 'npm run build')
