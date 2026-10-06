@@ -55,7 +55,7 @@ const GAME_ID = 'gulp';
 /** What the results card says about the family board. */
 function familyLine(place: number, score: number, board: ScoreRound[]): string {
   if (place === 1) return 'New family record!';
-  if (place > 1) return `You're #${place} in the family!`;
+  if (place > 1) return `You're ${ordinal(place)} in the family.`;
   if (score <= 0) return 'Gulp something to join the board!';
   const need = board[board.length - 1].score - score + 1;
   return `${need.toLocaleString()} more to join the board!`;
@@ -84,14 +84,14 @@ function lengthOf(duration: number, map: MapId): Settings['length'] {
 type Phase = 'menu' | 'play' | 'over';
 
 /** 2 → "2nd": early readers say a place, not a hash sign. */
-function place(rank: number): string {
+function ordinal(rank: number): string {
   return `${rank}${rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th'}`;
 }
 
 /** The results card's big line: how the round went for the child. */
 function headline(rank: number, endedBy: World['endedBy']): string {
-  if (endedBy === 'out') return rank === 1 ? 'Still the biggest hole!' : `You came ${place(rank)}`;
-  return rank === 1 ? 'You are the biggest hole!' : `You came ${place(rank)}. Great gulping!`;
+  if (endedBy === 'out') return rank === 1 ? 'Still the biggest hole!' : `You came ${ordinal(rank)}`;
+  return rank === 1 ? 'You are the biggest hole!' : `You came ${ordinal(rank)}. Great gulping!`;
 }
 
 /** What the results card says ended the round. */

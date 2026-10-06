@@ -126,7 +126,7 @@ describe('<App> shell landmarks', () => {
       const { unmount } = render(<App />);
 
       const gate = screen.getByTestId('player-gate');
-      expect(gate).toHaveTextContent(`Tap your ticket to play ${game.title}`);
+      expect(gate).toHaveTextContent(`${game.title} needs a player.`);
       unmount();
     }
   });
