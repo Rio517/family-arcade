@@ -8,12 +8,12 @@ const world = () => createWorld(seededRng(1), [{ name: 'Clara', skin: 0 }], [{ n
 const fresh = (): Said => ({ police: false, combo: false });
 
 describe('feedback', () => {
-  it("names what each new level lets you eat, all the way up the ladder, then 'Bigger and bigger!'", () => {
+  it("names what each new level lets you eat, all the way up the ladder, then the top line", () => {
     const w = world();
     expect(feedbackFor({ type: 'level', hole: 0, level: 3 }, w, fresh())?.banner?.sub).toBe(`Now you can eat ${LEVELS[3].label.toLowerCase()}`);
     const top = LEVELS.length - 1;
     expect(feedbackFor({ type: 'level', hole: 0, level: top }, w, fresh())?.banner?.sub).toBe(`Now you can eat ${LEVELS[top].label.toLowerCase()}`);
-    expect(feedbackFor({ type: 'level', hole: 0, level: LEVELS.length }, w, fresh())?.banner?.sub).toBe('Bigger and bigger!');
+    expect(feedbackFor({ type: 'level', hole: 0, level: LEVELS.length }, w, fresh())?.banner?.sub).toBe('You are as big as it gets.');
   });
 
   it("only the child's own gulps, levels and knocks are announced", () => {
@@ -30,7 +30,7 @@ describe('feedback', () => {
     for (const kind of ['tanker', 'tank', 'heli', 'bomber'] as const) {
       expect(feedbackFor({ type: 'incoming', target: 0, kind }, w, fresh())?.banner?.kind).toBe('warn');
     }
-    expect(feedbackFor({ type: 'hurt', hole: 0, cause: 'tanker' }, w, fresh())?.banner?.text).toBe('Hot hot hot!');
+    expect(feedbackFor({ type: 'hurt', hole: 0, cause: 'tanker' }, w, fresh())?.banner?.text).toBe('Fuel burn!');
     // An attack on a computer hole is news, so the child sees the city fights everyone.
     expect(feedbackFor({ type: 'incoming', target: 1, kind: 'tank' }, w, fresh())?.banner).toEqual({ kind: 'news', text: 'Tanks are after Big Gulp!' });
   });
@@ -39,7 +39,7 @@ describe('feedback', () => {
     const w = world();
     const said = fresh();
     const first = feedbackFor({ type: 'combo', hole: 0, mult: 2 }, w, said);
-    expect(first?.banner).toEqual({ kind: 'good', text: 'Gulp fast! Points x2', sub: 'Keep gulping for bigger points' });
+    expect(first?.banner).toEqual({ kind: 'good', text: 'Points x2', sub: 'Gulp fast to keep it going.' });
     const later = feedbackFor({ type: 'combo', hole: 0, mult: 3 }, w, said);
     expect(later?.cue).toBe('power');
     expect(later?.banner).toBeUndefined();
@@ -59,7 +59,7 @@ describe('feedback', () => {
   it('says the police are coming once a round', () => {
     const w = world();
     const said = fresh();
-    expect(feedbackFor({ type: 'police', x: 0, z: 0 }, w, said)?.banner?.text).toBe('Nee-naw! Police!');
+    expect(feedbackFor({ type: 'police', x: 0, z: 0 }, w, said)?.banner?.text).toBe('Police!');
     expect(feedbackFor({ type: 'police', x: 0, z: 0 }, w, said)).toBeNull();
   });
 });

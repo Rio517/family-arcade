@@ -22,10 +22,10 @@ export interface Said {
 }
 
 const INCOMING: Record<'tanker' | 'tank' | 'heli' | 'bomber', Omit<Banner, 'id'>> = {
-  tanker: { kind: 'warn', text: 'Look out! A fuel truck!', sub: 'Swerve out of its way' },
-  tank: { kind: 'warn', text: 'Tanks are coming!', sub: 'Dodge the red circles, or gulp them!' },
-  heli: { kind: 'warn', text: 'Helicopter!', sub: 'Keep moving, dodge the red circles' },
-  bomber: { kind: 'warn', text: 'Bombers overhead!', sub: 'Get out of the red circles' },
+  tanker: { kind: 'warn', text: 'Fuel truck!', sub: 'Swerve out of its way.' },
+  tank: { kind: 'warn', text: 'Tanks incoming!', sub: 'Dodge the red circles, or gulp them.' },
+  heli: { kind: 'warn', text: 'Helicopter!', sub: 'Keep moving. Dodge the red circles.' },
+  bomber: { kind: 'warn', text: 'Bombers overhead!', sub: 'Get out of the red circles.' },
 };
 
 /** When the city goes after a computer hole, the child hears about it too. */
@@ -37,9 +37,9 @@ const AFTER: Record<'tanker' | 'tank' | 'heli' | 'bomber', string> = {
 };
 
 const HURT: Record<'chem' | 'tanker' | 'bomb', Omit<Banner, 'id'>> = {
-  chem: { kind: 'hurt', text: 'Yuck! Chemicals!', sub: 'Ouch, a bit smaller' },
-  tanker: { kind: 'hurt', text: 'Hot hot hot!', sub: 'The fuel truck burned you' },
-  bomb: { kind: 'hurt', text: 'Boom! You shrank', sub: 'Ouch, a bit smaller' },
+  chem: { kind: 'hurt', text: 'Chemicals!', sub: 'You shrank a bit.' },
+  tanker: { kind: 'hurt', text: 'Fuel burn!', sub: 'The fuel truck burned you.' },
+  bomb: { kind: 'hurt', text: 'Bomb hit!', sub: 'You shrank a bit.' },
 };
 
 /**
@@ -58,7 +58,7 @@ export function feedbackFor(e: WorldEvent, w: World, said: Said, me = 0): Feedba
         banner: {
           kind: 'level',
           text: `Level ${e.level}!`,
-          sub: e.level < LEVELS.length ? `Now you can eat ${LEVELS[e.level].label.toLowerCase()}` : 'Bigger and bigger!',
+          sub: e.level < LEVELS.length ? `Now you can eat ${LEVELS[e.level].label.toLowerCase()}` : 'You are as big as it gets.',
         },
       };
     case 'news':
@@ -67,7 +67,7 @@ export function feedbackFor(e: WorldEvent, w: World, said: Said, me = 0): Feedba
       // Once a round is plenty: the cars and officers say the rest.
       if (said.police) return null;
       said.police = true;
-      return { cue: 'warn', banner: { kind: 'good', text: 'Nee-naw! Police!' } };
+      return { cue: 'warn', banner: { kind: 'good', text: 'Police!' } };
     case 'wonder':
       return e.hole === me ? { cue: 'win', banner: { kind: 'news', text: `You gulped ${e.name}! +${e.points.toLocaleString()}` } } : null;
     case 'combo':
@@ -75,7 +75,7 @@ export function feedbackFor(e: WorldEvent, w: World, said: Said, me = 0): Feedba
       // The first step up in a round says what the multiplier is; after that the sound is enough.
       if (said.combo) return { cue: 'power' };
       said.combo = true;
-      return { cue: 'power', banner: { kind: 'good', text: `Gulp fast! Points x${e.mult}`, sub: 'Keep gulping for bigger points' } };
+      return { cue: 'power', banner: { kind: 'good', text: `Points x${e.mult}`, sub: 'Gulp fast to keep it going.' } };
     case 'power':
       return e.hole === me ? { cue: 'power', banner: { kind: 'good', text: e.kind === 'speed' ? 'Speed boost!' : 'Double points!' } } : null;
     case 'gulp':

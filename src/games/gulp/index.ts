@@ -21,9 +21,9 @@ export const gulp: GameDescriptor = {
     image: preview,
     facts: ['1 player vs the computer', 'Town to a whole region', '2–10 min'],
     blurb:
-      'You are a hungry hole in a toy city. Swallow cones, then cars, then buses, towers, stadiums and even mountains. Grow bigger than the other holes before the clock runs out!',
+      'You are a hungry hole in a toy city. Swallow cars, towers and mountains, and grow bigger than the other holes.',
   },
-  description: 'Be a hungry hole: swallow the city, grow bigger and bigger, and out-eat the computer holes.',
+  description: 'You are a hungry hole. Swallow the city and grow bigger than the computer holes.',
   Icon: GulpIcon,
   Page: GulpPage,
 };

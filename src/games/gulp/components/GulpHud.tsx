@@ -54,7 +54,7 @@ export function GulpHud({
   );
   const news = banners.filter((b) => b.kind === 'news').pop();
   // A warning always wins the banner spot: a police or level-up message
-  // arriving on top of "Look out!" must not hide it. Swallowing a hole beats
+  // arriving on top of "Fuel truck!" must not hide it. Swallowing a hole beats
   // the level-up it often brings: the level badge shows the new level anyway.
   const top = banners
     .filter((b) => b.kind !== 'news')

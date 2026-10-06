@@ -16,8 +16,8 @@ describe('GulpHud', () => {
   });
 
   it('a warning still wins the banner spot over a swallow', () => {
-    show([swallow, { id: 3, kind: 'warn', text: 'Look out! A fuel truck!' }]);
-    expect(screen.getByTestId('gulp-banner')).toHaveTextContent('Look out! A fuel truck!');
+    show([swallow, { id: 3, kind: 'warn', text: 'Fuel truck!' }]);
+    expect(screen.getByTestId('gulp-banner')).toHaveTextContent('Fuel truck!');
   });
 
   it('shows no star or hole counters during a round', () => {
