@@ -24,15 +24,15 @@ function renderResult(props: Partial<Parameters<typeof Result>[0]> = {}) {
 describe('<Result>', () => {
   it('celebrates the winner with points', () => {
     renderResult({ won: true, pointsEarned: 130, totalPoints: 430 });
-    expect(screen.getByText(/You Win!/)).toBeInTheDocument();
-    expect(screen.getByText(/\+130 points!/)).toBeInTheDocument();
+    expect(screen.getByText(/You win/)).toBeInTheDocument();
+    expect(screen.getByText(/\+130 points/)).toBeInTheDocument();
     expect(screen.getByText(/430 points/)).toBeInTheDocument();
   });
 
   it('encourages the loser — never uses harsh language', () => {
     renderResult({ won: false, pointsEarned: 25 });
-    expect(screen.getByText(/Good Game!/)).toBeInTheDocument();
-    expect(screen.getByText(/\+25 points for a great battle/)).toBeInTheDocument();
+    expect(screen.getByText(/Good game/)).toBeInTheDocument();
+    expect(screen.getByText(/\+25 points/)).toBeInTheDocument();
     // Kid-friendly guarantee: no "Defeat" wording and no emoji/pictographs.
     const text = document.body.textContent ?? '';
     expect(text).not.toMatch(/defeat/i);
@@ -90,8 +90,8 @@ describe('<Result>', () => {
         onExit={vi.fn()}
       />,
     );
-    expect(screen.getByText(/\+130 points!/)).toBeInTheDocument();
-    expect(screen.queryByText(/You now have/)).toBeNull();
+    expect(screen.getByText(/\+130 points/)).toBeInTheDocument();
+    expect(screen.queryByText(/You have/)).toBeNull();
   });
 
   it('fires rematch and exit callbacks', () => {

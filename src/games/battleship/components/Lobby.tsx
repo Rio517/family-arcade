@@ -142,7 +142,7 @@ export function Lobby({ onHost, onJoin, onSolo, era, onEra, onHostTable, initial
                     <span>.</span>
                   </span>
                 </p>
-                <p className="subtle">Hang tight — finding your friend.</p>
+                <p className="subtle">Finding your friend.</p>
               </div>
             </div>
           ) : partyHost ? (

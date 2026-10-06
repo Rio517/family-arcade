@@ -20,17 +20,17 @@ interface ResultProps {
 // Warm, varied end-of-game messages. Winner gets a celebration; the loser is
 // always encouraged and pointed at a rematch — never told they were "defeated".
 const WIN_LINES: Array<(me: string, opp: string) => string> = [
-  (me) => `You sank every ship, Captain ${me}!`,
-  () => `Admiral-level work — the whole fleet is yours.`,
-  (_, opp) => `You out-sailed ${opp} this time. Well played!`,
-  () => `Direct hits all around. What a battle!`,
+  () => `You sank every ship.`,
+  () => `You sank the whole fleet.`,
+  (_, opp) => `You beat ${opp}. Well played.`,
+  () => `Direct hits all round. The crowd is cheering.`,
 ];
 
 const LOSS_LINES: Array<(me: string, opp: string) => string> = [
-  (_, opp) => `${opp} got you this round — go again?`,
-  () => `Great battle! Your ships put up a real fight.`,
-  () => `So close! One more game and you'll get them.`,
-  (me) => `Nice sailing, Captain ${me}. Ready for a rematch?`,
+  (_, opp) => `${opp} got you this time. Go again?`,
+  () => `Your ships put up a real fight.`,
+  () => `So close. One more game could turn it.`,
+  () => `The crowd wants a rematch.`,
 ];
 
 export function Result({
@@ -71,14 +71,14 @@ export function Result({
           <div className={`result-emblem ${won ? 'win' : 'loss'}`} aria-hidden="true">
             {won ? <TrophyIcon size={78} /> : <BrokenShipIcon size={78} />}
           </div>
-          <div className={`big reveal ${won ? 'win' : 'loss'}`}>{won ? 'You Win!' : 'Good Game!'}</div>
+          <div className={`big reveal ${won ? 'win' : 'loss'}`}>{won ? 'You win' : 'Good game'}</div>
           <p className="result-flavor reveal">{flavor}</p>
           <div className="earned reveal">
-            +{pointsEarned} points{won ? '!' : ' for a great battle'}
+            +{pointsEarned} points
           </div>
           {totalPoints !== undefined && (
             <div className="subtle reveal" style={{ marginTop: 6 }}>
-              You now have {totalPoints} points — spend them on cooler fleets!
+              You have {totalPoints} points. Spend them on new fleets.
             </div>
           )}
         </div>
@@ -89,7 +89,7 @@ export function Result({
           <p className="subtle center">{rival} wants a rematch!</p>
         )}
         {iWantRematch && !oppWantsRematch && (
-          <p className="subtle center">Waiting for {rival} to jump back in…</p>
+          <p className="subtle center">Waiting for {rival} to say yes…</p>
         )}
         <button className="btn btn-primary btn-lg btn-block" onClick={onRematch} disabled={iWantRematch} data-testid="rematch">
           {iWantRematch ? 'Rematch requested' : 'Play again'}
