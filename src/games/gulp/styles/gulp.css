@@ -837,6 +837,8 @@ li.me > .gulp-rank { background: var(--g-ink); color: #fff; }
 }
 .gulp-eaten strong,
 .gulp-banner strong { font-size: 30px; line-height: 1.1; }
+.gulp-banner.warn strong,
+.gulp-banner.hurt strong { text-transform: uppercase; }
 .gulp-eaten { top: max(22%, 190px); }
 .gulp-eaten-lives { display: inline-flex; align-items: center; gap: 4px; color: #e0344b; }
 .gulp-eaten-lives svg { fill: currentColor; }
