@@ -1,24 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { SKY_CEILING, SKY_FLOOR } from './flight';
-import {
-  FIRST_RING,
-  RING_RADIUS,
-  TRAIL_RING_EVERY,
-  TRAIL_STEP,
-  islandsInCell,
-  nearestTrailIndex,
-  ringAt,
-  trailPoint,
-  trailRing,
-} from './sky';
+import { FIRST_RING, RING_RADIUS, TRAIL_RING_EVERY, TRAIL_STEP, nearestTrailIndex, ringAt, trailPoint, trailRing } from './sky';
 
 describe('the sky', () => {
-  it('is the same sky every time: a cell always holds the same islands', () => {
-    for (const [cx, cz] of [[3, -7], [-40, 12], [100, 100]]) {
-      expect(islandsInCell(cx, cz)).toEqual(islandsInCell(cx, cz));
-    }
-  });
-
   it('puts a ring straight ahead of the start, on the road', () => {
     const r = trailRing(FIRST_RING)!;
     expect(r.x).toBeCloseTo(0, 5);
@@ -40,14 +24,6 @@ describe('the sky', () => {
     const p = trailPoint(TRAIL_RING_EVERY * 4);
     for (const [dx, dz] of [[60, 0], [-90, 40], [0, 150]]) {
       expect(ringAt(p.x + dx, p.y, p.z + dz)).toBeNull();
-    }
-  });
-
-  it('keeps islands below the racers', () => {
-    for (let cx = -10; cx < 10; cx++) {
-      for (let cz = -10; cz < 10; cz++) {
-        for (const isl of islandsInCell(cx, cz)) expect(isl.y).toBeLessThan(SKY_FLOOR);
-      }
     }
   });
 

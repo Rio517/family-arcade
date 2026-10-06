@@ -3,12 +3,12 @@
  *
  * The sky has no edge, so it cannot be built in advance: it is cut into square
  * cells, and whatever sits in a cell (floating islands, clouds, a balloon) is
- * decided by hashing the cell's coordinates. The same cell always holds the
- * same things, on every device and every race, so two players see the same
- * sky without sending it, and the scene only builds the cells near the
- * camera. The rainbow road lives here too, with the rings that hang over it:
- * flying through a ring is a rule (a speed burst), not just scenery. Every
- * ring is on the road, so a ring always means "this way".
+ * decided by hashing the cell's coordinates (scenery.ts). The same cell
+ * always holds the same things, on every device and every race, so two
+ * players see the same sky without sending it, and the scene only builds the
+ * cells near the camera. The rainbow road lives here, with the rings that
+ * hang over it: flying through a ring is a rule (a speed burst), not just
+ * scenery. Every ring is on the road, so a ring always means "this way".
  */
 
 import { CRUISE_ALTITUDE, SKY_CEILING, SKY_FLOOR } from './flight';
@@ -28,17 +28,6 @@ export interface Ring {
   heading: number;
 }
 
-export interface Island {
-  x: number;
-  /** Height of the island's top. */
-  y: number;
-  z: number;
-  /** Radius of the top. */
-  radius: number;
-  /** 0–1, picks the flowers and trees. */
-  kind: number;
-}
-
 /** A deterministic 0–1 value for a cell and a salt. No Math.random. */
 export function cellNoise(cx: number, cz: number, salt: number): number {
   let h = Math.imul(cx | 0, 374761393) ^ Math.imul(cz | 0, 668265263) ^ Math.imul(salt | 0, 1274126177);
@@ -49,23 +38,6 @@ export function cellNoise(cx: number, cz: number, salt: number): number {
 
 export function cellOf(v: number): number {
   return Math.floor(v / CELL);
-}
-
-/** The floating islands in a cell (zero to two). They sit below the racers. */
-export function islandsInCell(cx: number, cz: number): Island[] {
-  const out: Island[] = [];
-  const count = cellNoise(cx, cz, 10) < 0.45 ? 0 : cellNoise(cx, cz, 11) < 0.7 ? 1 : 2;
-  for (let i = 0; i < count; i++) {
-    const s = 20 + i * 7;
-    out.push({
-      x: cx * CELL + 25 + cellNoise(cx, cz, s) * (CELL - 50),
-      y: -4 - cellNoise(cx, cz, s + 1) * 16,
-      z: cz * CELL + 25 + cellNoise(cx, cz, s + 2) * (CELL - 50),
-      radius: 14 + cellNoise(cx, cz, s + 3) * 22,
-      kind: cellNoise(cx, cz, s + 4),
-    });
-  }
-  return out;
 }
 
 /** The ring a racer at this point is flying through, if any. */
@@ -184,4 +156,9 @@ function trailRingsNear(x: number, z: number, radius: number): Ring[] {
     if (r && Math.hypot(r.x - x, r.z - z) <= radius) out.push(r);
   }
   return out;
+}
+
+/** The road points built so far that lie in a cell, in order. */
+export function trailPointsInCell(cx: number, cz: number): readonly number[] {
+  return trailCells.get(`${cx}:${cz}`) ?? [];
 }
