@@ -696,7 +696,7 @@ body:has(.risk-bare) .party-pill:focus-visible { outline: 2px solid #f6cf7d; out
   background: linear-gradient(#3c2a19, #241811); border: 1px solid var(--brass); border-radius: 4px;
   box-shadow: inset 0 0 0 1px var(--brass-dim), 0 20px 44px -20px #000;
 }
-.risk-victory-title { font-family: var(--font-display); font-size: 30px; color: var(--brass-hi); margin: 8px 0 6px; text-wrap: balance; }
+.risk-victory-title { text-transform: uppercase; font-family: var(--font-display); font-size: 30px; color: var(--brass-hi); margin: 8px 0 6px; text-wrap: balance; }
 .risk-victory-sub { color: var(--muted); font-style: italic; margin: 0; }
 .risk-win-emblem { width: 120px; height: 120px; --pc: #6a2f22; }
 .rw-laurel ellipse { fill: var(--brass); opacity: 0.85; }

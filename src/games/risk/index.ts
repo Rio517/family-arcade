@@ -29,9 +29,9 @@ export const risk: GameDescriptor = {
     image: preview,
     facts: ['2–6 players', 'One iPad, passed around', 'A long evening'],
     blurb:
-      'World conquest on one shared board: reinforce, roll the dice, take the map. Computer generals fill the empty chairs.',
+      'Take over the map one land at a time: place armies and attack with dice. Computer generals fill any empty seat.',
   },
-  description: 'World conquest on one shared board. Reinforce, attack with dice, and take over the map.',
+  description: 'Take over the world on one shared board: place armies and attack with dice.',
   Icon: GlobeIcon,
   Page: RiskPage,
   savedGames,

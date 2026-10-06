@@ -516,7 +516,7 @@ describe('<RiskPage>', () => {
       saveRiskGame(campaign);
       renderPage();
       resumeAndStrike();
-      expect(screen.getByText(/Rio holds the world/)).toBeInTheDocument();
+      expect(screen.getByText(/Rio wins/)).toBeInTheDocument();
 
       // Rio's ticket carries the win, filed under the game…
       expect(ticket('u1').wins).toBe(1);
@@ -573,7 +573,7 @@ describe('<RiskPage>', () => {
       fireEvent.click(screen.getByTestId('risk-resume-btn'));
       // Vex thinks for a moment, then lands the last blow himself.
       await waitFor(() => expect(screen.getByTestId('risk-again')).toBeInTheDocument(), { timeout: 3000 });
-      expect(screen.getByText(/Field Marshal Vex holds the world/)).toBeInTheDocument();
+      expect(screen.getByText(/Field Marshal Vex wins/)).toBeInTheDocument();
 
       // No ticket sat in the winning chair, so no ticket records anything.
       expectUntouched('u1');
