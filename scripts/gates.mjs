@@ -10,6 +10,26 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
+
+// Vitest fails hundreds of tests under a newer Node (see mise.toml), and agent
+// shells often have one first in PATH. Re-run under the pinned version.
+const pinned = readFileSync(join(root, '.nvmrc'), 'utf8').trim()
+const running = process.versions.node.split('.')[0]
+if (running !== pinned) {
+  const again = process.env.GATES_NODE_REEXEC
+    ? { error: true }
+    : spawnSync('mise', ['exec', `node@${pinned}`, '--', 'node', ...process.argv.slice(1)], {
+        cwd: root,
+        stdio: 'inherit',
+        env: { ...process.env, GATES_NODE_REEXEC: '1' },
+      })
+  if (again.error) {
+    console.log(`GATES FAIL · Node ${running} is running, the repo pins ${pinned} (.nvmrc): switch Node and rerun`)
+    process.exit(1)
+  }
+  process.exit(again.status ?? 1)
+}
+
 const baselinePath = join(root, 'gates-baseline.json')
 const update = process.argv.includes('--update-baseline')
 const MAIN_GROWTH_LIMIT = 2048 // bytes
