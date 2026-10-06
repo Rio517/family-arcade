@@ -30,6 +30,10 @@ export interface EngineBody {
   read(out: Pose): void;
   isSleeping(): boolean;
   sleep(): void;
+  /** Wakes the body for sure (even when an impulse is zero). */
+  wake(): void;
+  /** Calls `fn` for each other dynamic body touching this one. */
+  touching(fn: (other: EngineBody) => void): void;
   impulse(x: number, y: number, z: number): void;
   remove(): void;
 }
@@ -39,5 +43,7 @@ export interface Engine {
   addStaticBox(center: Vec3, half: Vec3, q: { x: number; y: number; z: number; w: number }): void;
   create(spec: BodySpec): EngineBody;
   step(h: number): void;
+  /** Runs a throwaway scene so the first real step is cheap. Leaves no trace. */
+  warmUp(): void;
   dispose(): void;
 }

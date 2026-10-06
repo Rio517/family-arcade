@@ -63,6 +63,11 @@ class BallisticBody implements EngineBody {
     this.v[0] = this.v[1] = this.v[2] = 0;
     this.w[0] = this.w[1] = this.w[2] = 0;
   }
+  wake(): void {
+    this.asleep = false;
+    this.quiet = 0;
+  }
+  touching(): void {}
   impulse(x: number, y: number, z: number): void {
     const k = 1 / this.spec.mass;
     this.v[0] += x * k;
@@ -167,6 +172,8 @@ export class BallisticEngine implements Engine {
       }
     }
   }
+
+  warmUp(): void {}
 
   dispose(): void {
     this.bodies.length = 0;

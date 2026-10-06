@@ -17,9 +17,12 @@ import type {
 
 const Q_IDENTITY = { x: 0, y: 0, z: 0, w: 1 };
 
-/** Below this speed (m/s) for `QUIET` seconds a body is put to rest by hand, on top of Rapier's own sleeping. */
+/**
+ * Normal motion uses Rapier's own sleeping only: a body is drawn as asleep exactly when Rapier says it sleeps.
+ * Reduced motion adds a kit rule: a body that has been slow for `QUIET_TIME_REDUCED` seconds is put to rest
+ * (and to sleep in Rapier) once every body touching it is slow too.
+ */
 const QUIET_SPEED = 0.03;
-const QUIET_TIME = 0.5;
 const QUIET_TIME_REDUCED = 0.15;
 /** Reduced motion: after this long a slow body is put to rest, so nothing keeps rolling or jittering. */
 const SETTLE_AGE_REDUCED = 1.2;
@@ -47,9 +50,15 @@ class Entry implements PhysicsBody {
   applyImpulse(x: number, y: number, z: number): void {
     if (this.removed) return;
     this.eb.impulse(x, y, z);
+    this.wake();
+  }
+  wake(): void {
+    if (this.removed) return;
+    this.eb.wake();
     this.asleep = false;
     this.quiet = 0;
     this.dirty = true;
+    this.prev.set(this.cur);
   }
   remove(): void {
     this.owner.removeEntry(this);
@@ -63,6 +72,7 @@ function resolveGravity(g: number | Vec3 | undefined): Vec3 {
 
 class World implements PhysicsWorld {
   private entries: Entry[] = [];
+  private readonly byBody = new Map<EngineBody, Entry>();
   private acc = 0;
   private seq = 0;
   private steps = 0;
@@ -92,6 +102,10 @@ class World implements PhysicsWorld {
   get allAsleep(): boolean {
     for (let i = 0; i < this.entries.length; i++) if (!this.entries[i].asleep) return false;
     return true;
+  }
+
+  warmUp(): void {
+    if (!this.disposed) this.engine.warmUp();
   }
 
   addGround(y: number): void {
@@ -128,6 +142,7 @@ class World implements PhysicsWorld {
     entry.eb.read(entry.cur);
     entry.prev.set(entry.cur);
     this.entries.push(entry);
+    this.byBody.set(entry.eb, entry);
     return entry;
   }
 
@@ -146,6 +161,7 @@ class World implements PhysicsWorld {
     e.removed = true;
     const i = this.entries.indexOf(e);
     if (i >= 0) this.entries.splice(i, 1);
+    this.byBody.delete(e.eb);
     if (!this.disposed) e.eb.remove();
   }
 
@@ -155,7 +171,7 @@ class World implements PhysicsWorld {
     this.acc += Math.min(Math.max(dt, 0), h * this.maxSubsteps);
     const entries = this.entries;
     const reduced = this.reducedMotion;
-    const quietTime = reduced ? QUIET_TIME_REDUCED : QUIET_TIME;
+    const quietTime = QUIET_TIME_REDUCED;
     let steps = 0;
     while (this.acc >= h) {
       this.acc -= h;
@@ -175,19 +191,21 @@ class World implements PhysicsWorld {
         }
         e.eb.read(e.cur);
         e.age += h;
+        if (e.eb.isSleeping()) {
+          e.asleep = true;
+          e.prev.set(e.cur);
+          e.dirty = true;
+          continue;
+        }
         const c = e.cur;
         const p = e.prev;
         const speed = Math.hypot(c[0] - p[0], c[1] - p[1], c[2] - p[2]) / h;
         const turn = 1 - Math.abs(c[3] * p[3] + c[4] * p[4] + c[5] * p[5] + c[6] * p[6]);
-        const slow = speed < (reduced && e.age > SETTLE_AGE_REDUCED ? SETTLE_SPEED_REDUCED : QUIET_SPEED) && turn < 2e-6 * (reduced && e.age > SETTLE_AGE_REDUCED ? 100 : 1);
+        const late = reduced && e.age > SETTLE_AGE_REDUCED;
+        const slow = speed < (late ? SETTLE_SPEED_REDUCED : QUIET_SPEED) && turn < 2e-6 * (late ? 100 : 1);
         e.quiet = slow ? e.quiet + h : 0;
-        if (e.eb.isSleeping() || e.quiet >= quietTime) {
-          if (!e.eb.isSleeping()) e.eb.sleep();
-          e.asleep = true;
-          e.prev.set(e.cur);
-          e.dirty = true;
-        }
       }
+      if (reduced) this.restQuiet(quietTime);
     }
     this.steps = steps;
     const a = this.acc / h;
@@ -202,6 +220,43 @@ class World implements PhysicsWorld {
       }
       write(e.object, e.prev, e.cur, a);
       e.dirty = true;
+    }
+  }
+
+  /**
+   * Reduced motion only. Rests a group of touching bodies together, and only when every awake body in
+   * the group has been slow long enough; the group is put to sleep in Rapier too. A body that is slow
+   * while something touching it still moves is never rested.
+   */
+  private restQuiet(quietTime: number): void {
+    const entries = this.entries;
+    const seen = new Set<Entry>();
+    const group: Entry[] = [];
+    for (let i = 0; i < entries.length; i++) {
+      const root = entries[i];
+      if (root.asleep || seen.has(root)) continue;
+      group.length = 0;
+      group.push(root);
+      seen.add(root);
+      let calm = true;
+      for (let k = 0; k < group.length; k++) {
+        const e = group[k];
+        if (e.quiet < quietTime) calm = false;
+        e.eb.touching((other) => {
+          const o = this.byBody.get(other);
+          if (o && !o.asleep && !seen.has(o)) {
+            seen.add(o);
+            group.push(o);
+          }
+        });
+      }
+      if (!calm) continue;
+      for (const e of group) {
+        e.eb.sleep();
+        e.asleep = true;
+        e.prev.set(e.cur);
+        e.dirty = true;
+      }
     }
   }
 
@@ -254,30 +309,34 @@ function isRapier(m: unknown): m is Rapier {
 export async function createPhysics(options: PhysicsOptions = {}): Promise<PhysicsWorld> {
   const gravity = resolveGravity(options.gravity);
   const h = options.fixedStep && options.fixedStep > 0 ? options.fixedStep : 1 / 60;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const load = options.loadRapier ?? (() => import('@dimforge/rapier3d-compat'));
     const timeout = options.initTimeoutMs ?? 8000;
-    const mod = await new Promise<unknown>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Rapier load timed out')), timeout);
-      load().then(
-        (m) => {
-          clearTimeout(timer);
-          resolve(m);
-        },
-        (e) => {
-          clearTimeout(timer);
-          reject(e);
-        },
-      );
-    });
-    const ns = mod as { default?: unknown };
-    const R = isRapier(mod) ? mod : isRapier(ns.default) ? ns.default : null;
-    if (!R) throw new Error('Rapier module has no World');
-    await R.init();
-    return new World(new RapierEngine(R, gravity, h), 'rapier', options);
+    // One budget for the download and Rapier's start-up (WASM init) together.
+    const start = (async (): Promise<Rapier> => {
+      const mod = await load();
+      const ns = mod as { default?: unknown };
+      const R = isRapier(mod) ? mod : isRapier(ns.default) ? ns.default : null;
+      if (!R) throw new Error('Rapier module has no World');
+      await R.init();
+      return R;
+    })();
+    start.catch(() => {}); // a late failure after the timeout is not an unhandled rejection
+    const R = await Promise.race([
+      start,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Rapier load timed out')), timeout);
+      }),
+    ]);
+    const world = new World(new RapierEngine(R, gravity, h), 'rapier', options);
+    if (options.warmUp !== false) world.warmUp();
+    return world;
   } catch (error) {
     options.onFallback?.(error);
     return new World(new BallisticEngine(gravity), 'ballistic', options);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
