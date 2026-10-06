@@ -79,7 +79,7 @@ function CouncilSeat({ seat, index, users, activeId, color, holders, onChange, o
         type="button"
         className="risk-seal-btn"
         aria-expanded={picking}
-        aria-label={`Chair ${index + 1} marches under ${tinctureName(color)} — change colour`}
+        aria-label={`Chair ${index + 1} colour: ${tinctureName(color)}. Change colour`}
         onClick={() => setPicking((p) => !p)}
         data-testid={`seat-color-${index}`}
       >
@@ -264,7 +264,7 @@ export function RiskPage() {
               <button className="risk-resume-main" onClick={resume} data-testid="risk-resume-btn">
                 <span className="risk-resume-icon"><ResumeIcon size={24} /></span>
                 <span className="risk-resume-text">
-                  <span className="risk-eyebrow">Unfinished campaign</span>
+                  <span className="risk-eyebrow">Saved game</span>
                   <strong>
                     Resume — {resumable.state.players.length} generals · {PHASE_NAMES[resumable.state.phase] ?? 'In progress'}
                   </strong>
@@ -278,7 +278,7 @@ export function RiskPage() {
                 className="risk-btn ghost risk-resume-discard"
                 onClick={() => { clearRiskGame(); setResumable(null); }}
                 data-testid="risk-resume-discard"
-                aria-label="Abandon the saved campaign"
+                aria-label="Abandon the saved game"
               >
                 Abandon
               </button>
@@ -312,13 +312,13 @@ export function RiskPage() {
             </div>
             <TicketStrip seats={table.seats} onChange={table.setSeats} />
             <p className="risk-note" style={{ marginTop: 10 }}>
-              Tap a ticket to take a chair — or tap the little figure to seat a
-              computer general, gentler or fiercer as you like.
+              Tap a ticket to sit down, or tap the little figure for a
+              computer general.
             </p>
           </div>
 
           <div className="panel">
-            <div className="risk-eyebrow">Fortunes of war</div>
+            <div className="risk-eyebrow">Dice</div>
             <div className="risk-count">
               <button
                 className={`risk-choice ${diceMode === 'random' ? 'on' : ''}`}
@@ -337,12 +337,12 @@ export function RiskPage() {
             </div>
             <p className="risk-note" style={{ marginTop: 10 }}>
               {diceMode === 'random'
-                ? 'Every roll is pure, independent luck — glorious upsets and cruel streaks alike.'
-                : 'Dice are drawn from a fair bag, so luck evens out — results stay close to the true odds, with no long cruel streaks.'}
+                ? 'Every roll is pure luck. Big upsets and long streaks can happen.'
+                : 'Dice come from a fair bag, so luck evens out. No long losing streaks.'}
             </p>
           </div>
 
-          <button className="risk-btn primary block lg" onClick={start} data-testid="risk-start">Take the field</button>
+          <button className="risk-btn primary block lg" onClick={start} data-testid="risk-start">Start game</button>
         </div>
       </Shell>
     );
@@ -356,11 +356,11 @@ export function RiskPage() {
         <div className="narrow-col stack">
           <div className="risk-victory">
             <WinEmblem color={w.color} />
-            <div className="risk-eyebrow">Dispatch from the front</div>
-            <h2 className="risk-victory-title">{w.name} holds the world</h2>
-            <p className="risk-victory-sub">Every banner on the map is theirs. A decisive campaign, General.</p>
+            <div className="risk-eyebrow">Game over</div>
+            <h2 className="risk-victory-title">{w.name} wins</h2>
+            <p className="risk-victory-sub">Every land on the map is theirs. The crowd wants a rematch.</p>
           </div>
-          <button className="risk-btn primary block lg" onClick={risk.newCampaign} data-testid="risk-again">New campaign</button>
+          <button className="risk-btn primary block lg" onClick={risk.newCampaign} data-testid="risk-again">Play again</button>
           <button className="risk-btn block" onClick={goMenu}>← Back to menu</button>
         </div>
       </Shell>
@@ -385,7 +385,7 @@ export function RiskPage() {
     claiming ? `${freeLands} lands free` :
     state.phase === 'setup' ? `${state.toPlace} left` :
     state.phase === 'reinforce'
-      ? (state.toPlace > 0 ? `${state.toPlace} left` : 'All placed — press Done ✓')
+      ? (state.toPlace > 0 ? `${state.toPlace} left` : 'All placed')
       : null;
 
   // A capture stays open until the general decides how many armies march in.
@@ -396,21 +396,21 @@ export function RiskPage() {
   // thing to do next. It replaces the old per-phase paragraphs, which moved
   // around and pushed the buttons with them.
   const hint =
-    claiming ? 'Tap any pale (unclaimed) land to claim it — one army raises your flag.' :
-    state.phase === 'setup' ? `Tap one of your lands to add an army — ${state.toPlace} left. Play passes on automatically.` :
+    claiming ? 'Tap a pale land to claim it. It gets one of your armies.' :
+    state.phase === 'setup' ? `Tap one of your lands to add an army. ${state.toPlace} left.` :
     state.phase === 'reinforce'
       ? (state.toPlace > 0
           ? `Tap your lands to place ${state.toPlace} more.`
-          : 'Every army placed — press Done to begin the attack.')
+          : 'All armies placed. Press Done to attack.')
     : state.phase === 'attack'
       ? (conquest && conquestSpare > 0
-          ? 'Land taken! Choose how many armies move into it.'
+          ? 'Land taken! Pick how many armies move in.'
           : sel
-            ? 'Tap a neighbouring enemy land to attack it — or press Done when you’re finished.'
+            ? 'Tap a touching enemy land to attack, or press Done to stop.'
             : 'Tap one of your lands with 2 or more armies, then a touching enemy land.')
     : (sel && dest
         ? 'Choose how many to move, then confirm.'
-        : 'Optional: tap a land, then a connected land of yours to move armies — or press Done.');
+        : 'To move armies, tap your land, then a connected land of yours. Or press Done.');
 
   return (
     <Shell onMenu={goMenu} bare>
@@ -607,7 +607,7 @@ function CommandRail({ state }: { state: GameState }) {
           <span className="risk-gen-nums">
             <b>{s.name}</b>
             {s.lands === 0 ? (
-              <span>Out of the war</span>
+              <span>Out of the game</span>
             ) : (
               // The units are their own elements so a phone can drop them and
               // still show the two numbers that matter: "39 · 14".
@@ -700,9 +700,9 @@ function Shell({
 function RiskHelp({ onClose }: { onClose: () => void }) {
   useDismissOnEscape(true, onClose);
   const steps: { n: number; name: string; body: string }[] = [
-    { n: 1, name: 'Place armies', body: 'You get fresh armies at the start of your turn — more if you hold whole continents (the +numbers on the map). Tap your own lands to place them.' },
-    { n: 2, name: 'Attack', body: 'Tap one of your lands that has 2 or more armies, then tap a touching enemy land. Dice decide the battle — the defender wins ties. Win, and the land becomes yours. Attack as often as you like, or not at all.' },
-    { n: 3, name: 'Move armies', body: 'Once per turn you may move armies between two of your connected lands. Then press Done to pass to the next general.' },
+    { n: 1, name: 'Place armies', body: 'Get new armies each turn, more if you hold a whole continent (the + numbers on the map). Tap your own lands to place them.' },
+    { n: 2, name: 'Attack', body: 'Tap one of your lands that has 2 or more armies, then tap a touching enemy land. Dice decide the battle, and the defender wins ties. Win and the land is yours. Attack as often as you like, or not at all.' },
+    { n: 3, name: 'Move armies', body: 'Once a turn, move armies between two of your connected lands. Then press Done to pass the turn.' },
   ];
   return (
     /* Backdrop click is a mouse convenience; Escape (above) and the "Got it"
@@ -737,7 +737,7 @@ function RiskHelp({ onClose }: { onClose: () => void }) {
           always shows whose turn it is and which step they’re on.
         </p>
         <button className="risk-btn primary block lg" onClick={onClose} data-testid="risk-help-close">
-          Got it — take the field
+          Got it
         </button>
       </div>
     </div>
