@@ -90,7 +90,12 @@ using **rebase merges** (sometimes squash). Therefore:
 
 ## Verification protocol (every change)
 
-1. `npm run check`, `npx vitest run`, `npm run build` — all clean.
+1. `npm run gates` — the one gate to run and quote. It runs the three below
+   (`npm run check`, `npx vitest run`, `npm run build`), parses the real
+   numbers, compares them with `gates-baseline.json` and prints ONE
+   `GATES ok|FAIL · …` line: paste that line verbatim in your report, never
+   a count from memory. `npm run gates -- --update-baseline` after an
+   intended change; say in the commit why it moved. All three clean:
    - `check` = `tsc -b` + ESLint (with jsx-a11y and react-hooks) + knip
      dead-code. Both CI workflows run it before the tests.
    - The REAL typecheck is the `tsc -b` inside `npm run build`: bare
