@@ -358,7 +358,7 @@ export function RiskPage() {
             <WinEmblem color={w.color} />
             <div className="risk-eyebrow">Game over</div>
             <h2 className="risk-victory-title">{w.name} wins</h2>
-            <p className="risk-victory-sub">Every land on the map is theirs. The crowd wants a rematch.</p>
+            <p className="risk-victory-sub">Every land on the map is theirs.</p>
           </div>
           <button className="risk-btn primary block lg" onClick={risk.newCampaign} data-testid="risk-again">Play again</button>
           <button className="risk-btn block" onClick={goMenu}>← Back to menu</button>
@@ -406,8 +406,8 @@ export function RiskPage() {
       ? (conquest && conquestSpare > 0
           ? 'Land taken! Pick how many armies move in.'
           : sel
-            ? 'Tap a touching enemy land to attack, or press Done to stop.'
-            : 'Tap one of your lands with 2 or more armies, then a touching enemy land.')
+            ? 'Tap an enemy land next door to attack, or press Done to stop.'
+            : 'Tap one of your lands with 2 or more armies, then an enemy land next door.')
     : (sel && dest
         ? 'Choose how many to move, then confirm.'
         : 'To move armies, tap your land, then a connected land of yours. Or press Done.');
@@ -701,7 +701,7 @@ function RiskHelp({ onClose }: { onClose: () => void }) {
   useDismissOnEscape(true, onClose);
   const steps: { n: number; name: string; body: string }[] = [
     { n: 1, name: 'Place armies', body: 'Get new armies each turn, more if you hold a whole continent (the + numbers on the map). Tap your own lands to place them.' },
-    { n: 2, name: 'Attack', body: 'Tap one of your lands that has 2 or more armies, then tap a touching enemy land. Dice decide the battle, and the defender wins ties. Win and the land is yours. Attack as often as you like, or not at all.' },
+    { n: 2, name: 'Attack', body: 'Tap one of your lands that has 2 or more armies, then tap an enemy land next door. Dice decide the battle, and the defender wins ties. Win and the land is yours. Attack as often as you like, or not at all.' },
     { n: 3, name: 'Move armies', body: 'Once a turn, move armies between two of your connected lands. Then press Done to pass the turn.' },
   ];
   return (
