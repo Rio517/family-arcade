@@ -62,23 +62,5 @@
       "Bash(mv ~/.claude/.credentials.json:*)",
       "Bash(tail ~/.claude/.credentials.json:*)"
     ]
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-critical-rules.mjs",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/tidewave-autostart.mjs",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
   }
 }

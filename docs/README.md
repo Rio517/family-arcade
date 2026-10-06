@@ -30,8 +30,7 @@ required.
 - **Screenshots live in `docs/screenshots/` only.** Do not copy them beside a
   doc. They are regenerated on every UI change, and copies go stale without
   any warning. Link to them relatively (`../screenshots/foo.png`). In a PR,
-  link them by SHA to `raw.githubusercontent.com` instead (see `CLAUDE.md`).
+  link them by SHA to `raw.githubusercontent.com` instead (see `AGENTS.md`).
 
-Session handoffs are not documentation. `BACKLOG.md` at the repo root is the
-one running handoff. Notes addressed to a particular agent belong in the
-conversation, not in `docs/`.
+Session handoffs and notes addressed to a particular agent are not
+documentation: they stay out of the repo.
