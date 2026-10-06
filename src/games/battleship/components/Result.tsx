@@ -30,7 +30,7 @@ const LOSS_LINES: Array<(me: string, opp: string) => string> = [
   (_, opp) => `${opp} got you this time. Go again?`,
   () => `Your ships put up a real fight.`,
   () => `So close. One more game could turn it.`,
-  () => `The crowd wants a rematch.`,
+  (_, opp) => `${opp} won this time. The crowd wants a rematch.`,
 ];
 
 export function Result({
