@@ -11,7 +11,7 @@ is no `docs/superpowers/` tree here; do not create one.
 
 A plan records what was intended. Once it ships, leave it as written instead
 of editing it to match the result. The result belongs in the commit, the PR,
-and `NEXT_STEP.md`.
+and `BACKLOG.md`.
 
 The design a plan builds from is in [../designs/](../designs/) or
 [../ideas/](../ideas/). The options the family chose between are in

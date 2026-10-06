@@ -32,6 +32,6 @@ required.
   any warning. Link to them relatively (`../screenshots/foo.png`). In a PR,
   link them by SHA to `raw.githubusercontent.com` instead (see `CLAUDE.md`).
 
-Session handoffs are not documentation. `NEXT_STEP.md` at the repo root is the
+Session handoffs are not documentation. `BACKLOG.md` at the repo root is the
 one running handoff. Notes addressed to a particular agent belong in the
 conversation, not in `docs/`.

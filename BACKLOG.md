@@ -1,4 +1,4 @@
-# Next Steps — Session Handoff
+# Backlog — Session Handoff
 
 > Future-focused. Anything already shipped lives in `git log`.
 > Durable rules live in `CLAUDE.md` (and `AGENTS.md` for other agents).
