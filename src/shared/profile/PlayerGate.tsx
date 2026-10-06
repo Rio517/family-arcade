@@ -23,17 +23,17 @@ export function PlayerGate({ gameTitle, children }: {
     <div className="app pgate" data-testid="player-gate">
       <div className="pgate-card">
         <div className="pgate-awning" aria-hidden="true" />
-        <h1 className="pgate-title">Step right up!</h1>
+        <h1 className="pgate-title">{users.length === 0 ? 'New player' : 'Pick a player'}</h1>
         <p className="pgate-sub">
           {users.length === 0
-            ? 'Make your ticket — it keeps your points and wins in every game.'
-            : `${gameTitle} needs a player — whose ticket?`}
+            ? 'Make your ticket. It keeps your points and wins in every game.'
+            : `Tap your ticket to play ${gameTitle}.`}
         </p>
 
         <TicketList users={users} onPick={signIn} onCreate={newPlayer} testIdPrefix="pgate" />
 
         <p className="pgate-back">
-          <Link to="/">‹ Back to the arcade</Link>
+          <Link to="/">‹ Back to arcade</Link>
         </p>
       </div>
     </div>

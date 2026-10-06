@@ -27,6 +27,7 @@
   font-size: 1.5rem;
   margin: 0 0 4px;
   letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 .pgate-sub {
   text-align: center;

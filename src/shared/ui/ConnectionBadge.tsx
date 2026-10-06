@@ -3,11 +3,11 @@ import { WarningIcon } from '@shared/ui/icons';
 
 const LABEL: Record<ConnStatus, string> = {
   idle: 'Offline',
-  hosting: 'Waiting for opponent',
+  hosting: 'Waiting for player 2',
   dialing: 'Connecting…',
   connected: 'Connected',
   reconnecting: 'Reconnecting…',
-  error: 'Connection error',
+  error: 'No connection',
 };
 
 // States where the two devices are NOT yet linked get a warning treatment so
