@@ -7,7 +7,8 @@ export type Rapier = typeof RapierModule;
 class RapierBody implements EngineBody {
   constructor(
     private readonly world: RapierModule.World,
-    private readonly rb: RapierModule.RigidBody,
+    readonly rb: RapierModule.RigidBody,
+    private readonly bodies: Map<number, RapierBody>,
   ) {}
   read(out: Pose): void {
     const t = this.rb.translation();
@@ -26,16 +27,32 @@ class RapierBody implements EngineBody {
   sleep(): void {
     this.rb.sleep();
   }
+  wake(): void {
+    this.rb.wakeUp();
+  }
+  touching(fn: (other: EngineBody) => void): void {
+    for (let i = 0, n = this.rb.numColliders(); i < n; i++) {
+      this.world.contactPairsWith(this.rb.collider(i), (other) => {
+        const parent = other.parent();
+        const body = parent ? this.bodies.get(parent.handle) : undefined;
+        if (body && body !== this) fn(body);
+      });
+    }
+  }
   impulse(x: number, y: number, z: number): void {
+    // Rapier ignores a zero impulse, even with wakeUp set, so wake explicitly.
+    this.rb.wakeUp();
     this.rb.applyImpulse({ x, y, z }, true);
   }
   remove(): void {
+    this.bodies.delete(this.rb.handle);
     this.world.removeRigidBody(this.rb);
   }
 }
 
 export class RapierEngine implements Engine {
   private readonly world: RapierModule.World;
+  private readonly bodies = new Map<number, RapierBody>();
   constructor(
     private readonly R: Rapier,
     gravity: Vec3,
@@ -84,12 +101,47 @@ export class RapierEngine implements Engine {
       .setRestitutionCombineRule(R.CoefficientCombineRule.Max)
       .setFriction(s.friction);
     this.world.createCollider(cd, rb);
-    return new RapierBody(this.world, rb);
+    const body = new RapierBody(this.world, rb, this.bodies);
+    this.bodies.set(rb.handle, body);
+    return body;
   }
 
   step(h: number): void {
     this.world.timestep = h;
     this.world.step();
+  }
+
+  /** A throwaway world with every shape falling and stacking for a few steps, then freed. */
+  warmUp(): void {
+    const g = { x: 0, y: -9.81, z: 0 };
+    const e = new RapierEngine(this.R, g, this.world.timestep);
+    e.addGround(0);
+    e.addStaticBox({ x: 1, y: 0.25, z: 0 }, { x: 0.3, y: 0.25, z: 0.3 }, { x: 0, y: 0, z: 0, w: 1 });
+    const kinds = ['box', 'sphere', 'cylinder', 'hull', 'box', 'box'] as const;
+    const hull = new Float32Array([-0.1, -0.1, -0.1, 0.1, -0.1, -0.1, 0, 0.1, 0, -0.1, -0.1, 0.1, 0.1, -0.1, 0.1]);
+    kinds.forEach((kind, i) => {
+      const b = e.create({
+        kind,
+        half: { x: 0.1, y: 0.1, z: 0.1 },
+        radius: 0.1,
+        points: kind === 'hull' ? hull : null,
+        offset: { x: 0, y: 0, z: 0 },
+        mass: 1,
+        bounce: 0.3,
+        friction: 0.6,
+        linDamp: 0.1,
+        angDamp: 3,
+        ccd: i === 5,
+        position: { x: (i % 3) * 0.05, y: 0.2 + i * 0.25, z: 0 },
+        quaternion: { x: 0, y: 0, z: 0, w: 1 },
+        velocity: { x: 0.1, y: 0, z: 0 },
+        spin: { x: 1, y: 0, z: 0 },
+      });
+      b.read(new Float64Array(7));
+      b.isSleeping();
+    });
+    for (let i = 0; i < 6; i++) e.step(this.world.timestep);
+    e.dispose();
   }
 
   dispose(): void {

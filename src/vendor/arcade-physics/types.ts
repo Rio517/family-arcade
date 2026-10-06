@@ -24,10 +24,12 @@ export interface PhysicsOptions {
   reducedMotion?: boolean;
   /** Called when the body cap removes a body, so the game can hide or recycle its object. */
   onEvict?: (body: PhysicsBody) => void;
-  /** Give up on Rapier and use the fallback if it has not loaded after this many ms (default 8000). */
+  /** Give up on Rapier and use the fallback if it has not downloaded and started up (WASM init) after this many ms, together (default 8000). */
   initTimeoutMs?: number;
   /** Load Rapier yourself (also how tests force a failure). Default: a dynamic import of `@dimforge/rapier3d-compat`. */
   loadRapier?: () => Promise<unknown>;
+  /** Run a throwaway scene before `createPhysics` resolves so the first real step is cheap (default true; false skips it). */
+  warmUp?: boolean;
   /** Called once if Rapier failed to load and the fallback took over. */
   onFallback?: (error: unknown) => void;
 }
@@ -64,6 +66,8 @@ export interface PhysicsBody {
   readonly removed: boolean;
   /** A push in kg*m/s, which also wakes the body. */
   applyImpulse(x: number, y: number, z: number): void;
+  /** Wake the body so it is simulated and drawn again. */
+  wake(): void;
   /** Take it out of the simulation; its object keeps the last pose written. */
   remove(): void;
 }
@@ -90,6 +94,8 @@ export interface PhysicsWorld {
   addBody(object: Object3D, options?: BodyOptions): PhysicsBody;
   /** Advance by `dt` seconds of wall time: runs fixed steps and writes interpolated poses to each object. */
   step(dt: number): void;
+  /** Runs a throwaway scene so the next real `step` is cheap. `createPhysics` already does this unless `warmUp: false`; call it yourself if you create the world early with that off. */
+  warmUp(): void;
   stats(): PhysicsStats;
   /** Remove every body, freeing the engine. The world is unusable afterwards. */
   dispose(): void;
