@@ -584,7 +584,7 @@
   }
 }
 
-.racer-win-card h2 { position: relative; z-index: 1; font-size: 30px; font-weight: 900; margin: 10px 0 4px; color: var(--r-pink-text); }
+.racer-win-card h2 { text-transform: uppercase; position: relative; z-index: 1; font-size: 30px; font-weight: 900; margin: 10px 0 4px; color: var(--r-pink-text); }
 .racer-win-face {
   position: relative;
   z-index: 1;

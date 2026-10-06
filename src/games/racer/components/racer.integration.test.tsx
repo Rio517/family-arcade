@@ -520,8 +520,8 @@ describe('two-player racer: reconnect re-sync', () => {
       // the wire — the host's hello, carried into the race's name list.
       await pump(2);
       expect(guest.getByTestId('racer-win')).toBeInTheDocument();
-      expect(guest.getByText('Rio wins!')).toBeInTheDocument();
-      expect(guest.queryByText('Kai wins!')).toBeNull();
+      expect(guest.getByText('Rio wins')).toBeInTheDocument();
+      expect(guest.queryByText('Kai wins')).toBeNull();
 
       // Kai's device credits Kai's ticket with the loss (named for Rio), and
       // the re-sync did not credit Rio a second time.

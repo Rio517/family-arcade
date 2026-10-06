@@ -15,10 +15,10 @@ export const racer: GameDescriptor = {
     image: preview,
     facts: ['1–2 players', 'Fly anywhere in the sky', 'About 2 min'],
     blurb:
-      'Fly a unicorn or a fairy, or ride one: a princess on a flying unicorn, a bunny on a cloud. Follow the rainbow road and grab 20 coins first; power-ups make you bigger, give you big wings, or pour out coins.',
+      'Fly a unicorn or a fairy down the rainbow road. Grab 20 coins first; power-ups make you big or pour out coins.',
   },
   description:
-    'Mario Kart in the sky: follow the rainbow road or fly anywhere, zoom through rainbow rings, and catch power-ups. Race the computer or a friend.',
+    'Fly the rainbow road, zoom through rainbow rings and catch power-ups. Race the computer or a friend.',
   Icon: BoltIcon,
   Page: RacerPage,
 };

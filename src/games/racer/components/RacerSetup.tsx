@@ -163,7 +163,7 @@ export function RacerLobby({
         <ConnectionBadge status={net.status} detail={net.statusDetail} />
         {net.role === 'host' && party.inParty ? (
           <div className="racer-lobby-card">
-            <h2>Race on!</h2>
+            <h2>Waiting to race</h2>
             <p className="racer-lobby-status">
               {net.connected ? 'Connected! Starting…' : `Waiting for ${friend} to hop in…`}
             </p>
