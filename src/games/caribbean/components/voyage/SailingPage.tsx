@@ -25,9 +25,9 @@ export function SailingPage({ controller }: { controller: CaribbeanController })
     setStatus('');
     try {
       const outcome = await controller.completeSeaLeg();
-      setStatus(outcome.kind === 'applied' ? 'Contact saved.' : 'Course change was not saved.');
+      setStatus(outcome.kind === 'applied' ? 'Contact saved.' : 'Course not saved. Nothing changed. Try again.');
     } catch {
-      setStatus('Course change failed. Try again.');
+      setStatus('Course not saved. Try again.');
     } finally {
       inFlightRef.current = false;
       setPending(false);

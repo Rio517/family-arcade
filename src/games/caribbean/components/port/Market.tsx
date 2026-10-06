@@ -329,7 +329,7 @@ export function Market({ state, busy, onTrade }: MarketProps) {
         ))}
       </ul>
       <p className="caribbean-market-status" data-testid="caribbean-market-status" aria-live="polite">
-        {phase === 'saving' ? 'Saving trade.' : phase === 'failure' ? 'Trade was not saved.' : ''}
+        {phase === 'saving' ? 'Saving trade.' : phase === 'failure' ? 'Trade not saved. Nothing changed. Try again.' : ''}
       </p>
     </section>
   );

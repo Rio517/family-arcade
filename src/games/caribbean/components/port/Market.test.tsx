@@ -322,8 +322,8 @@ describe('<Market>', () => {
   });
 
   it.each([
-    ['not applied', async () => ({ kind: 'not-applied' as const }), 'Trade was not saved.'],
-    ['rejected', async () => { throw new Error('writer rejected'); }, 'Trade was not saved.'],
+    ['not applied', async () => ({ kind: 'not-applied' as const }), 'Trade not saved. Nothing changed. Try again.'],
+    ['rejected', async () => { throw new Error('writer rejected'); }, 'Trade not saved. Nothing changed. Try again.'],
   ])('releases local trade ownership and announces failure when dispatch is %s', async (_label, onTrade, copy) => {
     const trade = vi.fn(onTrade);
     render(<Market state={openingState()} busy={false} onTrade={trade} />);
@@ -472,7 +472,7 @@ describe('<Market>', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('A newer save exists.');
     expect(screen.queryByRole('button', { name: 'Buy 5 Provisions' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reload newer save' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Export in-memory journal' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export this game' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continue without saving' })).toBeInTheDocument();
   });
 });

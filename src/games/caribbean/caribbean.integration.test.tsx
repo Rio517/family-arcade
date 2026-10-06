@@ -348,7 +348,7 @@ describe('Caribbean integrated production journey', () => {
     fireEvent.click(screen.getByTestId('port-action-log'));
     expect(await screen.findByTestId('captains-log-last-voyage')).toHaveTextContent('Victory — Red Jackdaw ready to board · Returned on day 4.');
     expect(screen.getByTestId('captains-log-last-voyage')).toHaveTextContent(
-      'Bridgetown’s harbour crew made Mistral ready for the next departure; the battle outcome remains in this log, but its damage is not carried onto the ready flagship.',
+      'The harbour crew fixed Mistral for the next trip. The battle stays in this log, but its damage does not carry over.',
     );
     expect(JSON.stringify(loadedJournal(store))).toBe(canonicalBeforeReload);
   }, 15_000);
@@ -372,14 +372,14 @@ describe('Caribbean integrated production journey', () => {
     if (degraded.kind !== 'loaded') throw new Error('fixture did not degrade to previous');
 
     const view = render(<CaribbeanPage runtime={runtime({ storage: store, now: [30, 40] })} />);
-    expect(screen.getByRole('heading', { name: 'Campaign recovery required' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Save needs repair' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Download recovery file' }));
     expect(capturedBlobParts).toEqual([
       serializeRecoveryExport(degraded.revision, degraded.unreadableSlots),
     ]);
     expect(String(capturedBlobParts?.[0])).toContain(corruptCurrentRaw);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Recover known-good campaign' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Recover last save' }));
     await screen.findByRole('heading', { name: 'Morgan’s commission' });
 
     const quarantineKeys = Object.keys(store).filter((key) => key.startsWith(QUARANTINE_KEY_PREFIX));
@@ -408,19 +408,19 @@ describe('Caribbean integrated production journey', () => {
     render(<CaribbeanPage runtime={runtime({ storage: store, locks: null })} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/safe save ownership is unavailable/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/can’t save games here/i);
     expect(screen.queryByTestId('caribbean-career-ready')).not.toBeInTheDocument();
     expect(store.getItem(CURRENT_SAVE_KEY)).toBeNull();
     expect(store.getItem(PREVIOUS_SAVE_KEY)).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue without saving' }));
     await screen.findByTestId('caribbean-career-ready');
-    expect(screen.getByRole('status')).toHaveTextContent('This career is not being saved. Keep this tab open.');
+    expect(screen.getByRole('status')).toHaveTextContent('Not saving. Keep this tab open: progress is lost if you close it.');
     await openPortActivity('Market');
     fireEvent.click(screen.getByRole('button', { name: 'Buy 5 Provisions' }));
     await waitFor(() => expect(within(screen.getByRole('region', { name: 'Cargo summary' })).getByText('3.9 months')).toBeVisible());
 
-    expect(screen.getByRole('status')).toHaveTextContent('This career is not being saved. Keep this tab open.');
+    expect(screen.getByRole('status')).toHaveTextContent('Not saving. Keep this tab open: progress is lost if you close it.');
     expect(store.getItem(CURRENT_SAVE_KEY)).toBeNull();
     expect(store.getItem(PREVIOUS_SAVE_KEY)).toBeNull();
   });
@@ -449,7 +449,7 @@ describe('Caribbean integrated production journey', () => {
     expect(await b.findByRole('alert')).toHaveTextContent(/newer save exists/i);
     expect(loadedJournal(store).events.map((event) => event.type)).toEqual(['lead-accepted']);
 
-    fireEvent.click(b.getByRole('button', { name: 'Export in-memory journal' }));
+    fireEvent.click(b.getByRole('button', { name: 'Export this game' }));
     expect(String(capturedBlobParts?.[0])).toContain('market-traded');
     fireEvent.click(b.getByRole('button', { name: 'Reload newer save' }));
     await b.findByTestId('caribbean-career-ready');

@@ -434,7 +434,7 @@ describe('accessible naval command deck', () => {
         session={session}
         sceneFactory={null}
         resolutionErrorAction={{
-          message: 'Battle result could not be verified.',
+          message: 'The battle result could not be checked. Your campaign is safe. Restart or withdraw.',
           busy: false,
           restartLabel: 'Restart engagement',
           withdrawLabel: 'Withdraw to Bridgetown',
@@ -446,7 +446,7 @@ describe('accessible naval command deck', () => {
 
     const dialog = screen.getByTestId('naval-resolution-error');
     expect(dialog).toHaveAttribute('role', 'dialog');
-    expect(dialog).toHaveTextContent('Battle result could not be verified.');
+    expect(dialog).toHaveTextContent('The battle result could not be checked. Your campaign is safe. Restart or withdraw.');
     expect(dialog).not.toHaveTextContent('Battle Lab');
     const restartButton = screen.getByTestId('naval-resolution-restart');
     const withdrawButton = screen.getByTestId('naval-resolution-withdraw');
@@ -575,7 +575,7 @@ describe('accessible naval command deck', () => {
 
     act(() => session.deliverFrame(1 / 60));
 
-    const dialog = screen.getByRole('dialog', { name: /battle state drift detected/i });
+    const dialog = screen.getByRole('dialog', { name: /battle error/i });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(dialog).toHaveTextContent('player.position.x:not-finite');
     expect(screen.getByTestId('naval-restart-input')).toBeEnabled();
@@ -904,10 +904,10 @@ describe('accessible naval command deck', () => {
     [{ kind: 'surrender', victorShipId: 'opponent' } as NavalOutcome, /Mistral.*crew surrendered.*hull 20%.*crew 8/i, 'Restart Battle Lab'],
     [{ kind: 'sunk', victorShipId: 'player' } as NavalOutcome, /Red Jackdaw reached hull 0/i, 'Rematch Battle Lab'],
     [{ kind: 'sunk', victorShipId: 'opponent' } as NavalOutcome, /Mistral reached hull 0/i, 'Restart Battle Lab'],
-    [{ kind: 'escaped', shipId: 'player' } as NavalOutcome, /Mistral crossed the 92-unit boundary at radial range 93\.0 while moving outward/i, 'Restart Battle Lab'],
-    [{ kind: 'escaped', shipId: 'opponent' } as NavalOutcome, /Red Jackdaw crossed the 92-unit boundary at radial range 93\.0 while moving outward/i, 'Restart Battle Lab'],
-    [{ kind: 'separated', shipId: 'player' } as NavalOutcome, /tick 7200 reached the 7200-tick limit/i, 'Restart Battle Lab'],
-    [{ kind: 'separated', shipId: 'opponent' } as NavalOutcome, /tick 7200 reached the 7200-tick limit/i, 'Restart Battle Lab'],
+    [{ kind: 'escaped', shipId: 'player' } as NavalOutcome, /Mistral sailed out of the battle area/i, 'Restart Battle Lab'],
+    [{ kind: 'escaped', shipId: 'opponent' } as NavalOutcome, /Red Jackdaw sailed out of the battle area/i, 'Restart Battle Lab'],
+    [{ kind: 'separated', shipId: 'player' } as NavalOutcome, /Time ran out\. Neither ship won/i, 'Restart Battle Lab'],
+    [{ kind: 'separated', shipId: 'opponent' } as NavalOutcome, /Time ran out\. Neither ship won/i, 'Restart Battle Lab'],
   ])('explains every outcome identity with decisive values and the correct next action', (outcome, detail, action) => {
     const session = manualNavalSession({ outcome });
     session.state.tick = 7_200;

@@ -32,7 +32,7 @@ export function ActiveCampaign({ controller }: { controller: ReturnType<typeof u
       case 'sailing': return <SailingPage controller={controller} />;
       case 'encounter': return <EncounterPage controller={controller} />;
       case 'naval': return (
-        <Suspense fallback={<p className="caribbean-status" role="status">Loading the engagement…</p>}>
+        <Suspense fallback={<p className="caribbean-status" role="status">Loading the battle…</p>}>
           <CampaignNavalBattle
             controller={controller}
             persistenceDecisionRequired={decisionRequired}
@@ -129,7 +129,7 @@ function ControllerPage({ runtime, autoResume }: { runtime: CaribbeanRuntime; au
 
       {controller.journal !== null && controller.persistence.kind === 'memory-only' && (
         <aside className="caribbean-status caribbean-memory-warning" role="status">
-          <p>This career is not being saved. Keep this tab open.</p>
+          <p>Not saving. Keep this tab open: progress is lost if you close it.</p>
           {controller.persistence.canRetrySaving && (
             <button data-testid="caribbean-retry-saving-button" type="button" disabled={controller.busy} onClick={() => void controller.retrySaving()}>
               Retry saving

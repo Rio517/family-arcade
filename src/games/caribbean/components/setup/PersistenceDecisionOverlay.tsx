@@ -8,15 +8,15 @@ import { useModalFocus } from '../recovery/useModalFocus';
 
 function saveFailureCopy(failure: SaveCapabilityFailure): string {
   if (failure.kind === 'writer-denied') {
-    return 'This tab could not acquire safe save ownership. Continue only if you accept a memory-only career.';
+    return 'This tab can’t save right now. You can play on, but progress is lost when you close the tab.';
   }
   if (failure.kind === 'writer-unavailable') {
-    return 'Safe save ownership is unavailable in this browser. Continue only if you accept a memory-only career.';
+    return 'This browser can’t save games here. You can play on, but progress is lost when you close the tab.';
   }
   if (failure.kind === 'operation-uncertain') {
-    return 'The last save operation has an uncertain outcome. Export or continue without saving before proceeding.';
+    return 'The last save may not have gone through. Keep this tab open and play on without saving.';
   }
-  return 'Campaign storage is unavailable. Continue only if you accept a memory-only career.';
+  return 'Saving isn’t available in this browser. You can play on, but progress is lost when you close the tab.';
 }
 
 function downloadText(raw: string, filename: string): void {
@@ -55,7 +55,7 @@ export function PersistenceDecisionControls({
   if (persistence.kind !== 'save-conflict') return null;
   return (
     <>
-      <p>A newer save exists. This tab will not overwrite or adopt it without your choice.</p>
+      <p>A newer save exists. Nothing was overwritten, and this game is safe.</p>
       <div className="caribbean-action-row">
         <button
           ref={initialFocusRef}
@@ -73,7 +73,7 @@ export function PersistenceDecisionControls({
             if (raw !== null) downloadText(raw, 'caribbean-in-memory-journal.json');
           }}
         >
-          Export in-memory journal
+          Export this game
         </button>
         <button data-testid="caribbean-continue-without-saving-button" type="button" onClick={controller.continueWithoutSaving}>
           Continue without saving
@@ -119,7 +119,9 @@ export function PersistenceDecisionOverlay({
       aria-modal="true"
       aria-labelledby="campaign-persistence-title"
     >
-      <h2 id="campaign-persistence-title">Choose how this campaign continues</h2>
+      <h2 id="campaign-persistence-title">
+        {persistence.kind === 'save-conflict' ? 'Newer save found' : 'Can’t save'}
+      </h2>
       <div role="alert">
         <PersistenceDecisionControls controller={controller} initialFocusRef={initialFocusRef} />
       </div>

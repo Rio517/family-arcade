@@ -22,12 +22,12 @@ function continuationMessage(
 ): string {
   const result = phase.result;
   if (result.cause === 'storage-unavailable') {
-    return `Storage became unavailable during ${result.failedOperation}.`;
+    return 'Saving stopped partway. Your backup copy is safe. Try recovery again.';
   }
   if (result.cause === 'partial-cleanup') {
-    return `Cleanup stopped during ${result.failedOperation}.`;
+    return 'Cleanup stopped partway. Your backup copy is safe. Try again.';
   }
-  return `The recovered campaign could not be published during ${result.saveFailure.reason === 'storage-unavailable' ? result.saveFailure.operation : result.saveFailure.reason}.`;
+  return 'The recovered campaign could not be saved. Your backup copy is safe. Try again.';
 }
 
 function blockedMessage(
@@ -36,19 +36,19 @@ function blockedMessage(
   const { result } = phase;
   switch (result.reason) {
     case 'active-revision-conflict':
-      return 'The active campaign changed before quarantine. Reload before making a new recovery decision.';
+      return 'The campaign changed before the backup finished. Nothing was removed. Reload the page and try again.';
     case 'quarantine-collision':
-      return 'The selected quarantine key already belongs to a different recovery copy.';
+      return 'A different backup already uses this name. Nothing was removed.';
     case 'storage-unavailable':
-      return `Storage became unavailable during ${result.operation}, before quarantine was verified.`;
+      return 'Saving stopped before the backup was checked. Nothing was removed. Reload the page and try again.';
     case 'external-revision-conflict':
-      return 'A newer active save appeared after quarantine. The verified copy is preserved; it cannot overwrite the newer save.';
+      return 'A newer save appeared. Your backup copy is safe and won’t overwrite it. Pick what to do next.';
     case 'quarantine-invalidated':
       return result.cause === 'quarantine-missing'
-        ? 'The verified quarantine copy is missing. No destructive action is available.'
-        : 'The verified quarantine copy changed. No destructive action is available.';
+        ? 'The backup copy is missing, so nothing can be removed. Reload the page and try again.'
+        : 'The backup copy changed, so nothing can be removed. Reload the page and try again.';
     case 'invalid-recovery-source':
-      return 'The loaded save is not a valid recovery source. Export it before choosing another action.';
+      return 'This save can’t be recovered from. Download it before you do anything else.';
   }
 }
 
@@ -57,25 +57,24 @@ function recoveryActionCopy(
   failure: RecoveryActionFailure | null,
 ): string | null {
   if (failure?.kind === 'post-result-load') {
-    const action = failure.action === 'recover' || failure.action === 'continue-recovery'
-      ? 'Recovery'
-      : 'Campaign abandonment';
-    return `${action} completed, but campaign storage could not be reread during ${failure.loadFailure.operation}. Reload before taking another recovery action.`;
+    return failure.action === 'recover' || failure.action === 'continue-recovery'
+      ? 'Recovery finished, but saves could not be read again. Reload the page to continue.'
+      : 'The campaign was abandoned, but saves could not be read again. Reload the page to continue.';
   }
   if (failure?.kind === 'writer') {
     if (failure.failure.kind === 'writer-denied') {
-      return 'Safe save ownership was denied. No recovery action ran; you can try again.';
+      return 'Couldn’t change saves. Nothing was changed. Try again.';
     }
     if (failure.failure.kind === 'writer-unavailable') {
-      return 'Safe save ownership is unavailable. Recovery and abandonment are disabled in this browser.';
+      return 'This browser can’t change saves, so recovery is off here. Nothing was changed.';
     }
     if (failure.failure.writer.kind === 'operation-threw') {
-      return 'The recovery operation threw before its outcome could be confirmed. Reload before taking another recovery action.';
+      return 'Couldn’t confirm what happened. Reload the page to check your save.';
     }
-    return 'Safe save ownership returned an invalid protocol result. Reload before taking another recovery action.';
+    return 'Something went wrong with saves. Reload the page, then try again.';
   }
   return capability === 'unavailable'
-    ? 'Safe save ownership is unavailable. Recovery and abandonment are disabled in this browser.'
+    ? 'This browser can’t change saves, so recovery is off here. Nothing was changed.'
     : null;
 }
 
@@ -129,7 +128,7 @@ export function RecoveryPanel({ controller }: { controller: CaribbeanController 
     <section className="caribbean-recovery-panel" aria-label="Campaign recovery">
       <div ref={backgroundRef} className="caribbean-recovery-content">
         <p className="caribbean-place-line">Bridgetown · save station</p>
-        <h1>{postResultLoadFailure ? 'Campaign storage must be reread' : 'Campaign recovery required'}</h1>
+        <h1>{postResultLoadFailure ? 'Reload to continue' : 'Save needs repair'}</h1>
 
         {recoveryNotice !== null && (
           <p id="caribbean-recovery-action-status" className="caribbean-alert" role="alert">
@@ -140,13 +139,13 @@ export function RecoveryPanel({ controller }: { controller: CaribbeanController 
         {postResultLoadFailure ? (
           <>
             <p>
-              The storage change completed, but this page will not infer or repeat the result until the active slots can be read again.
+              The change went through. Reload the page to see your saved campaign.
             </p>
             <div className="caribbean-action-row">
               <button data-testid="caribbean-download-recovery-button" type="button" onClick={exportRecovery}>Download recovery file</button>
               {load.kind === 'loaded' && (
                 <button data-testid="caribbean-recover-known-good-button" className="caribbean-button-primary" type="button" disabled aria-describedby={mutationReasonId}>
-                  Recover known-good campaign
+                  Recover last save
                 </button>
               )}
               <button data-testid="caribbean-abandon-campaign-button" ref={abandonRef} type="button" disabled aria-describedby={mutationReasonId}>
@@ -162,7 +161,7 @@ export function RecoveryPanel({ controller }: { controller: CaribbeanController 
             </p>
             <div className="caribbean-action-row">
               <button data-testid="caribbean-retry-recovery-button" type="button" disabled={mutationDisabled} aria-describedby={mutationReasonId} onClick={() => void controller.continueRecovery('continue')}>Retry recovery</button>
-              <button data-testid="caribbean-abandon-from-quarantine-button" className="caribbean-button-danger" type="button" disabled={mutationDisabled} aria-describedby={mutationReasonId} onClick={() => void controller.continueRecovery('abandon')}>Abandon from quarantine</button>
+              <button data-testid="caribbean-abandon-from-quarantine-button" className="caribbean-button-danger" type="button" disabled={mutationDisabled} aria-describedby={mutationReasonId} onClick={() => void controller.continueRecovery('abandon')}>Abandon campaign</button>
             </div>
           </div>
         ) : phase.kind === 'recovery-blocked' ? (
@@ -175,7 +174,7 @@ export function RecoveryPanel({ controller }: { controller: CaribbeanController 
                   type="button"
                   onClick={() => downloadText(externalConflict.quarantineRaw, 'caribbean-verified-quarantine.json')}
                 >
-                  Download verified quarantine
+                  Download backup
                 </button>
                 <button data-testid="caribbean-reload-newer-save-button" type="button" onClick={() => void controller.reloadExternalSave()}>Reload newer save</button>
                 <button data-testid="caribbean-recovery-cancel-button" type="button" onClick={() => setExternalCancelled(true)}>Cancel</button>
@@ -185,13 +184,13 @@ export function RecoveryPanel({ controller }: { controller: CaribbeanController 
         ) : (
           <>
             <p>
-              The active save could not be used as-is. Download its exact bytes before choosing recovery or abandonment.
+              This save can’t be opened as it is. Download a recovery file first, then choose to recover or abandon.
             </p>
             <div className="caribbean-action-row">
               <button data-testid="caribbean-download-recovery-button" type="button" onClick={exportRecovery}>Download recovery file</button>
               {load.kind === 'loaded' && (
                 <button data-testid="caribbean-recover-known-good-button" className="caribbean-button-primary" type="button" disabled={mutationDisabled} aria-describedby={mutationReasonId} onClick={() => void controller.recover()}>
-                  Recover known-good campaign
+                  Recover last save
                 </button>
               )}
               <button data-testid="caribbean-abandon-campaign-button" ref={abandonRef} type="button" disabled={mutationDisabled} aria-describedby={mutationReasonId} onClick={() => setAbandonOpen(true)}>
@@ -213,7 +212,7 @@ export function RecoveryPanel({ controller }: { controller: CaribbeanController 
         >
           <h2 id="recovery-abandon-title">Abandon this campaign?</h2>
           <p id="recovery-abandon-description">
-            The save will be copied to quarantine before its active slots are removed.
+            A copy of the save is kept first, then the campaign is removed.
           </p>
           <div className="caribbean-dialog-actions">
             <button data-testid="caribbean-abandon-cancel-button" ref={cancelRef} type="button" onClick={() => setAbandonOpen(false)}>Cancel</button>
@@ -223,7 +222,7 @@ export function RecoveryPanel({ controller }: { controller: CaribbeanController 
               type="button"
               onClick={() => { setAbandonOpen(false); void controller.abandon(); }}
             >
-              Quarantine and abandon
+              Abandon it
             </button>
           </div>
         </section>

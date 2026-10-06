@@ -215,10 +215,10 @@ describe('<CampaignSetup>', () => {
     fireEvent.click(opener);
     expect(document.querySelector('.caribbean-commission-content')).toHaveAttribute('inert');
     expect(screen.getByRole('dialog', { name: 'Abandon this campaign?' })).toHaveAccessibleDescription(
-      'The save will be copied to quarantine before its active slots are removed.',
+      'A copy of the save is kept first, then the campaign is removed.',
     );
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
-    fireEvent.click(screen.getByRole('button', { name: 'Quarantine and abandon' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abandon it' }));
     expect(view.abandon).toHaveBeenCalledTimes(1);
     expect(document.querySelector('.caribbean-commission-content')).not.toHaveAttribute('inert');
   });
@@ -234,7 +234,7 @@ describe('<CampaignSetup>', () => {
 
   it('states that saving is disabled without claiming a saved campaign', () => {
     renderSetup(controller(), setupIdentity(), false);
-    expect(screen.getByRole('status')).toHaveTextContent(/Saving disabled/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/Saving is off/i);
     expect(screen.queryByText(/saved safely/i)).not.toBeInTheDocument();
   });
 
@@ -244,10 +244,10 @@ describe('<CampaignSetup>', () => {
       recoveryWriterCapability: 'unavailable',
     }), setupIdentity(), false);
     expect(screen.getByRole('status')).toHaveTextContent(
-      'Saving disabled. Resume requires explicit memory-only consent.',
+      'Saving is off in this browser. To resume, choose to play without saving.',
     );
     expect(screen.getByRole('heading', { name: 'Morgan’s commission' })).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent(/campaign abandonment is disabled/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/can’t be abandoned here/i);
     expect(screen.getByRole('button', { name: 'Resume career' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeDisabled();
   });
@@ -269,10 +269,9 @@ describe('<CampaignSetup>', () => {
       },
     }));
 
-    expect(screen.getByRole('heading', { name: 'Campaign storage must be reread' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Reload to continue' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Morgan’s commission' })).not.toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent(/abandonment completed/i);
-    expect(screen.getByRole('alert')).toHaveTextContent(/read-current/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/campaign was abandoned/i);
     expect(screen.getByRole('button', { name: 'Resume career' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Abandon campaign' })).toBeDisabled();
   });
@@ -301,7 +300,7 @@ describe('<CampaignSetup>', () => {
     const view = controller({ persistence });
     renderSetup(view, setupIdentity(), false);
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/could not acquire safe save ownership/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/can’t save right now/i);
     const action = screen.getByRole('button', { name: 'Continue without saving' });
     action.focus();
     action.click();
@@ -316,7 +315,7 @@ describe('<CampaignSetup>', () => {
     renderSetup(view, setupIdentity(), false);
 
     expect(screen.getByRole('heading', { name: 'Sign a captain’s commission' })).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent(/memory-only career/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/progress is lost when you close the tab/i);
     expect(screen.queryByTestId('campaign-persistence-dialog')).not.toBeInTheDocument();
   });
 
@@ -333,7 +332,7 @@ describe('<CampaignSetup>', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent(/newer save exists/i);
     fireEvent.click(screen.getByRole('button', { name: 'Reload newer save' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Export in-memory journal' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export this game' }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue without saving' }));
     expect(view.reloadExternalSave).toHaveBeenCalledTimes(1);
     expect(view.exportInMemoryJournal).toHaveBeenCalledTimes(1);

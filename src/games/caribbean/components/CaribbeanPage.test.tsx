@@ -198,7 +198,7 @@ describe('<CaribbeanPage>', () => {
     const store = storage();
     render(<CaribbeanPage runtime={runtime(store)} />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('960 × 600 playfield');
+    expect(screen.getByRole('alert')).toHaveTextContent('at least 960 × 600');
     expect(store.getItem).not.toHaveBeenCalled();
   });
 
@@ -258,7 +258,7 @@ describe('<CaribbeanPage>', () => {
     render(<CaribbeanPage runtime={runtime(store)} />);
     fireEvent.click(screen.getByRole('button', { name: 'Resume career' }));
     expect(await screen.findByTestId('naval-elapsed')).toHaveAttribute('data-battle-tick', '0');
-    expect(screen.getByText('Reloading restarts this engagement from first contact.')).toBeVisible();
+    expect(screen.getByText('Reloading restarts this battle from first contact.')).toBeVisible();
     expect(started.size).toBe(1);
     expect(JSON.stringify([...started][0]?.state.input)).toBe(JSON.stringify(saved.state.mode.kind === 'naval' ? saved.state.mode.input : null));
 
@@ -271,7 +271,7 @@ describe('<CaribbeanPage>', () => {
     setViewport(1440, 900);
     fireEvent(window, new Event('resize'));
     expect(await screen.findByTestId('naval-elapsed')).toHaveAttribute('data-battle-tick', '0');
-    expect(screen.getByText('Reloading restarts this engagement from first contact.')).toBeVisible();
+    expect(screen.getByText('Reloading restarts this battle from first contact.')).toBeVisible();
     expect(started.size).toBe(2);
     expect(disposed.size).toBe(1);
     expect([...started][1]).not.toBe([...started][0]);
@@ -314,7 +314,7 @@ describe('<CaribbeanPage>', () => {
     injected.writer = createCampaignWriter(observed.locks);
     render(<CaribbeanPage runtime={injected} />);
 
-    expect(screen.getByRole('heading', { name: 'Campaign recovery required' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Save needs repair' })).toBeInTheDocument();
     expect(screen.queryByTestId('caribbean-career-ready')).not.toBeInTheDocument();
     expect(observed.request).not.toHaveBeenCalled();
   });
@@ -337,7 +337,7 @@ describe('<CaribbeanPage>', () => {
     };
     render(<CaribbeanPage runtime={injected} />);
 
-    expect(screen.getByRole('status')).toHaveTextContent(/Saving disabled/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/Saving is off/i);
     fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
     expect(makeSeed).not.toHaveBeenCalled();
     expect(screen.queryByTestId('caribbean-career-ready')).not.toBeInTheDocument();
@@ -345,7 +345,7 @@ describe('<CaribbeanPage>', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue without saving' }));
     expect(makeSeed).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('caribbean-career-ready')).toHaveTextContent('Captain');
-    expect(screen.getByRole('status')).toHaveTextContent(/not being saved/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/Not saving/i);
   });
 
   it.each(['read-current', 'read-previous'] as const)(
@@ -362,9 +362,9 @@ describe('<CaribbeanPage>', () => {
       };
       render(<CaribbeanPage runtime={injected} />);
 
-      expect(screen.getByRole('status')).toHaveTextContent(/Saving disabled/i);
+      expect(screen.getByRole('status')).toHaveTextContent(/Saving is off/i);
       fireEvent.click(screen.getByRole('button', { name: 'Start career' }));
-      expect(await screen.findByRole('alert')).toHaveTextContent(/storage is unavailable/i);
+      expect(await screen.findByRole('alert')).toHaveTextContent(/isn’t available in this browser/i);
       expect(makeSeed).not.toHaveBeenCalled();
       expect(screen.queryByTestId('caribbean-career-ready')).not.toBeInTheDocument();
 

@@ -1,7 +1,7 @@
 import { redJackdawView } from '../../domain/leadSelectors';
 import type { CampaignStateV1, LastVoyageSummary } from '../../domain/types';
 
-const SAFE_RETURN_COPY = 'Bridgetown’s harbour crew made Mistral ready for the next departure; the battle outcome remains in this log, but its damage is not carried onto the ready flagship.';
+const SAFE_RETURN_COPY = 'The harbour crew fixed Mistral for the next trip. The battle stays in this log, but its damage does not carry over.';
 
 function lastVoyageCopy(lastVoyage: LastVoyageSummary): string {
   let result: string;

@@ -47,7 +47,7 @@ export function MinimumScreenGate({ children }: { children(supportGeneration: nu
       role="alert"
       tabIndex={-1}
     >
-      <p>Caribbean Career needs a 960 × 600 playfield. Use a larger landscape display.</p>
+      <p>Caribbean Career needs a landscape screen at least 960 × 600. Turn the device sideways or use a bigger one.</p>
     </section>
   );
 }

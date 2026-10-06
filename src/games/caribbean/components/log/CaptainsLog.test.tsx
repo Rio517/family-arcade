@@ -71,7 +71,7 @@ describe("<CaptainsLog>", () => {
       'Victory — Red Jackdaw surrendered · Returned on day 4.',
     );
     expect(screen.getByText(
-      'Bridgetown’s harbour crew made Mistral ready for the next departure; the battle outcome remains in this log, but its damage is not carried onto the ready flagship.',
+      'The harbour crew fixed Mistral for the next trip. The battle stays in this log, but its damage does not carry over.',
     )).toBeInTheDocument();
     expect(state.world.lastVoyage.outcome).toEqual({ kind: 'surrender', victorShipId: 'player' });
     expect(state.fleet.ships[0]).toEqual(flagshipBefore);
@@ -86,6 +86,6 @@ describe("<CaptainsLog>", () => {
     expect(screen.getByTestId('captains-log-last-voyage')).toHaveTextContent(
       'Avoided contact · Returned to Bridgetown on day 2.',
     );
-    expect(screen.queryByText(/damage is not carried/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/damage does not carry over/i)).not.toBeInTheDocument();
   });
 });

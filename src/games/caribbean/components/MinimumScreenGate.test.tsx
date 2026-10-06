@@ -41,7 +41,7 @@ describe('<MinimumScreenGate>', () => {
 
     const notice = screen.getByRole('alert');
     expect(notice).toHaveTextContent(
-      'Caribbean Career needs a 960 × 600 playfield. Use a larger landscape display.',
+      'Caribbean Career needs a landscape screen at least 960 × 600. Turn the device sideways or use a bigger one.',
     );
     expect(notice).toHaveFocus();
     expect(screen.queryByTestId('campaign-controller')).not.toBeInTheDocument();

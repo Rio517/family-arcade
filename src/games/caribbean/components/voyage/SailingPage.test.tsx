@@ -70,7 +70,7 @@ describe('<SailingPage>', () => {
     render(<SailingPage controller={controller} />);
     const action = screen.getByTestId('voyage-continue-east');
     fireEvent.click(action);
-    await waitFor(() => expect(screen.getByTestId('voyage-status')).toHaveTextContent('Course change was not saved.'));
+    await waitFor(() => expect(screen.getByTestId('voyage-status')).toHaveTextContent('Course not saved. Nothing changed. Try again.'));
     expect(action).toBeEnabled();
   });
 });
