@@ -15,7 +15,7 @@ npm run shots      # headless screenshots of open rounds into shots/
 The scripts live in `.shelf/` (see `.shelf/VERSION`). The pick page template
 is in `.shelf/pick-template/`.
 
-`CLAUDE.md` requires big visual changes to be pitched as mockups first, with
+`AGENTS.md` requires big visual changes to be pitched as mockups first, with
 about three labelled options, and built only after the family picks. A round
 keeps the options, the choice and what was set aside.
 

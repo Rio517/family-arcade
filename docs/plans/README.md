@@ -10,8 +10,8 @@ skill produces.** Its default of `docs/superpowers/plans/` is overridden. There
 is no `docs/superpowers/` tree here; do not create one.
 
 A plan records what was intended. Once it ships, leave it as written instead
-of editing it to match the result. The result belongs in the commit, the PR,
-and `BACKLOG.md`.
+of editing it to match the result. The result belongs in the commit and the
+PR.
 
 The design a plan builds from is in [../designs/](../designs/) or
 [../ideas/](../ideas/). The options the family chose between are in

@@ -6,16 +6,16 @@ description: Use when building, extending, tuning, profiling or shipping a game 
 # Arcade game playbook
 
 How games get built here, from the Gulp Universe work and the art drops
-before it. The repo's `CLAUDE.md` holds the architecture invariants, git
+before it. The repo's `AGENTS.md` holds the architecture invariants, git
 rules and design system; this skill is the working pattern on top of it.
-Where they overlap, `CLAUDE.md` wins.
+Where they overlap, `AGENTS.md` wins.
 
 ## Shipping: which rule applies
 
 | The work is | Then |
 |---|---|
 | A **new game** (not on `main` yet, even after the family has played a preview) | Build it locally and hand the owner the URL `http://127.0.0.1:5178/#/<id>`, or a LAN or Tailscale preview for the iPads. Playtest fixes go on local branches too. **No push and no PR** until the owner asks. |
-| A change to an **existing game** (on `main`) | Commit on its own branch, open a PR, and rebase-merge it after CI is green, using the `git cherry` routine in `CLAUDE.md`. Then watch the Pages deploy. |
+| A change to an **existing game** (on `main`) | Commit on its own branch, open a PR, and rebase-merge it after CI is green, using the `git cherry` routine in `AGENTS.md`. Then watch the Pages deploy. |
 | A **big visual change**, including a new game's overall look | A mockup with about three labelled options first (`docs/mockups/rounds/YYYYMMDD-<topic>/`), built from the real components behind an opt-in harness. The family picks; build the look after the pick. The rules and the plain view can be built meanwhile. |
 | **Less visual quality** (fewer shadows, lower DPR, simpler models, dropped effects, fewer things on screen) | Ask the owner first, with pictures. Never trade it away silently for speed. |
 | **Tuning** a value the owner or the children complained about, or making something bigger, clearer or higher-contrast so it can be seen | Straight in, small, one complaint per commit, with before and after evidence. A restyle is a mockup instead. |
@@ -52,8 +52,8 @@ iPad".
 4. **Build** in the three layers below, tests first for the rules.
 5. **Gates** (below), a shot per UI state, and every shot opened.
 6. **Real-device test**, then ship by the table above.
-7. **Playtest notes** go into `BACKLOG.md` as they arrive. Done items are
-   removed. Read the owner's wording literally: "it isn't about perceived
+7. **Playtest notes** go into a GitHub issue (or the PR they belong to) as
+   they arrive, and are closed when done. Read the owner's wording literally: "it isn't about perceived
    size, things are a little too far apart" meant spacing, not camera.
 
 ## Build a game in three layers
@@ -89,10 +89,10 @@ icon, colour, shot and poster entries.
 
 ## Gates
 
-Run all gates under Node 20 (`mise x node@20 --`, or any way of getting
-Node 20). CI runs `CLAUDE.md`'s bare commands on Node 20; a newer local Node
-whose `localStorage` global breaks dozens of jsdom tests gives false
-failures.
+Run all gates under Node 20. `npm run gates` switches to it through mise by
+itself, and a bare `vitest` under a newer Node stops with one line saying
+so: a newer Node's `localStorage` global breaks hundreds of jsdom tests. CI
+runs `AGENTS.md`'s bare commands on Node 20.
 
 ```
 mise x node@20 -- npm run check > <scratch>/check.txt 2>&1   # never piped; 0 errors, warnings at the baseline, knip clean
@@ -150,8 +150,9 @@ ADR replacing ADR 0008's scope first.
 ## Assets
 
 Procedural first. When a game needs authored art (concepts, models,
-textures), ask the owner's asset factory: it commissions concept art, builds
-the models and delivers files to integrate. Keep earlier drops outside the
+textures), ask the maintainer: the arcade's authored art comes from an
+asset factory that commissions concept art, builds the models and delivers
+files to integrate. Keep earlier drops outside the
 repo, in a per-game assets folder. The drop drill, review renders and the
 measured precache cap (13 MiB per file; triangles are not the limit) are in
 `references/assets.md`.
@@ -166,8 +167,8 @@ measured precache cap (13 MiB per file; triangles are not the limit) are in
   extraction).
 - **Check what else is running first:** `ListAgents`, `git status`, and the
   ports (5178 is Tidewave's dev server; reuse it).
-- **Hand-offs** go in a HANDOFF.md and PROGRESS.md pair. Commit test scripts
-  to `scripts/`: the real-PeerJS scripts that proved play together lived
+- **Hand-offs** between agents go in files outside the repo or in the PR
+  description, never in the repo's docs. Commit test scripts to `scripts/`: the real-PeerJS scripts that proved play together lived
   only in a session temp folder.
 - Shell: chaining with `&&` is fine. Never `rm -rf`; delete files one by one.
   Write commit messages to a file and use `git commit -F <file>`. `bash -c "…"`

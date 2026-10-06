@@ -67,7 +67,7 @@ reporting it. Dimensions:
 ## Phase 2 — Verify in the browser
 
 Boot the production build in headless chromium (paths + WebGL flag in
-CLAUDE.md) and smoke the arcade end to end: landing renders, each registry
+AGENTS.md) and smoke the arcade end to end: landing renders, each registry
 game opens, chess 2D/3D + each theme loads without console errors, a save
 appears in the Save Station and resumes. Console errors found here are
 findings even if tests pass.
@@ -97,4 +97,4 @@ Baseline: commit <sha> · N games · N tests passing · build OK/warnings · tsc
 - [HIGH|MED|LOW] <area>: <one-line claim> — <scenario> (CONFIRMED|PLAUSIBLE)
 ```
 
-Follow the CLAUDE.md git workflow — the owner merges fast.
+Follow the AGENTS.md git workflow — PRs merge fast.

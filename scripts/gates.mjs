@@ -49,7 +49,7 @@ function step(name, kind, cmd) {
   return { file, exit: r.status ?? 1, text: readFileSync(file, 'utf8') }
 }
 
-/** Delete stray *.tsbuildinfo outside node_modules, as CLAUDE.md requires. */
+/** Delete stray *.tsbuildinfo outside node_modules, as AGENTS.md requires. */
 function deleteTsbuildinfo(dir = root) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (e.name === 'node_modules' || e.name === '.git' || e.name === '.claude') continue

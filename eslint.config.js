@@ -2,7 +2,7 @@
 // class of bug the others miss:
 //   - typescript-eslint  → type-aware sloppiness (unused vars, bad awaits)
 //   - react-hooks        → dependency-array and rules-of-hooks violations
-//   - jsx-a11y           → the accessibility floor CLAUDE.md promises
+//   - jsx-a11y           → the accessibility floor AGENTS.md promises
 // Run via `npm run lint` (or `npm run check`, which also typechecks + knips).
 import js from '@eslint/js';
 import globals from 'globals';
