@@ -88,6 +88,9 @@ const WAKE = 1e-6;
 const NUDGE_AFTER = 0.3;
 const NUDGES = 3;
 
+/** Steps taken when the world is made, so the first spill does not pay for Rapier's start (see `warmUp`). */
+const WARM_STEPS = 30;
+
 const ONE = new THREE.Vector3(1, 1, 1);
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
@@ -407,6 +410,7 @@ export class SpillPhysics {
         return false;
       }
       for (const lane of this.lanes) build(world, lane.x);
+      warmUp(world);
       this.world = world;
       return true;
     } catch (error) {
@@ -439,6 +443,20 @@ export class SpillPhysics {
       // It is already broken; nothing more to free.
     }
   }
+}
+
+/**
+ * Rapier's first steps are slow (about 30 ms on a fast Mac, many times that
+ * on an old iPad): a box dropped into the first lane takes them now, while
+ * the round counts down, instead of on the frame the first container leaves
+ * a ship's deck.
+ */
+function warmUp(world: PhysicsWorld): void {
+  const box = new THREE.Object3D();
+  box.position.set(0, -BOWL_DEEP + 2, 0);
+  const body = world.addBody(box, { size: { x: 1, y: 1, z: 2.5 } });
+  for (let i = 0; i < WARM_STEPS; i++) world.step(1 / 60);
+  body.remove();
 }
 
 /** A lane's colliders, its middle at `x`: the street round the mouth, the throat's wall, its floor. */
