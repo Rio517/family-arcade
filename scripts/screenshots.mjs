@@ -950,6 +950,26 @@ const SHOTS = [
       await page.waitForTimeout(6000);
     },
   },
+  // A swallowed ship's containers as real bodies (the spill harness: Robin's
+  // hole takes a moored ship by its stern, on a seeded Region map). They
+  // tumble off the deck over the rim, then lie in a heap in the throat.
+  // Both engines: the family plays on WebKit.
+  ...[
+    ['gulp-spill-tumble', 0.75],
+    ['gulp-spill-pile', 3.2],
+  ].map(([name, at]) => ({
+    name,
+    path: `/preview-gulp-spill.html?at=${at}`,
+    viewport: TABLET,
+    fits: true,
+    motion: true,
+    engines: ['chromium', 'webkit'],
+    expect: '[data-testid="gulp-spill-ready"]',
+    prep: async (page) => {
+      await page.waitForSelector('[data-testid="gulp-spill-ready"]', { state: 'attached', timeout: 60000 });
+      await page.waitForTimeout(300);
+    },
+  })),
   {
     // The phone menu must leave PLAY clear of the arcade's own bottom bar.
     name: 'gulp-phone',
