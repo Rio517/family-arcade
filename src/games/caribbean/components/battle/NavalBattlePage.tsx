@@ -109,7 +109,6 @@ function outcomeCopy(
     return { heading: 'Escaped', detail: `${ship.name} sailed out of the battle area.`, action: 'Restart Battle Lab' };
   }
   if (outcome.kind === 'separated') {
-    const separated = state.ships[outcome.shipId];
     return { heading: 'Separated', detail: 'Time ran out. Neither ship won.', action: 'Restart Battle Lab' };
   }
   return { heading: 'Battle complete', detail: 'The battle is over.', action: 'Restart Battle Lab' };
