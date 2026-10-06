@@ -43,7 +43,7 @@ export interface Engine {
   addStaticBox(center: Vec3, half: Vec3, q: { x: number; y: number; z: number; w: number }): void;
   create(spec: BodySpec): EngineBody;
   step(h: number): void;
-  /** Runs a throwaway scene so the first real step is cheap. Leaves no trace. */
-  warmUp(): void;
+  /** A new, empty engine of the same kind and settings (for the warm-up's throwaway world), or null. */
+  scratch(): Engine | null;
   dispose(): void;
 }

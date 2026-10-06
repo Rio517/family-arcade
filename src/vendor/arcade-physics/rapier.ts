@@ -111,37 +111,8 @@ export class RapierEngine implements Engine {
     this.world.step();
   }
 
-  /** A throwaway world with every shape falling and stacking for a few steps, then freed. */
-  warmUp(): void {
-    const g = { x: 0, y: -9.81, z: 0 };
-    const e = new RapierEngine(this.R, g, this.world.timestep);
-    e.addGround(0);
-    e.addStaticBox({ x: 1, y: 0.25, z: 0 }, { x: 0.3, y: 0.25, z: 0.3 }, { x: 0, y: 0, z: 0, w: 1 });
-    const kinds = ['box', 'sphere', 'cylinder', 'hull', 'box', 'box'] as const;
-    const hull = new Float32Array([-0.1, -0.1, -0.1, 0.1, -0.1, -0.1, 0, 0.1, 0, -0.1, -0.1, 0.1, 0.1, -0.1, 0.1]);
-    kinds.forEach((kind, i) => {
-      const b = e.create({
-        kind,
-        half: { x: 0.1, y: 0.1, z: 0.1 },
-        radius: 0.1,
-        points: kind === 'hull' ? hull : null,
-        offset: { x: 0, y: 0, z: 0 },
-        mass: 1,
-        bounce: 0.3,
-        friction: 0.6,
-        linDamp: 0.1,
-        angDamp: 3,
-        ccd: i === 5,
-        position: { x: (i % 3) * 0.05, y: 0.2 + i * 0.25, z: 0 },
-        quaternion: { x: 0, y: 0, z: 0, w: 1 },
-        velocity: { x: 0.1, y: 0, z: 0 },
-        spin: { x: 1, y: 0, z: 0 },
-      });
-      b.read(new Float64Array(7));
-      b.isSleeping();
-    });
-    for (let i = 0; i < 6; i++) e.step(this.world.timestep);
-    e.dispose();
+  scratch(): Engine | null {
+    return new RapierEngine(this.R, this.world.gravity, this.world.timestep);
   }
 
   dispose(): void {
