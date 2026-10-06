@@ -265,7 +265,7 @@ export function BattleshipPage() {
             <div className="modal-head">
               <span className="modal-title">
                 {awaitingPlacement
-                  ? 'Opponent connected!'
+                  ? 'Opponent joined'
                   : awaitingJoin
                     ? 'Waiting for opponent to join'
                     : 'Invite your opponent'}
@@ -331,7 +331,7 @@ export function BattleshipPage() {
       {bs.side && bs.status === 'error' && (
         <div className="panel narrow-col">
           <p className="subtle" style={{ color: 'var(--bad)' }}>
-            {bs.statusDetail ?? 'Connection error.'}
+            {bs.statusDetail ?? 'Lost the connection. Your battle is saved. Go back to the menu and rejoin.'}
           </p>
           <button className="btn btn-block" onClick={exitToMenu} data-testid="exit-to-menu">← Back to menu</button>
         </div>

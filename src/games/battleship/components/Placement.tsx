@@ -149,8 +149,8 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting, onPlayCom
       <div className="placement-layout">
         <div className="panel">
         <div className="board-title">
-          <span className="name">Position your fleet</span>
-          <span className="hint">{complete ? 'Drag to adjust, or ready up' : 'Tap a cell to place'}</span>
+          <span className="name">Place your fleet</span>
+          <span className="hint">{complete ? 'Drag a ship to move it, or tap Ready.' : 'Tap the grid to place a ship.'}</span>
         </div>
         <Board
           cells={cells}
@@ -234,7 +234,7 @@ export function Placement({ skinId, fleet, onChange, onReady, waiting, onPlayCom
                       </button>
                     </>
                   ) : (
-                    <span className="status todo">tap / drag</span>
+                    <span className="status todo">Tap or drag</span>
                   )}
                 </span>
               </div>

@@ -501,7 +501,7 @@ function sunkEnemyShips(radar: CellState[][], log: GameLog, side: Side): PlacedS
 
 /** A shot's radar class and its human-readable log label. */
 function describeShot(e: ShotEvent): { res: 'hit' | 'miss' | 'sunk'; label: string } {
-  if (e.allSunk) return { res: 'sunk', label: 'WIN — fleet destroyed' };
+  if (e.allSunk) return { res: 'sunk', label: 'sank the last ship' };
   if (e.sunk) return { res: 'sunk', label: `sank the ${shipName(e.sunk)}` };
   return e.hit ? { res: 'hit', label: 'hit' } : { res: 'miss', label: 'miss' };
 }

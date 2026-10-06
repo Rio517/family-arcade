@@ -190,7 +190,7 @@ export function applyMessage(s: SessionState, msg: Message, rng: () => number = 
   switch (msg.t) {
     case 'hello': {
       if (msg.v !== PROTOCOL_VERSION) {
-        return { state: s, outgoing: [], error: 'Different app versions — both players refresh the page.' };
+        return { state: s, outgoing: [], error: 'The two devices run different versions. Both players, refresh the page.' };
       }
       return none({ ...s, oppName: msg.name.slice(0, 24), oppSkinId: msg.skinId });
     }

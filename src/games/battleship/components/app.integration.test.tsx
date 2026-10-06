@@ -340,7 +340,7 @@ describe('solo games never ask you to invite anyone', () => {
     // scan QR codes. (It used to: the host-waiting logic didn't know solo.)
     expect(app.getByTestId('auto-place')).toBeInTheDocument();
     expect(app.queryByTestId('share-chip')).toBeNull();
-    expect(app.queryByText(/Waiting for opponent/)).toBeNull();
+    expect(app.queryByText(/Waiting for opponent to join/)).toBeNull();
 
     // Through placement and into the wait, still nothing to share.
     fireEvent.click(app.getByTestId('auto-place'));
@@ -437,7 +437,7 @@ async function resumeAndWin(app: ReturnType<typeof within>, last: Coord) {
   fireEvent.click(app.getByTestId('resume-game'));
   await waitFor(() => expect(app.getByTestId('battleship-page')).toHaveAttribute('data-conn', 'connected'));
   fireEvent.click(app.getByTestId(`cell-enemy-${last.row}-${last.col}`));
-  await app.findByText('You Win!', {}, { timeout: 4000 });
+  await app.findByText('You win', {}, { timeout: 4000 });
 }
 
 describe('the result lands on the ticket that sat down', () => {
@@ -458,7 +458,7 @@ describe('the result lands on the ticket that sat down', () => {
     expect(rows['u-rio']).toEqual([]);
     // Kai is seated and signed in: the card's running total is Kai's.
     const kai = getUsersSnapshot().users.find((u) => u.id === 'u-kai')!.profile;
-    expect(app.getByText(new RegExp(`You now have ${kai.points} points`))).toBeInTheDocument();
+    expect(app.getByText(new RegExp(`You have ${kai.points} points`))).toBeInTheDocument();
   });
 
   it('shows no connection badge against a computer captain — there is no link to report', async () => {
@@ -478,15 +478,15 @@ describe('the result lands on the ticket that sat down', () => {
     switchTo('u-rio');
     await waitFor(() => expect(app.getByTestId('battleship-page')).toHaveAttribute('data-conn', 'connected'));
     fireEvent.click(app.getByTestId(`cell-enemy-${last.row}-${last.col}`));
-    await app.findByText('You Win!', {}, { timeout: 4000 });
+    await app.findByText('You win', {}, { timeout: 4000 });
 
     const rows = historyById();
     expect(rows['u-kai']).toHaveLength(1);
     expect(rows['u-kai'][0]).toMatchObject({ game: 'battleship', result: 'win' });
     expect(rows['u-rio']).toEqual([]);
     // Rio is signed in but the points went to Kai: the card must not read
-    // Rio's balance back as "You now have".
-    expect(app.queryByText(/You now have/)).toBeNull();
+    // Rio's balance back as "You have".
+    expect(app.queryByText(/You have/)).toBeNull();
   });
 
   it('a save from before tickets took seats records nothing — for anybody', async () => {
@@ -499,7 +499,7 @@ describe('the result lands on the ticket that sat down', () => {
     expect(rows['u-kai']).toEqual([]);
     expect(rows['u-rio']).toEqual([]);
     // Nothing was credited, so there is no running total to report.
-    expect(app.queryByText(/You now have/)).toBeNull();
+    expect(app.queryByText(/You have/)).toBeNull();
   });
 });
 
@@ -626,8 +626,8 @@ async function playToHostWin(host: Scope, guest: Scope) {
       fireEvent.click(guest.getByTestId(`cell-enemy-${w.row}-${w.col}`));
     }
   }
-  await host.findByText('You Win!');
-  await guest.findByText('Good Game!');
+  await host.findByText('You win');
+  await guest.findByText('Good game');
 }
 
 describe('two-player integration: to the finish, and a rematch', () => {

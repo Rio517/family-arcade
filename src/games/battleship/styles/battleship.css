@@ -578,3 +578,6 @@
 .captain-chip strong { color: #fbbf24; font-variant-numeric: tabular-nums; }
 .captain-chip:hover { border-color: #fbbf24; }
 .captain-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Result states read as capitals; the source stays in sentence case. */
+.result-panel .result-hero .big { text-transform: uppercase; }
