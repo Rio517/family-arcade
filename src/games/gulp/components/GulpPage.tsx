@@ -83,10 +83,15 @@ function lengthOf(duration: number, map: MapId): Settings['length'] {
 
 type Phase = 'menu' | 'play' | 'over';
 
+/** 2 → "2nd": early readers say a place, not a hash sign. */
+function place(rank: number): string {
+  return `${rank}${rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th'}`;
+}
+
 /** The results card's big line: how the round went for the child. */
 function headline(rank: number, endedBy: World['endedBy']): string {
-  if (endedBy === 'out') return rank === 1 ? 'Still the biggest hole!' : `You finished #${rank}`;
-  return rank === 1 ? 'You are the biggest hole!' : `#${rank} — great gulping!`;
+  if (endedBy === 'out') return rank === 1 ? 'Still the biggest hole!' : `You came ${place(rank)}`;
+  return rank === 1 ? 'You are the biggest hole!' : `You came ${place(rank)}. Great gulping!`;
 }
 
 /** What the results card says ended the round. */

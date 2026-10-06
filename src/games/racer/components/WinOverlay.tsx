@@ -9,14 +9,18 @@ export function WinOverlay({ ctx, onAgain, onMenu }: { ctx: RaceCtx; onAgain: ()
   const iWon = ctx.winner === ctx.myIndex;
   const tie = ctx.mode === 'net' && ctx.winner === null;
   const title = tie
-    ? 'It is a tie'
+    ? 'It’s a tie'
     : iWon
       ? 'You win'
       : `${ctx.names[ctx.winner ?? 0]} wins`;
+  const mine = ctx.scores[ctx.myIndex];
+  // The wink is rare: only a close loss (three quarters of the coins) gets it.
   const sub =
     tie || iWon
       ? `You got ${ctx.target} coins first.`
-      : `You got ${ctx.scores[ctx.myIndex]} coins. The crowd wants a rematch.`;
+      : mine >= ctx.target * 0.75
+        ? `You got ${mine} coins. The crowd wants a rematch.`
+        : `You got ${mine} coins.`;
   const order = ctx.looks.map((_, i) => i).sort((a, b) => ctx.scores[b] - ctx.scores[a]);
   return (
     <div className="racer-win" data-testid="racer-win">
