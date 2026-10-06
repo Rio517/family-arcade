@@ -2,56 +2,62 @@
  * The three.js view for Rainbow Racer — an open sky over a sea of clouds.
  *
  * There is no arena and no edge. The world is cut into the same cells the
- * rules use (domain/sky.ts): each cell's floating islands, clouds and
- * balloons are rebuilt from its hash whenever the camera comes near and
- * dropped when it leaves, so wherever a child flies there is more sky. The
- * rainbow road and its rings are built ahead of me as I fly. The sky dome
- * and the cloud sea travel with the camera.
+ * rules use (domain/sky.ts): each cell's floating islands and cloud banks
+ * (domain/scenery.ts) and its balloons are rebuilt from its hash whenever
+ * the camera comes near and dropped when it leaves, so wherever a child
+ * flies there is more sky. Each
+ * cell bakes into one or two meshes (world.ts); how an island looks comes
+ * from an island source (islands.ts). The rainbow road and its rings are built ahead of me as I fly
+ * (road.ts). The sky dome and the cloud sea travel with the camera.
  *
  * Framework-free: the page builds one of these, then each frame hands it a
  * plain view (racers, coins, stars) to mirror. Everything is procedural,
  * the racers included (see riders.ts), so the PWA stays offline.
  */
 import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { disposeDeep } from '@shared/three/disposeDeep';
-import {
-  CELL,
-  RING_RADIUS,
-  cellNoise,
-  cellOf,
-  islandsInCell,
-  trailPoint,
-  trailRing,
-  type Ring,
-} from '../domain/sky';
+import { CLOUD_SEA_Y } from '../domain/scenery';
+import { CELL, RING_RADIUS, cellOf, trailPoint, trailRing, type Ring } from '../domain/sky';
 import type { Flyer } from '../domain/flight';
 import type { MountId } from '../domain/mounts';
 import type { Coin, PowerKind, Star } from '../domain/pickups';
+import { coinGeometry, coinMaterial } from './coin';
+import { codeIslands, type IslandSource } from './islands';
 import { createRider, type CharacterId, type Rider } from './riders';
+import { ROAD_DROP, ROAD_WIDTH, ringGeometry, ringMaterial, roadGeometries, roadGlowMaterial, roadMaterial, STRIPES, type RoadSee } from './road';
+import { HAZE, HAZE_FAR, HAZE_NEAR, cloudSeaTexture, glossTexture, skyTexture } from './skyLook';
+import { cellSteps, createWorldKit, disposeCell, disposeWorldKit, flowFalls, type WorldKit } from './world';
 
-/** How many cells either side of the camera are built. */
+/** How many cells either side of the middle of the built square. */
 const VIEW_CELLS = 3;
-/** The cloud sea's height; racers never fly below SKY_FLOOR, well above it. */
-const CLOUD_SEA_Y = -26;
+/** The built square sits this far ahead of the camera: the camera only looks forward. */
+const VIEW_AHEAD = CELL * 1.4;
+/** The most time a frame spends building sky cells, in milliseconds; a cell takes several frames. */
+const BUILD_BUDGET_MS = 1.5;
 
-const RAINBOW = [0xff5a5a, 0xff9f45, 0xffe14a, 0x5fd08a, 0x4aa3ff, 0x9b6bff];
+/** A cell shows its full-detail version within this distance of the camera, its cheap one past this. */
+/** How far from the road's surface I am before it starts to turn see-through, and when it is wholly so. */
+const SEE_FROM = 1;
+const SEE_FULL = 4;
+/** Once see-through, the depth it holds on to a little longer. */
+const SEE_HOLD = 0.4;
+const NEAR_IN = 115;
+const NEAR_OUT = 140;
+
+/** The rings' sparkle colours, outside band to inside. */
+const RAINBOW = STRIPES.map((c) => c.getHex());
+
+/** A ring shows its full geometry within this distance of the camera, a lighter one past it. */
+const RING_NEAR = 110;
 
 /** How much of the rainbow road is drawn, in road points behind and ahead of me. */
 const ROAD_BEHIND = 4;
 const ROAD_AHEAD = 36;
-/** The road runs this far below the line racers fly along, and is this wide. */
-const ROAD_DROP = 4;
-const ROAD_WIDTH = 13;
-/** Curve samples per road point: enough that bends read smooth. */
-const ROAD_SAMPLES = 6;
 
 /** Each power-up's glow and sparkle colour, so a child learns them by colour. */
 const POWER_GLOW: Record<PowerKind, number> = { grow: 0xfff0a0, wings: 0x9fd8ff, coins: 0xff9ad5 };
 const POWER_SPARKLE: Record<PowerKind, number> = { grow: 0xffe066, wings: 0xa8e0ff, coins: 0xff8fd0 };
-const FLOWERS = [0xff5d8f, 0xffd23f, 0xff9f45, 0x9b6bff, 0xffffff, 0x53d0ff];
-const BALLOONS = [0xff5d6c, 0x4aa3ff, 0xffd23f, 0x53d08a, 0xc38bff];
 
 export interface RacerLook {
   /** The racer's picture, shown in the HUD next to the score. */
@@ -70,68 +76,6 @@ export interface SceneView {
   karts: Flyer[];
   coins: Coin[];
   stars: Star[];
-}
-
-/** A soft pastel sky, horizon warm, zenith blue. */
-function skyTexture(): THREE.Texture {
-  const c = document.createElement('canvas');
-  c.width = 8;
-  c.height = 256;
-  const ctx = c.getContext('2d')!;
-  const g = ctx.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0.0, '#2f7fe0');
-  g.addColorStop(0.3, '#5fa6f2');
-  g.addColorStop(0.46, '#a9d2fb');
-  g.addColorStop(0.52, '#ffd6ec');
-  g.addColorStop(0.58, '#c9e2ff');
-  g.addColorStop(1.0, '#9ec8f4');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 8, 256);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-/** Soft white cloud tops with faint lilac hollows, tiling. */
-function cloudSeaTexture(): THREE.Texture {
-  const s = 512;
-  const c = document.createElement('canvas');
-  c.width = c.height = s;
-  const ctx = c.getContext('2d')!;
-  ctx.fillStyle = '#dfe6fb';
-  ctx.fillRect(0, 0, s, s);
-  const puff = (x: number, y: number, r: number, col: string) => {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, col);
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    // Draw wrapped so the tile repeats seamlessly.
-    for (const dx of [-s, 0, s]) {
-      for (const dy of [-s, 0, s]) {
-        ctx.beginPath();
-        ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  };
-  // Lilac hollows between the cloud tops, then the tops, then a bright rim
-  // on each top — enough shape that flying low reads as clouds, not a floor.
-  for (let i = 0; i < 120; i++) {
-    const n = (k: number) => cellNoise(i, k, 91);
-    puff(n(1) * s, n(2) * s, 30 + n(3) * 60, 'rgba(140,150,225,0.5)');
-  }
-  for (let i = 0; i < 150; i++) {
-    const n = (k: number) => cellNoise(i, k, 92);
-    puff(n(1) * s, n(2) * s, 16 + n(3) * 44, 'rgba(255,255,255,0.9)');
-  }
-  for (let i = 0; i < 150; i++) {
-    const n = (k: number) => cellNoise(i, k, 92);
-    puff(n(1) * s - 6, n(2) * s - 8, 8 + n(3) * 20, 'rgba(255,255,255,1)');
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  return tex;
 }
 
 /** A name tag that always faces the camera. */
@@ -230,30 +174,32 @@ interface RacerObj {
   mine: boolean;
 }
 
-/** Shared geometry and materials for everything built per cell. */
-interface Kit {
-  islandTop: THREE.BufferGeometry;
-  islandRock: THREE.BufferGeometry;
-  grass: THREE.Material;
-  rock: THREE.Material;
-  trunk: THREE.BufferGeometry;
-  trunkMat: THREE.Material;
-  canopy: THREE.BufferGeometry;
-  canopyMats: THREE.Material[];
-  flower: THREE.BufferGeometry;
-  flowerMats: THREE.Material[];
-  puff: THREE.BufferGeometry;
-  cloudMat: THREE.Material;
-  ringBands: THREE.BufferGeometry[];
-  ringMats: THREE.Material[];
-  balloon: THREE.BufferGeometry;
-  balloonMats: THREE.Material[];
-  basket: THREE.BufferGeometry;
-  basketMat: THREE.Material;
+/** One sky cell in two versions: cheap for the haze, and the full one near the camera. */
+interface CellObj {
+  cx: number;
+  cz: number;
+  /** By level; level 0 is always there. */
+  v: Array<THREE.Group | null>;
 }
 
-interface CellObj {
-  group: THREE.Group;
+/** A cell version being built a few steps a frame. */
+interface BuildJob {
+  key: string;
+  cx: number;
+  cz: number;
+  level: number;
+  steps: Generator<void, THREE.Group>;
+}
+
+/** Shared geometry and materials for the track: rings and coins. */
+interface Kit {
+  gloss: THREE.Texture;
+  ring: THREE.BufferGeometry;
+  /** The lighter ring for the distance. */
+  ringFar: THREE.BufferGeometry;
+  ringMat: THREE.Material;
+  coin: THREE.BufferGeometry;
+  coinMat: THREE.Material;
 }
 
 export class RacerScene {
@@ -262,17 +208,35 @@ export class RacerScene {
   private camera: THREE.PerspectiveCamera;
   private racers: RacerObj[] = [];
   private kit: Kit;
+  private world: WorldKit;
+  /** What the floating islands look like. */
+  private islands: IslandSource = codeIslands();
+  /** The cell version being built right now. */
+  private job: BuildJob | null = null;
   private cells = new Map<string, CellObj>();
+  /** Cells wanted but not built yet, nearest first. */
+  private pending: Array<[string, number, number]> = [];
+  /** The cells in the built square. */
+  private wanted = new Set<string>();
+  /** The cell in the middle of the built square. */
+  private cellsAround = '';
   private skyDome: THREE.Mesh;
   private cloudSea: THREE.Mesh;
   private cloudTex: THREE.Texture;
-  private coinTemplate: THREE.Group;
   private coins = new Map<number, THREE.Group>();
   private power: PowerKit;
   private stars = new Map<number, THREE.Group>();
   /** The rainbow road near me, rebuilt as I move along it. */
   private road: THREE.Mesh;
+  /** The light along the road's edges. */
+  private roadGlow: THREE.Mesh;
+  /** Where I am and whether the road is between me and the camera (see road.ts). */
+  /** The road is already turning see-through (see updateRoadSee). */
+  private seeLatched = false;
+  private roadSee: RoadSee = { player: new THREE.Vector3(), through: { value: 0 } };
   private roadFrom = -1;
+  /** The next stretch of road being built a few steps a frame, with the rings it wants. */
+  private roadJob: { from: number; steps: Generator<void, { road: THREE.BufferGeometry; glow: THREE.BufferGeometry }> } | null = null;
   private roadRings = new Map<string, THREE.Group>();
   /** Points the way back to the road when I have flown off it. */
   private roadArrow: THREE.Group;
@@ -311,8 +275,8 @@ export class RacerScene {
     this.scene.environmentIntensity = 0.35;
     pmrem.dispose();
 
-    // Fog the colour of the horizon, so far things melt into the sky.
-    this.scene.fog = new THREE.Fog(0xb9dcff, 300, 900);
+    // Haze the colour of the horizon, so far things melt into the sky.
+    this.scene.fog = new THREE.Fog(HAZE, HAZE_NEAR, HAZE_FAR);
     this.camera = new THREE.PerspectiveCamera(62, container.clientWidth / (container.clientHeight || 400), 0.5, 1600);
 
     this.scene.add(new THREE.HemisphereLight(0xeaf4ff, 0xa9a6e6, 0.85));
@@ -323,18 +287,19 @@ export class RacerScene {
     rim.position.set(-90, 40, -70);
     this.scene.add(rim);
 
+    // Not tone-mapped: the blue on screen is the blue picked in skyLook.
     this.skyDome = new THREE.Mesh(
       new THREE.SphereGeometry(1400, 32, 16),
-      new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, fog: false, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false }),
     );
     this.skyDome.renderOrder = -1;
     this.scene.add(this.skyDome);
 
     this.cloudTex = cloudSeaTexture();
-    this.cloudTex.repeat.set(14, 14);
+    this.cloudTex.repeat.set(10, 10);
     this.cloudSea = new THREE.Mesh(
       new THREE.PlaneGeometry(3000, 3000),
-      new THREE.MeshStandardMaterial({ map: this.cloudTex, roughness: 1, color: 0xf2f4ff }),
+      new THREE.MeshBasicMaterial({ map: this.cloudTex, toneMapped: false }),
     );
     this.cloudSea.rotation.x = -Math.PI / 2;
     this.cloudSea.position.y = CLOUD_SEA_Y;
@@ -364,21 +329,14 @@ export class RacerScene {
     this.scene.add(sunDisc);
 
     this.kit = this.buildKit();
-    this.coinTemplate = this.buildCoinTemplate();
+    this.world = createWorldKit();
     this.power = this.buildPowerKit();
-    this.road = new THREE.Mesh(
-      new THREE.BufferGeometry(),
-      // Not tone-mapped: the stripes keep their full colour over white cloud.
-      new THREE.MeshBasicMaterial({
-        vertexColors: true,
-        transparent: true,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-        toneMapped: false,
-      }),
-    );
+    this.road = new THREE.Mesh(new THREE.BufferGeometry(), roadMaterial(this.kit.gloss, this.roadSee));
     this.scene.add(this.road);
-    this.updateRoad(0);
+    this.roadGlow = new THREE.Mesh(new THREE.BufferGeometry(), roadGlowMaterial());
+    this.roadGlow.renderOrder = 2;
+    this.scene.add(this.roadGlow);
+    this.updateRoad(0, true);
     this.roadArrow = this.buildRoadArrow();
     this.scene.add(this.roadArrow);
     this.sparkleMat = new THREE.SpriteMaterial({
@@ -391,7 +349,9 @@ export class RacerScene {
 
     looks.forEach((look, i) => this.racers.push(this.buildRacer(look, i)));
 
-    this.updateCells(0, 0);
+    // Every cell in view before the first picture; after that, one a frame.
+    this.updateCells(this.camPos.x, this.camPos.z, 0);
+    this.buildAll();
 
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObs = new ResizeObserver(() => this.resize());
@@ -400,106 +360,8 @@ export class RacerScene {
   }
 
   private buildKit(): Kit {
-    const std = (color: number, extra: THREE.MeshStandardMaterialParameters = {}) =>
-      new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...extra });
-    const ringBands = RAINBOW.map((_, i) => new THREE.TorusGeometry(RING_RADIUS + 1.6 - i * 0.55, 0.32, 8, 48));
-    return {
-      islandTop: new THREE.CylinderGeometry(1, 0.96, 1.4, 28),
-      islandRock: new THREE.ConeGeometry(0.96, 1.9, 9),
-      grass: std(0x8fd46a),
-      rock: std(0xc9b2a0, { flatShading: true }),
-      trunk: new THREE.CylinderGeometry(0.45, 0.6, 5, 7),
-      trunkMat: std(0x9a6b4a),
-      canopy: new THREE.SphereGeometry(3.2, 14, 10),
-      canopyMats: [std(0x67c46b), std(0xff9cc8), std(0x9fdc7a)],
-      flower: new THREE.SphereGeometry(0.7, 8, 6),
-      flowerMats: FLOWERS.map((c) => std(c, { roughness: 0.6 })),
-      puff: new THREE.SphereGeometry(1, 14, 10),
-      cloudMat: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, emissive: 0xf4f0ff, emissiveIntensity: 0.25 }),
-      ringBands,
-      ringMats: RAINBOW.map(
-        (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.55, roughness: 0.4 }),
-      ),
-      balloon: new THREE.SphereGeometry(6, 18, 14),
-      balloonMats: BALLOONS.map((c) => std(c, { roughness: 0.45 })),
-      basket: new RoundedBoxGeometry(2.4, 2.2, 2.4, 2, 0.4),
-      basketMat: std(0x9a6b3f),
-    };
-  }
-
-  /** Everything in one sky cell, from its hash. Shared kit, own group. */
-  private buildCell(cx: number, cz: number): CellObj {
-    const k = this.kit;
-    const group = new THREE.Group();
-    const n = (salt: number) => cellNoise(cx, cz, salt);
-
-    for (const isl of islandsInCell(cx, cz)) {
-      const top = new THREE.Mesh(k.islandTop, k.grass);
-      top.scale.set(isl.radius, 3, isl.radius);
-      top.position.set(isl.x, isl.y, isl.z);
-      const rock = new THREE.Mesh(k.islandRock, k.rock);
-      rock.scale.set(isl.radius, isl.radius * 1.1, isl.radius);
-      rock.rotation.x = Math.PI;
-      rock.position.set(isl.x, isl.y - 2 - isl.radius * 1.0, isl.z);
-      group.add(top, rock);
-      const trees = 1 + Math.floor(isl.kind * 3);
-      for (let t = 0; t < trees; t++) {
-        const a = isl.kind * 20 + t * 2.1;
-        const r = isl.radius * 0.55 * ((t + 1) / (trees + 1));
-        const tx = isl.x + Math.cos(a) * r;
-        const tz = isl.z + Math.sin(a) * r;
-        const trunk = new THREE.Mesh(k.trunk, k.trunkMat);
-        trunk.position.set(tx, isl.y + 3.8, tz);
-        const canopy = new THREE.Mesh(k.canopy, k.canopyMats[(t + Math.floor(isl.kind * 7)) % k.canopyMats.length]);
-        canopy.position.set(tx, isl.y + 8, tz);
-        group.add(trunk, canopy);
-      }
-      for (let f = 0; f < 10; f++) {
-        const a = f * 2.39996 + isl.kind * 9;
-        const r = isl.radius * 0.85 * Math.sqrt((f + 0.5) / 10);
-        const flower = new THREE.Mesh(k.flower, k.flowerMats[(f + Math.floor(isl.kind * 5)) % k.flowerMats.length]);
-        flower.position.set(isl.x + Math.cos(a) * r, isl.y + 1.8, isl.z + Math.sin(a) * r);
-        group.add(flower);
-      }
-    }
-
-    // Loose clouds in the racing band, and big soft ones below it.
-    const clouds = Math.floor(n(40) * 3);
-    for (let c = 0; c < clouds; c++) {
-      const cloud = new THREE.Group();
-      const puffs = 4 + Math.floor(n(41 + c) * 4);
-      for (let p = 0; p < puffs; p++) {
-        const puff = new THREE.Mesh(k.puff, k.cloudMat);
-        const s = 5 + cellNoise(cx * 7 + p, cz * 3 + c, 42) * 5;
-        puff.scale.set(s * 1.3, s, s);
-        puff.position.set((p - puffs / 2) * 6, cellNoise(cx + p, cz, 43) * 3, cellNoise(cx, cz + p, 44) * 5 - 2);
-        cloud.add(puff);
-      }
-      // Below the racers, or high above them — never in the band where a
-      // cloud would hide the child's own racer from the camera.
-      const low = n(45 + c) < 0.7;
-      cloud.position.set(
-        cx * CELL + n(46 + c) * CELL,
-        low ? -10 + n(47 + c) * 8 : 115 + n(48 + c) * 40,
-        cz * CELL + n(49 + c) * CELL,
-      );
-      cloud.rotation.y = n(50 + c) * Math.PI;
-      group.add(cloud);
-    }
-
-    if (n(60) < 0.18) {
-      const b = new THREE.Group();
-      const envelope = new THREE.Mesh(k.balloon, k.balloonMats[Math.floor(n(61) * k.balloonMats.length)]);
-      envelope.scale.y = 1.2;
-      const basket = new THREE.Mesh(k.basket, k.basketMat);
-      basket.position.y = -9.5;
-      b.add(envelope, basket);
-      b.position.set(cx * CELL + n(62) * CELL, 105 + n(63) * 40, cz * CELL + n(64) * CELL);
-      group.add(b);
-    }
-
-    this.scene.add(group);
-    return { group };
+    const gloss = glossTexture();
+    return { gloss, ring: ringGeometry(), ringFar: ringGeometry(true), ringMat: ringMaterial(gloss), coin: coinGeometry(), coinMat: coinMaterial() };
   }
 
   /**
@@ -508,9 +370,8 @@ export class RacerScene {
    * glow filling the ring would white out the picture just then.
    */
   private makeRing(r: Ring): THREE.Group {
-    const k = this.kit;
     const ring = new THREE.Group();
-    k.ringBands.forEach((geo, i) => ring.add(new THREE.Mesh(geo, k.ringMats[i])));
+    ring.add(new THREE.Mesh(this.kit.ring, this.kit.ringMat));
     ring.position.set(r.x, r.y, r.z);
     ring.rotation.y = r.heading;
     return ring;
@@ -547,6 +408,33 @@ export class RacerScene {
   }
 
   /**
+   * The road is solid, except where it would hide me: when I am under it and
+   * the camera over it, or the other way round, the road around me turns
+   * see-through so I stay in sight while diving. How much grows with how far
+   * I am from its surface: nothing within a unit (skimming it, or idling just
+   * under it, reads solid), all of it by four units, eased between. Once it
+   * has begun it holds on a little longer, so hovering at the edge does not
+   * flicker.
+   */
+  private updateRoadSee(me: Flyer, dt: number): void {
+    const i = Math.floor(me.trail);
+    const f = me.trail - i;
+    const a = trailPoint(i);
+    const b = trailPoint(i + 1);
+    const roadY = a.y + (b.y - a.y) * f - ROAD_DROP;
+    const lateral = Math.hypot(a.x + (b.x - a.x) * f - me.x, a.z + (b.z - a.z) * f - me.z);
+    const mine = me.y - roadY;
+    const apart = mine * (this.camPos.y - roadY) < 0;
+    const depth = Math.abs(mine) + (this.seeLatched ? SEE_HOLD : 0);
+    const x = Math.min(1, Math.max(0, (depth - SEE_FROM) / (SEE_FULL - SEE_FROM)));
+    const want = apart && lateral < ROAD_WIDTH + 8 ? x * x * (3 - 2 * x) : 0;
+    this.seeLatched = want > 0;
+    const t = this.roadSee.through;
+    t.value += (want - t.value) * Math.min(1, dt * 8);
+    this.roadSee.player.set(me.x, me.y, me.z);
+  }
+
+  /**
    * Off the road, an arrow floats ahead of me pointing at where the road goes
    * next; back on it, the arrow fades away.
    */
@@ -568,66 +456,30 @@ export class RacerScene {
   }
 
   /**
-   * The rainbow road: a six-stripe ribbon under the line the road rings sit
-   * on, from a little behind me to well ahead, faded at both ends. Rebuilt
-   * when I have moved a few road points along it, with the rings over it.
+   * The rainbow road under the line the road rings sit on, from a little
+   * behind me to well ahead, faded at both ends. Rebuilt when I have moved a
+   * few road points along it, with the rings over it.
    */
-  private updateRoad(at: number): void {
+  private updateRoad(at: number, now = false): void {
     const from = Math.max(0, Math.floor(at) - ROAD_BEHIND);
-    if (this.roadFrom >= 0 && Math.abs(from - this.roadFrom) < 3) return;
-    this.roadFrom = from;
-    const span = ROAD_BEHIND + ROAD_AHEAD;
-    const to = from + span;
-    const pts: THREE.Vector3[] = [];
-    for (let i = from; i <= to; i++) {
-      const p = trailPoint(i);
-      pts.push(new THREE.Vector3(p.x, p.y - ROAD_DROP, p.z));
-    }
-    const curve = new THREE.CatmullRomCurve3(pts);
-    const n = span * ROAD_SAMPLES;
-    const stripes = RAINBOW.length;
-    const pos = new Float32Array((n + 1) * stripes * 2 * 3);
-    const col = new Float32Array((n + 1) * stripes * 2 * 4);
-    const index: number[] = [];
-    const colour = new THREE.Color();
-    const at3 = new THREE.Vector3();
-    const tan = new THREE.Vector3();
-    for (let s = 0; s <= n; s++) {
-      const u = s / n;
-      curve.getPointAt(u, at3);
-      curve.getTangentAt(u, tan);
-      // Across the road, level, whichever way it runs.
-      const len = Math.hypot(tan.x, tan.z) || 1;
-      const sx = tan.z / len;
-      const sz = -tan.x / len;
-      const d = u * span;
-      // The start of the road is solid; anywhere else it fades in behind me.
-      const fadeIn = from === 0 ? 1 : d / 2.5;
-      const alpha = 0.82 * Math.max(0, Math.min(1, fadeIn, (span - d) / 10));
-      for (let k = 0; k < stripes; k++) {
-        colour.setHex(RAINBOW[k]);
-        for (let e = 0; e < 2; e++) {
-          const across = ((k + e) / stripes - 0.5) * ROAD_WIDTH;
-          const v = (s * stripes + k) * 2 + e;
-          pos[v * 3] = at3.x + sx * across;
-          pos[v * 3 + 1] = at3.y;
-          pos[v * 3 + 2] = at3.z + sz * across;
-          col.set([colour.r, colour.g, colour.b, alpha], v * 4);
-        }
-        if (s > 0) {
-          const a = ((s - 1) * stripes + k) * 2;
-          const b = (s * stripes + k) * 2;
-          index.push(a, a + 1, b, a + 1, b + 1, b);
-        }
-      }
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
-    geo.setIndex(index);
-    this.road.geometry.dispose();
-    this.road.geometry = geo;
+    if (this.roadJob || (this.roadFrom >= 0 && Math.abs(from - this.roadFrom) < 3)) return;
+    this.roadJob = { from, steps: roadGeometries(from, ROAD_BEHIND + ROAD_AHEAD) };
+    // Otherwise built a few steps a frame (buildSome); the road in view stays until the new stretch is ready.
+    if (!now) return;
+    let r = this.roadJob.steps.next();
+    while (!r.done) r = this.roadJob.steps.next();
+    this.installRoad(this.roadJob.from, r.value);
+  }
 
+  /** Swap in a freshly built stretch of road, and the rings over it. */
+  private installRoad(from: number, geo: { road: THREE.BufferGeometry; glow: THREE.BufferGeometry }): void {
+    this.roadJob = null;
+    this.roadFrom = from;
+    this.road.geometry.dispose();
+    this.road.geometry = geo.road;
+    this.roadGlow.geometry.dispose();
+    this.roadGlow.geometry = geo.glow;
+    const to = from + ROAD_BEHIND + ROAD_AHEAD;
     const want = new Set<string>();
     for (let i = from; i <= to; i++) {
       const r = trailRing(i);
@@ -645,23 +497,159 @@ export class RacerScene {
     }
   }
 
-  /** Build the cells near the camera and drop the ones left behind. */
-  private updateCells(x: number, z: number): void {
-    const cx = cellOf(x);
-    const cz = cellOf(z);
+  /**
+   * Want the cells in a square that sits ahead of the camera (it only looks
+   * forward), drop the ones left behind, and queue the new ones nearest
+   * first.
+   */
+  private updateCells(x: number, z: number, heading: number): void {
+    const cx = cellOf(x + Math.sin(heading) * VIEW_AHEAD);
+    const cz = cellOf(z + Math.cos(heading) * VIEW_AHEAD);
+    const middle = `${cx}:${cz}`;
+    if (middle === this.cellsAround) return;
+    this.cellsAround = middle;
     const want = new Set<string>();
+    const queue: Array<[string, number, number]> = [];
     for (let dx = -VIEW_CELLS; dx <= VIEW_CELLS; dx++) {
       for (let dz = -VIEW_CELLS; dz <= VIEW_CELLS; dz++) {
         const key = `${cx + dx}:${cz + dz}`;
         want.add(key);
-        if (!this.cells.has(key)) this.cells.set(key, this.buildCell(cx + dx, cz + dz));
+        if (!this.cells.has(key) && !(this.job && this.job.level === 0 && this.job.key === key)) queue.push([key, cx + dx, cz + dz]);
       }
     }
     for (const [key, cell] of this.cells) {
       if (want.has(key)) continue;
-      this.scene.remove(cell.group);
+      for (const g of cell.v) {
+        if (!g) continue;
+        this.scene.remove(g);
+        disposeCell(g);
+      }
       this.cells.delete(key);
     }
+    const far = (c: [string, number, number]) => ((c[1] + 0.5) * CELL - x) ** 2 + ((c[2] + 0.5) * CELL - z) ** 2;
+    this.pending = queue.sort((a, b) => far(a) - far(b));
+    this.wanted = want;
+  }
+
+  /** Every wanted cell in both versions, at once. */
+  private buildAll(): void {
+    const run = (j: BuildJob | null) => {
+      if (!j) return false;
+      for (;;) {
+        const r = j.steps.next();
+        if (r.done) {
+          this.finishJob(j, r.value);
+          return true;
+        }
+      }
+    };
+    while (run(this.nextJob())) {
+      /* all of them */
+    }
+  }
+
+  /** The version a cell at distance `d` wants, `shown` being the one it shows now (a little hysteresis). */
+  private wantLevel(d: number, shown: number): number {
+    if (d < (shown >= 1 ? NEAR_OUT : NEAR_IN)) return 1;
+    return 0;
+  }
+
+  private cellDistance(cell: { cx: number; cz: number }): number {
+    return Math.hypot((cell.cx + 0.5) * CELL - this.camPos.x, (cell.cz + 0.5) * CELL - this.camPos.z);
+  }
+
+  /** The level of the version a cell shows now. */
+  private shownLevel(cell: CellObj): number {
+    return Math.max(0, cell.v.findIndex((g) => g?.visible));
+  }
+
+  /** Show each cell's best built version for its distance from the camera. */
+  private updateDetail(): void {
+    for (const cell of this.cells.values()) {
+      let level = this.wantLevel(this.cellDistance(cell), this.shownLevel(cell));
+      while (level > 0 && !cell.v[level]) level--;
+      cell.v.forEach((g, l) => {
+        if (g) g.visible = l === level;
+      });
+    }
+  }
+
+  /**
+   * The next cell version to build: the nearest cell lacking the version its
+   * distance wants else a cheap
+   * version for the nearest queued cell.
+   */
+  private nextJob(): BuildJob | null {
+    const job = (key: string, cx: number, cz: number, level: number): BuildJob => ({
+      key,
+      cx,
+      cz,
+      level,
+      steps: cellSteps(cx, cz, this.world, this.islands, level),
+    });
+    let best: CellObj | null = null;
+    let bestD = Infinity;
+    let bestLevel = 0;
+    for (const cell of this.cells.values()) {
+      const d = this.cellDistance(cell);
+      const level = this.wantLevel(d, this.shownLevel(cell));
+      if (level > 0 && !cell.v[level] && d < bestD) {
+        best = cell;
+        bestD = d;
+        bestLevel = level;
+      }
+    }
+    if (best) return job(`${best.cx}:${best.cz}`, best.cx, best.cz, bestLevel);
+    const next = this.pending.shift();
+    return next ? job(next[0], next[1], next[2], 0) : null;
+  }
+
+  /** Put a finished cell version into the scene, replacing the one it outdates. */
+  private finishJob(j: BuildJob, group: THREE.Group): void {
+    let cell = this.cells.get(j.key);
+    if (j.level === 0 && !cell) {
+      if (!this.wanted.has(j.key)) {
+        disposeCell(group);
+        return;
+      }
+      cell = { cx: j.cx, cz: j.cz, v: [null, null] };
+      this.cells.set(j.key, cell);
+      group.visible = true;
+    } else if (!cell) {
+      disposeCell(group);
+      return;
+    }
+    const old = cell.v[j.level];
+    if (old) {
+      group.visible = old.visible;
+      this.scene.remove(old);
+      disposeCell(old);
+    } else {
+      group.visible = false;
+    }
+    cell.v[j.level] = group;
+    this.scene.add(group);
+    this.updateDetail();
+  }
+
+  /** Builds the next stretch of road and sky cells for the time left in this frame's budget. */
+  private buildSome(): void {
+    const start = performance.now();
+    do {
+      if (this.roadJob) {
+        const r = this.roadJob.steps.next();
+        if (r.done) this.installRoad(this.roadJob.from, r.value);
+        continue;
+      }
+      if (!this.job) this.job = this.nextJob();
+      const job = this.job;
+      if (!job) return;
+      const r = job.steps.next();
+      if (r.done) {
+        this.job = null;
+        this.finishJob(job, r.value);
+      }
+    } while (performance.now() - start < BUILD_BUDGET_MS);
   }
 
   private buildRacer(look: RacerLook, i: number): RacerObj {
@@ -697,33 +685,11 @@ export class RacerScene {
     return { holder, rider, label, glow, mine };
   }
 
-  private buildCoinTemplate(): THREE.Group {
-    const g = new THREE.Group();
-    const disc = new THREE.Mesh(
-      new THREE.CylinderGeometry(3, 3, 0.7, 28),
-      new THREE.MeshStandardMaterial({ color: 0xffd54a, metalness: 0.35, roughness: 0.35 }),
-    );
-    disc.rotation.x = Math.PI / 2;
-    const rim = new THREE.Mesh(
-      new THREE.TorusGeometry(3, 0.55, 10, 28),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, emissiveIntensity: 0.6 }),
-    );
-    g.add(disc, rim);
-    return g;
-  }
-
+  /** A gold star coin; its sparkles, when it is picked up, are its own hue. */
   private makeCoin(coin: Coin): THREE.Group {
-    const g = this.coinTemplate.clone(true);
-    const col = new THREE.Color().setHSL(coin.hue / 360, 0.9, 0.6);
-    const disc = g.children[0] as THREE.Mesh;
-    const rim = g.children[1] as THREE.Mesh;
-    const discMat = (disc.material as THREE.MeshStandardMaterial).clone();
-    discMat.emissive = col.clone().multiplyScalar(0.45);
-    disc.material = discMat;
-    const rimMat = (rim.material as THREE.MeshStandardMaterial).clone();
-    rimMat.color = col;
-    rimMat.emissive = col.clone().multiplyScalar(0.75);
-    rim.material = rimMat;
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(this.kit.coin, this.kit.coinMat));
+    g.userData.sparkle = new THREE.Color().setHSL(coin.hue / 360, 0.9, 0.6).getHex();
     g.position.set(coin.x, coin.y, coin.z);
     this.scene.add(g);
     return g;
@@ -891,12 +857,10 @@ export class RacerScene {
     for (const [id, mesh] of this.coins) {
       if (this.live.has(id)) continue;
       if (me && mesh.position.distanceTo(this.scratch.set(me.x, me.y, me.z)) < 40) {
-        const rim = mesh.children[1] as THREE.Mesh;
-        this.burst(mesh.position, (rim.material as THREE.MeshStandardMaterial).color.getHex(), 8);
+        this.burst(mesh.position, mesh.userData.sparkle as number, 8);
       }
       this.scene.remove(mesh);
       this.coins.delete(id);
-      for (const child of mesh.children) ((child as THREE.Mesh).material as THREE.Material).dispose();
     }
 
     this.live.clear();
@@ -940,8 +904,7 @@ export class RacerScene {
 
     if (!me) return;
 
-    // Rings turn slowly, and pop and throw rainbow sparkles off their rim
-    // when I fly through one.
+    // Rings pop and throw rainbow sparkles off their rim when I fly through one.
     if (me.lastRing && me.lastRing !== this.lastRing) {
       this.lastRing = me.lastRing;
       this.ringFlash.set(me.lastRing, 1);
@@ -949,9 +912,10 @@ export class RacerScene {
       if (ring) this.ringSparkles(ring);
     }
     for (const [id, ring] of this.roadRings) {
-      const flash = this.ringFlash.get(id) ?? 0;
-      if (!this.reducedMotion) ring.children.forEach((c, i) => (c.rotation.z = this.time * (0.4 + i * 0.05)));
-      ring.scale.setScalar(1 + flash * 0.2);
+      ring.scale.setScalar(1 + (this.ringFlash.get(id) ?? 0) * 0.2);
+      // The full ring only while it is near enough to show the detail.
+      const near = ring.position.distanceToSquared(this.camPos) < RING_NEAR * RING_NEAR;
+      (ring.children[0] as THREE.Mesh).geometry = near ? this.kit.ring : this.kit.ringFar;
     }
     for (const [id, f] of this.ringFlash) {
       const next = f - dt * 1.5;
@@ -959,9 +923,16 @@ export class RacerScene {
       else this.ringFlash.set(id, next);
     }
 
-    this.updateCells(me.x, me.z);
+    this.updateCells(me.x, me.z, me.heading);
+    // Cells are built a step or two a frame, so none ever stalls one.
+    this.updateDetail();
+    this.buildSome();
+    if (!this.reducedMotion) {
+      flowFalls(this.world, dt);
+    }
     this.updateRoad(me.trail);
     this.updateRoadArrow(me, dt);
+    this.updateRoadSee(me, dt);
 
     // Chase camera: behind, a little above, looking ahead. It leans into turns
     // and pulls back a touch at speed, so a burst feels fast.
@@ -1012,17 +983,13 @@ export class RacerScene {
     this.disposed = true;
     this.resizeObs?.disconnect();
     for (const r of this.racers) r.rider.dispose();
-    for (const mesh of this.coins.values()) {
-      for (const child of mesh.children) ((child as THREE.Mesh).material as THREE.Material).dispose();
-    }
     // Riders were freed by their own dispose; take them out before the sweep.
     for (const r of this.racers) r.holder.remove(r.rider.group);
     disposeDeep(this.scene);
     const k = this.kit;
-    for (const v of Object.values(k)) {
-      const list = Array.isArray(v) ? v : [v];
-      for (const item of list) (item as { dispose?: () => void }).dispose?.();
-    }
+    for (const v of [k.gloss, k.ring, k.ringFar, k.ringMat, k.coin, k.coinMat]) v.dispose();
+    disposeWorldKit(this.world);
+    this.islands.dispose();
     const pk = this.power;
     for (const v of [pk.star, pk.starMat, pk.wing, pk.wingMat, pk.heart, pk.heartMat, pk.coin, pk.coinMat]) v.dispose();
     for (const glow of Object.values(pk.glows)) {
