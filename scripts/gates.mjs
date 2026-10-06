@@ -39,12 +39,17 @@ mkdirSync(logDir, { recursive: true })
 
 const hasHeavy = spawnSync('sh', ['-c', 'command -v heavy'], { encoding: 'utf8' }).status === 0
 
+// The parsers below read plain text. A FORCE_COLOR left in the shell wraps the
+// numbers in colour codes, and the summary then reads "tests ?/?".
+const plain = { ...process.env, NO_COLOR: '1' }
+delete plain.FORCE_COLOR
+
 /** Run a shell command with stdout+stderr going to a file; returns the exit code and log text. */
 function step(name, kind, cmd) {
   const file = join(logDir, `${name}.log`)
   const fd = openSync(file, 'w')
   const full = hasHeavy ? ['heavy', 'run', '--kind', kind, '--', 'sh', '-c', cmd] : ['sh', '-c', cmd]
-  const r = spawnSync(full[0], full.slice(1), { cwd: root, stdio: ['ignore', fd, fd] })
+  const r = spawnSync(full[0], full.slice(1), { cwd: root, env: plain, stdio: ['ignore', fd, fd] })
   closeSync(fd)
   return { file, exit: r.status ?? 1, text: readFileSync(file, 'utf8') }
 }

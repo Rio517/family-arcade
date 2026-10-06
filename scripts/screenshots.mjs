@@ -12,7 +12,8 @@
  * 2. It serves the *production* build on its own port and tears it down, so a
  *    shot never depends on whichever dev server happened to be running (the
  *    dev server also injects CSS in a different order than the build, which
- *    once hid a specificity bug).
+ *    once hid a specificity bug). The port is SHOTS_PORT (default 4317), or a
+ *    free one when something already answers there.
  * 3. A shot can fail. `expect` names something that must be on the page and
  *    `fits` says the page must not scroll, so a wrong route or a layout that
  *    overflows a monitor is a red run instead of a plausible-looking picture.
@@ -38,6 +39,7 @@
 
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,8 +47,7 @@ import { chromium, webkit } from 'playwright';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = path.join(ROOT, 'docs', 'screenshots');
-const PORT = Number(process.env.SHOTS_PORT ?? 4317);
-const BASE = `http://localhost:${PORT}`;
+const WANTED_PORT = Number(process.env.SHOTS_PORT ?? 4317);
 
 /**
  * Phone-ish and tablet-ish — the family plays on iPads and phones — and the
@@ -1243,6 +1244,37 @@ async function waitForServer(url, timeoutMs = 30_000) {
   throw new Error(`preview server never came up at ${url}`);
 }
 
+/** Whether something already answers on this port at the given address. */
+function answers(port, host) {
+  return new Promise((resolve) => {
+    const socket = net.connect({ port, host });
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once('error', () => resolve(false));
+  });
+}
+
+/**
+ * The wanted port, or a free one when another server (a second worktree's
+ * shots, a dev server) already answers there. Shots of that server would
+ * otherwise pass for this build's, or the run would stop at "never came up".
+ */
+async function servingPort(wanted) {
+  if (!(await answers(wanted, '127.0.0.1')) && !(await answers(wanted, '::1'))) return wanted;
+  const port = await new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port: free } = probe.address();
+      probe.close(() => resolve(free));
+    });
+  });
+  console.log(`Port ${wanted} is taken, so serving on ${port} instead.`);
+  return port;
+}
+
 /**
  * A real face for Chromium's fake camera, which plays a y4m on a loop as the
  * device. The portrait becomes a still 640×480 feed — scaled to fit, padded
@@ -1352,8 +1384,10 @@ async function main() {
   console.log('Building (with the battle harness)…');
   await run('npx', ['vite', 'build'], { env: { ...process.env, BUILD_HARNESS: '1' } });
 
-  console.log(`Serving dist on ${BASE}…`);
-  const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
+  const port = await servingPort(WANTED_PORT);
+  const base = `http://localhost:${port}`;
+  console.log(`Serving dist on ${base}…`);
+  const server = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], {
     cwd: ROOT,
     stdio: 'ignore',
   });
@@ -1361,7 +1395,7 @@ async function main() {
   const browsers = browserPool();
   const failures = [];
   try {
-    await waitForServer(BASE);
+    await waitForServer(base);
 
     console.log(`Capturing ${shots.length} shot(s) into docs/screenshots/`);
     const tally = { new: 0, updated: 0, unchanged: 0, looked: 0, skipped: 0, failed: 0 };
@@ -1395,7 +1429,7 @@ async function main() {
               /* storage blocked — the gate will show instead */
             }
           }, roster);
-          await page.goto(`${BASE}${shot.path}`, { waitUntil: 'networkidle' });
+          await page.goto(`${base}${shot.path}`, { waitUntil: 'networkidle' });
           if (shot.prep) await shot.prep(page);
 
           // The checks: a shot of the wrong page, or of a page that scrolls
