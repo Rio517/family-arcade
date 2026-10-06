@@ -1,4 +1,4 @@
-import { Object3D, Quaternion, Vector3 } from 'three';
+import { BoxGeometry, Mesh, Object3D, Quaternion, Vector3 } from 'three';
 import { BallisticEngine } from './ballistic';
 import type { BodySpec, Engine, EngineBody, Pose } from './engine';
 import { measure } from './measure';
@@ -104,8 +104,50 @@ class World implements PhysicsWorld {
     return true;
   }
 
+  /**
+   * Runs a throwaway World (the same class and engine kind) through addStatic, addBody with every shape,
+   * a burst of bodies, several steps with sync, impulses and remove, then disposes it, so the kit's JS
+   * path and Rapier are warm before the first real spill. It never touches this world: bodies, poses,
+   * sleeping, the step accumulator and `bodyCount` are unchanged. Call it after the static colliders are
+   * in (during a countdown or loading screen); `createPhysics` already calls it once.
+   */
   warmUp(): void {
-    if (!this.disposed) this.engine.warmUp();
+    if (!this.disposed) this.warmScratch();
+  }
+
+  private warmScratch(): void {
+    const engine = this.engine.scratch();
+    if (!engine) return;
+    const w = new World(engine, this.backend, {
+      maxBodies: 16,
+      reducedMotion: this.opts.reducedMotion,
+      fixedStep: this.fixedStep,
+      maxSubsteps: this.maxSubsteps,
+    });
+    try {
+      w.addGround(0);
+      w.addStatic({ center: { x: 1, y: 0.25, z: 0 }, size: { x: 0.6, y: 0.5, z: 0.6 } });
+      w.addStatic(new Mesh(new BoxGeometry(0.6, 0.5, 0.6)));
+      const box = new BoxGeometry(0.2, 0.2, 0.2);
+      const hull = new Mesh(new BoxGeometry(0.2, 0.2, 0.2));
+      const kinds = ['box', 'sphere', 'cylinder', 'hull', 'box', 'box'] as const;
+      const made: PhysicsBody[] = [];
+      const spawn = (kind: (typeof kinds)[number], i: number): void => {
+        const m = kind === 'hull' ? hull : new Mesh(box);
+        m.position.set((i % 3) * 0.05, 0.2 + i * 0.25, 0);
+        made.push(w.addBody(m, { shape: kind, mass: 1, bounce: 0.3, velocity: { x: 0.1 }, spin: { x: 1 }, ccd: i === 5 }));
+      };
+      kinds.forEach(spawn);
+      for (let i = 0; i < 12; i++) spawn(kinds[i % kinds.length], i + 6); // a burst, as a spill makes
+      for (let i = 0; i < 6; i++) w.step(this.fixedStep);
+      made[0].applyImpulse(0, 1, 0);
+      made[1].wake();
+      w.stats();
+      made[2].remove();
+      made[3].remove();
+    } finally {
+      w.dispose();
+    }
   }
 
   addGround(y: number): void {
@@ -125,9 +167,19 @@ class World implements PhysicsWorld {
   addBody(object: Object3D, options: BodyOptions = {}): PhysicsBody {
     if (this.disposed) throw new Error('physics world was disposed');
     if (this.entries.length >= this.maxBodies) this.evictOne();
+    const spec = this.specFor(object, options);
+    const entry = new Entry(object, this.engine.create(spec), this.seq++, this);
+    entry.eb.read(entry.cur);
+    entry.prev.set(entry.cur);
+    this.entries.push(entry);
+    this.byBody.set(entry.eb, entry);
+    return entry;
+  }
+
+  private specFor(object: Object3D, options: BodyOptions): BodySpec {
     const m = measure(object, options);
     const reduced = this.reducedMotion;
-    const spec: BodySpec = {
+    return {
       ...m,
       mass: Math.max(options.mass ?? 1, 1e-3),
       bounce: Math.min(options.bounce ?? 0.3, reduced ? REDUCED_BOUNCE : 1),
@@ -138,12 +190,6 @@ class World implements PhysicsWorld {
       velocity: { x: options.velocity?.x ?? 0, y: options.velocity?.y ?? 0, z: options.velocity?.z ?? 0 },
       spin: { x: options.spin?.x ?? 0, y: options.spin?.y ?? 0, z: options.spin?.z ?? 0 },
     };
-    const entry = new Entry(object, this.engine.create(spec), this.seq++, this);
-    entry.eb.read(entry.cur);
-    entry.prev.set(entry.cur);
-    this.entries.push(entry);
-    this.byBody.set(entry.eb, entry);
-    return entry;
   }
 
   /** The cap: the oldest resting body goes, or the oldest body if all are moving. */

@@ -173,7 +173,9 @@ export class BallisticEngine implements Engine {
     }
   }
 
-  warmUp(): void {}
+  scratch(): Engine | null {
+    return null;
+  }
 
   dispose(): void {
     this.bodies.length = 0;
