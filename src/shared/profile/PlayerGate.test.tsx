@@ -56,7 +56,7 @@ describe('<PlayerGate>', () => {
     roster = addUser(roster, 'u2', 'Klara');
     setUsersState(setActiveUser(roster, null));
     gate();
-    expect(screen.getByText(/Tap your ticket to play Galaxy Chess/)).toBeInTheDocument();
+    expect(screen.getByText(/Galaxy Chess needs a player/)).toBeInTheDocument();
     // A returning player taps their stub; the field must not steal focus.
     expect(screen.getByTestId('pgate-name')).not.toHaveFocus();
     fireEvent.click(screen.getByTestId('pgate-user-u2'));

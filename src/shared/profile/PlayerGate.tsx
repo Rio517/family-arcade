@@ -27,7 +27,7 @@ export function PlayerGate({ gameTitle, children }: {
         <p className="pgate-sub">
           {users.length === 0
             ? 'Make your ticket. It keeps your points and wins in every game.'
-            : `Tap your ticket to play ${gameTitle}.`}
+            : `${gameTitle} needs a player.`}
         </p>
 
         <TicketList users={users} onPick={signIn} onCreate={newPlayer} testIdPrefix="pgate" />

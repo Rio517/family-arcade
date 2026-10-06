@@ -238,7 +238,7 @@ describe('GulpPage', () => {
 
     const family = screen.getByTestId('gulp-results-family');
     expect(family).toHaveTextContent('City · Easy');
-    expect(screen.getByTestId('gulp-family-place')).toHaveTextContent("You're #2 in the family!");
+    expect(screen.getByTestId('gulp-family-place')).toHaveTextContent("You're 2nd in the family.");
     const rows = [...screen.getByTestId('gulp-results-board').querySelectorAll('li')];
     expect(rows.map((li) => li.querySelector('.gulp-name')?.textContent)).toEqual(['Milo', 'Rio', 'Rio', 'Clara']);
     expect(rows[1]).toHaveClass('me');
