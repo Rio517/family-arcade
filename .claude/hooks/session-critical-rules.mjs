@@ -43,7 +43,7 @@ const CONTEXT = `Family Arcade — critical session rules (read before any tool 
 9. Big visual changes are pitched as mockups first — the family picks, then
    you build.
 
-Canonical references: CLAUDE.md (durable rules) · NEXT_STEP.md (what's queued)
+Canonical references: CLAUDE.md (durable rules) · BACKLOG.md (what's queued)
 `;
 
 process.stdin.on('data', () => {});

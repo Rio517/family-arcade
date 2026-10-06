@@ -52,7 +52,7 @@ iPad".
 4. **Build** in the three layers below, tests first for the rules.
 5. **Gates** (below), a shot per UI state, and every shot opened.
 6. **Real-device test**, then ship by the table above.
-7. **Playtest notes** go into `NEXT_STEP.md` as they arrive. Done items are
+7. **Playtest notes** go into `BACKLOG.md` as they arrive. Done items are
    removed. Read the owner's wording literally: "it isn't about perceived
    size, things are a little too far apart" meant spacing, not camera.
 

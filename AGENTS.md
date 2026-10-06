@@ -5,7 +5,7 @@ The durable working agreements for this repo live in **[CLAUDE.md](./CLAUDE.md)*
 testing gotchas, and the design-system map. Read that file first; it applies to
 every agent, not just Claude Code.
 
-What's queued right now lives in **[NEXT_STEP.md](./NEXT_STEP.md)**.
+What's queued right now lives in **[BACKLOG.md](./BACKLOG.md)**.
 
 ## The short version
 
