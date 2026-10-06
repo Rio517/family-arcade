@@ -17,6 +17,7 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "knip": "knip",
+    "gates": "node scripts/gates.mjs",
     "check": "npm run typecheck && npm run lint && npm run knip",
     "shots": "node scripts/screenshots.mjs",
     "previews": "node scripts/game-previews.mjs",

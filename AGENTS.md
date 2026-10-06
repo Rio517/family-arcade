@@ -34,6 +34,12 @@ What's queued right now lives in **[NEXT_STEP.md](./NEXT_STEP.md)**.
 ## Verification (all three, every change)
 
 ```
+npm run gates      # the one gate to run and quote: paste its GATES line verbatim
+```
+
+It runs, and fails on a regression against `gates-baseline.json`:
+
+```
 npm run check      # tsc -b, eslint (incl. jsx-a11y), knip dead-code
 npx vitest run
 npm run build      # the real typecheck; delete stray *.tsbuildinfo first
