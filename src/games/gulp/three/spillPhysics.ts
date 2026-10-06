@@ -374,8 +374,6 @@ export class SpillPhysics {
   private async make(): Promise<boolean> {
     let world: PhysicsWorld | null = null;
     try {
-      // The kit warms Rapier up before it resolves, so the first spill's
-      // first step is cheap.
       world = await createPhysics({
         gravity: -GRAVITY,
         maxBodies: MAX_BODIES,
@@ -391,6 +389,9 @@ export class SpillPhysics {
         return false;
       }
       for (const lane of this.lanes) build(world, lane.x);
+      // Warm the kit's own path once more with the colliders in, while the
+      // round counts down, so the first spill's first frames are cheap.
+      world.warmUp();
       this.world = world;
       return true;
     } catch (error) {
