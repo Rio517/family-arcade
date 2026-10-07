@@ -18,6 +18,8 @@ import type { GulpScene, HoleLook } from '../three/scene';
 import { loadScene, type SceneLoader } from './round';
 import { FrameMeter, frameMeterWanted } from './frameMeter';
 import { HOLD_60_GAP, PACING_SAMPLE, shouldHold60 } from './pacing';
+import { mouseMayTakeOver } from './steering';
+import { arcadeNow } from '@shared/time/clock';
 
 const KEYS: Record<string, [number, number]> = {
   arrowup: [0, -1],
@@ -70,6 +72,8 @@ export function GulpStage({
 }) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const keysRef = useRef(new Set<string>());
+  /** When a steering key was last pressed or let go: the mouse waits a moment after it (see steering.ts). */
+  const keyAtRef = useRef(-Infinity);
   const pointerRef = useRef<Pointer>({ kind: null, dx: 0, dy: 0, ox: 0, oy: 0, scale: 1 });
   const onFrameRef = useRef(onFrame);
   const stepRef = useRef(step);
@@ -144,9 +148,16 @@ export function GulpStage({
       if (KEYS[k]) {
         e.preventDefault();
         keysRef.current.add(k);
+        keyAtRef.current = arcadeNow();
+        // The keys take over at once: the mouse lets go until it moves again.
+        if (pointerRef.current.kind === 'mouse') pointerRef.current.kind = null;
       }
     };
-    const up = (e: KeyboardEvent) => keysRef.current.delete(e.key.toLowerCase());
+    const up = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (KEYS[k]) keyAtRef.current = arcadeNow();
+      keysRef.current.delete(k);
+    };
     const blur = () => keysRef.current.clear();
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
@@ -255,6 +266,8 @@ export function GulpStage({
         p.kind = null;
         return;
       }
+      // Fresh from the keys, the mouse waits its turn.
+      if (p.kind !== 'mouse' && !mouseMayTakeOver(keysRef.current.size, keyAtRef.current, arcadeNow())) return;
       p.kind = 'mouse';
       p.dx = e.clientX - (rect.left + rect.width / 2);
       p.dy = e.clientY - (rect.top + rect.height / 2);
