@@ -30,6 +30,17 @@ const MASKS = { fire: fireMaskUrl, enchanted: enchantedMaskUrl };
 const WORN_MASK: keyof typeof MASKS = 'fire';
 const maskUrl = MASKS[WORN_MASK];
 
+/**
+ * The overlay's lights, per mask. The fire dragon was painted for these;
+ * the enchanted dragon's colour is vertex data, which needs brighter lights
+ * and a cool fill to read as jade with ivory horns.
+ */
+const LIGHT_PROFILES = {
+  fire: { ambient: 0.85, sun: 1.4, sunColor: 0xfff2dd, fill: 0 },
+  enchanted: { ambient: 1.3, sun: 2.0, sunColor: 0xffffff, fill: 0.9 },
+};
+export const MASK_LIGHTS = LIGHT_PROFILES[WORN_MASK];
+
 const SCALES_GREEN = 0x3d9c50;
 const BELLY_GREEN = 0x86d68f;
 const HORN_CREAM = 0xf3e9c6;
