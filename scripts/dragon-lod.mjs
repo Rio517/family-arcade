@@ -211,6 +211,56 @@ function findEyeApertures(shellNode) {
   return { left, right };
 }
 
+
+// ── colour ─────────────────────────────────────────────────────────────────
+
+const toSrgb = (c) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+
+/**
+ * The master's colour is vertex data painted for Blender's render, and on a
+ * face under the mirror's lights two places read wrong: the arch between the
+ * eye openings is a dark, blue-shifted smudge, and the horns lean tan. Both
+ * are corrected here, at the source, as gains in sRGB on the vertex colours
+ * (so the scale tips and sculpt detail stay), not with more light. The brow
+ * gain is feathered out from the midpoint between the eye apertures.
+ */
+const BROW_GAIN = [1.75, 1.12, 1.15];
+const BROW_RADIUS = [0.3, 0.2];
+const HORN_GAIN = [1.0, 0.99, 1.07];
+const HORN = /^Swept ivory horn/;
+
+function gainColours(node, gain, weightAt = () => 1) {
+  const v = [0, 0, 0];
+  const c = [0, 0, 0, 1];
+  for (const prim of node.getMesh()?.listPrimitives() ?? []) {
+    const pos = prim.getAttribute('POSITION');
+    const col = prim.getAttribute('COLOR_0');
+    if (!pos || !col) continue;
+    for (let i = 0; i < pos.getCount(); i++) {
+      const w = weightAt(pos.getElement(i, v));
+      if (w <= 0) continue;
+      col.getElement(i, c);
+      for (let k = 0; k < 3; k++) {
+        const s = Math.min(1, toSrgb(c[k]) * (1 + (gain[k] - 1) * w));
+        c[k] = toLinear(s);
+      }
+      col.setElement(i, c);
+    }
+  }
+}
+
+function correctColours(shell, horns, eyes) {
+  const cx = (eyes.left.x + eyes.right.x) / 2;
+  const cy = (eyes.left.y + eyes.right.y) / 2;
+  gainColours(shell, BROW_GAIN, (p) => {
+    if (p[2] < 0) return 0;
+    const d = Math.hypot((p[0] - cx) / BROW_RADIUS[0], (p[1] - cy) / BROW_RADIUS[1]);
+    return d >= 1 ? 0 : 1 - d * d * (3 - 2 * d);
+  });
+  for (const horn of horns) gainColours(horn, HORN_GAIN);
+}
+
 // ── the build ──────────────────────────────────────────────────────────────
 
 async function main() {
@@ -271,6 +321,8 @@ async function main() {
   console.log(`  jaw pivot      (${pivot.map((v) => v.toFixed(3)).join(', ')})  opens ${opts.jawDegrees}°`);
   console.log(`  fire socket    (${socket.map((v) => v.toFixed(3)).join(', ')})`);
   console.log(`  jaw parts      ${jawParts.map((p) => p.getName()).join(', ')}`);
+
+  correctColours(shell, parts.filter((p) => HORN.test(p.getName())), eyes);
 
   // Build the rig.
   master.setName('DragonMaskRoot').setExtras({

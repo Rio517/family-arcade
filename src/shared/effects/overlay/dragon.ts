@@ -1,11 +1,12 @@
 /**
- * The Fire Dragon head, in two forms.
+ * The Dragon head, in two forms.
  *
- * `buildDragonMask()` instances the modelled mask — hand-authored in Blender,
- * exported as a GLB and meshopt-compressed into the bundle (ADR 0010: nothing
+ * `buildDragonMask()` instances the modelled mask — sculpted in Blender, cut
+ * and rigged by scripts/dragon-lod.mjs, meshopt-compressed into the bundle (ADR 0010: nothing
  * is fetched at runtime; the file ships and precaches like the ship meshes).
- * It carries its own rig contract in node extras: `DragonJaw` opens with the
- * tracked `jawOpen`, and `FireSocket` marks where the breath leaves the mouth.
+ * It carries its rig in nodes: `EyeAperture_L/R` say where the wearer's eyes
+ * look out, `DragonJaw` opens with the tracked `jawOpen`, and `FireSocket`
+ * marks where the breath leaves the mouth.
  *
  * `buildDragonHead()` is the procedural head (ADR 0006), kept as the face worn
  * until the model arrives — and on any device where it never does.
@@ -18,28 +19,14 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import fireMaskUrl from '../assets/fire-dragon-mask.glb';
-import enchantedMaskUrl from '../assets/dragon-mask.glb';
+import maskUrl from '../assets/dragon-mask.glb';
 
 /**
- * Which modelled mask the mirror wears: the shipped fire dragon (v8), or the
- * enchanted dragon cut from the sculpted master by `scripts/dragon-lod.mjs`.
- * Both ship in the bundle; this one line is the swap.
+ * The overlay's lights. The enchanted dragon's colour is vertex data, which
+ * needs a bright ambient, a white key and a cool fill to read as jade with
+ * ivory horns.
  */
-const MASKS = { fire: fireMaskUrl, enchanted: enchantedMaskUrl };
-const WORN_MASK: keyof typeof MASKS = 'fire';
-const maskUrl = MASKS[WORN_MASK];
-
-/**
- * The overlay's lights, per mask. The fire dragon was painted for these;
- * the enchanted dragon's colour is vertex data, which needs brighter lights
- * and a cool fill to read as jade with ivory horns.
- */
-const LIGHT_PROFILES = {
-  fire: { ambient: 0.85, sun: 1.4, sunColor: 0xfff2dd, fill: 0 },
-  enchanted: { ambient: 1.3, sun: 2.0, sunColor: 0xffffff, fill: 0.9 },
-};
-export const MASK_LIGHTS = LIGHT_PROFILES[WORN_MASK];
+export const MASK_LIGHTS = { ambient: 1.3, sun: 2.0, sunColor: 0xffffff, fill: 0.9 };
 
 const SCALES_GREEN = 0x3d9c50;
 const BELLY_GREEN = 0x86d68f;
@@ -55,28 +42,6 @@ const DARK = 0x1c2a1e;
  * units it was sculpted in.
  */
 const EYE_SPAN_FIT = 0.61;
-
-/**
- * For a mask without eye anchors (the fire dragon): ear to ear, in model
- * units, of the head it was fitted to in Blender. Dividing by it turns the
- * mask into face widths, so it lands on a tracked face at any distance.
- */
-const DESIGN_FACE_WIDTH = 1.24;
-
-/**
- * How much head the mask is worn over, in tracked face widths. The tracker
- * measures across the face oval (MediaPipe 234↔454), which runs inside the
- * ears, so a mask cut to exactly that width sits high on the face and leaves
- * the chin out. Measured against a face on camera.
- */
-const HEAD_FIT = 1.1;
-
-/**
- * For a mask without eye anchors: where the wearer's eyes sit, in model units
- * above its origin. The mask hangs from this line, because eyes looking out
- * of the apertures are what sells it.
- */
-const EYE_LINE = 0.12;
 
 /**
  * The tracked anchor is the bridge between the eyes (MediaPipe 168), a little
@@ -146,13 +111,13 @@ export function buildDragonMask(): DragonHead | null {
 
   const model = source.clone(true);
 
-  // Size the mask so its eye apertures land on the wearer's eyes (or, without
-  // anchors, by the head it was fitted to), then hang it from that line at the
-  // point the tracker anchors on.
+  // Size the mask so its eye apertures land on the wearer's eyes, then hang it
+  // from that line at the point the tracker anchors on. A mask without its eye
+  // anchors can't be fitted: the procedural head stays on.
   const [eyeL, eyeR] = EYE_NODES.map((name) => model.getObjectByName(name));
-  const scale =
-    eyeL && eyeR ? EYE_SPAN_FIT / Math.abs(eyeR.position.x - eyeL.position.x) : HEAD_FIT / DESIGN_FACE_WIDTH;
-  const eyeLine = eyeL && eyeR ? (eyeL.position.y + eyeR.position.y) / 2 : EYE_LINE;
+  if (!eyeL || !eyeR) return null;
+  const scale = EYE_SPAN_FIT / Math.abs(eyeR.position.x - eyeL.position.x);
+  const eyeLine = (eyeL.position.y + eyeR.position.y) / 2;
   model.position.y -= eyeLine + ANCHOR_DROP / scale;
 
   const group = new THREE.Group();
@@ -228,7 +193,7 @@ export function buildDragonHead(rng: () => number): DragonHead {
   }
 
   // Built around a unit head; 0.72 is the fit that reads as a mask over a face
-  // of width 1 (the same job DESIGN_FACE_WIDTH does for the modelled mask).
+  // of width 1 (the same job EYE_SPAN_FIT does for the modelled mask).
   const group = new THREE.Group();
   group.add(head);
   group.scale.setScalar(0.72);
