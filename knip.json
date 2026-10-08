@@ -22,5 +22,5 @@
   ],
   "project": ["src/**/*.{ts,tsx}"],
   "ignoreExportsUsedInFile": { "interface": true, "type": true },
-  "ignoreBinaries": ["ffmpeg", "mise"]
+  "ignoreBinaries": ["ffmpeg", "heavy", "mise"]
 }
