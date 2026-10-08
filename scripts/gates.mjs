@@ -35,10 +35,20 @@ const baselinePath = join(root, 'gates-baseline.json')
 const update = process.argv.includes('--update-baseline')
 const MAIN_GROWTH_LIMIT = 2048 // bytes
 
+// Where the machine-wide `heavy` queue is installed, the whole run is one job
+// in it, and the steps run side by side inside its slot. Queued one by one,
+// the build waited for the load the tests themselves were making.
+const hasHeavy = spawnSync('sh', ['-c', 'command -v heavy'], { encoding: 'utf8' }).status === 0
+if (hasHeavy && !process.env.HEAVY_QUEUE_SLOT) {
+  const again = spawnSync('heavy', ['run', '--kind', 'test', '--label', 'gates', '--', process.execPath, ...process.argv.slice(1)], {
+    cwd: root,
+    stdio: 'inherit',
+  })
+  process.exit(again.status ?? 1)
+}
+
 const logDir = join(tmpdir(), `gates-${new Date().toISOString().replace(/[:.]/g, '-')}`)
 mkdirSync(logDir, { recursive: true })
-
-const hasHeavy = spawnSync('sh', ['-c', 'command -v heavy'], { encoding: 'utf8' }).status === 0
 
 // The parsers below read plain text. A FORCE_COLOR left in the shell wraps the
 // numbers in colour codes, and the summary then reads "tests ?/?".
@@ -46,12 +56,11 @@ const plain = { ...process.env, NO_COLOR: '1' }
 delete plain.FORCE_COLOR
 
 /** Run a shell command with stdout+stderr going to a file; resolves to the exit code and log text. */
-function step(name, kind, cmd) {
+function step(name, cmd) {
   const file = join(logDir, `${name}.log`)
   const fd = openSync(file, 'w')
-  const full = hasHeavy ? ['heavy', 'run', '--kind', kind, '--', 'sh', '-c', cmd] : ['sh', '-c', cmd]
   return new Promise((done) => {
-    const p = spawn(full[0], full.slice(1), { cwd: root, env: plain, stdio: ['ignore', fd, fd] })
+    const p = spawn('sh', ['-c', cmd], { cwd: root, env: plain, stdio: ['ignore', fd, fd] })
     p.on('close', (code) => {
       closeSync(fd)
       done({ file, exit: code ?? 1, text: readFileSync(file, 'utf8') })
@@ -66,8 +75,8 @@ const fmt = (n) => (n == null ? '?' : n.toLocaleString('en-US'))
 // cache), so the build here is `vite build` alone. `npm run build` still
 // typechecks first for CI and for anyone running it by hand.
 const [[check, build], test] = await Promise.all([
-  (async () => [await step('check', 'test', 'npm run check'), await step('build', 'build', 'npx vite build')])(),
-  step('vitest', 'test', 'npx vitest run'),
+  (async () => [await step('check', 'npm run check'), await step('build', 'npx vite build')])(),
+  step('vitest', 'npx vitest run'),
 ])
 
 // ESLint summary line; 0/0 when absent and the check exited 0.
