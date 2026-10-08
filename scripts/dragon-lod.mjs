@@ -58,6 +58,7 @@ function parseArgs(argv) {
     if (a === '--out') opts.out = argv[++i];
     else if (a === '--tris') opts.tris = Number(argv[++i]);
     else if (a === '--jaw') opts.jawDegrees = Number(argv[++i]);
+    else if (a === '--no-ao') opts.noAo = true;
     else if (a.startsWith('--')) fail(`unknown option ${a}`);
     else if (opts.input) fail('one master at a time');
     else opts.input = a;
@@ -261,6 +262,109 @@ function correctColours(shell, horns, eyes) {
   for (const horn of horns) gainColours(horn, HORN_GAIN);
 }
 
+
+// ── crevice darkening ──────────────────────────────────────────────────────
+
+const AO_GRID = 1024;
+const AO_RADIUS = 0.035; // model units: about a scale tip's width
+const AO_STRENGTH = 0.65;
+/** Open surface keeps its colour: the lift offsets the average that occlusion takes away. */
+const AO_LIFT = 1.1;
+/** The scale tips catch the key light: a glossier jade than the master's 0.49. */
+const SHELL_ROUGHNESS = 0.38;
+const AO_TAPS = 16;
+
+/**
+ * Baked ambient occlusion for the front of the mask. The mirror lights it
+ * with a handful of lights and no shadows, so the gaps between the scales
+ * read flat. Here the front is rasterised into a depth map (nearest surface
+ * per pixel), and a vertex is occluded by however much nearer surface sits
+ * within a scale's width around it, as a screen-space AO would, but once,
+ * from the sculpt. The result multiplies the vertex colour.
+ */
+function bakeCreviceDarkening(nodes) {
+  const all = nodes.map(bounds).reduce(union);
+  const half = (Math.max(all.max[0] - all.min[0], all.max[1] - all.min[1]) / 2) * 1.02;
+  const cx = (all.min[0] + all.max[0]) / 2;
+  const cy = (all.min[1] + all.max[1]) / 2;
+  const N = AO_GRID;
+  const scale = N / (2 * half);
+  const depth = new Float32Array(N * N).fill(-Infinity);
+
+  for (const node of nodes) {
+    for (const prim of node.getMesh().listPrimitives()) {
+      const pos = prim.getAttribute('POSITION').getArray();
+      const idx = prim.getIndices()?.getArray();
+      const count = idx ? idx.length : pos.length / 3;
+      const at = (k) => (idx ? idx[k] : k);
+      for (let t = 0; t < count; t += 3) {
+        const i0 = at(t) * 3;
+        const i1 = at(t + 1) * 3;
+        const i2 = at(t + 2) * 3;
+        const ax = (pos[i0] - (cx - half)) * scale;
+        const ay = (pos[i0 + 1] - (cy - half)) * scale;
+        const bx = (pos[i1] - (cx - half)) * scale;
+        const by = (pos[i1 + 1] - (cy - half)) * scale;
+        const qx = (pos[i2] - (cx - half)) * scale;
+        const qy = (pos[i2 + 1] - (cy - half)) * scale;
+        const area = (bx - ax) * (qy - ay) - (by - ay) * (qx - ax);
+        if (area === 0) continue;
+        const x0 = Math.max(0, Math.floor(Math.min(ax, bx, qx)));
+        const x1 = Math.min(N - 1, Math.ceil(Math.max(ax, bx, qx)));
+        const y0 = Math.max(0, Math.floor(Math.min(ay, by, qy)));
+        const y1 = Math.min(N - 1, Math.ceil(Math.max(ay, by, qy)));
+        for (let y = y0; y <= y1; y++) {
+          for (let x = x0; x <= x1; x++) {
+            const px = x + 0.5;
+            const py = y + 0.5;
+            const w0 = ((bx - ax) * (py - ay) - (by - ay) * (px - ax)) / area;
+            const w1 = ((qx - bx) * (py - by) - (qy - by) * (px - bx)) / area;
+            const w2 = ((ax - qx) * (py - qy) - (ay - qy) * (px - qx)) / area;
+            if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+            // w0 weighs vertex 2, w1 vertex 0, w2 vertex 1 (edge-function convention above).
+            const z = w1 * pos[i0 + 2] + w2 * pos[i1 + 2] + w0 * pos[i2 + 2];
+            if (z > depth[y * N + x]) depth[y * N + x] = z;
+          }
+        }
+      }
+    }
+  }
+
+  const taps = [];
+  for (let k = 0; k < AO_TAPS; k++) {
+    const a = (k / AO_TAPS) * Math.PI * 2 + (k % 2) * 0.4;
+    const r = AO_RADIUS * (0.35 + 0.65 * ((k * 7) % AO_TAPS) / AO_TAPS) * scale;
+    taps.push([Math.cos(a) * r, Math.sin(a) * r]);
+  }
+  const v = [0, 0, 0];
+  const c = [0, 0, 0, 1];
+  for (const node of nodes) {
+    for (const prim of node.getMesh().listPrimitives()) {
+      const pos = prim.getAttribute('POSITION');
+      const col = prim.getAttribute('COLOR_0');
+      if (!col) continue;
+      for (let i = 0; i < pos.getCount(); i++) {
+        pos.getElement(i, v);
+        if (v[2] < 0) continue;
+        const gx = (v[0] - (cx - half)) * scale;
+        const gy = (v[1] - (cy - half)) * scale;
+        let occluded = 0;
+        for (const [dx, dy] of taps) {
+          const x = Math.round(gx + dx);
+          const y = Math.round(gy + dy);
+          if (x < 0 || y < 0 || x >= N || y >= N) continue;
+          const rise = depth[y * N + x] - v[2];
+          if (rise > 0.004) occluded += Math.min(1, rise / AO_RADIUS);
+        }
+        const light = 1 - AO_STRENGTH * (occluded / AO_TAPS);
+        col.getElement(i, c);
+        for (let k = 0; k < 3; k++) c[k] = Math.min(1, c[k] * light * AO_LIFT);
+        col.setElement(i, c);
+      }
+    }
+  }
+}
+
 // ── the build ──────────────────────────────────────────────────────────────
 
 async function main() {
@@ -322,6 +426,8 @@ async function main() {
   console.log(`  fire socket    (${socket.map((v) => v.toFixed(3)).join(', ')})`);
   console.log(`  jaw parts      ${jawParts.map((p) => p.getName()).join(', ')}`);
 
+  if (!opts.noAo) bakeCreviceDarkening([shell, jawSculpt]);
+  for (const n of [shell, jawSculpt]) for (const prim of n.getMesh().listPrimitives()) prim.getMaterial()?.setRoughnessFactor(SHELL_ROUGHNESS);
   correctColours(shell, parts.filter((p) => HORN.test(p.getName())), eyes);
 
   // Build the rig.
