@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { seededRng } from '@shared/rng';
 import { disposeDeep } from '@shared/three/disposeDeep';
-import { buildDragonHead, buildDragonMask, loadDragonMask, type DragonHead } from './dragon';
+import { buildDragonHead, buildDragonMask, loadDragonMask, MASK_LIGHTS, type DragonHead } from './dragon';
 import { easing, follow, followAngle } from './follow';
 import { FireBreath } from './fire';
 import { PeaceBurst } from './sparkles';
@@ -78,10 +78,15 @@ export function createEffectsScene(
   const camera = new THREE.OrthographicCamera(0, 2, 2, 0, 0.1, 4000);
   camera.position.z = 1000;
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-  const sun = new THREE.DirectionalLight(0xfff2dd, 1.4);
+  scene.add(new THREE.AmbientLight(0xffffff, MASK_LIGHTS.ambient));
+  const sun = new THREE.DirectionalLight(MASK_LIGHTS.sunColor, MASK_LIGHTS.sun);
   sun.position.set(200, 500, 800);
   scene.add(sun);
+  if (MASK_LIGHTS.fill > 0) {
+    const fill = new THREE.DirectionalLight(0xd6e8ff, MASK_LIGHTS.fill);
+    fill.position.set(-400, -150, 600);
+    scene.add(fill);
+  }
 
   let effects = new Set(opts.effects);
   let width = 2;
