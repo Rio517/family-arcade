@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreDependencies": ["typescript7"],
   "entry": [
     "src/games/battleship/preview-b.tsx",
     "src/games/battleship/preview-guns.tsx",

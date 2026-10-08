@@ -9,12 +9,11 @@
     "skipLibCheck": true,
 
     "moduleResolution": "bundler",
-    "baseUrl": ".",
     "paths": {
-      "@shared/*": ["src/shared/*"],
-      "@games/*": ["src/games/*"],
-      "@app/*": ["src/app/*"],
-      "@test/*": ["src/test/*"]
+      "@shared/*": ["./src/shared/*"],
+      "@games/*": ["./src/games/*"],
+      "@app/*": ["./src/app/*"],
+      "@test/*": ["./src/test/*"]
     },
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
