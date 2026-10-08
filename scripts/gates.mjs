@@ -1,11 +1,12 @@
 // The one gate to run and quote: `npm run gates`.
-// Runs check, vitest and build with output going to files (never piped, so
+// Runs check, vitest and build (vitest beside check-then-build, so the slow
+// step overlaps the others) with output going to files (never piped, so
 // nothing is lost), parses the real numbers, compares them with
 // gates-baseline.json and prints ONE summary line. Exit 1 on a regression.
 // `npm run gates -- --update-baseline` rewrites the baseline after an
 // intended change; say in the commit why it moved.
-import { spawnSync } from 'node:child_process'
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -44,33 +45,30 @@ const hasHeavy = spawnSync('sh', ['-c', 'command -v heavy'], { encoding: 'utf8' 
 const plain = { ...process.env, NO_COLOR: '1' }
 delete plain.FORCE_COLOR
 
-/** Run a shell command with stdout+stderr going to a file; returns the exit code and log text. */
+/** Run a shell command with stdout+stderr going to a file; resolves to the exit code and log text. */
 function step(name, kind, cmd) {
   const file = join(logDir, `${name}.log`)
   const fd = openSync(file, 'w')
   const full = hasHeavy ? ['heavy', 'run', '--kind', kind, '--', 'sh', '-c', cmd] : ['sh', '-c', cmd]
-  const r = spawnSync(full[0], full.slice(1), { cwd: root, env: plain, stdio: ['ignore', fd, fd] })
-  closeSync(fd)
-  return { file, exit: r.status ?? 1, text: readFileSync(file, 'utf8') }
-}
-
-/** Delete stray *.tsbuildinfo outside node_modules, as AGENTS.md requires. */
-function deleteTsbuildinfo(dir = root) {
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    if (e.name === 'node_modules' || e.name === '.git' || e.name === '.claude') continue
-    const p = join(dir, e.name)
-    if (e.isDirectory()) deleteTsbuildinfo(p)
-    else if (e.name.endsWith('.tsbuildinfo')) unlinkSync(p)
-  }
+  return new Promise((done) => {
+    const p = spawn(full[0], full.slice(1), { cwd: root, env: plain, stdio: ['ignore', fd, fd] })
+    p.on('close', (code) => {
+      closeSync(fd)
+      done({ file, exit: code ?? 1, text: readFileSync(file, 'utf8') })
+    })
+  })
 }
 
 const num = (s) => Number(String(s).replace(/,/g, ''))
 const fmt = (n) => (n == null ? '?' : n.toLocaleString('en-US'))
 
-const check = step('check', 'test', 'npm run check')
-const test = step('vitest', 'test', 'npx vitest run')
-deleteTsbuildinfo()
-const build = step('build', 'build', 'npm run build')
+// `npm run check` already did the one clean typecheck (TypeScript 7, no
+// cache), so the build here is `vite build` alone. `npm run build` still
+// typechecks first for CI and for anyone running it by hand.
+const [[check, build], test] = await Promise.all([
+  (async () => [await step('check', 'test', 'npm run check'), await step('build', 'build', 'npx vite build')])(),
+  step('vitest', 'test', 'npx vitest run'),
+])
 
 // ESLint summary line; 0/0 when absent and the check exited 0.
 const lint = check.text.match(/✖ (\d+) problems? \((\d+) errors?, (\d+) warnings?\)/)

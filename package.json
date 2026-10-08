@@ -10,12 +10,12 @@
   "scripts": {
     "dev": "vite",
     "dev:tidewave": "vite --host 127.0.0.1 --port 5178 --strictPort",
-    "build": "tsc -b && vite build",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b --noEmit",
-    "lint": "eslint .",
+    "typecheck": "node scripts/typecheck.mjs",
+    "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/",
     "knip": "knip",
     "gates": "node scripts/gates.mjs",
     "check": "npm run typecheck && npm run lint && npm run knip",
@@ -73,6 +73,7 @@
     "tidewave": "^0.8.3",
     "typescript": "^5.6.2",
     "typescript-eslint": "^8.66.0",
+    "typescript7": "npm:typescript@^7.0.2",
     "vite": "^5.4.8",
     "vite-plugin-pwa": "^0.20.5",
     "vitest": "^2.1.2"

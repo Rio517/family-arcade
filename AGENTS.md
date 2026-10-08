@@ -100,13 +100,17 @@ Therefore:
    `GATES ok|FAIL · …` line: paste that line verbatim in your report, never
    a count from memory. `npm run gates -- --update-baseline` after an
    intended change; say in the commit why it moved. All three clean:
-   - `check` = `tsc -b` + ESLint (with jsx-a11y and react-hooks) + knip
-     dead-code. Both CI workflows run it before the tests.
-   - The REAL typecheck is the `tsc -b` inside `npm run build`: bare
-     `npx tsc --noEmit` is a silent no-op here (solution-style tsconfig), and
-     `tsc -b`'s incremental cache can hide errors — before trusting a build,
-     delete stray `*.tsbuildinfo` files like CI's clean room would (two type
-     errors shipped this way once).
+   - `check` = typecheck + ESLint (with jsx-a11y and react-hooks, cached under
+     `node_modules/.cache/eslint`) + knip dead-code. Both CI workflows run it
+     before the tests. Gates run vitest beside check-then-`vite build`.
+   - The REAL typecheck is `npm run typecheck` (`scripts/typecheck.mjs`):
+     TypeScript 7 (the `typescript7` dev dependency, native, about a second)
+     over `tsconfig.app.json` and `tsconfig.node.json`, clean every time with
+     `--composite false`, so no `*.tsbuildinfo` can hide an error. `typescript`
+     stays on 5.x only because typescript-eslint needs its API. Bare
+     `npx tsc --noEmit` is a silent no-op here (solution-style tsconfig). Don't
+     add `baseUrl` back: TypeScript 7 removed it (paths are `./src/...`).
+     `npm run build` = typecheck + `vite build`.
    - ESLint has 60-odd *warnings* from eslint-plugin-react-hooks v6's
      React-Compiler-readiness rules. They're deliberately not errors — see the
      rationale in `eslint.config.js`. Don't "fix" them by rewriting the
