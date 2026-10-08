@@ -26,6 +26,7 @@
     "caribbean:naval-check": "node scripts/caribbean-naval-check.mjs",
     "caribbean:port-check": "node scripts/caribbean-port-check.mjs",
     "glb": "node scripts/optimize-glb.mjs",
+    "dragon-lod": "node scripts/dragon-lod.mjs",
     "risk:drag": "node scripts/risk-drag-check.mjs",
     "perf:gulp": "node scripts/perf-gulp.mjs"
   },
