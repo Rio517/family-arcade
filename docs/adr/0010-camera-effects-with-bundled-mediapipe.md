@@ -45,6 +45,13 @@ that follows `jawOpen` and a socket that marks where the breath leaves the
 mouth. Everything else is procedural geometry (ADR 0006). Both are built in
 face widths, so a head lands on a face at any distance from the camera, and
 the procedural head stays as the fallback wherever the model can't be decoded.
+The enchanted dragon is the second modelled mask: sculpted in Blender as a
+reference master (1.2M triangles, colour as vertex data, no rig) and turned
+into the runtime asset by `scripts/dragon-lod.mjs`: decimated to 300k
+triangles, quantised and meshopt-compressed, with `EyeAperture_L/R`, a
+`DragonJaw` pivot and a `FireSocket` read off the geometry. A mask with eye
+anchors is scaled so they sit 0.61 tracked face widths apart. Which mask the
+mirror wears is one constant in `overlay/dragon.ts`.
 In a call, each device runs the
 tracker on whatever video it is *displaying* — its own preview and the remote
 stream alike — and the chosen effect travels as a tiny message on the
