@@ -39,19 +39,17 @@ open an effect never download a byte of it, same as the three.js chunk.
 
 **Effects are drawn on top of the video, never burned into the stream.** A
 transparent three.js canvas overlays each `<video>` element and draws to the
-tracked face/hand. The Fire Dragon wears a modelled mask — hand-authored in
-Blender, meshopt-compressed and bundled like the ship meshes, with a jaw node
-that follows `jawOpen` and a socket that marks where the breath leaves the
-mouth. Everything else is procedural geometry (ADR 0006). Both are built in
-face widths, so a head lands on a face at any distance from the camera, and
-the procedural head stays as the fallback wherever the model can't be decoded.
-The enchanted dragon is the second modelled mask: sculpted in Blender as a
-reference master (1.2M triangles, colour as vertex data, no rig) and turned
-into the runtime asset by `scripts/dragon-lod.mjs`: decimated to 300k
-triangles, quantised and meshopt-compressed, with `EyeAperture_L/R`, a
-`DragonJaw` pivot and a `FireSocket` read off the geometry. A mask with eye
-anchors is scaled so they sit 0.61 tracked face widths apart. Which mask the
-mirror wears is one constant in `overlay/dragon.ts`.
+tracked face/hand. The Fire Dragon wears a modelled mask, sculpted in Blender as a reference
+master (1.2M triangles, colour as vertex data, no rig) and turned into the
+runtime asset by `scripts/dragon-lod.mjs`: decimated to 300k triangles,
+quantised and meshopt-compressed like the ship meshes, with `EyeAperture_L/R`,
+a `DragonJaw` pivot that follows `jawOpen` and a `FireSocket` where the breath
+leaves the mouth, all read off the geometry. The mask is scaled so its eye
+apertures sit 0.61 tracked face widths apart. Everything else is procedural
+geometry (ADR 0006). Both are built in face widths, so a head lands on a face
+at any distance from the camera, and the procedural head stays as the fallback
+wherever the model can't be decoded. (The earlier hand-authored mask lives in
+git history.)
 In a call, each device runs the
 tracker on whatever video it is *displaying* — its own preview and the remote
 stream alike — and the chosen effect travels as a tiny message on the
